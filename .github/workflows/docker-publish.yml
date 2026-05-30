@@ -68,31 +68,30 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
       
-      # [SECURITY HOLD] 2026-03-24
-      # aquasecurity/trivy-action@master 에 공급망 공격(악성 코드 삽입)이 보고되었습니다.
-      # 안전한 버전이 공식 확인될 때까지 이 스텝을 비활성화합니다.
-      # 재활성화 전 반드시 다음을 확인하세요:
-      #   1. aquasecurity/trivy-action 공식 릴리스 및 커밋 서명 검증
-      #   2. @master 대신 검증된 커밋 SHA 또는 태그로 고정 (예: @v0.x.x)
-      #   참고: https://github.com/aquasecurity/trivy-action
-      #
-      # - name: Scan for vulnerabilities
-      #   if: github.event_name != 'pull_request'
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     scan-type: 'config'
-      #     scan-ref: './docker'
-      #     format: 'sarif'
-      #     output: 'trivy-results.sarif'
-      #     exit-code: '0'
-      #
-      # - name: Upload scan results (trivy-action 비활성화로 인해 함께 비활성화)
-      #   if: github.event_name != 'pull_request'
-      #   uses: github/codeql-action/upload-sarif@v3
-      #   with:
-      #     sarif_file: 'trivy-results.sarif'
-      #   continue-on-error: true
-      
+      # 보안 노트: 공급망 공격이 보고된 aquasecurity/trivy-action(@master)을 사용하지 않고,
+      # Trivy CLI를 고정 버전으로 직접 설치해 스캔합니다(서드파티 Action 의존 제거).
+      # TRIVY_VERSION은 docker/Dockerfile의 ARG TRIVY_VERSION과 일치시킵니다.
+      - name: Install Trivy (pinned CLI)
+        if: github.event_name != 'pull_request'
+        env:
+          TRIVY_VERSION: v0.58.2
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}"
+          trivy --version
+
+      - name: Scan Dockerfile config with Trivy
+        if: github.event_name != 'pull_request'
+        run: |
+          trivy config --quiet --format sarif --output trivy-results.sarif --exit-code 0 ./docker
+
+      - name: Upload scan results
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
       - name: Output build information
         if: github.event_name != 'pull_request'
         run: |
