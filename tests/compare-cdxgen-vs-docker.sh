@@ -28,6 +28,7 @@ WORK_ROOT="$WORKSPACE/compare"
 rm -rf "$WORK_ROOT"; mkdir -p "$WORK_ROOT"
 
 SCANNER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
+CDXGEN_IMAGE="${CDXGEN_IMAGE:-ghcr.io/cyclonedx/cdxgen:latest}"
 FIXTURES_DIR="${SBOM_FIXTURES_DIR:-$HOME/projects/bd-scan/tests/fixtures/projects}"
 
 if [ ! -d "$FIXTURES_DIR" ]; then
@@ -58,8 +59,8 @@ fi
 
 echo "Fixtures dir : $FIXTURES_DIR"
 echo "Projects     : ${#PROJECT_DIRS[@]}"
-echo "Baseline (A) : $SCANNER_IMAGE  (SKIP_BUILD=true — manifest/lockfile only)"
-echo "Variant  (B) : $SCANNER_IMAGE  (with build env — resolves dependencies)"
+echo "Baseline (A) : $CDXGEN_IMAGE  (cdxgen official — internal install, no extra setup)"
+echo "Variant  (B) : $SCANNER_IMAGE  (our image)"
 echo ""
 
 comp_count() { jq '([.components[]?] | length)' "$1" 2>/dev/null || echo 0; }
@@ -78,17 +79,14 @@ for projdir in "${PROJECT_DIRS[@]}"; do
     name="$(basename "$projdir")"
     printf '  [%-22s] ' "$name"
 
-    # ----- Baseline A: same image, dependency install skipped (SKIP_BUILD=true) -----
-    # cdxgen parses manifests/lockfiles only — no transitive resolution.
+    # ----- Baseline A: cdxgen official image (internal install ON; ships its own toolchain) -----
+    # This is what a user gets WITHOUT our image — plain cdxgen, no extra setup.
     tmpA="$(mktemp -d "$WORK_ROOT/A.XXXXXX")"; cp -R "$projdir/." "$tmpA/" 2>/dev/null || true
     sA=$(date +%s)
-    docker run --rm -v "$tmpA":/src -v "$tmpA":/host-output \
-        -e MODE=SOURCE -e SKIP_BUILD=true -e PROJECT_NAME=cmp -e PROJECT_VERSION=0 \
-        -e UPLOAD_ENABLED=false -e HOST_OUTPUT_DIR=/host-output \
-        "$SCANNER_IMAGE" >/dev/null 2>&1 || true
+    docker run --rm -v "$tmpA":/app "$CDXGEN_IMAGE" -r -o /app/out_bom.json /app >/dev/null 2>&1 || true
     eA=$(date +%s)
     compA=0; cveA=0
-    if [ -f "$tmpA/cmp_0_bom.json" ]; then compA=$(comp_count "$tmpA/cmp_0_bom.json"); cveA=$(vuln_count "$tmpA/cmp_0_bom.json"); fi
+    if [ -f "$tmpA/out_bom.json" ]; then compA=$(comp_count "$tmpA/out_bom.json"); cveA=$(vuln_count "$tmpA/out_bom.json"); fi
     compA=${compA:-0}; cveA=${cveA:-0}; secA=$((eA - sA))
 
     # ----- Variant B: sbom-tools image (build tools + dependency resolution) -----
