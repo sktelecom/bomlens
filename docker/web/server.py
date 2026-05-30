@@ -2,12 +2,15 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# server.py — minimal local web UI wrapper for sbom-tools.
-# Uses only the Python standard library (no extra dependencies); runs inside the
-# scanner Docker image and drives /usr/local/bin/run-scan. Bound to 0.0.0.0:8080
-# so the host can reach it via `docker run -p`.
+# server.py — local web UI backend for sbom-tools (Python stdlib only).
+# Runs inside the scanner image and drives /usr/local/bin/run-scan.
+#   GET  /                -> index.html
+#   GET  /results         -> JSON list of generated artifacts
+#   GET  /file?name=...   -> serve one artifact (path-traversal guarded)
+#   GET  /scan-stream?... -> Server-Sent Events: live scan log + final summary
 import json
 import os
+import re
 import subprocess
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,8 +20,21 @@ OUTPUT_DIR = "/host-output"
 SRC_DIR = "/src"
 PORT = int(os.environ.get("UI_PORT", "8080"))
 
+ARTIFACT_SUFFIXES = (
+    "_bom.json", "_NOTICE.txt", "_NOTICE.html",
+    "_security.json", "_security.md", "_security.html",
+    "_bom.json.sig", "_scancode.json",
+)
 
-def safe_output_path(name: str):
+
+def safe_name(s):
+    """Mirror entrypoint.sh filename normalization."""
+    s = re.sub(r"[^a-zA-Z0-9.-]", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s
+
+
+def safe_output_path(name):
     """Resolve a filename strictly inside OUTPUT_DIR (block path traversal)."""
     base = os.path.basename(name)
     if base != name or not base:
@@ -29,7 +45,51 @@ def safe_output_path(name: str):
     return path
 
 
+def list_results():
+    out = []
+    if os.path.isdir(OUTPUT_DIR):
+        for name in sorted(os.listdir(OUTPUT_DIR)):
+            p = os.path.join(OUTPUT_DIR, name)
+            if os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES):
+                out.append({"name": name, "size": os.path.getsize(p)})
+    return out
+
+
+def security_summary(project, version):
+    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+    p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
+    if not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+    for r in (data.get("Results") or []):
+        for v in (r.get("Vulnerabilities") or []):
+            s = (v.get("Severity") or "UNKNOWN").upper()
+            sev[s] = sev.get(s, 0) + 1
+    sev["TOTAL"] = sum(sev.values())
+    return sev
+
+
+def sbom_summary(project, version):
+    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+    p = os.path.join(OUTPUT_DIR, prefix + "_bom.json")
+    if not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return {"components": len(data.get("components") or [])}
+
+
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"  # close-terminated; fine for one SSE per scan
+
     def _send(self, code, body, ctype="application/json"):
         if isinstance(body, str):
             body = body.encode("utf-8")
@@ -41,44 +101,45 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path in ("/", "/index.html"):
+        path = parsed.path
+        if path in ("/", "/index.html"):
             with open(os.path.join(WEB_DIR, "index.html"), "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
-        elif parsed.path == "/results":
-            self._send(200, json.dumps(self._list_results()))
-        elif parsed.path == "/file":
-            qs = urllib.parse.parse_qs(parsed.query)
-            name = (qs.get("name") or [""])[0]
-            path = safe_output_path(name)
-            if not path or not os.path.isfile(path):
-                self._send(404, json.dumps({"error": "not found"}))
-                return
-            ctype = "text/html; charset=utf-8" if name.endswith(".html") else "text/plain; charset=utf-8"
-            if name.endswith(".json"):
-                ctype = "application/json"
-            with open(path, "rb") as f:
-                self._send(200, f.read(), ctype)
+        elif path == "/results":
+            self._send(200, json.dumps(list_results()))
+        elif path == "/file":
+            self._serve_file(urllib.parse.parse_qs(parsed.query))
+        elif path == "/scan-stream":
+            self._scan_stream(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
-    def do_POST(self):
-        if urllib.parse.urlparse(self.path).path != "/scan":
+    def _serve_file(self, qs):
+        name = (qs.get("name") or [""])[0]
+        path = safe_output_path(name)
+        if not path or not os.path.isfile(path):
             self._send(404, json.dumps({"error": "not found"}))
             return
-        length = int(self.headers.get("Content-Length", "0"))
-        try:
-            payload = json.loads(self.rfile.read(length) or b"{}")
-        except json.JSONDecodeError:
-            self._send(400, json.dumps({"error": "invalid JSON"}))
-            return
+        if name.endswith(".html"):
+            ctype = "text/html; charset=utf-8"
+        elif name.endswith(".json") or name.endswith(".sig"):
+            ctype = "application/json"
+        else:
+            ctype = "text/plain; charset=utf-8"
+        with open(path, "rb") as f:
+            self._send(200, f.read(), ctype)
 
-        project = (payload.get("project") or "").strip()
-        version = (payload.get("version") or "").strip()
-        target = (payload.get("target") or "").strip()
+    def _scan_stream(self, qs):
+        def g(k, d=""):
+            return (qs.get(k) or [d])[0]
+
+        project = g("project").strip()
+        version = g("version").strip()
         if not project or not version:
-            self._send(400, json.dumps({"error": "project and version are required"}))
+            self._send(400, json.dumps({"error": "project and version required"}))
             return
 
+        target = g("target").strip()
         mode = "IMAGE" if target else "SOURCE"
         env = os.environ.copy()
         env.update({
@@ -87,47 +148,54 @@ class Handler(BaseHTTPRequestHandler):
             "PROJECT_VERSION": version,
             "UPLOAD_ENABLED": "false",
             "HOST_OUTPUT_DIR": OUTPUT_DIR,
-            "GENERATE_NOTICE": "true" if payload.get("notice") else "false",
-            "GENERATE_SECURITY": "true" if payload.get("security") else "false",
-            "DEEP_LICENSE": "true" if payload.get("deep_license") else "false",
-            "BYTE_STABLE": "true" if payload.get("byte_stable") else "false",
+            "GENERATE_NOTICE": "true" if g("notice") == "true" else "false",
+            "GENERATE_SECURITY": "true" if g("security") == "true" else "false",
+            "DEEP_LICENSE": "true" if g("deep_license") == "true" else "false",
+            "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
         })
         if mode == "IMAGE":
             env["TARGET_IMAGE"] = target
         cwd = SRC_DIR if mode == "SOURCE" else OUTPUT_DIR
 
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        def sse(event, payload):
+            try:
+                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
+        ok = False
         try:
-            proc = subprocess.run(
-                ["/usr/local/bin/run-scan"],
-                env=env, cwd=cwd,
-                capture_output=True, text=True, timeout=1800,
+            proc = subprocess.Popen(
+                ["/usr/local/bin/run-scan"], env=env, cwd=cwd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
             )
+            for line in proc.stdout:
+                sse("log", json.dumps(line.rstrip("\n")))
+            proc.wait()
             ok = proc.returncode == 0
-            log = (proc.stdout + "\n" + proc.stderr)[-12000:]
-        except subprocess.TimeoutExpired:
-            ok, log = False, "Scan timed out after 30 minutes."
         except Exception as exc:  # noqa: BLE001
-            ok, log = False, f"Failed to launch scan: {exc}"
+            sse("log", json.dumps("Failed to launch scan: %s" % exc))
 
-        self._send(200, json.dumps({"ok": ok, "log": log, "results": self._list_results()}))
+        done = {
+            "ok": ok,
+            "results": list_results(),
+            "sbom": sbom_summary(project, version),
+            "security": security_summary(project, version) if g("security") == "true" else None,
+        }
+        sse("done", json.dumps(done))
 
-    @staticmethod
-    def _list_results():
-        out = []
-        if os.path.isdir(OUTPUT_DIR):
-            for name in sorted(os.listdir(OUTPUT_DIR)):
-                p = os.path.join(OUTPUT_DIR, name)
-                if os.path.isfile(p) and (
-                    name.endswith(("_bom.json", "_NOTICE.txt", "_NOTICE.html",
-                                   "_security.json", "_security.md", "_security.html"))
-                ):
-                    out.append({"name": name, "size": os.path.getsize(p)})
-        return out
-
-    def log_message(self, *args):  # quiet default logging
+    def log_message(self, *args):
         pass
 
 
 if __name__ == "__main__":
-    print(f"[ui] SBOM Tools Web UI listening on 0.0.0.0:{PORT}", flush=True)
+    print("[ui] SBOM Tools Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

@@ -5,117 +5,255 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SBOM Tools</title>
 <style>
- :root{--blue:#2563eb;--green:#0b5;--bg:#f6f7f9;}
- *{box-sizing:border-box;}
- body{font-family:system-ui,Arial,sans-serif;margin:0;background:var(--bg);color:#1a1a1a;}
- header{background:#0f172a;color:#fff;padding:1rem 1.5rem;}
- header h1{margin:0;font-size:1.25rem;}
- header p{margin:.25rem 0 0;color:#94a3b8;font-size:.85rem;}
- main{max-width:900px;margin:1.5rem auto;padding:0 1rem;}
- .card{background:#fff;border:1px solid #e3e3e3;border-radius:8px;padding:1.2rem;margin-bottom:1.2rem;}
- label{display:block;font-weight:600;font-size:.85rem;margin:.6rem 0 .25rem;}
- input[type=text]{width:100%;padding:.5rem;border:1px solid #ccc;border-radius:5px;font-size:.9rem;}
- .row{display:flex;gap:1rem;flex-wrap:wrap;}
- .row>div{flex:1;min-width:200px;}
- .checks{display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:.8rem;}
- .checks label{font-weight:400;display:flex;align-items:center;gap:.35rem;}
- button{background:var(--blue);color:#fff;border:0;border-radius:6px;padding:.6rem 1.4rem;font-size:.95rem;cursor:pointer;margin-top:1rem;}
- button:disabled{opacity:.5;cursor:default;}
- pre{background:#0f172a;color:#d1fae5;padding:1rem;border-radius:6px;overflow:auto;max-height:340px;font-size:.8rem;white-space:pre-wrap;}
- table{width:100%;border-collapse:collapse;font-size:.85rem;}
- th,td{border:1px solid #e3e3e3;padding:.45rem .6rem;text-align:left;}
- th{background:#f3f4f6;}
- a{color:var(--blue);}
- .hint{color:#666;font-size:.8rem;margin-top:.3rem;}
- .status{font-weight:600;margin-left:.5rem;}
+ :root{
+   --bg:#f1f5f9; --surface:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+   --primary:#2563eb; --primary-d:#1d4ed8; --ring:rgba(37,99,235,.25);
+   --crit:#dc2626; --high:#ea580c; --med:#d97706; --low:#2563eb; --unk:#64748b; --ok:#16a34a;
+   --radius:12px; --shadow:0 1px 2px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.06);
+ }
+ *{box-sizing:border-box}
+ html{-webkit-font-smoothing:antialiased}
+ body{margin:0;background:var(--bg);color:var(--ink);
+   font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;line-height:1.5}
+ header{background:linear-gradient(180deg,#0f172a,#1e293b);color:#fff;padding:1.1rem 1.5rem;
+   display:flex;align-items:center;justify-content:space-between;gap:1rem}
+ header .brand{display:flex;align-items:center;gap:.7rem}
+ header .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#3b82f6,#06b6d4);
+   display:grid;place-items:center;font-weight:800;font-size:1rem}
+ header h1{margin:0;font-size:1.15rem;letter-spacing:-.01em}
+ header p{margin:.1rem 0 0;color:#94a3b8;font-size:.82rem}
+ .lang{display:flex;gap:.25rem;background:rgba(255,255,255,.08);border-radius:999px;padding:.2rem}
+ .lang button{all:unset;cursor:pointer;font-size:.78rem;color:#cbd5e1;padding:.25rem .6rem;border-radius:999px}
+ .lang button.on{background:#fff;color:#0f172a;font-weight:600}
+ main{max-width:980px;margin:1.6rem auto;padding:0 1.1rem;display:grid;gap:1.1rem}
+ .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+   box-shadow:var(--shadow);padding:1.3rem}
+ .card h2{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+ .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+ @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+ label.fld{display:block;font-weight:600;font-size:.82rem;margin:0 0 .3rem}
+ .req{color:var(--crit)}
+ input[type=text]{width:100%;padding:.6rem .7rem;border:1px solid var(--line);border-radius:9px;
+   font-size:.92rem;background:#fff;transition:border .15s,box-shadow .15s}
+ input[type=text]:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 4px var(--ring)}
+ input.invalid{border-color:var(--crit);box-shadow:0 0 0 4px rgba(220,38,38,.15)}
+ .hint{color:var(--muted);font-size:.78rem;margin:.35rem 0 0}
+ .err{color:var(--crit);font-size:.76rem;margin:.3rem 0 0;min-height:1em}
+ .opts{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+ .opt{display:flex;align-items:center;gap:.45rem;border:1px solid var(--line);border-radius:999px;
+   padding:.4rem .8rem;font-size:.84rem;cursor:pointer;user-select:none;background:#fff}
+ .opt input{accent-color:var(--primary)}
+ .opt.on{border-color:var(--primary);background:#eff6ff;color:var(--primary-d)}
+ .actions{display:flex;align-items:center;gap:.8rem;margin-top:1.2rem}
+ button.run{all:unset;cursor:pointer;background:var(--primary);color:#fff;font-weight:600;font-size:.95rem;
+   padding:.7rem 1.5rem;border-radius:10px;transition:background .15s,transform .05s}
+ button.run:hover{background:var(--primary-d)} button.run:active{transform:translateY(1px)}
+ button.run[disabled]{opacity:.55;cursor:default}
+ .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+   display:inline-block;vertical-align:-3px;margin-right:.4rem;animation:sp .7s linear infinite}
+ @keyframes sp{to{transform:rotate(360deg)}}
+ .status{font-size:.86rem;font-weight:600}
+ .status.run{color:var(--primary)} .status.ok{color:var(--ok)} .status.bad{color:var(--crit)}
+ .hidden{display:none!important}
+ /* summary */
+ .sumrow{display:flex;gap:.7rem;flex-wrap:wrap}
+ .stat{flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;background:#fff}
+ .stat .n{font-size:1.6rem;font-weight:800;line-height:1}
+ .stat .l{font-size:.74rem;color:var(--muted);margin-top:.25rem;text-transform:uppercase;letter-spacing:.04em}
+ .sev{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.2rem}
+ .badge{color:#fff;border-radius:999px;padding:.3rem .7rem;font-size:.8rem;font-weight:700}
+ .b-crit{background:var(--crit)} .b-high{background:var(--high)} .b-med{background:var(--med)}
+ .b-low{background:var(--low)} .b-unk{background:var(--unk)}
+ /* log */
+ .logwrap{position:relative}
+ pre.log{background:#0b1220;color:#9be7c4;padding:1rem;border-radius:10px;overflow:auto;max-height:320px;
+   font:.78rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;margin:0}
+ table{width:100%;border-collapse:collapse;font-size:.85rem}
+ th,td{border-bottom:1px solid var(--line);padding:.55rem .5rem;text-align:left}
+ th{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em}
+ td.act a{color:var(--primary);text-decoration:none;font-weight:600} td.act a:hover{text-decoration:underline}
+ .empty{color:var(--muted);font-size:.85rem;padding:.6rem 0}
 </style>
 </head>
 <body>
 <header>
-  <h1>SBOM Tools</h1>
-  <p>단일 프로젝트의 SBOM · 오픈소스 고지문 · 보안 보고서를 한 번에 생성</p>
+  <div class="brand">
+    <div class="logo">SB</div>
+    <div>
+      <h1>SBOM Tools</h1>
+      <p data-i18n="subtitle"></p>
+    </div>
+  </div>
+  <div class="lang">
+    <button id="lang-ko" class="on" onclick="setLang('ko')">한국어</button>
+    <button id="lang-en" onclick="setLang('en')">EN</button>
+  </div>
 </header>
+
 <main>
-  <div class="card">
-    <div class="row">
+  <!-- Form -->
+  <section class="card">
+    <h2 data-i18n="formTitle"></h2>
+    <div class="grid2">
       <div>
-        <label for="project">프로젝트 이름 *</label>
-        <input type="text" id="project" placeholder="MyApp">
+        <label class="fld" for="project" data-i18n="project"></label>
+        <input type="text" id="project" placeholder="MyApp" autocomplete="off">
+        <div class="err" id="err-project"></div>
       </div>
       <div>
-        <label for="version">버전 *</label>
-        <input type="text" id="version" placeholder="1.0.0">
+        <label class="fld" for="version" data-i18n="version"></label>
+        <input type="text" id="version" placeholder="1.0.0" autocomplete="off">
+        <div class="err" id="err-version"></div>
       </div>
     </div>
-    <label for="target">타겟 (비우면 현재 디렉토리 소스 스캔)</label>
-    <input type="text" id="target" placeholder="예: nginx:latest (Docker 이미지)">
-    <p class="hint">비워두면 마운트된 소스 코드를 스캔합니다. Docker 이미지명을 입력하면 이미지를 스캔합니다.</p>
-    <div class="checks">
-      <label><input type="checkbox" id="notice" checked> 고지문(NOTICE)</label>
-      <label><input type="checkbox" id="security" checked> 보안 보고서(Trivy)</label>
-      <label><input type="checkbox" id="deep_license"> 정밀 라이선스(scancode)</label>
-      <label><input type="checkbox" id="byte_stable"> 결정론적 출력</label>
+    <div style="margin-top:.6rem">
+      <label class="fld" for="target" data-i18n="target"></label>
+      <input type="text" id="target" placeholder="nginx:latest" autocomplete="off">
+      <p class="hint" data-i18n="targetHint"></p>
     </div>
-    <button id="run">스캔 실행</button>
-    <span class="status" id="status"></span>
-  </div>
+    <div class="opts" id="opts">
+      <label class="opt"><input type="checkbox" id="notice" checked> <span data-i18n="optNotice"></span></label>
+      <label class="opt"><input type="checkbox" id="security" checked> <span data-i18n="optSecurity"></span></label>
+      <label class="opt"><input type="checkbox" id="deep_license"> <span data-i18n="optDeep"></span></label>
+      <label class="opt"><input type="checkbox" id="byte_stable"> <span data-i18n="optStable"></span></label>
+    </div>
+    <div class="actions">
+      <button class="run" id="run" data-i18n="run"></button>
+      <span class="status" id="status"></span>
+    </div>
+  </section>
 
-  <div class="card" id="logCard" style="display:none">
-    <h3>실행 로그</h3>
-    <pre id="log"></pre>
-  </div>
+  <!-- Summary (after scan) -->
+  <section class="card hidden" id="summaryCard">
+    <h2 data-i18n="summaryTitle"></h2>
+    <div class="sumrow">
+      <div class="stat"><div class="n" id="compN">–</div><div class="l" data-i18n="components"></div></div>
+      <div class="stat" style="flex:2">
+        <div class="l" data-i18n="vulns" style="margin:0 0 .5rem"></div>
+        <div class="sev" id="sevBadges"><span class="empty" data-i18n="noSec"></span></div>
+      </div>
+    </div>
+  </section>
 
-  <div class="card">
-    <h3>생성된 결과물</h3>
-    <table id="results"><tr><th>파일</th><th>크기</th><th>보기 / 다운로드</th></tr></table>
-  </div>
+  <!-- Live log -->
+  <section class="card hidden" id="logCard">
+    <h2 data-i18n="logTitle"></h2>
+    <div class="logwrap"><pre class="log" id="log"></pre></div>
+  </section>
+
+  <!-- Results -->
+  <section class="card">
+    <h2 data-i18n="resultsTitle"></h2>
+    <table>
+      <thead><tr><th data-i18n="colFile"></th><th data-i18n="colSize"></th><th data-i18n="colView"></th></tr></thead>
+      <tbody id="results"></tbody>
+    </table>
+    <div class="empty hidden" id="noResults" data-i18n="noResults"></div>
+  </section>
 </main>
 
 <script>
+const I18N = {
+  ko:{ subtitle:'단일 프로젝트의 SBOM · 고지문 · 보안 보고서를 한 번에',
+    formTitle:'스캔 설정', project:'프로젝트 이름', version:'버전', target:'타겟 (선택)',
+    targetHint:'비우면 현재 디렉토리 소스를 스캔합니다. Docker 이미지명을 넣으면 이미지를 스캔합니다.',
+    optNotice:'고지문', optSecurity:'보안 보고서', optDeep:'정밀 라이선스', optStable:'결정론적 출력',
+    run:'스캔 실행', running:'스캔 중…', done:'완료', failed:'실패',
+    reqProject:'프로젝트 이름은 필수입니다', reqVersion:'버전은 필수입니다',
+    summaryTitle:'요약', components:'컴포넌트', vulns:'취약점 (Trivy)', noSec:'보안 보고서 미생성',
+    logTitle:'실행 로그', resultsTitle:'생성된 결과물', colFile:'파일', colSize:'크기', colView:'보기 / 다운로드',
+    open:'열기', download:'다운로드', noResults:'아직 생성된 결과물이 없습니다.' },
+  en:{ subtitle:'SBOM · OSS notice · security report for a single project, in one run',
+    formTitle:'Scan settings', project:'Project name', version:'Version', target:'Target (optional)',
+    targetHint:'Leave empty to scan the current directory source. Enter a Docker image name to scan an image.',
+    optNotice:'Notice', optSecurity:'Security report', optDeep:'Deep license', optStable:'Deterministic',
+    run:'Run scan', running:'Scanning…', done:'Done', failed:'Failed',
+    reqProject:'Project name is required', reqVersion:'Version is required',
+    summaryTitle:'Summary', components:'Components', vulns:'Vulnerabilities (Trivy)', noSec:'No security report',
+    logTitle:'Live log', resultsTitle:'Generated artifacts', colFile:'File', colSize:'Size', colView:'View / Download',
+    open:'Open', download:'Download', noResults:'No artifacts generated yet.' }
+};
+let lang = 'ko';
 const $ = id => document.getElementById(id);
+const t = k => (I18N[lang][k] || k);
 
-async function refreshResults() {
-  const r = await fetch('/results').then(x => x.json()).catch(() => []);
-  const rows = ['<tr><th>파일</th><th>크기</th><th>보기 / 다운로드</th></tr>'];
-  for (const f of r) {
-    const url = '/file?name=' + encodeURIComponent(f.name);
-    rows.push(`<tr><td>${f.name}</td><td>${(f.size/1024).toFixed(1)} KB</td>`
-      + `<td><a href="${url}" target="_blank">열기</a> · `
-      + `<a href="${url}" download="${f.name}">다운로드</a></td></tr>`);
-  }
-  $('results').innerHTML = rows.join('');
+function setLang(l){
+  lang = l; document.documentElement.lang = l;
+  $('lang-ko').classList.toggle('on', l==='ko');
+  $('lang-en').classList.toggle('on', l==='en');
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  refreshResults();
 }
 
-$('run').addEventListener('click', async () => {
-  const project = $('project').value.trim();
-  const version = $('version').value.trim();
-  if (!project || !version) { alert('프로젝트 이름과 버전은 필수입니다.'); return; }
-  const body = {
-    project, version,
-    target: $('target').value.trim(),
-    notice: $('notice').checked,
-    security: $('security').checked,
-    deep_license: $('deep_license').checked,
-    byte_stable: $('byte_stable').checked,
-  };
-  $('run').disabled = true;
-  $('status').textContent = '스캔 중… (수 분 소요될 수 있습니다)';
-  $('logCard').style.display = 'block';
-  $('log').textContent = '실행 중…';
-  try {
-    const res = await fetch('/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(x => x.json());
-    $('log').textContent = res.log || '(로그 없음)';
-    $('status').textContent = res.ok ? '✅ 완료' : '❌ 실패';
-  } catch (e) {
-    $('log').textContent = String(e);
-    $('status').textContent = '❌ 오류';
-  } finally {
-    $('run').disabled = false;
-    refreshResults();
-  }
+// toggle "on" style on option chips
+document.querySelectorAll('.opt input').forEach(cb=>{
+  const sync=()=>cb.closest('.opt').classList.toggle('on', cb.checked); cb.addEventListener('change',sync); sync();
 });
 
-refreshResults();
+async function refreshResults(){
+  let r=[]; try{ r = await fetch('/results').then(x=>x.json()); }catch(e){}
+  const tb=$('results'); tb.innerHTML='';
+  $('noResults').classList.toggle('hidden', r.length>0);
+  for(const f of r){
+    const url='/file?name='+encodeURIComponent(f.name);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${f.name}</td><td>${(f.size/1024).toFixed(1)} KB</td>`
+      +`<td class="act"><a href="${url}" target="_blank">${t('open')}</a> · `
+      +`<a href="${url}" download="${f.name}">${t('download')}</a></td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function validate(){
+  let ok=true;
+  for(const f of ['project','version']){
+    const v=$(f).value.trim();
+    $('err-'+f).textContent = v ? '' : t('req'+f[0].toUpperCase()+f.slice(1));
+    $(f).classList.toggle('invalid', !v); if(!v) ok=false;
+  }
+  return ok;
+}
+['project','version'].forEach(f=>$(f).addEventListener('input',()=>{ if($(f).value.trim()){ $(f).classList.remove('invalid'); $('err-'+f).textContent=''; }}));
+
+function renderSecurity(sec){
+  const box=$('sevBadges');
+  if(!sec){ box.innerHTML=`<span class="empty">${t('noSec')}</span>`; return; }
+  const map=[['CRITICAL','b-crit'],['HIGH','b-high'],['MEDIUM','b-med'],['LOW','b-low'],['UNKNOWN','b-unk']];
+  box.innerHTML = map.map(([k,c])=>`<span class="badge ${c}">${k[0]+k.slice(1).toLowerCase()} ${sec[k]||0}</span>`).join('');
+}
+
+$('run').addEventListener('click', ()=>{
+  if(!validate()) return;
+  const qs = new URLSearchParams({
+    project:$('project').value.trim(), version:$('version').value.trim(), target:$('target').value.trim(),
+    notice:$('notice').checked, security:$('security').checked,
+    deep_license:$('deep_license').checked, byte_stable:$('byte_stable').checked,
+  });
+  $('run').disabled=true;
+  $('status').className='status run'; $('status').innerHTML=`<span class="spin"></span>${t('running')}`;
+  $('logCard').classList.remove('hidden'); $('summaryCard').classList.add('hidden');
+  const logEl=$('log'); logEl.textContent='';
+
+  const es = new EventSource('/scan-stream?'+qs.toString());
+  es.addEventListener('log', e=>{
+    logEl.textContent += JSON.parse(e.data)+'\n'; logEl.scrollTop=logEl.scrollHeight;
+  });
+  es.addEventListener('done', e=>{
+    const d = JSON.parse(e.data);
+    $('status').className = 'status '+(d.ok?'ok':'bad');
+    $('status').textContent = d.ok ? '✓ '+t('done') : '✕ '+t('failed');
+    $('compN').textContent = d.sbom ? d.sbom.components : '–';
+    renderSecurity(d.security);
+    $('summaryCard').classList.remove('hidden');
+    $('run').disabled=false; es.close(); refreshResults();
+  });
+  es.onerror = ()=>{
+    $('status').className='status bad'; $('status').textContent='✕ '+t('failed');
+    $('run').disabled=false; es.close();
+  };
+});
+
+setLang('ko');
 </script>
 </body>
 </html>
