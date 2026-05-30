@@ -20,7 +20,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # --------------------------------------------------------
 ARG CDXGEN_VERSION=11.2.2
 ARG SYFT_VERSION=v1.18.1
-ARG TRIVY_VERSION=v0.58.2
+ARG TRIVY_VERSION=v0.70.0
 ARG SCANCODE_VERSION=32.3.0
 ARG GO_VERSION=1.23.4
 ARG DOTNET_CHANNEL=8.0
@@ -43,8 +43,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install --no-cache-dir --break-system-packages poetry pipenv
 
-# Node package managers: enable yarn & pnpm via corepack (bundled with node:20)
-RUN corepack enable && corepack prepare yarn@stable pnpm@latest --activate
+# Node package managers: yarn via corepack, pnpm via npm (corepack multi-prepare
+# is unreliable; install pnpm explicitly so `pnpm` resolves at runtime)
+RUN corepack enable yarn && corepack prepare yarn@stable --activate \
+    && npm install -g pnpm@9
 
 # Single JDK: Java 17 LTS
 RUN mkdir -p /etc/apt/keyrings \
@@ -111,10 +113,21 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && apt-get install -y --no-install-recommends docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-# SBOM + vulnerability tools (pinned)
+# SBOM tools (pinned)
 RUN npm install -g "@cyclonedx/cdxgen@${CDXGEN_VERSION}" \
-    && curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin "${SYFT_VERSION}" \
-    && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "${TRIVY_VERSION}"
+    && curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin "${SYFT_VERSION}"
+
+# Trivy (pinned official release tarball; contrib/install.sh is unreliable on arm64)
+RUN TRIVY_VER_NUM="${TRIVY_VERSION#v}" \
+    && case "${TARGETARCH}" in \
+         amd64) TRIVY_ARCH="Linux-64bit" ;; \
+         arm64) TRIVY_ARCH="Linux-ARM64" ;; \
+         *)     TRIVY_ARCH="Linux-64bit" ;; \
+       esac \
+    && wget -q "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VER_NUM}_${TRIVY_ARCH}.tar.gz" -O /tmp/trivy.tgz \
+    && tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy \
+    && rm /tmp/trivy.tgz \
+    && trivy --version
 
 # scancode-toolkit (opt-in deep license detection: --build-arg SBOM_DEEP_LICENSE=true) — heavy
 RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
