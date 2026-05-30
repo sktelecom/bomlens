@@ -115,6 +115,30 @@ Components (1):
 
 ---
 
+## SBOM 서명 (`--sign`)
+
+cosign으로 SBOM에 detached 서명을 만들어 공급망 신뢰를 확보합니다. 오프라인 키 기반 서명(`--tlog-upload=false`)이라 네트워크·OIDC가 필요 없습니다.
+
+```bash
+# 1) 키 생성 (최초 1회). 무비밀번호 키는 COSIGN_PASSWORD="" 로 생성
+docker run --rm -v "$PWD":/keys -w /keys -e COSIGN_PASSWORD="" \
+  --entrypoint cosign ghcr.io/sktelecom/sbom-scanner:latest generate-key-pair
+
+# 2) 서명하며 스캔 (COSIGN_KEY=개인키 경로, COSIGN_PASSWORD=키 비밀번호)
+COSIGN_KEY="$PWD/cosign.key" COSIGN_PASSWORD="" \
+  ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --sign --generate-only
+
+# 3) 검증
+docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
+  ghcr.io/sktelecom/sbom-scanner:latest \
+  verify-blob --key cosign.pub --signature MyApp_1.0.0_bom.json.sig \
+  --insecure-ignore-tlog MyApp_1.0.0_bom.json
+```
+
+개인키는 컨테이너에 **읽기 전용**으로 마운트됩니다. 추가 산출물: `MyApp_1.0.0_bom.json.sig`
+
+---
+
 ## 웹 UI (`--ui`)
 
 CLI 없이 브라우저에서 스캔합니다. UI 서버는 스캐너 이미지에 내장되어 있어 추가 설치가 필요 없습니다.
