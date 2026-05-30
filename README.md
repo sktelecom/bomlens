@@ -8,13 +8,15 @@
 
 ## Overview
 
-SBOM Tools automatically generates Software Bill of Materials (SBOM) in [CycloneDX 1.4](https://cyclonedx.org/) format for multiple programming languages and environments. Originally developed by SK Telecom for supply chain security management, now available as open source.
+SBOM Tools automatically generates Software Bill of Materials (SBOM) in [CycloneDX 1.6](https://cyclonedx.org/) format for multiple programming languages and environments, and can additionally produce an open-source notice and a Trivy-based security report. Originally developed by SK Telecom for supply chain security management, now available as open source.
 
 ### Key Features
 
-- **Multi-language Support**: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++
+- **Multi-language Support**: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Android opt-in)
 - **Versatile Analysis Modes**: Source code, Docker images, binary files, RootFS
-- **Standard Format**: CycloneDX 1.4
+- **One-shot Outputs**: SBOM + open-source notice + Trivy security report (`--all`)
+- **Browser UI**: `--ui` flag launches a local web interface for non-CLI users
+- **Standard Format**: CycloneDX 1.6
 - **Docker-based**: No language-specific runtime installation required on the host
 - **Cross-platform**: Linux (AMD64, ARM64), macOS, Windows (Git Bash)
 
@@ -64,9 +66,19 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 # Scan a binary file
 ./scripts/scan-sbom.sh --project "MyFirmware" --version "2.0.0" \
   --target "./firmware.bin" --generate-only
+
+# Generate SBOM + open-source notice + security report in one run
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
+
+# Launch the browser-based UI (no CLI knowledge required)
+./scripts/scan-sbom.sh --ui          # macOS/Linux
+scripts\sbom-ui.bat                   # Windows (double-click)
 ```
 
-Output file: `{ProjectName}_{Version}_bom.json` (CycloneDX 1.4 JSON)
+Output files (CycloneDX 1.6 JSON):
+- `{ProjectName}_{Version}_bom.json` — SBOM
+- `{ProjectName}_{Version}_NOTICE.{txt,html}` — open-source notice (`--notice`)
+- `{ProjectName}_{Version}_security.{json,md,html}` — Trivy security report (`--security`)
 
 ## Architecture
 
@@ -97,6 +109,18 @@ Output file: `{ProjectName}_{Version}_bom.json` (CycloneDX 1.4 JSON)
 
 See [docs/architecture.md](docs/architecture.md) for details (Korean).
 
+## Why a Docker image? (cdxgen alone vs Docker scan)
+
+Running `cdxgen` directly on a host that has no build tools only parses manifests, so **transitive dependencies are frequently missed**. The sbom-tools image installs each language's build tools and resolves dependencies *before* running cdxgen, which surfaces far more components — and therefore far more detectable vulnerabilities.
+
+Reproduce the comparison yourself:
+
+```bash
+./tests/compare-cdxgen-vs-docker.sh   # writes tests/test-workspace/compare-result.csv
+```
+
+The script scans fixture projects with **(A) cdxgen alone** and **(B) the sbom-tools image**, reporting component count, vulnerability count, and scan time for each. See [docs/direction-study.md](docs/direction-study.md) for methodology and reference data.
+
 ## Documentation (한국어)
 
 | 문서 | 설명 |
@@ -105,6 +129,7 @@ See [docs/architecture.md](docs/architecture.md) for details (Korean).
 | [사용 가이드](docs/usage-guide.md) | 전체 옵션, 분석 모드, CI/CD 통합, 트러블슈팅 |
 | [예제 가이드](docs/examples-guide.md) | 언어별 예제 프로젝트 실습 |
 | [아키텍처](docs/architecture.md) | 시스템 구조 및 설계 원칙 |
+| [방향성 조사 보고서](docs/direction-study.md) | Docker 스캔의 가치, 커버리지, 고지문·보안보고서·UI 로드맵 |
 | [테스트 가이드](docs/contributing/testing-guide.md) | 테스트 작성 및 실행 |
 | [패키지 매니저 추가](docs/contributing/package-manager-guide.md) | 새로운 언어/패키지 매니저 지원 추가 |
 | [기여하기](CONTRIBUTING.md) | 기여 절차 및 코딩 규칙 |
