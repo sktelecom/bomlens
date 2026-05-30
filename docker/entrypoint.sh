@@ -311,7 +311,8 @@ fi
 if [ "${SIGN_SBOM:-false}" = "true" ]; then
     if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
         echo "[INFO] Signing SBOM with cosign..."
-        if cosign sign-blob --yes --key "$COSIGN_KEY" --output-signature "${OUTPUT_FILE}.sig" "$OUTPUT_FILE"; then
+        if cosign sign-blob --yes --tlog-upload=false --key "$COSIGN_KEY" \
+               --output-signature "${OUTPUT_FILE}.sig" "$OUTPUT_FILE"; then
             ARTIFACTS+=("${OUTPUT_FILE}.sig")
         fi
     else

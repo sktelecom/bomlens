@@ -25,16 +25,19 @@ ARG SCANCODE_VERSION=32.3.0
 ARG GO_VERSION=1.23.4
 ARG DOTNET_CHANNEL=8.0
 ARG GRADLE_VERSION=8.5
+ARG COSIGN_VERSION=v2.4.1
 # Opt-in heavy components (kept out of the default image)
 ARG SBOM_ANDROID_SDK=false
 ARG SBOM_DEEP_LICENSE=false
 # buildx-provided target architecture (amd64 / arm64)
 ARG TARGETARCH=amd64
 
-# Essential tools only (no build-essential)
+# Essential tools + build toolchain (needed for native extensions, e.g. Ruby
+# gems with C extensions, node-gyp, some Python wheels — required for accurate
+# dependency resolution before SBOM generation)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl bash jq git wget ca-certificates gnupg software-properties-common \
-    file procps unzip xz-utils \
+    file procps unzip xz-utils build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 3 (+ poetry / pipenv via pip; PEP668 override on slim image)
@@ -128,6 +131,11 @@ RUN TRIVY_VER_NUM="${TRIVY_VERSION#v}" \
     && tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy \
     && rm /tmp/trivy.tgz \
     && trivy --version
+
+# Cosign (pinned) for optional SBOM signing (--sign)
+RUN curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${TARGETARCH}" -o /usr/local/bin/cosign \
+    && chmod +x /usr/local/bin/cosign \
+    && cosign version
 
 # scancode-toolkit (opt-in deep license detection: --build-arg SBOM_DEEP_LICENSE=true) — heavy
 RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \

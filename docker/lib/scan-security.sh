@@ -40,6 +40,12 @@ if ! trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$SBOM" 2>/
     echo '{"Results":[]}' > "$JSON"
 fi
 
+# Ensure .Results exists even when Trivy omits it (e.g. SBOM with no components).
+if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
+    tmp_r="$(mktemp)"
+    if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
+fi
+
 # Flatten findings: id, pkg, version, severity, fixed, title.
 FINDINGS=$(jq -r '
   [ .Results[]?.Vulnerabilities[]? | {

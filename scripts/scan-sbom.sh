@@ -227,6 +227,20 @@ else
     UPLOAD_VAR="true"
 fi
 
+# Cosign signing: mount the private key (COSIGN_KEY env = host path) read-only.
+SIGN_MOUNT=""
+SIGN_ENV=""
+if [ "$SIGN_SBOM" = "true" ]; then
+    if [ -n "${COSIGN_KEY:-}" ] && [ -f "${COSIGN_KEY}" ]; then
+        COSIGN_KEY_ABS="$(cd "$(dirname "$COSIGN_KEY")" && pwd)/$(basename "$COSIGN_KEY")"
+        SIGN_MOUNT="-v \"$COSIGN_KEY_ABS\":/cosign.key:ro"
+        SIGN_ENV="-e COSIGN_KEY=/cosign.key -e COSIGN_PASSWORD=\"${COSIGN_PASSWORD:-}\""
+    else
+        echo "[WARN] --sign requires COSIGN_KEY to point to a cosign private key file. Skipping signing."
+        SIGN_SBOM="false"
+    fi
+fi
+
 # ========================================================
 # Run Docker container
 # ========================================================
@@ -242,6 +256,8 @@ echo "=========================================="
 eval docker run --rm \
     $VOLUME_MOUNTS \
     $CACHE_MOUNTS \
+    $SIGN_MOUNT \
+    $SIGN_ENV \
     --add-host=host.docker.internal:host-gateway \
     -e MODE=\"$MODE\" \
     $ENV_VARS \
