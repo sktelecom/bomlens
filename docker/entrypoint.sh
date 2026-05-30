@@ -42,6 +42,13 @@ fi
 
 # Validate required environment variables
 SCAN_MODE="${MODE:-SOURCE}"
+
+# UI mode needs no project metadata — hand off to the web server immediately.
+if [ "$SCAN_MODE" = "UI" ]; then
+    echo "[INFO] Starting SBOM Tools Web UI on port ${UI_PORT:-8080}..."
+    exec python3 /usr/local/lib/sbom-web/server.py
+fi
+
 if [ -z "$PROJECT_NAME" ] || [ -z "$PROJECT_VERSION" ]; then
     echo "[ERROR] PROJECT_NAME and PROJECT_VERSION are required."
     exit 1
@@ -63,12 +70,6 @@ export GRADLE_OPTS="-Dorg.gradle.daemon=false"
 # Execute by mode
 # ========================================================
 case "$SCAN_MODE" in
-    UI)
-        # Launch the local web UI wrapper (served from inside the container).
-        echo "[INFO] Starting SBOM Tools Web UI on port ${UI_PORT:-8080}..."
-        exec python3 /usr/local/lib/sbom-web/server.py
-        ;;
-
     IMAGE)
         # Docker image analysis
         if [ -z "$TARGET_IMAGE" ]; then
