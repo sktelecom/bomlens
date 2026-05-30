@@ -29,6 +29,11 @@ set GENERATE_ONLY=false
 set TARGET=
 set PROJECT_NAME=
 set PROJECT_VERSION=
+set GENERATE_NOTICE=false
+set GENERATE_SECURITY=false
+set DEEP_LICENSE=false
+set SIGN_SBOM=false
+set BYTE_STABLE=false
 
 REM ========================================================
 REM Parse arguments
@@ -58,6 +63,37 @@ if "%~1"=="--generate-only" (
     shift
     goto parse_args
 )
+if "%~1"=="--notice" (
+    set GENERATE_NOTICE=true
+    shift
+    goto parse_args
+)
+if "%~1"=="--security" (
+    set GENERATE_SECURITY=true
+    shift
+    goto parse_args
+)
+if "%~1"=="--all" (
+    set GENERATE_NOTICE=true
+    set GENERATE_SECURITY=true
+    shift
+    goto parse_args
+)
+if "%~1"=="--deep-license" (
+    set DEEP_LICENSE=true
+    shift
+    goto parse_args
+)
+if "%~1"=="--byte-stable" (
+    set BYTE_STABLE=true
+    shift
+    goto parse_args
+)
+if "%~1"=="--sign" (
+    set SIGN_SBOM=true
+    shift
+    goto parse_args
+)
 if "%~1"=="--help" (
     call :show_help
     exit /b 0
@@ -77,6 +113,12 @@ echo                          - Image name (e.g., nginx:latest): Docker image
 echo                          - File path (e.g., firmware.bin): Binary file
 echo                          - Directory (e.g., .\rootfs\): RootFS directory
 echo   --generate-only        Save locally without uploading
+echo   --notice               Also generate open-source NOTICE (txt + html)
+echo   --security             Also generate Trivy security report (json + md + html)
+echo   --all                  Shorthand for --notice --security
+echo   --deep-license         Deep 1st-party license detection via scancode (opt-in)
+echo   --byte-stable          Deterministic SBOM output
+echo   --sign                 Sign the SBOM with cosign (requires COSIGN_KEY)
 echo   --help                 Show this help message
 echo.
 echo Environment Variables:
@@ -221,6 +263,11 @@ docker run --rm ^
     -e MODE="%MODE%" ^
     %ENV_VARS% ^
     -e UPLOAD_ENABLED="%UPLOAD_VAR%" ^
+    -e GENERATE_NOTICE="%GENERATE_NOTICE%" ^
+    -e GENERATE_SECURITY="%GENERATE_SECURITY%" ^
+    -e DEEP_LICENSE="%DEEP_LICENSE%" ^
+    -e SIGN_SBOM="%SIGN_SBOM%" ^
+    -e BYTE_STABLE="%BYTE_STABLE%" ^
     -e HOST_OUTPUT_DIR="/host-output" ^
     -e PROJECT_NAME="%PROJECT_NAME%" ^
     -e PROJECT_VERSION="%PROJECT_VERSION%" ^

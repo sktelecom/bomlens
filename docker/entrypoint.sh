@@ -63,6 +63,12 @@ export GRADLE_OPTS="-Dorg.gradle.daemon=false"
 # Execute by mode
 # ========================================================
 case "$SCAN_MODE" in
+    UI)
+        # Launch the local web UI wrapper (served from inside the container).
+        echo "[INFO] Starting SBOM Tools Web UI on port ${UI_PORT:-8080}..."
+        exec python3 /usr/local/lib/sbom-web/server.py
+        ;;
+
     IMAGE)
         # Docker image analysis
         if [ -z "$TARGET_IMAGE" ]; then
@@ -103,7 +109,7 @@ case "$SCAN_MODE" in
             cat > "$OUTPUT_FILE" <<EOF
 {
   "bomFormat": "CycloneDX",
-  "specVersion": "1.4",
+  "specVersion": "1.6",
   "version": 1,
   "metadata": {
     "component": {
@@ -204,15 +210,42 @@ EOF
             . "$HOME/.cargo/env"
             cargo generate-lockfile 2>&1 | grep -i error || true
         fi
-        
+
+        # Handle Python Poetry (pyproject.toml + poetry.lock)
+        if [ -f "pyproject.toml" ] && grep -q "\[tool.poetry\]" pyproject.toml 2>/dev/null && command -v poetry >/dev/null 2>&1; then
+            echo "[INFO] Found Poetry project. Resolving dependencies..."
+            poetry lock --no-interaction 2>&1 | grep -iE 'error' || true
+        fi
+
+        # Handle Go modules (go.mod)
+        if [ -f "go.mod" ] && command -v go >/dev/null 2>&1; then
+            echo "[INFO] Found go.mod. Downloading Go modules..."
+            go mod download 2>&1 | grep -iE 'error' || true
+        fi
+
+        # Handle .NET (*.csproj / *.sln)
+        if { ls ./*.csproj >/dev/null 2>&1 || ls ./*.sln >/dev/null 2>&1; } && command -v dotnet >/dev/null 2>&1; then
+            echo "[INFO] Found .NET project. Restoring NuGet packages..."
+            dotnet restore 2>&1 | grep -iE 'error' || true
+        fi
+
+        # Handle Node.js yarn / pnpm lockfiles (npm handled natively by cdxgen)
+        if [ -f "yarn.lock" ] && command -v yarn >/dev/null 2>&1; then
+            echo "[INFO] Found yarn.lock. Installing dependencies..."
+            yarn install --silent 2>&1 | grep -iE 'error' || true
+        elif [ -f "pnpm-lock.yaml" ] && command -v pnpm >/dev/null 2>&1; then
+            echo "[INFO] Found pnpm-lock.yaml. Installing dependencies..."
+            pnpm install --silent 2>&1 | grep -iE 'error' || true
+        fi
+
         export NODE_OPTIONS="--max-old-space-size=8192"
         
         # Grant execution permissions
         [ -f "./gradlew" ] && chmod +x ./gradlew 2>/dev/null || true
         [ -f "./mvnw" ] && chmod +x ./mvnw 2>/dev/null || true
         
-        # Run cdxgen
-        if ! cdxgen -r -o "$OUTPUT_FILE" . 2>&1 | tee /tmp/cdxgen.log; then
+        # Run cdxgen (CycloneDX 1.6)
+        if ! cdxgen -r --spec-version 1.6 -o "$OUTPUT_FILE" . 2>&1 | tee /tmp/cdxgen.log; then
             echo "[ERROR] cdxgen failed. Check /tmp/cdxgen.log for details."
             cat /tmp/cdxgen.log
             exit 1
@@ -231,27 +264,83 @@ fi
 echo "[INFO] SBOM generated: $OUTPUT_FILE"
 
 # ========================================================
+# Post-processing: normalize, deep-license, notice, security, sign
+# ========================================================
+OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
+LIBDIR="/usr/local/lib/sbom"
+ARTIFACTS=("$OUTPUT_FILE")
+
+# Deterministic / byte-stable output
+if [ "${BYTE_STABLE:-false}" = "true" ]; then
+    bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable || true
+else
+    bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
+fi
+
+# Deep license detection (scancode, opt-in, SOURCE only)
+if [ "${DEEP_LICENSE:-false}" = "true" ] && [ "$SCAN_MODE" = "SOURCE" ]; then
+    if command -v scancode >/dev/null 2>&1; then
+        echo "[INFO] Running scancode deep license detection..."
+        if scancode --license --json-pp /tmp/scancode.json /src >/dev/null 2>&1; then
+            cp /tmp/scancode.json "${OUT_PREFIX}_scancode.json"
+            ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
+        else
+            echo "[WARN] scancode run failed."
+        fi
+    else
+        echo "[WARN] --deep-license requested but scancode not in image (rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
+    fi
+fi
+
+# Open-source notice (Text + HTML)
+if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
+    if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
+        ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt" "${OUT_PREFIX}_NOTICE.html")
+    fi
+fi
+
+# Security report (Trivy: JSON + Markdown + HTML)
+if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
+    if bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
+        ARTIFACTS+=("${OUT_PREFIX}_security.json" "${OUT_PREFIX}_security.md" "${OUT_PREFIX}_security.html")
+    fi
+fi
+
+# Optional cosign signing (opt-in; cosign install is roadmap Phase 5)
+if [ "${SIGN_SBOM:-false}" = "true" ]; then
+    if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
+        echo "[INFO] Signing SBOM with cosign..."
+        if cosign sign-blob --yes --key "$COSIGN_KEY" --output-signature "${OUTPUT_FILE}.sig" "$OUTPUT_FILE"; then
+            ARTIFACTS+=("${OUTPUT_FILE}.sig")
+        fi
+    else
+        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+    fi
+fi
+
+# ========================================================
+# Copy all artifacts to host output (always)
+# ========================================================
+if [ -n "$HOST_OUTPUT_DIR" ] && [ -d "$HOST_OUTPUT_DIR" ]; then
+    for art in "${ARTIFACTS[@]}"; do
+        [ -f "$art" ] || continue
+        if [ "$art" -ef "$HOST_OUTPUT_DIR/$(basename "$art")" ]; then
+            echo "[SUCCESS] saved (in-place): $art"
+        elif cp "$art" "$HOST_OUTPUT_DIR/" 2>/dev/null; then
+            echo "[SUCCESS] copied: $HOST_OUTPUT_DIR/$(basename "$art")"
+        else
+            echo "[WARN] copy failed for $art (available in container at: $art)"
+        fi
+    done
+else
+    echo "[WARN] HOST_OUTPUT_DIR not set/accessible. Artifacts at: $(pwd)"
+fi
+
+# ========================================================
 # Upload Handling
 # ========================================================
 if [ "${UPLOAD_ENABLED:-true}" = "false" ]; then
-    echo "[INFO] Generate-only mode."
-    
-    if [ -n "$HOST_OUTPUT_DIR" ] && [ -d "$HOST_OUTPUT_DIR" ]; then
-        # Check if source and destination are the same file (same inode)
-        if [ "$OUTPUT_FILE" -ef "$HOST_OUTPUT_DIR/$OUTPUT_FILE" ]; then
-            echo "[SUCCESS] SBOM already saved (in-place): $OUTPUT_FILE"
-        else
-            # Perform copy if they are different files
-            if cp "$OUTPUT_FILE" "$HOST_OUTPUT_DIR/" 2>/dev/null; then
-                echo "[SUCCESS] SBOM copied to: $HOST_OUTPUT_DIR/$OUTPUT_FILE"
-            else
-                echo "[WARN] Copy failed (file may already exist at destination)."
-                echo "[INFO] SBOM available at: $OUTPUT_FILE"
-            fi
-        fi
-    else
-        echo "[WARN] HOST_OUTPUT_DIR not set or not accessible. SBOM remains at: $OUTPUT_FILE"
-    fi
+    echo "[INFO] Generate-only mode. Done."
     exit 0
 fi
 

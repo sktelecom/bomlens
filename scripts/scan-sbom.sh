@@ -28,6 +28,13 @@ GENERATE_ONLY="false"
 TARGET=""
 PROJECT_NAME=""
 PROJECT_VERSION=""
+GENERATE_NOTICE="false"
+GENERATE_SECURITY="false"
+DEEP_LICENSE="false"
+SIGN_SBOM="false"
+BYTE_STABLE="false"
+UI_MODE="false"
+UI_PORT="${UI_PORT:-8080}"
 
 # ========================================================
 # Parse arguments
@@ -38,7 +45,14 @@ while [[ "$#" -gt 0 ]]; do
         --version) PROJECT_VERSION="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
         --generate-only) GENERATE_ONLY="true" ;;
-        --help) 
+        --notice) GENERATE_NOTICE="true" ;;
+        --security) GENERATE_SECURITY="true" ;;
+        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true" ;;
+        --deep-license) DEEP_LICENSE="true" ;;
+        --sign) SIGN_SBOM="true" ;;
+        --byte-stable) BYTE_STABLE="true" ;;
+        --ui) UI_MODE="true" ;;
+        --help)
             cat << EOF
 Usage: $0 --project <name> --version <ver> [OPTIONS]
 
@@ -51,6 +65,13 @@ Options:
                          - File path (e.g., firmware.bin): Binary file
                          - Directory (e.g., ./rootfs/): RootFS directory
   --generate-only        Save locally without uploading
+  --notice               Also generate open-source NOTICE (txt + html)
+  --security             Also generate Trivy security report (json + md + html)
+  --all                  Shorthand for --notice --security
+  --deep-license         Deep 1st-party license detection via scancode (opt-in, heavy)
+  --byte-stable          Deterministic SBOM output (pinned timestamp, sorted components)
+  --sign                 Sign the SBOM with cosign (requires COSIGN_KEY)
+  --ui                   Launch the local web UI (browser) instead of scanning
   --help                 Show this help message
 
 Environment Variables:
@@ -79,6 +100,40 @@ EOF
     esac
     shift
 done
+
+# ========================================================
+# Web UI mode (launch browser-based wrapper, no scan args needed)
+# ========================================================
+if [ "$UI_MODE" = "true" ]; then
+    if ! command -v docker &> /dev/null; then
+        echo "[ERROR] Docker is not installed or not in PATH"
+        echo "  Install Docker Desktop: https://www.docker.com/products/docker-desktop/"
+        exit 1
+    fi
+    if ! docker info > /dev/null 2>&1; then
+        echo "[ERROR] Docker daemon is not running. Please start Docker Desktop and retry."
+        echo "  Download: https://www.docker.com/products/docker-desktop/"
+        exit 1
+    fi
+    echo "=========================================="
+    echo "  SBOM Tools Web UI"
+    echo "  URL: http://localhost:${UI_PORT}"
+    echo "  (Ctrl+C to stop)"
+    echo "=========================================="
+    # Best-effort browser open (after the server has a moment to start)
+    ( sleep 2
+      if command -v open >/dev/null 2>&1; then open "http://localhost:${UI_PORT}"
+      elif command -v xdg-open >/dev/null 2>&1; then xdg-open "http://localhost:${UI_PORT}"
+      fi ) >/dev/null 2>&1 &
+    exec docker run --rm -it \
+        -p "${UI_PORT}:8080" \
+        -v "$(pwd)":/src \
+        -v "$(pwd)":/host-output \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -e MODE=UI \
+        -e UI_PORT=8080 \
+        "$DOCKER_IMAGE"
+fi
 
 # ========================================================
 # Validate input
@@ -191,6 +246,11 @@ eval docker run --rm \
     -e MODE=\"$MODE\" \
     $ENV_VARS \
     -e UPLOAD_ENABLED=\"$UPLOAD_VAR\" \
+    -e GENERATE_NOTICE=\"$GENERATE_NOTICE\" \
+    -e GENERATE_SECURITY=\"$GENERATE_SECURITY\" \
+    -e DEEP_LICENSE=\"$DEEP_LICENSE\" \
+    -e SIGN_SBOM=\"$SIGN_SBOM\" \
+    -e BYTE_STABLE=\"$BYTE_STABLE\" \
     -e HOST_OUTPUT_DIR=\"/host-output\" \
     -e PROJECT_NAME=\"$PROJECT_NAME\" \
     -e PROJECT_VERSION=\"$PROJECT_VERSION\" \
@@ -209,5 +269,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
     SAFE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/[^a-zA-Z0-9._-]/_/g')
     echo "  SBOM saved: ${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
+    [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:     ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
+    [ "$GENERATE_SECURITY" = "true" ] && echo "  Security:   ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
 fi
 echo "=========================================="
