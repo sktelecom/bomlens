@@ -129,6 +129,7 @@ The script scans fixture projects with **(A) cdxgen alone** and **(B) the sbom-t
 | [사용 가이드](docs/usage-guide.md) | 전체 옵션, 분석 모드, CI/CD 통합, 트러블슈팅 |
 | [예제 가이드](docs/examples-guide.md) | 언어별 예제 프로젝트 실습 |
 | [아키텍처](docs/architecture.md) | 시스템 구조 및 설계 원칙 |
+| [고지문·보안·UI 가이드](docs/notice-security-ui-guide.md) | 고지문, 보안 보고서, 웹 UI 사용법 |
 | [방향성 조사 보고서](docs/direction-study.md) | Docker 스캔의 가치, 커버리지, 고지문·보안보고서·UI 로드맵 |
 | [테스트 가이드](docs/contributing/testing-guide.md) | 테스트 작성 및 실행 |
 | [패키지 매니저 추가](docs/contributing/package-manager-guide.md) | 새로운 언어/패키지 매니저 지원 추가 |
