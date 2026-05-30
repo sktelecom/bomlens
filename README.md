@@ -109,27 +109,29 @@ Output files (CycloneDX 1.6 JSON):
 
 See [docs/architecture.md](docs/architecture.md) for details (Korean).
 
-## Why a Docker image? (build env vs manifest-only)
+## Why a Docker image? (vs plain cdxgen)
 
-For ecosystems with a **lockfile** (npm, Maven, Gradle, Go, Composer, Bundler, NuGet), cdxgen resolves dependencies accurately *without* building — the lockfile already pins the full transitive set. The Docker image's real value shows up when there is **no lockfile**: installing dependencies generates one and surfaces the transitive graph.
+Fair question: cdxgen already installs dependencies internally, so do you even need this image? We measured **cdxgen's official image** (which ships its own toolchain and resolves deps on its own) against this image, on the bundled examples (no lockfiles committed):
 
-Measured on the bundled examples (same image, `SKIP_BUILD=true` vs full build):
+| Project | cdxgen official | this image | Δ |
+|---------|---:|---:|---|
+| dotnet · java-maven · java-gradle · php · python | same | same | — |
+| nodejs | 471 | 493 | +5% |
+| **go** | 3 | 19 | **+533%** |
+| **ruby** | 0 | 9 | **cdxgen finds none** |
+| **rust** | 5 | 180 | **+3500%** |
 
-| Project | Manifest-only | With build env | Δ |
-|---------|---:|---:|---:|
-| python (`requirements.txt`, no lock) | 14 | 39 | **+178%** |
-| rust (`Cargo.toml`, no `Cargo.lock`) | 5 | 180 | **+3500%** |
-| maven / gradle / npm / go / nuget / composer / bundler (lockfile present) | — | — | identical |
+**For mainstream languages (Java, Python, Node, .NET, PHP), cdxgen's official image is enough** — detection is identical. The difference shows up in **go, ruby, rust**, where this image ships the toolchain cdxgen's image lacks (cargo, bundler, full go) and resolves far more (ruby: nothing → 9; rust: 36×).
 
-So the Docker image earns its keep through **(1)** accurate scanning of lockfile-less projects, **(2)** no host-side language toolchain setup (consistency), **(3)** one-shot SBOM + notice + security report, and **(4)** image/binary scanning via syft — not through a blanket "many× more components" claim.
+So the value of this image is **(1)** broad language coverage in one pull (no picking per-language cdxgen images), **(2)** things cdxgen doesn't do at all — syft (image/binary/RootFS), OSS notice, Trivy security report, web UI — and **(3)** pinned tool versions + deterministic output. It is **not** a blanket "many× more components" claim for every language.
 
 Reproduce it yourself:
 
 ```bash
-./tests/compare-cdxgen-vs-docker.sh   # writes tests/test-workspace/compare-result.csv
+./tests/compare-cdxgen-vs-docker.sh   # cdxgen official vs this image → tests/test-workspace/compare-result.csv
 ```
 
-The script scans each project twice with the **same image** — baseline `SKIP_BUILD=true` (manifest/lockfile only) vs full build — and reports component count, vulnerability count, and scan time. See [docs/direction-study.md](docs/direction-study.md) for methodology.
+See [docs/direction-study.md](docs/direction-study.md) for methodology.
 
 ## Documentation (한국어)
 
