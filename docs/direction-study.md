@@ -8,7 +8,7 @@
 
 | # | 질문 | 결론 |
 |---|------|------|
-| 1 | Docker 이미지의 의미 / cdxgen 단독 vs Docker 차이 | **빌드환경을 갖춘 Docker 스캔이 transitive 의존성까지 잡아 검출량이 크게 늘어난다.** `tests/compare-cdxgen-vs-docker.sh`로 실증(컴포넌트·취약점·시간 3지표 CSV). |
+| 1 | Docker 이미지의 의미 / 빌드 유무 차이 | **lockfile이 있으면 빌드 유무와 무관하게 동일 검출. lockfile 없는 python(+178%)·rust(+3500%)에서만 빌드환경이 transitive를 크게 늘림(실측).** `compare-cdxgen-vs-docker.sh`로 재현. |
 | 2 | 이미지 커버리지는 충분한가 | **불충분 — Go·.NET 미설치, yarn/pnpm/poetry 누락, 도구 버전 미고정.** 커버리지 보강 + Android 추가 + 버전 고정. 장기적으로 언어별 이미지 분리 + on-demand pull. |
 | 3 | SBOM + 고지문 + 보안보고서 | **`scan-sbom.sh` 플래그(`--notice`/`--security`/`--all`)로 통합.** 고지문 Text+HTML, 보안보고서 Trivy 기반 JSON+MD+HTML. scancode는 `--deep-license` 옵트인. |
 | 4 | CLI 미숙 사용자용 UI | **localhost 웹 래퍼를 Docker 이미지에 내장.** `scan-sbom.sh --ui` → 브라우저. Windows는 `.bat` 더블클릭. Docker Desktop은 감지·안내. |
@@ -50,27 +50,26 @@ sbom-tools는 **생성(generation)** 전문, trustedoss-portal은 **관리(gover
 [ -f requirements.txt ] && pip install ...             # Python
 ```
 
-이것이 **Docker 이미지의 존재 이유**다. cdxgen을 빌드도구 없는 호스트에서 단독 실행하면 매니페스트(`pom.xml`, `package.json`)만 직접 파싱해 **직접 의존성 위주로만** 잡히고, lockfile이 없거나 빌드가 필요한 경우 **transitive(전이) 의존성이 통째로 누락**된다.
+의존성 설치는 **lockfile이 없는 프로젝트에서 결정적**이다. cdxgen은 lockfile이 있으면 빌드 없이도 transitive까지 정확히 파싱하지만, lockfile이 없으면 매니페스트의 **직접 의존성만** 잡는다 — 이때 빌드(설치)가 lockfile을 생성해 전이 의존성을 끌어온다.
 
-### 참고 근거 (bd-scan 실증)
-자매 프로젝트 `bd-scan`은 동일 fixture를 (빌드환경 없음) vs (빌드환경 있음) 두 모드로 스캔해 정량 비교한 데이터를 보유한다:
+### 실측 데이터 (sbom-tools 자체, `compare-cdxgen-vs-docker.sh`)
 
-| 케이스 | 빌드환경 없음 | 빌드환경 있음 | 증가 |
-|--------|-------------:|-------------:|-----:|
-| Maven | 1 | 12 | +1100% |
-| Gradle | 0 | 18 | +∞ |
-| Python pip | 0 | 5 | +∞ |
-| **합계(22 fixture)** | **14** | **892** | **+6271%** |
+같은 sbom-tools 이미지로 **빌드 유무만 달리해**(baseline `SKIP_BUILD=true` = 매니페스트/lockfile만, variant = 빌드 포함) 번들 예제를 측정한 결과:
 
-→ 빌드환경(=Docker)을 갖추면 검출 컴포넌트가 수 배~수십 배 늘어난다. 이는 곧 **취약점·라이선스 누락 위험의 차이**다.
+| 프로젝트 | 빌드 없이 | 빌드 포함 | 차이 |
+|----------|-------:|-------:|-----:|
+| python (`requirements.txt`, lock 없음) | 14 | 39 | **+178%** |
+| rust (`Cargo.toml`, `Cargo.lock` 없음) | 5 | 180 | **+3500%** |
+| dotnet · go · java-gradle · java-maven · nodejs · php · ruby (lockfile 존재) | (동일) | (동일) | — |
+
+→ **lockfile이 있는 7개 생태계는 빌드 유무와 무관하게 동일**(maven 91, npm 493 등). **lockfile이 없는 python·rust에서만 빌드환경이 transitive 검출을 크게 늘린다.**
+
+> 주의: 초기 보고서는 `bd-scan`의 "+6271%"를 인용했으나, 그것은 **빌드도구 자체가 없어 Black Duck detector가 실패하는** 다른 맥락이다. sbom-tools는 cdxgen이 lockfile 파싱을 잘 수행하므로 그 수치는 적용되지 않는다. (초기 cdxgen-공식-이미지 baseline이 0을 반환한 것은 이미지 실행 문제였고, 빌드환경 부재가 아니었음 — 측정 교정 완료.)
 
 ### 권고 + 다음 단계
-- **실증 스크립트 `tests/compare-cdxgen-vs-docker.sh`** 로 sbom-tools 자체 데이터를 생성한다. (본 보고서와 함께 구현)
-  - 대상: `~/projects/bd-scan/tests/fixtures/projects/` 의 표준 13종(dotnet, go, gradle, gradle-kts, maven, maven-node, node, node-yarn, php, python-pip, python-poetry, ruby, rust) — `SBOM_FIXTURES_DIR` 환경변수로 경로 지정, 미존재 시 `examples/` 폴백.
-  - 기준선 A: 빌드도구 없는 cdxgen 단독. 비교군 B: sbom-tools Docker.
-  - 3지표: **컴포넌트 개수**(`jq '.components|length'`), **주요 취약점 검출 수**(Trivy), **스캔 소요시간**.
-  - 출력: `tests/test-workspace/compare-result.csv`.
-- 결과 요약 표를 README의 **"Why Docker?"** 섹션으로 게재한다.
+- Docker 이미지의 실제 가치는 ① **lockfile 없는 프로젝트의 정확도**(python·rust) ② 호스트 도구 설치 불필요(일관성) ③ SBOM+고지문+보안보고서 통합 ④ syft 이미지/바이너리 스캔 — "무조건 수 배 검출"이 아니다.
+- 실증은 `tests/compare-cdxgen-vs-docker.sh`(같은 이미지 `SKIP_BUILD` 대조)로 재현. 결과 요약을 README **"Why Docker?"**에 게재.
+- 권장: lockfile 없는 프로젝트 스캔 시 빌드 포함을 기본으로, lockfile 있으면 빌드 생략(`SKIP_BUILD`)으로 빠르게 — 향후 자동 판단 가능.
 
 ---
 

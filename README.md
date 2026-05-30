@@ -109,17 +109,27 @@ Output files (CycloneDX 1.6 JSON):
 
 See [docs/architecture.md](docs/architecture.md) for details (Korean).
 
-## Why a Docker image? (cdxgen alone vs Docker scan)
+## Why a Docker image? (build env vs manifest-only)
 
-Running `cdxgen` directly on a host that has no build tools only parses manifests, so **transitive dependencies are frequently missed**. The sbom-tools image installs each language's build tools and resolves dependencies *before* running cdxgen, which surfaces far more components — and therefore far more detectable vulnerabilities.
+For ecosystems with a **lockfile** (npm, Maven, Gradle, Go, Composer, Bundler, NuGet), cdxgen resolves dependencies accurately *without* building — the lockfile already pins the full transitive set. The Docker image's real value shows up when there is **no lockfile**: installing dependencies generates one and surfaces the transitive graph.
 
-Reproduce the comparison yourself:
+Measured on the bundled examples (same image, `SKIP_BUILD=true` vs full build):
+
+| Project | Manifest-only | With build env | Δ |
+|---------|---:|---:|---:|
+| python (`requirements.txt`, no lock) | 14 | 39 | **+178%** |
+| rust (`Cargo.toml`, no `Cargo.lock`) | 5 | 180 | **+3500%** |
+| maven / gradle / npm / go / nuget / composer / bundler (lockfile present) | — | — | identical |
+
+So the Docker image earns its keep through **(1)** accurate scanning of lockfile-less projects, **(2)** no host-side language toolchain setup (consistency), **(3)** one-shot SBOM + notice + security report, and **(4)** image/binary scanning via syft — not through a blanket "many× more components" claim.
+
+Reproduce it yourself:
 
 ```bash
 ./tests/compare-cdxgen-vs-docker.sh   # writes tests/test-workspace/compare-result.csv
 ```
 
-The script scans fixture projects with **(A) cdxgen alone** and **(B) the sbom-tools image**, reporting component count, vulnerability count, and scan time for each. See [docs/direction-study.md](docs/direction-study.md) for methodology and reference data.
+The script scans each project twice with the **same image** — baseline `SKIP_BUILD=true` (manifest/lockfile only) vs full build — and reports component count, vulnerability count, and scan time. See [docs/direction-study.md](docs/direction-study.md) for methodology.
 
 ## Documentation (한국어)
 
