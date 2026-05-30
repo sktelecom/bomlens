@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SBOM Tools</title>
+<style>
+ :root{--blue:#2563eb;--green:#0b5;--bg:#f6f7f9;}
+ *{box-sizing:border-box;}
+ body{font-family:system-ui,Arial,sans-serif;margin:0;background:var(--bg);color:#1a1a1a;}
+ header{background:#0f172a;color:#fff;padding:1rem 1.5rem;}
+ header h1{margin:0;font-size:1.25rem;}
+ header p{margin:.25rem 0 0;color:#94a3b8;font-size:.85rem;}
+ main{max-width:900px;margin:1.5rem auto;padding:0 1rem;}
+ .card{background:#fff;border:1px solid #e3e3e3;border-radius:8px;padding:1.2rem;margin-bottom:1.2rem;}
+ label{display:block;font-weight:600;font-size:.85rem;margin:.6rem 0 .25rem;}
+ input[type=text]{width:100%;padding:.5rem;border:1px solid #ccc;border-radius:5px;font-size:.9rem;}
+ .row{display:flex;gap:1rem;flex-wrap:wrap;}
+ .row>div{flex:1;min-width:200px;}
+ .checks{display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:.8rem;}
+ .checks label{font-weight:400;display:flex;align-items:center;gap:.35rem;}
+ button{background:var(--blue);color:#fff;border:0;border-radius:6px;padding:.6rem 1.4rem;font-size:.95rem;cursor:pointer;margin-top:1rem;}
+ button:disabled{opacity:.5;cursor:default;}
+ pre{background:#0f172a;color:#d1fae5;padding:1rem;border-radius:6px;overflow:auto;max-height:340px;font-size:.8rem;white-space:pre-wrap;}
+ table{width:100%;border-collapse:collapse;font-size:.85rem;}
+ th,td{border:1px solid #e3e3e3;padding:.45rem .6rem;text-align:left;}
+ th{background:#f3f4f6;}
+ a{color:var(--blue);}
+ .hint{color:#666;font-size:.8rem;margin-top:.3rem;}
+ .status{font-weight:600;margin-left:.5rem;}
+</style>
+</head>
+<body>
+<header>
+  <h1>SBOM Tools</h1>
+  <p>단일 프로젝트의 SBOM · 오픈소스 고지문 · 보안 보고서를 한 번에 생성</p>
+</header>
+<main>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="project">프로젝트 이름 *</label>
+        <input type="text" id="project" placeholder="MyApp">
+      </div>
+      <div>
+        <label for="version">버전 *</label>
+        <input type="text" id="version" placeholder="1.0.0">
+      </div>
+    </div>
+    <label for="target">타겟 (비우면 현재 디렉토리 소스 스캔)</label>
+    <input type="text" id="target" placeholder="예: nginx:latest (Docker 이미지)">
+    <p class="hint">비워두면 마운트된 소스 코드를 스캔합니다. Docker 이미지명을 입력하면 이미지를 스캔합니다.</p>
+    <div class="checks">
+      <label><input type="checkbox" id="notice" checked> 고지문(NOTICE)</label>
+      <label><input type="checkbox" id="security" checked> 보안 보고서(Trivy)</label>
+      <label><input type="checkbox" id="deep_license"> 정밀 라이선스(scancode)</label>
+      <label><input type="checkbox" id="byte_stable"> 결정론적 출력</label>
+    </div>
+    <button id="run">스캔 실행</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="card" id="logCard" style="display:none">
+    <h3>실행 로그</h3>
+    <pre id="log"></pre>
+  </div>
+
+  <div class="card">
+    <h3>생성된 결과물</h3>
+    <table id="results"><tr><th>파일</th><th>크기</th><th>보기 / 다운로드</th></tr></table>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function refreshResults() {
+  const r = await fetch('/results').then(x => x.json()).catch(() => []);
+  const rows = ['<tr><th>파일</th><th>크기</th><th>보기 / 다운로드</th></tr>'];
+  for (const f of r) {
+    const url = '/file?name=' + encodeURIComponent(f.name);
+    rows.push(`<tr><td>${f.name}</td><td>${(f.size/1024).toFixed(1)} KB</td>`
+      + `<td><a href="${url}" target="_blank">열기</a> · `
+      + `<a href="${url}" download="${f.name}">다운로드</a></td></tr>`);
+  }
+  $('results').innerHTML = rows.join('');
+}
+
+$('run').addEventListener('click', async () => {
+  const project = $('project').value.trim();
+  const version = $('version').value.trim();
+  if (!project || !version) { alert('프로젝트 이름과 버전은 필수입니다.'); return; }
+  const body = {
+    project, version,
+    target: $('target').value.trim(),
+    notice: $('notice').checked,
+    security: $('security').checked,
+    deep_license: $('deep_license').checked,
+    byte_stable: $('byte_stable').checked,
+  };
+  $('run').disabled = true;
+  $('status').textContent = '스캔 중… (수 분 소요될 수 있습니다)';
+  $('logCard').style.display = 'block';
+  $('log').textContent = '실행 중…';
+  try {
+    const res = await fetch('/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(x => x.json());
+    $('log').textContent = res.log || '(로그 없음)';
+    $('status').textContent = res.ok ? '✅ 완료' : '❌ 실패';
+  } catch (e) {
+    $('log').textContent = String(e);
+    $('status').textContent = '❌ 오류';
+  } finally {
+    $('run').disabled = false;
+    refreshResults();
+  }
+});
+
+refreshResults();
+</script>
+</body>
+</html>
