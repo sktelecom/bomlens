@@ -23,9 +23,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="$SCRIPT_DIR/test-workspace"
 RESULT_CSV="$WORKSPACE/compare-result.csv"
 mkdir -p "$WORKSPACE"
+# Work under the repo (/Users/...) so Docker Desktop file sharing mounts it.
+WORK_ROOT="$WORKSPACE/compare"
+rm -rf "$WORK_ROOT"; mkdir -p "$WORK_ROOT"
 
 SCANNER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
-CDXGEN_IMAGE="${CDXGEN_IMAGE:-ghcr.io/cyclonedx/cdxgen:latest}"
 FIXTURES_DIR="${SBOM_FIXTURES_DIR:-$HOME/projects/bd-scan/tests/fixtures/projects}"
 
 if [ ! -d "$FIXTURES_DIR" ]; then
@@ -39,7 +41,11 @@ if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
 fi
 
 # Discover project directories that contain a recognized manifest.
-mapfile -t PROJECT_DIRS < <(find "$FIXTURES_DIR" -maxdepth 2 -type f \
+# (avoid `mapfile` — absent in macOS's bundled bash 3.2)
+PROJECT_DIRS=()
+while IFS= read -r _d; do
+    [ -n "$_d" ] && PROJECT_DIRS+=("$_d")
+done < <(find "$FIXTURES_DIR" -maxdepth 2 -type f \
     \( -name pom.xml -o -name build.gradle -o -name build.gradle.kts \
        -o -name package.json -o -name requirements.txt -o -name pyproject.toml \
        -o -name go.mod -o -name Cargo.toml -o -name Gemfile -o -name composer.json \
@@ -52,8 +58,8 @@ fi
 
 echo "Fixtures dir : $FIXTURES_DIR"
 echo "Projects     : ${#PROJECT_DIRS[@]}"
-echo "Baseline (A) : $CDXGEN_IMAGE"
-echo "Variant  (B) : $SCANNER_IMAGE"
+echo "Baseline (A) : $SCANNER_IMAGE  (SKIP_BUILD=true — manifest/lockfile only)"
+echo "Variant  (B) : $SCANNER_IMAGE  (with build env — resolves dependencies)"
 echo ""
 
 comp_count() { jq '([.components[]?] | length)' "$1" 2>/dev/null || echo 0; }
@@ -72,30 +78,36 @@ for projdir in "${PROJECT_DIRS[@]}"; do
     name="$(basename "$projdir")"
     printf '  [%-22s] ' "$name"
 
-    # ----- Baseline A: cdxgen alone -----
-    tmpA="$(mktemp -d)"; cp -R "$projdir/." "$tmpA/" 2>/dev/null
+    # ----- Baseline A: same image, dependency install skipped (SKIP_BUILD=true) -----
+    # cdxgen parses manifests/lockfiles only — no transitive resolution.
+    tmpA="$(mktemp -d "$WORK_ROOT/A.XXXXXX")"; cp -R "$projdir/." "$tmpA/" 2>/dev/null || true
     sA=$(date +%s)
-    docker run --rm -v "$tmpA":/app "$CDXGEN_IMAGE" -r -o /app/out_bom.json /app >/dev/null 2>&1
+    docker run --rm -v "$tmpA":/src -v "$tmpA":/host-output \
+        -e MODE=SOURCE -e SKIP_BUILD=true -e PROJECT_NAME=cmp -e PROJECT_VERSION=0 \
+        -e UPLOAD_ENABLED=false -e HOST_OUTPUT_DIR=/host-output \
+        "$SCANNER_IMAGE" >/dev/null 2>&1 || true
     eA=$(date +%s)
-    compA=$(comp_count "$tmpA/out_bom.json"); secA=$((eA - sA))
-    cveA=$([ -f "$tmpA/out_bom.json" ] && vuln_count "$tmpA/out_bom.json" || echo 0)
+    compA=0; cveA=0
+    if [ -f "$tmpA/cmp_0_bom.json" ]; then compA=$(comp_count "$tmpA/cmp_0_bom.json"); cveA=$(vuln_count "$tmpA/cmp_0_bom.json"); fi
+    compA=${compA:-0}; cveA=${cveA:-0}; secA=$((eA - sA))
 
-    # ----- Variant B: sbom-tools image -----
-    tmpB="$(mktemp -d)"; cp -R "$projdir/." "$tmpB/" 2>/dev/null
+    # ----- Variant B: sbom-tools image (build tools + dependency resolution) -----
+    tmpB="$(mktemp -d "$WORK_ROOT/B.XXXXXX")"; cp -R "$projdir/." "$tmpB/" 2>/dev/null || true
     sB=$(date +%s)
     docker run --rm -v "$tmpB":/src -v "$tmpB":/host-output \
         -e MODE=SOURCE -e PROJECT_NAME=cmp -e PROJECT_VERSION=0 \
         -e UPLOAD_ENABLED=false -e HOST_OUTPUT_DIR=/host-output \
-        "$SCANNER_IMAGE" >/dev/null 2>&1
+        "$SCANNER_IMAGE" >/dev/null 2>&1 || true
     eB=$(date +%s)
-    compB=$(comp_count "$tmpB/cmp_0_bom.json"); secB=$((eB - sB))
-    cveB=$([ -f "$tmpB/cmp_0_bom.json" ] && vuln_count "$tmpB/cmp_0_bom.json" || echo 0)
+    compB=0; cveB=0
+    if [ -f "$tmpB/cmp_0_bom.json" ]; then compB=$(comp_count "$tmpB/cmp_0_bom.json"); cveB=$(vuln_count "$tmpB/cmp_0_bom.json"); fi
+    compB=${compB:-0}; cveB=${cveB:-0}; secB=$((eB - sB))
 
     delta=$((compB - compA))
     if [ "$compA" -gt 0 ]; then pct="$(awk "BEGIN{printf \"%.1f\", ($delta/$compA)*100}")"; else pct="inf"; fi
 
     echo "$name,$compA,$compB,$delta,$pct,$cveA,$cveB,$secA,$secB" >> "$RESULT_CSV"
-    echo "cdxgen=$compA docker=$compB (Δ$delta, ${pct}%) cve:$cveA→$cveB time:${secA}s→${secB}s"
+    echo "cdxgen=$compA docker=$compB (delta=$delta, ${pct}%) cve:$cveA->$cveB time:${secA}s->${secB}s"
 
     rm -rf "$tmpA" "$tmpB"
 done

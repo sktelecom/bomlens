@@ -155,6 +155,11 @@ EOF
             exit 1
         fi
         
+        # Dependency installation. Skipped when SKIP_BUILD=true so that
+        # "no build env" (manifest/lockfile parsing only) can be compared against
+        # "with build env" (resolved transitive deps). See tests/compare-cdxgen-vs-docker.sh
+        if [ "${SKIP_BUILD:-false}" != "true" ]; then
+
         # Handle Python 2.x requirements.txt
         if [ -f "requirements.txt" ] && command -v python2 >/dev/null 2>&1; then
             # Detect Python 2.x project
@@ -239,8 +244,12 @@ EOF
             pnpm install --silent 2>&1 | grep -iE 'error' || true
         fi
 
+        else
+            echo "[INFO] SKIP_BUILD=true — skipping dependency installation (manifest/lockfile only)"
+        fi
+
         export NODE_OPTIONS="--max-old-space-size=8192"
-        
+
         # Grant execution permissions
         [ -f "./gradlew" ] && chmod +x ./gradlew 2>/dev/null || true
         [ -f "./mvnw" ] && chmod +x ./mvnw 2>/dev/null || true
