@@ -251,6 +251,41 @@ else
 fi
 
 # --------------------------------------------------------
+# Group 6: cosign signing E2E (requires image + docker)
+# --------------------------------------------------------
+section "Cosign signing E2E"
+if [ "$have_image" != 1 ]; then
+    skip "cosign signing (scanner image not available)"
+else
+    keydir="$(mktemp -d "$WORK_ROOT/keys.XXXXXX")"
+    docker run --rm -v "$keydir":/keys -w /keys -e COSIGN_PASSWORD="" \
+        --entrypoint cosign "$SCANNER_IMG" generate-key-pair >/dev/null 2>&1
+    if [ -f "$keydir/cosign.key" ]; then
+        pass "cosign keypair generated"
+        w="$(mktemp -d "$WORK_ROOT/sign.XXXXXX")"
+        cp -R "$EXAMPLES/go/." "$w/" 2>/dev/null
+        ( cd "$w" && COSIGN_KEY="$keydir/cosign.key" COSIGN_PASSWORD="" SBOM_SCANNER_IMAGE="$SCANNER_IMG" \
+            bash "$SCAN" --project signtest --version 1.0 --sign --generate-only ) > "$w/_scan.log" 2>&1
+        if [ -f "$w/signtest_1.0_bom.json.sig" ]; then
+            pass "cosign produced detached signature"
+            if docker run --rm -v "$w":/w -v "$keydir":/keys -w /w --entrypoint cosign "$SCANNER_IMG" \
+                verify-blob --key /keys/cosign.pub --signature signtest_1.0_bom.json.sig \
+                --insecure-ignore-tlog signtest_1.0_bom.json >/dev/null 2>&1; then
+                pass "cosign verify-blob succeeds"
+            else
+                fail "cosign verify-blob succeeds"
+            fi
+        else
+            fail "cosign produced detached signature" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
+    else
+        fail "cosign keypair generated"
+    fi
+    rm -rf "$keydir"
+fi
+
+# --------------------------------------------------------
 # Summary
 # --------------------------------------------------------
 echo ""
