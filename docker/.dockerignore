@@ -1,0 +1,9 @@
+# The web SPA is rebuilt inside the `web` build stage (npm ci + vite build),
+# so the host's installed deps and prior build output must not bloat the
+# build context or leak into the image.
+**/node_modules
+web/frontend/dist
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.git

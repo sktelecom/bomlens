@@ -16,9 +16,25 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
+DIST_DIR = os.path.join(WEB_DIR, "dist")  # built React SPA (Vite output)
 OUTPUT_DIR = "/host-output"
 SRC_DIR = "/src"
 PORT = int(os.environ.get("UI_PORT", "8080"))
+
+# Content types for the static SPA bundle.
+STATIC_CTYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".map": "application/json",
+    ".webmanifest": "application/manifest+json",
+}
 
 ARTIFACT_SUFFIXES = (
     "_bom.json", "_NOTICE.txt", "_NOTICE.html",
@@ -102,17 +118,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
-        if path in ("/", "/index.html"):
-            with open(os.path.join(WEB_DIR, "index.html"), "rb") as f:
-                self._send(200, f.read(), "text/html; charset=utf-8")
-        elif path == "/results":
+        if path == "/results":
             self._send(200, json.dumps(list_results()))
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
         elif path == "/scan-stream":
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
         else:
-            self._send(404, json.dumps({"error": "not found"}))
+            # Everything else is the React SPA: serve the static asset if it
+            # exists, else fall back to index.html (client-side routing).
+            self._serve_static(path)
+
+    def _serve_static(self, path):
+        rel = path.lstrip("/") or "index.html"
+        distroot = os.path.realpath(DIST_DIR)
+        target = os.path.realpath(os.path.join(DIST_DIR, rel))
+        inside = target == distroot or target.startswith(distroot + os.sep)
+        if not inside or not os.path.isfile(target):
+            target = os.path.join(DIST_DIR, "index.html")  # SPA fallback
+        if not os.path.isfile(target):
+            self._send(503, json.dumps({"error": "UI bundle not built"}))
+            return
+        ctype = STATIC_CTYPES.get(
+            os.path.splitext(target)[1], "application/octet-stream"
+        )
+        with open(target, "rb") as f:
+            self._send(200, f.read(), ctype)
 
     def _serve_file(self, qs):
         name = (qs.get("name") or [""])[0]

@@ -1,0 +1,67 @@
+{
+  "appTitle": "SBOM Tools",
+  "subtitle": "단일 프로젝트의 SBOM · 고지문 · 보안 보고서를 한 번에",
+  "form": {
+    "title": "스캔 설정",
+    "description": "프로젝트 정보를 입력하고 생성할 항목을 선택하세요.",
+    "project": "프로젝트 이름",
+    "projectPlaceholder": "my-app",
+    "version": "버전",
+    "versionPlaceholder": "1.0.0",
+    "target": "타겟 (선택)",
+    "targetPlaceholder": "nginx:latest",
+    "targetHint": "비우면 현재 디렉터리의 소스를 스캔합니다. Docker 이미지명을 넣으면 해당 이미지를 스캔합니다.",
+    "options": "생성 옵션",
+    "run": "스캔 실행",
+    "running": "스캔 중…"
+  },
+  "options": {
+    "notice": "고지문",
+    "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
+    "security": "보안 보고서",
+    "securityHint": "Trivy 취약점 보고서 생성",
+    "deepLicense": "정밀 라이선스",
+    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)",
+    "byteStable": "결정론적 출력",
+    "byteStableHint": "타임스탬프 제거로 재현 가능한 출력"
+  },
+  "progress": {
+    "title": "실행 로그",
+    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다."
+  },
+  "result": {
+    "title": "결과",
+    "succeeded": "스캔 완료",
+    "failed": "스캔 실패",
+    "components": "컴포넌트",
+    "vulnerabilities": "취약점",
+    "noSecurity": "보안 보고서를 생성하지 않았습니다",
+    "severityTitle": "심각도 분포",
+    "noVulns": "발견된 취약점이 없습니다",
+    "artifacts": "생성된 결과물",
+    "artifactsEmpty": "생성된 결과물이 없습니다.",
+    "download": "다운로드",
+    "view": "보기"
+  },
+  "severity": {
+    "CRITICAL": "심각",
+    "HIGH": "높음",
+    "MEDIUM": "중간",
+    "LOW": "낮음",
+    "UNKNOWN": "알 수 없음"
+  },
+  "viewer": {
+    "open": "결과물 보기",
+    "close": "닫기"
+  },
+  "theme": {
+    "toLight": "라이트 모드로",
+    "toDark": "다크 모드로"
+  },
+  "lang": {
+    "label": "언어"
+  },
+  "validation": {
+    "required": "프로젝트 이름과 버전을 입력하세요."
+  }
+}

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+ * sbom-tools local UI — design tokens.
+ *
+ * Mirrors trustedoss-portal's "W11-A" language (Vercel light base + Linear
+ * polish) so the two surfaces feel like one product. Unlike the portal,
+ * sbom-tools SHIPS a dark theme: the `.dark` block below is fully populated
+ * (the portal left it as a TODO placeholder).
+ *
+ * Never reference hex directly in components — use the CSS var / Tailwind
+ * utility (`bg-background`, `text-foreground`, `bg-risk-high/10`, …).
+ * ------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    --background: 0 0% 98%; /* #fafafa */
+    --foreground: 240 6% 10%; /* #18181b warm near-black */
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+
+    --muted: 240 5% 96%; /* #f4f4f5 */
+    --muted-foreground: 240 4% 46%; /* #71717a — AA on muted */
+
+    --border: 240 5% 91%; /* #e5e5ea */
+    --input: 240 5% 91%;
+
+    --primary: 240 6% 10%; /* #18181b */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 72% 51%; /* ~#dc2626 — aligns with risk-critical */
+    --destructive-foreground: 0 0% 98%;
+
+    --ring: 240 6% 10%;
+
+    --radius: 0.375rem;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.08), 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.12), 0 3px 8px -3px rgb(0 0 0 / 0.06);
+
+    --duration-fast: 150ms;
+    --duration-base: 200ms;
+    --duration-slow: 250ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Risk severity — domain meaning fixed (shared with portal). */
+    --risk-critical: #dc2626;
+    --risk-high: #ea580c;
+    --risk-medium: #ca8a04;
+    --risk-low: #2563eb;
+    --risk-info: #71717a;
+  }
+
+  /* Dark theme — populated (mirrors the portal's reserved token names). */
+  .dark {
+    --background: 240 6% 6%; /* #0a0a0c */
+    --foreground: 0 0% 98%; /* #fafafa */
+
+    --card: 240 4% 11%; /* #18181b */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 4% 11%;
+    --popover-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%; /* #27272a */
+    --muted-foreground: 240 5% 65%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 6% 10%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring: 240 5% 65%;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.6), 0 3px 8px -3px rgb(0 0 0 / 0.4);
+
+    /* Slightly brighter risk hues read better on the dark canvas. */
+    --risk-critical: #f87171;
+    --risk-high: #fb923c;
+    --risk-medium: #facc15;
+    --risk-low: #60a5fa;
+    --risk-info: #a1a1aa;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    letter-spacing: -0.005em;
+  }
+  code,
+  kbd,
+  pre,
+  samp {
+    @apply font-mono;
+    letter-spacing: 0;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-semibold tracking-tight;
+  }
+}
