@@ -168,8 +168,8 @@ EOF
 cat > "$tmp/bin.cdx.json" <<'EOF'
 {"components":[{"name":"zlib","version":"1.2.13","purl":"pkg:deb/zlib@1.2.13"},{"name":"openssl","version":"3.0.1"}]}
 EOF
-pkgc=$(jq -c '[.components[]? | select(.name != null)]' "$tmp/pkg.cdx.json")
-binc=$(jq -c '[.components[]? | select(.name != null)]' "$tmp/bin.cdx.json")
+pkgc=$(jq -c '[.components[]? | select((.name // "") != "")]' "$tmp/pkg.cdx.json")
+binc=$(jq -c '[.components[]? | select((.name // "") != "")]' "$tmp/bin.cdx.json")
 merged=$(jq -n --argjson a "$pkgc" --argjson b "$binc" '($a + $b) | group_by(.purl // ((.name // "") + "@" + (.version // ""))) | map(.[0]) | length')
 if [ "$merged" = "3" ]; then
     pass "firmware merge dedupes by purl (3 unique of 4)"
