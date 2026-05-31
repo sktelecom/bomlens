@@ -8,9 +8,6 @@
     "projectPlaceholder": "my-app",
     "version": "버전",
     "versionPlaceholder": "1.0.0",
-    "target": "타겟 (선택)",
-    "targetPlaceholder": "nginx:latest",
-    "targetHint": "비우면 현재 디렉터리의 소스를 스캔합니다. Docker 이미지명을 넣으면 해당 이미지를 스캔합니다.",
     "options": "생성 옵션",
     "run": "스캔 실행",
     "running": "스캔 중…"
