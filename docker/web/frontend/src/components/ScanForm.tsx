@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
+  stashGitCred,
   uploadFile,
   type Capabilities,
   type ScanParams,
@@ -47,6 +48,7 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
   const [version, setVersion] = useState("");
   const [source, setSource] = useState<SourceType>("current-dir");
   const [target, setTarget] = useState(""); // git URL or docker image
+  const [gitToken, setGitToken] = useState(""); // optional private-repo token
   const [file, setFile] = useState<File | null>(null);
   const [notice, setNotice] = useState(true);
   const [security, setSecurity] = useState(true);
@@ -77,11 +79,25 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
     setInvalid(false);
 
     let token: string | undefined;
+    let cred: string | undefined;
     if (uploadKind && file) {
       try {
         setUploading(true);
         const r = await uploadFile(file, uploadKind);
         token = r.token;
+      } catch (e) {
+        setUploadError((e as Error).message);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+    // Private git URL: stash the token (single-use) so it never hits the query string.
+    if (source === "git-url" && gitToken.trim()) {
+      try {
+        setUploading(true);
+        const r = await stashGitCred(gitToken.trim());
+        cred = r.credId;
       } catch (e) {
         setUploadError((e as Error).message);
         setUploading(false);
@@ -96,6 +112,7 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
       source,
       target: isText ? target.trim() : undefined,
       token,
+      cred,
       // ANALYZE forces notice+security on (needed for the risk report).
       notice: isAnalyze ? true : notice,
       security: isAnalyze ? true : security,
@@ -154,6 +171,7 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
               setSource(s);
               setFile(null);
               setTarget("");
+              setGitToken("");
               setUploadError(null);
               setInvalid(false);
             }}
@@ -164,9 +182,15 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
 
         {/* Source-specific control */}
         {source === "current-dir" && (
-          <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            {capabilities.hostDir && (
+              <div className="mb-1">
+                <span className="text-foreground">{t("source.currentDirPath")}: </span>
+                <span className="break-all font-mono">{capabilities.hostDir}</span>
+              </div>
+            )}
             {t("source.currentDirHint")}
-          </p>
+          </div>
         )}
 
         {isText && (
@@ -188,6 +212,22 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
             <p className="text-xs text-muted-foreground">
               {source === "git-url" ? t("source.gitHint") : t("source.dockerHint")}
             </p>
+          </div>
+        )}
+
+        {source === "git-url" && (
+          <div className="space-y-2">
+            <Label htmlFor="gitToken">{t("source.gitToken")}</Label>
+            <Input
+              id="gitToken"
+              type="password"
+              autoComplete="off"
+              value={gitToken}
+              onChange={(e) => setGitToken(e.target.value)}
+              placeholder={t("source.gitTokenPlaceholder")}
+              disabled={busy}
+            />
+            <p className="text-xs text-muted-foreground">{t("source.gitTokenHint")}</p>
           </div>
         )}
 

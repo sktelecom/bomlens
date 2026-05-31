@@ -266,6 +266,11 @@ def scan_root_of(extract_dir):
     return extract_dir
 
 
+# Single-use private-repo tokens, stashed via POST /git-cred so the secret
+# never travels in the scan-stream querystring (which could be logged/cached).
+_GIT_CREDS = {}
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"  # close-terminated; fine for one SSE per scan
 
@@ -289,6 +294,7 @@ class Handler(BaseHTTPRequestHandler):
                 "firmware": firmware_capable(),
                 "docker": docker_capable(),
                 "firmwareImage": FIRMWARE_IMAGE,
+                "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
             }))
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
@@ -302,8 +308,32 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/upload":
             self._upload(urllib.parse.parse_qs(parsed.query))
+        elif parsed.path == "/git-cred":
+            self._git_cred()
         else:
             self._send(404, json.dumps({"error": "not found"}))
+
+    def _git_cred(self):
+        """Stash a private-repo token; return a single-use credId."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > 8192:
+            self._send(400, json.dumps({"error": "bad credential request"}))
+            return
+        try:
+            data = json.loads(self.rfile.read(length) or b"{}")
+            token = (data.get("token") or "").strip()
+        except (ValueError, OSError):
+            self._send(400, json.dumps({"error": "invalid JSON"}))
+            return
+        if not token:
+            self._send(400, json.dumps({"error": "token required"}))
+            return
+        cid = secrets.token_hex(16)
+        _GIT_CREDS[cid] = token
+        self._send(200, json.dumps({"credId": cid}))
 
     def _upload(self, qs):
         kind = (qs.get("kind") or [""])[0]
@@ -456,17 +486,26 @@ class Handler(BaseHTTPRequestHandler):
                     fail("Unsafe or unsupported git URL"); return
                 if not shutil.which("git"):
                     fail("git not available in this image"); return
+                # Optional private-repo token (single-use, via POST /git-cred).
+                # Injected into the clone URL only; the log shows the bare URL.
+                clone_url = target
+                cred = g("cred").strip()
+                if cred:
+                    tok = _GIT_CREDS.pop(cred, None)
+                    if tok and target.startswith("https://"):
+                        clone_url = "https://x-access-token:%s@%s" % (tok, target[len("https://"):])
                 cleanup_dir = os.path.join(UPLOAD_DIR, "git-" + secrets.token_hex(8))
                 os.makedirs(cleanup_dir, exist_ok=True)
                 clone_dest = os.path.join(cleanup_dir, "repo")
                 sse("log", json.dumps("▶ Cloning %s ..." % target))
                 cp = subprocess.run(
-                    ["git", "clone", "--depth", "1", "--single-branch", "--", target, clone_dest],
+                    ["git", "clone", "--depth", "1", "--single-branch", "--", clone_url, clone_dest],
                     env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
                 if cp.returncode != 0:
-                    fail("git clone failed: %s" % (cp.stdout or "").strip()[-500:]); return
+                    out = re.sub(r"x-access-token:[^@]*@", "x-access-token:***@", (cp.stdout or "").strip()[-500:])
+                    fail("git clone failed: %s" % out); return
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
                 env["SOURCE_ROOT"] = scan_root_of(clone_dest)
