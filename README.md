@@ -57,6 +57,8 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 
 No CLI knowledge required — **launch → scan → download results** in three steps.
 
+![SBOM Tools web UI](docs/images/web-ui.png)
+
 ```bash
 # 1) Launch (run from the project folder you want to scan)
 cd /path/to/your-project
