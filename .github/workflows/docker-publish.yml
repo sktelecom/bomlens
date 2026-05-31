@@ -12,8 +12,11 @@ on:
       - main          # publish :latest so `--ui` (default image) tracks main
     tags:
       - 'v*.*.*'
-  release:
-    types: [ published ]
+    paths:            # only rebuild when image content changes (not docs-only)
+      - 'docker/**'
+      - '.github/workflows/docker-publish.yml'
+  release:            # paths do NOT apply to release/dispatch — versioned
+    types: [ published ]   # publishes always run regardless of changed files
   workflow_dispatch:
     inputs:
       push:
