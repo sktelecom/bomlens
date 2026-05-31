@@ -37,7 +37,7 @@ DEFAULT_API_KEY="${API_KEY:-odt_YOUR_REAL_API_KEY_HERE}"
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
-FORCE_FIRMWARE="false"
+FORCE_FIRMWARE="false"; ANALYZE_SBOM=""
 
 # ========================================================
 # Parse arguments
@@ -47,6 +47,7 @@ while [[ "$#" -gt 0 ]]; do
         --project) PROJECT_NAME="$2"; shift ;;
         --version) PROJECT_VERSION="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
+        --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
         --generate-only) GENERATE_ONLY="true" ;;
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true" ;;
@@ -65,6 +66,8 @@ Options:
   --version <ver>        Version (required)
   --target <target>      Not set: source (current dir) | image name | file | directory
   --firmware             Force firmware mode for --target file (opt-in image)
+  --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
+                         CycloneDX or SPDX; mutually exclusive with --target.
   --generate-only        Save locally without uploading
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
@@ -146,7 +149,15 @@ is_firmware() {
 }
 
 MODE="SOURCE"
-if [ -n "$TARGET" ]; then
+if [ -n "$ANALYZE_SBOM" ]; then
+    # Supplier SBOM analysis takes precedence; it does not use --target.
+    [ -z "$TARGET" ] || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --target."; exit 1; }
+    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with --analyze."; exit 1; }
+    [ -f "$ANALYZE_SBOM" ] || { echo "[ERROR] --analyze SBOM file not found: $ANALYZE_SBOM"; exit 1; }
+    MODE="ANALYZE"
+    # The risk report needs both license and vulnerability data, so enable them.
+    GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
+elif [ -n "$TARGET" ]; then
     if [ -f "$TARGET" ]; then
         if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then MODE="FIRMWARE"; else MODE="BINARY"; fi
     elif [ -d "$TARGET" ]; then MODE="ROOTFS";
@@ -263,6 +274,7 @@ else
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
+        ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$SOURCE_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
     esac
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
@@ -276,5 +288,9 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     echo "  SBOM: ${OUTPUT_FILE}"
     [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
     [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
+    if [ "$MODE" = "ANALYZE" ]; then
+        echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
+        echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
+    fi
 fi
 echo "=========================================="
