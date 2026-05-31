@@ -10,9 +10,19 @@
 # Responsibilities:
 #   - syft scanning of container images / binaries / RootFS
 #   - normalize, open-source notice, Trivy security report, cosign signing
-#   - the local web UI (Python stdlib)
+#   - the local web UI (React SPA, built in stage 1; served by Python stdlib)
 # ========================================================
 
+# ---- Stage 1: build the React SPA (Vite). node lives ONLY in this stage; the
+#      runtime image copies just the static dist/, so it stays lightweight. ----
+FROM node:22-alpine AS web
+WORKDIR /web
+COPY web/frontend/package.json web/frontend/package-lock.json* ./
+RUN npm ci || npm install
+COPY web/frontend/ ./
+RUN npm run build
+
+# ---- Stage 2: post-process runtime ----
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="SBOM Scanner (post-process)"
@@ -67,7 +77,8 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
 
 COPY entrypoint.sh /usr/local/bin/run-scan
 COPY lib/ /usr/local/lib/sbom/
-COPY web/ /usr/local/lib/sbom-web/
+COPY web/server.py /usr/local/lib/sbom-web/server.py
+COPY --from=web /web/dist /usr/local/lib/sbom-web/dist
 RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh
 
 WORKDIR /src

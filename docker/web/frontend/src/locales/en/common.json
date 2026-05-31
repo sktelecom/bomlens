@@ -1,0 +1,67 @@
+{
+  "appTitle": "SBOM Tools",
+  "subtitle": "SBOM, open-source notices and security reports for a single project — in one run",
+  "form": {
+    "title": "Scan settings",
+    "description": "Enter your project details and pick what to generate.",
+    "project": "Project name",
+    "projectPlaceholder": "my-app",
+    "version": "Version",
+    "versionPlaceholder": "1.0.0",
+    "target": "Target (optional)",
+    "targetPlaceholder": "nginx:latest",
+    "targetHint": "Leave empty to scan the source in the current directory. Enter a Docker image name to scan that image instead.",
+    "options": "Generation options",
+    "run": "Run scan",
+    "running": "Scanning…"
+  },
+  "options": {
+    "notice": "Notice",
+    "noticeHint": "Generate the open-source license NOTICE",
+    "security": "Security report",
+    "securityHint": "Generate a Trivy vulnerability report",
+    "deepLicense": "Deep license",
+    "deepLicenseHint": "ScanCode deep license detection (slow)",
+    "byteStable": "Deterministic output",
+    "byteStableHint": "Strip timestamps for reproducible output"
+  },
+  "progress": {
+    "title": "Run log",
+    "waiting": "Live logs will appear here once a scan starts."
+  },
+  "result": {
+    "title": "Results",
+    "succeeded": "Scan complete",
+    "failed": "Scan failed",
+    "components": "Components",
+    "vulnerabilities": "Vulnerabilities",
+    "noSecurity": "Security report was not generated",
+    "severityTitle": "Severity distribution",
+    "noVulns": "No vulnerabilities found",
+    "artifacts": "Generated artifacts",
+    "artifactsEmpty": "No artifacts were generated.",
+    "download": "Download",
+    "view": "View"
+  },
+  "severity": {
+    "CRITICAL": "Critical",
+    "HIGH": "High",
+    "MEDIUM": "Medium",
+    "LOW": "Low",
+    "UNKNOWN": "Unknown"
+  },
+  "viewer": {
+    "open": "View artifact",
+    "close": "Close"
+  },
+  "theme": {
+    "toLight": "Switch to light",
+    "toDark": "Switch to dark"
+  },
+  "lang": {
+    "label": "Language"
+  },
+  "validation": {
+    "required": "Enter a project name and version."
+  }
+}
