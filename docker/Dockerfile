@@ -45,7 +45,6 @@ ARG TARGETARCH=amd64
 ARG SBOM_FIRMWARE=false
 ARG UNBLOB_VERSION=26.3.30
 ARG CVE_BIN_TOOL_VERSION=3.4
-ARG BINWALK_VERSION=2.1.0
 ARG UBI_READER_VERSION=0.8.13
 
 # jq (helper scripts), curl/tar (installers), file (binary mode).
@@ -84,10 +83,14 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
     fi
 
 # Firmware unpack + binary identification (opt-in: --build-arg SBOM_FIRMWARE=true).
-#   unblob/binwalk = MIT (unpackers); cve-bin-tool/ubi_reader = GPL (binary ID, UBI).
-#   squashfs-tools/e2fsprogs/p7zip/unar/... are the extractor binaries unblob shells out to.
-#   Built only into ghcr.io/sktelecom/sbom-scanner-firmware so the base image stays GPL-free.
-#   NOTE: vendor-modified (non-standard) squashfs needs sasquatch added on top of this.
+#   unblob = MIT (primary unpacker); cve-bin-tool/ubi_reader = GPL (binary ID, UBI).
+#   squashfs-tools/e2fsprogs/p7zip/unar/jefferson/... are the extractor binaries
+#   unblob shells out to; unsquashfs (squashfs-tools) is also the standard-squashfs
+#   fallback used by scan-firmware.sh when unblob's sasquatch handler is absent.
+#   Built only into ghcr.io/sktelecom/sbom-scanner-firmware so the base stays GPL-free.
+#   NOTE: the PyPI `binwalk` 2.x dist is broken (no binwalk.core), so it is NOT
+#   installed; unsquashfs covers the common squashfs case. vendor-modified
+#   (non-standard) squashfs still needs sasquatch added on top of this.
 RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       apt-get update && apt-get install -y --no-install-recommends \
         squashfs-tools e2fsprogs p7zip-full unar cpio cabextract \
@@ -95,7 +98,6 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       && pip3 install --no-cache-dir \
         "unblob==${UNBLOB_VERSION}" \
         "cve-bin-tool==${CVE_BIN_TOOL_VERSION}" \
-        "binwalk==${BINWALK_VERSION}" \
         "ubi_reader==${UBI_READER_VERSION}" \
       && rm -rf /var/lib/apt/lists/* \
       && unblob --version && cve-bin-tool --version; \

@@ -47,25 +47,39 @@ FILE_INFO="firmware image"
 command -v file >/dev/null 2>&1 && FILE_INFO=$(file -b "$FW" 2>/dev/null || echo "firmware image")
 
 # --------------------------------------------------------
-# ① Unpack — unblob preferred, BANG / binwalk as fallback.
+# ① Unpack — unblob preferred; BANG, then format-specific extractors, as fallback.
+# Each step is gated on whether real files actually landed (exit codes are
+# unreliable: unblob returns 0 even when an extractor dependency is missing).
 # --------------------------------------------------------
+has_extracted() { [ -n "$(find "$EXTRACT" -type f -size +0c 2>/dev/null | head -1)" ]; }
 unpacked=0
+
 if command -v unblob >/dev/null 2>&1; then
     echo "[firmware] unpacking with unblob..."
-    if unblob --extract-dir "$EXTRACT" "$FW" >/dev/null 2>&1; then unpacked=1; fi
+    unblob --extract-dir "$EXTRACT" "$FW" >/dev/null 2>&1 || true
+    has_extracted && unpacked=1
 fi
 if [ "$unpacked" = 0 ] && command -v bang-scanner >/dev/null 2>&1; then
-    echo "[firmware] unblob unavailable/failed; falling back to BANG..."
-    if bang-scanner -f "$FW" -u "$EXTRACT" >/dev/null 2>&1; then unpacked=1; fi
+    echo "[firmware] unblob produced nothing; falling back to BANG..."
+    bang-scanner -f "$FW" -u "$EXTRACT" >/dev/null 2>&1 || true
+    has_extracted && unpacked=1
+fi
+# squashfs is the most common firmware filesystem; unsquashfs (squashfs-tools)
+# handles standard images even when unblob's sasquatch handler is absent.
+if [ "$unpacked" = 0 ] && command -v unsquashfs >/dev/null 2>&1 && printf '%s' "$FILE_INFO" | grep -qi squashfs; then
+    echo "[firmware] falling back to unsquashfs..."
+    unsquashfs -f -d "$EXTRACT/squashfs-root" "$FW" >/dev/null 2>&1 || true
+    has_extracted && unpacked=1
 fi
 if [ "$unpacked" = 0 ] && command -v binwalk >/dev/null 2>&1; then
     echo "[firmware] falling back to binwalk extraction..."
-    if binwalk --run-as=root --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 \
-       || binwalk --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1; then unpacked=1; fi
+    binwalk --run-as=root --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 \
+        || binwalk --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 || true
+    has_extracted && unpacked=1
 fi
 
 if [ "$unpacked" = 0 ]; then
-    echo "[firmware] WARN: no unpacker succeeded (unblob/BANG/binwalk)." >&2
+    echo "[firmware] WARN: no unpacker produced files (unblob/BANG/unsquashfs/binwalk)." >&2
     echo "[firmware]       Firmware may be encrypted/signed or in an unsupported format; emitting best-effort SBOM." >&2
 fi
 
@@ -112,7 +126,8 @@ fi
 # --------------------------------------------------------
 # ④ Merge package + binary components, dedupe by purl (fallback name@version).
 # --------------------------------------------------------
-comps_of() { jq -c '[.components[]? | select(.name != null)]' "$1" 2>/dev/null || echo '[]'; }
+# Keep only components with a real name (drops syft's empty "os:unknown" noise).
+comps_of() { jq -c '[.components[]? | select((.name // "") != "")]' "$1" 2>/dev/null || echo '[]'; }
 PKG_COMPS=$(comps_of "$PKG_SBOM")
 BIN_COMPS=$(comps_of "$BIN_SBOM")
 

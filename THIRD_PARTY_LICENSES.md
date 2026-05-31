@@ -34,15 +34,16 @@
 | 도구 | 핀 버전 (ARG) | 용도 | 라이선스 (SPDX) | Copyleft | Source |
 |------|------|------|------------------|----------|--------|
 | unblob | 26.3.30 (`UNBLOB_VERSION`) | 펌웨어 언팩(주) | MIT | permissive | https://github.com/onekey-sec/unblob |
-| binwalk | 2.1.0 (`BINWALK_VERSION`) | 언팩 폴백 | MIT | permissive | https://github.com/ReFirmLabs/binwalk |
 | cve-bin-tool | 3.4 (`CVE_BIN_TOOL_VERSION`) | stripped 바이너리 식별+CVE | **GPL-3.0** | strong | https://github.com/intel/cve-bin-tool |
 | ubi_reader | 0.8.13 (`UBI_READER_VERSION`) | UBI/UBIFS 추출 | **GPL-3.0** | strong | https://github.com/onekey-sec/ubi_reader |
-| squashfs-tools, e2fsprogs, p7zip, unar, cpio, cabextract 등 | (apt 배포 버전) | unblob/binwalk가 호출하는 추출 바이너리 | GPL-2.0+ / 기타 | strong/various | Debian 패키지 |
+| squashfs-tools(unsquashfs) | (apt 배포 버전) | 표준 squashfs 추출 폴백 | GPL-2.0+ | strong | https://github.com/plougher/squashfs-tools |
+| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson 등 | (apt 배포 버전) | unblob가 호출하는 추출 바이너리 | GPL-2.0+ / 기타 | strong/various | Debian 패키지 |
 
 ### 폴백·선택 도구 (기본 미설치)
 
-- **BANG** (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh`는 `bang-scanner`가 PATH에 있으면 언팩 폴백으로 사용합니다. 의존성이 무거워 기본 이미지에는 포함하지 않으며, 필요 시 별도로 설치하면 자동 인식됩니다(폴백 순서: unblob → BANG → binwalk).
-- **sasquatch** (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용. 표준 squashfs는 `squashfs-tools`(unsquashfs)로 충분하므로 기본 미포함입니다.
+- **BANG** (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh`는 `bang-scanner`가 PATH에 있으면 언팩 폴백으로 사용합니다. 의존성이 무거워 기본 이미지에는 포함하지 않으며, 필요 시 별도로 설치하면 자동 인식됩니다. 언팩 폴백 순서: **unblob → BANG → unsquashfs(squashfs) → binwalk**.
+- **binwalk**: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 **설치하지 않습니다**. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 사용하지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
+- **sasquatch** (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용(unblob 핸들러가 사용). 표준 squashfs는 `squashfs-tools`(unsquashfs) 폴백으로 충분하므로 기본 미포함입니다.
 
 ### GPL 소스 오퍼 (펌웨어 이미지)
 위 GPL 도구들은 모두 공개 저장소/패키지 레지스트리에서 고정 버전으로 취득됩니다. `sbom-tools`는 이미지에 설치된 것과 **동일한 버전의 대응 소스코드**를 위 Source URL(해당 버전 태그/릴리스)에서 제공받을 수 있도록 보장합니다. 펌웨어 이미지에는 `com.sktelecom.sbom.gpl-source-offer` 라벨로 본 문서 경로가 임베드됩니다. 추가 요청은 프로젝트 저장소 이슈로 문의하십시오.
