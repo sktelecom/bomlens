@@ -149,6 +149,17 @@ pp_env() {
         "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL"
 }
 
+# cosign key mount + env, only when --sign is set with a real key. The private
+# key dir is mounted READ-ONLY and the password comes from the host env — never
+# hardcoded (CLAUDE.md security). Without this the container's COSIGN_KEY is
+# unset and entrypoint.sh skips signing, so `--sign` produced no .sig.
+cosign_run() {
+    [ "$SIGN_SBOM" = "true" ] && [ -n "${COSIGN_KEY:-}" ] && [ -f "$COSIGN_KEY" ] || return 0
+    local d f
+    d="$(cd "$(dirname "$COSIGN_KEY")" && pwd)"; f="$(basename "$COSIGN_KEY")"
+    printf ' -v %q:/cosign:ro -e COSIGN_KEY=%q -e COSIGN_PASSWORD=%q' "$d" "/cosign/$f" "${COSIGN_PASSWORD:-}"
+}
+
 # ========================================================
 # Detect target type
 # ========================================================
@@ -425,7 +436,7 @@ if [ "$MODE" = "SOURCE" ]; then
     eval docker run --rm \
         -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$SOURCE_DIR\"":/host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS $(pp_env) \
+        -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
     # image / binary / rootfs / firmware: scanner image runs syft + pipeline in one shot.
@@ -440,7 +451,7 @@ else
     esac
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" $ENVV $(pp_env) \
+        -e MODE="$MODE" $ENVV $(pp_env)$(cosign_run) \
         "\"$RUN_IMAGE\""
 fi
 
