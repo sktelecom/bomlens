@@ -32,6 +32,7 @@ jobs:
           - php
           - rust
           - dotnet
+          - swift
           # docker example excluded - Dockerfile alone doesn't generate components
       fail-fast: false
     
