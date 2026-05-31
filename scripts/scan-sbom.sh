@@ -209,10 +209,14 @@ if [ "$MODE" = "SOURCE" ]; then
     CACHE_MOUNTS=""
     [ -d "$HOME/.gradle" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$HOME/.gradle\":/root/.gradle"
     [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$HOME/.m2\":/root/.m2"
+    # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
+    # so maven/cargo/etc. caches resolve regardless of the base image's user.
     eval docker run --rm \
         -v "\"$SOURCE_DIR\"":/app \
         -v "\"$BUILD_PREP\"":/tmp/build-prep.sh:ro \
         $CACHE_MOUNTS \
+        -e HOME=/tmp/sbomhome \
+        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
         --entrypoint sh "\"$CDX_IMG\"" \
         -c "'sh /tmp/build-prep.sh /app \"/app/$OUTPUT_FILE\" 1.6'" \
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }

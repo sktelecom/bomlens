@@ -19,6 +19,8 @@ set +e
 SRC="${1:-/app}"
 OUT="${2:-$SRC/bom.json}"
 SPEC="${3:-1.6}"
+# Ensure HOME exists & is writable (maven/cargo/etc. caches) for any base user.
+mkdir -p "${HOME:-/tmp/sbomhome}" 2>/dev/null || true
 cd "$SRC" 2>/dev/null || exit 0
 
 log() { echo "[build-prep] $*"; }
