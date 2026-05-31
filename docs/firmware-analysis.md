@@ -2,7 +2,7 @@
 
 > **관련 문서**: [아키텍처](architecture.md) · [방향성 조사 보고서](direction-study.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [번들 도구 라이선스](../THIRD_PARTY_LICENSES.md)
 >
-> 성격: 설계·의사결정 문서 (메인테이너용). 일부 단계는 **구현 예정**이며 본문에 명시했습니다.
+> 성격: 설계·의사결정 문서 (메인테이너용). **Phase 1+2는 구현·머지 완료**이며(§5), §1의 "현재"는 **펌웨어 도구가 없는 기본 이미지 기준**의 한계를 뜻합니다 — opt-in `sbom-scanner-firmware` 이미지(`--firmware`)가 이를 해소합니다. Phase 3(함수 핑거프린팅)만 선택적 향후 과제입니다.
 
 ## 요약 (Executive Summary)
 
@@ -30,7 +30,9 @@
 
 ## 1. 현재 능력과 한계
 
-펌웨어는 운영체제·라이브러리 수십 개가 **통째로 압축·밀봉된 이삿짐 가방**과 같습니다. 현재 파이프라인은 이 가방을 **열지 못합니다**.
+> 이 절은 **펌웨어 도구가 없는 기본 이미지** 기준의 baseline입니다. `--firmware`로 진입하는 opt-in `sbom-scanner-firmware` 이미지는 §5처럼 언팩+바이너리 식별을 수행합니다(구현 완료).
+
+펌웨어는 운영체제·라이브러리 수십 개가 **통째로 압축·밀봉된 이삿짐 가방**과 같습니다. 기본 이미지의 파이프라인만으로는 이 가방을 **열지 못합니다**.
 
 | 입력 | 현재 동작 | 결과 |
 |------|-----------|------|
@@ -180,9 +182,9 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 1. **SCANOSS** winnowing 통합 — 공개 OSSKB, CycloneDX 병합, 통합 난이도 낮음.
 2. **EMBA** 결과 수집기 연계 — 펌웨어 전용, CycloneDX+VEX.
 3. 함수 핑거프린팅이 필요하면 **LibDB/BinaryAI**(학술 공개 모델/DB) 실험 또는 **Ghidra BSim 커스텀 DB** 자체 구축(3~6개월 고비용).
-4. 그 외: 중첩 추출, 커널/모듈, rootfs deep-license(scancode), UI 업로드 경로(`docker/web/server.py`).
+4. 그 외: 중첩 추출, 커널/모듈, rootfs deep-license(scancode). (웹 UI "펌웨어 업로드"는 구현 완료.)
 
-> 이번 구현 목표는 **Phase 1+2** 입니다.
+> **Phase 1+2는 구현·머지 완료**입니다. Phase 3(정확도 고도화)만 선택 과제로 남습니다.
 
 ---
 

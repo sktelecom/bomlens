@@ -42,7 +42,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
   ```
 - 모든 예시는 **스캔할 프로젝트 루트**에서 실행합니다.
 
-> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. Dependency-Track 업로드를 함께 쓰려면 생략하세요.
+> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. trustedoss-portal(Dependency-Track 호환) 자동 업로드를 함께 쓰려면 생략하세요.
 
 ---
 
@@ -218,7 +218,7 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 > **펌웨어 업로드** 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
 >
-> **참고:** UI의 소스 스캔(현재 디렉터리/ZIP/GitHub)은 컨테이너 내부에서 **syft**로 디렉터리를 분석합니다. 잠금 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있는 경우 더 깊은 해석이 필요하면 CLI 소스 모드(cdxgen)를 사용하세요.
+> **참고:** UI의 소스 스캔(현재 폴더/ZIP/GitHub)은 컨테이너 내부에서 **syft**로 디렉터리를 분석합니다. 잠금 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있는 경우 더 깊은 해석이 필요하면 CLI 소스 모드(cdxgen)를 사용하세요.
 
 **포트 변경 / 충돌 시:** 기본 포트(8080)가 다른 서비스에 점유돼 있으면 다른 포트를 지정하세요:
 ```bash

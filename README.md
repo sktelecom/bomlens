@@ -31,7 +31,7 @@ cd ~/sbom-output     # any folder — this is where results are saved
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-Enter **project + version**, pick an **input type** (current directory / GitHub URL / ZIP / SBOM / firmware upload / Docker image), click **Run scan**, then view/download the results.
+Enter **project + version**, pick a **scan target** (current folder / GitHub URL / ZIP / SBOM / firmware upload / Docker image), click **Run scan**, then view/download the results.
 
 ### CLI
 

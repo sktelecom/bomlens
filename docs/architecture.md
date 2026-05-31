@@ -243,10 +243,13 @@ flowchart TD
     E -->|아니오| F
     E1 --> F
     F{"⑤ SIGN_SBOM<br/>&& COSIGN_KEY"} -->|예| F1["cosign sign-blob →<br/>bom.json.sig"]
-    F -->|아니오| G
-    F1 --> G
-    G["⑥ 산출물 호스트 복사 — 항상"] --> H
-    H{"⑦ UPLOAD_ENABLED"} -->|기본| H1["curl → Dependency-Track"]
+    F -->|아니오| R
+    F1 --> R
+    R{"⑥ GENERATE_REPORT<br/>(기본 on)"} -->|예| R1["generate-risk-report.sh →<br/>_risk-report.md / .html"]
+    R -->|--no-report| G
+    R1 --> G
+    G["⑦ 산출물 호스트 복사 — 항상"] --> H
+    H{"⑧ UPLOAD_ENABLED"} -->|기본| H1["curl → trustedoss-portal"]
     H -->|false (--generate-only)| Z([종료])
     H1 --> Z
 
@@ -263,8 +266,9 @@ flowchart TD
 | ③ | **고지문** | `generate-notice.sh` (jq) | `--notice` / `--all` | `_NOTICE.txt`, `_NOTICE.html` |
 | ④ | **보안 보고서** | `scan-security.sh` (Trivy) | `--security` / `--all` | `_security.{json,md,html}` |
 | ⑤ | **서명** | `cosign sign-blob` | `--sign` + `COSIGN_KEY` | `bom.json.sig` |
-| ⑥ | **호스트 복사** | `cp` | 항상 | `HOST_OUTPUT_DIR`로 복사 |
-| ⑦ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | Dependency-Track 등록 |
+| ⑥ | **위험분석보고서** | `generate-risk-report.sh` | 기본 (`--no-report`로 생략) | `_risk-report.{md,html}` (+ ANALYZE면 `_conformance.*`) |
+| ⑦ | **호스트 복사** | `cp` | 항상 | `HOST_OUTPUT_DIR`로 복사 |
+| ⑧ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | trustedoss-portal(Dependency-Track 호환) 등록 |
 
 > **순서가 고정인 이유**: 정규화는 이후 모든 단계의 입력을 안정화하므로 가장 먼저, 서명은 최종 `bom.json`을 대상으로 해야 하므로 가장 나중에 실행됩니다. 각 단계는 실패해도 `|| true`/경고로 처리되어 전체 스캔을 중단시키지 않습니다(서명·업로드 제외).
 
@@ -272,25 +276,31 @@ flowchart TD
 
 ## 입력 타입별 분기
 
-`scan-sbom.sh`는 `--target` 값을 보고 모드를 자동 결정합니다.
+`scan-sbom.sh`는 `--git`/`--analyze`/`--firmware`와 `--target` 값을 보고 모드를 자동 결정합니다.
 
 ```mermaid
 flowchart TD
-    T{"--target 값"} -->|미지정| SOURCE["MODE=SOURCE<br/>현재 디렉터리 소스 → cdxgen"]
-    T -->|존재하는 파일| BINARY["MODE=BINARY → syft"]
-    T -->|존재하는 디렉터리| ROOTFS["MODE=ROOTFS → syft"]
-    T -->|그 외 문자열| IMAGE["MODE=IMAGE<br/>Docker 이미지명 → syft"]
-
-    UI["--ui"] --> UIMODE["MODE=UI<br/>웹 서버 기동 (python3 server.py)"]
+    G{"입력"} -->|"--git URL / URL형 target"| GIT["clone → MODE=SOURCE"]
+    G -->|"--target *.zip/*.tar.gz"| ZIP["압축 해제 → MODE=SOURCE"]
+    G -->|"--analyze sbom"| ANALYZE["MODE=ANALYZE<br/>검증 + CDX 변환"]
+    G -->|"target 미지정"| SOURCE["MODE=SOURCE<br/>현재 디렉터리 → cdxgen"]
+    G -->|"존재 파일"| FB{"펌웨어?"}
+    FB -->|"--firmware / 확장자·magic"| FIRMWARE["MODE=FIRMWARE<br/>opt-in 펌웨어 이미지"]
+    FB -->|"아니오"| BINARY["MODE=BINARY → syft"]
+    G -->|"존재 디렉터리"| ROOTFS["MODE=ROOTFS → syft"]
+    G -->|"그 외 문자열"| IMAGE["MODE=IMAGE → syft"]
+    UI["--ui"] --> UIMODE["MODE=UI<br/>웹 서버 (server.py)"]
 ```
 
 | 모드 | 트리거 | 생성 도구 | 비고 |
 |------|--------|-----------|------|
-| `SOURCE` | 기본 (target 미지정) | cdxgen | 언어 감지 → 언어별 이미지 라우팅 |
+| `SOURCE` | target 미지정 · `--git <url>` · `--target *.zip/*.tar.gz` | cdxgen | 언어 감지 → 언어별 이미지. git는 clone, 아카이브는 자동 해제 후 소스로 처리. (웹 UI의 SOURCE는 컨테이너 내 `syft dir:`) |
+| `ANALYZE` | `--analyze <sbom>` (별칭 `--sbom`) | — | 공급사 SBOM(CycloneDX/SPDX) 검증 → CDX 변환 → 재집계. `_conformance.*` 생성 |
+| `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `sbom-scanner-firmware`. 상세 [firmware-analysis.md](firmware-analysis.md) |
 | `BINARY` | `--target <파일>` | syft | `file:` 스킴 |
 | `ROOTFS` | `--target <디렉터리>` | syft | `dir:` 스킴 |
 | `IMAGE` | `--target <이미지명>` | syft | docker.sock 마운트 |
-| `UI` | `--ui` | — | 브라우저 UI, 후속 스캔을 폼으로 실행 |
+| `UI` | `--ui` | — | 브라우저 UI, 6종 스캔 대상을 폼/업로드로 실행 |
 
 ---
 
@@ -300,15 +310,21 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 | 플래그 | 환경변수 | 켜지는 단계 |
 |--------|----------|-------------|
-| (기본) | — | normalize + 업로드 |
+| (기본) | `GENERATE_REPORT=true` (+ notice·security) | normalize + **위험분석보고서** + 업로드 |
+| `--no-report` | `GENERATE_REPORT=false` | 위험분석보고서·고지문·보안 강제 활성화 안 함 |
 | `--notice` | `GENERATE_NOTICE=true` | ③ 고지문 |
 | `--security` | `GENERATE_SECURITY=true` | ④ 보안 보고서 |
 | `--all` | 위 둘 다 | ③ + ④ |
+| `--git <url>` / `--branch` | (호스트에서 clone) | SOURCE 입력 수집 |
+| `--analyze <sbom>` | `MODE=ANALYZE` | 공급사 SBOM 검증·변환·보고서 |
+| `--firmware` | `MODE=FIRMWARE` (펌웨어 이미지) | 언팩 → syft + cve-bin-tool |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
-| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 |
+| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (CLI 전용) |
 | `--sign` | `SIGN_SBOM=true` (+ `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ 서명 |
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ 업로드 생략 |
 | `--ui` | `MODE=UI` | 웹 UI |
+
+> **위험분석보고서**(`_risk-report.{md,html}`)는 모든 모드에서 **기본 생성**됩니다(라이선스+취약점 집계). 이를 위해 고지문·보안 스캔이 자동으로 함께 켜지며, `--no-report`로 끌 수 있습니다.
 
 각 기능의 **사용법**은 [고지문·보안·UI 가이드](notice-security-ui-guide.md)를 참조하세요.
 
@@ -321,8 +337,10 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | 파일 | 생성 조건 |
 |------|-----------|
 | `{P}_{V}_bom.json` | 항상 (CycloneDX 1.6) |
-| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` |
-| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` |
+| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 생성 시 |
+| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 생성 시 |
+| `{P}_{V}_risk-report.md` / `.html` | 기본 (전 모드) — `--no-report`로 생략 |
+| `{P}_{V}_conformance.json` / `.md` / `.html` | `--analyze` (공급사 SBOM 검증) |
 | `{P}_{V}_scancode.json` | `--deep-license` |
 | `{P}_{V}_bom.json.sig` | `--sign` |
 

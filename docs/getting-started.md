@@ -87,7 +87,7 @@ Windows에서는 `scripts\sbom-ui.bat`를 **더블클릭**합니다. (포트 충
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
 
-UI 화면 구성·입력 유형별 상세는 [고지문·보안·UI 가이드](notice-security-ui-guide.md#웹-ui---ui)를 참고하세요. 아래는 동일한 작업을 **명령줄(CLI)**로 하는 방법입니다.
+UI 화면 구성·스캔 대상별 상세는 [고지문·보안·UI 가이드](notice-security-ui-guide.md#웹-ui---ui)를 참고하세요. 아래는 동일한 작업을 **명령줄(CLI)**로 하는 방법입니다.
 
 ## 첫 번째 SBOM 생성 (CLI)
 
@@ -188,10 +188,9 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
 
 ```bash
 # 컴포넌트 수 확인
-cat MyApp_1.0.0_bom.json | python3 -m json.tool | grep '"name"' | wc -l
-
-# jq 사용 시
 jq '.components | length' MyApp_1.0.0_bom.json
+
+# 사용된 라이선스 목록
 jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 ```
 
