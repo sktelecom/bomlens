@@ -329,11 +329,13 @@ detect_lang() {
     [ -f "$d/Cargo.toml" ] && langs="$langs rust"
     [ -f "$d/go.mod" ] && langs="$langs go"
     [ -f "$d/Gemfile" ] && langs="$langs ruby"
-    { [ -f "$d/pom.xml" ] || ls "$d"/*.gradle "$d"/*.gradle.kts >/dev/null 2>&1; } && langs="$langs java"
+    # Separate single-pattern globs: `ls a.gradle *.gradle.kts` exits non-zero when
+    # one variant is absent, which would mis-skip gradle-only / kts-only projects.
+    { [ -f "$d/pom.xml" ] || ls "$d"/*.gradle >/dev/null 2>&1 || ls "$d"/*.gradle.kts >/dev/null 2>&1; } && langs="$langs java"
     { [ -f "$d/requirements.txt" ] || [ -f "$d/pyproject.toml" ]; } && langs="$langs python"
     [ -f "$d/package.json" ] && langs="$langs node"
     [ -f "$d/composer.json" ] && langs="$langs php"
-    ls "$d"/*.csproj "$d"/*.sln >/dev/null 2>&1 && langs="$langs dotnet"
+    { ls "$d"/*.csproj >/dev/null 2>&1 || ls "$d"/*.sln >/dev/null 2>&1; } && langs="$langs dotnet"
     # C/C++ with a package manager (Conan / vcpkg). cdxgen's all-in-one image
     # resolves these; raw CMake/Make C/C++ has no manifest and stays "unknown".
     { [ -f "$d/conanfile.txt" ] || [ -f "$d/conanfile.py" ] || [ -f "$d/vcpkg.json" ]; } && langs="$langs cpp"
@@ -404,7 +406,10 @@ if [ "$MODE" = "SOURCE" ]; then
     [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$HOME/.m2\":/root/.m2"
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
-    eval docker run --rm \
+    # -u 0:0: the all-in-one fallback image runs as a non-root user and could not
+    # write the host-owned /app on Linux (EACCES). Per-language images are already
+    # root (no-op); the resulting bom is chown'd back to the host user in stage 2.
+    eval docker run --rm -u 0:0 \
         -v "\"$SCAN_INPUT_DIR\"":/app \
         -v "\"$BUILD_PREP\"":/tmp/build-prep.sh:ro \
         $CACHE_MOUNTS \
