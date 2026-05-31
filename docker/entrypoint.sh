@@ -223,12 +223,19 @@ fi
 if [ -n "$HOST_OUTPUT_DIR" ] && [ -d "$HOST_OUTPUT_DIR" ]; then
     for art in "${ARTIFACTS[@]}"; do
         [ -f "$art" ] || continue
-        if [ "$art" -ef "$HOST_OUTPUT_DIR/$(basename "$art")" ]; then
+        dest="$HOST_OUTPUT_DIR/$(basename "$art")"
+        if [ "$art" -ef "$dest" ]; then
             echo "[SUCCESS] saved (in-place): $art"
         elif cp "$art" "$HOST_OUTPUT_DIR/" 2>/dev/null; then
-            echo "[SUCCESS] copied: $HOST_OUTPUT_DIR/$(basename "$art")"
+            echo "[SUCCESS] copied: $dest"
         else
             echo "[WARN] copy failed for $art (available in container at: $art)"
+            continue
+        fi
+        # Hand ownership back to the calling user so Linux hosts/CI runners can
+        # read the artifacts (the container runs as root). No-op/ignored on macOS.
+        if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+            chown "${HOST_UID}:${HOST_GID}" "$dest" 2>/dev/null || true
         fi
     done
 else

@@ -141,10 +141,12 @@ UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 cleanup() { local d; for d in "${CLEANUP_DIRS[@]}"; do [ -n "$d" ] && rm -rf -- "$d"; done; }
 trap cleanup EXIT INT TERM
 
-# Common -e flags for the post-process image
+# Common -e flags for the post-process image.
+# HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
+# user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e API_KEY=%q -e API_URL=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$DEFAULT_API_KEY" "$SERVER_URL"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL"
 }
 
 # ========================================================
