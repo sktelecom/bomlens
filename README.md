@@ -21,9 +21,9 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 
 ### Web UI — easiest (no CLI needed)
 
-**launch → scan → download**, in the browser.
+**launch → scan → download**, in the browser. Live logs stream as it runs.
 
-![SBOM Tools web UI](docs/images/web-ui.png)
+![SBOM Tools web UI — a scan in progress with live logs](docs/images/web-ui-scan.png)
 
 ```bash
 cd ~/sbom-output     # any folder — this is where results are saved

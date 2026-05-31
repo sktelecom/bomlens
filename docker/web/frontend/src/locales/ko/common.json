@@ -13,9 +13,9 @@
     "running": "스캔 중…"
   },
   "source": {
-    "label": "입력 유형",
-    "currentDir": "현재 디렉터리",
-    "currentDirHint": "컨테이너에 마운트된 현재 디렉터리(/src)의 소스를 스캔합니다.",
+    "label": "스캔 대상",
+    "currentDir": "현재 폴더",
+    "currentDirHint": "UI를 실행한 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다.",
     "gitUrl": "GitHub URL",
     "gitHint": "공개 저장소는 바로, 비공개는 GIT_TOKEN 설정 시 클론됩니다.",
     "gitPlaceholder": "https://github.com/org/repo",
@@ -37,9 +37,7 @@
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "정밀 라이선스",
-    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)",
-    "byteStable": "결정론적 출력",
-    "byteStableHint": "타임스탬프 제거로 재현 가능한 출력"
+    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)"
   },
   "progress": {
     "title": "실행 로그",
