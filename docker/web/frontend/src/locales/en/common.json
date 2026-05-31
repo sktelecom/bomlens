@@ -8,9 +8,6 @@
     "projectPlaceholder": "my-app",
     "version": "Version",
     "versionPlaceholder": "1.0.0",
-    "target": "Target (optional)",
-    "targetPlaceholder": "nginx:latest",
-    "targetHint": "Leave empty to scan the source in the current directory. Enter a Docker image name to scan that image instead.",
     "options": "Generation options",
     "run": "Run scan",
     "running": "Scanning…"

@@ -63,12 +63,14 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 **1단계 — UI 실행**
 
 ```bash
-# 스캔하려는 프로젝트 폴더로 이동한 뒤 실행
-cd /path/to/your-project
+# 결과물을 저장할 폴더에서 실행 (어디든 무방)
+cd ~/sbom-output
 /path/to/sbom-tools/scripts/scan-sbom.sh --ui
 #  → 잠시 후 브라우저에서 http://localhost:8080 가 자동으로 열립니다
 ```
 Windows에서는 `scripts\sbom-ui.bat`를 **더블클릭**합니다. (포트 충돌 시 `UI_PORT=9090 ... --ui`)
+
+> 실행 위치(현재 폴더)는 **산출물이 저장되는 곳**이자, 입력 유형 **"현재 디렉터리"**를 골랐을 때 **스캔 대상**이 됩니다. GitHub URL·ZIP/SBOM/펌웨어 업로드·Docker 이미지를 쓸 거라면 입력을 UI에서 직접 주므로 **아무 폴더에서나 실행**해도 됩니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하세요.
 
 **2단계 — 스캔**
 
