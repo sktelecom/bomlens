@@ -172,7 +172,7 @@ generate-sbom:
 
 ## 출력 형식
 
-생성된 SBOM은 **CycloneDX 1.4** JSON 형식입니다.
+생성된 SBOM은 **CycloneDX 1.6** JSON 형식입니다.
 
 **파일명**: `{ProjectName}_{Version}_bom.json` (예: `MyApp_1.0.0_bom.json`)
 
@@ -180,7 +180,7 @@ generate-sbom:
 
 ```
 bomFormat          "CycloneDX"
-specVersion        "1.4"
+specVersion        "1.6"
 metadata
   ├── timestamp    생성 시각 (ISO 8601)
   └── component    프로젝트 정보 (name, version, type)

@@ -99,12 +99,12 @@ cd /path/to/your/project
 
 예시: `MyApp_1.0.0_bom.json`
 
-파일은 [CycloneDX 1.4](https://cyclonedx.org/) 형식의 JSON입니다.
+파일은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON입니다.
 
 ```json
 {
   "bomFormat": "CycloneDX",
-  "specVersion": "1.4",
+  "specVersion": "1.6",
   "version": 1,
   "metadata": {
     "timestamp": "2026-01-15T10:30:00Z",
