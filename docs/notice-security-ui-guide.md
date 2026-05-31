@@ -1,10 +1,10 @@
 # 고지문 · 보안 보고서 · 웹 UI 가이드
 
-> sbom-tools는 SBOM 생성에 더해 **오픈소스 고지문(NOTICE)**, **보안 취약점 보고서**를 한 번에 만들고, CLI에 익숙하지 않은 사용자를 위한 **웹 UI**를 제공합니다. 이 문서는 이 세 기능의 사용법을 다룹니다.
+> sbom-tools는 SBOM 생성에 더해 오픈소스 고지문(NOTICE)과 보안 취약점 보고서를 한 번에 만들고, CLI에 익숙하지 않은 사용자를 위한 웹 UI를 제공합니다. 이 문서는 이 세 기능의 사용법을 다룹니다.
 
-## ⚡ Quickstart (5분)
+## Quickstart (5분)
 
-처음이라면 **이것만** 따라 하면 됩니다. Docker Desktop이 실행 중인 상태에서, **스캔할 프로젝트 폴더로 이동**한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
+처음이라면 이것만 따라 하면 됩니다. Docker Desktop이 실행 중인 상태에서 스캔할 프로젝트 폴더로 이동한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
@@ -17,10 +17,10 @@ $SBOM --project MyApp --version 1.0.0 --all --generate-only
 $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 UI_PORT=9090 $SBOM --ui)
 ```
 
-끝나면 같은 폴더에 생긴 **`MyApp_1.0.0_NOTICE.html`**(고지문)과 **`MyApp_1.0.0_security.html`**(보안)을 브라우저로 열어 결과를 바로 확인하세요. 더 자세한 옵션은 아래를 참고하세요.
+끝나면 같은 폴더에 생긴 `MyApp_1.0.0_NOTICE.html`(고지문)과 `MyApp_1.0.0_security.html`(보안)을 브라우저로 열어 결과를 바로 확인하세요. 더 자세한 옵션은 아래를 참고하세요.
 
 ## 목차
-- [⚡ Quickstart (5분)](#-quickstart-5분)
+- [Quickstart (5분)](#quickstart-5분)
 - [사전 준비](#사전-준비)
 - [한 번에 모두 생성하기 (`--all`)](#한-번에-모두-생성하기---all)
 - [오픈소스 고지문 (`--notice`)](#오픈소스-고지문---notice)
@@ -40,7 +40,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
   ```bash
   docker pull ghcr.io/sktelecom/sbom-scanner:latest
   ```
-- 모든 예시는 **스캔할 프로젝트 루트**에서 실행합니다.
+- 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 
 > 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. trustedoss-portal(Dependency-Track 호환) 자동 업로드를 함께 쓰려면 생략하세요.
 
@@ -48,7 +48,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
 
 ## 한 번에 모두 생성하기 (`--all`)
 
-`--all`은 `--notice --security`의 단축형입니다. SBOM·고지문·보안보고서를 한 번의 스캔으로 만듭니다.
+`--all`은 `--notice --security`의 단축형입니다. SBOM과 고지문, 보안보고서를 한 번의 스캔으로 만듭니다.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
@@ -66,7 +66,7 @@ MyApp_1.0.0_risk-report.md      # 오픈소스위험분석보고서 (요약)
 MyApp_1.0.0_risk-report.html    # 오픈소스위험분석보고서 (시각화)
 ```
 
-> **오픈소스위험분석보고서(`_risk-report`)는 모든 분석 모드에서 기본 생성**됩니다(라이선스+취약점 집계, 대응 기한 포함). 생략하려면 `--no-report`를 쓰세요. 5가지 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md)를 참고하세요.
+> 오픈소스위험분석보고서(`_risk-report`)는 모든 분석 모드에서 기본 생성됩니다(라이선스+취약점 집계, 대응 기한 포함). 생략하려면 `--no-report`를 쓰세요. 5가지 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md)를 참고하세요.
 
 ---
 
@@ -78,8 +78,8 @@ SBOM의 `components[].licenses` 정보를 모아 라이선스별로 컴포넌트
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --generate-only
 ```
 
-- **`_NOTICE.txt`** — 배포물에 동봉하기 좋은 표준 텍스트.
-- **`_NOTICE.html`** — 브라우저로 보기 좋은 형식. 모든 패키지 메타데이터는 HTML escape되어 안전합니다.
+- `_NOTICE.txt` — 배포물에 동봉하기 좋은 표준 텍스트.
+- `_NOTICE.html` — 브라우저로 보기 좋은 형식. 모든 패키지 메타데이터는 HTML escape되어 안전합니다.
 - 라이선스 정보가 없는 컴포넌트는 `NOASSERTION`으로 분류됩니다.
 
 예시(텍스트):
@@ -93,17 +93,17 @@ Components (1):
 
 ## 보안 취약점 보고서 (`--security`)
 
-생성된 SBOM을 **Trivy**로 스캔해 알려진 취약점(CVE)을 보고합니다. (NVD + OSV + GHSA DB)
+생성된 SBOM을 Trivy로 스캔해 알려진 취약점(CVE)을 보고합니다. (NVD + OSV + GHSA DB)
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --security --generate-only
 ```
 
-- **`_security.json`** — Trivy 원본 JSON. CI·기계 처리용.
-- **`_security.md`** — severity별 집계 표 + CVE 목록. PR/이슈에 붙이기 좋습니다.
-- **`_security.html`** — severity 배지·표가 포함된 시각적 보고서.
+- `_security.json` — Trivy 원본 JSON. CI나 기계 처리용.
+- `_security.md` — severity별 집계 표와 CVE 목록. PR/이슈에 붙이기 좋습니다.
+- `_security.html` — severity 배지와 표가 포함된 시각적 보고서.
 
-보고서는 취약점이 있어도 **스캔을 실패시키지 않습니다**(report-only). 게이트가 필요하면 `_security.json`을 후처리하세요.
+보고서는 취약점이 있어도 스캔을 실패시키지 않습니다(report-only). 게이트가 필요하면 `_security.json`을 후처리하세요.
 
 ### 결과 해석 & 후속 조치
 
@@ -114,25 +114,25 @@ Components (1):
 | **Medium / Low** | 영향 제한적 | 정기 점검 시 처리 |
 | **Unknown** | 심각도 미평가 | 해당 CVE를 직접 확인 후 분류 |
 
-- 보고서의 **`Fixed` 열**에 버전이 있으면, 그 버전 이상으로 의존성을 올리면 해결됩니다. 가장 빠른 1차 대응입니다.
-- **CI 게이트** 예시 — Critical이 1건이라도 있으면 빌드 실패:
+- 보고서의 `Fixed` 열에 버전이 있으면, 그 버전 이상으로 의존성을 올리면 해결됩니다. 가장 빠른 1차 대응입니다.
+- CI 게이트 예시. Critical이 1건이라도 있으면 빌드 실패:
   ```bash
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "Critical 취약점 ${crit}건"; exit 1; }
   ```
-- 오탐(실제 영향 없음) 판단·예외 승인·이력 관리 같은 **triage**는 sbom-tools 범위를 넘습니다 — SBOM을 **trustedoss-portal**에 업로드해 처리하세요.
+- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 sbom-tools 범위를 넘습니다. SBOM을 trustedoss-portal에 업로드해 처리하세요.
 
 ---
 
 ## 정밀 라이선스 탐지 (`--deep-license`)
 
-기본 고지문은 의존성(3rd-party)의 라이선스를 다룹니다. `--deep-license`는 **scancode-toolkit**으로 프로젝트 **자체 소스코드(1st-party)**의 라이선스 헤더까지 탐지합니다.
+기본 고지문은 의존성(3rd-party)의 라이선스를 다룹니다. `--deep-license`는 scancode-toolkit으로 프로젝트 자체 소스코드(1st-party)의 라이선스 헤더까지 탐지합니다.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-> ⚠️ scancode는 무겁고 느립니다(대형 저장소는 수 분~수십 분). 기본 이미지에는 포함되지 않으며, 사용하려면 이미지를 다음과 같이 빌드해야 합니다:
+> scancode는 무겁고 느립니다(대형 저장소는 수 분~수십 분). 기본 이미지에는 포함되지 않으며, 사용하려면 이미지를 다음과 같이 빌드해야 합니다:
 > ```bash
 > docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner:deep ./docker
 > SBOM_SCANNER_IMAGE=sbom-scanner:deep ./scripts/scan-sbom.sh ... --deep-license
@@ -144,7 +144,7 @@ Components (1):
 
 ## 결정론적 출력 (`--byte-stable`)
 
-동일한 입력에 대해 **항상 동일한 바이트**의 SBOM을 생성합니다. CI에서 의미 없는 diff(타임스탬프·랜덤 ID·정렬 차이)를 제거하고 재현성을 확보합니다.
+같은 입력이면 항상 동일한 바이트의 SBOM을 생성합니다. CI에서 의미 없는 diff(타임스탬프, 랜덤 ID, 정렬 차이)를 제거하고 재현성을 확보합니다.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --byte-stable --generate-only
@@ -174,7 +174,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
   --insecure-ignore-tlog MyApp_1.0.0_bom.json
 ```
 
-개인키는 컨테이너에 **읽기 전용**으로 마운트됩니다. 추가 산출물: `MyApp_1.0.0_bom.json.sig`
+개인키는 컨테이너에 읽기 전용으로 마운트됩니다. 추가 산출물: `MyApp_1.0.0_bom.json.sig`
 
 ---
 
@@ -191,13 +191,13 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 # → http://localhost:8080 자동 열림
 ```
 
-**Windows:** `scripts\sbom-ui.bat`를 **더블클릭**합니다.
+**Windows:** `scripts\sbom-ui.bat`를 더블클릭합니다.
 
-> 실행 위치는 **산출물 저장 폴더**이며, 스캔 대상 **"현재 폴더"**를 고를 때만 그 폴더의 소스를 스캔합니다. GitHub URL·업로드·Docker 이미지를 쓸 거라면 실행 위치는 무관합니다.
+> 실행 위치는 산출물 저장 폴더이며, 스캔 대상으로 "현재 폴더"를 고를 때만 그 폴더의 소스를 스캔합니다. GitHub URL이나 업로드, Docker 이미지를 쓸 거라면 실행 위치는 무관합니다.
 
 화면 구성:
-1. **스캔 설정** — 프로젝트 이름·버전(필수, 인라인 검증), **스캔 대상 선택**, 생성 옵션(고지문·보안·정밀 라이선스).
-2. **스캔 대상** — 6가지 중 선택하고 형태에 맞게 입력/업로드합니다:
+1. **스캔 설정** — 프로젝트 이름과 버전(필수, 인라인 검증), 스캔 대상 선택, 생성 옵션(고지문, 보안, 정밀 라이선스).
+2. **스캔 대상** — 6가지 중 선택하고 형태에 맞게 입력하거나 업로드합니다:
 
    | 스캔 대상 | 입력 방법 | 백엔드 모드 |
    |-----------|-----------|-------------|
@@ -208,24 +208,24 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
    | 펌웨어 업로드 | `.bin` 등 업로드 | FIRMWARE |
    | Docker 이미지 | 이미지명 입력 | IMAGE |
 
-3. **스캔 실행** — 진행 중 **실시간 로그가 스트리밍**됩니다. 오류(클론 실패·소켓 없음·미지원 파일 등)는 로그에 명확히 표시됩니다.
-4. **요약** — 완료되면 **컴포넌트 수**, **취약점 심각도 배지**, (공급사 SBOM의 경우) **적합성(적합/부적합)** 카드가 표시됩니다.
-5. **결과물** — SBOM·고지문·**오픈소스위험분석보고서**·보안보고서·(적합성)를 표에서 바로 **열기/다운로드**. 위험분석보고서는 강조 표시됩니다.
+3. **스캔 실행** — 진행 중 실시간 로그가 스트리밍됩니다. 오류(클론 실패, 소켓 없음, 미지원 파일 등)는 로그에 명확히 표시됩니다.
+4. **요약** — 완료되면 컴포넌트 수, 취약점 심각도 배지, 그리고 공급사 SBOM의 경우 적합성(적합/부적합) 카드가 표시됩니다.
+5. **결과물** — SBOM, 고지문, 오픈소스위험분석보고서, 보안보고서, 적합성을 표에서 바로 열거나 내려받습니다. 위험분석보고서는 강조 표시됩니다.
 
-우측 상단의 **한국어 / EN** 토글로 표시 언어를 바꿀 수 있습니다.
+우측 상단의 한국어 / EN 토글로 표시 언어를 바꿀 수 있습니다.
 
-> **SBOM 업로드(ANALYZE)** 선택 시 위험분석을 위해 고지문·보안이 자동 활성화됩니다.
-> **펌웨어 업로드** 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
+> SBOM 업로드(ANALYZE)를 선택하면 위험분석을 위해 고지문과 보안이 자동 활성화됩니다.
+> 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
 >
-> **참고:** UI의 소스 스캔(현재 폴더/ZIP/GitHub)은 컨테이너 내부에서 **syft**로 디렉터리를 분석합니다. 잠금 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있는 경우 더 깊은 해석이 필요하면 CLI 소스 모드(cdxgen)를 사용하세요.
+> **참고:** UI의 소스 스캔(현재 폴더/ZIP/GitHub)은 컨테이너 내부에서 syft로 디렉터리를 분석합니다. 잠금 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있다면 더 깊은 해석이 필요할 때 CLI 소스 모드(cdxgen)를 사용하세요.
 
 **포트 변경 / 충돌 시:** 기본 포트(8080)가 다른 서비스에 점유돼 있으면 다른 포트를 지정하세요:
 ```bash
 UI_PORT=9090 ./scripts/scan-sbom.sh --ui      # http://localhost:9090
 ```
 
-> **참고:** UI가 쉬워도 **Docker Desktop 설치·실행이 전제**입니다. 런처는 Docker 미설치/미실행을 감지해 설치 링크를 안내합니다.
+> **참고:** UI가 쉬워도 Docker Desktop 설치와 실행이 전제입니다. 런처는 Docker 미설치/미실행을 감지해 설치 링크를 안내합니다.
 
 ---
 

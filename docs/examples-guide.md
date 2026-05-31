@@ -1,8 +1,8 @@
 # 예제 가이드
 
-> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md)
+> 관련 문서: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md)
 
-`examples/` 디렉토리에 있는 언어별 예제 프로젝트를 활용한 실습 가이드입니다. 각 예제를 직접 실행하여 SBOM 출력 결과를 확인할 수 있습니다.
+`examples/` 디렉토리의 언어별 예제 프로젝트로 직접 실습해 보는 가이드입니다. 각 예제를 실행하면 SBOM 출력 결과를 바로 확인할 수 있습니다.
 
 ## 예제 디렉토리 구조
 
@@ -49,7 +49,7 @@ cd examples/java-maven
 ../../scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `pom.xml`
+감지 파일: `pom.xml`
 
 ```xml
 <!-- 예제 pom.xml -->
@@ -71,7 +71,7 @@ cd examples/java-gradle
 ../../scripts/scan-sbom.sh --project "JavaGradleExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `build.gradle` 또는 `build.gradle.kts`
+감지 파일: `build.gradle` 또는 `build.gradle.kts`
 
 ---
 
@@ -82,9 +82,9 @@ cd examples/nodejs
 ../../scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `package.json` + `package-lock.json` (또는 `yarn.lock`, `pnpm-lock.yaml`)
+감지 파일: `package.json` + `package-lock.json` (또는 `yarn.lock`, `pnpm-lock.yaml`)
 
-> **주의**: 잠금 파일이 없으면 의존성이 불완전하게 탐지됩니다. `npm install` 실행 후 시도하세요.
+> 주의: 잠금 파일이 없으면 의존성이 불완전하게 잡힙니다. `npm install`을 먼저 실행한 뒤 시도하세요.
 
 ---
 
@@ -95,7 +95,7 @@ cd examples/python
 ../../scripts/scan-sbom.sh --project "PythonExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `requirements.txt` 또는 `pyproject.toml` + `poetry.lock`
+감지 파일: `requirements.txt` 또는 `pyproject.toml` + `poetry.lock`
 
 ---
 
@@ -106,9 +106,9 @@ cd examples/go
 ../../scripts/scan-sbom.sh --project "GoExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `go.mod` + `go.sum`
+감지 파일: `go.mod` + `go.sum`
 
-> **주의**: `go.sum`이 있어야 정확한 버전 해시가 포함됩니다. `go mod tidy` 실행 후 시도하세요.
+> 주의: `go.sum`이 있어야 정확한 버전 해시가 들어갑니다. `go mod tidy`를 먼저 실행한 뒤 시도하세요.
 
 ---
 
@@ -119,7 +119,7 @@ cd examples/ruby
 ../../scripts/scan-sbom.sh --project "RubyExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `Gemfile.lock`
+감지 파일: `Gemfile.lock`
 
 ---
 
@@ -130,7 +130,7 @@ cd examples/php
 ../../scripts/scan-sbom.sh --project "PHPExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `composer.lock`
+감지 파일: `composer.lock`
 
 ---
 
@@ -141,7 +141,7 @@ cd examples/rust
 ../../scripts/scan-sbom.sh --project "RustExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `Cargo.lock`
+감지 파일: `Cargo.lock`
 
 ---
 
@@ -152,7 +152,7 @@ cd examples/dotnet
 ../../scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --generate-only
 ```
 
-**감지 파일**: `*.csproj` + `packages.lock.json`
+감지 파일: `*.csproj` + `packages.lock.json`
 
 ---
 
@@ -196,4 +196,4 @@ Docker 이미지 분석은 프로젝트 루트에서 실행합니다.
 
 ## 문제 해결
 
-예제 실행 중 문제가 발생하면 [사용 가이드 → 트러블슈팅](usage-guide.md#트러블슈팅)을 참고하세요.
+예제를 실행하다 문제가 생기면 [사용 가이드의 트러블슈팅](usage-guide.md#트러블슈팅)을 참고하세요.
