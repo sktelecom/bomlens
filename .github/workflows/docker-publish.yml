@@ -1,4 +1,10 @@
-name: Build and Publish Docker Image
+name: Build and Publish Docker Images
+
+# Two-stage architecture: we build only the images cdxgen does NOT provide —
+#   (1) the lightweight post-process image (sbom-scanner)
+#   (2) Android SDK images per compileSdk (sbom-scanner-android-sdk<API>)
+# All language SBOM generation uses cdxgen's official images (pulled on-demand),
+# so they are NOT built here.
 
 on:
   push:
@@ -9,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       push:
-        description: 'Push image to registry?'
+        description: 'Push images to registry?'
         required: true
         type: boolean
         default: false
@@ -19,28 +25,25 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/sbom-scanner
 
 jobs:
-  build:
-    name: Build and Push
+  # ---------------------------------------------------------------
+  # (1) Post-process image: syft + Trivy + cosign + notice + UI
+  # ---------------------------------------------------------------
+  build-postprocess:
+    name: Build post-process image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Login to GitHub Container Registry
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -52,25 +55,19 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
-      
-      - name: Build and push Docker image
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || github.ref == 'refs/heads/main' || inputs.push == true) }}
+          push: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true) }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.version }}
-      
-      # 보안 노트: 공급망 공격이 보고된 aquasecurity/trivy-action(@master)을 사용하지 않고,
-      # Trivy CLI를 고정 버전으로 직접 설치해 스캔합니다(서드파티 Action 의존 제거).
-      # TRIVY_VERSION은 docker/Dockerfile의 ARG TRIVY_VERSION과 일치시킵니다.
+
+      # Supply-chain note: use a pinned Trivy CLI (not the trivy-action that had
+      # a supply-chain incident). Keep TRIVY_VERSION in sync with docker/Dockerfile.
       - name: Install Trivy (pinned release tarball)
         if: github.event_name != 'pull_request'
         env:
@@ -80,12 +77,9 @@ jobs:
           curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${ver}_Linux-64bit.tar.gz" -o /tmp/trivy.tgz
           sudo tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy
           trivy --version
-
-      - name: Scan Dockerfile config with Trivy
+      - name: Scan Dockerfiles with Trivy
         if: github.event_name != 'pull_request'
-        run: |
-          trivy config --quiet --format sarif --output trivy-results.sarif --exit-code 0 ./docker
-
+        run: trivy config --quiet --format sarif --output trivy-results.sarif --exit-code 0 ./docker
       - name: Upload scan results
         if: github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
@@ -93,18 +87,59 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
 
-      - name: Output build information
+  # ---------------------------------------------------------------
+  # (2) Android SDK images — one per compileSdk (cdxgen has none)
+  # ---------------------------------------------------------------
+  build-android:
+    name: Build Android SDK image (API ${{ matrix.api }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [ 30, 31, 32, 33, 34, 35 ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        run: |
-          echo "## 🐳 Docker Image Build Complete" >> $GITHUB_STEP_SUMMARY
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk${{ matrix.api }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/android
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true) }}
+          build-args: |
+            ANDROID_API=${{ matrix.api }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=android-${{ matrix.api }}
+          cache-to: type=gha,mode=max,scope=android-${{ matrix.api }}
+
+  summary:
+    name: Build summary
+    runs-on: ubuntu-latest
+    needs: [ build-postprocess, build-android ]
+    if: github.event_name != 'pull_request'
+    steps:
+      - run: |
+          echo "## 🐳 Images built" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` (post-process)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk{30..35}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Usage" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Language SBOM generation uses cdxgen official images (pulled on-demand by scan-sbom.sh)." >> $GITHUB_STEP_SUMMARY
