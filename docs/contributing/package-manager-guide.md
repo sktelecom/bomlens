@@ -75,7 +75,7 @@ run_scan \
 
 assert_file_exists "KotlinExample_1.0.0_bom.json"
 assert_json_field ".bomFormat" "CycloneDX"
-assert_json_field ".specVersion" "1.4"
+assert_json_field ".specVersion" "1.6"
 assert_components_count_gte 1
 assert_purl_prefix "pkg:maven/"
 

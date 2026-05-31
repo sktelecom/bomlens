@@ -35,7 +35,7 @@ cd examples/{언어}
   --generate-only
 
 # 3. 결과 확인
-cat *_bom.json | python3 -m json.tool | head -60
+python3 -m json.tool *_bom.json | head -60
 # jq 사용 시
 jq '.components | length' *_bom.json
 ```

@@ -165,10 +165,10 @@ flowchart TD
 | **1** | `validate-sbom.sh` (검증기) | 독립적, host jq로 테스트 가능 → 가치 높고 의존성 적어 우선 |
 | **2** | `--analyze`/ANALYZE 입력 경로 + `convert-to-cdx.sh` | 기존 normalize/notice/security 재사용 연결 |
 | **3** | `generate-risk-report.sh` | 기존 산출물 재집계 |
-| **4** | 웹 UI 업로드 (`server.py` `do_POST` + 입력 유형 폼) | 구현 완료 |
+| **4** | 웹 UI 업로드 (`server.py` `do_POST` + "SBOM 업로드" 스캔 대상) | 구현 완료 |
 | **5** | 문서·역할 경계 명시 | |
 
-> 이번 구현 목표 = **전체(검증+분석+보고서, Phase 1~3)**. 웹 UI(Phase 4)는 후순위.
+> Phase 1~4 **모두 구현·머지 완료**. 또한 위험 보고서(Phase 3)는 ANALYZE 전용이 아니라 **모든 분석 모드에서 기본 생성**되도록 일반화됨(`--no-report`로 opt-out).
 
 **검증(e2e)**: `tests/test-e2e.sh`의 host-side(Docker 불필요) 패턴으로 — ① 정상 CycloneDX → pass ② 정상 SPDX → pass + 변환 후 components>0 + 라이선스 추출 ③ 결함 SBOM(각 1개 위반: pkg:generic / PURL 누락 / tools 없음 / dependencies 없음) → 각각 fail + 누락 목록 단언 ④ 위험 보고서에 "7일"/"30일" 문구·Critical/High 표 포함 단언 ⑤ `--help`에 `--analyze` 노출.
 
