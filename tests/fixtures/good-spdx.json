@@ -1,0 +1,42 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "supplier-app-2.3.1",
+  "documentNamespace": "https://example.com/spdx/supplier-app-2.3.1",
+  "creationInfo": {
+    "created": "2026-01-02T03:04:05Z",
+    "creators": [ "Tool: syft-1.18.1", "Organization: Supplier Inc." ]
+  },
+  "documentDescribes": [ "SPDXRef-Package-express" ],
+  "packages": [
+    {
+      "name": "express",
+      "SPDXID": "SPDXRef-Package-express",
+      "versionInfo": "4.18.2",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "checksums": [ { "algorithm": "SHA256", "checksumValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } ],
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/express@4.18.2" }
+      ]
+    },
+    {
+      "name": "lodash",
+      "SPDXID": "SPDXRef-Package-lodash",
+      "versionInfo": "4.17.21",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "checksums": [ { "algorithm": "SHA256", "checksumValue": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ],
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/lodash@4.17.21" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-Package-express", "relationshipType": "DESCRIBES" },
+    { "spdxElementId": "SPDXRef-Package-express", "relatedSpdxElement": "SPDXRef-Package-lodash", "relationshipType": "DEPENDS_ON" }
+  ]
+}

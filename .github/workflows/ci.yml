@@ -72,6 +72,9 @@ jobs:
           echo "Checking docker/lib/scan-firmware.sh..."
           shellcheck docker/lib/scan-firmware.sh || true
           echo ""
+          echo "Checking docker/lib analyze scripts..."
+          shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
+          echo ""
           echo "Checking tests/test-scan.sh..."
           shellcheck tests/test-scan.sh || true
           echo ""

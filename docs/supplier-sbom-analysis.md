@@ -2,7 +2,7 @@
 
 > **관련 문서**: [아키텍처](architecture.md) · [방향성 조사 보고서](direction-study.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [펌웨어 분석](firmware-analysis.md)
 >
-> 성격: 설계·의사결정 문서 (메인테이너용). **실제 코드 구현은 예정**이며, 본문은 설계와 단계 계획입니다.
+> 성격: 설계·의사결정 문서 (메인테이너용). **Phase 1~3(검증+분석+위험보고서)은 구현 완료**되었습니다(`docker/lib/validate-sbom.sh`·`convert-to-cdx.sh`·`generate-risk-report.sh`, `--analyze`/ANALYZE 모드). 웹 UI 업로드(Phase 4)는 후순위입니다.
 
 ## 요약 (Executive Summary)
 

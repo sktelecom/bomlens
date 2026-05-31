@@ -89,6 +89,12 @@ else
     fail "--firmware documented in help"
 fi
 
+if bash "$SCAN" --help 2>&1 | grep -q -- "--analyze"; then
+    pass "--analyze documented in help"
+else
+    fail "--analyze documented in help"
+fi
+
 # --firmware with no target must fail fast with a clear message (needs docker daemon:
 # the guard runs after docker_check in the orchestrator).
 if [ "$have_docker" = 1 ]; then
@@ -171,6 +177,99 @@ else
     fail "firmware merge dedupes by purl (3 unique of 4)" "got $merged"
 fi
 rm -rf "$tmp"
+
+# --------------------------------------------------------
+# Group 2b: supplier SBOM analysis libraries (host-side, no Docker)
+# Exercises validate-sbom.sh / convert-to-cdx.sh / generate-risk-report.sh
+# against tests/fixtures/, matching the design's host-verification plan.
+# --------------------------------------------------------
+section "Supplier SBOM analysis (host)"
+
+FIX="$REPO/tests/fixtures"
+atmp="$(mktemp -d)"
+
+# Good CycloneDX -> pass
+bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$atmp/gc" "demo" >/dev/null 2>&1
+if [ "$(jq -r '.result' "$atmp/gc_conformance.json" 2>/dev/null)" = "pass" ]; then
+    pass "validate: good CycloneDX -> pass"
+else
+    fail "validate: good CycloneDX -> pass" "$(jq -c '[.checks[]|select(.required and .status==\"fail\")|.id]' "$atmp/gc_conformance.json" 2>/dev/null)"
+fi
+
+# Good SPDX -> pass + conversion yields components + licenses
+bash "$LIB/validate-sbom.sh" "$FIX/good-spdx.json" "$atmp/gs" "demo" >/dev/null 2>&1
+[ "$(jq -r '.result' "$atmp/gs_conformance.json" 2>/dev/null)" = "pass" ] \
+    && pass "validate: good SPDX -> pass" || fail "validate: good SPDX -> pass"
+bash "$LIB/convert-to-cdx.sh" "$FIX/good-spdx.json" "$atmp/gs_bom.json" >/dev/null 2>&1
+ncdx=$(jq '[.components[]?]|length' "$atmp/gs_bom.json" 2>/dev/null || echo 0)
+if jq -e '.bomFormat=="CycloneDX"' "$atmp/gs_bom.json" >/dev/null 2>&1 && [ "${ncdx:-0}" -gt 0 ]; then
+    pass "convert: SPDX -> CycloneDX with components ($ncdx)"
+else
+    fail "convert: SPDX -> CycloneDX with components" "got $ncdx"
+fi
+if [ "$(jq -r '[.components[].licenses[]?.license.id]|length' "$atmp/gs_bom.json" 2>/dev/null || echo 0)" -gt 0 ]; then
+    pass "convert: SPDX licenses preserved"
+else
+    fail "convert: SPDX licenses preserved"
+fi
+
+# Defective SBOMs -> fail with the specific violated check + non-empty missing list where applicable
+check_bad() {
+    local fixture="$1" expect_id="$2" label="$3"
+    bash "$LIB/validate-sbom.sh" "$FIX/$fixture" "$atmp/b" "demo" >/dev/null 2>&1
+    local res fails
+    res=$(jq -r '.result' "$atmp/b_conformance.json" 2>/dev/null)
+    fails=$(jq -rc '[.checks[]|select(.required and .status=="fail")|.id]' "$atmp/b_conformance.json" 2>/dev/null)
+    if [ "$res" = "fail" ] && printf '%s' "$fails" | grep -q "\"$expect_id\""; then
+        pass "validate: $label -> fail ($expect_id)"
+    else
+        fail "validate: $label -> fail ($expect_id)" "result=$res fails=$fails"
+    fi
+}
+check_bad bad-generic-cyclonedx.json no-generic  "pkg:generic"
+check_bad bad-nopurl-cyclonedx.json  purl        "missing PURL"
+check_bad bad-notools-cyclonedx.json tools       "no tools"
+check_bad bad-nodeps-cyclonedx.json  transitive  "no dependencies"
+
+# Missing list populated for the no-PURL case
+bash "$LIB/validate-sbom.sh" "$FIX/bad-nopurl-cyclonedx.json" "$atmp/mp" "demo" >/dev/null 2>&1
+if jq -e '.checks[]|select(.id=="purl")|.missing|index("mysterylib")' "$atmp/mp_conformance.json" >/dev/null 2>&1; then
+    pass "validate: missing-PURL report lists the offending component"
+else
+    fail "validate: missing-PURL report lists the offending component"
+fi
+
+# Risk report: re-aggregate a fail-conformance + synthetic Trivy findings
+bash "$LIB/validate-sbom.sh" "$FIX/bad-generic-cyclonedx.json" "$atmp/rr" "demo" >/dev/null 2>&1
+cat > "$atmp/rr_security.json" <<'EOF'
+{"Results":[{"Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2024-0001","PkgName":"express","InstalledVersion":"4.18.2","Severity":"CRITICAL","FixedVersion":"4.19.0"},
+ {"VulnerabilityID":"CVE-2024-0002","PkgName":"lodash","InstalledVersion":"4.17.21","Severity":"HIGH","FixedVersion":""}
+]}]}
+EOF
+printf 'License: MIT\n' > "$atmp/rr_NOTICE.txt"
+bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" >/dev/null 2>&1
+if grep -q "7일" "$atmp/rr_risk-report.md" && grep -q "30일" "$atmp/rr_risk-report.md"; then
+    pass "risk report: Critical-7d / High-30d deadlines present (md)"
+else
+    fail "risk report: Critical-7d / High-30d deadlines present (md)"
+fi
+if grep -q "7일" "$atmp/rr_risk-report.html" && grep -q "30일" "$atmp/rr_risk-report.html"; then
+    pass "risk report: deadlines present (html)"
+else
+    fail "risk report: deadlines present (html)"
+fi
+if grep -qE "Critical \| High" "$atmp/rr_risk-report.md" && grep -q "CVE-2024-0001" "$atmp/rr_risk-report.md"; then
+    pass "risk report: severity table + CVE rows present"
+else
+    fail "risk report: severity table + CVE rows present"
+fi
+if grep -q "반려" "$atmp/rr_risk-report.md"; then
+    pass "risk report: surfaces conformance rejection reason"
+else
+    fail "risk report: surfaces conformance rejection reason"
+fi
+rm -rf "$atmp"
 
 # --------------------------------------------------------
 # Group 3: full source-scan E2E (requires image)
@@ -319,6 +418,35 @@ EOF
     else
         fail "firmware fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
     fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 4c: supplier SBOM analysis E2E through the container (requires image)
+# --------------------------------------------------------
+section "Supplier SBOM analysis E2E"
+if [ "$have_image" != 1 ]; then
+    skip "analyze scan (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/analyze.XXXXXX")"
+    cp "$REPO/tests/fixtures/good-spdx.json" "$w/" 2>/dev/null
+    ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "supplier" --version "2.3.1" --analyze good-spdx.json --generate-only ) > "$w/_scan.log" 2>&1
+
+    if jq -e '.result=="pass"' "$w/supplier_2.3.1_conformance.json" >/dev/null 2>&1; then
+        pass "analyze: SPDX conformance pass (container)"
+    else
+        fail "analyze: SPDX conformance pass (container)" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    nbom=$(jq '[.components[]?]|length' "$w/supplier_2.3.1_bom.json" 2>/dev/null || echo 0)
+    if jq -e '.bomFormat=="CycloneDX"' "$w/supplier_2.3.1_bom.json" >/dev/null 2>&1 && [ "${nbom:-0}" -gt 0 ]; then
+        pass "analyze: SPDX converted to CycloneDX with components ($nbom)"
+    else
+        fail "analyze: SPDX converted to CycloneDX with components" "got $nbom"
+    fi
+    { [ -f "$w/supplier_2.3.1_risk-report.md" ] && grep -q "7일" "$w/supplier_2.3.1_risk-report.md" && grep -q "30일" "$w/supplier_2.3.1_risk-report.md"; } \
+        && pass "analyze: risk report with 7d/30d deadlines (container)" \
+        || fail "analyze: risk report with 7d/30d deadlines (container)"
     rm -rf "$w"
 fi
 

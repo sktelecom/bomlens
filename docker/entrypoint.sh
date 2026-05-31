@@ -23,6 +23,7 @@ set -e
 #   - UI          : local web UI
 #   - IMAGE/BINARY/ROOTFS : syft scan -> SBOM
 #   - FIRMWARE    : unpack firmware -> syft + cve-bin-tool -> SBOM (opt-in image)
+#   - ANALYZE     : validate + convert a supplier SBOM -> conformance + risk report
 #   - POSTPROCESS : consume an already-generated SBOM
 # then runs the common pipeline: normalize -> notice -> security -> sign.
 # ========================================================
@@ -43,6 +44,7 @@ fi
 SAFE_PROJECT=$(echo "${PROJECT_NAME}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')
 SAFE_VERSION=$(echo "${PROJECT_VERSION}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
+OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 LIBDIR="/usr/local/lib/sbom"
 
 echo "=========================================="
@@ -110,8 +112,23 @@ EOF
         fi
         ;;
 
+    ANALYZE)
+        # Supplier-submitted SBOM (CycloneDX or SPDX). Validate the ORIGINAL for
+        # conformance, then convert to CycloneDX so the common pipeline is reused.
+        if [ -z "$ANALYZE_SBOM" ] || [ ! -f "$ANALYZE_SBOM" ]; then
+            echo "[ERROR] ANALYZE_SBOM not found: $ANALYZE_SBOM"; exit 1
+        fi
+        echo "[1/2] Validating supplier SBOM (conformance, original input)..."
+        # Conformance never aborts the pipeline (best-effort report).
+        bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME" || true
+        echo "[1/2] Converting supplier SBOM to CycloneDX..."
+        if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
+            echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+        fi
+        ;;
+
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected IMAGE/BINARY/ROOTFS/FIRMWARE/POSTPROCESS/UI)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected IMAGE/BINARY/ROOTFS/FIRMWARE/ANALYZE/POSTPROCESS/UI)"
         exit 1
         ;;
 esac
@@ -122,7 +139,6 @@ echo "[INFO] SBOM ready: $OUTPUT_FILE"
 # ========================================================
 # Common pipeline: normalize / deep-license / notice / security / sign
 # ========================================================
-OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 ARTIFACTS=("$OUTPUT_FILE")
 
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
@@ -167,6 +183,17 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         fi
     else
         echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+    fi
+fi
+
+# ANALYZE: collect the conformance report (produced above) and re-aggregate the
+# pipeline outputs into a supplier-facing risk report.
+if [ "$SCAN_MODE" = "ANALYZE" ]; then
+    for ext in json md html; do
+        [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
+    done
+    if bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME"; then
+        ARTIFACTS+=("${OUT_PREFIX}_risk-report.md" "${OUT_PREFIX}_risk-report.html")
     fi
 fi
 
