@@ -69,6 +69,9 @@ jobs:
           echo "Checking docker/entrypoint.sh..."
           shellcheck docker/entrypoint.sh || true
           echo ""
+          echo "Checking docker/lib/scan-firmware.sh..."
+          shellcheck docker/lib/scan-firmware.sh || true
+          echo ""
           echo "Checking tests/test-scan.sh..."
           shellcheck tests/test-scan.sh || true
           echo ""

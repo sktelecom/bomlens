@@ -19,6 +19,7 @@ SCAN="$REPO/scripts/scan-sbom.sh"
 LIB="$REPO/docker/lib"
 EXAMPLES="$REPO/examples"
 SCANNER_IMG="${SBOM_SCANNER_IMAGE:-sbom-scanner:test}"
+FW_IMG="${SBOM_FIRMWARE_IMAGE:-sbom-scanner-firmware:test}"
 VERBOSE="${VERBOSE:-false}"
 
 # Work under the repo (/Users/...) so Docker Desktop file sharing mounts it.
@@ -39,6 +40,8 @@ have_docker=0
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then have_docker=1; fi
 have_image=0
 if [ "$have_docker" = 1 ] && docker image inspect "$SCANNER_IMG" >/dev/null 2>&1; then have_image=1; fi
+have_fw_image=0
+if [ "$have_docker" = 1 ] && docker image inspect "$FW_IMG" >/dev/null 2>&1; then have_fw_image=1; fi
 
 # Run a source scan in an isolated copy of a project. Echoes the work dir.
 run_source_scan() {
@@ -78,6 +81,26 @@ if bash "$SCAN" --help 2>&1 | grep -q -- "--ui"; then
     pass "--ui documented in help"
 else
     fail "--ui documented in help"
+fi
+
+if bash "$SCAN" --help 2>&1 | grep -q -- "--firmware"; then
+    pass "--firmware documented in help"
+else
+    fail "--firmware documented in help"
+fi
+
+# --firmware with no target must fail fast with a clear message (needs docker daemon:
+# the guard runs after docker_check in the orchestrator).
+if [ "$have_docker" = 1 ]; then
+    # Capture first (pipefail would otherwise see the intended non-zero exit as a failure).
+    fw_err="$(bash "$SCAN" --project p --version 1 --firmware 2>&1 || true)"
+    if printf '%s' "$fw_err" | grep -q -- "--firmware requires"; then
+        pass "--firmware without --target errors clearly"
+    else
+        fail "--firmware without --target errors clearly"
+    fi
+else
+    skip "--firmware without --target (docker daemon unavailable)"
 fi
 
 # --------------------------------------------------------
@@ -124,6 +147,28 @@ if grep -q "<h2>MIT</h2>" "$tmp/out_NOTICE.html"; then
     pass "notice html renders license sections"
 else
     fail "notice html renders license sections"
+fi
+
+# scan-firmware.sh: present + syntactically valid (host-side, no tools needed)
+if [ -f "$LIB/scan-firmware.sh" ] && bash -n "$LIB/scan-firmware.sh" 2>/dev/null; then
+    pass "scan-firmware.sh present and parses"
+else
+    fail "scan-firmware.sh present and parses"
+fi
+# Its component-merge/dedupe is the core jq logic — verify it standalone.
+cat > "$tmp/pkg.cdx.json" <<'EOF'
+{"components":[{"name":"zlib","version":"1.2.13","purl":"pkg:deb/zlib@1.2.13"},{"name":"busybox","version":"1.36"}]}
+EOF
+cat > "$tmp/bin.cdx.json" <<'EOF'
+{"components":[{"name":"zlib","version":"1.2.13","purl":"pkg:deb/zlib@1.2.13"},{"name":"openssl","version":"3.0.1"}]}
+EOF
+pkgc=$(jq -c '[.components[]? | select(.name != null)]' "$tmp/pkg.cdx.json")
+binc=$(jq -c '[.components[]? | select(.name != null)]' "$tmp/bin.cdx.json")
+merged=$(jq -n --argjson a "$pkgc" --argjson b "$binc" '($a + $b) | group_by(.purl // ((.name // "") + "@" + (.version // ""))) | map(.[0]) | length')
+if [ "$merged" = "3" ]; then
+    pass "firmware merge dedupes by purl (3 unique of 4)"
+else
+    fail "firmware merge dedupes by purl (3 unique of 4)" "got $merged"
 fi
 rm -rf "$tmp"
 
@@ -212,6 +257,68 @@ else
         fail "alpine image scan: valid SBOM" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; [ "$VERBOSE" = true ] && sed 's/^/        /' "$w/_scan.log"
     fi
     [ -f "$w/alpinetest_3.19_NOTICE.txt" ] && pass "alpine image scan: notice produced" || fail "alpine image scan: notice produced"
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 4b: firmware scan E2E (firmware image) + base-image regression
+# --------------------------------------------------------
+section "Firmware scan E2E"
+
+# Regression: the base (permissive-only) image must NOT carry firmware tools.
+if [ "$have_image" = 1 ]; then
+    if docker run --rm --entrypoint sh "$SCANNER_IMG" -c 'command -v unblob || command -v cve-bin-tool' >/dev/null 2>&1; then
+        fail "base image stays firmware-tool-free" "unblob/cve-bin-tool unexpectedly present"
+    else
+        pass "base image stays firmware-tool-free (GPL isolated to firmware image)"
+    fi
+else
+    skip "base-image firmware regression (scanner image not available)"
+fi
+
+if [ "$have_fw_image" != 1 ]; then
+    skip "firmware scan (firmware image '$FW_IMG' not available — build with --build-arg SBOM_FIRMWARE=true)"
+else
+    w="$(mktemp -d "$WORK_ROOT/fw.XXXXXX")"
+    # Minimal rootfs with a dpkg status DB so syft catalogs at least one package.
+    mkdir -p "$w/rootfs/var/lib/dpkg" "$w/rootfs/bin" "$w/rootfs/etc"
+    cat > "$w/rootfs/var/lib/dpkg/status" <<'EOF'
+Package: zlib1g
+Status: install ok installed
+Architecture: amd64
+Version: 1:1.2.13.dfsg-1
+Description: compression library - runtime
+EOF
+    echo "fixture" > "$w/rootfs/bin/busybox"
+    echo "NAME=Fixture" > "$w/rootfs/etc/os-release"
+
+    # Pack into a standard squashfs using the firmware image's mksquashfs.
+    if docker run --rm -v "$w":/w --entrypoint mksquashfs "$FW_IMG" \
+            /w/rootfs /w/fw.squashfs -noappend -no-progress >/dev/null 2>&1 && [ -f "$w/fw.squashfs" ]; then
+        pass "firmware fixture: squashfs packed"
+        ( cd "$w" && SBOM_FIRMWARE_IMAGE="$FW_IMG" bash "$SCAN" \
+            --project "fwtest" --version "1.0" --target fw.squashfs --all --generate-only ) > "$w/_scan.log" 2>&1
+
+        bom="$w/fwtest_1.0_bom.json"
+        if [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX" and .metadata.component.type=="firmware"' "$bom" >/dev/null 2>&1; then
+            pass "firmware scan: valid CycloneDX with firmware metadata"
+        else
+            fail "firmware scan: valid CycloneDX with firmware metadata" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+
+        ncomp=$(jq '[.components[]?]|length' "$bom" 2>/dev/null || echo 0)
+        if [ "${ncomp:-0}" -gt 0 ]; then
+            pass "firmware scan: components detected after unpack ($ncomp)"
+        else
+            fail "firmware scan: components detected after unpack" "got $ncomp (unpack/syft may have found nothing)"
+        fi
+
+        { [ -f "$w/fwtest_1.0_NOTICE.txt" ] && [ -f "$w/fwtest_1.0_security.json" ]; } \
+            && pass "firmware scan: notice + security artifacts produced" \
+            || fail "firmware scan: notice + security artifacts produced"
+    else
+        fail "firmware fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
+    fi
     rm -rf "$w"
 fi
 
