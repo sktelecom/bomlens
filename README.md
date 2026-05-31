@@ -6,9 +6,14 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/sktelecom/sbom-scanner?style=flat-square)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-scanner)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-One Docker image generates an **SBOM** from source code, container images, binaries, or firmware — and, in the same run, an **open-source notice**, an **open-source risk report**, and a **Trivy security report**. Use the **CLI** or the **browser UI**. Originally built by SK Telecom, now open source.
+**One Docker image, two jobs:**
 
-Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg). Also Docker images, binaries, RootFS, and firmware.
+- **Generate** — scan your **source code** (or a container image / binary) and produce a **CycloneDX SBOM**, an **open-source notice** (고지문), and a **security report**.
+- **Assess open-source risk** — analyze what you *receive*, including a supplier's finished **SBOM** or a **firmware** binary, and produce an **open-source risk report** (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines).
+
+Every scan also emits the risk report by default. Run it from the **CLI** or a **browser UI**. Originally built by SK Telecom for supply-chain security, now open source.
+
+Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware.
 
 ## Quick Start
 

@@ -45,8 +45,8 @@
 - **binwalk**: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 **설치하지 않습니다**. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 사용하지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
 - **sasquatch** (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용(unblob 핸들러가 사용). 표준 squashfs는 `squashfs-tools`(unsquashfs) 폴백으로 충분하므로 기본 미포함입니다.
 
-### GPL 소스 오퍼 (펌웨어 이미지)
-위 GPL 도구들은 모두 공개 저장소/패키지 레지스트리에서 고정 버전으로 취득됩니다. `sbom-tools`는 이미지에 설치된 것과 **동일한 버전의 대응 소스코드**를 위 Source URL(해당 버전 태그/릴리스)에서 제공받을 수 있도록 보장합니다. 펌웨어 이미지에는 `com.sktelecom.sbom.gpl-source-offer` 라벨로 본 문서 경로가 임베드됩니다. 추가 요청은 프로젝트 저장소 이슈로 문의하십시오.
+### GPL 소스 코드 제공 (펌웨어 이미지)
+펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소·패키지 레지스트리에서 **버전을 고정해** 받습니다. 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있습니다. 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다. 소스가 더 필요하면 저장소 이슈로 요청해 주세요.
 
 ---
 
