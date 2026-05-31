@@ -59,20 +59,24 @@ RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
     | sh -s -- -b /usr/local/bin "${SYFT_VERSION}" \
     && syft version
 
-# Trivy — security report engine (pinned release tarball; arch-mapped)
+# Trivy — security report engine (pinned release tarball; arch-mapped).
+# Detect arch with `uname -m` (under buildx QEMU this reports the TARGET arch),
+# not the TARGETARCH ARG whose Dockerfile default ("amd64") shadowed the
+# per-platform value and pulled an amd64 binary into the arm64 image.
 RUN TRIVY_VER_NUM="${TRIVY_VERSION#v}" \
-    && case "${TARGETARCH}" in \
-         amd64) TRIVY_ARCH="Linux-64bit" ;; \
-         arm64) TRIVY_ARCH="Linux-ARM64" ;; \
-         *)     TRIVY_ARCH="Linux-64bit" ;; \
+    && case "$(uname -m)" in \
+         x86_64)  TRIVY_ARCH="Linux-64bit" ;; \
+         aarch64) TRIVY_ARCH="Linux-ARM64" ;; \
+         *)       TRIVY_ARCH="Linux-64bit" ;; \
        esac \
     && curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VER_NUM}_${TRIVY_ARCH}.tar.gz" -o /tmp/trivy.tgz \
     && tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy \
     && rm /tmp/trivy.tgz \
     && trivy --version
 
-# Cosign — optional SBOM signing (--sign), pinned
-RUN curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${TARGETARCH}" -o /usr/local/bin/cosign \
+# Cosign — optional SBOM signing (--sign), pinned (arch via uname -m, see above)
+RUN case "$(uname -m)" in x86_64) CARCH=amd64 ;; aarch64) CARCH=arm64 ;; *) CARCH=amd64 ;; esac \
+    && curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${CARCH}" -o /usr/local/bin/cosign \
     && chmod +x /usr/local/bin/cosign \
     && cosign version
 
