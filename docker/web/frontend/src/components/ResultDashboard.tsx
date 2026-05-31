@@ -30,7 +30,11 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <KpiCards sbom={result.sbom} security={result.security} />
+        <KpiCards
+          sbom={result.sbom}
+          security={result.security}
+          conformance={result.conformance}
+        />
         {result.security ? (
           <SeverityBar security={result.security} />
         ) : (

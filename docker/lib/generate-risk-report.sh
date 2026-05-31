@@ -66,6 +66,25 @@ sev_count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"
 C=$(sev_count CRITICAL); H=$(sev_count HIGH); M=$(sev_count MEDIUM); L=$(sev_count LOW); U=$(sev_count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
 
+# --------------------------------------------------------
+# Report kind: with a conformance artifact this is a SUPPLIER SBOM review
+# (validate an externally-submitted SBOM's format); without one it is a
+# SELF-GENERATED 오픈소스위험분석보고서 (source/firmware/image/binary/rootfs scan).
+# The format-validation section only applies to the supplier case.
+# --------------------------------------------------------
+if [ "$CONF_RESULT" = "N/A" ]; then
+    HAS_CONF=false
+    REPORT_TITLE="오픈소스위험분석보고서 — ${PROJECT}"
+    HTML_H1="오픈소스위험분석보고서"
+    # Self mode: no 포맷 검증 section, so numbering starts at 취약점.
+    S_CONF=""; S_VULN=1; S_LIC=2; S_NEXT=3
+else
+    HAS_CONF=true
+    REPORT_TITLE="공급사 SBOM 위험 보고서 — ${PROJECT}"
+    HTML_H1="공급사 SBOM 위험 보고서"
+    S_CONF=1; S_VULN=2; S_LIC=3; S_NEXT=4
+fi
+
 # deadline string per severity (Korean, per SKT process)
 deadline_for() {
     case "$1" in
@@ -87,26 +106,25 @@ fi
 # Markdown
 # --------------------------------------------------------
 {
-    echo "# 공급사 SBOM 위험 보고서 — ${PROJECT}"
+    echo "# ${REPORT_TITLE}"
     echo ""
     echo "- 생성: ${GEN_AT}"
-    echo "- 본 보고서는 새 스캔 없이 검증/취약점/라이선스 산출물을 재집계한 것입니다."
+    echo "- 본 보고서는 새 스캔 없이 취약점/라이선스 산출물을 재집계한 것입니다."
     echo ""
-    echo "## 1. 요구사항 충족 (포맷 검증)"
-    echo ""
-    echo "- 입력 포맷: ${CONF_FORMAT}"
-    echo "- 검증 결과: **$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')**"
-    if [ "$CONF_RESULT" = "fail" ]; then
+    if [ "$HAS_CONF" = "true" ]; then
+        echo "## ${S_CONF}. 요구사항 충족 (포맷 검증)"
         echo ""
-        echo "> ⚠️ **SKT 포맷 검증 반려 사유** — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
+        echo "- 입력 포맷: ${CONF_FORMAT}"
+        echo "- 검증 결과: **$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')**"
+        if [ "$CONF_RESULT" = "fail" ]; then
+            echo ""
+            echo "> ⚠️ **SKT 포맷 검증 반려 사유** — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
+            echo ""
+            echo "$CONF_FAILS" | jq -r '.[] | "- " + .'
+        fi
         echo ""
-        echo "$CONF_FAILS" | jq -r '.[] | "- " + .'
-    elif [ "$CONF_RESULT" = "N/A" ]; then
-        echo ""
-        echo "_conformance 산출물이 없어 생략합니다._"
     fi
-    echo ""
-    echo "## 2. 취약점 분석 및 대응 기한"
+    echo "## ${S_VULN}. 취약점 분석 및 대응 기한"
     echo ""
     echo "> SKT 검증 프로세스 ③: **Critical → ${CRIT_DAYS}일 이내, High → ${HIGH_DAYS}일 이내** 대응계획 또는 위험 정당화 제출이 필요합니다."
     echo ""
@@ -126,7 +144,7 @@ fi
         echo "_알려진 취약점이 없거나 security 산출물이 없습니다._"
     fi
     echo ""
-    echo "## 3. 라이선스 요약"
+    echo "## ${S_LIC}. 라이선스 요약"
     echo ""
     if [ "$LIC_COUNT" = "N/A" ]; then
         echo "_NOTICE 산출물이 없어 생략합니다._"
@@ -134,11 +152,16 @@ fi
         echo "- 식별된 distinct 라이선스: ${LIC_COUNT}건 (상세는 \`${OUT_PREFIX}_NOTICE.{txt,html}\` 참조)"
     fi
     echo ""
-    echo "## 4. 다음 단계"
+    echo "## ${S_NEXT}. 다음 단계"
     echo ""
     echo "1. 위 대응 기한 내 **대응계획 또는 위험 정당화**를 SKT 검증 프로세스 ③에 따라 제출."
-    echo "2. 포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출."
-    echo "3. 결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위)."
+    if [ "$HAS_CONF" = "true" ]; then
+        echo "2. 포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출."
+        echo "3. 결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위)."
+    else
+        echo "2. 고지문(\`${OUT_PREFIX}_NOTICE.{txt,html}\`)과 SBOM(\`${OUT_PREFIX}_bom.json\`)을 납품 산출물로 함께 제출."
+        echo "3. 결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위)."
+    fi
 } > "$MD"
 
 # --------------------------------------------------------
@@ -146,13 +169,16 @@ fi
 # --------------------------------------------------------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RESULT" = "fail" ] && conf_class="fail"
+# Meta suffix only states 입력 포맷 for supplier (ANALYZE) reports (section numbers
+# S_CONF/S_VULN/S_LIC/S_NEXT were assigned once near the top).
+META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT=" &middot; 입력 포맷: ${CONF_FORMAT}"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
 <html lang="ko"><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>위험 보고서 — ${PROJECT}</title>
+<title>${HTML_H1} — ${PROJECT}</title>
 <style>
  body{font-family:system-ui,Arial,sans-serif;max-width:1000px;margin:2rem auto;padding:0 1rem;color:#1a1a1a;}
  h1{border-bottom:2px solid #ddd;padding-bottom:.4rem;} h2{margin-top:1.8rem;}
@@ -170,24 +196,23 @@ conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RE
  .sev-MEDIUM{color:#d97706;} .sev-LOW{color:#2563eb;}
  ul{margin:.3rem 0 0 1rem;}
 </style></head><body>
-<h1>공급사 SBOM 위험 보고서</h1>
-<p class="meta">Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT} &middot; 입력 포맷: ${CONF_FORMAT}</p>
-
-<h2>1. 요구사항 충족 (포맷 검증)</h2>
-<div class="cards"><div class="card ${conf_class}">검증 결과: $(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')</div></div>
+<h1>${HTML_H1}</h1>
+<p class="meta">Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT}${META_FORMAT}</p>
 HTMLHEAD
 
-    if [ "$CONF_RESULT" = "fail" ]; then
-        echo "<div class=\"note\"><b>SKT 포맷 검증 반려 사유</b> — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
-        echo "<ul>"
-        echo "$CONF_FAILS" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
-        echo "</ul></div>"
-    elif [ "$CONF_RESULT" = "N/A" ]; then
-        echo "<p><em>conformance 산출물이 없어 생략합니다.</em></p>"
+    if [ "$HAS_CONF" = "true" ]; then
+        echo "<h2>${S_CONF}. 요구사항 충족 (포맷 검증)</h2>"
+        echo "<div class=\"cards\"><div class=\"card ${conf_class}\">검증 결과: $(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')</div></div>"
+        if [ "$CONF_RESULT" = "fail" ]; then
+            echo "<div class=\"note\"><b>SKT 포맷 검증 반려 사유</b> — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
+            echo "<ul>"
+            echo "$CONF_FAILS" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
+            echo "</ul></div>"
+        fi
     fi
 
     cat <<HTMLSEC
-<h2>2. 취약점 분석 및 대응 기한</h2>
+<h2>${S_VULN}. 취약점 분석 및 대응 기한</h2>
 <div class="note">SKT 검증 프로세스 ③: <b>Critical → ${CRIT_DAYS}일 이내</b>, <b>High → ${HIGH_DAYS}일 이내</b> 대응계획 또는 위험 정당화 제출이 필요합니다.</div>
 <div class="cards">
  <div class="card crit">Critical ${C}</div>
@@ -211,22 +236,24 @@ HTMLSEC
         echo "<p>알려진 취약점이 없거나 security 산출물이 없습니다.</p>"
     fi
 
-    echo "<h2>3. 라이선스 요약</h2>"
+    echo "<h2>${S_LIC}. 라이선스 요약</h2>"
     if [ "$LIC_COUNT" = "N/A" ]; then
         echo "<p><em>NOTICE 산출물이 없어 생략합니다.</em></p>"
     else
         echo "<p>식별된 distinct 라이선스: <b>${LIC_COUNT}</b>건 (상세는 NOTICE 산출물 참조).</p>"
     fi
 
-    cat <<'HTMLNEXT'
-<h2>4. 다음 단계</h2>
-<ol>
- <li>위 대응 기한 내 <b>대응계획 또는 위험 정당화</b>를 SKT 검증 프로세스 ③에 따라 제출.</li>
- <li>포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출.</li>
- <li>결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위).</li>
-</ol>
-</body></html>
-HTMLNEXT
+    echo "<h2>${S_NEXT}. 다음 단계</h2>"
+    echo "<ol>"
+    echo " <li>위 대응 기한 내 <b>대응계획 또는 위험 정당화</b>를 SKT 검증 프로세스 ③에 따라 제출.</li>"
+    if [ "$HAS_CONF" = "true" ]; then
+        echo " <li>포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출.</li>"
+    else
+        echo " <li>고지문(NOTICE)과 SBOM을 납품 산출물로 함께 제출.</li>"
+    fi
+    echo " <li>결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위).</li>"
+    echo "</ol>"
+    echo "</body></html>"
 } > "$HTML"
 
 echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H})"

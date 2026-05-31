@@ -1,12 +1,18 @@
 import { FileSearch } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Header } from "./components/Header";
 import { ProgressLog } from "./components/ProgressLog";
 import { ResultDashboard } from "./components/ResultDashboard";
 import { ScanForm } from "./components/ScanForm";
-import { startScan, type DoneEvent, type ScanParams } from "./lib/api";
+import {
+  getCapabilities,
+  startScan,
+  type Capabilities,
+  type DoneEvent,
+  type ScanParams,
+} from "./lib/api";
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -15,6 +21,14 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
   const [result, setResult] = useState<DoneEvent | null>(null);
+  const [capabilities, setCapabilities] = useState<Capabilities>({
+    firmware: false,
+    docker: true,
+  });
+
+  useEffect(() => {
+    getCapabilities().then(setCapabilities);
+  }, []);
 
   const run = (params: ScanParams) => {
     setStatus("running");
@@ -26,7 +40,10 @@ export default function App() {
         setResult(done);
         setStatus(done.ok ? "done" : "error");
       },
-      onError: () => setStatus((s) => (s === "running" ? "error" : s)),
+      onError: (message) => {
+        if (message) setLogs((prev) => [...prev, `✖ ${message}`]);
+        setStatus((s) => (s === "running" ? "error" : s));
+      },
     });
   };
 
@@ -35,7 +52,11 @@ export default function App() {
       <Header />
       <main className="container py-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(320px,380px)_1fr]">
-          <ScanForm running={status === "running"} onRun={run} />
+          <ScanForm
+            running={status === "running"}
+            capabilities={capabilities}
+            onRun={run}
+          />
 
           <div className="space-y-6">
             {status === "idle" && (

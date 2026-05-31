@@ -71,6 +71,19 @@ cd /path/to/your/project
   --generate-only
 ```
 
+### GitHub URL에서 바로 생성
+
+수동 클론 없이 저장소 URL을 전달합니다(얕은 클론 후 분석).
+
+```bash
+./scripts/scan-sbom.sh \
+  --project "MyApp" --version "1.0.0" \
+  --git "https://github.com/org/repo" \
+  --all --generate-only
+```
+
+ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`) 등 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md)에 정리되어 있습니다.
+
 ### Docker 이미지 분석
 
 ```bash
@@ -91,7 +104,7 @@ cd /path/to/your/project
   --generate-only
 ```
 
-> **`--generate-only` 옵션**: SBOM 생성만 수행하고 취약점 스캔은 건너뜁니다. 전체 옵션은 [사용 가이드](usage-guide.md#옵션-레퍼런스)를 참고하세요.
+> **`--generate-only` 옵션**: 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`을 함께 쓰면 **고지문·SBOM·오픈소스위험분석보고서**가 한 번에 생성됩니다. 전체 옵션은 [사용 가이드](usage-guide.md#옵션-레퍼런스)를 참고하세요.
 
 ## 결과 파일 이해하기
 
@@ -152,6 +165,8 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 
 | 목표 | 문서 |
 |------|------|
+| 입력 형태(GitHub·ZIP·SBOM·펌웨어 등)별 처리 | [시나리오별 가이드](scenarios-guide.md) |
+| 고지문·보안보고서·위험분석보고서·웹 UI | [고지문·보안·UI 가이드](notice-security-ui-guide.md) |
 | 전체 옵션 및 CI/CD 연동 방법 | [사용 가이드](usage-guide.md) |
 | 언어별 예제 프로젝트 실습 | [예제 가이드](examples-guide.md) |
 | 내부 구조 이해 | [아키텍처](architecture.md) |

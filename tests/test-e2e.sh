@@ -95,6 +95,30 @@ else
     fail "--analyze documented in help"
 fi
 
+if bash "$SCAN" --help 2>&1 | grep -q -- "--git"; then
+    pass "--git documented in help"
+else
+    fail "--git documented in help"
+fi
+
+if bash "$SCAN" --help 2>&1 | grep -q -- "--no-report"; then
+    pass "--no-report documented in help"
+else
+    fail "--no-report documented in help"
+fi
+
+# --git + --target are mutually exclusive (validated after docker_check).
+if [ "$have_docker" = 1 ]; then
+    ge_err="$(bash "$SCAN" --project p --version 1 --git https://github.com/x/y --target z 2>&1 || true)"
+    if printf '%s' "$ge_err" | grep -q "mutually exclusive"; then
+        pass "--git + --target rejected (mutually exclusive)"
+    else
+        fail "--git + --target rejected (mutually exclusive)" "$ge_err"
+    fi
+else
+    skip "--git/--target exclusivity (docker daemon unavailable)"
+fi
+
 # --firmware with no target must fail fast with a clear message (needs docker daemon:
 # the guard runs after docker_check in the orchestrator).
 if [ "$have_docker" = 1 ]; then
@@ -271,6 +295,36 @@ else
 fi
 rm -rf "$atmp"
 
+# Self-generated risk report (no conformance artifact) — the all-modes default.
+# Without a *_conformance.json the report must drop the 포맷 검증 section and
+# retitle to 오픈소스위험분석보고서 with sections renumbered from 1.
+stmp="$(mktemp -d)"
+cat > "$stmp/self_security.json" <<'EOF'
+{"Results":[{"Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2025-0001","PkgName":"openssl","InstalledVersion":"3.0.0","Severity":"CRITICAL","FixedVersion":"3.0.1"}
+]}]}
+EOF
+printf 'License: MIT\nLicense: Apache-2.0\n' > "$stmp/self_NOTICE.txt"
+bash "$LIB/generate-risk-report.sh" "$stmp/self" "SelfApp" >/dev/null 2>&1
+if grep -q "오픈소스위험분석보고서" "$stmp/self_risk-report.md" \
+   && ! grep -q "포맷 검증" "$stmp/self_risk-report.md"; then
+    pass "risk report (self): titled 오픈소스위험분석보고서, no 포맷 검증 section"
+else
+    fail "risk report (self): titled 오픈소스위험분석보고서, no 포맷 검증 section"
+fi
+if grep -q "## 1. 취약점" "$stmp/self_risk-report.md" \
+   && grep -q "7일" "$stmp/self_risk-report.md" && grep -q "CVE-2025-0001" "$stmp/self_risk-report.md"; then
+    pass "risk report (self): renumbered from 1, vuln table present"
+else
+    fail "risk report (self): renumbered from 1, vuln table present"
+fi
+if grep -q "<h1>오픈소스위험분석보고서</h1>" "$stmp/self_risk-report.html"; then
+    pass "risk report (self): html titled 오픈소스위험분석보고서"
+else
+    fail "risk report (self): html titled 오픈소스위험분석보고서"
+fi
+rm -rf "$stmp"
+
 # --------------------------------------------------------
 # Group 3: full source-scan E2E (requires image)
 # --------------------------------------------------------
@@ -300,6 +354,13 @@ else
             pass "security json is valid Trivy output"
         else
             fail "security json is valid Trivy output"
+        fi
+        # Risk report is now generated in SOURCE mode too (not only ANALYZE).
+        if [ -f "$w/testapp_1.0_risk-report.md" ] && [ -f "$w/testapp_1.0_risk-report.html" ] \
+           && grep -q "오픈소스위험분석보고서" "$w/testapp_1.0_risk-report.md"; then
+            pass "nodejs SOURCE: 오픈소스위험분석보고서 generated (all-modes default)"
+        else
+            fail "nodejs SOURCE: 오픈소스위험분석보고서 generated (all-modes default)"
         fi
         rm -rf "$w"
     else
@@ -337,6 +398,65 @@ else
         rm -rf "$w1" "$w2"
     else
         skip "go example not found"
+    fi
+fi
+
+# --------------------------------------------------------
+# Group 3b: source ingestion E2E — ZIP archive + offline git clone
+# --------------------------------------------------------
+section "Source ingestion E2E (zip + git)"
+if [ "$have_image" != 1 ]; then
+    skip "ingestion scan (scanner image not available)"
+else
+    # ZIP: archive an example, then scan the .zip (auto-extract -> SOURCE).
+    if command -v zip >/dev/null 2>&1 && [ -d "$EXAMPLES/nodejs" ]; then
+        z="$(mktemp -d "$WORK_ROOT/zip.XXXXXX")"
+        ( cd "$EXAMPLES" && zip -qr "$z/app.zip" nodejs )
+        ( cd "$z" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project ziptest --version 1.0 --target app.zip --all --generate-only ) > "$z/_scan.log" 2>&1
+        if [ -f "$z/ziptest_1.0_bom.json" ] && jq -e '.bomFormat=="CycloneDX"' "$z/ziptest_1.0_bom.json" >/dev/null 2>&1; then
+            pass "zip ingestion: extracted + scanned to valid SBOM"
+        else
+            fail "zip ingestion: extracted + scanned to valid SBOM" "$(tail -3 "$z/_scan.log" 2>/dev/null)"; show_log_if_verbose "$z"
+        fi
+        if [ -f "$z/ziptest_1.0_risk-report.md" ]; then
+            pass "zip ingestion: risk-report produced"
+        else
+            fail "zip ingestion: risk-report produced"
+        fi
+        # the temp extraction dir must be cleaned up (only artifacts remain)
+        if ! ls -d "$z"/.sbom-arc.* >/dev/null 2>&1; then
+            pass "zip ingestion: temp extraction dir cleaned up"
+        else
+            fail "zip ingestion: temp extraction dir cleaned up"
+        fi
+        rm -rf "$z"
+    else
+        skip "zip ingestion (zip command or nodejs example unavailable)"
+    fi
+
+    # GIT: build a local bare repo (offline, no network) and clone via file://.
+    if command -v git >/dev/null 2>&1 && [ -d "$EXAMPLES/nodejs" ]; then
+        g="$(mktemp -d "$WORK_ROOT/git.XXXXXX")"
+        ( cd "$g" && git init -q proj && cp -R "$EXAMPLES/nodejs/." proj/ \
+          && cd proj && git config user.email t@t && git config user.name t \
+          && git add -A && git commit -qm init )
+        ( cd "$g" && git clone -q --bare proj fixture.git )
+        ( cd "$g" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project gittest --version 1.0 --git "file://$g/fixture.git" --all --generate-only ) > "$g/_scan.log" 2>&1
+        if [ -f "$g/gittest_1.0_bom.json" ] && jq -e '.bomFormat=="CycloneDX"' "$g/gittest_1.0_bom.json" >/dev/null 2>&1; then
+            pass "git ingestion: cloned + scanned to valid SBOM"
+        else
+            fail "git ingestion: cloned + scanned to valid SBOM" "$(tail -3 "$g/_scan.log" 2>/dev/null)"; show_log_if_verbose "$g"
+        fi
+        if [ -f "$g/gittest_1.0_risk-report.md" ]; then
+            pass "git ingestion: risk-report produced"
+        else
+            fail "git ingestion: risk-report produced"
+        fi
+        rm -rf "$g"
+    else
+        skip "git ingestion (git command or nodejs example unavailable)"
     fi
 fi
 
@@ -472,6 +592,18 @@ else
                 pass "web UI /results returns JSON array"
             else
                 fail "web UI /results returns JSON array"
+            fi
+            # /capabilities drives input-type gating (firmware tab etc.)
+            if curl -fsS "http://localhost:${port}/capabilities" | jq -e 'has("firmware") and has("docker")' >/dev/null 2>&1; then
+                pass "web UI /capabilities reports firmware/docker support"
+            else
+                fail "web UI /capabilities reports firmware/docker support"
+            fi
+            # base image has no firmware tools -> firmware capability is false
+            if [ "$(curl -fsS "http://localhost:${port}/capabilities" | jq -r '.firmware')" = "false" ]; then
+                pass "web UI: firmware disabled on base image"
+            else
+                fail "web UI: firmware disabled on base image"
             fi
             # path traversal guard
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${port}/file?name=../../etc/passwd")

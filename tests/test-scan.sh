@@ -269,7 +269,7 @@ echo ""
 # ========================================================
 # Test 1: Node.js project
 # ========================================================
-print_test "Test 1/10: Node.js project (npm)"
+print_test "Test 1/11: Node.js project (npm)"
 
 mkdir -p node-project
 cd node-project || true
@@ -315,7 +315,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 2: Python project
 # ========================================================
-print_test "Test 2/10: Python project (pip)"
+print_test "Test 2/11: Python project (pip)"
 
 mkdir -p python-project
 cd python-project || true
@@ -353,7 +353,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 3: Java Maven project
 # ========================================================
-print_test "Test 3/10: Java Maven project"
+print_test "Test 3/11: Java Maven project"
 
 mkdir -p java-maven-project
 cd java-maven-project || true
@@ -403,7 +403,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 4: Ruby project
 # ========================================================
-print_test "Test 4/10: Ruby project (Bundler)"
+print_test "Test 4/11: Ruby project (Bundler)"
 
 mkdir -p ruby-project
 cd ruby-project || true
@@ -442,7 +442,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 5: PHP project
 # ========================================================
-print_test "Test 5/10: PHP project (Composer)"
+print_test "Test 5/11: PHP project (Composer)"
 
 mkdir -p php-project
 cd php-project || true
@@ -484,7 +484,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 6: Rust project
 # ========================================================
-print_test "Test 6/10: Rust project (Cargo)"
+print_test "Test 6/11: Rust project (Cargo)"
 
 mkdir -p rust-project
 cd rust-project || true
@@ -527,7 +527,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 7: Docker image analysis
 # ========================================================
-print_test "Test 7/10: Docker image analysis"
+print_test "Test 7/11: Docker image analysis"
 
 # Pull alpine image if network available
 if docker pull alpine:latest > /dev/null 2>&1; then
@@ -562,7 +562,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 8: Binary file analysis
 # ========================================================
-print_test "Test 8/10: Binary file analysis"
+print_test "Test 8/11: Binary file analysis"
 
 mkdir -p binary-test
 cd binary-test || true
@@ -592,7 +592,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 9: RootFS directory analysis
 # ========================================================
-print_test "Test 9/10: RootFS directory analysis"
+print_test "Test 9/11: RootFS directory analysis"
 
 mkdir -p rootfs-test/usr/bin
 cd rootfs-test || true
@@ -620,7 +620,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 10: Example projects validation
 # ========================================================
-print_test "Test 10/10: Example project validation"
+print_test "Test 10/11: Example project validation"
 
 EXAMPLE_PASSED=0
 EXAMPLE_TOTAL=0
@@ -647,6 +647,42 @@ if [ $EXAMPLE_TOTAL -eq $EXAMPLE_PASSED ]; then
 else
     print_error "Example Project ($EXAMPLE_PASSED/$EXAMPLE_TOTAL complete)"
     ((FAILED++))
+fi
+
+cd "$TEST_DIR" || true
+
+# ========================================================
+# Test 11: ZIP archive ingestion (auto-extract -> source scan)
+# Exercises native archive ingestion + risk-report (default-on, all modes).
+# ========================================================
+print_test "Test 11/11: ZIP archive ingestion"
+
+if ! command -v zip > /dev/null 2>&1; then
+    print_error "ZIP ingestion (zip command unavailable)"
+    ((FAILED++))
+else
+    mkdir -p zip-src/app
+    cat > zip-src/app/package.json <<'EOF'
+{ "name": "zip-app", "version": "1.0.0", "dependencies": { "express": "^4.18.0" } }
+EOF
+    ( cd zip-src && zip -qr app.zip app )
+    cd zip-src || true
+    if run_scan_with_logs "test-zip" "TestZipApp" "1.0.0" "--target app.zip --all"; then
+        if find_bom_file "TestZipApp" "1.0.0" > /dev/null \
+           && [ -f "TestZipApp_1.0.0_risk-report.md" ]; then
+            print_success "ZIP ingestion (SBOM + risk-report)"
+            ((PASSED++))
+        else
+            print_error "ZIP ingestion (SBOM or risk-report missing)"
+            show_failure_log "test-zip"
+            ((FAILED++))
+        fi
+    else
+        print_error "ZIP ingestion (Scan failed)"
+        show_failure_log "test-zip"
+        ((FAILED++))
+    fi
+    cd "$TEST_DIR" || true
 fi
 
 # ========================================================

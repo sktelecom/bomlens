@@ -47,10 +47,11 @@ ARG UNBLOB_VERSION=26.3.30
 ARG CVE_BIN_TOOL_VERSION=3.4
 ARG UBI_READER_VERSION=0.8.13
 
-# jq (helper scripts), curl/tar (installers), file (binary mode).
+# jq (helper scripts), curl/tar (installers), file (binary mode),
+# git (web UI 'GitHub URL' ingestion: server.py clones into a temp source tree).
 # python3 + pip are already in the python:3.12-slim base (web UI + scancode).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    jq curl wget ca-certificates bash tar file \
+    jq curl wget ca-certificates bash tar file git \
     && rm -rf /var/lib/apt/lists/*
 
 # syft — image/binary/RootFS scanning (pinned)
