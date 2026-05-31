@@ -250,7 +250,7 @@ flowchart TD
     R1 --> G
     G["⑦ 산출물 호스트 복사 — 항상"] --> H
     H{"⑧ UPLOAD_ENABLED"} -->|기본| H1["curl → trustedoss-portal"]
-    H -->|false (--generate-only)| Z([종료])
+    H -->|"false (--generate-only)"| Z([종료])
     H1 --> Z
 
     style B fill:#f1f8e9
@@ -278,19 +278,26 @@ flowchart TD
 
 `scan-sbom.sh`는 `--git`/`--analyze`/`--firmware`와 `--target` 값을 보고 모드를 자동 결정합니다.
 
+위에서부터 순차로 판정합니다(먼저 맞는 분기 채택).
+
 ```mermaid
 flowchart TD
-    G{"입력"} -->|"--git URL / URL형 target"| GIT["clone → MODE=SOURCE"]
-    G -->|"--target *.zip/*.tar.gz"| ZIP["압축 해제 → MODE=SOURCE"]
-    G -->|"--analyze sbom"| ANALYZE["MODE=ANALYZE<br/>검증 + CDX 변환"]
-    G -->|"target 미지정"| SOURCE["MODE=SOURCE<br/>현재 디렉터리 → cdxgen"]
-    G -->|"존재 파일"| FB{"펌웨어?"}
-    FB -->|"--firmware / 확장자·magic"| FIRMWARE["MODE=FIRMWARE<br/>opt-in 펌웨어 이미지"]
-    FB -->|"아니오"| BINARY["MODE=BINARY → syft"]
-    G -->|"존재 디렉터리"| ROOTFS["MODE=ROOTFS → syft"]
-    G -->|"그 외 문자열"| IMAGE["MODE=IMAGE → syft"]
-    UI["--ui"] --> UIMODE["MODE=UI<br/>웹 서버 (server.py)"]
+    D1{"--git URL<br/>또는 URL형 target?"} -->|예| R1["clone → MODE=SOURCE"]
+    D1 -->|아니오| D2{"--target<br/>*.zip / *.tar.gz?"}
+    D2 -->|예| R2["압축 해제 → MODE=SOURCE"]
+    D2 -->|아니오| D3{"--analyze sbom?"}
+    D3 -->|예| R3["MODE=ANALYZE<br/>검증 + CDX 변환"]
+    D3 -->|아니오| D4{"target 미지정?"}
+    D4 -->|예| R4["MODE=SOURCE<br/>현재 디렉터리 → cdxgen"]
+    D4 -->|아니오| D5{"존재하는 파일?"}
+    D5 -->|"예 · --firmware/확장자"| R5["MODE=FIRMWARE<br/>opt-in 펌웨어 이미지"]
+    D5 -->|"예 · 그 외"| R6["MODE=BINARY → syft"]
+    D5 -->|아니오| D6{"존재하는 디렉터리?"}
+    D6 -->|예| R7["MODE=ROOTFS → syft"]
+    D6 -->|아니오| R8["MODE=IMAGE → syft"]
 ```
+
+> `--ui`는 위 분기와 별개로 `MODE=UI`(웹 서버 `server.py`)를 띄우고, 후속 스캔을 폼/업로드로 실행합니다.
 
 | 모드 | 트리거 | 생성 도구 | 비고 |
 |------|--------|-----------|------|
