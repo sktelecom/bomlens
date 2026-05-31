@@ -13,9 +13,9 @@
     "running": "Scanning…"
   },
   "source": {
-    "label": "Input type",
-    "currentDir": "Current directory",
-    "currentDirHint": "Scans the source in the current directory (/src) mounted into the container.",
+    "label": "Scan target",
+    "currentDir": "Current folder",
+    "currentDirHint": "Scans the source in the folder where you launched the UI (mounted as /src).",
     "gitUrl": "GitHub URL",
     "gitHint": "Public repos clone directly; private repos need GIT_TOKEN.",
     "gitPlaceholder": "https://github.com/org/repo",
@@ -37,9 +37,7 @@
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "Deep license",
-    "deepLicenseHint": "ScanCode deep license detection (slow)",
-    "byteStable": "Deterministic output",
-    "byteStableHint": "Strip timestamps for reproducible output"
+    "deepLicenseHint": "ScanCode deep license detection (slow)"
   },
   "progress": {
     "title": "Run log",

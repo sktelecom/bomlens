@@ -51,7 +51,6 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
   const [notice, setNotice] = useState(true);
   const [security, setSecurity] = useState(true);
   const [deepLicense, setDeepLicense] = useState(false);
-  const [byteStable, setByteStable] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -101,7 +100,9 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
       notice: isAnalyze ? true : notice,
       security: isAnalyze ? true : security,
       deepLicense,
-      byteStable,
+      // Byte-stable (reproducible) output is a CI concern; not exposed in the UI
+      // so the default deliverable keeps a real timestamp + serialNumber.
+      byteStable: false,
     });
   };
 
@@ -114,7 +115,6 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
     { key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze },
     { key: "deepLicense", value: deepLicense, set: setDeepLicense },
-    { key: "byteStable", value: byteStable, set: setByteStable },
   ];
 
   return (
