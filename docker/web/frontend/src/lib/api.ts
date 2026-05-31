@@ -68,6 +68,7 @@ export interface ScanParams {
   source: SourceType;
   target?: string; // git URL OR docker image name
   token?: string; // server-side token from /upload
+  cred?: string; // single-use credId from /git-cred (private git URL)
   notice: boolean;
   security: boolean;
   deepLicense: boolean;
@@ -84,6 +85,7 @@ export interface Capabilities {
   firmware: boolean;
   docker: boolean;
   firmwareImage?: string;
+  hostDir?: string; // the host folder the UI was launched from (mounted as /src)
 }
 
 /** Which input types this running image supports (firmware needs the fw image). */
@@ -122,6 +124,26 @@ export async function uploadFile(
   return (await res.json()) as { token: string; filename: string };
 }
 
+/** Stash a private-repo token; returns a single-use credId for the scan. */
+export async function stashGitCred(token: string): Promise<{ credId: string }> {
+  const res = await fetch("/git-cred", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) {
+    let msg = `credential error (${res.status})`;
+    try {
+      const j = await res.json();
+      if (j && j.error) msg = j.error;
+    } catch {
+      /* keep default */
+    }
+    throw new Error(msg);
+  }
+  return (await res.json()) as { credId: string };
+}
+
 /** URL to download / view a generated artifact (server validates basename). */
 export function fileUrl(name: string): string {
   return `/file?name=${encodeURIComponent(name)}`;
@@ -148,6 +170,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     source: params.source,
     target: params.target ?? "",
     token: params.token ?? "",
+    cred: params.cred ?? "",
     notice: String(params.notice),
     security: String(params.security),
     deep_license: String(params.deepLicense),

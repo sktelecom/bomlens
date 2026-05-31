@@ -121,7 +121,7 @@ if [ "$UI_MODE" = "true" ]; then
     exec docker run --rm -it -p "${UI_PORT}:8080" \
         -v "$(pwd)":/src -v "$(pwd)":/host-output \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 "$POSTPROCESS_IMAGE"
+        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(pwd)" "$POSTPROCESS_IMAGE"
 fi
 
 # ========================================================
