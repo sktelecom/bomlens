@@ -82,32 +82,24 @@ Output files (CycloneDX 1.6 JSON):
 
 ## Architecture
 
-```
-┌────────────────────────────────────────────────┐
-│           scan-sbom.sh  (Wrapper Script)       │
-│  • Parses arguments & detects target type      │
-│  • Orchestrates Docker execution               │
-└────────────────────────┬───────────────────────┘
-                         │  docker run
-                         ▼
-┌────────────────────────────────────────────────┐
-│        Docker Container (sbom-scanner)         │
-│  ┌─────────────────────────────────────────┐   │
-│  │     Multi-language Runtime Environment  │   │
-│  │  JDK 17 · Python 3 · Node.js 20 · Ruby │   │
-│  │  PHP · Rust · Go · .NET · Build Tools  │   │
-│  └─────────────────────────────────────────┘   │
-│  ┌──────────────────┐  ┌────────────────────┐  │
-│  │ cdxgen           │  │ syft               │  │
-│  │ (source code)    │  │ (images/binaries)  │  │
-│  └──────────────────┘  └────────────────────┘  │
-└────────────────────────┬───────────────────────┘
-                         │
-                         ▼
-                  CycloneDX 1.4 SBOM (.json)
+A **two-stage pipeline** orchestrated by a single entry point (`scan-sbom.sh`):
+
+- **Stage 1 — Generate**: source code → **cdxgen** (official per-language images); container images / binaries / directories → **syft**. Output: CycloneDX 1.6.
+- **Stage 2 — Post-process**: the lightweight `sbom-scanner` image runs **normalize → (deep license) → notice → Trivy → cosign → upload** in a fixed order.
+
+```mermaid
+flowchart LR
+    SRC["source code"] --> CDX["cdxgen<br/>(per-language images)"]
+    IMG["image / binary / dir"] --> SYFT["syft"]
+    CDX --> BOM[("bom.json<br/>CycloneDX 1.6")]
+    SYFT --> BOM
+    BOM --> NORM["normalize"] --> SCAN["scancode<br/>(opt-in)"] --> NOTICE["notice"] --> TRIVY["Trivy"] --> SIGN["cosign"]
+    SIGN --> OUT["host artifacts"]
+    SIGN -.upload.-> DT["Dependency-Track"]
+    style BOM fill:#fff9c4
 ```
 
-See [docs/architecture.md](docs/architecture.md) for details (Korean).
+See [docs/architecture.md](docs/architecture.md) for the full per-tool call order, sequence diagrams, and flag-to-stage mapping (Korean).
 
 ## Why a Docker image? (vs plain cdxgen)
 
@@ -143,6 +135,8 @@ See [docs/direction-study.md](docs/direction-study.md) for methodology.
 | [아키텍처](docs/architecture.md) | 시스템 구조 및 설계 원칙 |
 | [고지문·보안·UI 가이드](docs/notice-security-ui-guide.md) | 고지문, 보안 보고서, 웹 UI 사용법 |
 | [방향성 조사 보고서](docs/direction-study.md) | Docker 스캔의 가치, 커버리지, 고지문·보안보고서·UI 로드맵 |
+| [펌웨어 분석](docs/firmware-analysis.md) | 네트워크 장비 펌웨어 SBOM/취약점/라이선스 점검 설계 및 한계 |
+| [공급사 SBOM 분석](docs/supplier-sbom-analysis.md) | 공급사 제출 SBOM 검증(SKT 요구사항)·분석·위험 보고서 설계 |
 | [테스트 가이드](docs/contributing/testing-guide.md) | 테스트 작성 및 실행 |
 | [패키지 매니저 추가](docs/contributing/package-manager-guide.md) | 새로운 언어/패키지 매니저 지원 추가 |
 | [기여하기](CONTRIBUTING.md) | 기여 절차 및 코딩 규칙 |
@@ -167,6 +161,9 @@ We welcome contributions of all kinds — bug fixes, new language support, docum
 
 Apache License 2.0 — Copyright 2026 SK Telecom Co., Ltd.  
 See [LICENSE](LICENSE) for details.
+
+This project bundles third-party tools in its Docker images under their own
+licenses; see [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## Acknowledgments
 

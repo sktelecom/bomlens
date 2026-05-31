@@ -1,0 +1,15 @@
+sbom-tools
+Copyright 2026 SK Telecom Co., Ltd.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles third-party open-source tools within its Docker images
+to perform SBOM generation and analysis. Those tools are separate programs,
+invoked at arm's length (as separate processes), and remain under their own
+respective licenses. A full inventory of bundled tools, their licenses, and
+the corresponding source locations is provided in THIRD_PARTY_LICENSES.md.
+
+The base image (ghcr.io/sktelecom/sbom-scanner) bundles only permissively
+licensed tools (Apache-2.0 / MIT). GPL-licensed tools, when used, are isolated
+in a separate opt-in image (ghcr.io/sktelecom/sbom-scanner-firmware); see
+THIRD_PARTY_LICENSES.md for the GPL source offer.
