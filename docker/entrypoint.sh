@@ -16,34 +16,19 @@
 set -e
 
 # ========================================================
-# Exception Handling and Environment Validation
+# Post-processing entrypoint (2-stage architecture)
+#
+# Source-code SBOM generation is done by scan-sbom.sh via cdxgen language
+# images. THIS image (post-processor) handles:
+#   - UI          : local web UI
+#   - IMAGE/BINARY/ROOTFS : syft scan -> SBOM
+#   - POSTPROCESS : consume an already-generated SBOM
+# then runs the common pipeline: normalize -> notice -> security -> sign.
 # ========================================================
 
-# Auto-configure JAVA_HOME
-if [ -z "$JAVA_HOME" ]; then
-    JAVA_BIN=$(readlink -f $(which java 2>/dev/null) 2>/dev/null || echo "")
-    if [ -n "$JAVA_BIN" ]; then
-        export JAVA_HOME=$(dirname $(dirname "$JAVA_BIN"))
-        export PATH="$JAVA_HOME/bin:$PATH"
-        echo "[INFO] JAVA_HOME detected: $JAVA_HOME"
-    else
-        echo "[WARN] Java not found. Java projects may fail."
-    fi
-else
-    echo "[INFO] JAVA_HOME already set: $JAVA_HOME"
-fi
+SCAN_MODE="${MODE:-POSTPROCESS}"
 
-# Verify JAVA_HOME is valid
-if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
-    echo "[INFO] Java verified: $($JAVA_HOME/bin/java -version 2>&1 | head -n 1)"
-else
-    echo "[WARN] JAVA_HOME is set but java binary not found at: $JAVA_HOME/bin/java"
-fi
-
-# Validate required environment variables
-SCAN_MODE="${MODE:-SOURCE}"
-
-# UI mode needs no project metadata — hand off to the web server immediately.
+# --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting SBOM Tools Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
@@ -59,236 +44,86 @@ SAFE_VERSION=$(echo "${PROJECT_VERSION}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/_
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 
 echo "=========================================="
-echo " SKT SBOM Scanner"
+echo " SKT SBOM Scanner (post-process)"
 echo " Mode: $SCAN_MODE"
 echo " Project: $PROJECT_NAME ($PROJECT_VERSION)"
 echo "=========================================="
 
-export GRADLE_OPTS="-Dorg.gradle.daemon=false"
-
 # ========================================================
-# Execute by mode
+# Produce / locate the SBOM
 # ========================================================
 case "$SCAN_MODE" in
     IMAGE)
-        # Docker image analysis
-        if [ -z "$TARGET_IMAGE" ]; then
-            echo "[ERROR] TARGET_IMAGE is required for IMAGE mode."
-            exit 1
-        fi
-        
-        # Check Docker socket
+        if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode."; exit 1; fi
         if [ ! -S /var/run/docker.sock ]; then
-            echo "[ERROR] Docker socket not found. Please mount: -v /var/run/docker.sock:/var/run/docker.sock"
-            exit 1
+            echo "[ERROR] Docker socket not mounted: -v /var/run/docker.sock:/var/run/docker.sock"; exit 1
         fi
-        
-        echo "[1/2] Analyzing Docker Image: $TARGET_IMAGE"
+        echo "[1/2] syft: Docker image $TARGET_IMAGE"
         if ! syft "$TARGET_IMAGE" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
-            echo "[ERROR] Syft failed. Image may be non-existent or inaccessible."
-            exit 1
+            echo "[ERROR] syft failed (image missing or inaccessible)."; exit 1
         fi
         ;;
-        
+
     BINARY)
-        # Binary file analysis
-        if [ -z "$TARGET_FILE" ]; then
-            echo "[ERROR] TARGET_FILE is required for BINARY mode."
-            exit 1
-        fi
-        
-        if [ ! -f "$TARGET_FILE" ]; then
-            echo "[ERROR] Target file not found: $TARGET_FILE"
-            exit 1
-        fi
-        
-        echo "[1/2] Analyzing Binary File: $TARGET_FILE"
+        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
+        echo "[1/2] syft: binary $TARGET_FILE"
         if ! syft "file:$TARGET_FILE" -o cyclonedx-json > "$OUTPUT_FILE" 2>&1; then
-            echo "[WARN] Standard binary analysis failed. Trying alternative method..."
-            # Extract basic binary information
+            echo "[WARN] syft binary scan failed; emitting minimal SBOM."
             FILE_INFO=$(file "$TARGET_FILE")
             cat > "$OUTPUT_FILE" <<EOF
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
   "version": 1,
-  "metadata": {
-    "component": {
-      "type": "file",
-      "name": "$(basename $TARGET_FILE)",
-      "version": "$PROJECT_VERSION",
-      "description": "$FILE_INFO"
-    }
-  },
+  "metadata": { "component": { "type": "file", "name": "$(basename "$TARGET_FILE")", "version": "$PROJECT_VERSION", "description": "$FILE_INFO" } },
   "components": []
 }
 EOF
         fi
         ;;
-        
+
     ROOTFS)
-        # RootFS directory analysis
-        if [ -z "$TARGET_DIR" ]; then
-            echo "[ERROR] TARGET_DIR is required for ROOTFS mode."
-            exit 1
-        fi
-        
-        if [ ! -d "$TARGET_DIR" ]; then
-            echo "[ERROR] Target directory not found: $TARGET_DIR"
-            exit 1
-        fi
-        
-        echo "[1/2] Analyzing RootFS Directory: $TARGET_DIR"
+        if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR"; exit 1; fi
+        echo "[1/2] syft: RootFS $TARGET_DIR"
         if ! syft "dir:$TARGET_DIR" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
-            echo "[ERROR] Syft failed to analyze directory."
+            echo "[ERROR] syft directory scan failed."; exit 1
+        fi
+        ;;
+
+    POSTPROCESS)
+        # SBOM was already generated by a cdxgen language image (scan-sbom.sh).
+        echo "[1/2] Post-processing existing SBOM: $OUTPUT_FILE"
+        if [ ! -s "$OUTPUT_FILE" ]; then
+            echo "[ERROR] SBOM not found for post-processing: $OUTPUT_FILE"
+            echo "        (stage 1 — cdxgen language image — may have failed)"
             exit 1
         fi
         ;;
-        
-    SOURCE|*)
-        # Source code analysis
-        echo "[1/2] Analyzing Source Code..."
-        
-        # Check working directory
-        if [ ! "$(ls -A /src)" ]; then
-            echo "[ERROR] /src directory is empty. Please mount your source code: -v \$(pwd):/src"
-            exit 1
-        fi
-        
-        # Dependency installation. Skipped when SKIP_BUILD=true so that
-        # "no build env" (manifest/lockfile parsing only) can be compared against
-        # "with build env" (resolved transitive deps). See tests/compare-cdxgen-vs-docker.sh
-        if [ "${SKIP_BUILD:-false}" != "true" ]; then
 
-        # Handle Python 2.x requirements.txt
-        if [ -f "requirements.txt" ] && command -v python2 >/dev/null 2>&1; then
-            # Detect Python 2.x project
-            if head -n 5 requirements.txt | grep -qiE 'python_version.*2\.|==.*py2'; then
-                echo "[INFO] Detected Python 2.x project. Installing dependencies..."
-                if python2 -m pip install --user -r requirements.txt 2>&1 | grep -i error || true; then
-                    echo "[WARN] Some Python 2 dependencies failed to install."
-                fi
-            fi
-        fi
-        
-        # Handle Python 3.x requirements.txt
-        if [ -f "requirements.txt" ]; then
-            echo "[INFO] Found requirements.txt. Installing Python 3 dependencies..."
-            if python3 -m venv /tmp/venv 2>/dev/null && source /tmp/venv/bin/activate; then
-                pip install --quiet -r requirements.txt 2>&1 | grep -i error || true
-            else
-                echo "[WARN] Python venv creation failed. Continuing without Python dependencies."
-            fi
-        fi
-        
-        # Handle Ruby Gemfile
-        if [ -f "Gemfile" ] && command -v bundle >/dev/null 2>&1; then
-            echo "[INFO] Found Gemfile. Installing Ruby dependencies..."
-            bundle install --quiet 2>&1 | grep -i error || true
-        fi
-        
-        # Handle PHP composer.json
-        if [ -f "composer.json" ] && command -v composer >/dev/null 2>&1; then
-            echo "[INFO] Found composer.json. Installing PHP dependencies..."
-            composer install --quiet --no-interaction 2>&1 | grep -i error || true
-        fi
-        
-        # Handle Java Maven pom.xml
-        if [ -f "pom.xml" ] && command -v mvn >/dev/null 2>&1; then
-            echo "[INFO] Found pom.xml. Downloading Maven dependencies..."
-            mvn dependency:resolve dependency:resolve-plugins -q 2>&1 | grep -iE 'error|failure' || true
-        fi
-        
-        # Handle Java Gradle build.gradle
-        if [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
-            if [ -x "./gradlew" ]; then
-                echo "[INFO] Found Gradle project. Downloading dependencies..."
-                ./gradlew dependencies --quiet 2>&1 | grep -iE 'error|failure' || true
-            elif command -v gradle >/dev/null 2>&1; then
-                echo "[INFO] Found Gradle project. Downloading dependencies..."
-                gradle dependencies --quiet 2>&1 | grep -iE 'error|failure' || true
-            fi
-        fi
-        
-        # Handle Rust Cargo.toml
-        if [ -f "Cargo.toml" ] && command -v cargo >/dev/null 2>&1; then
-            echo "[INFO] Found Cargo.toml. Generating Cargo.lock..."
-            . "$HOME/.cargo/env"
-            cargo generate-lockfile 2>&1 | grep -i error || true
-        fi
-
-        # Handle Python Poetry (pyproject.toml + poetry.lock)
-        if [ -f "pyproject.toml" ] && grep -q "\[tool.poetry\]" pyproject.toml 2>/dev/null && command -v poetry >/dev/null 2>&1; then
-            echo "[INFO] Found Poetry project. Resolving dependencies..."
-            poetry lock --no-interaction 2>&1 | grep -iE 'error' || true
-        fi
-
-        # Handle Go modules (go.mod)
-        if [ -f "go.mod" ] && command -v go >/dev/null 2>&1; then
-            echo "[INFO] Found go.mod. Downloading Go modules..."
-            go mod download 2>&1 | grep -iE 'error' || true
-        fi
-
-        # Handle .NET (*.csproj / *.sln)
-        if { ls ./*.csproj >/dev/null 2>&1 || ls ./*.sln >/dev/null 2>&1; } && command -v dotnet >/dev/null 2>&1; then
-            echo "[INFO] Found .NET project. Restoring NuGet packages..."
-            dotnet restore 2>&1 | grep -iE 'error' || true
-        fi
-
-        # Handle Node.js yarn / pnpm lockfiles (npm handled natively by cdxgen)
-        if [ -f "yarn.lock" ] && command -v yarn >/dev/null 2>&1; then
-            echo "[INFO] Found yarn.lock. Installing dependencies..."
-            yarn install --silent 2>&1 | grep -iE 'error' || true
-        elif [ -f "pnpm-lock.yaml" ] && command -v pnpm >/dev/null 2>&1; then
-            echo "[INFO] Found pnpm-lock.yaml. Installing dependencies..."
-            pnpm install --silent 2>&1 | grep -iE 'error' || true
-        fi
-
-        else
-            echo "[INFO] SKIP_BUILD=true — skipping dependency installation (manifest/lockfile only)"
-        fi
-
-        export NODE_OPTIONS="--max-old-space-size=8192"
-
-        # Grant execution permissions
-        [ -f "./gradlew" ] && chmod +x ./gradlew 2>/dev/null || true
-        [ -f "./mvnw" ] && chmod +x ./mvnw 2>/dev/null || true
-        
-        # Run cdxgen (CycloneDX 1.6)
-        if ! cdxgen -r --spec-version 1.6 -o "$OUTPUT_FILE" . 2>&1 | tee /tmp/cdxgen.log; then
-            echo "[ERROR] cdxgen failed. Check /tmp/cdxgen.log for details."
-            cat /tmp/cdxgen.log
-            exit 1
-        fi
+    *)
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected IMAGE/BINARY/ROOTFS/POSTPROCESS/UI)"
+        exit 1
         ;;
 esac
 
-# ========================================================
-# SBOM Validation
-# ========================================================
-if [ ! -s "$OUTPUT_FILE" ]; then
-    echo "[ERROR] SBOM file is empty or not generated."
-    exit 1
-fi
-
-echo "[INFO] SBOM generated: $OUTPUT_FILE"
+if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE"; exit 1; fi
+echo "[INFO] SBOM ready: $OUTPUT_FILE"
 
 # ========================================================
-# Post-processing: normalize, deep-license, notice, security, sign
+# Common pipeline: normalize / deep-license / notice / security / sign
 # ========================================================
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 LIBDIR="/usr/local/lib/sbom"
 ARTIFACTS=("$OUTPUT_FILE")
 
-# Deterministic / byte-stable output
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable || true
 else
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
 fi
 
-# Deep license detection (scancode, opt-in, SOURCE only)
-if [ "${DEEP_LICENSE:-false}" = "true" ] && [ "$SCAN_MODE" = "SOURCE" ]; then
+# Deep license detection (scancode, opt-in). Only meaningful for source trees.
+if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
     if command -v scancode >/dev/null 2>&1; then
         echo "[INFO] Running scancode deep license detection..."
         if scancode --license --json-pp /tmp/scancode.json /src >/dev/null 2>&1; then
@@ -302,21 +137,18 @@ if [ "${DEEP_LICENSE:-false}" = "true" ] && [ "$SCAN_MODE" = "SOURCE" ]; then
     fi
 fi
 
-# Open-source notice (Text + HTML)
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt" "${OUT_PREFIX}_NOTICE.html")
     fi
 fi
 
-# Security report (Trivy: JSON + Markdown + HTML)
 if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
     if bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_security.json" "${OUT_PREFIX}_security.md" "${OUT_PREFIX}_security.html")
     fi
 fi
 
-# Optional cosign signing (opt-in; cosign install is roadmap Phase 5)
 if [ "${SIGN_SBOM:-false}" = "true" ]; then
     if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
         echo "[INFO] Signing SBOM with cosign..."
@@ -330,7 +162,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
 fi
 
 # ========================================================
-# Copy all artifacts to host output (always)
+# Copy artifacts to host output (always)
 # ========================================================
 if [ -n "$HOST_OUTPUT_DIR" ] && [ -d "$HOST_OUTPUT_DIR" ]; then
     for art in "${ARTIFACTS[@]}"; do
@@ -348,26 +180,20 @@ else
 fi
 
 # ========================================================
-# Upload Handling
+# Upload handling (optional Dependency-Track)
 # ========================================================
 if [ "${UPLOAD_ENABLED:-true}" = "false" ]; then
     echo "[INFO] Generate-only mode. Done."
     exit 0
 fi
 
-# Upload to Dependency Track
 echo "[2/2] Uploading to Dependency Track..."
-
 if [ -z "$API_KEY" ] || [ -z "$API_URL" ]; then
-    echo "[ERROR] API_KEY and API_URL are required for upload."
-    exit 1
+    echo "[ERROR] API_KEY and API_URL are required for upload."; exit 1
 fi
-
-# Server connectivity test
 if ! curl -s --max-time 5 "$API_URL/api/version" > /dev/null 2>&1; then
-    echo "[WARN] Cannot reach Dependency Track at $API_URL. Check network/firewall."
+    echo "[WARN] Cannot reach Dependency Track at $API_URL."
 fi
-
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/api/v1/bom" \
     -H "Content-Type: multipart/form-data" \
     -H "X-Api-Key: $API_KEY" \
@@ -375,14 +201,10 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/api/v1/bom" \
     -F "projectName=$PROJECT_NAME" \
     -F "projectVersion=$PROJECT_VERSION" \
     -F "bom=@$OUTPUT_FILE")
-
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 BODY=$(echo "$RESPONSE" | sed '$d')
-
 if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] && echo "$BODY" | grep -q "token"; then
     echo "[SUCCESS] Upload complete!"
 else
-    echo "[ERROR] Upload failed (HTTP $HTTP_CODE)"
-    echo "Response: $BODY"
-    exit 1
+    echo "[ERROR] Upload failed (HTTP $HTTP_CODE)"; echo "Response: $BODY"; exit 1
 fi
