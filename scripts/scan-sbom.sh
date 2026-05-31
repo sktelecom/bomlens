@@ -25,6 +25,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
+FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/sbom-scanner-firmware:latest}"  # opt-in (unblob/cve-bin-tool)
 CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen language image tag
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
 ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/sbom-scanner-android-sdk}"
@@ -36,6 +37,7 @@ DEFAULT_API_KEY="${API_KEY:-odt_YOUR_REAL_API_KEY_HERE}"
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
+FORCE_FIRMWARE="false"
 
 # ========================================================
 # Parse arguments
@@ -52,6 +54,7 @@ while [[ "$#" -gt 0 ]]; do
         --deep-license) DEEP_LICENSE="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --firmware) FORCE_FIRMWARE="true" ;;
         --ui) UI_MODE="true" ;;
         --help)
             cat << EOF
@@ -61,6 +64,7 @@ Options:
   --project <name>       Project name (required)
   --version <ver>        Version (required)
   --target <target>      Not set: source (current dir) | image name | file | directory
+  --firmware             Force firmware mode for --target file (opt-in image)
   --generate-only        Save locally without uploading
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
@@ -125,11 +129,34 @@ pp_env() {
 # ========================================================
 # Detect target type
 # ========================================================
+# Recognize a firmware blob by extension, or (if `file` is on the host) by magic.
+is_firmware() {
+    local f="$1" lower magic
+    lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+        *.bin|*.img|*.squashfs|*.sqsh|*.ubi|*.ubifs|*.trx|*.chk|*.fw|*.rom|*.dlf) return 0 ;;
+    esac
+    if command -v file >/dev/null 2>&1; then
+        magic=$(file -b "$f" 2>/dev/null)
+        case "$magic" in
+            *Squashfs*|*"UBI image"*|*"u-boot legacy uImage"*|*JFFS2*|*cramfs*|*"filesystem data"*) return 0 ;;
+        esac
+    fi
+    return 1
+}
+
 MODE="SOURCE"
 if [ -n "$TARGET" ]; then
-    if [ -f "$TARGET" ]; then MODE="BINARY";
+    if [ -f "$TARGET" ]; then
+        if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then MODE="FIRMWARE"; else MODE="BINARY"; fi
     elif [ -d "$TARGET" ]; then MODE="ROOTFS";
     else MODE="IMAGE"; fi
+elif [ "$FORCE_FIRMWARE" = "true" ]; then
+    echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
+fi
+
+if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
+    echo "[ERROR] --firmware expects a file target, but '$TARGET' is not a regular file."; exit 1
 fi
 
 # ========================================================
@@ -228,17 +255,19 @@ if [ "$MODE" = "SOURCE" ]; then
         -e MODE=POSTPROCESS $(pp_env) \
         "\"$POSTPROCESS_IMAGE\""
 else
-    # image / binary / rootfs: post-process image runs syft + pipeline in one shot
-    VOL=""; ENVV=""
+    # image / binary / rootfs / firmware: scanner image runs syft + pipeline in one shot.
+    # Firmware needs the heavier opt-in image (unblob/cve-bin-tool); others use the base image.
+    VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
         IMAGE)  VOL="-v \"$SOURCE_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
+        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
     esac
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" $ENVV $(pp_env) \
-        "\"$POSTPROCESS_IMAGE\""
+        "\"$RUN_IMAGE\""
 fi
 
 echo "=========================================="

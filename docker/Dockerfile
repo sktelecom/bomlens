@@ -40,6 +40,14 @@ ARG SCANCODE_VERSION=32.3.0
 ARG SBOM_DEEP_LICENSE=false
 ARG TARGETARCH=amd64
 
+# Firmware analysis (opt-in image `sbom-scanner-firmware`). GPL tools are isolated
+# here so the base image stays permissive-only; see THIRD_PARTY_LICENSES.md.
+ARG SBOM_FIRMWARE=false
+ARG UNBLOB_VERSION=26.3.30
+ARG CVE_BIN_TOOL_VERSION=3.4
+ARG BINWALK_VERSION=2.1.0
+ARG UBI_READER_VERSION=0.8.13
+
 # jq (helper scripts), curl/tar (installers), file (binary mode).
 # python3 + pip are already in the python:3.12-slim base (web UI + scancode).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -74,6 +82,31 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
     else \
       echo "[build] scancode-toolkit skipped (SBOM_DEEP_LICENSE=false)"; \
     fi
+
+# Firmware unpack + binary identification (opt-in: --build-arg SBOM_FIRMWARE=true).
+#   unblob/binwalk = MIT (unpackers); cve-bin-tool/ubi_reader = GPL (binary ID, UBI).
+#   squashfs-tools/e2fsprogs/p7zip/unar/... are the extractor binaries unblob shells out to.
+#   Built only into ghcr.io/sktelecom/sbom-scanner-firmware so the base image stays GPL-free.
+#   NOTE: vendor-modified (non-standard) squashfs needs sasquatch added on top of this.
+RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        squashfs-tools e2fsprogs p7zip-full unar cpio cabextract \
+        lzop zstd lz4 liblzo2-2 zlib1g \
+      && pip3 install --no-cache-dir \
+        "unblob==${UNBLOB_VERSION}" \
+        "cve-bin-tool==${CVE_BIN_TOOL_VERSION}" \
+        "binwalk==${BINWALK_VERSION}" \
+        "ubi_reader==${UBI_READER_VERSION}" \
+      && rm -rf /var/lib/apt/lists/* \
+      && unblob --version && cve-bin-tool --version; \
+    else \
+      echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
+    fi
+
+# Reflects the firmware build flavor. When SBOM_FIRMWARE=true the image bundles GPL
+# tools (cve-bin-tool, ubi_reader); the source-offer label points to the inventory.
+LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
+      com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan
 COPY lib/ /usr/local/lib/sbom/
