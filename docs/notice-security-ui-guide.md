@@ -62,7 +62,11 @@ MyApp_1.0.0_NOTICE.html         # 고지문 (HTML)
 MyApp_1.0.0_security.json       # 보안보고서 (Trivy 원본)
 MyApp_1.0.0_security.md         # 보안보고서 (요약)
 MyApp_1.0.0_security.html       # 보안보고서 (시각화)
+MyApp_1.0.0_risk-report.md      # 오픈소스위험분석보고서 (요약)
+MyApp_1.0.0_risk-report.html    # 오픈소스위험분석보고서 (시각화)
 ```
+
+> **오픈소스위험분석보고서(`_risk-report`)는 모든 분석 모드에서 기본 생성**됩니다(라이선스+취약점 집계, 대응 기한 포함). 생략하려면 `--no-report`를 쓰세요. 5가지 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md)를 참고하세요.
 
 ---
 
@@ -190,12 +194,29 @@ cd /path/to/your/project
 **Windows:** `scripts\sbom-ui.bat`를 **더블클릭**합니다.
 
 화면 구성:
-1. **스캔 설정** — 프로젝트 이름·버전(필수, 인라인 검증), 타겟(비우면 현재 디렉토리 소스, Docker 이미지명을 넣으면 이미지 스캔), 옵션 칩(고지문·보안·정밀 라이선스·결정론적).
-2. **스캔 실행** — 진행 중 **실시간 로그가 스트리밍**됩니다(완료까지 기다릴 필요 없이 진행 상황 확인).
-3. **요약** — 완료되면 **컴포넌트 수**와 **취약점 심각도 배지**(Critical/High/…)가 카드로 표시됩니다.
-4. **결과물** — SBOM·고지문·보안보고서를 표에서 바로 **열기/다운로드**.
+1. **스캔 설정** — 프로젝트 이름·버전(필수, 인라인 검증), **입력 유형 선택**, 옵션 칩(고지문·보안·정밀 라이선스·결정론적).
+2. **입력 유형** — 6가지 중 선택하고 형태에 맞게 입력/업로드합니다:
+
+   | 입력 유형 | 입력 방법 | 백엔드 모드 |
+   |-----------|-----------|-------------|
+   | 현재 디렉터리 | UI 실행 디렉터리의 소스 스캔 | SOURCE |
+   | GitHub URL | 저장소 URL 입력 | SOURCE(클론) |
+   | ZIP 업로드 | `.zip`/tar 파일 업로드 | SOURCE(해제) |
+   | SBOM 업로드 | 기존 SBOM(JSON) 업로드 | ANALYZE |
+   | 펌웨어 업로드 | `.bin` 등 업로드 | FIRMWARE |
+   | Docker 이미지 | 이미지명 입력 | IMAGE |
+
+3. **스캔 실행** — 진행 중 **실시간 로그가 스트리밍**됩니다. 오류(클론 실패·소켓 없음·미지원 파일 등)는 로그에 명확히 표시됩니다.
+4. **요약** — 완료되면 **컴포넌트 수**, **취약점 심각도 배지**, (공급사 SBOM의 경우) **적합성(적합/부적합)** 카드가 표시됩니다.
+5. **결과물** — SBOM·고지문·**오픈소스위험분석보고서**·보안보고서·(적합성)를 표에서 바로 **열기/다운로드**. 위험분석보고서는 강조 표시됩니다.
 
 우측 상단의 **한국어 / EN** 토글로 표시 언어를 바꿀 수 있습니다.
+
+> **SBOM 업로드(ANALYZE)** 선택 시 위험분석을 위해 고지문·보안이 자동 활성화됩니다.
+> **펌웨어 업로드** 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
+> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
+>
+> **참고:** UI의 소스 스캔(현재 디렉터리/ZIP/GitHub)은 컨테이너 내부에서 **syft**로 디렉터리를 분석합니다. 잠금 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있는 경우 더 깊은 해석이 필요하면 CLI 소스 모드(cdxgen)를 사용하세요.
 
 **포트 변경 / 충돌 시:** 기본 포트(8080)가 다른 서비스에 점유돼 있으면 다른 포트를 지정하세요:
 ```bash
@@ -211,8 +232,10 @@ UI_PORT=9090 ./scripts/scan-sbom.sh --ui      # http://localhost:9090
 | 파일 | 생성 조건 | 설명 |
 |------|----------|------|
 | `{P}_{V}_bom.json` | 항상 | SBOM (CycloneDX 1.6) |
-| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` | 오픈소스 고지문 |
-| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` | Trivy 보안보고서 |
+| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 | 오픈소스 고지문 |
+| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
+| `{P}_{V}_risk-report.md` / `.html` | 기본(전 모드) — `--no-report`로 생략 | 오픈소스위험분석보고서 |
+| `{P}_{V}_conformance.json` / `.md` / `.html` | `--analyze` | 포맷 적합성 보고서 |
 | `{P}_{V}_scancode.json` | `--deep-license` | scancode 원본 결과 |
 | `{P}_{V}_bom.json.sig` | `--sign` | cosign 서명 |
 

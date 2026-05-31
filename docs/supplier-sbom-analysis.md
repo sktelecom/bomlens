@@ -2,7 +2,7 @@
 
 > **관련 문서**: [아키텍처](architecture.md) · [방향성 조사 보고서](direction-study.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [펌웨어 분석](firmware-analysis.md)
 >
-> 성격: 설계·의사결정 문서 (메인테이너용). **Phase 1~3(검증+분석+위험보고서)은 구현 완료**되었습니다(`docker/lib/validate-sbom.sh`·`convert-to-cdx.sh`·`generate-risk-report.sh`, `--analyze`/ANALYZE 모드). 웹 UI 업로드(Phase 4)는 후순위입니다.
+> 성격: 설계·의사결정 문서 (메인테이너용). **Phase 1~4 모두 구현 완료**되었습니다(`docker/lib/validate-sbom.sh`·`convert-to-cdx.sh`·`generate-risk-report.sh`, `--analyze`/ANALYZE 모드, 웹 UI **SBOM 업로드**). 또한 위험분석보고서(`_risk-report`)는 ANALYZE 전용이 아니라 **모든 분석 모드에서 기본 생성**되도록 일반화되었습니다(자체 생성 SBOM에는 포맷 검증 절을 생략하고 제목을 "오픈소스위험분석보고서"로 표기). 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md) 참고.
 
 ## 요약 (Executive Summary)
 
@@ -165,7 +165,7 @@ flowchart TD
 | **1** | `validate-sbom.sh` (검증기) | 독립적, host jq로 테스트 가능 → 가치 높고 의존성 적어 우선 |
 | **2** | `--analyze`/ANALYZE 입력 경로 + `convert-to-cdx.sh` | 기존 normalize/notice/security 재사용 연결 |
 | **3** | `generate-risk-report.sh` | 기존 산출물 재집계 |
-| **4** | 웹 UI 업로드 (`server.py` `do_POST` + 폼) | 후순위 |
+| **4** | 웹 UI 업로드 (`server.py` `do_POST` + 입력 유형 폼) | 구현 완료 |
 | **5** | 문서·역할 경계 명시 | |
 
 > 이번 구현 목표 = **전체(검증+분석+보고서, Phase 1~3)**. 웹 UI(Phase 4)는 후순위.

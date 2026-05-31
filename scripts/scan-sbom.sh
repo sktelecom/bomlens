@@ -38,6 +38,8 @@ GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""
+GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
+INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 
 # ========================================================
 # Parse arguments
@@ -48,6 +50,9 @@ while [[ "$#" -gt 0 ]]; do
         --version) PROJECT_VERSION="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
         --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
+        --git) GIT_URL="$2"; shift ;;
+        --branch|--ref) GIT_REF="$2"; shift ;;
+        --no-report) NO_REPORT="true" ;;
         --generate-only) GENERATE_ONLY="true" ;;
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true" ;;
@@ -64,7 +69,12 @@ Usage: $0 --project <name> --version <ver> [OPTIONS]
 Options:
   --project <name>       Project name (required)
   --version <ver>        Version (required)
-  --target <target>      Not set: source (current dir) | image name | file | directory
+  --target <target>      Not set: source (current dir) | image name | file |
+                         directory | .zip/.tar.gz archive (auto-extracted)
+  --git <url>            Clone a git/GitHub URL (shallow) and scan as source.
+                         Private repos: set GIT_TOKEN env. Mutually exclusive
+                         with --target/--analyze/--firmware.
+  --branch <ref>         Branch, tag, or commit for --git (default: repo default)
   --firmware             Force firmware mode for --target file (opt-in image)
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
@@ -72,6 +82,9 @@ Options:
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
   --all                  --notice --security
+  --no-report            Skip the 오픈소스위험분석보고서 (risk-report). By default
+                         the risk report (+notice+security) is generated in
+                         every mode; --no-report opts out.
   --deep-license         scancode deep license (opt-in image)
   --byte-stable          Deterministic SBOM output
   --sign                 cosign sign (requires COSIGN_KEY)
@@ -120,13 +133,18 @@ docker_check
 SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
 SAFE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/[^a-zA-Z0-9._-]/_/g')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
-SOURCE_DIR="$(pwd)"
+SOURCE_DIR="$(pwd)"          # host-output anchor: artifacts land where the user ran the tool
+SCAN_INPUT_DIR="$SOURCE_DIR" # what cdxgen scans (overridden by git clone / zip extract)
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
+
+# Temp dirs (git clone / archive extract) are cleaned on any exit.
+cleanup() { local d; for d in "${CLEANUP_DIRS[@]}"; do [ -n "$d" ] && rm -rf -- "$d"; done; }
+trap cleanup EXIT INT TERM
 
 # Common -e flags for the post-process image
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e API_KEY=%q -e API_URL=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$DEFAULT_API_KEY" "$SERVER_URL"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e API_KEY=%q -e API_URL=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$DEFAULT_API_KEY" "$SERVER_URL"
 }
 
 # ========================================================
@@ -148,8 +166,122 @@ is_firmware() {
     return 1
 }
 
+# A git/GitHub URL we are willing to clone. Strict allowlist (anti-injection):
+# only http(s)/git/ssh/file schemes, no whitespace, no '..', no leading '-' .
+is_git_url() {
+    case "$1" in
+        -*) return 1 ;;
+        *..*) return 1 ;;
+        *" "*|*$'\t'*) return 1 ;;
+    esac
+    [[ "$1" =~ ^(https?://|git@|ssh://git@|file://)[A-Za-z0-9._~:@/+-]+$ ]]
+}
+
+# A source archive we auto-extract and scan as SOURCE.
+is_archive() {
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+        *.zip|*.tar.gz|*.tgz|*.tar.bz2|*.tar.xz|*.tar) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Pick the scan root inside an extracted/cloned temp dir: if it contains exactly
+# one subdirectory (and no top-level files), descend into it (GitHub tarballs/zips
+# wrap everything in a single `repo-main/` folder).
+flatten_single_dir() {
+    local d="$1" entries
+    # shellcheck disable=SC2012
+    entries=$(ls -A "$d" 2>/dev/null)
+    if [ "$(printf '%s\n' "$entries" | grep -c .)" = "1" ] && [ -d "$d/$entries" ]; then
+        printf '%s' "$d/$entries"
+    else
+        printf '%s' "$d"
+    fi
+}
+
+ingest_git() {
+    local url="$1" tmp args
+    is_git_url "$url" || { echo "[ERROR] unsafe or unsupported git URL: $url"; exit 1; }
+    command -v git >/dev/null 2>&1 || { echo "[ERROR] git not installed (required for --git)."; exit 1; }
+    # Clone under the pwd (already shared with Docker Desktop) rather than $TMPDIR,
+    # which on macOS is /var/folders and is NOT mounted into the cdxgen container.
+    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-git.XXXXXX") || { echo "[ERROR] mktemp failed"; exit 1; }
+    CLEANUP_DIRS+=("$tmp")
+    # Inject a token for private https repos into a LOCAL var only (never logged).
+    local clone_url="$url"
+    if [ -n "${GIT_TOKEN:-}" ]; then
+        case "$url" in
+            https://*) clone_url="https://x-access-token:${GIT_TOKEN}@${url#https://}" ;;
+        esac
+    fi
+    echo "[INFO] Cloning $url (shallow)..."
+    args=(clone --depth 1 --single-branch)
+    [ -n "$GIT_REF" ] && args+=(--branch "$GIT_REF")
+    # `--` stops option parsing so a hostile URL can't smuggle git options.
+    if ! GIT_TERMINAL_PROMPT=0 git "${args[@]}" -- "$clone_url" "$tmp/repo" 2>/tmp/sbom-git-err; then
+        echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+    fi
+    rm -f /tmp/sbom-git-err
+    SCAN_INPUT_DIR=$(flatten_single_dir "$tmp/repo")
+    INGEST_SOURCE="true"
+}
+
+ingest_archive() {
+    local arc="$1" tmp lower
+    [ -f "$arc" ] || { echo "[ERROR] archive not found: $arc"; exit 1; }
+    # Extract under the pwd (shared with Docker Desktop), not $TMPDIR (/var/folders
+    # on macOS is not mounted into the cdxgen container).
+    tmp=$(mktemp -d "$SOURCE_DIR/.sbom-arc.XXXXXX") || { echo "[ERROR] mktemp failed"; exit 1; }
+    CLEANUP_DIRS+=("$tmp")
+    lower=$(printf '%s' "$arc" | tr '[:upper:]' '[:lower:]')
+    echo "[INFO] Extracting archive $arc..."
+    case "$lower" in
+        *.zip)
+            # zip-slip guard: reject absolute or parent-traversal entries before extracting.
+            if command -v unzip >/dev/null 2>&1; then
+                if unzip -l "$arc" 2>/dev/null | awk '{print $4}' | grep -qE '(^/|(^|/)\.\.(/|$))'; then
+                    echo "[ERROR] unsafe path in archive (zip-slip)"; exit 1
+                fi
+                unzip -q -d "$tmp" -- "$arc" || { echo "[ERROR] unzip failed"; exit 1; }
+            else
+                # bsdtar (Git Bash on Windows) extracts .zip and rejects traversal.
+                tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { echo "[ERROR] unsafe path in archive"; exit 1; }
+                tar -C "$tmp" -xf "$arc" || { echo "[ERROR] tar (zip) extract failed"; exit 1; }
+            fi
+            ;;
+        *)
+            tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { echo "[ERROR] unsafe path in archive"; exit 1; }
+            tar -C "$tmp" --no-same-owner -xf "$arc" || { echo "[ERROR] tar extract failed"; exit 1; }
+            ;;
+    esac
+    SCAN_INPUT_DIR=$(flatten_single_dir "$tmp")
+    INGEST_SOURCE="true"
+}
+
+# --------------------------------------------------------
+# Ingestion: git URL (--git or a URL-shaped --target) / source archive.
+# Produces a local SCAN_INPUT_DIR and forces SOURCE mode below.
+# --------------------------------------------------------
+# Allow a git URL passed positionally via --target.
+if [ -z "$GIT_URL" ] && [ -n "$TARGET" ] && is_git_url "$TARGET"; then
+    GIT_URL="$TARGET"; TARGET=""
+fi
+if [ -n "$GIT_URL" ]; then
+    [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --git is mutually exclusive with --analyze."; exit 1; }
+    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --git cannot be combined with --firmware."; exit 1; }
+    ingest_git "$GIT_URL"
+elif [ -n "$TARGET" ] && [ -f "$TARGET" ] && is_archive "$TARGET"; then
+    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with a source archive."; exit 1; }
+    ingest_archive "$TARGET"
+fi
+
 MODE="SOURCE"
-if [ -n "$ANALYZE_SBOM" ]; then
+if [ "$INGEST_SOURCE" = "true" ]; then
+    # A git clone / extracted archive is always scanned as SOURCE (the temp dir
+    # would otherwise be detected as ROOTFS below).
+    MODE="SOURCE"
+elif [ -n "$ANALYZE_SBOM" ]; then
     # Supplier SBOM analysis takes precedence; it does not use --target.
     [ -z "$TARGET" ] || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --target."; exit 1; }
     [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with --analyze."; exit 1; }
@@ -168,6 +300,13 @@ fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
     echo "[ERROR] --firmware expects a file target, but '$TARGET' is not a regular file."; exit 1
+fi
+
+# Unified 오픈소스위험분석보고서 (risk-report) is on by default in every mode.
+# It aggregates license (NOTICE) + vulnerability (security), so both are forced
+# on unless the user opts out with --no-report. ANALYZE already enabled them.
+if [ "$NO_REPORT" != "true" ]; then
+    GENERATE_REPORT="true"; GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
 fi
 
 # ========================================================
@@ -193,6 +332,9 @@ detect_lang() {
     [ -f "$d/package.json" ] && langs="$langs node"
     [ -f "$d/composer.json" ] && langs="$langs php"
     ls "$d"/*.csproj "$d"/*.sln >/dev/null 2>&1 && langs="$langs dotnet"
+    # C/C++ with a package manager (Conan / vcpkg). cdxgen's all-in-one image
+    # resolves these; raw CMake/Make C/C++ has no manifest and stays "unknown".
+    { [ -f "$d/conanfile.txt" ] || [ -f "$d/conanfile.py" ] || [ -f "$d/vcpkg.json" ]; } && langs="$langs cpp"
     # shellcheck disable=SC2086
     set -- $langs
     if [ "$#" -eq 1 ]; then echo "$1"; elif [ "$#" -eq 0 ]; then echo "unknown"; else echo "mixed"; fi
@@ -223,16 +365,20 @@ android_api() {
 echo "=========================================="
 echo "  SBOM Analysis — Mode: $MODE — $PROJECT_NAME ($PROJECT_VERSION)"
 [ -n "$TARGET" ] && echo "  Target: $TARGET"
+[ -n "$GIT_URL" ] && echo "  Git:    $GIT_URL${GIT_REF:+ (ref: $GIT_REF)}"
 echo "=========================================="
 
 # ========================================================
 # Stage 1: produce SBOM
 # ========================================================
 if [ "$MODE" = "SOURCE" ]; then
-    [ -n "$(ls -A "$SOURCE_DIR" 2>/dev/null)" ] || { echo "[ERROR] current directory is empty"; exit 1; }
-    LANG_DET=$(detect_lang "$SOURCE_DIR")
+    # SCAN_INPUT_DIR = the tree we scan (current dir, or a cloned/extracted temp
+    # dir). SOURCE_DIR ($(pwd)) stays the host-output anchor so artifacts land
+    # where the user ran the tool, even for --git/zip ingestion.
+    [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
+    LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
     if [ "$LANG_DET" = "android" ]; then
-        API=$(android_api "$SOURCE_DIR")
+        API=$(android_api "$SCAN_INPUT_DIR")
         CDX_IMG="${ANDROID_IMAGE_PREFIX}${API}:latest"
         echo "[INFO] Android source detected (compileSdk=$API) -> $CDX_IMG"
     else
@@ -242,6 +388,13 @@ if [ "$MODE" = "SOURCE" ]; then
             echo "[WARN] iOS/Swift: CocoaPods(Podfile.lock) resolves fully; SPM is augmented via 'swift package resolve'."
             echo "[WARN]   iOS-platform (UIKit) and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
         fi
+        if [ "$LANG_DET" = "cpp" ]; then
+            echo "[WARN] C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
+            echo "[WARN]   Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers."
+        fi
+        if [ "$LANG_DET" = "unknown" ]; then
+            echo "[WARN] No package manifest detected; using cdxgen all-in-one (results may be sparse)."
+        fi
     fi
     echo "[1/2] Generating SBOM (cdxgen)..."
     CACHE_MOUNTS=""
@@ -250,7 +403,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     eval docker run --rm \
-        -v "\"$SOURCE_DIR\"":/app \
+        -v "\"$SCAN_INPUT_DIR\"":/app \
         -v "\"$BUILD_PREP\"":/tmp/build-prep.sh:ro \
         $CACHE_MOUNTS \
         -e HOME=/tmp/sbomhome \
@@ -260,8 +413,10 @@ if [ "$MODE" = "SOURCE" ]; then
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }
 
     echo "[2/2] Post-processing..."
+    # Mount the scanned tree as /src (so POSTPROCESS finds the bom + deep-license
+    # sees the real source) and the pwd as /host-output (artifact destination).
     eval docker run --rm \
-        -v "\"$SOURCE_DIR\"":/src -v "\"$SOURCE_DIR\"":/host-output \
+        -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$SOURCE_DIR\"":/host-output \
         --add-host=host.docker.internal:host-gateway \
         -e MODE=POSTPROCESS $(pp_env) \
         "\"$POSTPROCESS_IMAGE\""
@@ -288,9 +443,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     echo "  SBOM: ${OUTPUT_FILE}"
     [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
     [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
-    if [ "$MODE" = "ANALYZE" ]; then
-        echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
-        echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
-    fi
+    [ "$MODE" = "ANALYZE" ] && echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
+    [ "$GENERATE_REPORT" = "true" ] && echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
 fi
 echo "=========================================="

@@ -15,6 +15,25 @@
     "run": "스캔 실행",
     "running": "스캔 중…"
   },
+  "source": {
+    "label": "입력 유형",
+    "currentDir": "현재 디렉터리",
+    "currentDirHint": "컨테이너에 마운트된 현재 디렉터리(/src)의 소스를 스캔합니다.",
+    "gitUrl": "GitHub URL",
+    "gitHint": "공개 저장소는 바로, 비공개는 GIT_TOKEN 설정 시 클론됩니다.",
+    "gitPlaceholder": "https://github.com/org/repo",
+    "zipUpload": "ZIP 업로드",
+    "sbomUpload": "SBOM 업로드",
+    "sbomAnalyzeHint": "위험분석을 위해 고지문·보안 보고서가 자동 활성화됩니다.",
+    "firmwareUpload": "펌웨어 업로드",
+    "firmwareHint": "추출 후 syft·cve-bin-tool로 구성요소를 식별합니다(.bin/.img/.squashfs 등).",
+    "firmwareUnavailable": "펌웨어 분석은 펌웨어 이미지에서 UI를 실행해야 사용할 수 있습니다.",
+    "dockerImage": "Docker 이미지",
+    "dockerHint": "로컬/원격 Docker 이미지를 스캔합니다(Docker 소켓 필요).",
+    "dockerPlaceholder": "nginx:latest",
+    "uploading": "업로드 중…",
+    "uploadFailed": "업로드 실패: {{msg}}"
+  },
   "options": {
     "notice": "고지문",
     "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
@@ -41,7 +60,11 @@
     "artifacts": "생성된 결과물",
     "artifactsEmpty": "생성된 결과물이 없습니다.",
     "download": "다운로드",
-    "view": "보기"
+    "view": "보기",
+    "conformance": "적합성",
+    "verdictPass": "적합",
+    "verdictFail": "부적합",
+    "riskReport": "오픈소스 위험분석 보고서"
   },
   "severity": {
     "CRITICAL": "심각",
@@ -62,6 +85,7 @@
     "label": "언어"
   },
   "validation": {
-    "required": "프로젝트 이름과 버전을 입력하세요."
+    "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",
+    "file": "분석할 파일을 선택하세요."
   }
 }

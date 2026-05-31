@@ -60,7 +60,7 @@ flowchart LR
     SYFT --> MERGE["④ SBOM 병합<br/>(jq / cyclonedx-cli)"]
     CVEBIN --> MERGE
     MERGE --> POST["⑤ 기존 후처리<br/>normalize → scancode → notice → Trivy → cosign"]
-    POST --> OUT["산출물 (CycloneDX + NOTICE + security)"]
+    POST --> OUT["산출물 (CycloneDX + NOTICE + security + risk-report)"]
 
     style UNPACK fill:#e3f2fd
     style MERGE fill:#fff9c4

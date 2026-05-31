@@ -15,6 +15,25 @@
     "run": "Run scan",
     "running": "Scanning…"
   },
+  "source": {
+    "label": "Input type",
+    "currentDir": "Current directory",
+    "currentDirHint": "Scans the source in the current directory (/src) mounted into the container.",
+    "gitUrl": "GitHub URL",
+    "gitHint": "Public repos clone directly; private repos need GIT_TOKEN.",
+    "gitPlaceholder": "https://github.com/org/repo",
+    "zipUpload": "ZIP upload",
+    "sbomUpload": "SBOM upload",
+    "sbomAnalyzeHint": "Notice + security reports are enabled automatically for the risk analysis.",
+    "firmwareUpload": "Firmware upload",
+    "firmwareHint": "Unpacks, then identifies components with syft + cve-bin-tool (.bin/.img/.squashfs…).",
+    "firmwareUnavailable": "Firmware analysis requires launching the UI from the firmware image.",
+    "dockerImage": "Docker image",
+    "dockerHint": "Scans a local/remote Docker image (Docker socket required).",
+    "dockerPlaceholder": "nginx:latest",
+    "uploading": "Uploading…",
+    "uploadFailed": "Upload failed: {{msg}}"
+  },
   "options": {
     "notice": "Notice",
     "noticeHint": "Generate the open-source license NOTICE",
@@ -41,7 +60,11 @@
     "artifacts": "Generated artifacts",
     "artifactsEmpty": "No artifacts were generated.",
     "download": "Download",
-    "view": "View"
+    "view": "View",
+    "conformance": "Conformance",
+    "verdictPass": "Pass",
+    "verdictFail": "Fail",
+    "riskReport": "Open-source risk report"
   },
   "severity": {
     "CRITICAL": "Critical",
@@ -62,6 +85,7 @@
     "label": "Language"
   },
   "validation": {
-    "required": "Enter a project name and version."
+    "required": "Enter a project name and version (and any required input).",
+    "file": "Choose a file to analyze."
   }
 }

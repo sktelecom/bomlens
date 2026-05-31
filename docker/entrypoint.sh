@@ -18,9 +18,10 @@ set -e
 # ========================================================
 # Post-processing entrypoint (2-stage architecture)
 #
-# Source-code SBOM generation is done by scan-sbom.sh via cdxgen language
+# Source-code SBOM generation (CLI) is done by scan-sbom.sh via cdxgen language
 # images. THIS image (post-processor) handles:
 #   - UI          : local web UI
+#   - SOURCE      : syft dir scan of a source tree (web UI source/zip/git path)
 #   - IMAGE/BINARY/ROOTFS : syft scan -> SBOM
 #   - FIRMWARE    : unpack firmware -> syft + cve-bin-tool -> SBOM (opt-in image)
 #   - ANALYZE     : validate + convert a supplier SBOM -> conformance + risk report
@@ -57,6 +58,22 @@ echo "=========================================="
 # Produce / locate the SBOM
 # ========================================================
 case "$SCAN_MODE" in
+    SOURCE)
+        # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
+        # The CLI source path uses cdxgen language images on the HOST (scan-sbom.sh)
+        # for deeper transitive resolution; inside this image we have syft (no
+        # language toolchains, no docker CLI), so we scan the tree like ROOTFS.
+        # syft detects package manifests (package.json/go.mod/pom.xml/Gemfile/…)
+        # without building. SOURCE_ROOT lets the UI point at an extracted/cloned dir.
+        SRC_ROOT="${SOURCE_ROOT:-/src}"
+        if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
+        if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
+        echo "[1/2] syft: source dir $SRC_ROOT"
+        if ! syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
+            echo "[ERROR] syft source scan failed."; exit 1
+        fi
+        ;;
+
     IMAGE)
         if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode."; exit 1; fi
         if [ ! -S /var/run/docker.sock ]; then
@@ -128,7 +145,7 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected IMAGE/BINARY/ROOTFS/FIRMWARE/ANALYZE/POSTPROCESS/UI)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/ANALYZE/POSTPROCESS/UI)"
         exit 1
         ;;
 esac
@@ -186,9 +203,12 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
     fi
 fi
 
-# ANALYZE: collect the conformance report (produced above) and re-aggregate the
-# pipeline outputs into a supplier-facing risk report.
-if [ "$SCAN_MODE" = "ANALYZE" ]; then
+# Risk report (오픈소스위험분석보고서): always for ANALYZE, and for every other
+# mode when GENERATE_REPORT=true (the CLI/UI default, opt-out via --no-report).
+# It re-aggregates the notice + security artifacts already produced above.
+# Conformance artifacts only exist in ANALYZE; the [ -f ] guard skips them
+# elsewhere, and generate-risk-report.sh drops the 포맷 검증 section accordingly.
+if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; then
     for ext in json md html; do
         [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
     done
