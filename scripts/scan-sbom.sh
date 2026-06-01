@@ -455,6 +455,18 @@ else
         "\"$RUN_IMAGE\""
 fi
 
+# Verify artifacts actually reached the host. When the run folder is outside
+# Docker Desktop file sharing, the container runs and reports success but the
+# /host-output mount is silently empty, so nothing lands here. Catch that
+# instead of printing "Analysis Complete!" over a folder with no SBOM.
+if [ "$GENERATE_ONLY" = "true" ] && [ ! -f "$SOURCE_DIR/$OUTPUT_FILE" ]; then
+    echo "[ERROR] SBOM not found on host: $SOURCE_DIR/$OUTPUT_FILE"
+    echo "  The container ran but no artifact reached this folder."
+    echo "  Likely cause: this folder is outside Docker Desktop file sharing."
+    echo "  Run from a shared path (e.g. under your home directory) and retry."
+    exit 1
+fi
+
 echo "=========================================="
 echo "  Analysis Complete!"
 if [ "$GENERATE_ONLY" = "true" ]; then
