@@ -37,7 +37,7 @@ docker build -t sbom-example:1.0.0 -t sbom-example:latest .
 
 ## SBOM 생성
 
-### 방법 1: SBOM Tools 스크립트 사용 (권장)
+### 방법 1: SBOM Generator 스크립트 사용 (권장)
 
 ```bash
 # 이미지 빌드 후

@@ -1,5 +1,5 @@
 # ========================================================
-# SBOM Scanner — post-processing image (2-stage architecture)
+# SBOM Generator — post-processing image (2-stage architecture)
 # Image: ghcr.io/sktelecom/sbom-scanner
 #
 # In the redesigned pipeline (see docs/direction-study.md), SBOM GENERATION for
@@ -25,7 +25,7 @@ RUN npm run build
 # ---- Stage 2: post-process runtime ----
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.title="SBOM Scanner (post-process)"
+LABEL org.opencontainers.image.title="SBOM Generator (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
 LABEL org.opencontainers.image.vendor="SK Telecom"
 LABEL org.opencontainers.image.licenses="Apache-2.0"

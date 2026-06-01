@@ -33,7 +33,7 @@ SCAN_MODE="${MODE:-POSTPROCESS}"
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
-    echo "[INFO] Starting SBOM Tools Web UI on port ${UI_PORT:-8080}..."
+    echo "[INFO] Starting SBOM Generator Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
 fi
 
@@ -49,7 +49,7 @@ OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 LIBDIR="/usr/local/lib/sbom"
 
 echo "=========================================="
-echo " SKT SBOM Scanner (post-process)"
+echo " SKT SBOM Generator (post-process)"
 echo " Mode: $SCAN_MODE"
 echo " Project: $PROJECT_NAME ($PROJECT_VERSION)"
 echo "=========================================="

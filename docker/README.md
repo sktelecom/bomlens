@@ -1,6 +1,6 @@
 # Docker 이미지 가이드
 
-SKT SBOM Scanner Docker 이미지 빌드, 배포 및 사용 가이드입니다.
+SKT SBOM Generator Docker 이미지 빌드, 배포 및 사용 가이드입니다.
 
 ## 목차
 
@@ -13,7 +13,7 @@ SKT SBOM Scanner Docker 이미지 빌드, 배포 및 사용 가이드입니다.
 
 ## 개요
 
-SBOM Scanner는 다음 환경을 포함한 Docker 이미지로 제공됩니다:
+SBOM Generator는 다음 환경을 포함한 Docker 이미지로 제공됩니다:
 
 ### 포함된 도구 및 런타임
 

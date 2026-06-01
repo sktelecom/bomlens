@@ -1,5 +1,5 @@
 # ========================================================
-# SBOM Scanner — Android SDK image (per compileSdk)
+# SBOM Generator — Android SDK image (per compileSdk)
 # Image: ghcr.io/sktelecom/sbom-scanner-android-sdk<ANDROID_API>
 #
 # cdxgen does NOT provide Android-SDK-bundled images and marks Android as
@@ -19,7 +19,7 @@ ARG ANDROID_API=35
 ARG ANDROID_BUILD_TOOLS=${ANDROID_API}.0.0
 ARG CMDLINE_TOOLS=11076708
 
-LABEL org.opencontainers.image.title="SBOM Scanner Android SDK"
+LABEL org.opencontainers.image.title="SBOM Generator Android SDK"
 LABEL org.opencontainers.image.vendor="SK Telecom"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 

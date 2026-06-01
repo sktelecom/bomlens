@@ -1,4 +1,4 @@
-# SBOM Tools
+# SBOM Generator
 
 > Automated SBOM (CycloneDX 1.6) generation for supply chain security
 
@@ -22,7 +22,7 @@ Prerequisite: a Docker engine, 20.10+. Free options that work on Windows: **Ranc
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
-docker pull ghcr.io/sktelecom/sbom-scanner:latest
+docker pull ghcr.io/sktelecom/sbom-generator:latest   # legacy alias: sbom-scanner serves the same image
 ```
 
 No git installed? Download the repo as a ZIP from the GitHub page (the green Code button, then Download ZIP) and unzip it.
@@ -31,7 +31,7 @@ No git installed? Download the repo as a ZIP from the GitHub page (the green Cod
 
 Launch, scan, and download — all in the browser. Live logs stream as it runs.
 
-![SBOM Tools web UI — a scan in progress with live logs](docs/images/web-ui-scan.png)
+![SBOM Generator web UI — a scan in progress with live logs](docs/images/web-ui-scan.png)
 
 ```bash
 cd ~/sbom-output     # any folder — this is where results are saved
