@@ -1,13 +1,13 @@
 # Third-Party Licenses
 
-`sbom-tools`(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성·분석을 위해 여러 오픈소스 도구를 Docker 이미지에 **번들**합니다. 이 문서는 번들 도구의 라이선스 인벤토리와 배포 의무를 정리합니다.
+`sbom-tools`(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성과 분석에 쓰는 여러 오픈소스 도구를 Docker 이미지에 번들합니다. 이 문서는 번들 도구의 라이선스 인벤토리와 배포 의무를 정리합니다.
 
 ## 컴플라이언스 요지
 
-- `sbom-tools`의 셸 스크립트는 번들 도구를 **별도 프로세스로 호출(exec)** 하며 도구 소스를 수정하지 않습니다. 따라서 GPL/AGPL의 copyleft가 `sbom-tools`의 **Apache-2.0 코드로 전파되지 않습니다**(FSF 기준: 파이프/CLI/exec = 별개 프로그램, 컨테이너 번들 = mere aggregation).
-- 다만 도구 바이너리를 이미지로 **재배포**하므로, 각 도구의 라이선스 텍스트와 (GPL 도구의) 대응 소스 접근 경로를 제공합니다(아래 표의 Source URL이 그 경로입니다).
-- **AGPL 라이선스 도구는 포함하지 않습니다.** 따라서 웹 UI(`--ui`) 사용 시에도 AGPL §13 네트워크 조항이 트리거되지 않습니다.
-- **GPL 도구는 별도 opt-in 이미지(`sbom-scanner-firmware`)에만** 포함되며, **기본 이미지(`sbom-scanner`)는 permissive-only**로 유지됩니다.
+- `sbom-tools`의 셸 스크립트는 번들 도구를 별도 프로세스로 호출(exec)할 뿐 도구 소스를 수정하지 않습니다. 그래서 GPL/AGPL의 copyleft가 `sbom-tools`의 Apache-2.0 코드로 전파되지 않습니다(FSF 기준: 파이프/CLI/exec = 별개 프로그램, 컨테이너 번들 = mere aggregation).
+- 다만 도구 바이너리를 이미지로 재배포하므로, 각 도구의 라이선스 텍스트와 (GPL 도구의) 대응 소스 접근 경로를 제공합니다(아래 표의 Source URL이 그 경로입니다).
+- AGPL 라이선스 도구는 포함하지 않습니다. 따라서 웹 UI(`--ui`)를 써도 AGPL §13 네트워크 조항은 트리거되지 않습니다.
+- GPL 도구는 별도 opt-in 이미지(`sbom-scanner-firmware`)에만 들어가고, 기본 이미지(`sbom-scanner`)는 permissive-only로 유지됩니다.
 
 ## 기본 이미지 — `ghcr.io/sktelecom/sbom-scanner` (permissive-only)
 
@@ -41,12 +41,12 @@
 
 ### 폴백·선택 도구 (기본 미설치)
 
-- **BANG** (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh`는 `bang-scanner`가 PATH에 있으면 언팩 폴백으로 사용합니다. 의존성이 무거워 기본 이미지에는 포함하지 않으며, 필요 시 별도로 설치하면 자동 인식됩니다. 언팩 폴백 순서: **unblob → BANG → unsquashfs(squashfs) → binwalk**.
-- **binwalk**: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 **설치하지 않습니다**. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 사용하지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
-- **sasquatch** (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용(unblob 핸들러가 사용). 표준 squashfs는 `squashfs-tools`(unsquashfs) 폴백으로 충분하므로 기본 미포함입니다.
+- BANG (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh`는 `bang-scanner`가 PATH에 있으면 언팩 폴백으로 사용합니다. 의존성이 무거워 기본 이미지에는 넣지 않으며, 필요할 때 따로 설치하면 자동으로 인식합니다. 언팩 폴백은 unblob, BANG, unsquashfs(squashfs), binwalk 순으로 시도합니다.
+- binwalk: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 설치하지 않습니다. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 쓰지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
+- sasquatch (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용으로 unblob 핸들러가 사용합니다. 표준 squashfs는 `squashfs-tools`(unsquashfs) 폴백으로 충분하므로 기본 이미지에는 넣지 않습니다.
 
 ### GPL 소스 코드 제공 (펌웨어 이미지)
-펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소·패키지 레지스트리에서 **버전을 고정해** 받습니다. 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있습니다. 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다. 소스가 더 필요하면 저장소 이슈로 요청해 주세요.
+펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소나 패키지 레지스트리에서 버전을 고정해 받습니다. 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있습니다. 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다. 소스가 더 필요하면 저장소 이슈로 요청해 주세요.
 
 ---
 

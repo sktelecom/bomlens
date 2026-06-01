@@ -6,12 +6,12 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/sktelecom/sbom-scanner?style=flat-square)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-scanner)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 
-**One Docker image, two jobs:**
+One Docker image, two jobs:
 
-- **Generate** — scan your **source code** (or a container image / binary) and produce a **CycloneDX SBOM**, an **open-source notice** (고지문), and a **security report**.
-- **Assess open-source risk** — analyze what you *receive*, including a supplier's finished **SBOM** or a **firmware** binary, and produce an **open-source risk report** (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines).
+- **Generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice (고지문), and a security report.
+- **Assess open-source risk** — analyze what you *receive*, including a supplier's finished SBOM or a firmware binary, and produce an open-source risk report (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines).
 
-Every scan also emits the risk report by default. Run it from the **CLI** or a **browser UI**. Originally built by SK Telecom for supply-chain security, now open source.
+Every scan also emits the risk report by default. Run it from the CLI or a browser UI. Originally built by SK Telecom for supply-chain security, now open source.
 
 Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware.
 
@@ -26,7 +26,7 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 
 ### Web UI — easiest (no CLI needed)
 
-**launch → scan → download**, in the browser. Live logs stream as it runs.
+Launch, scan, and download — all in the browser. Live logs stream as it runs.
 
 ![SBOM Tools web UI — a scan in progress with live logs](docs/images/web-ui-scan.png)
 
@@ -36,7 +36,7 @@ cd ~/sbom-output     # any folder — this is where results are saved
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-Enter **project + version**, pick a **scan target** (current folder / GitHub URL / ZIP / SBOM / firmware upload / Docker image), click **Run scan**, then view/download the results.
+Enter the project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results.
 
 ### CLI
 
@@ -51,7 +51,7 @@ Enter **project + version**, pick a **scan target** (current folder / GitHub URL
 ./scripts/scan-sbom.sh --target dev.bin --firmware --project MyApp --version 1.0.0 --all --generate-only
 ```
 
-**Outputs** (`{Project}_{Version}_…`): `bom.json` (SBOM) · `NOTICE.{txt,html}` (고지문) · `risk-report.{md,html}` (위험분석, default) · `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
+Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고지문), `risk-report.{md,html}` (위험분석, default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
 
 ## Documentation (한국어)
 

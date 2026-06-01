@@ -4,10 +4,10 @@
 
 ## Docker 이미지 정보
 
-- **베이스 이미지**: node:18-alpine
-- **빌드 방식**: 멀티 스테이지 빌드
-- **애플리케이션**: Express.js REST API
-- **크기**: 약 150MB (압축 후)
+- 베이스 이미지: node:18-alpine
+- 빌드 방식: 멀티 스테이지 빌드
+- 애플리케이션: Express.js REST API
+- 크기: 약 150MB (압축 후)
 
 ## 사전 요구사항
 
@@ -51,7 +51,7 @@ docker images | grep sbom-example
   --generate-only
 ```
 
-**결과**: `DockerImageExample_1.0.0_sbom-example_latest_bom.json` 파일 생성
+결과로 `DockerImageExample_1.0.0_sbom-example_latest_bom.json` 파일이 생성됩니다.
 
 ### 방법 2: Docker 직접 사용
 
@@ -80,7 +80,7 @@ syft sbom-example:latest -o cyclonedx-json > bom.json
 
 ### 방법 4: Trivy 사용
 
-> **⚠️ 보안 경고 (2026-03-24):** `aquasecurity/trivy-action` GitHub Action에 공급망 공격(악성 코드 삽입)이 보고되었습니다.
+> 보안 경고 (2026-03-24): `aquasecurity/trivy-action` GitHub Action에 공급망 공격(악성 코드 삽입)이 보고되었습니다.
 > Trivy CLI 자체의 안전성도 공식적으로 재확인될 때까지, 아래 명령어 실행 전 반드시 [공식 릴리스 페이지](https://github.com/aquasecurity/trivy/releases)에서 최신 보안 공지를 확인하세요.
 
 ```bash
@@ -101,7 +101,7 @@ trivy image --format cyclonedx sbom-example:latest > bom.json
 docker run -p 3000:3000 sbom-example:latest
 ```
 
-**접속**: http://localhost:3000
+접속 주소는 http://localhost:3000 입니다.
 
 ### 백그라운드 실행
 
@@ -177,7 +177,7 @@ cat *_bom.json | jq -r '.components[] | select(.type == "operating-system") | "\
 cat *_bom.json | jq -r '.components[] | select(.purl | contains("npm")) | "\(.name)@\(.version)"'
 ```
 
-**예상 컴포넌트 수**: 약 100-150개
+예상 컴포넌트 수는 약 100-150개입니다.
 - Alpine Linux 시스템 패키지: 20-30개
 - Node.js 런타임: 10-20개
 - npm 의존성: 70-100개
@@ -187,18 +187,18 @@ cat *_bom.json | jq -r '.components[] | select(.purl | contains("npm")) | "\(.na
 생성된 SBOM에는 다음과 같은 정보가 포함됩니다:
 
 ### OS 레이어
-- **Alpine Linux**: musl, busybox, apk-tools 등
-- **시스템 라이브러리**: libssl, libcrypto, zlib 등
+- Alpine Linux: musl, busybox, apk-tools 등
+- 시스템 라이브러리: libssl, libcrypto, zlib 등
 
 ### Node.js 런타임
-- **Node.js**: v18.x.x
-- **npm**: v9.x.x
+- Node.js: v18.x.x
+- npm: v9.x.x
 
 ### 애플리케이션 의존성
-- **Express 스택**: express, body-parser, serve-static
-- **보안**: helmet, cors
-- **유틸리티**: lodash, moment
-- **로깅**: morgan, winston
+- Express 스택: express, body-parser, serve-static
+- 보안: helmet, cors
+- 유틸리티: lodash, moment
+- 로깅: morgan, winston
 
 ## Docker 이미지 분석
 
@@ -216,7 +216,7 @@ docker images sbom-example:latest
 
 ### 취약점 스캔
 
-> **⚠️ 보안 경고 (2026-03-24):** Trivy 관련 공급망 공격이 보고되었습니다. 실행 전 공식 보안 공지를 확인하세요.
+> 보안 경고 (2026-03-24): Trivy 관련 공급망 공격이 보고되었습니다. 실행 전 공식 보안 공지를 확인하세요.
 
 ```bash
 # Trivy로 취약점 스캔
@@ -293,21 +293,18 @@ ls -lh sbom-example.tar
 
 Dockerfile은 이미 멀티 스테이지를 사용하고 있습니다:
 
-- **Stage 1 (builder)**: 의존성 설치 및 빌드
-- **Stage 2 (production)**: 최종 실행 이미지 (필요한 파일만 포함)
+- Stage 1 (builder): 의존성 설치 및 빌드
+- Stage 2 (production): 최종 실행 이미지 (필요한 파일만 포함)
 
-**장점**:
-- 이미지 크기 감소
-- 빌드 도구가 최종 이미지에 포함되지 않음
-- 보안 향상
+이렇게 하면 이미지 크기가 줄고, 빌드 도구가 최종 이미지에 포함되지 않아 보안에도 도움이 됩니다.
 
 ### Alpine Linux 사용
 
 Alpine Linux는 매우 작은 크기의 베이스 이미지입니다:
 
-- **크기**: 약 5MB
-- **패키지 매니저**: apk
-- **보안**: 정기적인 보안 업데이트
+- 크기: 약 5MB
+- 패키지 매니저: apk
+- 보안: 정기적인 보안 업데이트
 
 ### .dockerignore 사용
 
@@ -382,9 +379,9 @@ HEALTHCHECK --interval=30s --timeout=3s \
 
 ### 취약점 스캔
 
-정기적으로 이미지를 스캔하여 취약점을 확인하세요:
+정기적으로 이미지를 스캔하여 취약점을 확인하세요.
 
-> **⚠️ 보안 경고 (2026-03-24):** Trivy 관련 공급망 공격이 보고되었습니다. 실행 전 공식 보안 공지를 확인하세요.
+> 보안 경고 (2026-03-24): Trivy 관련 공급망 공격이 보고되었습니다. 실행 전 공식 보안 공지를 확인하세요.
 
 ```bash
 trivy image --severity HIGH,CRITICAL sbom-example:latest

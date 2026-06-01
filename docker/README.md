@@ -147,7 +147,7 @@ docker images | grep sbom-scanner
 docker run --rm sbom-scanner:local cdxgen --version
 ```
 
-**출력 예시**:
+출력 예시:
 ```
 10.2.0
 ```
@@ -185,7 +185,7 @@ docker buildx inspect --bootstrap
 docker buildx inspect
 ```
 
-**출력 예시**:
+출력 예시:
 ```
 Name:   multiplatform-builder
 Driver: docker-container
@@ -205,7 +205,7 @@ docker buildx build \
   .
 ```
 
-**참고**: `--load`는 단일 플랫폼만 가능. 멀티 플랫폼은 `--push` 사용.
+참고: `--load`는 단일 플랫폼만 가능. 멀티 플랫폼은 `--push` 사용.
 
 ### GitHub Container Registry에 푸시
 
@@ -219,7 +219,7 @@ docker buildx build \
   .
 ```
 
-**빌드 시간**: 약 15-20분 (플랫폼 2개)
+빌드 시간: 약 15-20분 (플랫폼 2개)
 
 ## GitHub Container Registry 배포
 
@@ -244,7 +244,7 @@ export GITHUB_USERNAME="your_github_username"
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USERNAME --password-stdin
 ```
 
-**성공 메시지**:
+성공 메시지:
 ```
 Login Succeeded
 ```
@@ -273,7 +273,7 @@ docker buildx build \
 docker buildx imagetools inspect ghcr.io/${ORG_NAME}/${IMAGE_NAME}:${VERSION}
 ```
 
-**출력 예시**:
+출력 예시:
 ```
 Name:      ghcr.io/sktelecom/sbom-scanner:v1
 MediaType: application/vnd.oci.image.index.v1+json
@@ -340,7 +340,7 @@ ENTRYPOINT ["/usr/local/bin/run-scan"]
 | SBOM 도구 | ~150MB | cdxgen, syft |
 | 기타 도구 | ~100MB | Maven, Gradle, Git 등 |
 
-**총 크기**: 약 2.5GB (압축 전: ~4GB)
+총 크기: 약 2.5GB (압축 전: ~4GB)
 
 ### 지원 아키텍처
 
@@ -403,9 +403,9 @@ cat TestProject_1.0.0_bom.json | jq '.components | length'
 
 #### 오류: "manifest unknown"
 
-**원인**: GitHub Container Registry에 이미지가 없음
+원인: GitHub Container Registry에 이미지가 없음
 
-**해결**:
+해결:
 ```bash
 # 로그인 확인
 docker login ghcr.io
@@ -416,9 +416,9 @@ echo ghcr.io/sktelecom/sbom-scanner:v1
 
 #### 오류: "no space left on device"
 
-**원인**: 디스크 공간 부족
+원인: 디스크 공간 부족
 
-**해결**:
+해결:
 ```bash
 # 사용하지 않는 이미지 정리
 docker system prune -a
@@ -431,9 +431,9 @@ df -h
 
 #### 오류: "Cannot connect to the Docker daemon"
 
-**원인**: Docker 소켓이 마운트되지 않음 (IMAGE 모드)
+원인: Docker 소켓이 마운트되지 않음 (IMAGE 모드)
 
-**해결**:
+해결:
 ```bash
 # Linux/macOS
 -v /var/run/docker.sock:/var/run/docker.sock
@@ -444,9 +444,9 @@ df -h
 
 #### 오류: "Permission denied" (파일 쓰기)
 
-**원인**: 컨테이너 내부 사용자 권한 문제
+원인: 컨테이너 내부 사용자 권한 문제
 
-**해결**:
+해결:
 ```bash
 # 현재 사용자 권한으로 실행
 docker run --rm --user $(id -u):$(id -g) ...
