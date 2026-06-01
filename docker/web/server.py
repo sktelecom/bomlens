@@ -596,5 +596,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    print("[ui] SBOM Tools Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
+    print("[ui] SBOM Generator Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

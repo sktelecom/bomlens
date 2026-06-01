@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # ========================================================
-# SBOM Tools - Integration Test Script
+# SBOM Generator - Integration Test Script
 # ========================================================
 
 set -e
@@ -182,7 +182,7 @@ show_failure_log() {
 }
 
 echo "=========================================="
-echo " SBOM Tools - Integration Test"
+echo " SBOM Generator - Integration Test"
 echo " Version: 1.0.0"
 echo "=========================================="
 

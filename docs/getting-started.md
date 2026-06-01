@@ -2,7 +2,7 @@
 
 > **관련 문서**: [사용 가이드](usage-guide.md) | [예제 가이드](examples-guide.md) | [아키텍처](architecture.md)
 
-SBOM Tools를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생성까지의 단계별 가이드입니다.
+SBOM Generator를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생성까지의 단계별 가이드입니다.
 
 ## 목차
 
@@ -47,7 +47,7 @@ chmod +x scan-sbom.sh
 ### 2. Docker 이미지 다운로드
 
 ```bash
-docker pull ghcr.io/sktelecom/sbom-scanner:latest
+docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지로 제공됩니다
 ```
 
 이미지 크기는 약 3–4 GB입니다. 네트워크 상황에 따라 수 분이 소요될 수 있습니다.
@@ -78,7 +78,7 @@ Windows에서는 `scripts\sbom-ui.bat`를 더블클릭합니다. UI를 실행한
 
 ### 스캔
 
-![SBOM Tools 웹 UI](images/web-ui.png)
+![SBOM Generator 웹 UI](images/web-ui.png)
 
 1. 프로젝트 이름과 버전을 입력합니다.
 2. 스캔 대상을 고릅니다. 현재 폴더, GitHub URL, ZIP 업로드, SBOM 업로드, 펌웨어 업로드, Docker 이미지 중에서 선택할 수 있습니다.

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SBOM Tools - Examples Test Script
+# SBOM Generator - Examples Test Script
 # 모든 예제를 순차적으로 테스트합니다.
 
 set -e
@@ -18,7 +18,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo "========================================"
-echo "  SBOM Tools - Examples Test Suite"
+echo "  SBOM Generator - Examples Test Suite"
 echo "========================================"
 echo ""
 

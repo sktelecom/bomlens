@@ -38,7 +38,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
 - Docker 20.10 이상 (Docker Desktop 권장)
 - 스캐너 이미지 pull:
   ```bash
-  docker pull ghcr.io/sktelecom/sbom-scanner:latest
+  docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지
   ```
 - 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 
@@ -182,7 +182,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 
 CLI 없이 브라우저에서 스캔합니다. UI 서버는 스캐너 이미지에 내장되어 있어 추가 설치가 필요 없습니다.
 
-![SBOM Tools 웹 UI](images/web-ui.png)
+![SBOM Generator 웹 UI](images/web-ui.png)
 
 **macOS / Linux:**
 ```bash

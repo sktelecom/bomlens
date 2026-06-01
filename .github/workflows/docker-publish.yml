@@ -53,7 +53,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Co-publish under two names from a single build (same digest):
+          #   sbom-generator   — featured name, matches the product "SBOM Generator"
+          #   sbom-scanner     — legacy name, kept so existing supplier pulls never break
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -147,7 +152,8 @@ jobs:
     steps:
       - run: |
           echo "## 🐳 Images built" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` (post-process)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator\` (post-process, featured)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` (post-process, legacy alias)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk{30..35}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Language SBOM generation uses cdxgen official images (pulled on-demand by scan-sbom.sh)." >> $GITHUB_STEP_SUMMARY

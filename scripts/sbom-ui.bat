@@ -2,7 +2,7 @@
 REM Copyright 2026 SK Telecom Co., Ltd.
 REM Licensed under the Apache License, Version 2.0.
 REM
-REM sbom-ui.bat - launch the SBOM Tools local web UI on Windows.
+REM sbom-ui.bat - launch the SBOM Generator local web UI on Windows.
 REM Double-click this file to start the browser-based interface.
 
 setlocal
@@ -29,7 +29,7 @@ if errorlevel 1 (
 )
 
 echo ==========================================
-echo   SBOM Tools Web UI
+echo   SBOM Generator Web UI
 echo   URL: http://localhost:%UI_PORT%
 echo   (Close this window to stop)
 echo ==========================================
