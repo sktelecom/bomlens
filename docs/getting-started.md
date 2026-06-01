@@ -19,10 +19,12 @@ SBOM Tools를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생
 |------|-------------|
 | Docker | 20.10 이상 |
 | 디스크 공간 | 4 GB 이상 (Docker 이미지 포함) |
-| OS | Linux, macOS, Windows (Git Bash) |
+| OS | Linux, macOS, Windows |
 | 아키텍처 | AMD64, ARM64 |
 
 Docker가 설치되어 있지 않다면 [Docker 공식 설치 문서](https://docs.docker.com/get-docker/)를 참고하세요.
+
+Windows에서 웹 UI만 쓴다면 추가 도구가 필요 없습니다. `scripts\sbom-ui.bat`를 더블클릭하면 됩니다. 명령줄(`scripts\scan-sbom.bat`)을 쓸 때만 [Git for Windows](https://git-scm.com/download/win)(Git Bash)가 추가로 필요합니다.
 
 ## 설치
 
@@ -32,6 +34,8 @@ Docker가 설치되어 있지 않다면 [Docker 공식 설치 문서](https://do
 git clone https://github.com/sktelecom/sbom-tools.git
 cd sbom-tools
 ```
+
+git이 설치되어 있지 않다면 GitHub 저장소 페이지에서 Code 버튼을 눌러 Download ZIP으로 받은 뒤 압축을 풉니다.
 
 스크립트만 필요하다면 단독으로 내려받을 수도 있습니다.
 
@@ -60,7 +64,7 @@ docker pull ghcr.io/sktelecom/sbom-scanner:latest
 
 명령어에 익숙하지 않아도 됩니다. 브라우저에서 실행해 스캔하고 결과를 내려받는 세 단계면 끝입니다. (UI 서버는 스캐너 이미지에 내장되어 있어 추가 설치가 필요 없습니다.)
 
-**1단계 — UI 실행**
+### UI 실행
 
 ```bash
 # 결과물을 저장할 폴더에서 실행 (어디든 무방)
@@ -68,11 +72,11 @@ cd ~/sbom-output
 /path/to/sbom-tools/scripts/scan-sbom.sh --ui
 #  → 잠시 후 브라우저에서 http://localhost:8080 가 자동으로 열립니다
 ```
-Windows에서는 `scripts\sbom-ui.bat`를 **더블클릭**합니다. (포트 충돌 시 `UI_PORT=9090 ... --ui`)
+Windows에서는 `scripts\sbom-ui.bat`를 더블클릭합니다. UI를 실행한 폴더가 산출물 저장 위치가 되는데, 이 폴더는 Docker Desktop 파일 공유에 포함된 경로여야 합니다. 홈 디렉터리(`C:\Users\...`) 아래는 기본으로 공유되므로 안전합니다. 공유되지 않은 위치에서 실행하면 스캔이 끝나도 산출물이 PC에 나타나지 않습니다. 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다.
 
-> 실행 위치(현재 폴더)는 산출물이 저장되는 곳이자, 스캔 대상으로 "현재 폴더"를 골랐을 때 스캔되는 소스입니다. GitHub URL이나 ZIP·SBOM·펌웨어 업로드, Docker 이미지를 쓴다면 입력을 UI에서 직접 주므로 아무 폴더에서나 실행해도 됩니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하세요.
+> 실행 위치(현재 폴더)는 산출물이 저장되는 곳이자, 스캔 대상으로 "현재 폴더"를 골랐을 때 스캔되는 소스입니다. GitHub URL이나 ZIP, SBOM, 펌웨어 업로드, Docker 이미지를 쓴다면 입력을 UI에서 직접 주므로 아무 폴더에서나 실행해도 됩니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하세요.
 
-**2단계 — 스캔**
+### 스캔
 
 ![SBOM Tools 웹 UI](images/web-ui.png)
 
@@ -80,7 +84,7 @@ Windows에서는 `scripts\sbom-ui.bat`를 **더블클릭**합니다. (포트 충
 2. 스캔 대상을 고릅니다. 현재 폴더, GitHub URL, ZIP 업로드, SBOM 업로드, 펌웨어 업로드, Docker 이미지 중에서 선택할 수 있습니다.
 3. 스캔 실행을 누르면 진행 로그가 실시간으로 표시됩니다.
 
-**3단계 — 결과 확인**
+### 결과 확인
 
 완료되면 화면에 컴포넌트 수와 취약점 심각도(공급사 SBOM이면 적합성도)가 카드로 뜨고, 표에서 SBOM, 오픈소스 고지문, 오픈소스 위험분석 보고서, 보안 보고서를 바로 열거나 내려받을 수 있습니다.
 

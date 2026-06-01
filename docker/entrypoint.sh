@@ -153,6 +153,16 @@ esac
 if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE"; exit 1; fi
 echo "[INFO] SBOM ready: $OUTPUT_FILE"
 
+# Warn (don't fail) when the SBOM has no components. A genuine no-dependency
+# project can legitimately be empty, but more often this means the scan saw
+# nothing — a missing lockfile or an empty/unshared source mount.
+if command -v jq >/dev/null 2>&1; then
+    COMP_COUNT=$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    if [ "${COMP_COUNT:-0}" -eq 0 ]; then
+        echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)."
+    fi
+fi
+
 # ========================================================
 # Common pipeline: normalize / deep-license / notice / security / sign
 # ========================================================
