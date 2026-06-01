@@ -23,7 +23,9 @@ if errorlevel 1 (
 docker version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker is not installed or not running.
-    echo   Install/start Docker Desktop: https://www.docker.com/products/docker-desktop/
+    echo   Free engines for Windows: Rancher Desktop ^(https://rancherdesktop.io/^)
+    echo   or WSL2 + docker-ce ^(run scan-sbom.sh inside WSL^). Docker Desktop also
+    echo   works ^(paid license for larger orgs^).
     exit /b 1
 )
 

@@ -16,14 +16,16 @@ REM --- Docker checks (the real prerequisite) ---
 docker version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Docker is not installed or not in PATH.
-    echo   Install Docker Desktop: https://www.docker.com/products/docker-desktop/
+    echo   Free options for Windows:
+    echo     - Rancher Desktop ^(GUI, works with this launcher^): https://rancherdesktop.io/
+    echo     - WSL2 + docker-ce ^(run scan-sbom.sh inside WSL^): https://docs.docker.com/engine/install/
+    echo   Docker Desktop also works ^(paid license for larger orgs^): https://www.docker.com/products/docker-desktop/
     pause
     exit /b 1
 )
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Docker Desktop is not running. Please start it and retry.
-    echo   Download: https://www.docker.com/products/docker-desktop/
+    echo [ERROR] The Docker engine is not running. Start it ^(e.g. Rancher Desktop / Docker Desktop^) and retry.
     pause
     exit /b 1
 )

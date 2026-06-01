@@ -1,0 +1,14 @@
+# Keep shell scripts LF even on Windows checkouts. Git for Windows defaults to
+# core.autocrlf=true, which would otherwise rewrite *.sh with CRLF on clone; CRLF
+# in a script breaks `#!/bin/bash` and string comparisons under MSYS2/Git Bash,
+# and these .sh files are run on Windows via scripts\scan-sbom.bat (Git Bash).
+*.sh        text eol=lf
+build-prep  text eol=lf
+entrypoint  text eol=lf
+
+# Windows batch wrappers must stay CRLF.
+*.bat       text eol=crlf
+
+# Fixtures / data are normalized to LF for byte-stable diffs across platforms.
+*.json      text eol=lf
+*.md        text eol=lf

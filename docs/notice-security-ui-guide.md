@@ -4,7 +4,7 @@
 
 ## Quickstart (5분)
 
-처음이라면 이것만 따라 하면 됩니다. Docker Desktop이 실행 중인 상태에서 스캔할 프로젝트 폴더로 이동한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
+처음이라면 이것만 따라 하면 됩니다. Docker 엔진이 실행 중인 상태에서 스캔할 프로젝트 폴더로 이동한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
@@ -35,7 +35,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
 
 ## 사전 준비
 
-- Docker 20.10 이상 (Docker Desktop 권장)
+- Docker 엔진 20.10 이상 (무료: WSL2 + docker-ce 또는 Rancher Desktop / Docker Desktop은 조직 사용 시 유료)
 - 스캐너 이미지 pull:
   ```bash
   docker pull ghcr.io/sktelecom/sbom-scanner:latest
@@ -225,7 +225,7 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 UI_PORT=9090 ./scripts/scan-sbom.sh --ui      # http://localhost:9090
 ```
 
-> **참고:** UI가 쉬워도 Docker Desktop 설치와 실행이 전제입니다. 런처는 Docker 미설치/미실행을 감지해 설치 링크를 안내합니다.
+> **참고:** UI가 쉬워도 Docker 엔진 설치와 실행이 전제입니다(무료: WSL2 + docker-ce 또는 Rancher Desktop). 런처는 Docker 미설치/미실행을 감지해 설치 링크를 안내합니다.
 
 ---
 
@@ -251,7 +251,7 @@ UI_PORT=9090 ./scripts/scan-sbom.sh --ui      # http://localhost:9090
 |------|------------|
 | `trivy not installed ... skipping` | 구버전 이미지. `docker pull`로 최신 이미지를 받으세요. |
 | `--deep-license requested but scancode not in image` | `--build-arg SBOM_DEEP_LICENSE=true`로 이미지를 빌드하세요. |
-| UI에서 `Docker is not running` | Docker Desktop을 시작한 뒤 다시 실행하세요. |
+| UI에서 `Docker is not running` | Docker 엔진(Rancher Desktop/Docker Desktop 등)을 시작한 뒤 다시 실행하세요. |
 | 고지문에 `NOASSERTION`이 많음 | 의존성에 라이선스 메타데이터가 없는 경우입니다. `--deep-license`로 보완하거나 수동 확인하세요. |
 | 포트 충돌(`--ui`) | `UI_PORT`로 다른 포트를 지정하세요. |
 
