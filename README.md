@@ -3,7 +3,7 @@
 > Automated SBOM (CycloneDX 1.6) generation for supply chain security
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/sbom-tools?style=flat-square)](https://github.com/sktelecom/sbom-tools/releases)
-[![Container image](https://img.shields.io/badge/ghcr.io-sbom--scanner-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-scanner)
+[![Container image](https://img.shields.io/badge/ghcr.io-sbom--generator-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-generator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 
