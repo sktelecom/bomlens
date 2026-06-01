@@ -18,7 +18,7 @@ Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg)
 
 ## Quick Start
 
-Prerequisite: Docker 20.10+ (Docker Desktop on Windows and macOS). The Web UI needs nothing else; the Windows CLI wrapper additionally needs Git for Windows (Git Bash).
+Prerequisite: a Docker engine, 20.10+. Free options that work on Windows: **Rancher Desktop** (GUI; supports the `.bat` double-click flow) or **WSL2 + docker-ce** (run the tool from inside WSL — fully free, no Windows named-pipe needed). Docker Desktop also works but requires a paid license for larger organizations. The Web UI needs nothing else; the Windows CLI wrapper additionally needs Git for Windows (Git Bash).
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
@@ -45,9 +45,9 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 
 The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM.
 
-1. Install and start Docker Desktop.
+1. Install and start a Docker engine. **Rancher Desktop** is a free, drop-in choice for this double-click flow; Docker Desktop also works (with licensing caveats for organizations).
 2. Get this repo: on the GitHub page use the green Code button, then Download ZIP, and unzip it.
-3. Pick a folder for the results under your home directory, such as `C:\Users\you\sbom-output`. It must sit inside a path that Docker Desktop is allowed to share, and `C:\Users` is shared by default.
+3. Pick a folder for the results under your home directory, such as `C:\Users\you\sbom-output`. It must sit inside a path your Docker engine is allowed to share (file sharing); `C:\Users` is shared by default in both Rancher Desktop and Docker Desktop.
 4. Double-click `scripts\sbom-ui.bat`. A browser opens at http://localhost:8080.
 5. Enter a project name and version, choose ZIP upload as the scan target, upload the source ZIP you received, run the scan, then download the SBOM, the notice, and the risk report.
 
