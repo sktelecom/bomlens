@@ -34,7 +34,7 @@
 
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
-docker pull ghcr.io/sktelecom/sbom-scanner:latest
+docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지
 
 # 편의를 위해 스크립트 경로를 변수로 둡니다.
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
@@ -81,7 +81,7 @@ $SBOM --project team2-app --version 1.0.0 \
 - 지원 형식: `.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`
 - zip-slip(경로 탈출) 검사 후 임시 디렉터리에 해제하며, 최상위 폴더가 하나면 자동으로 그 안으로 진입합니다.
 
-**산출물**: 고지문 · SBOM · 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
 ## 시나리오 3 — 로컬 C/C++ 소스 디렉터리
 
@@ -98,11 +98,11 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 - 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다.
 - 패키지 매니저가 없어도 위험분석보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
-**산출물**: 고지문 · SBOM · 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
 ## 시나리오 4 — 기존 SBOM JSON
 
-개발4팀이 SBOM(JSON)을 전달한 경우. 소스가 없어도 검증·분석합니다.
+개발4팀이 SBOM(JSON)을 전달한 경우. 소스가 없어도 검증하고 분석합니다.
 
 ```bash
 $SBOM --project team4-proj --version 2.0.0 \
@@ -110,11 +110,11 @@ $SBOM --project team4-proj --version 2.0.0 \
   --generate-only
 ```
 
-- CycloneDX·SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다.
-- `--analyze`는 고지문·보안을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다.
+- CycloneDX와 SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다.
+- `--analyze`는 고지문과 보안을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다.
 - 추가로 포맷 적합성 보고서(`_conformance.{json,md,html}`)가 생성되고, 위험분석보고서 1절에 적합성 검증 결과(필수 항목 충족 여부)가 들어갑니다.
 
-**산출물**: 고지문 · SBOM(변환본) · 위험분석보고서 · 적합성 보고서
+**산출물**: 고지문, SBOM(변환본), 위험분석보고서, 적합성 보고서
 
 ## 시나리오 5 — 펌웨어 바이너리
 
@@ -128,9 +128,9 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 - 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정하거나, 기본값(`ghcr.io/sktelecom/sbom-scanner-firmware:latest`)을 받습니다.
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
-- 자세한 동작·한계는 [펌웨어 분석](firmware-analysis.md)을 참고하세요.
+- 자세한 동작과 한계는 [펌웨어 분석](firmware-analysis.md)을 참고하세요.
 
-**산출물**: 고지문 · SBOM · 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
 ## 산출물 3종 해석
 
@@ -153,7 +153,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | 현재 폴더 | UI를 실행한 폴더의 소스를 스캔 |
 | GitHub URL | URL 입력 |
 | ZIP 업로드 | `.zip`/tar 파일 업로드 |
-| SBOM 업로드 | 기존 SBOM(JSON) 업로드 → 분석(ANALYZE) |
+| SBOM 업로드 | 기존 SBOM(JSON) 업로드, 분석(ANALYZE) 모드 |
 | 펌웨어 업로드 | `.bin` 등 업로드(펌웨어 이미지에서 UI 실행 필요) |
 | Docker 이미지 | 이미지명 입력 |
 
@@ -164,8 +164,8 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 ## 트러블슈팅 / 한계
 
-- **GitHub URL**: 비공개 저장소는 `GIT_TOKEN`이 필요합니다. 허용되지 않은 URL 형식(셸 메타문자·`..`·공백)은 보안상 거부됩니다.
+- **GitHub URL**: 비공개 저장소는 `GIT_TOKEN`이 필요합니다. 허용되지 않은 URL 형식(셸 메타문자, `..`, 공백)은 보안상 거부됩니다.
 - **ZIP/tar**: 경로 탈출(zip-slip)이 포함된 아카이브는 거부됩니다. Windows Git Bash에 `unzip`이 없으면 `tar`로 처리됩니다.
 - **C/C++**: 패키지 매니저가 없는 순수 소스는 SBOM이 희소합니다([시나리오 3](#시나리오-3--로컬-cc-소스-디렉터리) 참고).
-- **펌웨어**: 정적 링크 라이브러리·벤더 변형 squashfs는 탐지율이 제한적입니다([펌웨어 분석](firmware-analysis.md) §한계).
-- **SBOM 분석**: SPDX → CycloneDX 변환 시 일부 라이선스 표현이 단순화될 수 있습니다.
+- **펌웨어**: 정적 링크 라이브러리와 벤더 변형 squashfs는 탐지율이 제한적입니다([펌웨어 분석](firmware-analysis.md) §한계).
+- **SBOM 분석**: SPDX를 CycloneDX로 변환할 때 일부 라이선스 표현이 단순화될 수 있습니다.

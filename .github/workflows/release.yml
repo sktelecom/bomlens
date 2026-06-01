@@ -79,7 +79,7 @@ jobs:
             
             #### Docker Image
             ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/sbom-scanner:${{ steps.version.outputs.version }}
+            docker pull ghcr.io/${{ github.repository_owner }}/sbom-generator:${{ steps.version.outputs.version }}   # legacy alias: sbom-scanner
             ```
             
             ### Documentation
@@ -146,5 +146,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Image" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ghcr.io/${{ github.repository_owner }}/sbom-scanner:${{ needs.create-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/${{ github.repository_owner }}/sbom-generator:${{ needs.create-release.outputs.version }}   # legacy alias: sbom-scanner" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
