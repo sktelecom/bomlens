@@ -18,12 +18,14 @@ Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg)
 
 ## Quick Start
 
-Prerequisite: Docker 20.10+.
+Prerequisite: Docker 20.10+ (Docker Desktop on Windows and macOS). The Web UI needs nothing else; the Windows CLI wrapper additionally needs Git for Windows (Git Bash).
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
 docker pull ghcr.io/sktelecom/sbom-scanner:latest
 ```
+
+No git installed? Download the repo as a ZIP from the GitHub page (the green Code button, then Download ZIP) and unzip it.
 
 ### Web UI — easiest (no CLI needed)
 
@@ -39,6 +41,18 @@ cd ~/sbom-output     # any folder — this is where results are saved
 
 Enter the project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results.
 
+#### Windows, no CLI — from a source ZIP you received
+
+The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM.
+
+1. Install and start Docker Desktop.
+2. Get this repo: on the GitHub page use the green Code button, then Download ZIP, and unzip it.
+3. Pick a folder for the results under your home directory, such as `C:\Users\you\sbom-output`. It must sit inside a path that Docker Desktop is allowed to share, and `C:\Users` is shared by default.
+4. Double-click `scripts\sbom-ui.bat`. A browser opens at http://localhost:8080.
+5. Enter a project name and version, choose ZIP upload as the scan target, upload the source ZIP you received, run the scan, then download the SBOM, the notice, and the risk report.
+
+The [getting-started guide](docs/getting-started.md) covers this in more detail and shows the CLI path.
+
 ### CLI
 
 ```bash
@@ -51,6 +65,8 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 ./scripts/scan-sbom.sh --target nginx:latest   --project MyApp --version 1.0.0 --all --generate-only
 ./scripts/scan-sbom.sh --target dev.bin --firmware --project MyApp --version 1.0.0 --all --generate-only
 ```
+
+On Windows, run the same commands through `scripts\scan-sbom.bat`, which forwards them to the script via Git Bash (Git for Windows required).
 
 Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고지문), `risk-report.{md,html}` (위험분석, default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
 
