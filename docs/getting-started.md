@@ -66,6 +66,8 @@ Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 
 
 가장 간단한 길은 데스크톱 앱입니다. [최신 릴리스](https://github.com/sktelecom/sbom-tools/releases/latest)에서 `SBOM-Generator-*.exe`를 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 단계별 안내는 [라이선스 담당자용 빠른 시작](notice-quickstart.md)을 참고하세요.
 
+![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](images/desktop-startup.png)
+
 스크립트로 쓰고 싶다면 아래 ZIP 방식도 있습니다.
 
 [![Download Windows ZIP](https://img.shields.io/badge/Download-Windows%20ZIP-2496ED?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sktelecom/sbom-tools/archive/refs/heads/main.zip)
