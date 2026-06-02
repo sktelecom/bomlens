@@ -59,6 +59,8 @@ The [getting-started guide](docs/getting-started.md) covers this in more detail 
 
 Prefer a real app over a `.bat`? A desktop app wraps this same flow with no console window — it checks Docker, pulls the image, and opens the UI on double-click. Download `SBOM-Generator-*.exe` (or `.dmg`) from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest). It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. Build details are in [`electron/`](electron/README.md).
 
+![SBOM Generator desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup.png)
+
 ### CLI
 
 ```bash
