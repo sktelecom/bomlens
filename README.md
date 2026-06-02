@@ -83,7 +83,7 @@ Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고
 | [고지문·보안·UI](docs/notice-security-ui-guide.md) | 산출물과 웹 UI 사용법 |
 | [아키텍처](docs/architecture.md) | 2-stage 파이프라인(cdxgen + syft → 후처리) |
 
-> Docker 이미지의 가치(cdxgen 대비 측정)와 설계 배경은 [방향성 조사 보고서](docs/direction-study.md), 전체 문서는 [docs/](docs/)를 참고하세요.
+> Docker 이미지의 가치(cdxgen 대비 측정)와 설계 배경은 [방향성 조사 보고서](docs/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/desktop-app-study.md), 전체 문서는 [docs/](docs/)를 참고하세요.
 
 ## Contributing & License
 
