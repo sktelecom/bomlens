@@ -57,7 +57,23 @@ Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 
 
 ## 설치
 
-### 1. 저장소 클론
+설치 방법은 운영체제에 따라 다릅니다. Windows에서 명령줄 없이 쓰려면 아래 다운로드 방식이 가장 쉽고, macOS와 Linux, WSL2에서는 CLI로 설치합니다.
+
+### Windows — 다운로드 후 더블클릭 (명령줄 불필요)
+
+[![Download Windows ZIP](https://img.shields.io/badge/Download-Windows%20ZIP-2496ED?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sktelecom/sbom-tools/archive/refs/heads/main.zip)
+
+1. 위 버튼으로 ZIP을 받아 압축을 풉니다.
+2. 압축을 푼 폴더에서 `scripts\sbom-ui.bat`를 더블클릭합니다.
+3. 잠시 뒤 브라우저에 `http://localhost:8080`이 열립니다.
+
+스캐너 이미지는 처음 실행할 때 자동으로 내려받습니다(약 3–4 GB). `sbom-ui.bat`이 Docker 설치와 실행 여부를 먼저 확인하고, 문제가 있으면 해결 방법을 안내합니다.
+
+명령줄을 쓰고 싶다면 [Git for Windows](https://git-scm.com/download/win)(Git Bash)를 설치한 뒤 `scripts\scan-sbom.bat`를 사용하거나, WSL2에서 아래 macOS/Linux 절차를 그대로 따르면 됩니다.
+
+### macOS / Linux — CLI
+
+#### 1. 저장소 클론
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git
@@ -73,7 +89,7 @@ curl -O https://raw.githubusercontent.com/sktelecom/sbom-tools/main/scripts/scan
 chmod +x scan-sbom.sh
 ```
 
-### 2. Docker 이미지 다운로드
+#### 2. Docker 이미지 다운로드
 
 ```bash
 docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지로 제공됩니다
@@ -81,7 +97,7 @@ docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scann
 
 이미지 크기는 약 3–4 GB입니다. 네트워크 상황에 따라 수 분이 소요될 수 있습니다.
 
-### 3. 설치 확인
+#### 3. 설치 확인
 
 ```bash
 ./scripts/scan-sbom.sh --help
