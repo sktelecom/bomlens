@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-06-02
+
 ### Added
 
 - Firmware analysis (FIRMWARE mode): unpack a firmware image and produce an SBOM and risk report.
@@ -20,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed the product to SBOM Generator; the post-process image is co-published as `ghcr.io/sktelecom/sbom-generator` (the legacy `sbom-scanner` name keeps working).
+- Windows-friendly onboarding: a download-and-double-click web UI flow, plus consistent Windows guidance across the supplier docs.
+- The Windows release archive now bundles both launchers and the host-mounted `build-prep.sh`, so it runs without the full repo.
 - Reworked the scanner into a two-stage architecture (generate, then assess risk).
 - Documentation refreshed to match the current product, including the web UI flow and the two core roles.
 

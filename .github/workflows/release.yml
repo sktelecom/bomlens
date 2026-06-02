@@ -108,16 +108,20 @@ jobs:
           chmod +x release-assets/scan-sbom.sh
           tar -czf release-assets/scan-sbom-linux.tar.gz -C scripts scan-sbom.sh
           
-          if [ -f scripts/scan-sbom.bat ]; then
-            cp scripts/scan-sbom.bat release-assets/
-            zip -j release-assets/scan-sbom-windows.zip scripts/scan-sbom.bat
-          fi
-          
+          # Windows runtime bundle: both launchers, the orchestration script,
+          # and the one lib file scan-sbom.sh mounts into the container for
+          # source scans (docker/lib/build-prep.sh). Paths are preserved so the
+          # scan-sbom.bat -> scan-sbom.sh -> REPO_DIR/docker/lib resolution works
+          # after unzip. sbom-ui.bat is self-contained (double-click web UI).
+          zip -r release-assets/scan-sbom-windows.zip \
+            scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
+            docker/lib/build-prep.sh
+
           # Examples
           tar -czf release-assets/sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz examples/
-          
-          # Complete package
-          tar -czf release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz scripts/ examples/ docs/ README.md LICENSE
+
+          # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans)
+          tar -czf release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz scripts/ docker/ examples/ docs/ README.md LICENSE
       
       - name: Upload release assets
         uses: softprops/action-gh-release@v1
