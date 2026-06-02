@@ -31,10 +31,14 @@ if [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1; then
     cargo generate-lockfile 2>/dev/null
 fi
 
-# Go — generate go.sum / module graph
+# Go — complete go.sum so cdxgen's default-readonly `go list -deps` resolves the
+# full transitive graph. Plain `go mod download` leaves go.sum missing entries
+# that readonly `go list` requires (it then fails and cdxgen falls back to parsing
+# go.mod = direct deps only). `go mod tidy` populates go.sum fully; fall back to
+# download if tidy can't run (e.g. no network to fix an inconsistent go.mod).
 if [ -f go.mod ] && command -v go >/dev/null 2>&1; then
-    log "go mod download"
-    GOFLAGS="-mod=mod" go mod download 2>/dev/null
+    log "go mod tidy"
+    GOFLAGS="-mod=mod" go mod tidy 2>/dev/null || GOFLAGS="-mod=mod" go mod download 2>/dev/null
 fi
 
 # Ruby — ensure a lockfile exists (cdxgen ruby images usually auto-resolve,
