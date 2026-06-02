@@ -43,6 +43,8 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 
 #### Windows, no CLI — from a source ZIP you received
 
+New to all this and just need the notice? Start with the [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md) — a step-by-step Korean guide written for non-developers.
+
 The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM.
 
 1. Install and start a Docker engine. **Rancher Desktop** is a free, drop-in choice for this double-click flow; Docker Desktop also works (with licensing caveats for organizations).
@@ -74,6 +76,7 @@ Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고
 
 | 문서 | 설명 |
 |------|------|
+| [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md) | CLI 없이 웹 UI로 오픈소스 고지문 만들기 |
 | [시작하기](docs/getting-started.md) | 설치 · 첫 SBOM (웹 UI 포함) |
 | [시나리오 가이드](docs/scenarios-guide.md) | 입력 형태별(GitHub·ZIP·로컬·SBOM·펌웨어) 처리 |
 | [사용 가이드](docs/usage-guide.md) | 전체 옵션 · 분석 모드 · CI/CD |

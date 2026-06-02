@@ -276,15 +276,28 @@ section "Windows wrappers (static checks)"
 # --------------------------------------------------------
 UI_BAT="$REPO/scripts/sbom-ui.bat"
 SCAN_BAT="$REPO/scripts/scan-sbom.bat"
+CHECK_BAT="$REPO/scripts/check-setup.bat"
+CHECK_SH="$REPO/scripts/check-setup.sh"
 [ -f "$UI_BAT" ]   && pass "scripts/sbom-ui.bat present"   || fail "scripts/sbom-ui.bat present"
 [ -f "$SCAN_BAT" ] && pass "scripts/scan-sbom.bat present" || fail "scripts/scan-sbom.bat present"
 if [ -f "$UI_BAT" ]; then
   grep -q "MODE=UI" "$UI_BAT"            && pass "sbom-ui.bat sets MODE=UI"               || fail "sbom-ui.bat sets MODE=UI"
   grep -qi "docker version" "$UI_BAT"    && pass "sbom-ui.bat preflight-checks docker"    || fail "sbom-ui.bat preflight-checks docker"
+  # New onboarding behaviors: artifacts go to a dedicated home-dir folder, and the
+  # image is pre-pulled on first run so the user sees download progress.
+  grep -q "sbom-output" "$UI_BAT"        && pass "sbom-ui.bat isolates output to a dedicated sbom-output folder" || fail "sbom-ui.bat isolates output folder"
+  grep -qi "docker image inspect" "$UI_BAT"      && pass "sbom-ui.bat checks for the image before run" || fail "sbom-ui.bat checks for image"
+  grep -qi "docker pull" "$UI_BAT"               && pass "sbom-ui.bat pre-pulls the image on first run" || fail "sbom-ui.bat pre-pulls image"
 fi
 if [ -f "$SCAN_BAT" ]; then
   grep -q "scan-sbom.sh" "$SCAN_BAT"     && pass "scan-sbom.bat delegates to scan-sbom.sh" || fail "scan-sbom.bat delegates to scan-sbom.sh"
   grep -qi "where bash" "$SCAN_BAT"      && pass "scan-sbom.bat checks for Git Bash"        || fail "scan-sbom.bat checks for Git Bash"
+fi
+# check-setup helper exists on both platforms and inspects the same prerequisites.
+[ -f "$CHECK_BAT" ] && pass "scripts/check-setup.bat present" || fail "scripts/check-setup.bat present"
+[ -f "$CHECK_SH" ]  && pass "scripts/check-setup.sh present"  || fail "scripts/check-setup.sh present"
+if [ -f "$CHECK_SH" ]; then
+  grep -qi "docker image inspect" "$CHECK_SH" && pass "check-setup.sh inspects the scanner image" || fail "check-setup.sh inspects image"
 fi
 
 # --------------------------------------------------------

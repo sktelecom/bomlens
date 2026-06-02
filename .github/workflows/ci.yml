@@ -66,6 +66,9 @@ jobs:
           echo "Checking scripts/scan-sbom.sh..."
           shellcheck scripts/scan-sbom.sh || true
           echo ""
+          echo "Checking scripts/check-setup.sh..."
+          shellcheck scripts/check-setup.sh || true
+          echo ""
           echo "Checking docker/entrypoint.sh..."
           shellcheck docker/entrypoint.sh || true
           echo ""

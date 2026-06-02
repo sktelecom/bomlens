@@ -5,47 +5,74 @@ REM
 REM sbom-ui.bat - launch the SBOM Generator local web UI on Windows.
 REM Double-click this file to start the browser-based interface.
 
+chcp 65001 >nul
 setlocal
 
 set DOCKER_IMAGE=%SBOM_SCANNER_IMAGE%
-if "%DOCKER_IMAGE%"=="" set DOCKER_IMAGE=ghcr.io/sktelecom/sbom-scanner:latest
+if "%DOCKER_IMAGE%"=="" set DOCKER_IMAGE=ghcr.io/sktelecom/sbom-generator:latest
 set UI_PORT=%UI_PORT%
 if "%UI_PORT%"=="" set UI_PORT=8080
 
-REM --- Docker checks (the real prerequisite) ---
+REM Results land in a dedicated folder under the user's home directory, which
+REM both Rancher Desktop and Docker Desktop share by default. Double-clicking
+REM this .bat would otherwise dump artifacts next to the script.
+set OUTDIR=%USERPROFILE%\sbom-output
+if not exist "%OUTDIR%" mkdir "%OUTDIR%"
+
+REM --- Docker 점검 (진짜 사전 요구사항) ---
 docker version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Docker is not installed or not in PATH.
-    echo   Free options for Windows:
-    echo     - Rancher Desktop ^(GUI, works with this launcher^): https://rancherdesktop.io/
-    echo     - WSL2 + docker-ce ^(run scan-sbom.sh inside WSL^): https://docs.docker.com/engine/install/
-    echo   Docker Desktop also works ^(paid license for larger orgs^): https://www.docker.com/products/docker-desktop/
+    echo [오류] Docker가 설치되어 있지 않거나 PATH에 없습니다.
+    echo   Windows에서 쓸 수 있는 무료 옵션:
+    echo     - Rancher Desktop ^(GUI, 이 런처와 바로 동작^): https://rancherdesktop.io/
+    echo     - WSL2 + docker-ce ^(WSL 안에서 scan-sbom.sh 실행^): https://docs.docker.com/engine/install/
+    echo   Docker Desktop도 동작합니다 ^(규모가 큰 조직은 유료 라이선스 필요^): https://www.docker.com/products/docker-desktop/
+    echo.
+    echo   무엇이 문제인지 한눈에 보려면 check-setup.bat 을 더블클릭하세요.
     pause
     exit /b 1
 )
 docker info >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] The Docker engine is not running. Start it ^(e.g. Rancher Desktop / Docker Desktop^) and retry.
+    echo [오류] Docker 엔진이 실행 중이 아닙니다. Rancher Desktop / Docker Desktop을 켠 뒤 다시 시도하세요.
     pause
     exit /b 1
 )
 
+REM --- 첫 실행이면 스캐너 이미지를 미리 내려받는다 (진행률 표시) ---
+docker image inspect "%DOCKER_IMAGE%" >nul 2>&1
+if errorlevel 1 (
+    echo ==========================================
+    echo   처음 실행이라 스캐너 이미지를 내려받습니다 ^(약 3~4GB^).
+    echo   네트워크 상황에 따라 수 분 걸릴 수 있어요. 잠시 기다려 주세요.
+    echo   이미지: %DOCKER_IMAGE%
+    echo ==========================================
+    docker pull "%DOCKER_IMAGE%"
+    if errorlevel 1 (
+        echo [오류] 이미지 다운로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하세요.
+        pause
+        exit /b 1
+    )
+)
+
 echo ==========================================
-echo   SBOM Generator Web UI
-echo   URL: http://localhost:%UI_PORT%
-echo   (Close this window to stop)
+echo   SBOM Generator 웹 UI
+echo   주소: http://localhost:%UI_PORT%
+echo   결과 저장 폴더: %OUTDIR%
+echo   ^(이 창을 닫으면 중지됩니다^)
 echo ==========================================
 
-REM Open the browser shortly after the server starts.
+REM 서버가 뜬 직후 브라우저를 연다.
 start "" cmd /c "timeout /t 2 >nul & start http://localhost:%UI_PORT%"
 
 docker run --rm -it ^
     -p %UI_PORT%:8080 ^
-    -v "%CD%":/src ^
-    -v "%CD%":/host-output ^
+    -v "%OUTDIR%":/src ^
+    -v "%OUTDIR%":/host-output ^
     -v \\.\pipe\docker_engine:\\.\pipe\docker_engine ^
     -e MODE=UI ^
     -e UI_PORT=8080 ^
+    -e SBOM_UI_HOST_DIR="%OUTDIR%" ^
     "%DOCKER_IMAGE%"
 
 endlocal
