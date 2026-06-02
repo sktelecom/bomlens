@@ -7,6 +7,8 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 
+> **Windows에서 명령줄 없이 시작하려면** [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md)부터 보세요. 더블클릭 데스크톱 앱이나 ZIP 하나로 오픈소스 고지문과 SBOM을 만듭니다. Docker 엔진은 필요하며, 무료 [Rancher Desktop](https://rancherdesktop.io/)을 권장합니다.
+
 One Docker image, two jobs:
 
 - **Generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice (고지문), and a security report.
@@ -55,7 +57,7 @@ The common case for an open-source PM: a dev team handed you a source archive an
 
 The [getting-started guide](docs/getting-started.md) covers this in more detail and shows the CLI path.
 
-A desktop app that wraps this flow with no console window is in preview — it checks Docker, pulls the image, and opens the UI on double-click. See [`electron/`](electron/README.md); installers build in CI ([desktop workflow](.github/workflows/desktop.yml)) and are unsigned for now.
+Prefer a real app over a `.bat`? A desktop app wraps this same flow with no console window — it checks Docker, pulls the image, and opens the UI on double-click. Download `SBOM-Generator-*.exe` (or `.dmg`) from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest). It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. Build details are in [`electron/`](electron/README.md).
 
 ### CLI
 
