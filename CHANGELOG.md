@@ -7,10 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v0.10.0] - 2026-06-02
-
-First versioned pre-1.0 release. The earlier `v1.x` tags were premature and have
-been withdrawn; everything they shipped is consolidated here.
+## [v1.1.0] - 2026-06-02
 
 ### Added
 
@@ -47,8 +44,6 @@ been withdrawn; everything they shipped is consolidated here.
 
 ## [v1.0.0] - 2026-02-19
 
-> Historical release predating the 0.x reset, kept for the users who already downloaded it.
-
 ### Added
 
 - Initial public release of SBOM Tools.
@@ -61,6 +56,6 @@ been withdrawn; everything they shipped is consolidated here.
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v0.10.0...HEAD
-[v0.10.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v0.10.0
+[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.1.0...HEAD
+[v1.1.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.0.0
