@@ -11,6 +11,8 @@ files:
   - package.json
 # 백엔드와 React SPA는 스캐너 Docker 이미지가 서빙하므로 사이드카/프론트 동봉이 없다.
 # 1차는 미서명(코드 서명 인증서 주체 미정). 정식 배포 시 win.certificate / mac.notarize 추가.
+# 공백 없는 파일명이라 릴리스 다운로드 URL이 깔끔하다(타깃마다 확장자가 달라 구분된다).
+artifactName: SBOM-Generator-${version}.${ext}
 win:
   target: nsis
 mac:
