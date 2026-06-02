@@ -56,8 +56,15 @@ jobs:
       - name: Install dependencies
         run: npm install
       # 1차 미서명: mac 자동 서명 탐색을 끄고, 어떤 레지스트리에도 publish 하지 않는다.
+      # 태그 빌드는 버전을 태그에서 주입해 인스톨러 파일명이 릴리스와 항상 일치하게 한다.
       - name: Build installer
-        run: npx --no-install electron-builder ${{ matrix.args }} --publish never
+        shell: bash
+        run: |
+          args=(${{ matrix.args }} --publish never)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            args+=("-c.extraMetadata.version=${GITHUB_REF#refs/tags/v}")
+          fi
+          npx --no-install electron-builder "${args[@]}"
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - uses: actions/upload-artifact@v4
