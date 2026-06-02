@@ -1,0 +1,20 @@
+{
+  "name": "sbom-generator-desktop",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Double-click desktop app that wraps the SBOM Generator web UI (runs the scanner in Docker).",
+  "main": "main.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

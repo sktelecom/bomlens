@@ -55,6 +55,8 @@ The common case for an open-source PM: a dev team handed you a source archive an
 
 The [getting-started guide](docs/getting-started.md) covers this in more detail and shows the CLI path.
 
+A desktop app that wraps this flow with no console window is in preview — it checks Docker, pulls the image, and opens the UI on double-click. See [`electron/`](electron/README.md); installers build in CI ([desktop workflow](.github/workflows/desktop.yml)) and are unsigned for now.
+
 ### CLI
 
 ```bash
