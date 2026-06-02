@@ -28,12 +28,22 @@ TMP="$(mktemp)"
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
+# cdxgen can emit spec-invalid swift PURLs: pkg:swift REQUIRES a namespace
+# (e.g. pkg:swift/github.com/apple/swift-log@1.0.0), but the root component and
+# first-party modules come out as pkg:swift/<name>@<ver> with no namespace. A
+# single invalid PURL on the root component makes strict parsers (Trivy) reject
+# the WHOLE SBOM ("failed to parse PURL: namespace is required"), so the security
+# scan silently produces an empty report. Drop only those invalid purls (the
+# component name/version are retained); valid namespaced swift purls are untouched.
+PURL_FIX='(.metadata.component) |= (if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) | (.components) |= (if type=="array" then map(if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) else . end)'
+
 if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
     # inside metadata annotations — normalize that to keep output byte-stable.
     jq -S "
-        ${SORT_FILTER}
+        ${PURL_FIX}
+        | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
         | (if (.annotations|type)==\"array\" then
               .annotations |= map(if (.text|type)==\"string\"
@@ -43,7 +53,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S "${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S "${PURL_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
