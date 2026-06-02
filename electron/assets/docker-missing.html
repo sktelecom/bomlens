@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Docker가 필요합니다 — SBOM Generator</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+        background: #0a0a0b;
+        color: #e7e7ea;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      main {
+        max-width: 560px;
+        padding: 32px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.7;
+        color: #c7c7cd;
+      }
+      ul {
+        font-size: 14px;
+        line-height: 1.8;
+        color: #c7c7cd;
+        padding-left: 18px;
+      }
+      a {
+        color: #6ea8fe;
+      }
+      .hint {
+        margin-top: 20px;
+        font-size: 13px;
+        color: #9a9aa2;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Docker가 필요합니다</h1>
+      <p id="lead"></p>
+      <p>SBOM Generator는 스캐너를 Docker 컨테이너로 실행합니다. Windows에서 쓸 수 있는 무료 옵션:</p>
+      <ul>
+        <li><a href="https://rancherdesktop.io/">Rancher Desktop</a> — GUI, 이 앱과 바로 동작(권장)</li>
+        <li><a href="https://docs.docker.com/engine/install/">WSL2 + docker-ce</a> — 완전 무료</li>
+        <li>
+          <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> — 규모가 큰
+          조직은 유료 라이선스 필요
+        </li>
+      </ul>
+      <p class="hint">설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.</p>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const reason = params.get("reason");
+      const title = document.getElementById("title");
+      const lead = document.getElementById("lead");
+      if (reason === "not-running") {
+        title.textContent = "Docker 엔진을 켜 주세요";
+        lead.textContent =
+          "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. Rancher Desktop 또는 Docker Desktop을 켜고 아이콘이 안정될 때까지 기다린 뒤 이 앱을 다시 실행하세요.";
+      } else {
+        lead.textContent = "Docker가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다.";
+      }
+    </script>
+  </body>
+</html>

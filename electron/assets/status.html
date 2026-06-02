@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>SBOM Generator</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+        background: #0a0a0b;
+        color: #e7e7ea;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 28px 32px 12px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      header p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: #9a9aa2;
+      }
+      #log {
+        flex: 1;
+        margin: 8px 32px 28px;
+        padding: 16px;
+        background: #131316;
+        border: 1px solid #26262b;
+        border-radius: 8px;
+        overflow-y: auto;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .line {
+        color: #c7c7cd;
+      }
+      .line.latest {
+        color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SBOM Generator</h1>
+      <p>준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.</p>
+    </header>
+    <div id="log" aria-live="polite"></div>
+    <script>
+      const log = document.getElementById("log");
+      function add(line) {
+        const prev = log.querySelector(".latest");
+        if (prev) prev.classList.remove("latest");
+        const el = document.createElement("div");
+        el.className = "line latest";
+        el.textContent = line;
+        log.appendChild(el);
+        log.scrollTop = log.scrollHeight;
+      }
+      if (window.sbomDesktop && window.sbomDesktop.onStatus) {
+        window.sbomDesktop.onStatus(add);
+      }
+    </script>
+  </body>
+</html>
