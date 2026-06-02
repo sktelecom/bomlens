@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v1.2.0] - 2026-06-02
+## [v0.10.0] - 2026-06-02
+
+First versioned pre-1.0 release. The earlier `v1.x` tags were premature and have
+been withdrawn; everything they shipped is consolidated here.
 
 ### Added
 
@@ -17,16 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows verification assets: an automated smoke test (`tests/windows-smoke.ps1`) and a manual e2e checklist (`tests/windows-e2e-checklist.md`).
 - Desktop-app packaging study (`docs/desktop-app-study.md`).
 - Screenshots and a flow diagram across the user guides.
-
-### Changed
-
-- `scripts/sbom-ui.bat`: results go to a dedicated `%USERPROFILE%\sbom-output` folder, the scanner image is pre-pulled on first run with progress shown, and messages are in Korean.
-- README routes first-time Windows users to the easiest path up front, and the license-manager quickstart leads with the desktop app and lists expected install and download times.
-
-## [v1.1.0] - 2026-06-02
-
-### Added
-
 - Firmware analysis (FIRMWARE mode): unpack a firmware image and produce an SBOM and risk report.
 - Supplier SBOM validation and analysis (ANALYZE mode) for SBOMs you receive from third parties.
 - End-to-end support for five input forms (source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS) with a risk report emitted in every mode.
@@ -38,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `scripts/sbom-ui.bat`: results go to a dedicated `%USERPROFILE%\sbom-output` folder, the scanner image is pre-pulled on first run with progress shown, and messages are in Korean.
+- README routes first-time Windows users to the easiest path up front, and the license-manager quickstart leads with the desktop app and lists expected install and download times.
 - Renamed the product to SBOM Generator; the post-process image is co-published as `ghcr.io/sktelecom/sbom-generator` (the legacy `sbom-scanner` name keeps working).
 - Windows-friendly onboarding: a download-and-double-click web UI flow, plus consistent Windows guidance across the supplier docs.
 - The Windows release archive now bundles both launchers and the host-mounted `build-prep.sh`, so it runs without the full repo.
@@ -52,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.0.0] - 2026-02-19
 
+> Historical release predating the 0.x reset, kept for the users who already downloaded it.
+
 ### Added
 
 - Initial public release of SBOM Tools.
@@ -64,5 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v0.10.0...HEAD
+[v0.10.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v0.10.0
 [v1.0.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.0.0
