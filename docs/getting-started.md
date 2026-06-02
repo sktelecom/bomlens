@@ -22,11 +22,17 @@ SBOM Generator를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM
 | OS | Linux, macOS, Windows |
 | 아키텍처 | AMD64, ARM64 |
 
-필요한 것은 Docker "엔진"이며, 특정 제품에 묶이지 않습니다. Docker가 없다면 [공식 설치 문서](https://docs.docker.com/get-docker/)를 참고하거나 아래 무료 옵션 중 하나를 고르세요.
+이 도구에 필요한 건 Docker "엔진"뿐이고, 특정 제품에 묶이지 않습니다. 이미 Docker를 쓰고 있다면(Docker Desktop, Rancher Desktop, WSL2의 docker-ce 등 무엇이든) 새로 설치할 필요 없이 동작만 확인하고 넘어가세요.
 
-### Windows에서 Docker 엔진 고르기
+```bash
+docker run --rm hello-world
+```
 
-Docker Desktop은 가장 쉽지만 일정 규모 이상의 조직에서는 **유료 라이선스**가 필요합니다. 무료로 쓰려면 다음을 권장합니다.
+환영 메시지가 출력되면 준비가 끝난 것이니 [설치](#설치)로 바로 넘어가면 됩니다. Docker가 아직 없다면 [공식 설치 문서](https://docs.docker.com/get-docker/)를 참고하고, Windows에서 처음 설치한다면 아래에서 무료 엔진을 고르세요.
+
+### Windows에서 Docker를 처음 설치한다면
+
+이미 Docker가 있다면 이 절은 건너뛰어도 됩니다. 처음 설치하는 경우, Docker Desktop이 가장 간단하지만 일정 규모 이상의 조직에서는 유료 라이선스가 필요합니다. 무료로 쓰려면 다음을 권장합니다.
 
 | 옵션 | 특징 | 이 도구와의 관계 |
 |------|------|------------------|
@@ -43,7 +49,7 @@ wsl --install -d Ubuntu          # 설치 후 재부팅, 우분투 초기 설정
 ```bash
 sudo apt-get update && curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"  # 로그아웃/로그인 후 적용
-docker pull ghcr.io/sktelecom/sbom-scanner:latest
+docker pull ghcr.io/sktelecom/sbom-generator:latest
 ```
 이후 WSL 안에서 이 저장소를 클론하고 `./scripts/scan-sbom.sh ...`를 그대로 실행하면 됩니다.
 
