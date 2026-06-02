@@ -39,6 +39,8 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/}
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Image tags follow SemVer without the leading "v" (metadata-action {{version}}).
+          echo "image_version=${VERSION#v}" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
       
       - name: Generate changelog
@@ -79,7 +81,7 @@ jobs:
             
             #### Docker Image
             ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/sbom-generator:${{ steps.version.outputs.version }}   # legacy alias: sbom-scanner
+            docker pull ghcr.io/${{ github.repository_owner }}/sbom-generator:${{ steps.version.outputs.image_version }}   # legacy alias: sbom-scanner
             ```
             
             ### Documentation
