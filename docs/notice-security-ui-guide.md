@@ -6,6 +6,8 @@
 
 처음이라면 이것만 따라 하면 됩니다. Docker 엔진이 실행 중인 상태에서 스캔할 프로젝트 폴더로 이동한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
 
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행하거나(Git Bash 필요), WSL2에서 그대로 실행하세요. 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭하면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
@@ -191,7 +193,7 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 # → http://localhost:8080 자동 열림
 ```
 
-**Windows:** `scripts\sbom-ui.bat`를 더블클릭합니다.
+**Windows — 더블클릭 (명령줄 불필요):** 압축을 푼 폴더에서 `scripts\sbom-ui.bat`를 더블클릭하면 잠시 뒤 브라우저에 `http://localhost:8080`이 열립니다. Docker가 실행 중이면 되고, `sbom-ui.bat`은 Rancher Desktop이나 Docker Desktop에서 동작합니다(WSL2라면 WSL 안에서 `scan-sbom.sh --ui`를 실행).
 
 > 실행 위치는 산출물 저장 폴더이며, 스캔 대상으로 "현재 폴더"를 고를 때만 그 폴더의 소스를 스캔합니다. GitHub URL이나 업로드, Docker 이미지를 쓸 거라면 실행 위치는 무관합니다.
 

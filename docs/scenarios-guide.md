@@ -32,6 +32,8 @@
 
 ## 공통 준비
 
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행하거나(Git Bash 필요), WSL2에서 그대로 실행하세요. 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭하면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
 docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지
