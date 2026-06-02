@@ -9,6 +9,12 @@ entrypoint  text eol=lf
 # Windows batch wrappers must stay CRLF.
 *.bat       text eol=crlf
 
+# PowerShell scripts: keep CRLF. The file carries a UTF-8 BOM so Windows
+# PowerShell 5.1 (the default on Korean Windows) reads non-ASCII string
+# literals as UTF-8 instead of the CP949 ANSI codepage; without the BOM the
+# Korean text mangles and the script fails to parse.
+*.ps1       text eol=crlf
+
 # Fixtures / data are normalized to LF for byte-stable diffs across platforms.
 *.json      text eol=lf
 *.md        text eol=lf

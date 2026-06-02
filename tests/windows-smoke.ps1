@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows 자동 스모크 테스트 — SBOM Generator의 Windows 고유 위험을 헤드리스로 검증한다.
 
