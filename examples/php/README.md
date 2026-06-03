@@ -1,4 +1,6 @@
 # PHP Example
+
+> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/getting-started.en.md) and the [usage guide](../../docs/usage-guide.en.md).
 Composer-based PHP project example.
 ## Generate SBOM
 
