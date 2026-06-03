@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # GitHub Actions used across all workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  # Electron desktop app dependencies.
+  - package-ecosystem: npm
+    directory: /electron
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+
+  # Web UI (React SPA) dependencies.
+  - package-ecosystem: npm
+    directory: /docker/web/frontend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+
+  # Base images for the post-process scanner image.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+
+  # Base images for the Android SDK images.
+  - package-ecosystem: docker
+    directory: /docker/android
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
