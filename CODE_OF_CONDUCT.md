@@ -1,5 +1,7 @@
 # 기여자 행동 강령
 
+> **English**: [CODE_OF_CONDUCT.en.md](CODE_OF_CONDUCT.en.md)
+
 ## 우리의 다짐
 
 우리는 구성원, 기여자, 유지보수자로서 나이, 신체 크기, 장애 여부, 민족, 성별 특성,

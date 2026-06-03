@@ -1,5 +1,7 @@
 # 보안 정책 (Security Policy)
 
+> **English**: [SECURITY.en.md](SECURITY.en.md)
+
 SBOM Generator는 소프트웨어 공급망 보안을 다루는 도구인 만큼, 도구 자체의 보안도
 중요하게 여긴다. 취약점을 발견했다면 책임 있는 절차에 따라 알려 주기를 부탁한다.
 
