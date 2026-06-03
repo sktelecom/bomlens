@@ -15,7 +15,7 @@
 
 # ---- Stage 1: build the React SPA (Vite). node lives ONLY in this stage; the
 #      runtime image copies just the static dist/, so it stays lightweight. ----
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 COPY web/frontend/package.json web/frontend/package-lock.json* ./
 RUN npm ci || npm install
