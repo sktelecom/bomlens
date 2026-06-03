@@ -37,11 +37,16 @@ jobs:
     name: Build post-process image
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # attach the image SBOM to the release
+      id-token: write   # keyless cosign signing (Sigstore OIDC)
       packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      # Resolve the publish flag once and reuse it for push, signing, and attest.
+      - name: Resolve publish flag
+        id: flags
+        run: echo "push=${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true || github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -66,15 +71,54 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true || github.ref == 'refs/heads/main') }}
+          push: ${{ steps.flags.outputs.push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # --- Supply-chain: dogfood our own signing and SBOM on the published image ---
+      # The tool offers cosign signing (--sign) and SBOM generation to users; we do
+      # the same to our own image. Keyless signatures use the GitHub OIDC token
+      # (no key management): OIDC -> Fulcio cert -> Rekor transparency log.
+      - name: Install cosign
+        if: steps.flags.outputs.push == 'true'
+        uses: sigstore/cosign-installer@v3
+      - name: Install syft (pinned release tarball)
+        if: steps.flags.outputs.push == 'true'
+        env:
+          SYFT_VERSION: v1.18.1   # keep in sync with docker/Dockerfile
+        run: |
+          ver="${SYFT_VERSION#v}"
+          curl -sSfL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${ver}_linux_amd64.tar.gz" -o /tmp/syft.tgz
+          sudo tar -C /usr/local/bin -xzf /tmp/syft.tgz syft
+          syft version
+      - name: Sign image and attest its SBOM
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          gen="${REGISTRY}/${OWNER}/sbom-generator@${DIGEST}"
+          leg="${REGISTRY}/${OWNER}/sbom-scanner@${DIGEST}"
+          cosign sign --yes "$gen"
+          cosign sign --yes "$leg"
+          # CycloneDX SBOM of our own image, attached as a signed attestation.
+          syft "$gen" -o cyclonedx-json=sbom.cdx.json
+          cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$gen"
+          cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$leg"
+      - name: Attach image SBOM to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sbom.cdx.json
+        continue-on-error: true
 
       # Supply-chain note: use a pinned Trivy CLI (not the trivy-action that had
       # a supply-chain incident). Keep TRIVY_VERSION in sync with docker/Dockerfile.
