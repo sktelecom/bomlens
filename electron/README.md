@@ -51,3 +51,29 @@ npm run dist:win      # Windows NSIS
 
 산출물은 `dist-electron/`에 생성된다. 멀티플랫폼 빌드는 CI(`.github/workflows/desktop.yml`)가
 `windows-latest`와 `macos-latest`에서 수행한다. 1차 빌드는 미서명이다.
+
+## 코드 서명
+
+미서명 인스톨러는 Windows SmartScreen과 macOS Gatekeeper 경고를 띄운다. 서명하려면 코드
+서명 인증서가 필요하다. 인증서는 유료이고 조직 신원 확인이 필요해 별도로 발급받아야 한다.
+
+CI 워크플로우는 아래 저장소 시크릿이 설정되면 자동으로 서명하도록 배선돼 있다(시크릿이
+없으면 지금처럼 미서명으로 빌드된다).
+
+| 시크릿 | 용도 |
+|--------|------|
+| `CSC_LINK` | 코드 서명 인증서(base64 인코딩한 `.pfx`/`.p12`, 또는 경로) |
+| `CSC_KEY_PASSWORD` | 인증서 비밀번호 |
+| `APPLE_ID` | (macOS 공증) Apple ID |
+| `APPLE_APP_SPECIFIC_PASSWORD` | (macOS 공증) 앱 암호 |
+| `APPLE_TEAM_ID` | (macOS 공증) 팀 ID |
+
+설정 방법:
+
+1. Windows: Authenticode 인증서(`.pfx`)를 base64로 인코딩해 `CSC_LINK`에, 비밀번호를
+   `CSC_KEY_PASSWORD`에 넣는다. 이것만으로 NSIS 인스톨러가 서명된다.
+2. macOS: Developer ID 인증서를 같은 방식으로 `CSC_LINK`/`CSC_KEY_PASSWORD`에 넣고,
+   `electron-builder.yml`의 `mac.identity: null`을 제거한 뒤 `APPLE_*` 시크릿으로 공증을
+   설정한다.
+
+시크릿은 저장소 Settings의 Secrets and variables에서 추가한다.
