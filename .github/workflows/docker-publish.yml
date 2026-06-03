@@ -115,7 +115,7 @@ jobs:
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$leg"
       - name: Attach image SBOM to the release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: sbom.cdx.json
         continue-on-error: true
