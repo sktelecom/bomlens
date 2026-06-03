@@ -6,6 +6,7 @@
 [![Container image](https://img.shields.io/badge/ghcr.io-sbom--generator-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-generator)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
 
 > **Windows에서 명령줄 없이 시작하려면** [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md)부터 보세요. 더블클릭 데스크톱 앱이나 ZIP 하나로 오픈소스 고지문과 SBOM을 만듭니다. Docker 엔진은 필요하며, 무료 [Rancher Desktop](https://rancherdesktop.io/)을 권장합니다.
 
@@ -91,7 +92,7 @@ The web UI itself is bilingual (English and Korean, English by default). Core do
 | [Getting started](docs/getting-started.en.md) | Install and your first SBOM (web UI + CLI) |
 | [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
 | [Input scenarios](docs/scenarios-guide.en.md) | GitHub URL, ZIP, local C/C++, existing SBOM, firmware |
-| [Architecture](docs/architecture.md) | Two-stage pipeline (cdxgen + syft, then post-processing) |
+| [Architecture](docs/architecture.md) | Two-stage pipeline (cdxgen + syft, then post-processing) — _Korean_ |
 
 ### 한국어
 
@@ -108,6 +109,6 @@ The web UI itself is bilingual (English and Korean, English by default). Core do
 
 ## Contributing & License
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) (한국어) and [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues).
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues).
 
 Apache License 2.0 · © 2026 SK Telecom Co., Ltd. Bundled third-party tools keep their own licenses — see [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

@@ -140,7 +140,7 @@ jobs:
           echo "| Example | Status | Components |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|------------|" >> $GITHUB_STEP_SUMMARY
           
-          if [ -d sbom-* ]; then
+          if compgen -G "sbom-*/" > /dev/null; then
             for dir in sbom-*/; do
               if [ -d "$dir" ]; then
                 example=$(basename "$dir" | sed 's/sbom-//')
