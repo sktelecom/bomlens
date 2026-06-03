@@ -14,10 +14,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       
       - name: Grant script permissions
         run: |
@@ -32,7 +32,7 @@ jobs:
       
       - name: Upload test logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-logs
           path: tests/test-workspace/failed-tests-logs/
@@ -40,7 +40,7 @@ jobs:
       
       - name: Upload generated SBOMs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-sbom-files
           path: tests/test-workspace/*_bom.json
@@ -53,7 +53,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       
       - name: Install ShellCheck
         run: |
@@ -84,7 +84,7 @@ jobs:
           echo "✅ Shellcheck completed (warnings are informational)"
       
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
           dockerfile: docker/Dockerfile
           failure-threshold: error
@@ -100,7 +100,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       # Exercises scan-sbom.sh orchestration (arg parsing, language detection,
       # image selection, mode routing, zip/git ingestion) with a stub docker —
@@ -116,7 +116,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       
       - name: Check required documentation
         run: |
@@ -156,7 +156,7 @@ jobs:
           echo "✅ Documentation check completed"
       
       - name: Check Markdown links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        uses: gaurav-nelson/github-action-markdown-link-check@5c5dfc0ac2e225883c0e5f03a85311ec2830d368 # v1
         with:
           config-file: '.github/markdown-link-check-config.json'
           use-quiet-mode: 'yes'
@@ -173,7 +173,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       
       - name: Validate ${{ matrix.example }} structure
         run: |

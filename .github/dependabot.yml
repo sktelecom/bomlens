@@ -1,41 +1,70 @@
 version: 2
 updates:
-  # GitHub Actions used across all workflows.
+  # GitHub Actions, pinned to SHAs in the workflows. Dependabot bumps the SHA and
+  # the version comment. Minor/patch are grouped; majors come as separate PRs.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+    groups:
+      actions-minor:
+        update-types: [minor, patch]
 
-  # Electron desktop app dependencies.
+  # Electron desktop app. Hold majors (electron/electron-builder) for a deliberate,
+  # tested bump; batch the rest.
   - package-ecosystem: npm
     directory: /electron
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: build
+    groups:
+      electron-minor:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
-  # Web UI (React SPA) dependencies.
+  # Web UI (React SPA). Batch minor/patch; hold majors for a deliberate bump.
   - package-ecosystem: npm
     directory: /docker/web/frontend
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: build
+    groups:
+      frontend-minor:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
-  # Base images for the post-process scanner image.
+  # Base images for the post-process scanner image. Hold base-image majors
+  # (e.g. node, python) for a deliberate, tested bump.
   - package-ecosystem: docker
     directory: /docker
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: build
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
   # Base images for the Android SDK images.
   - package-ecosystem: docker
     directory: /docker/android
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: build
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
