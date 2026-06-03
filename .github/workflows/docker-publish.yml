@@ -41,22 +41,22 @@ jobs:
       id-token: write   # keyless cosign signing (Sigstore OIDC)
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       # Resolve the publish flag once and reuse it for push, signing, and attest.
       - name: Resolve publish flag
         id: flags
         run: echo "push=${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true || github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           # Co-publish under two names from a single build (same digest):
           #   sbom-generator   — featured name, matches the product "SBOM Generator"
@@ -72,7 +72,7 @@ jobs:
             type=sha,prefix=sha-,format=short
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./docker
           platforms: linux/amd64,linux/arm64
@@ -88,7 +88,7 @@ jobs:
       # (no key management): OIDC -> Fulcio cert -> Rekor transparency log.
       - name: Install cosign
         if: steps.flags.outputs.push == 'true'
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
       - name: Install syft (pinned release tarball)
         if: steps.flags.outputs.push == 'true'
         env:
@@ -115,7 +115,7 @@ jobs:
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$leg"
       - name: Attach image SBOM to the release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: sbom.cdx.json
         continue-on-error: true
@@ -136,7 +136,7 @@ jobs:
         run: trivy config --quiet --format sarif --output trivy-results.sarif --exit-code 0 ./docker
       - name: Upload scan results
         if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@d77b13a0df3134d64a457ea9003f600b09fa1c8a # v3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -157,25 +157,25 @@ jobs:
       matrix:
         api: [ 30, 31, 32, 33, 34, 35 ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk${{ matrix.api }}
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./docker/android
           platforms: linux/amd64,linux/arm64
