@@ -58,7 +58,7 @@ jobs:
       
       - name: Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
@@ -128,9 +128,17 @@ jobs:
 
           # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans)
           tar -czf release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz scripts/ docker/ examples/ docs/ README.md LICENSE
-      
+
+          # Checksums so downloaders can verify integrity of these assets.
+          ( cd release-assets && sha256sum \
+            scan-sbom-linux.tar.gz \
+            scan-sbom-windows.zip \
+            sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz \
+            sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz \
+            > SHA256SUMS.txt )
+
       - name: Upload release assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: |
@@ -138,6 +146,7 @@ jobs:
             release-assets/scan-sbom-windows.zip
             release-assets/sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz
             release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz
+            release-assets/SHA256SUMS.txt
   
   summary:
     name: Release Summary
