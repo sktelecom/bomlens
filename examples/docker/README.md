@@ -1,5 +1,7 @@
 # Docker 이미지 예제
 
+> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/getting-started.en.md) and the [usage guide](../../docs/usage-guide.en.md).
+
 멀티 스테이지 빌드를 사용한 Node.js 애플리케이션 Docker 이미지입니다. Docker 이미지의 SBOM 생성 테스트를 위한 예제로 사용됩니다.
 
 ## Docker 이미지 정보
@@ -40,7 +42,6 @@ docker build -t sbom-example:1.0.0 -t sbom-example:latest .
 ### 방법 1: SBOM Generator 스크립트 사용 (권장)
 
 > **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/getting-started.md) 참고.
-
 
 ```bash
 # 이미지 빌드 후
