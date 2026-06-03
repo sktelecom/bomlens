@@ -47,7 +47,7 @@ jobs:
         id: changelog
         run: |
           if [ -f CHANGELOG.md ]; then
-            CHANGELOG=$(sed -n "/## \[${{ steps.version.outputs.version }}\]/,/## \[/p" CHANGELOG.md | sed '$d')
+            CHANGELOG=$(sed -n "/## \[${{ steps.version.outputs.version }}\]/,/## \[/p" CHANGELOG.md | sed '$d' | sed '1{/^## \[/d}')
           else
             CHANGELOG=$(git log $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")..HEAD --pretty=format:"- %s" 2>/dev/null || echo "Initial release")
           fi
@@ -63,16 +63,19 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## SBOM Tools ${{ steps.version.outputs.version }}
-            
-            Automated SBOM generation tool for supply chain security.
-            
+            ## SBOM Generator ${{ steps.version.outputs.version }}
+
+            Generate a CycloneDX SBOM, an open-source notice (고지문), and a security report from your source code — or assess the open-source risk of an SBOM or firmware you receive.
+
             ### Changes
-            
+
             ${{ steps.changelog.outputs.changelog }}
-            
+
             ### Installation
-            
+
+            #### Desktop app (double-click, no CLI)
+            Download `SBOM-Generator-*.exe` (Windows) or `.dmg` (macOS) from the assets below. Unsigned for now; if Windows SmartScreen warns, choose "More info", then "Run anyway".
+
             #### Scripts
             ```bash
             curl -O https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/scan-sbom.sh
@@ -87,6 +90,7 @@ jobs:
             ### Documentation
             
             - [Getting Started](https://github.com/${{ github.repository }}/blob/main/docs/getting-started.md)
+            - [License-manager quickstart](https://github.com/${{ github.repository }}/blob/main/docs/notice-quickstart.md)
             - [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/usage-guide.md)
             - [Examples](https://github.com/${{ github.repository }}/blob/main/docs/examples-guide.md)
           draft: false
