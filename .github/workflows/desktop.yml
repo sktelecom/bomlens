@@ -66,7 +66,18 @@ jobs:
           fi
           npx --no-install electron-builder "${args[@]}"
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # Code signing is inert until these repo secrets are configured; without
+          # them the build stays unsigned (current behavior). When CSC_LINK is set,
+          # electron-builder signs the Windows installer. macOS Developer ID signing
+          # and notarization additionally require removing `identity: null` from
+          # electron-builder.yml and the APPLE_* secrets below — see electron/README.md.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Stay unsigned on macOS unless a Developer ID cert is provided.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
