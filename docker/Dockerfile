@@ -23,7 +23,7 @@ COPY web/frontend/ ./
 RUN npm run build
 
 # ---- Stage 2: post-process runtime ----
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="SBOM Generator (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
