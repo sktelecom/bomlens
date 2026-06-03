@@ -133,12 +133,28 @@ jobs:
           trivy --version
       - name: Scan Dockerfiles with Trivy
         if: github.event_name != 'pull_request'
-        run: trivy config --quiet --format sarif --output trivy-results.sarif --exit-code 0 ./docker
-      - name: Upload scan results
+        run: trivy config --quiet --format sarif --output trivy-config.sarif --exit-code 0 ./docker
+      - name: Upload Dockerfile scan results
         if: github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@d77b13a0df3134d64a457ea9003f600b09fa1c8a # v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: 'trivy-config.sarif'
+          category: trivy-config
+        continue-on-error: true
+
+      # Scan the actual published image (not just the Dockerfile) for known CVEs.
+      - name: Scan published image with Trivy
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+        run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/sbom-generator@${DIGEST}"
+      - name: Upload image scan results
+        if: steps.flags.outputs.push == 'true'
+        uses: github/codeql-action/upload-sarif@d77b13a0df3134d64a457ea9003f600b09fa1c8a # v3
+        with:
+          sarif_file: 'trivy-image.sarif'
+          category: trivy-image
         continue-on-error: true
 
   # ---------------------------------------------------------------

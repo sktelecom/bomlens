@@ -12,6 +12,10 @@ updates:
     groups:
       actions-minor:
         update-types: [minor, patch]
+    ignore:
+      # Action majors are pinned to SHAs; bump them deliberately, not automatically.
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
 
   # Electron desktop app. Hold majors (electron/electron-builder) for a deliberate,
   # tested bump; batch the rest.
