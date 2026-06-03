@@ -78,7 +78,7 @@ jobs:
       # PR과 수동 실행에서는 이 단계를 건너뛰고 위 아티팩트만 남긴다.
       - name: Attach installer to the release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           tag_name: ${{ github.ref_name }}
           files: |
