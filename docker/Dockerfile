@@ -15,7 +15,7 @@
 
 # ---- Stage 1: build the React SPA (Vite). node lives ONLY in this stage; the
 #      runtime image copies just the static dist/, so it stays lightweight. ----
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /web
 COPY web/frontend/package.json web/frontend/package-lock.json* ./
 RUN npm ci || npm install
@@ -23,7 +23,7 @@ COPY web/frontend/ ./
 RUN npm run build
 
 # ---- Stage 2: post-process runtime ----
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="SBOM Generator (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
@@ -49,7 +49,7 @@ ARG UBI_READER_VERSION=0.8.13
 
 # jq (helper scripts), curl/tar (installers), file (binary mode),
 # git (web UI 'GitHub URL' ingestion: server.py clones into a temp source tree).
-# python3 + pip are already in the python:3.12-slim base (web UI + scancode).
+# python3 + pip are already in the python:3.14-slim base (web UI + scancode).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     jq curl wget ca-certificates bash tar file git \
     && rm -rf /var/lib/apt/lists/*

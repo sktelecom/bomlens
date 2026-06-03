@@ -90,6 +90,7 @@ The web UI itself is bilingual (English and Korean, English by default). Core do
 |-----|------|
 | [Getting started](docs/getting-started.en.md) | Install and your first SBOM (web UI + CLI) |
 | [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
+| [Input scenarios](docs/scenarios-guide.en.md) | GitHub URL, ZIP, local C/C++, existing SBOM, firmware |
 | [Architecture](docs/architecture.md) | Two-stage pipeline (cdxgen + syft, then post-processing) |
 
 ### 한국어
