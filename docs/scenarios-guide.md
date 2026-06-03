@@ -1,5 +1,7 @@
 # 5가지 입력 시나리오별 처리 가이드
 
+> **English**: [Input scenarios guide](scenarios-guide.en.md)
+>
 > **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안·UI 가이드](notice-security-ui-guide.md) | [공급사 SBOM 분석](supplier-sbom-analysis.md) | [펌웨어 분석](firmware-analysis.md)
 
 ## 목차
