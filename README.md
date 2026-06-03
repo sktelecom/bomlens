@@ -80,7 +80,19 @@ On Windows, run the same commands through `scripts\scan-sbom.bat`, which forward
 
 Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고지문), `risk-report.{md,html}` (위험분석, default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
 
-## Documentation (한국어)
+## Documentation
+
+The web UI itself is bilingual (English and Korean, English by default). Core docs are available in English; the full set of guides is in Korean.
+
+### English
+
+| Doc | What |
+|-----|------|
+| [Getting started](docs/getting-started.en.md) | Install and your first SBOM (web UI + CLI) |
+| [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
+| [Architecture](docs/architecture.md) | Two-stage pipeline (cdxgen + syft, then post-processing) |
+
+### 한국어
 
 | 문서 | 설명 |
 |------|------|
