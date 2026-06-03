@@ -7,8 +7,8 @@ SBOM Generator는 소프트웨어 공급망 보안을 다루는 도구인 만큼
 
 ## 지원 버전 (Supported Versions)
 
-보안 수정은 최신 릴리스를 기준으로 제공한다. Docker 이미지는 `ghcr.io/sktelecom/sbom-scanner:latest`
-태그가 최신 보안 패치를 반영한다.
+보안 수정은 최신 릴리스를 기준으로 제공한다. Docker 이미지는 `ghcr.io/sktelecom/sbom-generator:latest`
+(이전 이름 별칭 `sbom-scanner:latest`) 태그가 최신 보안 패치를 반영한다.
 
 | 버전 | 지원 여부 |
 |------|-----------|
