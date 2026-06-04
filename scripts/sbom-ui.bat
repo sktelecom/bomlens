@@ -69,7 +69,7 @@ docker run --rm -it ^
     -p %UI_PORT%:8080 ^
     -v "%OUTDIR%":/src ^
     -v "%OUTDIR%":/host-output ^
-    -v \\.\pipe\docker_engine:\\.\pipe\docker_engine ^
+    -v /var/run/docker.sock:/var/run/docker.sock ^
     -e MODE=UI ^
     -e UI_PORT=8080 ^
     -e SBOM_UI_HOST_DIR="%OUTDIR%" ^

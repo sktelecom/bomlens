@@ -34,22 +34,32 @@ function Skip($msg) { Write-Host "[SKIP] $msg" -ForegroundColor Yellow }
 function Failed($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red; $script:Fail++ }
 function Section($msg) { Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
 
+# docker 등 네이티브 명령은 정상 동작 중에도 stderr로 경고를 낸다(예: Rancher Desktop의
+# "daemon is not using the default seccomp profile"). Windows PowerShell 5.1에서는
+# $ErrorActionPreference='Stop'과 겹치면 그 stderr 한 줄이 종료 오류로 승격돼, 엔진이
+# 멀쩡한데도 스크립트가 멈춘다. 네이티브 호출을 이 헬퍼로 감싸 종료 코드만 본다.
+function Invoke-Native {
+    param([Parameter(Mandatory)][scriptblock]$Script)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Script 2>&1 | Out-Null } finally { $ErrorActionPreference = $prev }
+    return $LASTEXITCODE
+}
+
 # ---------------------------------------------------------------------------
 # 1) Docker 엔진 점검
 # ---------------------------------------------------------------------------
 Section '1. Docker 엔진'
-docker version *> $null
-if ($LASTEXITCODE -ne 0) { Failed 'docker가 설치되어 있지 않거나 PATH에 없습니다. 더 진행할 수 없습니다.'; exit 1 }
-docker info *> $null
-if ($LASTEXITCODE -ne 0) { Failed 'Docker 엔진이 실행 중이 아닙니다. Rancher/Docker Desktop을 켜고 다시 실행하세요.'; exit 1 }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Failed 'docker가 설치되어 있지 않거나 PATH에 없습니다. 더 진행할 수 없습니다.'; exit 1 }
+if ((Invoke-Native { docker version }) -ne 0) { Failed 'docker가 설치되어 있지 않거나 PATH에 없습니다. 더 진행할 수 없습니다.'; exit 1 }
+if ((Invoke-Native { docker info }) -ne 0) { Failed 'Docker 엔진이 실행 중이 아닙니다. Rancher/Docker Desktop을 켜고 다시 실행하세요.'; exit 1 }
 Pass 'Docker 엔진 실행 중'
 
 # ---------------------------------------------------------------------------
 # 2) 스캐너 이미지 프리풀
 # ---------------------------------------------------------------------------
 Section '2. 스캐너 이미지 프리풀'
-docker pull $Image
-if ($LASTEXITCODE -ne 0) { Failed "이미지 pull 실패: $Image"; exit 1 }
+if ((Invoke-Native { docker pull $Image }) -ne 0) { Failed "이미지 pull 실패: $Image"; exit 1 }
 Pass "이미지 준비됨: $Image"
 
 # ---------------------------------------------------------------------------
@@ -72,7 +82,7 @@ if (-not $bash) {
         Push-Location $work
         try {
             $bat = Join-Path $script:RepoRoot 'scripts\scan-sbom.bat'
-            & $bat --project SmokeApp --version 0.0.1 --notice --generate-only
+            Invoke-Native { & $bat --project SmokeApp --version 0.0.1 --notice --generate-only } | Out-Null
         } finally {
             Pop-Location
         }
@@ -96,14 +106,17 @@ $uiOut = Join-Path $env:USERPROFILE ('sbom-ui-smoke-' + (Get-Date -Format 'yyyyM
 New-Item -ItemType Directory -Path $uiOut -Force | Out-Null
 $cid = $null
 try {
+    $eapPrev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $cid = docker run -d --rm `
         -p "$($UiPort):8080" `
         -v "$($uiOut):/src" `
         -v "$($uiOut):/host-output" `
-        -v '\\.\pipe\docker_engine:\\.\pipe\docker_engine' `
+        -v '/var/run/docker.sock:/var/run/docker.sock' `
         -e MODE=UI -e UI_PORT=8080 -e "SBOM_UI_HOST_DIR=$uiOut" `
-        $Image
-    if ($LASTEXITCODE -ne 0 -or -not $cid) {
+        $Image 2>$null
+    $runRc = $LASTEXITCODE
+    $ErrorActionPreference = $eapPrev
+    if ($runRc -ne 0 -or -not $cid) {
         Failed 'UI 컨테이너를 시작하지 못했습니다.'
     } else {
         $ok = $false
@@ -120,7 +133,7 @@ try {
         else { Failed "웹 UI가 시간 내에 200을 반환하지 않았습니다 (포트 $UiPort 충돌 여부 확인)." }
     }
 } finally {
-    if ($cid) { docker stop $cid *> $null }
+    if ($cid) { Invoke-Native { docker stop $cid } | Out-Null }
     Remove-Item -Path $uiOut -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -141,7 +154,7 @@ if (-not $bash) {
         Push-Location $unshared
         try {
             $bat = Join-Path $script:RepoRoot 'scripts\scan-sbom.bat'
-            & $bat --project UnsharedApp --version 0.0.1 --notice --generate-only *> $null
+            Invoke-Native { & $bat --project UnsharedApp --version 0.0.1 --notice --generate-only } | Out-Null
         } finally {
             Pop-Location
         }
