@@ -11,7 +11,6 @@ import os from "node:os";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const isWin = process.platform === "win32";
 
 export const DEFAULT_IMAGE =
   process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/sbom-generator:latest";
@@ -22,11 +21,11 @@ export function defaultOutputDir() {
 }
 
 // 호스트의 Docker 엔진을 컨테이너에 연결하는 마운트. UI 컨테이너가 언어별 cdxgen 이미지를
-// 띄우려면 호스트 엔진에 접근해야 한다(Windows는 명명 파이프, 그 외는 유닉스 소켓).
+// 띄우려면 호스트 엔진에 접근해야 한다. Windows 명명 파이프(\\.\pipe\docker_engine)는 Docker
+// Desktop만 특수처리하고 Rancher Desktop은 거부하므로(invalid volume name), 양쪽 모두 지원하고
+// 컨테이너 엔트리포인트가 실제로 요구하는 유닉스 소켓을 쓴다. (sbom-ui.bat과 동일하게 정렬)
 function engineMount() {
-  return isWin
-    ? "\\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine"
-    : "/var/run/docker.sock:/var/run/docker.sock";
+  return "/var/run/docker.sock:/var/run/docker.sock";
 }
 
 function run(cmd, args, opts = {}) {
