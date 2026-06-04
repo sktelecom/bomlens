@@ -44,6 +44,29 @@ powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Smoke
 
 FAIL이 없으면 다음으로 넘어간다. SKIP(예: Git Bash 없음)은 아래 수동 단계에서 다시 본다.
 
+### 1b. 데스크톱 앱을 소스에서 실행해 검증 (Rancher Desktop 호환)
+
+릴리스 인스톨러는 빌드 시점에 따라 최신 수정이 빠져 있을 수 있다(예: 데스크톱 앱이 Rancher
+Desktop에서 도커 소켓을 못 잡던 버그 수정). 인스톨러를 다시 받지 말고, 현재 소스를 직접 실행해
+검증한다. Rancher Desktop이 켜져 있어야 한다.
+
+```powershell
+git pull                # 최신 main 받기
+cd electron
+npm install
+npm start               # Electron 개발 실행 (현재 container.mjs 사용)
+```
+
+확인할 것:
+
+- Docker 점검을 지나 (첫 실행이면) 이미지 다운로드가 진행되고,
+- UI 컨테이너가 떠서 앱 창에 웹 UI가 로드된다. Rancher Desktop에서 "invalid volume name" 같은
+  오류 없이 떠야 한다.
+- 로드된 UI 화면을 `app-running`으로 캡처해 둔다(아래 표의 선택 항목).
+
+이 단계가 통과하면 권장 경로(Rancher Desktop + 데스크톱 앱)가 실제로 동작한다는 뜻이다. 그다음
+사람이 ZIP을 올려 스캔하고 고지문을 받는 전체 흐름까지 이어서 본다.
+
 ### 2. 데스크톱 앱 흐름 점검 + 캡처
 
 `tests/windows-e2e-checklist.md`의 "데스크톱 앱 흐름" 표를 따라 사람이 GUI를 진행하고, 각 화면을
