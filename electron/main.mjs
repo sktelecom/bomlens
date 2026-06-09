@@ -14,12 +14,16 @@ import {
   pullImage,
   UiContainer,
 } from "./lib/container.mjs";
+import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 let container = null;
 let mainWindow = null;
 let appOrigin = "file://";
+// 시작 화면 언어: app.getLocale()로 결정(앱 준비 이후에 확정). 그 전 안전한 기본은 영어.
+let lang = "en";
+let t = mainMessages("en");
 
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -58,39 +62,41 @@ async function createWindow() {
       sandbox: false, // ESM preload 사용
     },
   });
-  await mainWindow.loadFile(path.join(here, "assets", "status.html"));
+  await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
+    query: { lang },
+  });
 }
 
 async function startup() {
-  status("Docker 상태를 확인하는 중...");
+  status(t.dockerChecking);
   const docker = await dockerStatus();
   if (!docker.installed || !docker.running) {
     appOrigin = "file://";
     const reason = !docker.installed ? "not-installed" : "not-running";
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-      query: { reason },
+      query: { reason, lang },
     });
     return;
   }
 
   if (!(await imagePresent(DEFAULT_IMAGE))) {
-    status(`처음 실행이라 스캐너 이미지를 내려받습니다 (약 3~4GB).`);
-    status(`이미지: ${DEFAULT_IMAGE}`);
-    status(`네트워크 상황에 따라 수 분 걸릴 수 있어요...`);
+    status(t.firstPull);
+    status(t.image(DEFAULT_IMAGE));
+    status(t.network);
     const ok = await pullImage(DEFAULT_IMAGE, (line) => status(line));
     if (!ok) {
-      status("이미지 다운로드에 실패했습니다. 인터넷 연결을 확인하고 앱을 다시 실행하세요.");
+      status(t.pullFailed);
       return;
     }
   }
 
-  status("UI 컨테이너를 시작하는 중...");
+  status(t.startingUi);
   const port = await findFreePort();
   container = new UiContainer({ image: DEFAULT_IMAGE, hostPort: port });
   await container.start({ timeoutMs: 90000 });
 
   appOrigin = `http://127.0.0.1:${port}`;
-  status("준비 완료. UI를 엽니다.");
+  status(t.ready);
   await mainWindow.loadURL(appOrigin);
 }
 
@@ -106,6 +112,9 @@ function shutdown() {
 }
 
 app.whenReady().then(async () => {
+  // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
+  lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
+  t = mainMessages(lang);
   app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
   // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -121,7 +130,7 @@ app.whenReady().then(async () => {
 
   await createWindow();
   startup().catch((err) => {
-    status(`시작에 실패했습니다: ${err.message}`);
+    status(t.startFailed(err.message));
   });
 });
 
