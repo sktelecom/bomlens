@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.1] - 2026-06-09
+
+### Added
+
+- Desktop startup screen is now bilingual: it follows the system locale (Korean on Korean systems, English elsewhere) and falls back to English, matching the web UI. The `SBOM_LANG` environment variable forces a language (`SBOM_LANG=en` or `ko`).
+
+### Changed
+
+- The main `README.md` is unified to English, with English UI screenshots. The Korean documentation table and Korean guides are kept for Korean users; the Korean screenshots stay with the Korean docs.
+
 ## [v1.1.0] - 2026-06-02
 
 ### Added
@@ -56,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.1.1...HEAD
+[v1.1.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.0.0
