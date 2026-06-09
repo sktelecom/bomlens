@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>SBOM Generator</title>
@@ -54,10 +54,20 @@
   <body>
     <header>
       <h1>SBOM Generator</h1>
-      <p>준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.</p>
+      <p id="subtitle"></p>
     </header>
     <div id="log" aria-live="polite"></div>
     <script>
+      // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
+      const lang =
+        new URLSearchParams(location.search).get("lang") === "ko" ? "ko" : "en";
+      document.documentElement.lang = lang;
+      const SUBTITLE = {
+        ko: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
+        en: "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
+      };
+      document.getElementById("subtitle").textContent = SUBTITLE[lang];
+
       const log = document.getElementById("log");
       function add(line) {
         const prev = log.querySelector(".latest");
