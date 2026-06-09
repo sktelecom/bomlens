@@ -9,6 +9,12 @@ export function pickLang(locale = "en") {
   return String(locale).toLowerCase().startsWith("ko") ? "ko" : "en";
 }
 
+// 언어 결정: SBOM_LANG 환경변수가 있으면 우선(사용자가 언어를 강제하거나 스크린샷을 찍을 때),
+// 없으면 시스템 로캘. 둘 다 지원 언어로 환원한다.
+export function resolveLang(envLang, sysLocale) {
+  return pickLang(envLang || sysLocale || "en");
+}
+
 // 메인 프로세스(main.mjs)가 status()로 흘리는 문구. 일부는 값이 끼어들어 함수로 둔다.
 const MAIN = {
   ko: {

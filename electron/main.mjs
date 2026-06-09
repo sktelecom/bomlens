@@ -14,7 +14,7 @@ import {
   pullImage,
   UiContainer,
 } from "./lib/container.mjs";
-import { mainMessages, pickLang } from "./lib/i18n.mjs";
+import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -112,8 +112,8 @@ function shutdown() {
 }
 
 app.whenReady().then(async () => {
-  // 시스템 로캘로 시작 화면 언어 확정(한국어면 ko, 아니면 en).
-  lang = pickLang(app.getLocale());
+  // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
+  lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
   t = mainMessages(lang);
   app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
   // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
