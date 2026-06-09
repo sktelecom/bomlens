@@ -8,18 +8,18 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
 
-> **Windows에서 명령줄 없이 시작하려면** [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md)부터 보세요. 더블클릭 데스크톱 앱이나 ZIP 하나로 오픈소스 고지문과 SBOM을 만듭니다. Docker 엔진은 필요하며, 무료 [Rancher Desktop](https://rancherdesktop.io/)을 권장합니다.
+> **No command line on Windows?** Start with the [quick start for license managers](docs/notice-quickstart.md). A double-click desktop app or a single ZIP produces the open-source notice and the SBOM. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) is recommended.
 
 One Docker image, two jobs:
 
-- **Generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice (고지문), and a security report.
+- **Generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice, and a security report.
 - **Assess open-source risk** — analyze what you *receive*, including a supplier's finished SBOM or a firmware binary, and produce an open-source risk report (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines).
 
 Every scan also emits the risk report by default. Run it from the CLI or a browser UI. Originally built by SK Telecom for supply-chain security, now open source.
 
 Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware.
 
-![SBOM Generator web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui.png)
+![SBOM Generator web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ No git installed? Download the repo as a ZIP from the GitHub page (the green Cod
 
 Launch, scan, and download — all in the browser. Live logs stream as it runs.
 
-![SBOM Generator web UI — a scan in progress with live logs](docs/images/web-ui-scan.png)
+![SBOM Generator web UI — a scan in progress with live logs](docs/images/web-ui-scan-en.png)
 
 ```bash
 cd ~/sbom-output     # any folder — this is where results are saved
@@ -62,7 +62,7 @@ The [getting-started guide](docs/getting-started.md) covers this in more detail 
 
 Prefer a real app over a `.bat`? A desktop app wraps this same flow with no console window — it checks Docker, pulls the image, and opens the UI on double-click. Download `SBOM-Generator-*.exe` (or `.dmg`) from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest). It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. Build details are in [`electron/`](electron/README.md).
 
-![SBOM Generator desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup.png)
+![SBOM Generator desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup-en.png)
 
 ### CLI
 
@@ -79,7 +79,7 @@ Prefer a real app over a `.bat`? A desktop app wraps this same flow with no cons
 
 On Windows, run the same commands through `scripts\scan-sbom.bat`, which forwards them to the script via Git Bash (Git for Windows required).
 
-Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}` (고지문), `risk-report.{md,html}` (위험분석, default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
+Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
 
 ## Documentation
 
