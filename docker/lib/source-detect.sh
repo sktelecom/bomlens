@@ -16,6 +16,11 @@ CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen langua
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
 ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/sbom-scanner-android-sdk}"
 ANDROID_API_DEFAULT="${ANDROID_API_DEFAULT:-34}"
+# cdxgen does not resolve dependency licenses by default, leaving the SBOM (and
+# the NOTICE derived from it) without license data. FETCH_LICENSE=true makes
+# cdxgen look up each component's license. On by default; set FETCH_LICENSE=false
+# to skip the extra network lookups for a faster, license-sparse scan.
+FETCH_LICENSE="${FETCH_LICENSE:-true}"
 
 detect_lang() {
     local d="$1" langs=""

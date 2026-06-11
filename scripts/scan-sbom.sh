@@ -371,6 +371,7 @@ if [ "$MODE" = "SOURCE" ]; then
         $CACHE_MOUNTS \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+        -e FETCH_LICENSE="$FETCH_LICENSE" \
         --entrypoint sh "\"$CDX_IMG\"" \
         -c "'sh /tmp/build-prep.sh /app \"/app/$OUTPUT_FILE\" 1.6'" \
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }

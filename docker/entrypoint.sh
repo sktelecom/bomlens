@@ -79,6 +79,7 @@ generate_sbom_cdxgen() {
         -v "$src_host":/app \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+        -e FETCH_LICENSE="$FETCH_LICENSE" \
         --entrypoint sh "$img" \
         -c "$prep" _ /app "/app/$out" 1.6 || rc=$?
     [ "$rc" -eq 0 ] || { echo "[WARN] cdxgen sibling container failed (rc=$rc)."; return 1; }
