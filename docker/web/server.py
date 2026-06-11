@@ -113,6 +113,23 @@ def list_results():
     return out
 
 
+# Row caps so a huge SBOM/scan can't bloat the SSE 'done' payload. The counts
+# (sbom.components, severity totals) stay exact; only the detail lists are capped.
+MAX_COMPONENT_ROWS = 2000
+MAX_VULN_ROWS = 2000
+
+
+def _component_licenses(c):
+    """SPDX ids / names / expressions for one CycloneDX component (notice parity)."""
+    out = []
+    for lic in (c.get("licenses") or []):
+        node = lic.get("license") or {}
+        val = node.get("id") or node.get("name") or lic.get("expression")
+        if val:
+            out.append(val)
+    return out
+
+
 def security_summary(project, version):
     prefix = "%s_%s" % (safe_name(project), safe_name(version))
     p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
@@ -124,11 +141,24 @@ def security_summary(project, version):
     except (OSError, json.JSONDecodeError):
         return None
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+    vulns = []
     for r in (data.get("Results") or []):
         for v in (r.get("Vulnerabilities") or []):
             s = (v.get("Severity") or "UNKNOWN").upper()
-            sev[s] = sev.get(s, 0) + 1
+            if s not in sev:
+                s = "UNKNOWN"
+            sev[s] += 1
+            if len(vulns) < MAX_VULN_ROWS:
+                vulns.append({
+                    "id": v.get("VulnerabilityID") or "",
+                    "severity": s,
+                    "pkg": v.get("PkgName") or "",
+                    "installed": v.get("InstalledVersion") or "",
+                    "fixed": v.get("FixedVersion") or "",
+                    "title": v.get("Title") or "",
+                })
     sev["TOTAL"] = sum(sev.values())
+    sev["vulnerabilities"] = vulns
     return sev
 
 
@@ -142,7 +172,22 @@ def sbom_summary(project, version):
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    return {"components": len(data.get("components") or [])}
+    comps = data.get("components") or []
+    rows = []
+    for c in comps[:MAX_COMPONENT_ROWS]:
+        rows.append({
+            "name": c.get("name") or "",
+            "version": c.get("version") or "",
+            "group": c.get("group") or "",
+            "purl": c.get("purl") or "",
+            "type": c.get("type") or "",
+            "licenses": _component_licenses(c),
+        })
+    return {
+        "components": len(comps),
+        "componentList": rows,
+        "truncated": len(comps) > MAX_COMPONENT_ROWS,
+    }
 
 
 def conformance_summary(project, version):
