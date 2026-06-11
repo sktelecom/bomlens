@@ -234,6 +234,20 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 
 우측 상단의 한국어 / EN 토글로 표시 언어를 바꿀 수 있습니다.
 
+### 결과 화면
+
+스캔이 끝나면 결과 카드에 요약과 결과물이 함께 나타납니다. 결과물은 종류별로 묶여 제목과 설명이 붙고, 포맷(HTML/Markdown/JSON)별 칩으로 내려받거나 전체를 ZIP 하나로 받을 수 있습니다. 위험분석 보고서는 맨 위에 강조됩니다.
+
+![결과 화면 — 종류별 결과물 카드, 포맷 칩, 전체 ZIP 다운로드](images/app-results.png)
+
+컴포넌트 탭에서는 검출된 구성요소를 이름, 버전, 타입, 라이선스로 살펴보고 검색할 수 있습니다.
+
+![컴포넌트 탭 — 검출된 구성요소 목록과 검색](images/web-ui-components.png)
+
+취약점 탭에서는 심각도 분포와 CVE 상세(설치 버전과 수정 버전 포함)를 확인합니다.
+
+![취약점 탭 — 심각도 배지와 CVE 상세 표](images/web-ui-vulns.png)
+
 > SBOM 업로드(ANALYZE)를 선택하면 위험분석을 위해 고지문과 보안이 자동 활성화됩니다.
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`

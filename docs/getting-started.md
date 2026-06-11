@@ -140,7 +140,9 @@ Windows에서는(Rancher Desktop/Docker Desktop) `scripts\sbom-ui.bat`를 더블
 
 ### 결과 확인
 
-완료되면 화면에 컴포넌트 수와 취약점 심각도(공급사 SBOM이면 적합성도)가 카드로 뜨고, 표에서 SBOM, 오픈소스 고지문, 오픈소스 위험분석 보고서, 보안 보고서를 바로 열거나 내려받을 수 있습니다.
+완료되면 화면에 컴포넌트 수와 취약점 심각도(공급사 SBOM이면 적합성도)가 카드로 뜨고, 결과물에서 SBOM, 오픈소스 고지문, 오픈소스 위험분석 보고서, 보안 보고서를 바로 열거나 내려받을 수 있습니다. 결과물은 종류별 카드로 묶여 포맷(HTML/Markdown/JSON)별로 받거나 전체를 ZIP 하나로 받을 수 있습니다.
+
+![결과 화면 — 종류별 결과물 카드와 전체 ZIP 다운로드](images/app-results.png)
 
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
