@@ -47,7 +47,7 @@ def normalize($s):
   elif ($n | test("general public.*3")) then "GPL-3.0-only"
   elif ($n | test(" or | and ")) then $s
   elif ($n | test("apache.*2")) then "Apache-2.0"
-  elif ($n | test("mit license") or $n == "mit") then "MIT"
+  elif ($n | test("mit license") or $n == "mit" or ($n | test("expat"))) then "MIT"
   elif ($n | test("eclipse distribution") or ($n|test("^edl "))) then "BSD-3-Clause"
   elif ($n | test("eclipse public.*2")) then "EPL-2.0"
   elif ($n | test("eclipse public.*1")) then "EPL-1.0"
@@ -80,11 +80,15 @@ TOTAL_COMP=$(jq '[.components[]?] | length' "$SBOM")
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Used licenses that have a bundled SPDX full text.
-LICENSES_WITH_TEXT=""
-for lic in $(echo "$LICENSE_MAP" | jq -r '.[].license'); do
-    [ -f "$LICENSE_DIR/$lic.txt" ] && LICENSES_WITH_TEXT="$LICENSES_WITH_TEXT $lic"
-done
+# Used licenses that have a bundled SPDX full text. Read one license per line
+# (IFS=newline) so a compound expression like "Apache-2.0 OR BSD-2-Clause" is
+# matched whole — it has no bundled .txt, so it is skipped — instead of being
+# word-split into "Apache-2.0"/"BSD-2-Clause" and appending those texts a second
+# time. group_by already made the licenses unique, so each text appears once.
+LICENSES_WITH_TEXT=$(echo "$LICENSE_MAP" | jq -r '.[].license' | while IFS= read -r lic; do
+    [ -f "$LICENSE_DIR/$lic.txt" ] && printf '%s\n' "$lic"
+    :  # keep the loop's exit status 0 (set -e) when the last license has no text
+done)
 
 # ---------- TEXT ----------
 {

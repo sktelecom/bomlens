@@ -25,6 +25,12 @@ fi
 
 TMP="$(mktemp)"
 
+# Always: coerce a missing/null components field to an empty array. cdxgen emits
+# components:null when it cannot resolve any component (e.g. a swift tree with no
+# Package.resolved), which is spec-invalid — CycloneDX requires components to be an
+# array. Apply this first so every later step receives an array.
+NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
+
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
@@ -41,10 +47,15 @@ if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
     # inside metadata annotations — normalize that to keep output byte-stable.
+    # cdxgen further leaks the random name of the temp virtualenv it builds to
+    # resolve python deps (cdxgen-venv-XXXXXX) into component evidence values, so
+    # the same input yields a different byte stream each run; pin that suffix too.
     jq -S "
-        ${PURL_FIX}
+        ${NULL_FIX}
+        | ${PURL_FIX}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
+        | walk(if type==\"string\" then gsub(\"cdxgen-venv-[A-Za-z0-9]+\"; \"cdxgen-venv\") else . end)
         | (if (.annotations|type)==\"array\" then
               .annotations |= map(if (.text|type)==\"string\"
                   then .text |= gsub(\"created on [A-Za-z0-9, :]+ with cdxgen\"; \"created on (normalized) with cdxgen\")
@@ -53,7 +64,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S "${PURL_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S "${NULL_FIX} | ${PURL_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
