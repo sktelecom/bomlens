@@ -15,7 +15,7 @@
 
 # ---- Stage 1: build the React SPA (Vite). node lives ONLY in this stage; the
 #      runtime image copies just the static dist/, so it stays lightweight. ----
-FROM node:26-alpine AS web
+FROM node:26-alpine@sha256:3ad34ca6292aec4a91d8ddeb9229e29d9c2f689efd0dd242860889ac71842eba AS web
 WORKDIR /web
 COPY web/frontend/package.json web/frontend/package-lock.json* ./
 RUN npm ci || npm install
@@ -25,7 +25,7 @@ RUN npm run build
 # ---- Stage 2: post-process runtime ----
 # python 3.12: the base only needs stdlib (web server.py), but the opt-in scancode/
 # firmware tools (pinned) do not yet support newer Python, so we stay on 3.12.
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:a39549e211a16149edf74e5fdc9ef03a6767e46cd987c5048b6659b6c9904c94
 
 LABEL org.opencontainers.image.title="SBOM Generator (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
