@@ -34,7 +34,7 @@ if ! docker image inspect "$SCANNER_IMG" >/dev/null 2>&1; then
 fi
 
 # Example dirs that represent a buildable source project (docker/ is image-only).
-ALL_PROJECTS=(java-maven java-gradle nodejs python go ruby php rust dotnet)
+ALL_PROJECTS=(java-maven java-gradle nodejs python go ruby php rust dotnet swift)
 if [ -n "${ONLY:-}" ]; then read -r -a PROJECTS <<< "$ONLY"; else PROJECTS=("${ALL_PROJECTS[@]}"); fi
 
 echo "=================================================="
@@ -55,8 +55,12 @@ for proj in "${PROJECTS[@]}"; do
     rc=$?
 
     bom="$w/${proj}_1.0_bom.json"
-    if [ "$rc" -eq 0 ] && [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX"' "$bom" >/dev/null 2>&1; then
-        pass "$proj: valid CycloneDX SBOM"
+    # Assert the BOM is CycloneDX, carries the input project name (not cdxgen's
+    # source coords or a temp path), and has an array components (not null).
+    if [ "$rc" -eq 0 ] && [ -f "$bom" ] && jq -e --arg p "$proj" \
+        '.bomFormat=="CycloneDX" and .metadata.component.name==$p and (.components|type)=="array"' \
+        "$bom" >/dev/null 2>&1; then
+        pass "$proj: valid CycloneDX SBOM (name + array components)"
         ncomp=$(jq '[.components[]?]|length' "$bom" 2>/dev/null || echo 0)
         if [ "${ncomp:-0}" -gt 0 ]; then
             pass "$proj: SBOM has components ($ncomp)"
