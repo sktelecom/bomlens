@@ -7,6 +7,7 @@
 #   GET  /                -> index.html (React SPA)
 #   GET  /capabilities    -> {firmware, docker}: which input types are usable here
 #   GET  /results         -> JSON list of generated artifacts
+#   GET  /download-all    -> zip of every generated artifact
 #   GET  /file?name=...   -> serve one artifact (path-traversal guarded)
 #   POST /upload?kind=... -> store an uploaded file, return a {token}
 #   GET  /scan-stream?... -> Server-Sent Events: live scan log + final summary
@@ -18,6 +19,7 @@
 #   sbom-upload   -> MODE=ANALYZE on the uploaded SBOM
 #   firmware-upload -> MODE=FIRMWARE (only when unblob is present in this image)
 #   docker-image  -> MODE=IMAGE on <target>
+import io
 import json
 import os
 import re
@@ -356,6 +358,8 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         if path == "/results":
             self._send(200, json.dumps(list_results()))
+        elif path == "/download-all":
+            self._download_all()
         elif path == "/capabilities":
             self._send(200, json.dumps({
                 "firmware": firmware_capable(),
@@ -480,6 +484,47 @@ class Handler(BaseHTTPRequestHandler):
             ctype = "text/plain; charset=utf-8"
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype)
+
+    def _download_all(self):
+        """Bundle every generated artifact into one in-memory zip.
+
+        Artifacts are reports/JSON and stay small, so building the zip in a
+        BytesIO and sending it with a fixed Content-Length fits the server's
+        close-terminated model (no chunked transfer). Only files already
+        whitelisted by list_results() are added — no new path is exposed.
+        """
+        files = list_results()
+        if not files:
+            self._send(404, json.dumps({"error": "no artifacts to download"}))
+            return
+
+        # Zip name from the shared "{project}_{version}" prefix; fall back to a
+        # generic name if the artifacts don't share one.
+        first = files[0]["name"]
+        prefix = first
+        for suf in ARTIFACT_SUFFIXES:
+            if first.endswith(suf):
+                prefix = first[: -len(suf)]
+                break
+        prefix = prefix.strip("._")
+        zip_name = (prefix + "_sbom-artifacts.zip") if prefix else "sbom-artifacts.zip"
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in files:
+                path = safe_output_path(f["name"])
+                if path and os.path.isfile(path):
+                    zf.write(path, arcname=f["name"])
+        body = buf.getvalue()
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header(
+            "Content-Disposition", 'attachment; filename="%s"' % zip_name
+        )
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     # ---- scan stream (SSE) ----
     def _scan_stream(self, qs):

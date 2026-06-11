@@ -175,6 +175,16 @@ export function fileUrl(name: string): string {
   return `/file?name=${encodeURIComponent(name)}`;
 }
 
+/** Absolute artifact URL (origin + path) — for the "copy link" action. */
+export function absoluteFileUrl(name: string): string {
+  return new URL(fileUrl(name), window.location.origin).toString();
+}
+
+/** URL that streams every generated artifact as a single zip. */
+export function downloadAllUrl(): string {
+  return "/download-all";
+}
+
 export async function listResults(): Promise<ResultFile[]> {
   try {
     const res = await fetch("/results");

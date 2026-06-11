@@ -1,54 +1,160 @@
-import {
-  BadgeCheck,
-  Download,
-  Eye,
-  FileJson,
-  FileSignature,
-  FileText,
-  ScrollText,
-  ShieldAlert,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { Download, Eye, FileSignature, Link2, Package } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { fileUrl, type ResultFile } from "@/lib/api";
+import {
+  absoluteFileUrl,
+  downloadAllUrl,
+  fileUrl,
+  type ResultFile,
+} from "@/lib/api";
+import {
+  formatLabel,
+  groupArtifacts,
+  type ArtifactFormat,
+  type LogicalArtifact,
+} from "@/lib/artifacts";
+import { useToast } from "@/lib/toast";
 import { formatBytes } from "@/lib/utils";
 
 import { FileViewer } from "./FileViewer";
 
-function kindOf(name: string): {
-  label: string;
-  Icon: LucideIcon;
-  highlight?: boolean;
-} {
-  if (name.endsWith("_bom.json")) return { label: "SBOM", Icon: FileJson };
-  if (name.endsWith(".sig")) return { label: "Signature", Icon: FileSignature };
-  if (name.includes("_risk-report"))
-    return { label: "Risk report", Icon: ShieldAlert, highlight: true };
-  if (name.includes("_conformance")) return { label: "Conformance", Icon: BadgeCheck };
-  if (name.includes("_NOTICE")) return { label: "Notice", Icon: ScrollText };
-  if (name.includes("_security")) return { label: "Security", Icon: ShieldCheck };
-  if (name.includes("_scancode")) return { label: "License", Icon: FileText };
-  return { label: "File", Icon: FileText };
+/** Filename shared by an artifact's formats, with the format extension dropped. */
+function baseName(formats: ArtifactFormat[]): string {
+  const first = formats[0]?.name ?? "";
+  const i = first.lastIndexOf(".");
+  return i > 0 ? first.slice(0, i) : first;
 }
 
-// Headline deliverables float to the top of the artifact list.
-const RANK = (n: string) =>
-  n.includes("_risk-report") ? 0
-  : n.endsWith("_bom.json") ? 1
-  : n.includes("_NOTICE") ? 2
-  : n.includes("_conformance") ? 3
-  : 4;
+/** Richest viewable format for the inline viewer (HTML first). */
+function preferredView(formats: ArtifactFormat[]): string | null {
+  const html = formats.find((f) => f.ext === "html" && f.viewable);
+  return (html ?? formats.find((f) => f.viewable))?.name ?? null;
+}
 
-const viewable = (n: string) =>
-  /\.(html|json|txt|md)$/.test(n) && !n.endsWith(".sig");
+function DownloadChip({
+  fmt,
+  onDownload,
+}: {
+  fmt: ArtifactFormat;
+  onDownload: () => void;
+}) {
+  return (
+    <Button variant="outline" size="sm" asChild>
+      <a href={fileUrl(fmt.name)} download={fmt.name} onClick={onDownload}>
+        <Download className="h-3.5 w-3.5" />
+        {formatLabel(fmt.ext)}
+        <span className="font-normal text-muted-foreground">
+          {formatBytes(fmt.size)}
+        </span>
+      </a>
+    </Button>
+  );
+}
+
+function ArtifactCard({
+  artifact,
+  onView,
+}: {
+  artifact: LogicalArtifact;
+  onView: (name: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const { Icon, primary, formats, signature } = artifact;
+  const view = preferredView(formats);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(absoluteFileUrl(formats[0].name));
+      toast(t("result.copied"));
+    } catch {
+      /* clipboard blocked (insecure context) — silently ignore */
+    }
+  };
+
+  return (
+    <div
+      className={
+        "rounded-lg border bg-card p-4 transition-all duration-fast ease-out-soft hover:bg-accent/40 hover:shadow-md" +
+        (primary ? " border-primary/60 ring-1 ring-primary/30" : "")
+      }
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={
+            "flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground" +
+            (primary ? " h-11 w-11" : " h-9 w-9")
+          }
+        >
+          <Icon className={primary ? "h-5 w-5" : "h-4 w-4"} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={primary ? "font-semibold" : "text-sm font-medium"}>
+              {t(artifact.titleKey)}
+            </span>
+            {signature && (
+              <Badge tone="success" className="gap-1">
+                <FileSignature className="h-3 w-3" />
+                {t("result.signed")}
+              </Badge>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {t(artifact.descKey)}
+          </p>
+          <span className="mt-1 block truncate font-mono text-xs text-muted-foreground/80">
+            {baseName(formats)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {formats.map((fmt) => (
+          <DownloadChip
+            key={fmt.name}
+            fmt={fmt}
+            onDownload={() => toast(t("result.downloadStarted"))}
+          />
+        ))}
+        {signature && (
+          <DownloadChip
+            fmt={{
+              ext: "sig",
+              name: signature.name,
+              size: signature.size,
+              viewable: false,
+            }}
+            onDownload={() => toast(t("result.downloadStarted"))}
+          />
+        )}
+        <div className="flex-1" />
+        {view && (
+          <Button variant="ghost" size="sm" onClick={() => onView(view)}>
+            <Eye className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("result.view")}</span>
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={copyLink}
+          aria-label={t("result.copyLink")}
+        >
+          <Link2 className="h-4 w-4" />
+          <span className="hidden sm:inline">{t("result.copyLink")}</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function ResultsList({ results }: { results: ResultFile[] }) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [view, setView] = useState<string | null>(null);
 
   if (results.length === 0) {
@@ -57,48 +163,33 @@ export function ResultsList({ results }: { results: ResultFile[] }) {
     );
   }
 
-  const sorted = [...results].sort((a, b) => RANK(a.name) - RANK(b.name));
+  const artifacts = groupArtifacts(results);
+  const totalBytes = results.reduce((sum, r) => sum + r.size, 0);
 
   return (
-    <div className="space-y-2">
-      {sorted.map((f) => {
-        const { label, Icon, highlight } = kindOf(f.name);
-        return (
-          <div
-            key={f.name}
-            className={
-              "flex items-center gap-3 rounded-md border bg-card px-3 py-2.5 transition-colors duration-fast ease-out-soft hover:bg-accent/50" +
-              (highlight ? " border-primary/60 ring-1 ring-primary/30" : "")
-            }
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Icon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate font-mono text-xs">{f.name}</span>
-                <Badge variant="muted" className="shrink-0">
-                  {label}
-                </Badge>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {formatBytes(f.size)}
-              </span>
-            </div>
-            {viewable(f.name) && (
-              <Button variant="ghost" size="sm" onClick={() => setView(f.name)}>
-                <Eye className="h-4 w-4" />
-                <span className="hidden sm:inline">{t("result.view")}</span>
-              </Button>
-            )}
-            <Button variant="outline" size="sm" asChild aria-label={t("result.download")}>
-              <a href={fileUrl(f.name)} download={f.name}>
-                <Download className="h-4 w-4" />
-              </a>
-            </Button>
-          </div>
-        );
-      })}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Package className="h-4 w-4" />
+          {t("result.artifactCount", {
+            count: results.length,
+            size: formatBytes(totalBytes),
+          })}
+        </div>
+        <Button asChild onClick={() => toast(t("result.downloadStarted"))}>
+          <a href={downloadAllUrl()} download>
+            <Download className="h-4 w-4" />
+            {t("result.downloadAll")}
+          </a>
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        {artifacts.map((a) => (
+          <ArtifactCard key={a.key} artifact={a} onView={setView} />
+        ))}
+      </div>
+
       <FileViewer name={view} onClose={() => setView(null)} />
     </div>
   );

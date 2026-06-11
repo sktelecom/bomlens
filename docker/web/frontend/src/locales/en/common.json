@@ -58,6 +58,42 @@
     "noVulns": "No vulnerabilities found",
     "artifacts": "Generated artifacts",
     "artifactsEmpty": "No artifacts were generated.",
+    "artifactCount": "{{count}} artifacts · {{size}}",
+    "downloadAll": "Download all (ZIP)",
+    "copyLink": "Copy link",
+    "copied": "Link copied",
+    "downloadStarted": "Download started",
+    "signed": "Signed",
+    "kind": {
+      "riskReport": {
+        "title": "Open-source risk report",
+        "desc": "Consolidated supply-chain risk analysis across licenses and vulnerabilities."
+      },
+      "sbom": {
+        "title": "SBOM (CycloneDX)",
+        "desc": "The normalized software bill of materials in CycloneDX JSON."
+      },
+      "notice": {
+        "title": "Open-source notice",
+        "desc": "License notices and attributions for the bundled components."
+      },
+      "conformance": {
+        "title": "Conformance report",
+        "desc": "Format validation of the submitted SBOM."
+      },
+      "security": {
+        "title": "Security report",
+        "desc": "Known vulnerabilities (CVE) found in the components."
+      },
+      "license": {
+        "title": "Deep license analysis",
+        "desc": "ScanCode deep license detection results."
+      },
+      "signature": {
+        "title": "SBOM signature",
+        "desc": "Cosign signature for verifying the SBOM."
+      }
+    },
     "download": "Download",
     "view": "View",
     "conformance": "Conformance",

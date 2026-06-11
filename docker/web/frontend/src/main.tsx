@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./lib/i18n";
+import { ToastProvider } from "./lib/toast";
 
 // Theme: restore saved preference, else follow OS. Applied before paint so
 // there is no light→dark flash.
@@ -16,6 +17,8 @@ document.documentElement.classList.toggle(
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>,
 );
