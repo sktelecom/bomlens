@@ -124,6 +124,21 @@ find_bom_file() {
     return 1
 }
 
+# Assert a generated SBOM is well-formed: CycloneDX, the root component carries
+# the input project name (not cdxgen's source coords or a temp path), and
+# components is an array (not null). Guards the verification-report defects
+# B-2/B-3 end-to-end. Returns non-zero on any violation.
+assert_bom_sane() {
+    local file=$1
+    local project=$2
+    [ -f "$file" ] || return 1
+    jq -e --arg p "$project" \
+        '.bomFormat == "CycloneDX"
+         and (.metadata.component.name == $p)
+         and ((.components | type) == "array")' \
+        "$file" >/dev/null 2>&1
+}
+
 # Run scan with logging function
 run_scan_with_logs() {
     local test_name=$1
@@ -269,7 +284,7 @@ echo ""
 # ========================================================
 # Test 1: Node.js project
 # ========================================================
-print_test "Test 1/11: Node.js project (npm)"
+print_test "Test 1/12: Node.js project (npm)"
 
 mkdir -p node-project
 cd node-project || true
@@ -315,7 +330,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 2: Python project
 # ========================================================
-print_test "Test 2/11: Python project (pip)"
+print_test "Test 2/12: Python project (pip)"
 
 mkdir -p python-project
 cd python-project || true
@@ -353,7 +368,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 3: Java Maven project
 # ========================================================
-print_test "Test 3/11: Java Maven project"
+print_test "Test 3/12: Java Maven project"
 
 mkdir -p java-maven-project
 cd java-maven-project || true
@@ -403,7 +418,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 4: Ruby project
 # ========================================================
-print_test "Test 4/11: Ruby project (Bundler)"
+print_test "Test 4/12: Ruby project (Bundler)"
 
 mkdir -p ruby-project
 cd ruby-project || true
@@ -442,7 +457,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 5: PHP project
 # ========================================================
-print_test "Test 5/11: PHP project (Composer)"
+print_test "Test 5/12: PHP project (Composer)"
 
 mkdir -p php-project
 cd php-project || true
@@ -484,7 +499,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 6: Rust project
 # ========================================================
-print_test "Test 6/11: Rust project (Cargo)"
+print_test "Test 6/12: Rust project (Cargo)"
 
 mkdir -p rust-project
 cd rust-project || true
@@ -527,7 +542,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 7: Docker image analysis
 # ========================================================
-print_test "Test 7/11: Docker image analysis"
+print_test "Test 7/12: Docker image analysis"
 
 # Pull alpine image if network available
 if docker pull alpine:latest > /dev/null 2>&1; then
@@ -562,7 +577,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 8: Binary file analysis
 # ========================================================
-print_test "Test 8/11: Binary file analysis"
+print_test "Test 8/12: Binary file analysis"
 
 mkdir -p binary-test
 cd binary-test || true
@@ -592,7 +607,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 9: RootFS directory analysis
 # ========================================================
-print_test "Test 9/11: RootFS directory analysis"
+print_test "Test 9/12: RootFS directory analysis"
 
 mkdir -p rootfs-test/usr/bin
 cd rootfs-test || true
@@ -620,7 +635,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 10: Example projects validation
 # ========================================================
-print_test "Test 10/11: Example project validation"
+print_test "Test 10/12: Example project validation"
 
 EXAMPLE_PASSED=0
 EXAMPLE_TOTAL=0
@@ -655,7 +670,7 @@ cd "$TEST_DIR" || true
 # Test 11: ZIP archive ingestion (auto-extract -> source scan)
 # Exercises native archive ingestion + risk-report (default-on, all modes).
 # ========================================================
-print_test "Test 11/11: ZIP archive ingestion"
+print_test "Test 11/12: ZIP archive ingestion"
 
 if ! command -v zip > /dev/null 2>&1; then
     print_error "ZIP ingestion (zip command unavailable)"
@@ -684,6 +699,47 @@ EOF
     fi
     cd "$TEST_DIR" || true
 fi
+
+# ========================================================
+# Test 12: Python --byte-stable reproducibility + metadata/array sanity
+# Two scans of the same input must be byte-identical (B-1; python is the
+# language that builds a temp venv whose random name used to leak), and the
+# stamped SBOM must carry the input project name with an array components (B-2/B-3).
+# ========================================================
+print_test "Test 12/12: Python --byte-stable reproducibility"
+
+mkdir -p bytestable-project
+cd bytestable-project || true
+cat > requirements.txt <<'EOF'
+flask==3.0.0
+click==8.1.7
+EOF
+
+bs_ok=true
+if run_scan_with_logs "test-bytestable-1" "ByteStable" "1.0.0" "--byte-stable"; then
+    if F1=$(find_bom_file "ByteStable" "1.0.0"); then cp "$F1" "$TEST_DIR/bs1.json"; else bs_ok=false; fi
+else
+    bs_ok=false
+fi
+rm -f ./*_bom.json
+if run_scan_with_logs "test-bytestable-2" "ByteStable" "1.0.0" "--byte-stable"; then
+    if F2=$(find_bom_file "ByteStable" "1.0.0"); then cp "$F2" "$TEST_DIR/bs2.json"; else bs_ok=false; fi
+else
+    bs_ok=false
+fi
+
+if [ "$bs_ok" = true ] \
+   && diff -q "$TEST_DIR/bs1.json" "$TEST_DIR/bs2.json" >/dev/null 2>&1 \
+   && assert_bom_sane "$TEST_DIR/bs2.json" "ByteStable"; then
+    print_success "Python --byte-stable (two scans byte-identical, metadata sane)"
+    ((PASSED++))
+else
+    print_error "Python --byte-stable (non-reproducible or metadata/components invalid)"
+    show_failure_log "test-bytestable-2"
+    ((FAILED++))
+fi
+
+cd "$TEST_DIR" || true
 
 # ========================================================
 # Summary
