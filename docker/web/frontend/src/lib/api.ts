@@ -13,8 +13,21 @@ export interface ResultFile {
   size: number;
 }
 
+export interface ComponentItem {
+  name: string;
+  version: string;
+  group: string;
+  purl: string;
+  type: string;
+  licenses: string[];
+}
+
 export interface SbomSummary {
   components: number;
+  /** Per-component detail rows (capped server-side; see `truncated`). */
+  componentList?: ComponentItem[];
+  /** True when the SBOM has more components than the server returned. */
+  truncated?: boolean;
 }
 
 export const SEVERITY_ORDER = [
@@ -26,7 +39,20 @@ export const SEVERITY_ORDER = [
 ] as const;
 export type Severity = (typeof SEVERITY_ORDER)[number];
 
-export type SecuritySummary = Record<Severity, number> & { TOTAL: number };
+export interface VulnItem {
+  id: string;
+  severity: Severity;
+  pkg: string;
+  installed: string;
+  fixed: string;
+  title: string;
+}
+
+/** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */
+export type SecuritySummary = Record<Severity, number> & {
+  TOTAL: number;
+  vulnerabilities?: VulnItem[];
+};
 
 export interface ConformanceSummary {
   result: string; // "pass" | "fail" | "unknown"
