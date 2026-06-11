@@ -48,12 +48,14 @@ if [ -f Gemfile ] && [ ! -f Gemfile.lock ] && command -v bundle >/dev/null 2>&1;
     bundle lock 2>/dev/null || bundle install 2>/dev/null
 fi
 
-# Maven — resolve when no reactor output present (cdxgen usually handles pom.xml,
-# this is a light safety net)
-if [ -f pom.xml ] && command -v mvn >/dev/null 2>&1; then
-    log "mvn dependency:resolve"
-    mvn -q -o dependency:resolve 2>/dev/null || mvn -q dependency:resolve 2>/dev/null
-fi
+# Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
+# the cyclonedx plugin) to build the full transitive graph, so a separate
+# `mvn dependency:resolve` here is redundant. It also failed noisily: the run is
+# pinned to -Dmaven.repo.local=/tmp/sbomhome/.m2 (an empty repo), so maven could
+# not resolve the dependency-plugin prefix and printed a NoPluginFoundForPrefix
+# error to stdout on every Java scan. Dropping it removes that noise with no
+# effect on the SBOM — cdxgen alone already resolves transitive deps (verified:
+# the same scan yields 91 components with this step gone).
 
 # Gradle (java-gradle / Android) — resolve so cdxgen sees the full graph.
 # For Android, ANDROID_HOME is set in the android-sdk image, enabling AGP.
