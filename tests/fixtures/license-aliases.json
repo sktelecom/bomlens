@@ -1,0 +1,30 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "application", "name": "app", "version": "1.0.0" }
+  },
+  "components": [
+    {
+      "type": "library", "name": "mccabe", "version": "0.7.0",
+      "licenses": [ { "expression": "Expat license" } ]
+    },
+    {
+      "type": "library", "name": "packaging", "version": "23.0",
+      "licenses": [ { "expression": "Apache-2.0 OR BSD-2-Clause" } ]
+    },
+    {
+      "type": "library", "name": "requests", "version": "2.31.0",
+      "licenses": [ { "license": { "id": "Apache-2.0" } } ]
+    },
+    {
+      "type": "library", "name": "coverage", "version": "7.4.0",
+      "licenses": [ { "license": { "name": "Apache License, Version 2.0" } } ]
+    },
+    {
+      "type": "library", "name": "six", "version": "1.16.0",
+      "licenses": [ { "license": { "id": "MIT" } } ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-12T09:08:07Z",
+    "component": { "type": "application", "name": "app", "version": "latest" }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "click",
+      "version": "8.1.7",
+      "purl": "pkg:pypi/click@8.1.7",
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "methods": [
+              { "technique": "manifest-analysis", "confidence": 0.8, "value": "cdxgen-venv-QIRqlp" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "flask",
+      "version": "3.0.0",
+      "purl": "pkg:pypi/flask@3.0.0",
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "methods": [
+              { "technique": "manifest-analysis", "confidence": 0.8, "value": "cdxgen-venv-QIRqlp" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

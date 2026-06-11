@@ -1,0 +1,12 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "/host-output/.uploads/abc123def4567890abc123def4567890/extracted/swift"
+    }
+  },
+  "components": null
+}
