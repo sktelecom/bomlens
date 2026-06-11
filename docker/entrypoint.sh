@@ -48,6 +48,48 @@ OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 LIBDIR="/usr/local/lib/sbom"
 
+# Shared language detection + cdxgen image selection (also used by the CLI).
+# shellcheck source=docker/lib/source-detect.sh
+. "$LIBDIR/source-detect.sh"
+
+# generate_sbom_cdxgen: run a cdxgen language image as a SIBLING container (via the
+# mounted host Docker socket) so a web-UI source scan resolves transitive deps,
+# matching the CLI. The sibling is launched by the HOST daemon, which can only
+# bind-mount HOST paths — so we mount the scanned tree by its host path
+# ($src_host) and inject build-prep.sh inline (it lives only inside THIS image,
+# not on the host, so it cannot be bind-mounted). cdxgen writes the bom into the
+# scanned tree; we move it into the working dir for the common pipeline.
+#   $1 = scanned tree, this container's path   (for detect_lang / reading output)
+#   $2 = scanned tree, host path               (for the sibling bind-mount)
+#   $3 = output bom filename (relative)
+generate_sbom_cdxgen() {
+    local src_container="$1" src_host="$2" out="$3"
+    local lang img api rc=0
+    lang=$(detect_lang "$src_container")
+    if [ "$lang" = "android" ]; then
+        api=$(android_api "$src_container")
+        img="${ANDROID_IMAGE_PREFIX}${api}:latest"
+        echo "[INFO] Android source (compileSdk=$api) -> $img"
+    else
+        img=$(img_for_lang "$lang")
+        echo "[INFO] Language: $lang -> $img"
+    fi
+    local prep; prep=$(cat "$LIBDIR/build-prep.sh")
+    docker run --rm -u 0:0 \
+        -v "$src_host":/app \
+        -e HOME=/tmp/sbomhome \
+        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+        --entrypoint sh "$img" \
+        -c "$prep" _ /app "/app/$out" 1.6 || rc=$?
+    [ "$rc" -eq 0 ] || { echo "[WARN] cdxgen sibling container failed (rc=$rc)."; return 1; }
+    if [ -f "$src_container/$out" ]; then
+        mv "$src_container/$out" "./$out"
+    else
+        echo "[WARN] cdxgen produced no SBOM at $src_container/$out."; return 1
+    fi
+    return 0
+}
+
 echo "=========================================="
 echo " SKT SBOM Generator (post-process)"
 echo " Mode: $SCAN_MODE"
@@ -60,17 +102,26 @@ echo "=========================================="
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
-        # The CLI source path uses cdxgen language images on the HOST (scan-sbom.sh)
-        # for deeper transitive resolution; inside this image we have syft (no
-        # language toolchains, no docker CLI), so we scan the tree like ROOTFS.
-        # syft detects package manifests (package.json/go.mod/pom.xml/Gemfile/…)
-        # without building. SOURCE_ROOT lets the UI point at an extracted/cloned dir.
+        # Preferred path: run a cdxgen language image as a sibling container so
+        # transitive dependencies resolve, matching the CLI. This needs the host
+        # Docker socket, a docker CLI in this image, and the HOST path of the
+        # scanned tree (SOURCE_ROOT_HOST, supplied by the web server). When any is
+        # missing we fall back to syft, which parses package manifests
+        # (package.json/go.mod/pom.xml/Gemfile/…) without building — direct deps only.
         SRC_ROOT="${SOURCE_ROOT:-/src}"
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
-        echo "[1/2] syft: source dir $SRC_ROOT"
-        if ! syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
-            echo "[ERROR] syft source scan failed."; exit 1
+        if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
+            echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
+            if ! generate_sbom_cdxgen "$SRC_ROOT" "$SOURCE_ROOT_HOST" "$OUTPUT_FILE"; then
+                echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
+                syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
+                    || { echo "[ERROR] syft source scan failed."; exit 1; }
+            fi
+        else
+            echo "[1/2] syft: source dir $SRC_ROOT (manifest-only; docker.sock/CLI/host-path unavailable)"
+            syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
+                || { echo "[ERROR] syft source scan failed."; exit 1; }
         fi
         ;;
 

@@ -266,6 +266,28 @@ def scan_root_of(extract_dir):
     return extract_dir
 
 
+def host_path_of(container_path):
+    """Map a path inside THIS container to the equivalent host path.
+
+    The UI launches with `-v $(pwd):/src -v $(pwd):/host-output`, so both mount
+    points resolve to the same host dir (SBOM_UI_HOST_DIR). The entrypoint needs
+    the host path to bind-mount the scanned tree into the sibling cdxgen
+    container. Returns "" when SBOM_UI_HOST_DIR is unset or the path falls
+    outside the known mounts (the entrypoint then falls back to syft).
+    """
+    hostdir = os.environ.get("SBOM_UI_HOST_DIR", "")
+    if not hostdir:
+        return ""
+    p = os.path.normpath(container_path)
+    for base in (OUTPUT_DIR, SRC_DIR):
+        b = os.path.normpath(base)
+        if p == b:
+            return hostdir
+        if p.startswith(b + os.sep):
+            return os.path.join(hostdir, os.path.relpath(p, b))
+    return ""
+
+
 # Single-use private-repo tokens, stashed via POST /git-cred so the secret
 # never travels in the scan-stream querystring (which could be logged/cached).
 _GIT_CREDS = {}
@@ -557,6 +579,14 @@ class Handler(BaseHTTPRequestHandler):
 
             else:
                 fail("unknown input type: %s" % source); return
+
+            # For a source scan, hand the entrypoint the HOST path of the scanned
+            # tree so it can run a cdxgen language image as a sibling container
+            # (transitive resolution). Empty -> entrypoint falls back to syft.
+            if env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT"):
+                host_root = host_path_of(env["SOURCE_ROOT"])
+                if host_root:
+                    env["SOURCE_ROOT_HOST"] = host_root
 
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
