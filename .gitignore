@@ -1,3 +1,6 @@
+# Web UI upload staging (server.py writes uploads + extracted/cloned trees here)
+.uploads/
+
 # SBOM Output Files
 *_bom.json
 *.sbom.json
