@@ -17,6 +17,7 @@ examples/
 ├── php/             # PHP + Composer
 ├── rust/            # Rust + Cargo
 ├── dotnet/          # .NET + NuGet
+├── swift/           # Swift + SPM (Swift Package Manager)
 └── docker/          # Docker 이미지 분석
 ```
 
@@ -156,6 +157,19 @@ cd examples/dotnet
 
 ---
 
+## Swift
+
+```bash
+cd examples/swift
+../../scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --generate-only
+```
+
+감지 파일: `Package.swift` (+ `Package.resolved`)
+
+> 주의: `Package.resolved`가 있어야 의존성이 정확히 잡힙니다. `swift package resolve`를 먼저 실행한 뒤 시도하세요.
+
+---
+
 ## Docker 이미지 분석
 
 Docker 이미지 분석은 프로젝트 루트에서 실행합니다.
@@ -192,6 +206,7 @@ Docker 이미지 분석은 프로젝트 루트에서 실행합니다.
 | Ruby | `pkg:gem/rails@7.1.2` |
 | PHP | `pkg:composer/laravel/laravel@10.3.3` |
 | .NET | `pkg:nuget/Newtonsoft.Json@13.0.3` |
+| Swift | `pkg:swift/github.com/apple/swift-log@1.5.0` |
 | Docker (OS 패키지) | `pkg:deb/debian/curl@7.88.1` |
 
 ## 문제 해결
