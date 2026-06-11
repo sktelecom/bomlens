@@ -2,6 +2,19 @@
 *_bom.json
 *.sbom.json
 bom.json
+*_bom.json.sig
+# Scan deliverables ({project}_{version}_...)
+*_NOTICE.txt
+*_NOTICE.html
+*_risk-report.md
+*_risk-report.html
+*_security.json
+*_security.md
+*_security.html
+*_conformance.json
+*_conformance.md
+*_conformance.html
+*_scancode.json
 
 # Test Workspace
 tests/test-workspace/

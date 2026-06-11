@@ -8,7 +8,13 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
 
-> **No command line on Windows?** Start with the [quick start for license managers](docs/notice-quickstart.md). A double-click desktop app or a single ZIP produces the open-source notice and the SBOM. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) is recommended.
+**Where to start:**
+
+- **New to this, on Windows, and you just need the open-source notice or the SBOM?** Use the [license-manager quick start](docs/notice-quickstart.md) (Korean) — a double-click desktop app, no command line.
+- **Installing it yourself to scan or automate?** See [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)).
+- **Contributing?** See [CONTRIBUTING](CONTRIBUTING.en.md).
+
+A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
 
 One Docker image, two jobs:
 
@@ -48,9 +54,7 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 
 #### Windows, no CLI — from a source ZIP you received
 
-New to all this and just need the notice? Start with the [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md) — a step-by-step Korean guide written for non-developers.
-
-The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM.
+The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM. The [license-manager quick start](docs/notice-quickstart.md) walks through this step by step in Korean for non-developers; the short version is below.
 
 1. Install and start a Docker engine. **Rancher Desktop** is a free, drop-in choice for this double-click flow; Docker Desktop also works (with licensing caveats for organizations).
 2. Get this repo: on the GitHub page use the green Code button, then Download ZIP, and unzip it.
@@ -83,7 +87,7 @@ Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `ri
 
 ## Documentation
 
-The web UI itself is bilingual (English and Korean, English by default). Core docs are available in English; the full set of guides is in Korean.
+The web UI itself is bilingual (English and Korean, English by default). The core docs are available in English; the most detailed and complete guides — including the non-developer quick start — are in Korean.
 
 ### English
 
@@ -105,7 +109,7 @@ The web UI itself is bilingual (English and Korean, English by default). Core do
 | [고지문·보안·UI](docs/notice-security-ui-guide.md) | 산출물과 웹 UI 사용법 |
 | [아키텍처](docs/architecture.md) | 2-stage 파이프라인(cdxgen + syft → 후처리) |
 
-> Docker 이미지의 가치(cdxgen 대비 측정)와 설계 배경은 [방향성 조사 보고서](docs/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/desktop-app-study.md), 전체 문서는 [docs/](docs/)를 참고하세요.
+> 설계 배경과 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
 
 ## Contributing & License
 

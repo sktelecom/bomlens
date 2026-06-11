@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Desktop installers (`SBOM-Generator-*.exe` / `.dmg`) are built in CI and attached to tagged GitHub Releases, so non-developers can download them directly. Unsigned for now, so Windows SmartScreen prompts to confirm.
 - License-manager quickstart (`docs/notice-quickstart.md`) and a setup-check helper (`scripts/check-setup.bat` / `scripts/check-setup.sh`) that reports Docker, image, and port status in Korean.
 - Windows verification assets: an automated smoke test (`tests/windows-smoke.ps1`) and a manual e2e checklist (`tests/windows-e2e-checklist.md`).
-- Desktop-app packaging study (`docs/desktop-app-study.md`).
+- Desktop-app packaging study (`docs/internal/desktop-app-study.md`).
 - Screenshots and a flow diagram across the user guides.
 - Firmware analysis (FIRMWARE mode): unpack a firmware image and produce an SBOM and risk report.
 - Supplier SBOM validation and analysis (ANALYZE mode) for SBOMs you receive from third parties.
