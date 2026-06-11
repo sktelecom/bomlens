@@ -29,6 +29,10 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/sbom-scanner
 
+# Least-privilege default; jobs that publish images opt into packages: write below.
+permissions:
+  contents: read
+
 jobs:
   # ---------------------------------------------------------------
   # (1) Post-process image: syft + Trivy + cosign + notice + UI

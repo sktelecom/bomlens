@@ -209,12 +209,20 @@ def conformance_summary(project, version):
 # --------------------------------------------------------------------------
 # Upload handling
 # --------------------------------------------------------------------------
-def resolve_upload(token):
-    """Return the single uploaded file inside UPLOAD_DIR/<token>, traversal-safe."""
+def upload_token_dir(token):
+    """Resolve UPLOAD_DIR/<token> for a well-formed token only, traversal-safe."""
     if not re.fullmatch(r"[0-9a-f]{32}", token or ""):
         return None
     base = os.path.realpath(os.path.join(UPLOAD_DIR, token))
     if not base.startswith(os.path.realpath(UPLOAD_DIR) + os.sep):
+        return None
+    return base
+
+
+def resolve_upload(token):
+    """Return the single uploaded file inside UPLOAD_DIR/<token>, traversal-safe."""
+    base = upload_token_dir(token)
+    if base is None:
         return None
     if not os.path.isdir(base):
         return None
@@ -705,8 +713,9 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             # Remove uploaded/cloned/extracted trees; keep generated artifacts
             # (entrypoint copied them to OUTPUT_DIR root).
-            if token:
-                shutil.rmtree(os.path.join(UPLOAD_DIR, token), ignore_errors=True)
+            token_dir = upload_token_dir(token)
+            if token_dir:
+                shutil.rmtree(token_dir, ignore_errors=True)
             if cleanup_dir and source == "git-url":
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
 
