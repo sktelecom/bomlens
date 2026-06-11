@@ -58,6 +58,42 @@
     "noVulns": "발견된 취약점이 없습니다",
     "artifacts": "생성된 결과물",
     "artifactsEmpty": "생성된 결과물이 없습니다.",
+    "artifactCount": "결과물 {{count}}개 · {{size}}",
+    "downloadAll": "전체 다운로드 (ZIP)",
+    "copyLink": "링크 복사",
+    "copied": "링크를 복사했습니다",
+    "downloadStarted": "다운로드를 시작했습니다",
+    "signed": "서명됨",
+    "kind": {
+      "riskReport": {
+        "title": "오픈소스 위험분석 보고서",
+        "desc": "라이선스와 취약점을 아우른 공급망 위험 분석 종합본입니다."
+      },
+      "sbom": {
+        "title": "SBOM (CycloneDX)",
+        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다."
+      },
+      "notice": {
+        "title": "오픈소스 고지문",
+        "desc": "포함된 구성요소의 라이선스 고지와 저작권 표시입니다."
+      },
+      "conformance": {
+        "title": "적합성 보고서",
+        "desc": "제출한 SBOM의 포맷 검증 결과입니다."
+      },
+      "security": {
+        "title": "보안 보고서",
+        "desc": "구성요소에서 발견된 알려진 취약점(CVE)입니다."
+      },
+      "license": {
+        "title": "정밀 라이선스 분석",
+        "desc": "ScanCode 심화 라이선스 탐지 결과입니다."
+      },
+      "signature": {
+        "title": "SBOM 서명",
+        "desc": "SBOM 검증용 cosign 서명입니다."
+      }
+    },
     "download": "다운로드",
     "view": "보기",
     "conformance": "적합성",
