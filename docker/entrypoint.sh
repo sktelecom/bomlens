@@ -220,6 +220,32 @@ fi
 # ========================================================
 ARTIFACTS=("$OUTPUT_FILE")
 
+# Stamp the BOM's root component with the caller's --project/--version. cdxgen
+# fills metadata.component from the source manifest (pkg:pypi/app@latest) or, when
+# it cannot resolve a name, from the scanned directory — which on the web UI path
+# is the temp upload dir (/host-output/.uploads/<token>/extracted/<lang>), leaking
+# an internal path and breaking reproducibility. Limit this to the cdxgen-backed
+# modes; IMAGE/BINARY/ROOTFS/FIRMWARE/ANALYZE carry their own meaningful root
+# component (a basename, or a supplier's own identifier we must preserve). Drop the
+# now-stale purl (optional in CycloneDX) since it encoded the old coordinates.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS)
+        if command -v jq >/dev/null 2>&1; then
+            META_TMP="$(mktemp)"
+            if jq --arg n "$PROJECT_NAME" --arg v "$PROJECT_VERSION" \
+                '.metadata.component.name = $n
+                 | .metadata.component.version = $v
+                 | (.metadata.component) |= del(.purl)' \
+                "$OUTPUT_FILE" > "$META_TMP" 2>/dev/null; then
+                mv "$META_TMP" "$OUTPUT_FILE"
+            else
+                rm -f "$META_TMP"
+                echo "[WARN] could not stamp metadata.component (leaving cdxgen values)."
+            fi
+        fi
+        ;;
+esac
+
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable || true
 else
