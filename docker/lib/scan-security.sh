@@ -46,7 +46,8 @@ if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
 fi
 
-# Flatten findings: id, pkg, version, severity, fixed, title.
+# Flatten findings: id, pkg, version, severity, fixed, cvss, title.
+# cvss = highest V3 (fallback V2) score across Trivy's CVSS sources.
 FINDINGS=$(jq -r '
   [ .Results[]?.Vulnerabilities[]? | {
       id: .VulnerabilityID,
@@ -54,14 +55,45 @@ FINDINGS=$(jq -r '
       version: .InstalledVersion,
       severity: (.Severity // "UNKNOWN"),
       fixed: (.FixedVersion // ""),
+      cvss: ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ]
+              | map(select(. != null)) | (max // null)),
       title: (.Title // .Description // "" | .[0:120])
     } ]
-  | sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)
 ' "$JSON" 2>/dev/null || echo '[]')
+
+# --- Priority enrichment (best-effort, network) -------------------------------
+# EPSS = probability the CVE is exploited in the wild (FIRST.org, 0..1).
+# KEV  = the CVE is on CISA's Known Exploited Vulnerabilities list (actively
+# exploited, top priority). Both are looked up online; set SECURITY_ENRICH=false
+# to skip (offline / air-gapped) — the report then omits the EPSS/KEV columns.
+SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
+KEV_URL="${KEV_URL:-https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json}"
+EPSS_API="${EPSS_API:-https://api.first.org/data/v1/epss}"
+ENRICHED="false"; EPSS_MAP="{}"; KEV_LIST="[]"
+CVE_LIST=$(echo "$FINDINGS" | jq -r '[.[].id | select(test("^CVE-"))] | unique | join(",")')
+if [ "$SECURITY_ENRICH" != "false" ] && [ -n "$CVE_LIST" ]; then
+    echo "[security] enriching with EPSS + CISA KEV..."
+    EPSS_MAP=$(curl -sSfL --max-time 20 "$EPSS_API?cve=$CVE_LIST" 2>/dev/null \
+        | jq '[.data[]? | {key: .cve, value: (.epss | tonumber)}] | from_entries' 2>/dev/null || echo "{}")
+    KEV_LIST=$(curl -sSfL --max-time 25 "$KEV_URL" 2>/dev/null \
+        | jq '[.vulnerabilities[]?.cveID]' 2>/dev/null || echo "[]")
+    [ -n "$EPSS_MAP" ] || EPSS_MAP="{}"
+    [ -n "$KEV_LIST" ] || KEV_LIST="[]"
+    ENRICHED="true"
+fi
+
+# Merge epss/kev, then sort: KEV first, then severity, then EPSS desc.
+FINDINGS=$(echo "$FINDINGS" | jq --argjson epss "$EPSS_MAP" --argjson kev "$KEV_LIST" '
+  map(.id as $cid | . + { epss: ($epss[$cid] // null), kev: (($kev | index($cid)) != null) })
+  | sort_by([ (if .kev then 0 else 1 end),
+              ({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5),
+              (- (.epss // 0)) ])
+')
 
 count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
+KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
 
 # ---------- Markdown ----------
 {
@@ -76,13 +108,22 @@ TOTAL=$(echo "$FINDINGS" | jq 'length')
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
     echo ""
+    if [ "$ENRICHED" = "true" ]; then
+        echo "- Actively exploited (CISA KEV): **${KEV_COUNT}**"
+        echo "- Priority order: KEV first, then severity, then EPSS (exploit probability)."
+        echo ""
+    fi
     if [ "$TOTAL" -gt 0 ]; then
         echo "## Findings"
         echo ""
-        echo "| Severity | CVE | Package | Installed | Fixed | Title |"
-        echo "|----------|-----|---------|-----------|-------|-------|"
+        echo "| Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed |"
+        echo "|----------|-----|-----:|-----:|-----|---------|-----------|-------|"
         echo "$FINDINGS" | jq -r '.[] |
-            "| \(.severity) | \(.id) | \(.pkg) | \(.version) | \(.fixed) | \(.title | gsub("[|\n]"; " ")) |"'
+            "| \(.severity)" +
+            " | \(if .kev then "⚠️ KEV" else "" end)" +
+            " | \(.cvss // "")" +
+            " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
+            " | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
     else
         echo "_No known vulnerabilities found._"
     fi
@@ -109,6 +150,9 @@ TOTAL=$(echo "$FINDINGS" | jq 'length')
  th{background:#f3f4f6;}
  .sev-CRITICAL{color:#dc2626;font-weight:700;} .sev-HIGH{color:#ea580c;font-weight:700;}
  .sev-MEDIUM{color:#d97706;} .sev-LOW{color:#2563eb;}
+ .kev{background:#dc2626;color:#fff;font-weight:600;}
+ .kevbadge{background:#dc2626;color:#fff;border-radius:4px;padding:.05rem .35rem;font-size:.75rem;font-weight:700;}
+ td.num{text-align:right;font-variant-numeric:tabular-nums;}
 </style></head><body>
 <h1>Security Report</h1>
 <p class="meta">Project: ${PROJECT} &middot; Generated: ${GEN_AT} &middot; Engine: Trivy</p>
@@ -118,13 +162,18 @@ TOTAL=$(echo "$FINDINGS" | jq 'length')
  <div class="card med">Medium ${M}</div>
  <div class="card low">Low ${L}</div>
  <div class="card unk">Unknown ${U}</div>
-</div>
 HTMLHEAD
+    [ "$ENRICHED" = "true" ] && echo " <div class=\"card kev\">KEV ${KEV_COUNT}</div>"
+    echo "</div>"
+    [ "$ENRICHED" = "true" ] && echo "<p class=\"meta\">EPSS = exploit probability (FIRST.org) &middot; KEV = CISA known-exploited &middot; priority: KEV → severity → EPSS</p>"
 
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<table><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr>"
+        echo "<table><tr><th>Severity</th><th>KEV</th><th>CVSS</th><th>EPSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr>"
         echo "$FINDINGS" | jq -r '.[] |
             "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
+            "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
+            "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
+            "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
             "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + (.title|@html) + "</td></tr>"'
@@ -135,4 +184,4 @@ HTMLHEAD
     echo "</body></html>"
 } > "$HTML"
 
-echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H})"
+echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT})"
