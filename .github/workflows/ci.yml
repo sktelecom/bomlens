@@ -81,8 +81,14 @@ jobs:
           echo "Checking docker/lib analyze scripts..."
           shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
           echo ""
+          echo "Checking docker/lib post-process scripts..."
+          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh || true
+          echo ""
           echo "Checking tests/test-scan.sh..."
           shellcheck tests/test-scan.sh || true
+          echo ""
+          echo "Checking new test/helper scripts..."
+          shellcheck tests/test-postprocess.sh tests/check-examples-sync.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -112,6 +118,27 @@ jobs:
       - name: Run no-Docker orchestration tests
         shell: bash
         run: bash tests/test-windows.sh
+
+  postprocess:
+    name: Post-process Unit and Sync Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # No Docker: drives the jq/bash post-processing scripts against regression
+      # fixtures (byte-stable venv pinning, null components, metadata stamping,
+      # NOTICE dedupe) and keeps the example set in sync with the guide and
+      # test-all.sh. Guards the verification-report defects B-1..B-6 cheaply.
+      - name: Post-process unit tests
+        run: bash tests/test-postprocess.sh
+
+      - name: Examples / docs / test-all.sh sync check
+        run: bash tests/check-examples-sync.sh
+
+      - name: Examples manifest validation
+        run: bash examples/test-all.sh
 
   validate-docs:
     name: Validate Documentation
@@ -171,7 +198,7 @@ jobs:
     
     strategy:
       matrix:
-        example: [java-maven, java-gradle, nodejs, python, go, ruby, php, rust, dotnet]
+        example: [java-maven, java-gradle, nodejs, python, go, ruby, php, rust, dotnet, swift]
       fail-fast: false
     
     steps:
@@ -270,6 +297,14 @@ jobs:
                 exit 1
               fi
               ;;
+            swift)
+              if [ -f Package.swift ]; then
+                echo "✓ Swift project structure valid"
+              else
+                echo "❌ Missing Package.swift"
+                exit 1
+              fi
+              ;;
           esac
           
           echo "✅ ${{ matrix.example }} validation passed"
@@ -277,7 +312,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test, contract, lint, validate-docs, validate-examples]
+    needs: [test, contract, postprocess, lint, validate-docs, validate-examples]
     if: always()
 
     steps:
@@ -289,6 +324,7 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| No-Docker Contract (ubuntu+windows) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-process & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Script Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation | ${{ needs.validate-docs.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -300,6 +336,9 @@ jobs:
             exit 1
           elif [ "${{ needs.contract.result }}" == "failure" ]; then
             echo "❌ No-Docker contract tests failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.postprocess.result }}" == "failure" ]; then
+            echo "❌ Post-process / sync tests failed" >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [ "${{ needs.validate-examples.result }}" == "failure" ]; then
             echo "❌ Example validation failed" >> $GITHUB_STEP_SUMMARY
