@@ -16,6 +16,9 @@ on:
     - cron: '0 0 * * 1'  # Weekly on Monday
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test-examples:
     name: Test ${{ matrix.example }}
