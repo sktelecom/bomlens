@@ -41,6 +41,9 @@ ARG COSIGN_VERSION=v2.4.1
 ARG SCANCODE_VERSION=32.3.0
 ARG SBOM_DEEP_LICENSE=false
 ARG TARGETARCH=amd64
+# docker CLI (client only) — lets the web UI source scan launch cdxgen language
+# images as sibling containers via the mounted host socket (transitive deps).
+ARG DOCKER_CLI_VERSION=27.5.1
 
 # Firmware analysis (opt-in image `sbom-scanner-firmware`). GPL tools are isolated
 # here so the base image stays permissive-only; see THIRD_PARTY_LICENSES.md.
@@ -81,6 +84,19 @@ RUN case "$(uname -m)" in x86_64) CARCH=amd64 ;; aarch64) CARCH=arm64 ;; *) CARC
     && curl -sSfL "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${CARCH}" -o /usr/local/bin/cosign \
     && chmod +x /usr/local/bin/cosign \
     && cosign version
+
+# docker CLI (client binary only; no daemon). The web UI source scan shells out
+# to `docker run <cdxgen-language-image>` against the mounted host socket. Pulled
+# from Docker's static builds, arch-mapped via uname -m (see Trivy note above).
+RUN case "$(uname -m)" in \
+         x86_64)  DOCKER_ARCH="x86_64" ;; \
+         aarch64) DOCKER_ARCH="aarch64" ;; \
+         *)       DOCKER_ARCH="x86_64" ;; \
+       esac \
+    && curl -sSfL "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-${DOCKER_CLI_VERSION}.tgz" -o /tmp/docker.tgz \
+    && tar -C /usr/local/bin --strip-components=1 -xzf /tmp/docker.tgz docker/docker \
+    && rm /tmp/docker.tgz \
+    && docker --version
 
 # scancode-toolkit (opt-in deep license: --build-arg SBOM_DEEP_LICENSE=true)
 RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
