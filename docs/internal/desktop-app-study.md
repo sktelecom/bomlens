@@ -27,7 +27,7 @@
 
 ## 1. 배경과 목적
 
-[시작하기](getting-started.md)와 [라이선스 담당자용 빠른 시작](notice-quickstart.md)에서 보듯,
+[시작하기](../getting-started.md)와 [라이선스 담당자용 빠른 시작](../notice-quickstart.md)에서 보듯,
 현재 비개발자 흐름은 Docker 엔진을 설치하고 `scripts/sbom-ui.bat`을 더블클릭해 브라우저 UI를
 여는 것이다. 동작은 하지만 검은 콘솔 창이 뜨고, 앱 아이콘이나 인스톨러가 없으며, Docker 설치
 안내가 실행 시점에야 텍스트로 나온다.

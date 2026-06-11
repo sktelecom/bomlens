@@ -1,6 +1,6 @@
 # 아키텍처
 
-> **관련 문서**: [시작하기](getting-started.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [방향성 조사 보고서](direction-study.md) · [기여 가이드](../CONTRIBUTING.md) · [패키지 매니저 추가](contributing/package-manager-guide.md)
+> **관련 문서**: [시작하기](getting-started.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [방향성 조사 보고서](internal/direction-study.md) · [기여 가이드](../CONTRIBUTING.md) · [패키지 매니저 추가](contributing/package-manager-guide.md)
 
 SBOM Generator의 전체 시스템 구조와, 스캔 파이프라인에서 각 도구가 어느 단계에서 어떤 순서로 호출되는지 설명합니다.
 
@@ -63,7 +63,7 @@ flowchart LR
 
 ## 왜 2단계인가
 
-기존에는 모든 언어 런타임 + 분석 도구를 **하나의 거대한 이미지**에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다([근거: 방향성 조사 보고서](direction-study.md) §1, §5).
+기존에는 모든 언어 런타임 + 분석 도구를 **하나의 거대한 이미지**에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다([근거: 방향성 조사 보고서](internal/direction-study.md) §1, §5).
 
 | | Stage 1 이미지 | Stage 2 이미지 (`sbom-scanner`) |
 |---|---|---|
@@ -72,7 +72,7 @@ flowchart LR
 | **획득** | 프로젝트 언어 감지 후 **on-demand pull** | 한 번 pull해서 재사용 |
 | **이점** | 언어별 최신 toolchain을 cdxgen이 직접 관리 | 이미지가 작고, 도구 버전 고정으로 재현성 확보 |
 
-> 주류 5개 언어(java·python·node·dotnet·php)는 cdxgen 공식 이미지로 검출이 동일하고, **go·ruby·rust**에서 우리 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](../README.md#why-a-docker-image-vs-plain-cdxgen)와 [direction-study.md §1](direction-study.md)을 참조하세요.
+> 주류 5개 언어(java·python·node·dotnet·php)는 cdxgen 공식 이미지로 검출이 동일하고, **go·ruby·rust**에서 우리 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](../README.md#why-a-docker-image-vs-plain-cdxgen)와 [direction-study.md §1](internal/direction-study.md)을 참조하세요.
 
 ---
 
