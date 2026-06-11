@@ -84,6 +84,12 @@ SBOM의 `components[].licenses` 정보를 모아 라이선스별로 컴포넌트
 - `_NOTICE.html` — 브라우저로 보기 좋은 형식. 모든 패키지 메타데이터는 HTML escape되어 안전합니다.
 - 라이선스 정보가 없는 컴포넌트는 `NOASSERTION`으로 분류됩니다.
 
+고지문은 다음을 함께 처리합니다.
+
+- 라이선스 이름을 SPDX 식별자로 정규화합니다. 예를 들어 "Apache License, version 2.0"은 `Apache-2.0`으로 모읍니다. 같은 라이선스의 표기가 갈려 중복되던 항목이 하나로 합쳐집니다.
+- SBOM에 저작권(copyright) 값이 있으면 컴포넌트별로 표시합니다.
+- 주요 오픈소스 라이선스 21종(`Apache-2.0`, `MIT`, `BSD-3-Clause`, `GPL`/`LGPL` 계열 등)의 SPDX 표준 전문을 고지문 끝에 함께 묶습니다. 전문 동봉을 요구하는 라이선스의 의무를 별도 수집 없이 충족합니다. 번들 원본은 `docker/lib/licenses/*.txt`에 있습니다.
+
 예시(텍스트):
 ```
 License: Apache-2.0
@@ -106,6 +112,18 @@ Components (1):
 - `_security.html` — severity 배지와 표가 포함된 시각적 보고서.
 
 보고서는 취약점이 있어도 스캔을 실패시키지 않습니다(report-only). 게이트가 필요하면 `_security.json`을 후처리하세요.
+
+### 우선순위 신호 (CVSS · EPSS · CISA KEV)
+
+심각도(Severity)만으로는 무엇을 먼저 고칠지 정하기 어렵습니다. 보고서는 심각도 외에 세 가지 신호를 함께 보여 줍니다. Markdown과 HTML 표의 열 구성은 `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`입니다.
+
+- **CVSS** — 취약점의 기술적 심각도 점수(0~10). V3 점수를 우선 쓰고 없으면 V2로 대체합니다.
+- **EPSS** — 향후 30일 내 실제 악용 가능성(0~1)입니다. FIRST.org에서 조회하며, 점수가 높을수록 공격에 쓰일 확률이 큽니다.
+- **CISA KEV** — 미국 CISA가 관리하는 "실제 악용된 취약점" 목록에 포함됐는지 여부입니다. 포함되면 HTML 보고서에 ⚠️ 배지로 표시합니다.
+
+표는 KEV 포함 항목을 맨 위에 두고, 그다음 심각도, 마지막으로 EPSS 내림차순으로 정렬합니다. 위에서부터 처리하면 자연히 위험이 큰 것부터 대응하게 됩니다.
+
+EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURITY_ENRICH=false`로 두면 두 열을 생략하고 나머지 보고서는 그대로 생성합니다.
 
 ### 결과 해석 & 후속 조치
 

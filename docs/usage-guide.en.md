@@ -32,7 +32,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for SBOM Ge
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
 | `--generate-only` | false | Save locally only, without uploading |
 | `--notice` | (on by default) | Generate the open-source notice (NOTICE, txt+html) |
-| `--security` | (on by default) | Generate the Trivy security report (json+md+html) |
+| `--security` | (on by default) | Generate the Trivy security report (json+md+html), including CVSS, EPSS, and CISA KEV priority signals |
 | `--all` | — | `--notice --security` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
@@ -41,7 +41,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for SBOM Ge
 | `--ui` | — | Launch the local web UI |
 | `--help` | — | Print help |
 
-> **Environment variables**: `SBOM_SCANNER_IMAGE` (override the scanner image), `SBOM_FIRMWARE_IMAGE` (firmware image), `GIT_TOKEN` (private git clone), `COSIGN_KEY` (signing key). Output flags are detailed in the [notice/security/UI guide](notice-security-ui-guide.md); supplier SBOM analysis is in [supplier SBOM analysis](supplier-sbom-analysis.md).
+> **Environment variables**: `SBOM_SCANNER_IMAGE` (override the scanner image), `SBOM_FIRMWARE_IMAGE` (firmware image), `GIT_TOKEN` (private git clone), `COSIGN_KEY` (signing key), `FETCH_LICENSE` (default true; resolves dependency licenses during source scans — set `false` to skip the lookup and run faster), `SECURITY_ENRICH` (default true; enriches the security report with EPSS and CISA KEV signals — set `false` on air-gapped networks to skip the external lookups). Output flags are detailed in the [notice/security/UI guide](notice-security-ui-guide.md); supplier SBOM analysis is in [supplier SBOM analysis](supplier-sbom-analysis.md).
 
 ## Analysis modes
 

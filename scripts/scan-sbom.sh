@@ -91,6 +91,16 @@ Options:
   --ui                   Launch local web UI
   --help                 Show this help
 
+Environment:
+  FETCH_LICENSE          Resolve dependency licenses in source scans
+                         (default: true; set false to skip and run faster)
+  SECURITY_ENRICH        Enrich the security report with EPSS + CISA KEV
+                         signals (default: true; set false for air-gapped)
+  GIT_TOKEN              Token for cloning private --git repos
+  COSIGN_KEY             Signing key for --sign
+  SBOM_SCANNER_IMAGE     Override the scanner image
+  SBOM_FIRMWARE_IMAGE    Override the firmware image
+
 Architecture: source SBOM generation uses cdxgen's per-language images
 (on-demand); this tool orchestrates + post-processes. See docs/direction-study.md.
 EOF

@@ -45,7 +45,7 @@
 | 영역 | 포털이 제공하는 것 | 본 도구 현황 |
 |---|---|---|
 | 컴포넌트 | 이름, 버전, PURL, 라이선스, 취약점 수, 직접/간접, 깊이 테이블에 검색·필터·정렬 | 개수만 표시 |
-| 취약점 | CVE, 심각도, CVSS, EPSS, 수정버전, 참고링크와 영향 컴포넌트 | 심각도 막대와 개수만 |
+| 취약점 | CVE, 심각도, CVSS, EPSS, 수정버전, 참고링크와 영향 컴포넌트 | 보안 리포트는 CVSS, EPSS, CISA KEV, 수정버전을 표로 제공. 웹 UI 대시보드는 아직 심각도 막대와 개수만 |
 | 라이선스 | 라이선스와 의무사항 그리드, 카테고리(허용/조건부/금지) | NOTICE에 라이선스 ID만 |
 
 ## 남은 개선 항목과 우선순위
@@ -64,9 +64,9 @@
 
 ### 3. 리포트 충실도
 
-- 라이선스를 채운다. cdxgen이 라이선스를 못 채우면 `--deep-license`(scancode)의 기본 동작을 검토하거나 PURL에서 SPDX로의 매핑을 보강한다.
-- NOTICE를 강화한다. `generate-notice.sh`의 jq 필터에 `component.copyright`, `licenses[].license.text`(라이선스 전문), `author`, `homepage`를 추가한다. SBOM에 값이 있을 때만 채운다.
-- 보안 리포트에 우선순위 신호를 넣는다. Trivy 결과에 이미 들어오는 `fixed_version`을 리포트에 명확히 노출하고, 가능하면 EPSS와 KEV 컬럼을 더한다. Trivy의 지원 범위를 먼저 확인한다.
+- 라이선스를 채운다 — 완료. 소스 스캔 시 `FETCH_LICENSE`(기본 true)로 cdxgen이 의존성 라이선스를 조회한다. 1st-party 소스 헤더는 `--deep-license`(scancode)로 보강한다.
+- NOTICE를 강화한다 — 완료. `generate-notice.sh`가 라이선스 이름을 SPDX로 정규화하고, `component.copyright`를 표시하며, 주요 라이선스 21종의 SPDX 전문을 고지문에 번들한다.
+- 보안 리포트에 우선순위 신호를 넣는다 — 완료. 리포트에 CVSS, EPSS, CISA KEV 열을 더하고 KEV·심각도·EPSS 순으로 정렬한다(`SECURITY_ENRICH`로 EPSS/KEV 조회 제어).
 - 위험분석보고서를 보강한다. 라이선스 개수만 담던 것을 라이선스별 컴포넌트 매핑과 의무사항 요약까지 넓힌다.
 - 대상 파일은 `docker/lib/generate-notice.sh`, `docker/lib/scan-security.sh`, `docker/lib/generate-risk-report.sh`다.
 
