@@ -39,7 +39,7 @@ docker build -t sbom-example:1.0.0 -t sbom-example:latest .
 
 ## SBOM 생성
 
-### 방법 1: SBOM Generator 스크립트 사용 (권장)
+### 방법 1: BomLens 스크립트 사용 (권장)
 
 > **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/getting-started.md) 참고.
 

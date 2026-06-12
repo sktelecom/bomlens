@@ -2,7 +2,7 @@
 
 > **한국어**: [사용 가이드](usage-guide.md) · **Related**: [Getting started](getting-started.en.md)
 
-Full options, analysis modes, CI/CD integration, and troubleshooting for SBOM Generator.
+Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens.
 
 
 ## Options reference

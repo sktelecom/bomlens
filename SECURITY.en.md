@@ -2,7 +2,7 @@
 
 > **한국어**: [SECURITY.md](SECURITY.md)
 
-SBOM Generator is a software supply-chain security tool, so the security of the tool itself matters too. If you find a vulnerability, please report it responsibly.
+BomLens is a software supply-chain security tool, so the security of the tool itself matters too. If you find a vulnerability, please report it responsibly.
 
 ## Supported versions
 

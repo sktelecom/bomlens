@@ -2,7 +2,7 @@
 
 > **English**: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
 
-SBOM Generator 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 문서 개선, 새로운 언어 지원 추가 등 어떤 형태의 기여든 환영합니다.
+BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 문서 개선, 새로운 언어 지원 추가 등 어떤 형태의 기여든 환영합니다.
 
 > **관련 문서**: [아키텍처](docs/internal/architecture.md) | [테스트 가이드](docs/contributing/testing-guide.md) | [패키지 매니저 추가](docs/contributing/package-manager-guide.md)
 

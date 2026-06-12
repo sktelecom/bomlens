@@ -2,7 +2,7 @@
 # 렌더링한다(검색, 사이드바, 한국어/영어). 룩은 Gemini API 문서(Google DevSite) 인상을
 # MkDocs Material과 docs/stylesheets/extra.css로 재현하되, 강조색만 SK 브랜드 색을 쓴다.
 # internal/(메인테이너 설계 문서)과 contributing/는 사이트 빌드에서 제외한다.
-site_name: SBOM Generator
+site_name: BomLens
 site_description: 소프트웨어 공급망 보안을 위한 SBOM 자동 생성 도구
 site_url: https://sktelecom.github.io/sbom-tools/
 repo_url: https://github.com/sktelecom/sbom-tools

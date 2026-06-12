@@ -33,7 +33,7 @@ Docker Desktop is the simplest, but it needs a paid license above a certain orga
 
 ### Windows — download and double-click (no command line)
 
-The simplest path is the desktop app. Use [Download SBOM Generator for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click the file; the UI opens with no console window. It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. A step-by-step Korean guide is in the [no-CLI quickstart](quickstart-no-cli.md).
+The simplest path is the desktop app. Use [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click the file; the UI opens with no console window. It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. A step-by-step Korean guide is in the [no-CLI quickstart](quickstart-no-cli.md).
 
 Prefer scripts? Download the repo ZIP (the green Code button, then Download ZIP), unzip it, and double-click `scripts\sbom-ui.bat`. The scanner image (about 3–4 GB) downloads automatically on first run.
 
