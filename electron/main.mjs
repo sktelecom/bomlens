@@ -53,7 +53,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 860,
-    backgroundColor: "#0a0a0b",
+    backgroundColor: "#0a0a0c",
     title: "SBOM Generator",
     webPreferences: {
       preload: path.join(here, "preload.mjs"),
