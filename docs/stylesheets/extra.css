@@ -1,6 +1,6 @@
 /*
  * Gemini API 문서(Google DevSite) 인상에 맞춘 테마 보정.
- * 헤더는 밝게 두고, SK 브랜드 색은 링크/버튼/활성 탭 같은 강조에만 절제해서 쓴다.
+ * 헤더는 밝게 두고, SK 브랜드 색은 링크/버튼/강조에만 절제해서 쓴다.
  * 색 값은 [[skt-brand-colors]] 기준.
  *   SK Red    #EA002C  흰 배경 대비 약 4.63:1 (본문 텍스트 AA 충족) — 1차 강조
  *   SK Orange #F47725  흰 배경 대비 약 2.8:1 (본문 텍스트 불가) — hover/보조 강조만
@@ -63,35 +63,15 @@
   color: #5f6368;
 }
 
-/* ---- 탭: 흰 배경 + 어두운 글자, 활성/hover에 SK 레드 밑줄 ---- */
-.md-tabs {
-  background-color: #ffffff;
-  color: #1f1f1f;
-  border-bottom: 1px solid #e8eaed;
-}
-.md-tabs__link {
-  color: #3c4043;
-  opacity: 1;
-}
-.md-tabs__link:hover {
-  color: #ea002c;
-}
-.md-tabs__link--active {
-  color: #ea002c;
-  box-shadow: inset 0 -2px #ea002c;
-}
-
-/* ---- 다크 모드 헤더/탭: 어두운 표면 + 밝은 글자 ---- */
-[data-md-color-scheme="slate"] .md-header,
-[data-md-color-scheme="slate"] .md-tabs {
+/* ---- 다크 모드 헤더: 어두운 표면 + 밝은 글자 ---- */
+[data-md-color-scheme="slate"] .md-header {
   background-color: #1f1f23;
   color: #e8eaed;
   border-bottom-color: #2d2d31;
 }
 [data-md-color-scheme="slate"] .md-header__title,
 [data-md-color-scheme="slate"] .md-header__topic,
-[data-md-color-scheme="slate"] .md-header__button,
-[data-md-color-scheme="slate"] .md-tabs__link {
+[data-md-color-scheme="slate"] .md-header__button {
   color: #e8eaed;
 }
 [data-md-color-scheme="slate"] .md-search__form {
@@ -99,11 +79,6 @@
 }
 [data-md-color-scheme="slate"] .md-search__input {
   color: #e8eaed;
-}
-[data-md-color-scheme="slate"] .md-tabs__link:hover,
-[data-md-color-scheme="slate"] .md-tabs__link--active {
-  color: #ff4d6a;
-  box-shadow: inset 0 -2px #ff4d6a;
 }
 
 /* ---- 본문 링크: 1차 강조(SK Red), hover는 보조 강조(SK Orange) ---- */
@@ -140,6 +115,59 @@
   font-weight: 600;
 }
 
+/* ---- 표: DevSite 톤 (헤더 음영, 여백, 옅은 구분선, 행 hover) ---- */
+.md-typeset table:not([class]) {
+  border: 1px solid #e8eaed;
+  border-radius: 0.4rem;
+  font-size: 0.74rem;
+}
+.md-typeset table:not([class]) th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #202124;
+}
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+  padding: 0.7em 0.9em;
+  border-bottom: 1px solid #eef0f2;
+}
+.md-typeset table:not([class]) tr:hover {
+  background-color: #fafbfc;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
+  border-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: #26262b;
+  color: #e8eaed;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th,
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-bottom-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover {
+  background-color: #1f1f23;
+}
+
+/* ---- 블록쿼트: 평범한 인용 대신 차분한 콜아웃 박스 ---- */
+.md-typeset blockquote {
+  color: inherit;
+  border-left: 3px solid #f47725;
+  background-color: #faf7f4;
+  border-radius: 0 0.3rem 0.3rem 0;
+  padding: 0.5em 0.9em;
+}
+.md-typeset blockquote > :first-child {
+  margin-top: 0;
+}
+.md-typeset blockquote > :last-child {
+  margin-bottom: 0;
+}
+[data-md-color-scheme="slate"] .md-typeset blockquote {
+  background-color: #26221f;
+  border-left-color: #f47725;
+}
+
 /* ---- 1차 다운로드 버튼: SK Red 채움 + 흰 글자, hover는 약간 어둡게 ---- */
 .md-typeset .md-button--primary {
   background-color: #ea002c;
@@ -156,6 +184,7 @@
 /* ---- grid cards: DevSite 카드 느낌 ---- */
 .md-typeset .grid.cards > ul > li {
   border-radius: 0.5rem;
+  padding: 1em 1.1em;
   transition: box-shadow 200ms, border-color 200ms;
 }
 .md-typeset .grid.cards > ul > li:hover {
