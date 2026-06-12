@@ -2,7 +2,7 @@
 
 > **한국어**: [CONTRIBUTING.md](CONTRIBUTING.md)
 
-Thanks for your interest in SBOM Generator! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
+Thanks for your interest in BomLens! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
 
 > **Related**: [Architecture](docs/internal/architecture.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
 

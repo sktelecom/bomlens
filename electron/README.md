@@ -1,6 +1,6 @@
-# SBOM Generator 데스크톱 앱 (Electron)
+# BomLens 데스크톱 앱 (Electron)
 
-콘솔 없이 더블클릭으로 SBOM Generator 웹 UI를 여는 데스크톱 앱이다. 스캐너 자체는 여전히
+콘솔 없이 더블클릭으로 BomLens 웹 UI를 여는 데스크톱 앱이다. 스캐너 자체는 여전히
 Docker 컨테이너로 실행되며, 이 앱은 Docker 점검과 이미지 다운로드, 컨테이너 기동과 정리를
 대신 처리한다. 설계 배경은 [데스크톱 앱 검토 보고서](../docs/internal/desktop-app-study.md)를 참고한다.
 

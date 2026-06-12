@@ -3,9 +3,9 @@ hide:
   - toc
 ---
 
-# SBOM Generator
+# BomLens
 
-Automated SBOM (CycloneDX 1.6) generation for software supply chain security. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM, an open-source notice, and a security risk report in one run.
+A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
 
 [Download for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button .md-button--primary }
 [Get started](getting-started.md){ .md-button }

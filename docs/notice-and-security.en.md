@@ -190,7 +190,7 @@ The private key is mounted read-only into the container. Additional output: `MyA
 
 Scan from a browser without the CLI. The UI server is built into the scanner image, so no extra install is needed.
 
-![The SBOM Generator web UI](images/web-ui.png)
+![The BomLens web UI](images/web-ui.png)
 
 **macOS / Linux:**
 ```bash

@@ -1,6 +1,6 @@
-# SBOM Generator
+# BomLens
 
-> Automated SBOM (CycloneDX 1.6) generation for supply chain security
+> A local-first SBOM generator and open-source risk assessor — scan a single project in seconds, no SaaS.
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/sbom-tools?style=flat-square)](https://github.com/sktelecom/sbom-tools/releases)
 [![Container image](https://img.shields.io/badge/ghcr.io-sbom--generator-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-generator)
@@ -10,7 +10,7 @@
 
 **Where to start:**
 
-- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download SBOM Generator for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
+- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
 - **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/internal/architecture.md).
 
 A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
@@ -24,7 +24,7 @@ Every scan also emits the risk report by default. Run it from the CLI or a brows
 
 Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware.
 
-![SBOM Generator web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
+![BomLens web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
 
 ## Quick Start
 
@@ -41,7 +41,7 @@ No git installed? Download the repo as a ZIP from the GitHub page (the green Cod
 
 Launch, scan, and download — all in the browser. Live logs stream as it runs.
 
-![SBOM Generator web UI — a scan in progress with live logs](docs/images/web-ui-scan-en.png)
+![BomLens web UI — a scan in progress with live logs](docs/images/web-ui-scan-en.png)
 
 ```bash
 cd ~/sbom-output     # any folder — this is where results are saved
@@ -65,7 +65,7 @@ The [getting-started guide](docs/getting-started.md) covers this in more detail 
 
 Prefer a real app over a `.bat`? A desktop app wraps this same flow with no console window — it checks Docker, pulls the image, and opens the UI on double-click. Download `SBOM-Generator-*.exe` (or `.dmg`) from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest). It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. Build details are in [`electron/`](electron/README.md).
 
-![SBOM Generator desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup-en.png)
+![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup-en.png)
 
 ### CLI
 

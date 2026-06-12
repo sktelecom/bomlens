@@ -1,5 +1,5 @@
 appId: com.sktelecom.sbom-generator
-productName: SBOM Generator
+productName: BomLens
 directories:
   output: dist-electron
   buildResources: build

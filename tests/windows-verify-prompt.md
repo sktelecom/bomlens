@@ -5,7 +5,7 @@
 
 ## 미션
 
-SBOM Generator 데스크톱 앱의 실제 동작을 Windows에서 검증하고, `docs/quickstart-no-cli.md`의
+BomLens 데스크톱 앱의 실제 동작을 Windows에서 검증하고, `docs/quickstart-no-cli.md`의
 `TODO(windows-capture)` 자리표시를 실제 스크린샷으로 교체해 PR을 올린다. GUI 클릭은 사람이,
 스크립트 실행과 캡처와 문서 반영과 PR은 Claude가 맡는다.
 

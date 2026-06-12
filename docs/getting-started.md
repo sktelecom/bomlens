@@ -2,7 +2,7 @@
 
 > **관련 문서**: [사용 가이드](usage-guide.md) | [예제 가이드](examples-guide.md) | [시나리오 가이드](scenarios-guide.md)
 
-SBOM Generator를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생성까지의 단계별 가이드입니다.
+BomLens를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생성까지의 단계별 가이드입니다.
 
 > 명령어 없이 SBOM이나 고지문만 빨리 만들고 싶다면
 > [비개발자 빠른 시작](quickstart-no-cli.md)부터 보세요.
@@ -55,7 +55,7 @@ Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 
 
 ### Windows — 다운로드 후 더블클릭 (명령줄 불필요)
 
-가장 간단한 길은 데스크톱 앱입니다. [Windows용 SBOM Generator 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe)를 눌러 받은 파일을 더블클릭하면 콘솔 창 없이 UI가 열립니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)을 참고하세요.
+가장 간단한 길은 데스크톱 앱입니다. [Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe)를 눌러 받은 파일을 더블클릭하면 콘솔 창 없이 UI가 열립니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)을 참고하세요.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](images/desktop-startup.png)
 
@@ -123,7 +123,7 @@ Windows에서는(Rancher Desktop/Docker Desktop) `scripts\sbom-ui.bat`를 더블
 
 ### 스캔
 
-![SBOM Generator 웹 UI](images/web-ui.png)
+![BomLens 웹 UI](images/web-ui.png)
 
 1. 프로젝트 이름과 버전을 입력합니다.
 2. 스캔 대상을 고릅니다. 현재 폴더, GitHub URL, ZIP 업로드, SBOM 업로드, 펌웨어 업로드, Docker 이미지 중에서 선택할 수 있습니다.

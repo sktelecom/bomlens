@@ -2,7 +2,7 @@
 
 > **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [예제 가이드](examples-guide.md)
 
-SBOM Generator의 전체 옵션, 분석 모드, CI/CD 통합 방법 및 트러블슈팅을 설명합니다.
+BomLens의 전체 옵션, 분석 모드, CI/CD 통합 방법 및 트러블슈팅을 설명합니다.
 
 ## 옵션 레퍼런스
 

@@ -1,6 +1,6 @@
 # Support
 
-Thanks for using SBOM Generator. Here is where to go for help.
+Thanks for using BomLens. Here is where to go for help.
 
 ## Documentation first
 

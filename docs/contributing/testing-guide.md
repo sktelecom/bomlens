@@ -2,7 +2,7 @@
 
 > **관련 문서**: [기여 가이드](../../CONTRIBUTING.md) | [아키텍처](../internal/architecture.md) | [패키지 매니저 추가](package-manager-guide.md)
 
-SBOM Generator의 테스트 구조, 실행 방법, 테스트 작성 방법 및 디버깅 절차를 설명합니다.
+BomLens의 테스트 구조, 실행 방법, 테스트 작성 방법 및 디버깅 절차를 설명합니다.
 
 ## 목차
 

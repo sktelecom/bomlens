@@ -1,5 +1,5 @@
 # ========================================================
-# SBOM Generator — post-processing image (2-stage architecture)
+# BomLens — post-processing image (2-stage architecture)
 # Image: ghcr.io/sktelecom/sbom-scanner
 #
 # In the redesigned pipeline (see docs/direction-study.md), SBOM GENERATION for
@@ -27,7 +27,7 @@ RUN npm run build
 # firmware tools (pinned) do not yet support newer Python, so we stay on 3.12.
 FROM python:3.12-slim@sha256:a39549e211a16149edf74e5fdc9ef03a6767e46cd987c5048b6659b6c9904c94
 
-LABEL org.opencontainers.image.title="SBOM Generator (post-process)"
+LABEL org.opencontainers.image.title="BomLens (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
 LABEL org.opencontainers.image.vendor="SK Telecom"
 LABEL org.opencontainers.image.licenses="Apache-2.0"

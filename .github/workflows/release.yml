@@ -63,7 +63,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            ## SBOM Generator ${{ steps.version.outputs.version }}
+            ## BomLens ${{ steps.version.outputs.version }}
 
             Generate a CycloneDX SBOM, an open-source notice (고지문), and a security report from your source code — or assess the open-source risk of an SBOM or firmware you receive.
 

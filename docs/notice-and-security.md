@@ -190,7 +190,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 
 CLI 없이 브라우저에서 스캔합니다. UI 서버는 스캐너 이미지에 내장되어 있어 추가 설치가 필요 없습니다.
 
-![SBOM Generator 웹 UI](images/web-ui.png)
+![BomLens 웹 UI](images/web-ui.png)
 
 **macOS / Linux:**
 ```bash
