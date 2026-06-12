@@ -62,10 +62,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          # Co-publish under two names from a single build (same digest):
-          #   sbom-generator   — featured name, matches the product "SBOM Generator"
+          # Co-publish under three names from a single build (same digest):
+          #   bomlens          — featured name, the product brand
+          #   sbom-generator   — alias, kept for the prior featured name
           #   sbom-scanner     — legacy name, kept so existing supplier pulls never break
           images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -109,12 +111,15 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
+          bl="${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
           gen="${REGISTRY}/${OWNER}/sbom-generator@${DIGEST}"
           leg="${REGISTRY}/${OWNER}/sbom-scanner@${DIGEST}"
+          cosign sign --yes "$bl"
           cosign sign --yes "$gen"
           cosign sign --yes "$leg"
           # CycloneDX SBOM of our own image, attached as a signed attestation.
-          syft "$gen" -o cyclonedx-json=sbom.cdx.json
+          syft "$bl" -o cyclonedx-json=sbom.cdx.json
+          cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$bl"
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$gen"
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$leg"
       - name: Attach image SBOM to the release
@@ -152,7 +157,7 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           OWNER: ${{ github.repository_owner }}
-        run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/sbom-generator@${DIGEST}"
+        run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
       - name: Upload image scan results
         if: steps.flags.outputs.push == 'true'
         uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
@@ -274,7 +279,8 @@ jobs:
     steps:
       - run: |
           echo "## 🐳 Images built" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator\` (post-process, featured)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens\` (post-process, featured)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator\` (post-process, alias)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` (post-process, legacy alias)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk{30..35}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-firmware\` (firmware unpack/ID, GPL tools)" >> $GITHUB_STEP_SUMMARY
