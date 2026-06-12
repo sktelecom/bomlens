@@ -1,0 +1,103 @@
+# 사용자 문서 사이트 설정. 정본 마크다운은 docs/에 있고, 이 설정으로 GitHub Pages에
+# 렌더링한다(검색, 사이드바, 한국어/영어). 룩은 Gemini API 문서(Google DevSite) 인상을
+# MkDocs Material과 docs/stylesheets/extra.css로 재현하되, 강조색만 SK 브랜드 색을 쓴다.
+# internal/(메인테이너 설계 문서)과 contributing/는 사이트 빌드에서 제외한다.
+site_name: SBOM Generator
+site_description: 소프트웨어 공급망 보안을 위한 SBOM 자동 생성 도구
+site_url: https://sktelecom.github.io/sbom-tools/
+repo_url: https://github.com/sktelecom/sbom-tools
+repo_name: sktelecom/sbom-tools
+edit_uri: edit/main/docs/
+copyright: SK Telecom
+
+theme:
+  name: material
+  language: ko
+  font:
+    text: Roboto
+    code: Roboto Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: 다크 모드로
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: 라이트 모드로
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: ko
+          name: 한국어
+          default: true
+          build: true
+        - locale: en
+          name: English
+          build: true
+          nav_translations:
+            홈: Home
+            빠른 시작: Quick start
+            사용 가이드: Guides
+            검증과 분석: Validate & analyze
+
+exclude_docs: |
+  internal/
+  contributing/
+  korean-style-guide.md
+
+nav:
+  - 홈: index.md
+  - 빠른 시작:
+      - getting-started.md
+      - quickstart-no-cli.md
+  - 사용 가이드:
+      - usage-guide.md
+      - scenarios-guide.md
+      - notice-and-security.md
+      - examples-guide.md
+  - 검증과 분석:
+      - supplier-sbom-validation.md
+      - firmware-analysis-guide.md

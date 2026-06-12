@@ -1,0 +1,68 @@
+/*
+ * 강조색만 SK 브랜드 색으로 바꾸고, 나머지는 Material 기본을 Gemini 문서(Google DevSite)
+ * 인상에 가깝게 다듬는다. 색 값은 [[skt-brand-colors]] 기준.
+ *   SK Red    #EA002C  흰 배경 대비 약 4.63:1 (본문 텍스트 AA 충족) — 1차 강조
+ *   SK Orange #F47725  흰 배경 대비 약 2.8:1 (본문 텍스트 불가) — hover/보조 강조만
+ */
+
+/* palette: primary가 custom일 때 Material이 data-md-color-primary="custom"을 붙인다. */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #ea002c;
+  --md-primary-fg-color--light: #ff3355;
+  --md-primary-fg-color--dark: #b0001f;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #f47725;
+  --md-accent-fg-color--transparent: rgba(244, 119, 37, 0.1);
+}
+
+/* 본문 링크: 1차 강조(SK Red). hover에서 보조 강조(SK Orange). */
+.md-typeset a {
+  color: #ea002c;
+}
+.md-typeset a:hover {
+  color: #f47725;
+}
+
+/* 다크 모드에서는 어두운 배경 대비를 위해 살짝 밝은 레드를 쓴다. */
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: #ff4d6a;
+}
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: #f9914f;
+}
+
+/* DevSite 톤: 본문 폭을 약간 좁혀 가독성을 높이고 행간을 살짝 키운다. */
+.md-grid {
+  max-width: 64rem;
+}
+.md-typeset {
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+/* 1차 다운로드 버튼: SK Red 채움 + 흰 글자(대비 AA), hover는 약간 어둡게. */
+.md-typeset .md-button--primary {
+  background-color: #ea002c;
+  border-color: #ea002c;
+  color: #ffffff;
+}
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: #b0001f;
+  border-color: #b0001f;
+  color: #ffffff;
+}
+
+/* grid cards 모서리와 그림자를 DevSite 카드 느낌으로 다듬는다. */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 0.5rem;
+  transition: box-shadow 200ms, border-color 200ms;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: #f47725;
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.18);
+}

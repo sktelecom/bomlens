@@ -1,11 +1,11 @@
 # 시작하기
 
-> **관련 문서**: [사용 가이드](usage-guide.md) | [예제 가이드](examples-guide.md) | [아키텍처](architecture.md)
+> **관련 문서**: [사용 가이드](usage-guide.md) | [예제 가이드](examples-guide.md) | [시나리오 가이드](scenarios-guide.md)
 
 SBOM Generator를 처음 사용하는 분을 위한 설치부터 첫 번째 SBOM 생성까지의 단계별 가이드입니다.
 
-> 명령어 없이 오픈소스 고지문만 빨리 만들고 싶은 라이선스 담당자라면
-> [라이선스 담당자용 빠른 시작](notice-quickstart.md)부터 보세요.
+> 명령어 없이 SBOM이나 고지문만 빨리 만들고 싶다면
+> [비개발자 빠른 시작](quickstart-no-cli.md)부터 보세요.
 
 ## 목차
 
@@ -64,7 +64,7 @@ Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 
 
 ### Windows — 다운로드 후 더블클릭 (명령줄 불필요)
 
-가장 간단한 길은 데스크톱 앱입니다. [최신 릴리스](https://github.com/sktelecom/sbom-tools/releases/latest)에서 `SBOM-Generator-*.exe`를 받아 더블클릭하면 콘솔 창 없이 UI가 열립니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 단계별 안내는 [라이선스 담당자용 빠른 시작](notice-quickstart.md)을 참고하세요.
+가장 간단한 길은 데스크톱 앱입니다. [Windows용 SBOM Generator 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe)를 눌러 받은 파일을 더블클릭하면 콘솔 창 없이 UI가 열립니다. 아직 미서명이라 SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)을 참고하세요.
 
 ![데스크톱 앱 시작 화면 — Docker 점검과 이미지 다운로드, 컨테이너 준비 상황을 보여준다](images/desktop-startup.png)
 
@@ -147,7 +147,7 @@ Windows에서는(Rancher Desktop/Docker Desktop) `scripts\sbom-ui.bat`를 더블
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
 
-UI 화면 구성과 스캔 대상별 상세는 [고지문·보안·UI 가이드](notice-security-ui-guide.md#웹-ui---ui)를 참고하세요. 아래는 같은 작업을 명령줄(CLI)로 하는 방법입니다.
+UI 화면 구성과 스캔 대상별 상세는 [고지문·보안 보고서 가이드](notice-and-security.md#웹-ui---ui)를 참고하세요. 아래는 같은 작업을 명령줄(CLI)로 하는 방법입니다.
 
 ## 첫 번째 SBOM 생성 (CLI)
 
@@ -261,8 +261,8 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 | 목표 | 문서 |
 |------|------|
 | 입력 형태(GitHub·ZIP·SBOM·펌웨어 등)별 처리 | [시나리오별 가이드](scenarios-guide.md) |
-| 고지문·보안보고서·위험분석보고서·웹 UI | [고지문·보안·UI 가이드](notice-security-ui-guide.md) |
+| 고지문·보안 보고서·위험분석보고서·웹 UI | [고지문·보안 보고서 가이드](notice-and-security.md) |
 | 전체 옵션 및 CI/CD 연동 방법 | [사용 가이드](usage-guide.md) |
 | 언어별 예제 프로젝트 실습 | [예제 가이드](examples-guide.md) |
-| 내부 구조 이해 | [아키텍처](architecture.md) |
-| 프로젝트 기여 | [기여 가이드](../CONTRIBUTING.md) |
+| 내부 구조 이해 (기여자용) | [아키텍처](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) |
+| 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) |

@@ -10,9 +10,8 @@
 
 **Where to start:**
 
-- **New to this, on Windows, and you just need the open-source notice or the SBOM?** Use the [license-manager quick start](docs/notice-quickstart.md) (Korean) — a double-click desktop app, no command line.
-- **Installing it yourself to scan or automate?** See [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)).
-- **Contributing?** See [CONTRIBUTING](CONTRIBUTING.en.md).
+- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download SBOM Generator for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
+- **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/internal/architecture.md).
 
 A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
 
@@ -54,7 +53,7 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 
 #### Windows, no CLI — from a source ZIP you received
 
-The common case for an open-source PM: a dev team handed you a source archive and you need its SBOM. The [license-manager quick start](docs/notice-quickstart.md) walks through this step by step in Korean for non-developers; the short version is below.
+A common case: a dev team handed you a source archive and you need its SBOM. The [no-CLI quick start](docs/quickstart-no-cli.md) walks through this step by step in Korean for non-developers; the short version is below.
 
 1. Install and start a Docker engine. **Rancher Desktop** is a free, drop-in choice for this double-click flow; Docker Desktop also works (with licensing caveats for organizations).
 2. Get this repo: on the GitHub page use the green Code button, then Download ZIP, and unzip it.
@@ -87,6 +86,8 @@ Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `ri
 
 ## Documentation
 
+Read the docs as a navigable site at **[sktelecom.github.io/sbom-tools](https://sktelecom.github.io/sbom-tools/)** (search, sidebar, English/Korean). The same content lives under [docs/](docs/) in this repo.
+
 The web UI itself is bilingual (English and Korean, English by default). The core docs are available in English; the most detailed and complete guides — including the non-developer quick start — are in Korean.
 
 ### English
@@ -96,20 +97,21 @@ The web UI itself is bilingual (English and Korean, English by default). The cor
 | [Getting started](docs/getting-started.en.md) | Install and your first SBOM (web UI + CLI) |
 | [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
 | [Input scenarios](docs/scenarios-guide.en.md) | GitHub URL, ZIP, local C/C++, existing SBOM, firmware |
-| [Architecture](docs/architecture.md) | Two-stage pipeline (cdxgen + syft, then post-processing) — _Korean_ |
+
+Building or extending the tool? The [architecture](docs/internal/architecture.md) and design notes live under [docs/internal/](docs/internal/) (Korean).
 
 ### 한국어
 
 | 문서 | 설명 |
 |------|------|
-| [라이선스 담당자용 빠른 시작](docs/notice-quickstart.md) | CLI 없이 웹 UI로 오픈소스 고지문 만들기 |
-| [시작하기](docs/getting-started.md) | 설치 · 첫 SBOM (웹 UI 포함) |
-| [시나리오 가이드](docs/scenarios-guide.md) | 입력 형태별(GitHub·ZIP·로컬·SBOM·펌웨어) 처리 |
-| [사용 가이드](docs/usage-guide.md) | 전체 옵션 · 분석 모드 · CI/CD |
-| [고지문·보안·UI](docs/notice-security-ui-guide.md) | 산출물과 웹 UI 사용법 |
-| [아키텍처](docs/architecture.md) | 2-stage 파이프라인(cdxgen + syft → 후처리) |
+| [비개발자 빠른 시작](docs/quickstart-no-cli.md) | 명령줄 없이 데스크톱 앱과 웹 UI로 SBOM과 고지문 만들기 |
+| [시작하기](docs/getting-started.md) | 설치와 첫 SBOM (웹 UI 포함) |
+| [시나리오 가이드](docs/scenarios-guide.md) | 입력 형태별(GitHub, ZIP, 로컬, SBOM, 펌웨어) 처리 |
+| [고지문·보안 보고서](docs/notice-and-security.md) | 산출물 생성·해석과 웹 UI 사용법 |
+| [사용 가이드](docs/usage-guide.md) | 전체 옵션, 분석 모드, CI/CD |
+| [예제 가이드](docs/examples-guide.md) | 언어별 예제 프로젝트 실습 |
 
-> 설계 배경과 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
+> 내부 구조([아키텍처](docs/internal/architecture.md))와 설계 배경, 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
 
 ## Contributing & License
 

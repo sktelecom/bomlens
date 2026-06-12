@@ -33,7 +33,7 @@ Docker Desktop is the simplest, but it needs a paid license above a certain orga
 
 ### Windows — download and double-click (no command line)
 
-The simplest path is the desktop app. Download `SBOM-Generator-*.exe` from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest) and double-click it; the UI opens with no console window. It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. A step-by-step Korean guide is in the [license-manager quickstart](notice-quickstart.md).
+The simplest path is the desktop app. Use [Download SBOM Generator for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click the file; the UI opens with no console window. It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. A step-by-step Korean guide is in the [no-CLI quickstart](quickstart-no-cli.md).
 
 Prefer scripts? Download the repo ZIP (the green Code button, then Download ZIP), unzip it, and double-click `scripts\sbom-ui.bat`. The scanner image (about 3–4 GB) downloads automatically on first run.
 
@@ -104,5 +104,5 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 ## Next steps
 
 - [Usage guide](usage-guide.en.md) — every option, analysis modes, CI/CD integration
-- [Architecture](architecture.md) — the two-stage pipeline (cdxgen + syft, then post-processing)
-- [README](../README.md) — overview and the two core roles
+- [Architecture](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) — the two-stage pipeline (cdxgen + syft, then post-processing) (Korean)
+- [README](https://github.com/sktelecom/sbom-tools/blob/main/README.md) — overview and the two core roles

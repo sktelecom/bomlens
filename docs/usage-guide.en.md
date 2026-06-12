@@ -41,11 +41,11 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for SBOM Ge
 | `--ui` | — | Launch the local web UI |
 | `--help` | — | Print help |
 
-> **Environment variables**: `SBOM_SCANNER_IMAGE` (override the scanner image), `SBOM_FIRMWARE_IMAGE` (firmware image), `GIT_TOKEN` (private git clone), `COSIGN_KEY` (signing key), `FETCH_LICENSE` (default true; resolves dependency licenses during source scans — set `false` to skip the lookup and run faster), `SECURITY_ENRICH` (default true; enriches the security report with EPSS and CISA KEV signals — set `false` on air-gapped networks to skip the external lookups). Output flags are detailed in the [notice/security/UI guide](notice-security-ui-guide.md); supplier SBOM analysis is in [supplier SBOM analysis](supplier-sbom-analysis.md).
+> **Environment variables**: `SBOM_SCANNER_IMAGE` (override the scanner image), `SBOM_FIRMWARE_IMAGE` (firmware image), `GIT_TOKEN` (private git clone), `COSIGN_KEY` (signing key), `FETCH_LICENSE` (default true; resolves dependency licenses during source scans — set `false` to skip the lookup and run faster), `SECURITY_ENRICH` (default true; enriches the security report with EPSS and CISA KEV signals — set `false` on air-gapped networks to skip the external lookups). Output flags are detailed in the [notice and security guide](notice-and-security.md); validating a received supplier SBOM is covered in the [supplier SBOM validation guide](supplier-sbom-validation.md) (Korean).
 
 ## Analysis modes
 
-The right tool (cdxgen or syft) is selected automatically from the type of target. See [architecture](architecture.md) for the selection logic.
+The right tool (cdxgen or syft) is selected automatically from the type of target. See the [architecture](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) doc (Korean) for the selection logic.
 
 ### Source code (cdxgen)
 
