@@ -1,6 +1,6 @@
 {
   "name": "sbom-generator-desktop",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "Double-click desktop app that wraps the SBOM Generator web UI (runs the scanner in Docker).",
