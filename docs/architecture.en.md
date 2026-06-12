@@ -14,9 +14,9 @@ BomLens is a 2-stage pipeline in which two kinds of Docker images work together.
 - **Stage 2 — Post-processing**: the lightweight `sbom-scanner` image takes the SBOM and runs normalization, (deep license detection), notice generation, the security report, signing, and upload in order.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph S1["① Stage 1 — Generation (build the SBOM)"]
-        direction TB
+        direction LR
         SRC["Source code"] --> CDX["cdxgen<br/>(official per-language image)"]
         IMG["Image / binary / directory"] --> SYFT["syft"]
         CDX --> BOM[("bom.json<br/>CycloneDX 1.6")]
@@ -24,14 +24,14 @@ flowchart LR
     end
 
     subgraph S2["② Stage 2 — Post-processing (sbom-scanner image)"]
-        direction TB
-        BOM --> NORM["normalize (jq)"]
-        NORM --> SCAN["scancode<br/>(opt-in)"]
+        direction LR
+        NORM["normalize (jq)"] --> SCAN["scancode<br/>(opt-in)"]
         SCAN --> NOTICE["notice (jq)"]
         NOTICE --> TRIVY["Trivy<br/>(security)"]
         TRIVY --> SIGN["cosign<br/>(signing)"]
     end
 
+    BOM --> NORM
     SIGN --> OUT["Host artifacts"]
     SIGN -.upload (optional).-> DT["Dependency-Track"]
 
@@ -366,17 +366,19 @@ Add a helper script under `docker/lib/`, call it from the shared pipeline sectio
 BomLens specializes in **generation**. **Governance** — company-wide project management, vulnerability triage, and license policy gates — is delegated to the sister project [`trustedoss-portal`](https://github.com/sktelecom/trustedoss-portal). Both tools share cdxgen and Trivy, so the artifacts (CycloneDX) are directly compatible.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph dev["Developer · single project"]
-        A["Source / image / binary"] --> B["sbom-tools"]
+        direction LR
+        A["Source / image / binary"] --> B["BomLens"]
         B --> C["SBOM"]
         B --> D["Notice"]
         B --> E["Security report"]
     end
     subgraph org["Organization · central management"]
-        C -. upload .-> F["trustedoss-portal"]
-        F --> G["Vulnerability triage"]
+        direction LR
+        F["trustedoss-portal"] --> G["Vulnerability triage"]
         F --> H["License policy gate"]
         F --> I["Project dashboard"]
     end
+    C -. upload .-> F
 ```
