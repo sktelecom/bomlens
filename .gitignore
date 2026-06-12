@@ -68,6 +68,7 @@ target/
 # Build Artifacts
 dist/
 build/
+!electron/build/
 *.egg-info/
 
 # Environment Variables
