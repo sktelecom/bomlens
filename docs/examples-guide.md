@@ -1,6 +1,6 @@
 # 예제 가이드
 
-> 관련 문서: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md)
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md)
 
 `examples/` 디렉토리의 언어별 예제 프로젝트로 직접 실습해 보는 가이드입니다. 각 예제를 실행하면 SBOM 출력 결과를 바로 확인할 수 있습니다.
 

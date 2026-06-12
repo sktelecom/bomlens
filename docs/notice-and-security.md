@@ -31,7 +31,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
 
 ## 사전 준비
 
-- Docker 엔진 20.10 이상 (무료: WSL2 + docker-ce 또는 Rancher Desktop / Docker Desktop은 조직 사용 시 유료)
+- Docker 엔진 20.10 이상. 무료로는 WSL2 + docker-ce나 Rancher Desktop을 쓰면 되고, Docker Desktop은 조직 사용 시 유료입니다.
 - 스캐너 이미지 pull:
   ```bash
   docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
@@ -119,7 +119,7 @@ Components (1):
 
 EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURITY_ENRICH=false`로 두면 두 열을 생략하고 나머지 보고서는 그대로 생성합니다.
 
-### 결과 해석 & 후속 조치
+### 결과 해석과 후속 조치
 
 | Severity | 의미 | 권장 조치 |
 |----------|------|----------|
@@ -134,7 +134,7 @@ EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURIT
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "Critical 취약점 ${crit}건"; exit 1; }
   ```
-- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 sbom-tools 범위를 넘습니다. SBOM을 trustedoss-portal에 업로드해 처리하세요.
+- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 BomLens의 범위를 넘습니다. SBOM을 trustedoss-portal에 업로드해 처리하세요.
 
 ---
 
@@ -170,7 +170,7 @@ EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURIT
 
 ## SBOM 서명 (`--sign`)
 
-cosign으로 SBOM에 detached 서명을 만들어 공급망 신뢰를 확보합니다. 오프라인 키 기반 서명(`--tlog-upload=false`)이라 네트워크·OIDC가 필요 없습니다.
+cosign으로 SBOM에 detached 서명을 만들어 공급망 신뢰를 확보합니다. 오프라인 키 기반 서명(`--tlog-upload=false`)이라 네트워크나 OIDC가 필요 없습니다.
 
 ```bash
 # 1) 키 생성 (최초 1회). 무비밀번호 키는 COSIGN_PASSWORD="" 로 생성
