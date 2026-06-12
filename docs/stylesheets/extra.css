@@ -266,3 +266,30 @@
   border-color: #f47725;
   box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.18);
 }
+/* 카드 하단 링크: 기본은 본문색으로 차분하게, hover에서만 브랜드색.
+   화면 전체에 빨강이 반복되는 것을 줄인다. */
+.md-typeset .grid.cards a {
+  color: #3c4043;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a {
+  color: #c4c7ca;
+}
+.md-typeset .grid.cards a:hover,
+.md-typeset .grid.cards > ul > li:hover a {
+  color: #ea002c;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a:hover,
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover a {
+  color: #ff4d6a;
+}
+
+/* ---- 홈 히어로 스크린샷: 카드형 테두리와 옅은 그림자 ---- */
+.md-typeset img.home-shot {
+  margin-top: 1.2em;
+  border: 1px solid #e8eaed;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.22);
+}
+[data-md-color-scheme="slate"] .md-typeset img.home-shot {
+  border-color: #2d2d31;
+}
