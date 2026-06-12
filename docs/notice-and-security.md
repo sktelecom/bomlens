@@ -28,7 +28,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
 - Docker 엔진 20.10 이상 (무료: WSL2 + docker-ce 또는 Rancher Desktop / Docker Desktop은 조직 사용 시 유료)
 - 스캐너 이미지 pull:
   ```bash
-  docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지
+  docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
   ```
 - 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 

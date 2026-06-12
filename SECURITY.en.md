@@ -6,7 +6,7 @@ BomLens is a software supply-chain security tool, so the security of the tool it
 
 ## Supported versions
 
-Security fixes are provided for the latest release. The `ghcr.io/sktelecom/sbom-generator:latest` Docker image tag (legacy alias: `sbom-scanner:latest`) reflects the latest security patches.
+Security fixes are provided for the latest release. The `ghcr.io/sktelecom/bomlens:latest` Docker image tag (legacy alias: `sbom-scanner:latest`) reflects the latest security patches.
 
 | Version | Supported |
 |---------|-----------|

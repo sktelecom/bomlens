@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Capture deskt
 ```
 
 각 캡처는 `docs/images/<이름>.png`로 저장된다. 이미 받은 이미지라 다운로드 진행을 못 보면,
-로컬 이미지를 한 번 지우고(`docker rmi ghcr.io/sktelecom/sbom-generator:latest`) 다시 실행해
+로컬 이미지를 한 번 지우고(`docker rmi ghcr.io/sktelecom/bomlens:latest`) 다시 실행해
 첫 실행 화면을 재현한다.
 
 ### 3. 확인과 PR

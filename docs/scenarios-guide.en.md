@@ -22,7 +22,7 @@ For any input form, adding `--all --generate-only` produces all three at once (t
 
 ```bash
 # Docker 20.10+ required. Pull the scanner image once (or build it yourself).
-docker pull ghcr.io/sktelecom/sbom-generator:latest   # legacy name sbom-scanner serves the same image
+docker pull ghcr.io/sktelecom/bomlens:latest   # legacy name sbom-scanner serves the same image
 
 # For convenience, keep the script path in a variable.
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh

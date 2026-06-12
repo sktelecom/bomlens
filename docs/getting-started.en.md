@@ -44,7 +44,7 @@ For the command-line wrapper, install [Git for Windows](https://git-scm.com/down
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git
 cd sbom-tools
-docker pull ghcr.io/sktelecom/sbom-generator:latest   # legacy alias sbom-scanner serves the same image
+docker pull ghcr.io/sktelecom/bomlens:latest   # legacy alias sbom-scanner serves the same image
 ```
 
 The image is about 3–4 GB and may take a few minutes. Then verify:
