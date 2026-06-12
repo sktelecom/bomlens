@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.2] - 2026-06-13
+
+### Added
+
+- BomLens brand identity: aperture logo, app icons, and favicon across the docs site, web UI, and desktop app. (#125, #127, #128, #130)
+- Rendered documentation site (sktelecom.github.io/sbom-tools) with sidebar navigation, search, and a one-click Windows download, replacing repo-only docs. (#112, #113, #114, #115, #116)
+- New documentation pages on the site: use the Docker image directly, architecture, and the two contributing guides, each with an English translation. (#126)
+- English translations for the five previously Korean-only guides. (#117)
+
+### Changed
+
+- Renamed the product display name to BomLens; technical identifiers and download URLs are unchanged. (#120)
+- The web UI header shows the BomLens brand with an SBOM generator descriptor. (#124)
+- The post-process image is co-published as `ghcr.io/sktelecom/bomlens`; `sbom-generator` and `sbom-scanner` remain aliases of the same digest. (#121, #122)
+- Reworked the Korean guides for readability and kept the synced English pages aligned; wide architecture diagrams now stack vertically. (#123, #129)
+- The docs home leads with a headline, a Get started primary button, and a product screenshot; the header brand links to the home page. (#131, #132)
+
+### Fixed
+
+- The desktop app startup screen background matches the web UI dark token. (#118)
+
 ## [v1.2.1] - 2026-06-12
 
 ### Security
