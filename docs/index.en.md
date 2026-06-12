@@ -4,14 +4,16 @@ hide:
   - toc
 ---
 
-![BomLens — an SBOM generator](images/logo.svg){ width="300" }
+# Generate SBOMs and assess open-source risk, all locally
 
 A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
 
-[Download for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button .md-button--primary }
-[Get started](getting-started.md){ .md-button }
+[Get started](getting-started.md){ .md-button .md-button--primary }
+[Download for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button }
 
-Prefer no command line? Download the installer above and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough (Korean) is in the no-CLI quick start.
+Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough (Korean) is in the no-CLI quick start.
+
+![The scan results screen — view and download the SBOM, notice, and risk report as grouped cards](images/web-ui-en.png){ .home-shot }
 
 ## Where to go next
 

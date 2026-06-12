@@ -40,6 +40,18 @@
 .md-header .md-logo svg {
   color: #ea002c;
 }
+/* 헤더 브랜드: 락업 로고(아이콘+워드마크+부제)를 키워서 쓰고, 데스크톱에서는
+   중복되는 사이트명 텍스트를 숨긴다. 모바일에서는 Material이 로고를 숨기므로
+   텍스트 제목을 그대로 둔다. */
+.md-header .md-logo img {
+  height: 1.9rem;
+  width: auto;
+}
+@media screen and (min-width: 76.25em) {
+  .md-header__title {
+    display: none;
+  }
+}
 /* 저장소 통계(버전/스타/포크)는 밝은 헤더에서 번잡해 숨긴다(저장소 링크는 유지) */
 .md-source__facts {
   display: none;
@@ -265,4 +277,31 @@
 .md-typeset .grid.cards > ul > li:hover {
   border-color: #f47725;
   box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.18);
+}
+/* 카드 하단 링크: 기본은 본문색으로 차분하게, hover에서만 브랜드색.
+   화면 전체에 빨강이 반복되는 것을 줄인다. */
+.md-typeset .grid.cards a {
+  color: #3c4043;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a {
+  color: #c4c7ca;
+}
+.md-typeset .grid.cards a:hover,
+.md-typeset .grid.cards > ul > li:hover a {
+  color: #ea002c;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a:hover,
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover a {
+  color: #ff4d6a;
+}
+
+/* ---- 홈 히어로 스크린샷: 카드형 테두리와 옅은 그림자 ---- */
+.md-typeset img.home-shot {
+  margin-top: 1.2em;
+  border: 1px solid #e8eaed;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.22);
+}
+[data-md-color-scheme="slate"] .md-typeset img.home-shot {
+  border-color: #2d2d31;
 }
