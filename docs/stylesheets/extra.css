@@ -132,28 +132,39 @@
     display: none;
   }
 }
-/* 섹션 라벨: 작고 muted한 그룹 헤더 (대문자, 자간) */
+/* 사이드바의 "홈" 항목은 숨긴다(헤더 로고가 홈으로 가므로 중복). index.md는
+   i18n 홈페이지 인식을 위해 nav에 남겨두되, 사이드바 첫 항목만 가린다. */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-child {
+  display: none;
+}
+
+/* 섹션(상위) 헤더: 하위보다 크고 굵고 어둡게 — 상위가 더 두드러진다 */
 .md-nav--primary .md-nav__item--section > .md-nav__link {
-  color: #5f6368;
-  font-size: 0.62rem;
+  color: #202124;
+  font-size: 0.84rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 1.3em 0 0.2em;
+  letter-spacing: -0.005em;
+  margin: 1.6em 0 0.5em;
+  opacity: 1;
 }
 [data-md-color-scheme="slate"] .md-nav--primary .md-nav__item--section > .md-nav__link {
-  color: #9aa0a6;
+  color: #e8eaed;
 }
-/* 하위 페이지 링크: 약간 작게, 활성은 SK 레드 강조 */
+/* 하위 페이지 링크: 일반 무게, 약간 작게, 차분한 색 */
 .md-nav--primary .md-nav__link {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: #3c4043;
 }
-.md-nav__link--active,
-.md-nav__item .md-nav__link--active {
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link {
+  color: #c4c7ca;
+}
+/* 활성 페이지: SK 레드 강조 */
+.md-nav--primary .md-nav__link--active {
   color: #ea002c;
   font-weight: 600;
 }
-[data-md-color-scheme="slate"] .md-nav__link--active {
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
   color: #ff4d6a;
 }
 
