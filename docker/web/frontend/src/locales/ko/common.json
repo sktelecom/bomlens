@@ -1,5 +1,5 @@
 {
-  "appTitle": "SBOM Tools",
+  "appTitle": "BomLens",
   "subtitle": "단일 프로젝트의 SBOM · 고지문 · 보안 보고서를 한 번에",
   "form": {
     "title": "스캔 설정",
