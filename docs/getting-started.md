@@ -259,5 +259,5 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 | 고지문, 보안 보고서, 위험분석보고서, 웹 UI | [고지문·보안 보고서 가이드](notice-and-security.md) |
 | 전체 옵션과 CI/CD 연동 방법 | [사용 가이드](usage-guide.md) |
 | 언어별 예제 프로젝트 실습 | [예제 가이드](examples-guide.md) |
-| 내부 구조 이해 (기여자용) | [아키텍처](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) |
+| 내부 구조 이해 | [아키텍처](architecture.md) |
 | 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) |

@@ -104,5 +104,5 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 ## Next steps
 
 - [Usage guide](usage-guide.en.md) — every option, analysis modes, CI/CD integration
-- [Architecture](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) — the two-stage pipeline (cdxgen + syft, then post-processing) (Korean)
+- [Architecture](architecture.en.md) — the two-stage pipeline (cdxgen + syft, then post-processing)
 - [README](https://github.com/sktelecom/sbom-tools/blob/main/README.md) — overview and the two core roles

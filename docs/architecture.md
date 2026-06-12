@@ -1,27 +1,10 @@
 # 아키텍처
 
-> **관련 문서**: [시작하기](../getting-started.md) · [고지문·보안·UI 가이드](../notice-and-security.md) · [방향성 조사 보고서](direction-study.md) · [기여 가이드](../../CONTRIBUTING.md) · [패키지 매니저 추가](../contributing/package-manager-guide.md)
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [Docker 이미지 직접 사용](docker-image.md) | [패키지 매니저 추가](contributing/package-manager-guide.md)
 
 BomLens의 전체 시스템 구조와, 스캔 파이프라인에서 각 도구가 어느 단계에서 어떤 순서로 호출되는지 설명합니다.
 
 > 이 문서는 현재 구현된 2단계(2-stage) 아키텍처를 기준으로 작성되었습니다. 소스 코드의 Stage 1 라우팅(언어 감지 후 cdxgen 공식 언어 이미지 실행)은 `scripts/scan-sbom.sh`에 구현되어 동작합니다.
-
-## 목차
-
-- [한눈에 보기](#한눈에-보기)
-- [왜 2단계인가](#왜-2단계인가)
-- [도구 인벤토리](#도구-인벤토리)
-- [전체 파이프라인 흐름](#전체-파이프라인-흐름)
-- [Stage 1 — SBOM 생성](#stage-1--sbom-생성)
-- [Stage 2 — 후처리 파이프라인](#stage-2--후처리-파이프라인)
-- [입력 타입별 분기](#입력-타입별-분기)
-- [플래그 ↔ 단계 매핑](#플래그--단계-매핑)
-- [산출물](#산출물)
-- [확장 포인트](#확장-포인트)
-- [설계 원칙](#설계-원칙)
-- [역할 분담 (trustedoss-portal)](#역할-분담-trustedoss-portal)
-
----
 
 ## 한눈에 보기
 
@@ -63,7 +46,7 @@ flowchart LR
 
 ## 왜 2단계인가
 
-기존에는 모든 언어 런타임 + 분석 도구를 **하나의 거대한 이미지**에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다([근거: 방향성 조사 보고서](direction-study.md) §1, §5).
+기존에는 모든 언어 런타임 + 분석 도구를 하나의 거대한 이미지에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다(근거는 메인테이너용 [방향성 조사 보고서](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) §1, §5).
 
 | | Stage 1 이미지 | Stage 2 이미지 (`sbom-scanner`) |
 |---|---|---|
@@ -72,7 +55,7 @@ flowchart LR
 | **획득** | 프로젝트 언어 감지 후 **on-demand pull** | 한 번 pull해서 재사용 |
 | **이점** | 언어별 최신 toolchain을 cdxgen이 직접 관리 | 이미지가 작고, 도구 버전 고정으로 재현성 확보 |
 
-> 주류 5개 언어(java·python·node·dotnet·php)는 cdxgen 공식 이미지로 검출이 동일하고, **go·ruby·rust**에서 우리 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](../../README.md#why-a-docker-image-vs-plain-cdxgen)와 [direction-study.md §1](direction-study.md)을 참조하세요.
+> 주류 5개 언어(java, python, node, dotnet, php)는 cdxgen 공식 이미지로 검출이 동일하고, go와 ruby, rust에서 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen)와 [방향성 조사 보고서](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) §1을 참조하세요.
 
 ---
 
@@ -184,7 +167,7 @@ sequenceDiagram
 
 `scan-sbom.sh`가 `detect_lang()`으로 프로젝트 언어를 감지하고, `img_for_lang()`으로 해당 cdxgen **공식 언어 이미지**를 골라 pull한 뒤, 그 이미지 안에서 `build-prep.sh`를 실행합니다(`scripts/scan-sbom.sh:138-208`). 후처리 경량 이미지에는 언어 toolchain이 없으므로, 생성은 전적으로 언어 이미지가 담당합니다.
 
-**언어 → cdxgen 이미지 매핑** (`scan-sbom.sh:158-177`, 태그는 `CDXGEN_TAG`로 고정):
+언어별 cdxgen 이미지 매핑은 다음과 같습니다 (`scan-sbom.sh:158-177`, 태그는 `CDXGEN_TAG`로 고정).
 
 | 감지 언어 | 이미지 |
 |-----------|--------|
@@ -303,7 +286,7 @@ flowchart TD
 |------|--------|-----------|------|
 | `SOURCE` | target 미지정 · `--git <url>` · `--target *.zip/*.tar.gz` | cdxgen | 언어 감지 → 언어별 이미지. git는 clone, 아카이브는 자동 해제 후 소스로 처리. (웹 UI의 SOURCE는 컨테이너 내 `syft dir:`) |
 | `ANALYZE` | `--analyze <sbom>` (별칭 `--sbom`) | — | 공급사 SBOM(CycloneDX/SPDX) 검증 → CDX 변환 → 재집계. `_conformance.*` 생성 |
-| `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `sbom-scanner-firmware`. 상세 [firmware-analysis.md](firmware-analysis.md) |
+| `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `sbom-scanner-firmware`. 상세 [펌웨어 분석 가이드](firmware-analysis-guide.md) |
 | `BINARY` | `--target <파일>` | syft | `file:` 스킴 |
 | `ROOTFS` | `--target <디렉터리>` | syft | `dir:` 스킴 |
 | `IMAGE` | `--target <이미지명>` | syft | docker.sock 마운트 |
@@ -313,7 +296,7 @@ flowchart TD
 
 ## 플래그 ↔ 단계 매핑
 
-CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 정리합니다 (`scan-sbom.sh` → `entrypoint.sh`).
+CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 정리합니다 (`scan-sbom.sh`가 변환해 `entrypoint.sh`로 전달).
 
 | 플래그 | 환경변수 | 켜지는 단계 |
 |--------|----------|-------------|
@@ -333,7 +316,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 > **위험분석보고서**(`_risk-report.{md,html}`)는 모든 모드에서 **기본 생성**됩니다(라이선스+취약점 집계). 이를 위해 고지문·보안 스캔이 자동으로 함께 켜지며, `--no-report`로 끌 수 있습니다.
 
-각 기능의 **사용법**은 [고지문·보안·UI 가이드](../notice-and-security.md)를 참조하세요.
+각 기능의 사용법은 [고지문·보안 보고서 가이드](notice-and-security.md)를 참조하세요.
 
 ---
 
@@ -360,7 +343,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 2. cdxgen이 전이 의존성을 자동 해석하지 못하면 `docker/lib/build-prep.sh`에 보강 로직 추가.
 3. `examples/{언어}/`에 예제 프로젝트, `tests/cases/test-{언어}.sh`에 테스트 케이스 추가.
 
-자세한 절차: [패키지 매니저 추가 가이드](../contributing/package-manager-guide.md).
+자세한 절차: [패키지 매니저 추가 가이드](contributing/package-manager-guide.md).
 
 ### 새 후처리 단계 추가
 `docker/lib/`에 헬퍼 스크립트를 추가하고, `entrypoint.sh`의 공통 파이프라인 구간(정규화 이후)에서 환경변수 가드와 함께 호출한 뒤 산출물을 `ARTIFACTS`에 추가합니다. 서명 단계보다 **앞**에 배치해야 산출물이 서명 대상에 포함됩니다.
