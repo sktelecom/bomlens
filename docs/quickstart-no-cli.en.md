@@ -1,0 +1,96 @@
+# No-CLI quick start (no command line)
+
+> **Related**: [Getting started](getting-started.md) | [Notice and security guide](notice-and-security.md)
+
+You do not need to have ever typed a command. This page covers the shortest path for an open-source license manager to turn source code received from a dev team into an open-source notice. It is all clicks in a browser.
+
+## What is an open-source notice
+
+A document that lists the open-source components in a product and their licenses, provided alongside the product when it ships. Many open-source licenses (MIT, Apache-2.0, BSD, and others) require the copyright notice and the full license text to be included with the product, so a notice that gathers them is needed.
+
+This tool analyzes source code to build a component list (an SBOM), then groups components by license to generate two notice files.
+
+- `..._NOTICE.txt` — a text format to ship as-is with the distribution
+- `..._NOTICE.html` — a format that reads well in a browser
+
+The prefix (`...`) is the project name and version you entered. For example, if the project is `MyApp` and the version is `1.0.0`, the file is `MyApp_1.0.0_NOTICE.txt`.
+
+## What you need and how long it takes
+
+All you need is a Docker engine. On Windows, for a first install, **Rancher Desktop** is recommended — it is free and fits the double-click flow well. If you already use Docker, leave it as is and move on. (A detailed comparison of the other options is in [Getting started](getting-started.md).)
+
+The first time, install and download take a while. Roughly:
+
+- Installing and first launch of Rancher Desktop: about 5–10 minutes
+- First download of the scanner image (about 3–4 GB): about 5–15 minutes (varies by network, only the first time)
+
+Once set up, opening the app and scanning afterward takes 1–2 minutes.
+
+## Walkthrough
+
+There are two paths. The desktop app is the simplest, so it is recommended. The overall flow:
+
+```mermaid
+flowchart TD
+    A["Install Docker engine<br/>(Rancher Desktop)"] --> B["Get the desktop app<br/>.exe from releases/latest"]
+    B --> C["Double-click<br/>(if SmartScreen: More info, Run)"]
+    C --> D["First-run image download<br/>about 3-4 GB, once"]
+    D --> E["Enter project name and version"]
+    E --> F["Upload source ZIP and scan"]
+    F --> G["Download NOTICE.txt / NOTICE.html"]
+```
+
+### Path A — desktop app (recommended)
+
+1. **Install a Docker engine**. Download the Windows installer from [rancherdesktop.io](https://rancherdesktop.io/), install it, and run it. If it asks whether to use Kubernetes during install, you can turn it off. When the taskbar icon settles (usually 1–2 minutes), it is ready.
+2. **Get and run the app**. Click [Download SBOM Generator for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click the file. It is unsigned for now, so if Windows shows a "Windows protected your PC" warning, click "More info" and choose "Run anyway". The app opens with no console window.
+3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait.
+
+![Click "More info" on the SmartScreen warning and proceed with "Run anyway"](images/smartscreen.png)
+
+![The desktop app startup screen, showing image download and preparation progress](images/desktop-startup.png)
+
+If Docker is not installed or is stopped, the app tells you what to do instead of starting a scan.
+
+![The guidance screen the app shows when Docker is missing](images/desktop-docker-missing.png)
+
+Now go to [Scan and get the notice](#scan-and-get-the-notice) below.
+
+### Path B — ZIP and double-click batch file (alternative)
+
+If you prefer a script over the desktop app, this path works too.
+
+1. **Install a Docker engine**. Same as step 1 of Path A.
+2. **Download the tool**. On the GitHub repository page, click the green Code button, choose Download ZIP, and unzip it. You should see a `scripts` folder inside the unzipped folder.
+3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 3–4 GB)", and once done a browser opens `http://localhost:8080`. Results are saved to the `C:\Users\<your-name>\sbom-output` folder.
+
+To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in Korean.
+
+![The console window on the first run of sbom-ui.bat, showing the image download notice](images/bat-console.png)
+
+![The SBOM Generator web UI](images/web-ui.png)
+
+## Scan and get the notice
+
+From here the desktop app and the web UI are the same.
+
+1. Enter the project name and version.
+2. For the scan target, choose "ZIP upload" and upload the source code ZIP received from the dev team.
+3. Click run. The progress log streams in real time.
+
+![The scan progress screen](images/web-ui-scan.png)
+
+When the scan finishes, download the notice from the results screen as per-format chips (`HTML`, `TXT`). The SBOM (`..._bom.json`) and the risk report (`..._risk-report.html`) generated alongside are available on the same screen, and you can also download everything as a single ZIP. Downloaded files are saved to the results folder as well.
+
+![Download the notice per format from the results screen, or get everything as a ZIP](images/app-results.png)
+
+## When you get stuck
+
+- **I don't know what's wrong**: double-click `scripts\check-setup.bat` to check Docker, the image, and port status at once, and it tells you what to do next, in Korean.
+- **A "Windows protected your PC" warning appears**: this is because the desktop app is still unsigned. Click "More info" and choose "Run anyway".
+- **It says "Docker is not installed"**: make sure Rancher Desktop is installed and running.
+- **It says "the Docker engine is not running"**: start Rancher Desktop, wait for the icon to settle, then run it again.
+- **The scan finished but there are no files in the results folder**: this can happen if the results folder is outside Docker's file-sharing scope. This tool saves to `sbom-output` under your home directory (`C:\Users\...`), which is usually safe. If you still don't see them, download them directly with the download buttons in the browser.
+- **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself.
+
+For more detail and command-line usage, see [Getting started](getting-started.md) and the [Notice and security guide](notice-and-security.md).
