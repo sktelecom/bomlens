@@ -1,3 +1,8 @@
+---
+hide:
+  - toc
+---
+
 # SBOM Generator
 
 Automated SBOM (CycloneDX 1.6) generation for software supply chain security. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM, an open-source notice, and a security risk report in one run.
