@@ -1,8 +1,6 @@
 # 5가지 입력 시나리오별 처리 가이드
 
-> **English**: [Input scenarios guide](scenarios-guide.en.md)
->
-> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안·UI 가이드](notice-security-ui-guide.md) | [공급사 SBOM 분석](supplier-sbom-analysis.md) | [펌웨어 분석](firmware-analysis.md)
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md) | [공급사 SBOM 검증](supplier-sbom-validation.md) | [펌웨어 분석](firmware-analysis-guide.md)
 
 ## 목차
 
@@ -20,7 +18,7 @@
 
 ## 개요
 
-오픈소스 컴플라이언스 담당자는 여러 팀에서 서로 다른 형태로 산출물을 받습니다. 이 가이드는 5가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다.
+여러 팀에서 서로 다른 형태로 산출물(소스, ZIP, 기존 SBOM, 펌웨어 등)을 받게 됩니다. 이 가이드는 5가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다.
 
 **3종 산출물**
 
@@ -116,7 +114,7 @@ $SBOM --project team4-proj --version 2.0.0 \
 
 - CycloneDX와 SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다.
 - `--analyze`는 고지문과 보안을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다.
-- 추가로 포맷 적합성 보고서(`_conformance.{json,md,html}`)가 생성되고, 위험분석보고서 1절에 적합성 검증 결과(필수 항목 충족 여부)가 들어갑니다.
+- 추가로 포맷 적합성 보고서(`_conformance.{json,md,html}`)가 생성됩니다. 받은 SBOM이 필수 항목(이름, 버전, 식별자 등)을 갖췄는지 점검한 결과이며, 위험분석보고서 1절에도 요약이 들어갑니다. 받은 SBOM을 검증하고 공급사에 보완을 요청하는 흐름은 [공급사 SBOM 검증](supplier-sbom-validation.md)을 참고하세요.
 
 **산출물**: 고지문, SBOM(변환본), 위험분석보고서, 적합성 보고서
 
@@ -132,7 +130,7 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 - 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정하거나, 기본값(`ghcr.io/sktelecom/sbom-scanner-firmware:latest`)을 받습니다.
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
-- 자세한 동작과 한계는 [펌웨어 분석](firmware-analysis.md)을 참고하세요.
+- 자세한 동작과 한계는 [펌웨어 분석](firmware-analysis-guide.md)을 참고하세요.
 
 **산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
@@ -171,5 +169,5 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 - **GitHub URL**: 비공개 저장소는 `GIT_TOKEN`이 필요합니다. 허용되지 않은 URL 형식(셸 메타문자, `..`, 공백)은 보안상 거부됩니다.
 - **ZIP/tar**: 경로 탈출(zip-slip)이 포함된 아카이브는 거부됩니다. Windows Git Bash에 `unzip`이 없으면 `tar`로 처리됩니다.
 - **C/C++**: 패키지 매니저가 없는 순수 소스는 SBOM이 희소합니다([시나리오 3](#시나리오-3--로컬-cc-소스-디렉터리) 참고).
-- **펌웨어**: 정적 링크 라이브러리와 벤더 변형 squashfs는 탐지율이 제한적입니다([펌웨어 분석](firmware-analysis.md) §한계).
+- **펌웨어**: 정적 링크 라이브러리와 벤더 변형 squashfs는 탐지율이 제한적입니다([펌웨어 분석](firmware-analysis-guide.md) §한계).
 - **SBOM 분석**: SPDX를 CycloneDX로 변환할 때 일부 라이선스 표현이 단순화될 수 있습니다.

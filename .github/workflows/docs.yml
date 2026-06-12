@@ -1,0 +1,35 @@
+name: Docs site
+
+# docs/ 정본 마크다운을 MkDocs Material로 빌드해 GitHub Pages(gh-pages 브랜치)에 배포한다.
+# 사이트 소스는 docs/이며, internal/과 contributing/는 mkdocs.yml의 exclude_docs로 제외된다.
+# 최초 1회 저장소 Settings > Pages에서 소스를 "gh-pages 브랜치"로 지정해야 한다.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - mkdocs.yml
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # gh-deploy가 gh-pages 브랜치로 푸시하므로 쓰기 권한이 필요하다.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      # 시스템 파이썬은 externally-managed라 venv로 격리해 의존성을 설치한다.
+      - name: Build and deploy
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install mkdocs-material mkdocs-static-i18n
+          mkdocs build --strict
+          mkdocs gh-deploy --force --no-history

@@ -1,6 +1,6 @@
 # 아키텍처
 
-> **관련 문서**: [시작하기](getting-started.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [방향성 조사 보고서](internal/direction-study.md) · [기여 가이드](../CONTRIBUTING.md) · [패키지 매니저 추가](contributing/package-manager-guide.md)
+> **관련 문서**: [시작하기](../getting-started.md) · [고지문·보안·UI 가이드](../notice-and-security.md) · [방향성 조사 보고서](direction-study.md) · [기여 가이드](../../CONTRIBUTING.md) · [패키지 매니저 추가](../contributing/package-manager-guide.md)
 
 SBOM Generator의 전체 시스템 구조와, 스캔 파이프라인에서 각 도구가 어느 단계에서 어떤 순서로 호출되는지 설명합니다.
 
@@ -63,7 +63,7 @@ flowchart LR
 
 ## 왜 2단계인가
 
-기존에는 모든 언어 런타임 + 분석 도구를 **하나의 거대한 이미지**에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다([근거: 방향성 조사 보고서](internal/direction-study.md) §1, §5).
+기존에는 모든 언어 런타임 + 분석 도구를 **하나의 거대한 이미지**에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다([근거: 방향성 조사 보고서](direction-study.md) §1, §5).
 
 | | Stage 1 이미지 | Stage 2 이미지 (`sbom-scanner`) |
 |---|---|---|
@@ -72,7 +72,7 @@ flowchart LR
 | **획득** | 프로젝트 언어 감지 후 **on-demand pull** | 한 번 pull해서 재사용 |
 | **이점** | 언어별 최신 toolchain을 cdxgen이 직접 관리 | 이미지가 작고, 도구 버전 고정으로 재현성 확보 |
 
-> 주류 5개 언어(java·python·node·dotnet·php)는 cdxgen 공식 이미지로 검출이 동일하고, **go·ruby·rust**에서 우리 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](../README.md#why-a-docker-image-vs-plain-cdxgen)와 [direction-study.md §1](internal/direction-study.md)을 참조하세요.
+> 주류 5개 언어(java·python·node·dotnet·php)는 cdxgen 공식 이미지로 검출이 동일하고, **go·ruby·rust**에서 우리 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](../../README.md#why-a-docker-image-vs-plain-cdxgen)와 [direction-study.md §1](direction-study.md)을 참조하세요.
 
 ---
 
@@ -333,7 +333,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 > **위험분석보고서**(`_risk-report.{md,html}`)는 모든 모드에서 **기본 생성**됩니다(라이선스+취약점 집계). 이를 위해 고지문·보안 스캔이 자동으로 함께 켜지며, `--no-report`로 끌 수 있습니다.
 
-각 기능의 **사용법**은 [고지문·보안·UI 가이드](notice-security-ui-guide.md)를 참조하세요.
+각 기능의 **사용법**은 [고지문·보안·UI 가이드](../notice-and-security.md)를 참조하세요.
 
 ---
 
@@ -360,7 +360,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 2. cdxgen이 전이 의존성을 자동 해석하지 못하면 `docker/lib/build-prep.sh`에 보강 로직 추가.
 3. `examples/{언어}/`에 예제 프로젝트, `tests/cases/test-{언어}.sh`에 테스트 케이스 추가.
 
-자세한 절차: [패키지 매니저 추가 가이드](contributing/package-manager-guide.md).
+자세한 절차: [패키지 매니저 추가 가이드](../contributing/package-manager-guide.md).
 
 ### 새 후처리 단계 추가
 `docker/lib/`에 헬퍼 스크립트를 추가하고, `entrypoint.sh`의 공통 파이프라인 구간(정규화 이후)에서 환경변수 가드와 함께 호출한 뒤 산출물을 `ARTIFACTS`에 추가합니다. 서명 단계보다 **앞**에 배치해야 산출물이 서명 대상에 포함됩니다.

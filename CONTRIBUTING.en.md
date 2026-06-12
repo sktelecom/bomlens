@@ -4,7 +4,7 @@
 
 Thanks for your interest in SBOM Generator! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
 
-> **Related**: [Architecture](docs/architecture.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
+> **Related**: [Architecture](docs/internal/architecture.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
 
 ## Contents
 

@@ -5,7 +5,7 @@
 `tests/windows-smoke.ps1`이 처리하므로, 여기서는 더블클릭, 브라우저 업로드, 한글 인코딩처럼
 사람이 봐야 하는 부분을 다룹니다.
 
-검증 캡처는 `docs/notice-quickstart.md`의 스크린샷 자리표시(`TODO(windows-capture)`)를 실제
+검증 캡처는 `docs/quickstart-no-cli.md`의 스크린샷 자리표시(`TODO(windows-capture)`)를 실제
 화면으로 교체하는 데 씁니다.
 
 ## 역할 분담 (Claude와 사람)
@@ -65,7 +65,7 @@ FAIL이 없으면 다음으로 넘어갑니다. SKIP 항목(예: Git Bash 없음
 
 ## 본 흐름 — ZIP과 bat 대안 (가이드만으로 완주되는가)
 
-데스크톱 앱 대신 ZIP과 `sbom-ui.bat` 경로도 점검합니다. `docs/notice-quickstart.md`의 방법 B를
+데스크톱 앱 대신 ZIP과 `sbom-ui.bat` 경로도 점검합니다. `docs/quickstart-no-cli.md`의 방법 B를
 보고 아래를 수행합니다. 각 단계의 기대 결과가 나오는지 확인하고, 어긋나면 진단 칸을 채웁니다.
 
 | # | 단계 | 기대 결과 | 통과 | 진단/메모 |
@@ -101,7 +101,7 @@ FAIL이 없으면 다음으로 넘어갑니다. SKIP 항목(예: Git Bash 없음
 
 ## 캡처할 화면 (windows-verify.ps1)
 
-`docs/notice-quickstart.md`의 자리표시를 교체할 실제 스크린샷을 남깁니다. 사람이 해당 화면을
+`docs/quickstart-no-cli.md`의 자리표시를 교체할 실제 스크린샷을 남깁니다. 사람이 해당 화면을
 맨 앞으로 띄워 둔 뒤, 아래 명령으로 캡처합니다. 결과는 `docs/images/<이름>.png`로 저장됩니다.
 
 ```powershell

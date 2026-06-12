@@ -1,6 +1,6 @@
 # 패키지 매니저 추가 가이드
 
-> **관련 문서**: [기여 가이드](../../CONTRIBUTING.md) | [아키텍처](../architecture.md) | [테스트 가이드](testing-guide.md)
+> **관련 문서**: [기여 가이드](../../CONTRIBUTING.md) | [아키텍처](../internal/architecture.md) | [테스트 가이드](testing-guide.md)
 
 새로운 프로그래밍 언어 또는 패키지 매니저 지원을 추가하는 방법을 단계별로 설명합니다.
 

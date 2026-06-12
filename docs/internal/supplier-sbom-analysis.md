@@ -1,8 +1,8 @@
 # 공급사 제출 SBOM 검증·분석 (Supplier SBOM Analysis)
 
-> **관련 문서**: [아키텍처](architecture.md) · [방향성 조사 보고서](internal/direction-study.md) · [고지문·보안·UI 가이드](notice-security-ui-guide.md) · [펌웨어 분석](firmware-analysis.md)
+> **관련 문서**: [아키텍처](architecture.md) · [방향성 조사 보고서](direction-study.md) · [고지문·보안·UI 가이드](../notice-and-security.md) · [펌웨어 분석](firmware-analysis.md)
 >
-> 성격: 설계·의사결정 문서 (메인테이너용). Phase 1~4가 모두 구현 완료되었습니다(`docker/lib/validate-sbom.sh`·`convert-to-cdx.sh`·`generate-risk-report.sh`, `--analyze`/ANALYZE 모드, 웹 UI의 SBOM 업로드). 위험분석보고서(`_risk-report`)도 ANALYZE 전용이 아니라 모든 분석 모드에서 기본 생성되도록 일반화되었습니다. 자체 생성 SBOM에는 포맷 검증 절을 생략하고 제목을 "오픈소스위험분석보고서"로 표기합니다. 입력 형태별 처리는 [시나리오별 가이드](scenarios-guide.md)를 참고하세요.
+> 성격: 설계·의사결정 문서 (메인테이너용). Phase 1~4가 모두 구현 완료되었습니다(`docker/lib/validate-sbom.sh`·`convert-to-cdx.sh`·`generate-risk-report.sh`, `--analyze`/ANALYZE 모드, 웹 UI의 SBOM 업로드). 위험분석보고서(`_risk-report`)도 ANALYZE 전용이 아니라 모든 분석 모드에서 기본 생성되도록 일반화되었습니다. 자체 생성 SBOM에는 포맷 검증 절을 생략하고 제목을 "오픈소스위험분석보고서"로 표기합니다. 입력 형태별 처리는 [시나리오별 가이드](../scenarios-guide.md)를 참고하세요.
 
 ## 요약 (Executive Summary)
 
@@ -35,7 +35,7 @@ SK텔레콤은 [공급망 보안 가이드](https://sktelecom.github.io/guide/su
 
 | 구분 | 요구사항 |
 |------|----------|
-| **포맷** | CycloneDX v1.3~1.5 (JSON 권장) **또는** SPDX v2.2~2.3 (JSON/Tag-Value) |
+| **포맷** | CycloneDX v1.3~1.6 (JSON 권장) **또는** SPDX v2.2~2.3 (JSON/Tag-Value) |
 | **필수 메타데이터** | timestamp(ISO8601), tool info(vendor/name/version), top-level component name+version |
 | **필수 컴포넌트 필드** | name, version, **PURL** (ecosystem 타입 명시, `pkg:generic/`·커스텀 금지) |
 | **완전성** | 직접 + **추이적(transitive) 의존성 모두 포함** (직접만 있으면 반려) |
