@@ -41,7 +41,7 @@ Environment variables adjust the behavior.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | Override the scanner image (same image as `sbom-generator`) |
+| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | Override the scanner image (same image as `bomlens`) |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/sbom-scanner-firmware:latest` | Image used for firmware analysis |
 | `GIT_TOKEN` | — | Token for cloning private git repositories |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
