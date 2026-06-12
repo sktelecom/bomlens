@@ -4,14 +4,6 @@
 
 Full options, analysis modes, CI/CD integration, and troubleshooting for SBOM Generator.
 
-## Contents
-
-- [Options reference](#options-reference)
-- [Analysis modes](#analysis-modes)
-- [Advanced usage](#advanced-usage)
-- [CI/CD integration](#cicd-integration)
-- [Output formats](#output-formats)
-- [Troubleshooting](#troubleshooting)
 
 ## Options reference
 

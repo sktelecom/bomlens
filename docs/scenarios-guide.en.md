@@ -2,20 +2,6 @@
 
 > **한국어**: [시나리오 가이드](scenarios-guide.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)
 
-## Contents
-
-- [Overview](#overview)
-- [Common setup](#common-setup)
-- [At a glance](#at-a-glance)
-- [Scenario 1 — GitHub URL](#scenario-1--github-url)
-- [Scenario 2 — Source ZIP](#scenario-2--source-zip)
-- [Scenario 3 — Local C/C++ source directory](#scenario-3--local-cc-source-directory)
-- [Scenario 4 — Existing SBOM JSON](#scenario-4--existing-sbom-json)
-- [Scenario 5 — Firmware binary](#scenario-5--firmware-binary)
-- [Reading the three deliverables](#reading-the-three-deliverables)
-- [All at once in the web UI](#all-at-once-in-the-web-ui)
-- [Troubleshooting / limits](#troubleshooting--limits)
-
 ## Overview
 
 An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of five input forms.
