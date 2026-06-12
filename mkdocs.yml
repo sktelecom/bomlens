@@ -13,6 +13,8 @@ copyright: SK Telecom
 theme:
   name: material
   language: ko
+  logo: images/logo-mark.svg
+  favicon: images/logo-mark.svg
   font:
     text: Roboto
     code: Roboto Mono
