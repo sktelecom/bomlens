@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.1] - 2026-06-12
+
+### Security
+
+- The web UI cleanup endpoint validates the provided token before removing staged uploads, and CI workflows run with least-privilege permissions. (#106)
+- Pinned base image digests so the supply chain is verifiable (Scorecard pinned-dependencies). (#107)
+
+### Fixed
+
+- The NOTICE dedupes appended SPDX license texts and normalizes the Expat alias to MIT, so each license text appears once. (#108)
+- The SBOM stamps `metadata.component` from the input project name and version instead of leaving it unset. (#108)
+- Stabilized byte-stable SBOM output and coerced null components to empty arrays, preventing spurious diffs and parse failures. (#108)
+
 ## [v1.2.0] - 2026-06-11
 
 ### Added

@@ -1,0 +1,69 @@
+# 배포 절차 (메인테이너용)
+
+이 문서는 새 버전을 릴리스할 때 따르는 절차를 정리한다. 도구를 사용하려는 분은 이 폴더가 아니라
+[docs/](../) 상위의 사용자 가이드를 보세요.
+
+배포는 git 태그 push 한 번으로 자동화돼 있다. `v*.*.*` 형식의 태그를 올리면 세 워크플로가
+실행된다. `release.yml`이 GitHub Release와 자산을 만들고, `docker-publish.yml`이 GHCR 이미지를
+발행하며, `desktop.yml`이 데스크톱 인스톨러를 붙인다. 코드 변경은 필요하지 않다.
+
+## 릴리스 전 체크리스트
+
+자동 검증이 잡지 못해 사람이 직접 챙겨야 하는 항목이다. 특히 첫 두 가지는 틀려도 CI가 실패하지
+않고 결과만 조용히 어긋나므로 반드시 확인한다.
+
+1. **CHANGELOG 헤더를 태그와 글자까지 똑같이 맞춘다(`v` 포함).**
+   `release.yml`은 릴리스 노트 본문을 다음과 같이 추출한다.
+
+   ```bash
+   sed -n "/## \[vX.Y.Z\]/,/## \[/p" CHANGELOG.md
+   ```
+
+   태그가 `v1.2.1`이면 CHANGELOG 헤더도 `## [v1.2.1] - 날짜`여야 매칭된다. `v`를 빼고
+   `## [1.2.1]`로 쓰면 CI는 실패하지 않고 릴리스 노트의 Changes 섹션만 빈 채로 발행된다.
+
+2. **`[Unreleased]` 항목을 새 버전 섹션으로 옮겼는지 확인한다.** 릴리스 노트는 버전 섹션에서만
+   뽑히므로, 변경 기록이 `[Unreleased]`에 남아 있으면 노트에 반영되지 않는다.
+
+3. **태그는 main에 머지된 커밋에 단다.** `docker-publish.yml`은 main push에도 `:latest`
+   이미지를 발행한다. 따라서 PR을 먼저 머지해 main의 latest를 갱신한 뒤, 그 머지 커밋에 태그를
+   달아 버전 이미지를 발행하는 순서를 지킨다. main에 없는 커밋에 태그를 달면 `:latest`와 버전
+   이미지의 내용이 갈린다.
+
+4. **태그 형식은 3자리 `v*.*.*`다.** 워크플로 트리거가 이 패턴이라서, 2자리(`v1.2`)이거나
+   `v`가 없으면 어떤 워크플로도 실행되지 않는다. Docker 이미지의 SemVer 태그(`1.2`, `1`,
+   `latest`)도 이 값에서 파생된다.
+
+5. (선택) `electron/package.json`의 version을 새 버전에 맞춘다. 인스톨러 버전은 빌드 시 태그
+   값으로 덮어쓰므로 릴리스 차단 요인은 아니지만, 일관성을 위해 맞춘다.
+
+## 릴리스 실행
+
+체크리스트를 마치고 PR이 main에 머지된 뒤 실행한다.
+
+```bash
+git checkout main && git pull
+git tag vX.Y.Z            # 머지된 main 커밋에서
+git push origin vX.Y.Z
+```
+
+태그 push로 트리거되는 결과는 세 가지다.
+
+- GitHub Release: 릴리스 노트, 자산 묶음, 무결성 검증용 `SHA256SUMS.txt`
+- GHCR 이미지: `sbom-generator`와 `sbom-scanner` 공동 발행, Android SDK 6종과 firmware
+  이미지, cosign 키리스 서명과 SBOM attestation, Trivy 이미지 스캔
+- 데스크톱 인스톨러: `SBOM-Generator-*.exe`와 `.dmg`(현재 미서명)
+
+`workflow_dispatch`로 버전을 직접 입력해 수동 릴리스도 가능하다.
+
+## 릴리스 후 확인
+
+- GitHub Actions에서 release, docker-publish, desktop 세 워크플로가 모두 그린인지 확인한다.
+- Release 페이지에서 자산이 첨부됐는지, 노트 본문의 Changes 섹션이 비어 있지 않은지 확인한다.
+- 태그 릴리스는 main push보다 무겁고 느리다. Android SDK 이미지 6종(멀티아치)과 firmware
+  이미지를 추가로 빌드하기 때문이다. 전체가 그린이 될 때까지 기다려 확인한다.
+
+## 재릴리스 주의
+
+같은 버전을 다시 발행하려면 태그, 릴리스, GHCR 이미지 태그를 모두 지우고 덮어야 한다. 실수가
+나면 재태그 대신 패치 버전을 올리는 편이 안전하다.
