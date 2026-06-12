@@ -103,16 +103,80 @@
   font-size: 0.8rem;
   line-height: 1.75;
 }
+/* 제목: Material 기본은 옅은 회색 + 두꺼움이라 둔탁하다. 어둡게, 조금 가볍게. */
 .md-typeset h1 {
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  color: #202124;
+  font-weight: 500;
+  letter-spacing: -0.015em;
 }
 .md-typeset h2 {
+  color: #202124;
   margin-top: 2.2em;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .md-typeset h3 {
+  color: #202124;
   font-weight: 600;
+}
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #e8eaed;
+}
+
+/* ---- 좌측 사이드바: 상위(섹션)와 하위(페이지) 구분 ---- */
+/* 사이드바 상단의 사이트명 반복은 헤더와 겹쳐 데스크톱에서 숨긴다 */
+@media screen and (min-width: 76.25em) {
+  .md-nav--primary > .md-nav__title {
+    display: none;
+  }
+}
+/* 섹션 라벨: 작고 muted한 그룹 헤더 (대문자, 자간) */
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: #5f6368;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 1.3em 0 0.2em;
+}
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: #9aa0a6;
+}
+/* 하위 페이지 링크: 약간 작게, 활성은 SK 레드 강조 */
+.md-nav--primary .md-nav__link {
+  font-size: 0.72rem;
+}
+.md-nav__link--active,
+.md-nav__item .md-nav__link--active {
+  color: #ea002c;
+  font-weight: 600;
+}
+[data-md-color-scheme="slate"] .md-nav__link--active {
+  color: #ff4d6a;
+}
+
+/* ---- 코드 블록: 옅은 배경 + 보더 + 라운드로 정제 ---- */
+[data-md-color-scheme="default"] {
+  --md-code-bg-color: #f6f8fa;
+}
+[data-md-color-scheme="slate"] {
+  --md-code-bg-color: #1a1a1f;
+}
+.md-typeset pre {
+  border-radius: 0.5rem;
+}
+.md-typeset pre > code {
+  border: 1px solid #e8eaed;
+  border-radius: 0.5rem;
+  padding: 0.9em 1em;
+}
+[data-md-color-scheme="slate"] .md-typeset pre > code {
+  border-color: #2d2d31;
+}
+.md-typeset code {
+  border-radius: 0.25rem;
 }
 
 /* ---- 표: DevSite 톤 (헤더 음영, 여백, 옅은 구분선, 행 hover) ---- */
