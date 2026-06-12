@@ -28,7 +28,7 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` (notice) and `MyApp_1.0.0_secur
 - Docker engine 20.10+ (free: WSL2 + docker-ce, or Rancher Desktop / Docker Desktop, which is paid for organizational use)
 - Pull the scanner image:
   ```bash
-  docker pull ghcr.io/sktelecom/sbom-generator:latest   # the former name sbom-scanner is the same image
+  docker pull ghcr.io/sktelecom/bomlens:latest   # the former name sbom-scanner is the same image
   ```
 - Run every example from the root of the project to scan.
 

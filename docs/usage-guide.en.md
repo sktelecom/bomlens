@@ -148,7 +148,7 @@ Outputs are written to the directory you ran the command in (`$(pwd)`), named `{
 Override the scanner image with `SBOM_SCANNER_IMAGE`.
 
 ```bash
-SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/sbom-generator:1.1.0" \
+SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.1.0" \
   ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --generate-only
 ```
 
@@ -199,7 +199,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker pull ghcr.io/sktelecom/sbom-generator:latest
+      - run: docker pull ghcr.io/sktelecom/bomlens:latest
       - name: Generate SBOM (lightweight)
         run: |
           ./scripts/scan-sbom.sh \
@@ -217,7 +217,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker pull ghcr.io/sktelecom/sbom-generator:latest
+      - run: docker pull ghcr.io/sktelecom/bomlens:latest
       - name: Generate SBOM + reports
         run: |
           ./scripts/scan-sbom.sh \
@@ -258,7 +258,7 @@ generate-sbom:
   before_script:
     - apk add --no-cache jq
   script:
-    - docker pull ghcr.io/sktelecom/sbom-generator:latest
+    - docker pull ghcr.io/sktelecom/bomlens:latest
     - ./scripts/scan-sbom.sh
         --project "$CI_PROJECT_NAME"
         --version "$CI_COMMIT_SHA"
@@ -358,5 +358,5 @@ If source analysis finds no dependencies, check for the lockfile below.
 ### Anything else
 
 1. Check verbose logs with `VERBOSE=true ./tests/test-scan.sh`.
-2. Update the Docker image: `docker pull ghcr.io/sktelecom/sbom-generator:latest`.
+2. Update the Docker image: `docker pull ghcr.io/sktelecom/bomlens:latest`.
 3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/sbom-tools/issues) with your environment info and logs.

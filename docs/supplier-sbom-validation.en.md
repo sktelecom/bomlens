@@ -22,7 +22,7 @@ The criteria follow SK Telecom's [supply chain security guide](https://sktelecom
 
 ## Running it all at once
 
-Pull the scanner image once (`docker pull ghcr.io/sktelecom/sbom-generator:latest`), then pass the SBOM file you received to `--analyze`.
+Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), then pass the SBOM file you received to `--analyze`.
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh

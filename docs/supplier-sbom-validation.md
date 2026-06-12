@@ -22,7 +22,7 @@
 
 ## 한 번에 실행하기
 
-스캐너 이미지를 한 번 받아 두고(`docker pull ghcr.io/sktelecom/sbom-generator:latest`), 받은 SBOM 파일을 `--analyze`에 넘깁니다.
+스캐너 이미지를 한 번 받아 두고(`docker pull ghcr.io/sktelecom/bomlens:latest`), 받은 SBOM 파일을 `--analyze`에 넘깁니다.
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh

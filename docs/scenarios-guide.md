@@ -22,7 +22,7 @@
 
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
-docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지
+docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
 
 # 편의를 위해 스크립트 경로를 변수로 둡니다.
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh

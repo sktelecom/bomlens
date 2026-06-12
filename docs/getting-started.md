@@ -43,7 +43,7 @@ wsl --install -d Ubuntu          # 설치 후 재부팅, 우분투 초기 설정
 ```bash
 sudo apt-get update && curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"  # 로그아웃/로그인 후 적용
-docker pull ghcr.io/sktelecom/sbom-generator:latest
+docker pull ghcr.io/sktelecom/bomlens:latest
 ```
 이후 WSL 안에서 이 저장소를 클론하고 `./scripts/scan-sbom.sh ...`를 그대로 실행하면 됩니다.
 
@@ -92,7 +92,7 @@ chmod +x scan-sbom.sh
 #### 2. Docker 이미지 다운로드
 
 ```bash
-docker pull ghcr.io/sktelecom/sbom-generator:latest   # 이전 이름 sbom-scanner 도 같은 이미지로 제공됩니다
+docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지로 제공됩니다
 ```
 
 이미지 크기는 약 3–4 GB입니다. 네트워크 상황에 따라 수 분이 소요될 수 있습니다.

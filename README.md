@@ -3,7 +3,7 @@
 > A local-first SBOM generator and open-source risk assessor — scan a single project in seconds, no SaaS.
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/sbom-tools?style=flat-square)](https://github.com/sktelecom/sbom-tools/releases)
-[![Container image](https://img.shields.io/badge/ghcr.io-sbom--generator-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/sbom-generator)
+[![Container image](https://img.shields.io/badge/ghcr.io-bomlens-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/bomlens)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
@@ -32,7 +32,7 @@ Prerequisite: a Docker engine, 20.10+. Free options that work on Windows: **Ranc
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
-docker pull ghcr.io/sktelecom/sbom-generator:latest   # legacy alias: sbom-scanner serves the same image
+docker pull ghcr.io/sktelecom/bomlens:latest   # aliases: sbom-generator and sbom-scanner serve the same image
 ```
 
 No git installed? Download the repo as a ZIP from the GitHub page (the green Code button, then Download ZIP) and unzip it.
