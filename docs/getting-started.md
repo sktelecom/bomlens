@@ -30,7 +30,7 @@ docker run --rm hello-world
 
 | 옵션 | 특징 | 이 도구와의 관계 |
 |------|------|------------------|
-| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투 안에 docker-ce 설치 | WSL 안에서 `scan-sbom.sh`를 직접 실행. `.bat`·Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 |
+| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투 안에 docker-ce 설치 | WSL 안에서 `scan-sbom.sh`를 직접 실행. `.bat`와 Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 |
 | **Rancher Desktop** (무료, GUI) | Docker Desktop 대체 GUI, `docker` CLI 제공 | `scripts\sbom-ui.bat` 더블클릭 흐름을 그대로 사용 |
 | Docker Desktop | 가장 간편 | 동작하지만 조직 사용 시 유료 라이선스 확인 필요 |
 
@@ -47,7 +47,11 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 ```
 이후 WSL 안에서 이 저장소를 클론하고 `./scripts/scan-sbom.sh ...`를 그대로 실행하면 됩니다.
 
-Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 없이 `scripts\sbom-ui.bat`를 더블클릭하면 됩니다. 명령줄 래퍼(`scripts\scan-sbom.bat`)를 쓸 때만 [Git for Windows](https://git-scm.com/download/win)(Git Bash)가 추가로 필요합니다. WSL2 경로를 쓴다면 둘 다 필요 없습니다(WSL 안에서 `.sh`를 직접 실행).
+Windows에서 추가로 필요한 도구는 사용 방식에 따라 다릅니다.
+
+- 웹 UI만 쓴다면(Rancher Desktop, Docker Desktop) 추가 도구 없이 `scripts\sbom-ui.bat`를 더블클릭하면 됩니다.
+- 명령줄 래퍼(`scripts\scan-sbom.bat`)를 쓴다면 [Git for Windows](https://git-scm.com/download/win)(Git Bash)가 필요합니다.
+- WSL2 경로를 쓴다면 둘 다 필요 없습니다. WSL 안에서 `.sh`를 직접 실행합니다.
 
 ## 설치
 
@@ -95,7 +99,7 @@ chmod +x scan-sbom.sh
 docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지로 제공됩니다
 ```
 
-이미지 크기는 약 3–4 GB입니다. 네트워크 상황에 따라 수 분이 소요될 수 있습니다.
+이미지 크기는 약 3–4 GB입니다. 네트워크 상황에 따라 몇 분이 걸릴 수 있습니다.
 
 #### 3. 설치 확인
 
@@ -117,7 +121,7 @@ cd ~/sbom-output
 /path/to/sbom-tools/scripts/scan-sbom.sh --ui
 #  → 잠시 후 브라우저에서 http://localhost:8080 가 자동으로 열립니다
 ```
-Windows에서는(Rancher Desktop/Docker Desktop) `scripts\sbom-ui.bat`를 더블클릭합니다. UI를 실행한 폴더가 산출물 저장 위치가 되는데, 이 폴더는 Docker 엔진의 파일 공유에 포함된 경로여야 합니다. 홈 디렉터리(`C:\Users\...`) 아래는 두 엔진 모두 기본으로 공유되므로 안전합니다. (WSL2 + docker-ce를 쓴다면 `.bat` 대신 WSL 안에서 `scan-sbom.sh --ui`를 실행하며, 이 파일 공유 제약은 없습니다.) 공유되지 않은 위치에서 실행하면 스캔이 끝나도 산출물이 PC에 나타나지 않습니다. 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다.
+Windows에서는(Rancher Desktop, Docker Desktop) `scripts\sbom-ui.bat`를 더블클릭합니다. UI를 실행한 폴더가 산출물 저장 위치가 됩니다. 이 폴더는 Docker 엔진의 파일 공유에 포함된 경로여야 하는데, 홈 디렉터리(`C:\Users\...`) 아래는 두 엔진 모두 기본으로 공유되므로 안전합니다. 공유되지 않은 위치에서 실행하면 스캔이 끝나도 산출물이 PC에 나타나지 않습니다. WSL2 + docker-ce를 쓴다면 `.bat` 대신 WSL 안에서 `scan-sbom.sh --ui`를 실행하며, 이 파일 공유 제약도 없습니다. 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다.
 
 > 실행 위치(현재 폴더)는 산출물이 저장되는 곳이자, 스캔 대상으로 "현재 폴더"를 골랐을 때 스캔되는 소스입니다. GitHub URL이나 ZIP, SBOM, 펌웨어 업로드, Docker 이미지를 쓴다면 입력을 UI에서 직접 주므로 아무 폴더에서나 실행해도 됩니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하세요.
 
@@ -237,7 +241,7 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
 
 ### SBOM 내용 빠르게 확인하기
 
-아래 예시는 `jq`를 사용합니다. WSL2(우분투)에는 `sudo apt-get install jq`로, Windows Git Bash에는 기본 포함되지 않으니 [jq 릴리스](https://jqlang.github.io/jq/download/)에서 받거나 `winget install jqlang.jq`로 설치하세요. 설치가 번거롭다면 웹 UI의 요약 카드에서 컴포넌트 수·라이선스를 바로 확인할 수 있습니다.
+아래 예시는 `jq`를 사용합니다. WSL2(우분투)에는 `sudo apt-get install jq`로, Windows Git Bash에는 기본 포함되지 않으니 [jq 릴리스](https://jqlang.github.io/jq/download/)에서 받거나 `winget install jqlang.jq`로 설치하세요. 설치가 번거롭다면 웹 UI의 요약 카드에서 컴포넌트 수와 라이선스를 바로 확인할 수 있습니다.
 
 ```bash
 # 컴포넌트 수 확인
@@ -251,9 +255,9 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 
 | 목표 | 문서 |
 |------|------|
-| 입력 형태(GitHub·ZIP·SBOM·펌웨어 등)별 처리 | [시나리오별 가이드](scenarios-guide.md) |
-| 고지문·보안 보고서·위험분석보고서·웹 UI | [고지문·보안 보고서 가이드](notice-and-security.md) |
-| 전체 옵션 및 CI/CD 연동 방법 | [사용 가이드](usage-guide.md) |
+| 입력 형태(GitHub, ZIP, SBOM, 펌웨어 등)별 처리 | [시나리오별 가이드](scenarios-guide.md) |
+| 고지문, 보안 보고서, 위험분석보고서, 웹 UI | [고지문·보안 보고서 가이드](notice-and-security.md) |
+| 전체 옵션과 CI/CD 연동 방법 | [사용 가이드](usage-guide.md) |
 | 언어별 예제 프로젝트 실습 | [예제 가이드](examples-guide.md) |
 | 내부 구조 이해 (기여자용) | [아키텍처](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) |
 | 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) |

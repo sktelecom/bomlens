@@ -1,12 +1,18 @@
 # Notice · security report · web UI guide
 
-> Beyond SBOM generation, sbom-tools produces an open-source notice (NOTICE) and a security vulnerability report in one run, and provides a web UI for users not comfortable with the CLI. This page covers how to use these three features.
+> **한국어**: [고지문과 보안 보고서, 웹 UI 가이드](notice-and-security.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)
+
+Beyond SBOM generation, BomLens produces an open-source notice (NOTICE) and a security vulnerability report in one run, and provides a web UI for users not comfortable with the CLI. This page covers how to read and use the outputs (the notice and the security report) after generating an SBOM, and how to use the web UI.
 
 ## Quickstart (5 minutes)
 
 If this is your first time, this is all you need. With the Docker engine running, move to the project folder you want to scan and run one of the two (replace `SBOM` with the real path to `scan-sbom.sh`):
 
-> **Windows users**: the commands below assume macOS/Linux. Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (Git Bash required), or run it as-is under WSL2. To work without the command line, double-click `scripts\sbom-ui.bat`. For installation, see [Getting started](getting-started.md).
+> **Windows users**: the commands below assume macOS/Linux. Pick one of the following. For installation, see [Getting started](getting-started.en.md#installation).
+>
+> - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (Git Bash required).
+> - Under WSL2, run the commands as-is.
+> - To work without the command line, double-click `scripts\sbom-ui.bat`.
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
@@ -101,9 +107,9 @@ Scans the generated SBOM with Trivy and reports known vulnerabilities (CVEs). (N
 
 The report does not fail the scan even when vulnerabilities exist (report-only). If you need a gate, post-process `_security.json`.
 
-### Priority signals (CVSS · EPSS · CISA KEV)
+### Priority signals (CVSS, EPSS, CISA KEV)
 
-Severity alone makes it hard to decide what to fix first. Beyond severity, the report shows three more signals. The Markdown and HTML table columns are `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`.
+Severity alone makes it hard to decide what to fix first. To help with that, the report shows three more signals beyond severity. The Markdown and HTML table columns are `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`.
 
 - **CVSS** — the technical severity score of the vulnerability (0–10). The V3 score is used first, falling back to V2 if absent.
 - **EPSS** — the probability of real-world exploitation within the next 30 days (0–1). Queried from FIRST.org; a higher score means a greater chance of being used in an attack.

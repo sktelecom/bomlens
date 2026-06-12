@@ -1,8 +1,8 @@
 # Supplier SBOM validation guide
 
-> **Related**: [Getting started](getting-started.md) | [Scenarios guide](scenarios-guide.md) | [Usage guide](usage-guide.md) | [Notice and security guide](notice-and-security.md)
+> **한국어**: [공급사 SBOM 검증 가이드](supplier-sbom-validation.md) · **Related**: [Getting started](getting-started.en.md) | [Scenarios guide](scenarios-guide.en.md) | [Notice and security guide](notice-and-security.en.md)
 
-How to take an SBOM (JSON) submitted by a supplier, validate that it meets the requirements, analyze its licenses and vulnerabilities, and produce a risk report to send back to the supplier. You only need the SBOM file — no source code required.
+How to validate that an SBOM (JSON) submitted by a supplier meets the submission requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report to send back to the supplier. You only need the SBOM file — no source code required.
 
 For the design background and the internal validation logic, see the maintainer doc [Supplier SBOM validation and analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/supplier-sbom-analysis.md) (Korean).
 
@@ -32,7 +32,7 @@ $SBOM --project supplier-app --version 2.0.0 \
   --generate-only
 ```
 
-`--analyze` turns on notice and security analysis automatically, so you do not need to add `--all`. `--generate-only` leaves only the outputs in the current directory and cleans up the temporary working copy.
+`--analyze` turns on notice and security analysis automatically, so you do not need to add `--all`. `--generate-only` leaves only the outputs in the current directory and cleans up the temporary working copy. For the remaining options, see the [usage guide](usage-guide.en.md#options-reference).
 
 > **Windows**: to work without the command line, double-click `scripts\sbom-ui.bat` to open the web UI, choose "SBOM upload" at the top, and upload the file. For installation, see [Getting started](getting-started.md).
 
@@ -51,7 +51,7 @@ Unlike a self-generated SBOM, a received SBOM additionally produces a conformanc
 
 The conformance report is the per-item check of whether the received SBOM meets the submission criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
 
-- If a required item (timestamp, tool info, top-level component, name/version coverage, PURL coverage, no `pkg:generic`, transitive dependencies) falls short, it is a `fail`.
+- If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — timestamp, tool info, top-level component, name/version coverage, PURL coverage (no `pkg:generic`), and transitive dependencies.
 - If a recommended item (license, hash coverage) falls short, it is a `warn`, not a rejection reason.
 - The cards at the top of the HTML report show pass/fail and the list of missing items.
 
