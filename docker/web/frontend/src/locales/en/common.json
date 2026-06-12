@@ -1,5 +1,5 @@
 {
-  "appTitle": "SBOM Tools",
+  "appTitle": "BomLens",
   "subtitle": "SBOM, open-source notices and security reports for a single project — in one run",
   "form": {
     "title": "Scan settings",

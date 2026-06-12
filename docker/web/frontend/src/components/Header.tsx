@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { Aperture } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { LangToggle } from "./LangToggle";
@@ -11,11 +11,14 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-            <ShieldCheck className="h-5 w-5" />
+            <Aperture className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold leading-tight">
+            <h1 className="flex items-center gap-2 truncate text-base font-semibold leading-tight">
               {t("appTitle")}
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                SBOM Generator
+              </span>
             </h1>
             <p className="truncate text-xs text-muted-foreground">
               {t("subtitle")}
