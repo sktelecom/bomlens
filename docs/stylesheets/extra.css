@@ -40,6 +40,18 @@
 .md-header .md-logo svg {
   color: #ea002c;
 }
+/* 헤더 브랜드: 락업 로고(아이콘+워드마크+부제)를 키워서 쓰고, 데스크톱에서는
+   중복되는 사이트명 텍스트를 숨긴다. 모바일에서는 Material이 로고를 숨기므로
+   텍스트 제목을 그대로 둔다. */
+.md-header .md-logo img {
+  height: 1.9rem;
+  width: auto;
+}
+@media screen and (min-width: 76.25em) {
+  .md-header__title {
+    display: none;
+  }
+}
 /* 저장소 통계(버전/스타/포크)는 밝은 헤더에서 번잡해 숨긴다(저장소 링크는 유지) */
 .md-source__facts {
   display: none;
