@@ -1,30 +1,15 @@
-import { Aperture } from "lucide-react";
-import { useTranslation } from "react-i18next";
-
 import { LangToggle } from "./LangToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
-  const { t } = useTranslation();
   return (
     <header className="sticky top-0 z-20 border-b bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="container flex h-16 items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-            <Aperture className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 truncate text-base font-semibold leading-tight">
-              {t("appTitle")}
-              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                SBOM Generator
-              </span>
-            </h1>
-            <p className="truncate text-xs text-muted-foreground">
-              {t("subtitle")}
-            </p>
-          </div>
-        </div>
+        <img
+          src="/logo.svg"
+          alt="BomLens — an SBOM generator"
+          className="h-9 w-auto shrink-0"
+        />
         <div className="flex shrink-0 items-center gap-2">
           <LangToggle />
           <ThemeToggle />
