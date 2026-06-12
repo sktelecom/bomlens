@@ -18,7 +18,11 @@ For any input form, adding `--all --generate-only` produces all three at once (t
 
 ## Common setup
 
-> **Windows**: the commands here are for macOS/Linux. Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash), or run it under WSL2. To work without a command line, double-click `scripts\sbom-ui.bat`. See [Getting started](getting-started.en.md#installation).
+> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](getting-started.en.md#installation) for installation.
+>
+> - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash).
+> - Under WSL2, run the commands as-is.
+> - To work without a command line, double-click `scripts\sbom-ui.bat`.
 
 ```bash
 # Docker 20.10+ required. Pull the scanner image once (or build it yourself).

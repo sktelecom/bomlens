@@ -45,7 +45,7 @@ $SBOM --project device-fw --version 1.0.0 \
 
 ## 라이선스 주의
 
-펌웨어 이미지에는 GPL 도구(cve-bin-tool, BANG, unblob이 의존하는 일부 extractor)가 들어 있습니다. 셸 스크립트가 이들을 별도 프로세스로 호출만 하므로 copyleft가 우리 코드로 전파되지는 않지만, GPL 바이너리를 이미지로 재배포하는 데 따른 라이선스 텍스트 동봉과 소스 오퍼 의무가 있습니다. 상세 인벤토리는 [번들 도구 라이선스](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참고하세요. GPL 도구는 이 펌웨어 이미지에만 들어가고 기본 이미지는 permissive 라이선스만 유지합니다.
+펌웨어 이미지에는 GPL 도구(cve-bin-tool, BANG, unblob이 의존하는 일부 extractor)가 들어 있습니다. 셸 스크립트는 이 도구들을 별도 프로세스로 호출만 하므로 copyleft가 이 저장소의 코드로 전파되지는 않습니다. 다만 GPL 바이너리를 이미지에 담아 재배포하므로, 라이선스 텍스트 동봉과 소스 오퍼 의무는 그대로 적용됩니다. 상세 인벤토리는 [번들 도구 라이선스](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참고하세요. GPL 도구는 이 펌웨어 이미지에만 들어가고 기본 이미지는 permissive 라이선스만 유지합니다.
 
 ## 한계
 

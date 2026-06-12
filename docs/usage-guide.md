@@ -10,20 +10,24 @@ BomLens의 전체 옵션, 분석 모드, CI/CD 통합 방법 및 트러블슈팅
 ./scripts/scan-sbom.sh [옵션]
 ```
 
-> **Windows 사용자**: 위 명령은 macOS/Linux 기준입니다. `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행하거나(Git Bash 필요), WSL2에서 그대로 실행하세요. 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭하면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+> **Windows 사용자**: 위 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+>
+> - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
+> - WSL2에서는 명령을 그대로 실행합니다.
+> - 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
 
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
 | `--project <이름>` | — | **(필수)** 프로젝트 이름 |
 | `--version <버전>` | — | **(필수)** 프로젝트 버전 |
-| `--target <대상>` | 현재 디렉토리 | 분석 대상 (디렉토리 · Docker 이미지 · 바이너리 파일 · `.zip`/`.tar.gz` 아카이브) |
+| `--target <대상>` | 현재 디렉토리 | 분석 대상 (디렉토리, Docker 이미지, 바이너리 파일, `.zip`/`.tar.gz` 아카이브) |
 | `--git <url>` | — | git/GitHub URL을 얕은 클론(shallow) 후 소스로 분석 (비공개 저장소: `GIT_TOKEN` 환경변수) |
-| `--branch <ref>` | 기본 브랜치 | `--git` 대상의 브랜치·태그·커밋 |
+| `--branch <ref>` | 기본 브랜치 | `--git` 대상의 브랜치, 태그, 커밋 |
 | `--firmware` | false | `--target` 파일을 펌웨어 모드로 강제 (opt-in 펌웨어 이미지) |
 | `--analyze <sbom>` | — | 공급사 SBOM 검증·분석 (별칭 `--sbom`). CycloneDX/SPDX. `--target`와 배타 |
 | `--generate-only` | false | 업로드 없이 로컬에만 저장 |
 | `--notice` | (기본 on) | 오픈소스 고지문(NOTICE, txt+html) 생성 |
-| `--security` | (기본 on) | Trivy 보안 보고서(json+md+html) 생성. CVSS·EPSS·CISA KEV 우선순위 신호 포함 |
+| `--security` | (기본 on) | Trivy 보안 보고서(json+md+html) 생성. CVSS, EPSS, CISA KEV 우선순위 신호 포함 |
 | `--all` | — | `--notice --security` |
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--deep-license` | false | scancode 정밀 라이선스 탐지 (opt-in 이미지) |
@@ -32,7 +36,18 @@ BomLens의 전체 옵션, 분석 모드, CI/CD 통합 방법 및 트러블슈팅
 | `--ui` | — | 로컬 웹 UI 실행 |
 | `--help` | — | 도움말 출력 |
 
-> **환경변수**: `SBOM_SCANNER_IMAGE`(스캐너 이미지 재정의), `SBOM_FIRMWARE_IMAGE`(펌웨어 이미지), `GIT_TOKEN`(비공개 git 클론), `COSIGN_KEY`(서명 키), `FETCH_LICENSE`(기본 true, 소스 스캔 시 의존성 라이선스 자동 조회. `false`면 조회를 생략해 속도를 높임), `SECURITY_ENRICH`(기본 true, 보안 보고서에 EPSS와 CISA KEV 신호 보강. 폐쇄망에서는 `false`로 두면 외부 조회를 생략). 출력 플래그 상세는 [고지문·보안 보고서 가이드](notice-and-security.md)를, 공급사 SBOM 검증은 [공급사 SBOM 검증](supplier-sbom-validation.md)을 참고하세요.
+환경변수로 동작을 조정할 수 있습니다.
+
+| 환경변수 | 기본값 | 설명 |
+|----------|--------|------|
+| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | 스캐너 이미지를 다른 태그로 재정의 (`sbom-generator`와 같은 이미지) |
+| `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/sbom-scanner-firmware:latest` | 펌웨어 분석용 이미지 지정 |
+| `GIT_TOKEN` | — | 비공개 git 저장소 클론에 쓰는 토큰 |
+| `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
+| `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
+| `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
+
+출력 플래그 상세는 [고지문·보안 보고서 가이드](notice-and-security.md)를, 공급사 SBOM 검증은 [공급사 SBOM 검증](supplier-sbom-validation.md)을 참고하세요.
 
 ## 분석 모드
 

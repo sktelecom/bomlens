@@ -11,7 +11,11 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 ./scripts/scan-sbom.sh [options]
 ```
 
-> **Windows**: the commands here are for macOS/Linux. Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash), or run it as-is under WSL2. To work without a command line, double-click `scripts\sbom-ui.bat`, or download the desktop app. See [Getting started](getting-started.en.md#installation).
+> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](getting-started.en.md#installation) for installation.
+>
+> - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash).
+> - Under WSL2, run the commands as-is.
+> - To work without a command line, double-click `scripts\sbom-ui.bat`, or download the desktop app.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -33,7 +37,18 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--ui` | — | Launch the local web UI |
 | `--help` | — | Print help |
 
-> **Environment variables**: `SBOM_SCANNER_IMAGE` (override the scanner image), `SBOM_FIRMWARE_IMAGE` (firmware image), `GIT_TOKEN` (private git clone), `COSIGN_KEY` (signing key), `FETCH_LICENSE` (default true; resolves dependency licenses during source scans — set `false` to skip the lookup and run faster), `SECURITY_ENRICH` (default true; enriches the security report with EPSS and CISA KEV signals — set `false` on air-gapped networks to skip the external lookups). Output flags are detailed in the [notice and security guide](notice-and-security.md); validating a received supplier SBOM is covered in the [supplier SBOM validation guide](supplier-sbom-validation.md) (Korean).
+Environment variables adjust the behavior.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | Override the scanner image (same image as `sbom-generator`) |
+| `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/sbom-scanner-firmware:latest` | Image used for firmware analysis |
+| `GIT_TOKEN` | — | Token for cloning private git repositories |
+| `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
+| `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
+| `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |
+
+Output flags are detailed in the [notice and security guide](notice-and-security.en.md); validating a received supplier SBOM is covered in the [supplier SBOM validation guide](supplier-sbom-validation.en.md).
 
 ## Analysis modes
 

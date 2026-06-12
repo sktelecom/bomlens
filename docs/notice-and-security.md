@@ -1,12 +1,18 @@
 # 고지문 · 보안 보고서 · 웹 UI 가이드
 
-> sbom-tools는 SBOM 생성에 더해 오픈소스 고지문(NOTICE)과 보안 취약점 보고서를 한 번에 만들고, CLI에 익숙하지 않은 사용자를 위한 웹 UI를 제공합니다. 이 문서는 이 세 기능의 사용법을 다룹니다.
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [시나리오 가이드](scenarios-guide.md)
+
+BomLens는 SBOM 생성에 더해 오픈소스 고지문(NOTICE)과 보안 취약점 보고서를 한 번에 만들고, CLI에 익숙하지 않은 사용자를 위한 웹 UI를 제공합니다. 이 문서는 SBOM을 만든 뒤 산출물(고지문, 보안 보고서)을 읽고 활용하는 방법과 웹 UI 사용법을 다룹니다.
 
 ## Quickstart (5분)
 
 처음이라면 이것만 따라 하면 됩니다. Docker 엔진이 실행 중인 상태에서 스캔할 프로젝트 폴더로 이동한 뒤 둘 중 하나를 실행하세요 (`SBOM`은 `scan-sbom.sh`의 실제 경로로 바꾸세요):
 
-> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행하거나(Git Bash 필요), WSL2에서 그대로 실행하세요. 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭하면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+>
+> - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
+> - WSL2에서는 명령을 그대로 실행합니다.
+> - 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
 
 ```bash
 SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
@@ -101,9 +107,9 @@ Components (1):
 
 보고서는 취약점이 있어도 스캔을 실패시키지 않습니다(report-only). 게이트가 필요하면 `_security.json`을 후처리하세요.
 
-### 우선순위 신호 (CVSS · EPSS · CISA KEV)
+### 우선순위 신호 (CVSS, EPSS, CISA KEV)
 
-심각도(Severity)만으로는 무엇을 먼저 고칠지 정하기 어렵습니다. 보고서는 심각도 외에 세 가지 신호를 함께 보여 줍니다. Markdown과 HTML 표의 열 구성은 `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`입니다.
+심각도(Severity)만으로는 무엇을 먼저 고칠지 정하기 어렵습니다. 이를 보완하기 위해 보고서는 심각도 외에 세 가지 신호를 함께 보여 줍니다. Markdown과 HTML 표의 열 구성은 `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`입니다.
 
 - **CVSS** — 취약점의 기술적 심각도 점수(0~10). V3 점수를 우선 쓰고 없으면 V2로 대체합니다.
 - **EPSS** — 향후 30일 내 실제 악용 가능성(0~1)입니다. FIRST.org에서 조회하며, 점수가 높을수록 공격에 쓰일 확률이 큽니다.

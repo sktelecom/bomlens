@@ -1,8 +1,8 @@
 # 공급사 SBOM 검증 가이드
 
-> **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)
+> **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)
 
-공급사가 제출한 SBOM(JSON)을 받아 요구사항을 충족하는지 검증하고, 라이선스와 취약점을 분석해 공급사에 보낼 위험 보고서까지 만드는 방법을 설명합니다. 소스 코드가 없어도 SBOM 파일 하나만 있으면 됩니다.
+공급사가 제출한 SBOM(JSON)이 제출 요구사항을 충족하는지 검증하는 방법을 설명합니다. 검증에 이어 라이선스와 취약점을 분석하고, 공급사에 보낼 위험 보고서까지 만듭니다. 소스 코드가 없어도 SBOM 파일 하나만 있으면 됩니다.
 
 설계 배경과 검증 로직의 내부 동작은 메인테이너용 [공급사 제출 SBOM 검증·분석](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/supplier-sbom-analysis.md) 문서를 참고하세요.
 
@@ -32,7 +32,7 @@ $SBOM --project supplier-app --version 2.0.0 \
   --generate-only
 ```
 
-`--analyze`는 고지문과 보안 분석을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다. `--generate-only`는 산출물만 현재 디렉터리에 남기고 임시 작업본은 정리합니다.
+`--analyze`는 고지문과 보안 분석을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다. `--generate-only`는 산출물만 현재 디렉터리에 남기고 임시 작업본은 정리합니다. 나머지 옵션은 [사용 가이드](usage-guide.md#옵션-레퍼런스)를 참고하세요.
 
 > **Windows**: 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭해 웹 UI를 열고, 상단에서 "SBOM 업로드"를 골라 파일을 올리면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
 
@@ -51,7 +51,7 @@ $SBOM --project supplier-app --version 2.0.0 \
 
 적합성 보고서는 받은 SBOM이 제출 기준을 갖췄는지 항목별로 점검한 결과입니다. 검증은 변환 전 원본을 기준으로 하므로, SPDX를 넣어도 원본 SPDX의 필드를 그대로 확인합니다.
 
-- 필수 항목(timestamp, 도구 정보, 최상위 컴포넌트, name/version 커버리지, PURL 커버리지, `pkg:generic` 금지, 추이적 의존성)이 미달이면 `fail`입니다.
+- 필수 항목이 하나라도 미달이면 `fail`입니다. 필수 항목은 [언제 쓰나](#언제-쓰나)의 기준 표와 같습니다 — timestamp, 도구 정보, 최상위 컴포넌트, name/version 커버리지, PURL 커버리지(`pkg:generic` 금지), 추이적 의존성.
 - 권장 항목(라이선스, hash 커버리지)이 미달이면 `warn`이며, 반려 사유는 아닙니다.
 - HTML 보고서 상단 카드에 적합/부적합과 누락 목록이 표시됩니다.
 

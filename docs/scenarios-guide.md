@@ -1,6 +1,6 @@
 # 5가지 입력 시나리오별 처리 가이드
 
-> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md) | [공급사 SBOM 검증](supplier-sbom-validation.md) | [펌웨어 분석](firmware-analysis-guide.md)
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)
 
 ## 개요
 
@@ -18,7 +18,11 @@
 
 ## 공통 준비
 
-> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행하거나(Git Bash 필요), WSL2에서 그대로 실행하세요. 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭하면 됩니다. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](getting-started.md#설치)를 참고하세요.
+>
+> - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
+> - WSL2에서는 명령을 그대로 실행합니다.
+> - 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
 
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
@@ -32,7 +36,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 | 입력 형태 | 모드 | 핵심 명령(요약) | 산출물 |
 |-----------|------|-----------------|--------|
-| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문·SBOM·위험분석보고서 |
+| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 위험분석보고서 |
 | 소스 ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | 〃 |
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
 | 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃 + 적합성 보고서 |
@@ -124,7 +128,7 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
 - **SBOM**: CycloneDX 1.6. 포털이나 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
-- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약과 (공급사 SBOM의 경우) 포맷 적합성 결과를 포함합니다.
+- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
 
 ## 웹 UI로 한 번에
 

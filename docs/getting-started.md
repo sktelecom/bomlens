@@ -30,7 +30,7 @@ docker run --rm hello-world
 
 | 옵션 | 특징 | 이 도구와의 관계 |
 |------|------|------------------|
-| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투 안에 docker-ce 설치 | WSL 안에서 `scan-sbom.sh`를 직접 실행. `.bat`·Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 |
+| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투 안에 docker-ce 설치 | WSL 안에서 `scan-sbom.sh`를 직접 실행. `.bat`와 Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 |
 | **Rancher Desktop** (무료, GUI) | Docker Desktop 대체 GUI, `docker` CLI 제공 | `scripts\sbom-ui.bat` 더블클릭 흐름을 그대로 사용 |
 | Docker Desktop | 가장 간편 | 동작하지만 조직 사용 시 유료 라이선스 확인 필요 |
 
@@ -47,7 +47,11 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 ```
 이후 WSL 안에서 이 저장소를 클론하고 `./scripts/scan-sbom.sh ...`를 그대로 실행하면 됩니다.
 
-Windows에서 웹 UI만 쓴다면(Rancher Desktop/Docker Desktop) 추가 도구 없이 `scripts\sbom-ui.bat`를 더블클릭하면 됩니다. 명령줄 래퍼(`scripts\scan-sbom.bat`)를 쓸 때만 [Git for Windows](https://git-scm.com/download/win)(Git Bash)가 추가로 필요합니다. WSL2 경로를 쓴다면 둘 다 필요 없습니다(WSL 안에서 `.sh`를 직접 실행).
+Windows에서 추가로 필요한 도구는 사용 방식에 따라 다릅니다.
+
+- 웹 UI만 쓴다면(Rancher Desktop, Docker Desktop) 추가 도구 없이 `scripts\sbom-ui.bat`를 더블클릭하면 됩니다.
+- 명령줄 래퍼(`scripts\scan-sbom.bat`)를 쓴다면 [Git for Windows](https://git-scm.com/download/win)(Git Bash)가 필요합니다.
+- WSL2 경로를 쓴다면 둘 다 필요 없습니다. WSL 안에서 `.sh`를 직접 실행합니다.
 
 ## 설치
 
