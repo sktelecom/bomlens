@@ -1,4 +1,6 @@
-# BomLens
+<p align="center">
+  <img src="docs/images/logo.svg" alt="BomLens — an SBOM generator" width="300" />
+</p>
 
 > A local-first SBOM generator and open-source risk assessor — scan a single project in seconds, no SaaS.
 
