@@ -4,7 +4,7 @@
 
 Thanks for your interest in BomLens! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
 
-> **Related**: [Architecture](docs/internal/architecture.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
+> **Related**: [Architecture](docs/architecture.en.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
 
 ## Contents
 

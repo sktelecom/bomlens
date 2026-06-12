@@ -52,7 +52,7 @@ Output flags are detailed in the [notice and security guide](notice-and-security
 
 ## Analysis modes
 
-The right tool (cdxgen or syft) is selected automatically from the type of target. See the [architecture](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/architecture.md) doc (Korean) for the selection logic.
+The right tool (cdxgen or syft) is selected automatically from the type of target. See the [architecture](architecture.en.md) doc for the selection logic.
 
 ### Source code (cdxgen)
 

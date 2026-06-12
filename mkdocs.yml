@@ -87,10 +87,11 @@ plugins:
             빠른 시작: Quick start
             사용 가이드: Guides
             검증과 분석: Validate & analyze
+            참고: Reference
+            기여: Contributing
 
 exclude_docs: |
   internal/
-  contributing/
   korean-style-guide.md
 
 nav:
@@ -106,3 +107,9 @@ nav:
   - 검증과 분석:
       - supplier-sbom-validation.md
       - firmware-analysis-guide.md
+  - 참고:
+      - docker-image.md
+      - architecture.md
+  - 기여:
+      - contributing/package-manager-guide.md
+      - contributing/testing-guide.md

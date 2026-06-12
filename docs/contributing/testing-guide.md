@@ -1,27 +1,8 @@
 # 테스트 가이드
 
-> **관련 문서**: [기여 가이드](../../CONTRIBUTING.md) | [아키텍처](../internal/architecture.md) | [패키지 매니저 추가](package-manager-guide.md)
+> **관련 문서**: [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) | [아키텍처](../architecture.md) | [패키지 매니저 추가](package-manager-guide.md)
 
-BomLens의 테스트 구조, 실행 방법, 테스트 작성 방법 및 디버깅 절차를 설명합니다.
-
-## 목차
-
-- [테스트 가이드](#테스트-가이드)
-  - [목차](#목차)
-  - [테스트 구조](#테스트-구조)
-  - [테스트 실행](#테스트-실행)
-    - [전체 테스트 실행](#전체-테스트-실행)
-    - [특정 언어만 테스트](#특정-언어만-테스트)
-  - [실행 모드](#실행-모드)
-  - [테스트 작성](#테스트-작성)
-  - [단언 함수 레퍼런스](#단언-함수-레퍼런스)
-    - [테스트 작성 원칙](#테스트-작성-원칙)
-  - [로깅 및 디버깅](#로깅-및-디버깅)
-    - [생성된 SBOM 직접 검사](#생성된-sbom-직접-검사)
-    - [특정 테스트 디버깅](#특정-테스트-디버깅)
-  - [CI 통합](#ci-통합)
-    - [GitHub Actions](#github-actions)
-    - [테스트 실패 시 대응 절차](#테스트-실패-시-대응-절차)
+BomLens의 테스트 구조와 실행 방법, 테스트 작성 방법, 디버깅 절차를 설명합니다.
 
 ## 테스트 구조
 
@@ -141,7 +122,7 @@ teardown_test
 source "$(dirname "$0")/cases/test-kotlin.sh"
 ```
 
-전체 절차는 [패키지 매니저 추가 가이드](package-manager-guide.md#step-3-테스트-추가)를 참고하세요.
+전체 절차는 [패키지 매니저 추가 가이드](package-manager-guide.md#4-테스트-추가)를 참고하세요.
 
 ## 단언 함수 레퍼런스
 

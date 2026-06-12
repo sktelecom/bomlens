@@ -2,9 +2,10 @@
 
 이 폴더는 sbom-tools 메인테이너를 위한 의사결정과 조사 문서를 모아 둔 곳입니다. 도구를 사용하려는 분은 이 폴더가 아니라 [docs/](../) 상위의 사용자 가이드를 보세요.
 
+아키텍처 문서는 사용자 문서 사이트로 옮겼습니다. [docs/architecture.md](../architecture.md)를 보세요.
+
 | 문서 | 내용 |
 |------|------|
-| [아키텍처](architecture.md) | 2-stage 파이프라인(cdxgen + syft, 후처리)과 분석 도구 선택 로직 |
 | [방향성 조사 보고서](direction-study.md) | Docker 이미지의 가치(cdxgen 대비 측정)와 설계 방향 |
 | [데스크톱 앱 검토 보고서](desktop-app-study.md) | Windows 데스크톱 앱(Electron) 도입 검토 |
 | [공급사 제출 SBOM 검증·분석](supplier-sbom-analysis.md) | ANALYZE 모드 검증·변환·위험 보고 설계 |

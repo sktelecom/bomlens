@@ -1,121 +1,15 @@
-# Docker 이미지 가이드
+# Docker 이미지 가이드 (빌드와 배포)
 
-SKT BomLens Docker 이미지 빌드, 배포 및 사용 가이드입니다.
+BomLens Docker 이미지를 직접 빌드하고 배포하려는 기여자를 위한 가이드입니다.
 
-## 목차
+이미지를 사용만 한다면 이 문서가 아니라 사이트의 [Docker 이미지 직접 사용](https://sktelecom.github.io/sbom-tools/docker-image/) 가이드를 보세요. `docker run` 예시와 환경 변수 설명이 거기에 있습니다.
 
-- [개요](#개요)
-- [사전 빌드된 이미지 사용](#사전-빌드된-이미지-사용)
-- [직접 빌드하기](#직접-빌드하기)
-- [멀티 플랫폼 빌드](#멀티-플랫폼-빌드)
-- [GitHub Container Registry 배포](#github-container-registry-배포)
-- [이미지 상세 정보](#이미지-상세-정보)
+## 이미지 정보
 
-## 개요
-
-BomLens는 다음 환경을 포함한 Docker 이미지로 제공됩니다:
-
-### 포함된 도구 및 런타임
-
-| 카테고리 | 도구/런타임 | 버전 |
-|---------|------------|------|
-| **기본 이미지** | Node.js | 20 (Debian Slim) |
-| **Java** | Eclipse Temurin JDK | 17 LTS |
-| **Python** | Python 3 | 3.11+ |
-| **Ruby** | Ruby + Bundler | 3.x |
-| **PHP** | PHP + Composer | 8.x |
-| **Rust** | Rust + Cargo | Stable (minimal) |
-| **빌드 도구** | Maven, Gradle | Latest |
-| **SBOM 생성** | cdxgen | Latest |
-| **이미지 분석** | Syft | Latest |
-| **컨테이너 분석** | Docker CLI | Latest |
-
-> **최적화:** 이미지 크기를 50% 줄이기 위해 JDK 17만 포함됩니다 (Java 7-17 지원). Python 2는 제거되었습니다 (2020 EOL).
-
-### 이미지 정보
-
-- **저장소**: `ghcr.io/sktelecom/sbom-scanner`
-- **태그**: `v1`, `latest`
-- **플랫폼**: `linux/amd64`, `linux/arm64`
-- **크기**: 약 3-4 GB (최적화됨, 이전 7.3 GB)
-
-## 사전 빌드된 이미지 사용
-
-### 이미지 다운로드
-
-```bash
-# 최신 버전 다운로드
-docker pull ghcr.io/sktelecom/sbom-scanner:v1
-
-# latest 태그
-docker pull ghcr.io/sktelecom/sbom-scanner:latest
-```
-
-### 직접 실행
-
-스크립트 없이 Docker 이미지를 직접 사용할 수 있습니다.
-
-#### 소스코드 분석
-
-```bash
-docker run --rm \
-  -v "$(pwd)":/src \
-  -v "$(pwd)":/host-output \
-  -e MODE=SOURCE \
-  -e UPLOAD_ENABLED=false \
-  -e HOST_OUTPUT_DIR=/host-output \
-  -e PROJECT_NAME="MyApp" \
-  -e PROJECT_VERSION="1.0.0" \
-  ghcr.io/sktelecom/sbom-scanner:v1
-```
-
-#### Docker 이미지 분석
-
-```bash
-docker run --rm \
-  -v "$(pwd)":/host-output \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -e MODE=IMAGE \
-  -e TARGET_IMAGE="nginx:alpine" \
-  -e UPLOAD_ENABLED=false \
-  -e HOST_OUTPUT_DIR=/host-output \
-  -e PROJECT_NAME="Nginx" \
-  -e PROJECT_VERSION="alpine" \
-  ghcr.io/sktelecom/sbom-scanner:v1
-```
-
-#### 바이너리 파일 분석
-
-```bash
-docker run --rm \
-  -v "$(pwd)":/target \
-  -v "$(pwd)":/host-output \
-  -e MODE=BINARY \
-  -e TARGET_FILE=/target/firmware.bin \
-  -e UPLOAD_ENABLED=false \
-  -e HOST_OUTPUT_DIR=/host-output \
-  -e PROJECT_NAME="Firmware" \
-  -e PROJECT_VERSION="1.0" \
-  ghcr.io/sktelecom/sbom-scanner:v1
-```
-
-### 환경변수 설명
-
-| 환경변수 | 필수 | 설명 | 예시 |
-|---------|------|------|------|
-| `MODE` | O | 분석 모드 | `SOURCE`, `IMAGE`, `BINARY`, `ROOTFS` |
-| `PROJECT_NAME` | O | 프로젝트 이름 | `MyApp` |
-| `PROJECT_VERSION` | O | 프로젝트 버전 | `1.0.0` |
-| `UPLOAD_ENABLED` | X | 서버 업로드 여부 | `true`, `false` (기본: `true`) |
-| `HOST_OUTPUT_DIR` | X | 출력 디렉토리 | `/host-output` |
-| `TARGET_IMAGE` | X* | Docker 이미지명 | `nginx:latest` |
-| `TARGET_FILE` | X* | 바이너리 파일 경로 | `/target/firmware.bin` |
-| `TARGET_DIR` | X* | RootFS 디렉토리 | `/target` |
-| `API_KEY` | X** | Dependency Track API 키 | `odt_xxx` |
-| `API_URL` | X** | Dependency Track URL | `http://server:8081` |
-
-\* MODE에 따라 필수  
-\*\* UPLOAD_ENABLED=true인 경우 필수
+- 대표 이름: `ghcr.io/sktelecom/bomlens` (별칭 `sbom-generator`, `sbom-scanner` — 같은 다이제스트)
+- 펌웨어 분석용: `ghcr.io/sktelecom/sbom-scanner-firmware` (opt-in)
+- 플랫폼: `linux/amd64`, `linux/arm64`
+- 베이스: `python:3.12-slim`. 언어 toolchain 없는 경량 후처리 이미지이며, 포함 도구와 버전은 `Dockerfile`의 `ARG`로 고정됩니다 (syft, Trivy, cosign, scancode 등).
 
 ## 직접 빌드하기
 
@@ -225,7 +119,7 @@ docker buildx build \
 
 ### 1. Personal Access Token 생성
 
-1. GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+1. GitHub에서 Settings, Developer settings, Personal access tokens 순으로 들어가 Tokens (classic)을 엽니다.
 2. "Generate new token (classic)" 클릭
 3. 권한 선택:
    - `write:packages` - 패키지 업로드
@@ -294,8 +188,8 @@ Manifests:
 기본적으로 패키지는 Private입니다. Public으로 변경:
 
 1. https://github.com/orgs/sktelecom/packages 접속
-2. `sbom-scanner` 패키지 선택
-3. "Package settings" → "Change visibility" → "Public"
+2. `bomlens` 패키지 선택 (별칭 `sbom-generator`, `sbom-scanner`도 같은 방식)
+3. "Package settings"에서 "Change visibility"를 눌러 "Public"을 고릅니다
 4. 패키지명 입력하여 확인
 
 ## 이미지 상세 정보

@@ -13,7 +13,7 @@
 **Where to start:**
 
 - **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
-- **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/internal/architecture.md).
+- **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/architecture.en.md).
 
 A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
 
@@ -100,7 +100,7 @@ The web UI itself is bilingual (English and Korean, English by default). The cor
 | [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
 | [Input scenarios](docs/scenarios-guide.en.md) | GitHub URL, ZIP, local C/C++, existing SBOM, firmware |
 
-Building or extending the tool? The [architecture](docs/internal/architecture.md) and design notes live under [docs/internal/](docs/internal/) (Korean).
+Building or extending the tool? Start with the [architecture](docs/architecture.en.md); design notes live under [docs/internal/](docs/internal/) (Korean).
 
 ### 한국어
 
@@ -113,7 +113,7 @@ Building or extending the tool? The [architecture](docs/internal/architecture.md
 | [사용 가이드](docs/usage-guide.md) | 전체 옵션, 분석 모드, CI/CD |
 | [예제 가이드](docs/examples-guide.md) | 언어별 예제 프로젝트 실습 |
 
-> 내부 구조([아키텍처](docs/internal/architecture.md))와 설계 배경, 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
+> 내부 구조([아키텍처](docs/architecture.md))와 설계 배경, 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
 
 ## Contributing & License
 
