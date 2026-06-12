@@ -1,9 +1,10 @@
 ---
+title: BomLens
 hide:
   - toc
 ---
 
-# BomLens
+![BomLens — an SBOM generator](images/logo.svg){ width="300" }
 
 A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
 
