@@ -1,3 +1,7 @@
+---
+description: 공급사가 제출한 SBOM(CycloneDX/SPDX)이 요구사항을 충족하는지 BomLens로 검증하고, 라이선스와 취약점을 분석해 공급사에 보낼 위험 보고서를 만드는 방법.
+---
+
 # 공급사 SBOM 검증 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)

@@ -1,3 +1,7 @@
+---
+description: Java, Python, Node.js 등 언어별 예제 프로젝트로 BomLens의 SBOM 생성을 직접 실습하고 언어별 결과를 비교합니다.
+---
+
 # 예제 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md)

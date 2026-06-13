@@ -1,3 +1,7 @@
+---
+description: Unpack network-device firmware binaries (.bin, squashfs, and more) to identify components and check the SBOM, licenses, and vulnerabilities with BomLens firmware analysis.
+---
+
 # Firmware analysis guide
 
 > **Related**: [Getting started](getting-started.md) | [Scenarios guide](scenarios-guide.md) | [Usage guide](usage-guide.md) | [Notice and security guide](notice-and-security.md)

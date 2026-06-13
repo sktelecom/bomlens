@@ -1,3 +1,7 @@
+---
+description: 네트워크 장비 펌웨어 바이너리(.bin, squashfs 등)를 언패킹해 구성요소를 식별하고 SBOM과 라이선스, 취약점을 점검하는 BomLens 펌웨어 분석 방법.
+---
+
 # 펌웨어 분석 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)

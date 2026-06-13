@@ -1,3 +1,7 @@
+---
+description: How BomLens produces an SBOM, an open-source notice, and a risk report for five input forms — a GitHub URL, a ZIP archive, local source, an existing SBOM, and firmware.
+---
+
 # Input scenarios guide
 
 > **한국어**: [시나리오 가이드](scenarios-guide.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)

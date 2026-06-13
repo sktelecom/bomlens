@@ -1,3 +1,7 @@
+---
+description: BomLens가 만든 오픈소스 고지문(NOTICE)과 Trivy 보안 취약점 보고서를 읽고 활용하는 방법, 그리고 CLI 없이 웹 UI로 스캔하는 방법을 다룹니다.
+---
+
 # 고지문 · 보안 보고서 · 웹 UI 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [시나리오 가이드](scenarios-guide.md)

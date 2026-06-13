@@ -1,3 +1,7 @@
+---
+description: Try BomLens hands-on with per-language example projects (Java, Python, Node.js, and more) and compare the SBOM output across languages.
+---
+
 # Examples guide
 
 > **Related**: [Getting started](getting-started.md) | [Usage guide](usage-guide.md)

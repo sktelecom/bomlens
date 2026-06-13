@@ -1,3 +1,7 @@
+---
+description: Validate that a supplier-submitted SBOM (CycloneDX/SPDX) meets the requirements with BomLens, then analyze licenses and vulnerabilities into a risk report to send back.
+---
+
 # Supplier SBOM validation guide
 
 > **한국어**: [공급사 SBOM 검증 가이드](supplier-sbom-validation.md) · **Related**: [Getting started](getting-started.en.md) | [Scenarios guide](scenarios-guide.en.md) | [Notice and security guide](notice-and-security.en.md)
