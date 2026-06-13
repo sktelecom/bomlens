@@ -1,3 +1,7 @@
+---
+description: Complete BomLens reference — every CLI option, analysis modes (source code, container image, binary, firmware, received SBOM), CI/CD integration, and troubleshooting.
+---
+
 # Usage guide
 
 > **한국어**: [사용 가이드](usage-guide.md) · **Related**: [Getting started](getting-started.en.md)

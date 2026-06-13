@@ -1,3 +1,7 @@
+---
+description: BomLens의 전체 CLI 옵션과 분석 모드(소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM), CI/CD 통합, 트러블슈팅 레퍼런스입니다.
+---
+
 # 사용 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [시나리오 가이드](scenarios-guide.md) | [예제 가이드](examples-guide.md)

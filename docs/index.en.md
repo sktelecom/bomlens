@@ -1,5 +1,5 @@
 ---
-title: BomLens
+description: BomLens is a local-first SBOM generator and open-source risk assessor. From source code, containers, binaries, firmware, or an SBOM you received, it produces a CycloneDX SBOM, an open-source notice, and a security and license risk report — CLI or web UI, no SaaS.
 hide:
   - toc
 ---

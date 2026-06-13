@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+<!--
+  검색·소셜·AI 답변 노출용 메타 보강. Material 기본은 og/twitter 카드를 만들지 않으므로
+  여기서 페이지 제목과 설명, 고정 OG 카드 이미지를 명시한다. 설명은 페이지 front matter의
+  description을 우선 쓰고 없으면 site_description로 폴백한다(언어별 index에 description이 있음).
+-->
+{% block extrahead %}
+  {% set page_title = config.site_name %}
+  {% if page and page.title and not page.is_homepage %}
+    {% set page_title = (page.title | striptags) ~ " - " ~ config.site_name %}
+  {% endif %}
+  {% set page_desc = (page.meta.description if page and page.meta and page.meta.description else config.site_description) | striptags %}
+  {% set og_image = config.site_url ~ "images/og-card.png" %}
+  {% set og_url = page.canonical_url if page and page.canonical_url else config.site_url %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ page_title }}">
+  <meta property="og:description" content="{{ page_desc }}">
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="og:url" content="{{ og_url }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ page_title }}">
+  <meta name="twitter:description" content="{{ page_desc }}">
+  <meta name="twitter:image" content="{{ og_image }}">
+{% endblock %}
