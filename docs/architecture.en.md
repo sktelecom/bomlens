@@ -232,7 +232,7 @@ flowchart TD
     R -->|--no-report| G
     R1 --> G
     G["⑦ Copy artifacts to host — always"] --> H
-    H{"⑧ UPLOAD_ENABLED"} -->|default| H1["curl → trustedoss-portal"]
+    H{"⑧ UPLOAD_ENABLED"} -->|default| H1["curl → TRUSCA"]
     H -->|"false (--generate-only)"| Z([End])
     H1 --> Z
 
@@ -251,7 +251,7 @@ Step details:
 | ⑤ | **Signing** | `cosign sign-blob` | `--sign` and `COSIGN_KEY` | `bom.json.sig` |
 | ⑥ | **Risk report** | `generate-risk-report.sh` | Default (skip with `--no-report`) | `_risk-report.{md,html}` (plus `_conformance.*` in ANALYZE mode) |
 | ⑦ | **Copy to host** | `cp` | Always | Copied to `HOST_OUTPUT_DIR` |
-| ⑧ | **Upload** | `curl` | Default (skipped with `--generate-only`) | Registered with trustedoss-portal (Dependency-Track compatible) |
+| ⑧ | **Upload** | `curl` | Default (skipped with `--generate-only`) | Registered with TRUSCA (Dependency-Track compatible) |
 
 > **Why the order is fixed**: normalization stabilizes the input for every later step, so it runs first; signing must target the final `bom.json`, so it runs last. Each step is best-effort — failures are handled with `|| true` or a warning and do not abort the whole scan (signing and upload excepted).
 
@@ -361,9 +361,9 @@ Add a helper script under `docker/lib/`, call it from the shared pipeline sectio
 
 ---
 
-## Division of roles (trustedoss-portal)
+## Division of roles (TRUSCA)
 
-BomLens specializes in **generation**. **Governance** — company-wide project management, vulnerability triage, and license policy gates — is delegated to the sister project [`trustedoss-portal`](https://github.com/sktelecom/trustedoss-portal). Both tools share cdxgen and Trivy, so the artifacts (CycloneDX) are directly compatible.
+BomLens specializes in **generation**. **Governance** — company-wide project management, vulnerability triage, and license policy gates — is delegated to the sister project [TRUSCA](https://github.com/trustedoss/trusca) (formerly TrustedOSS Portal). Both tools share cdxgen and Trivy, so the artifacts (CycloneDX) are directly compatible.
 
 ```mermaid
 flowchart TB
@@ -376,7 +376,7 @@ flowchart TB
     end
     subgraph org["Organization · central management"]
         direction LR
-        F["trustedoss-portal"] --> G["Vulnerability triage"]
+        F["TRUSCA"] --> G["Vulnerability triage"]
         F --> H["License policy gate"]
         F --> I["Project dashboard"]
     end

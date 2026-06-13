@@ -103,6 +103,8 @@
     "tabSummary": "요약",
     "tabComponents": "컴포넌트",
     "tabVulns": "취약점",
+    "tabDependencies": "의존성",
+    "tabSourceTree": "소스 트리",
     "componentsEmpty": "검출된 컴포넌트가 없습니다.",
     "componentsSearch": "이름, 라이선스, 타입 검색…",
     "componentsCount": "{{total}}개 중 {{shown}}개",
@@ -118,6 +120,26 @@
     "colPackage": "패키지",
     "colInstalled": "설치 버전",
     "colFixed": "수정 버전"
+  },
+  "deps": {
+    "loading": "의존성을 불러오는 중…",
+    "loadError": "의존성 보기를 위한 SBOM을 불러오지 못했습니다.",
+    "viewGraph": "그래프",
+    "viewTree": "트리",
+    "direct": "직접",
+    "cycle": "순환",
+    "empty": "기록된 의존 관계가 없습니다.",
+    "flatFallback": "이 SBOM에는 의존성 그래프가 없어 평면 컴포넌트 목록으로 표시합니다.",
+    "expand": "펼치기",
+    "collapse": "접기",
+    "tooLarge": "노드가 {{count}}개로 {{cap}}개를 넘습니다. 트리 보기를 사용하세요.",
+    "graphError": "의존성 그래프를 렌더링하지 못했습니다.",
+    "graphLegend": "빨간 노드는 직접 의존성이며, 화살표는 패키지에서 그 패키지가 의존하는 대상을 가리킵니다."
+  },
+  "sourceTree": {
+    "loading": "소스 트리를 불러오는 중…",
+    "loadError": "ScanCode 결과를 불러오지 못했습니다.",
+    "empty": "스캔된 소스 파일이 없습니다."
   },
   "severity": {
     "CRITICAL": "심각",

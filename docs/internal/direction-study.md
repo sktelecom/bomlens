@@ -4,7 +4,7 @@
 
 ## 0. 요약 (Executive Summary)
 
-`sbom-tools`의 향후 방향을 5개 질문으로 조사했다. 결론은 **sbom-tools를 단독 프로젝트용 경량 종합 스캐너로 강화**하는 것이다. 한 프로젝트의 SBOM과 오픈소스 고지문, 보안 취약점 보고서를 로컬에서 한 번에 생성한다. 전사(全社) 프로젝트 관리와 협업, 취약점 triage, 라이선스 정책 게이트는 자매 프로젝트 [`trustedoss-portal`](https://github.com/sktelecom/trustedoss-portal)에 위임한다.
+`sbom-tools`의 향후 방향을 5개 질문으로 조사했다. 결론은 **sbom-tools를 단독 프로젝트용 경량 종합 스캐너로 강화**하는 것이다. 한 프로젝트의 SBOM과 오픈소스 고지문, 보안 취약점 보고서를 로컬에서 한 번에 생성한다. 전사(全社) 프로젝트 관리와 협업, 취약점 triage, 라이선스 정책 게이트는 자매 프로젝트 [TRUSCA](https://github.com/trustedoss/trusca)(구 TrustedOSS Portal)에 위임한다.
 
 | # | 질문 | 결론 |
 |---|------|------|
@@ -25,14 +25,14 @@ flowchart LR
         B --> E[보안보고서<br/>Trivy]
     end
     subgraph org["조직 · 전체 관리"]
-        C -. 업로드 .-> F[trustedoss-portal]
+        C -. 업로드 .-> F[TRUSCA]
         F --> G[취약점 triage]
         F --> H[라이선스 정책 게이트]
         F --> I[프로젝트 대시보드]
     end
 ```
 
-sbom-tools는 생성(generation) 전문이고, trustedoss-portal은 관리(governance) 전문이다. 둘 다 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환된다.
+sbom-tools는 생성(generation) 전문이고, TRUSCA는 관리(governance) 전문이다. 둘 다 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환된다.
 
 ---
 
@@ -107,16 +107,16 @@ sbom-tools는 생성(generation) 전문이고, trustedoss-portal은 관리(gover
 ## 3. SBOM + 오픈소스 고지문 + 보안 보고서
 
 ### 설계 원칙
-단독 프로젝트의 결과물 3종 생성은 sbom-tools 범위에 정확히 부합한다. 다만 trustedoss-portal의 관리 기능, 곧 triage 워크플로우와 정책 게이트, DB는 가져오지 않는다.
+단독 프로젝트의 결과물 3종 생성은 sbom-tools 범위에 정확히 부합한다. 다만 TRUSCA의 관리 기능, 곧 triage 워크플로우와 정책 게이트, DB는 가져오지 않는다.
 
 ### 고지문(NOTICE) — Text + HTML
 - 라이선스 소스(기본): 이미 생성된 CycloneDX의 `components[].licenses` 필드. 추가 도구·온라인 조회 불필요(경량).
 - `--deep-license` 옵트인: scancode-toolkit로 1st-party 소스코드의 라이선스 헤더까지 탐지(무겁고 느려 기본 비활성).
-- 구현: `docker/lib/generate-notice.sh`가 SBOM JSON을 라이선스별로 그룹핑해 `NOTICE.txt`와 `NOTICE.html`을 낸다. HTML은 모든 필드를 escape해 XSS를 막는다. 렌더 구조는 trustedoss-portal `services/obligation_service.py`에서 차용했다.
+- 구현: `docker/lib/generate-notice.sh`가 SBOM JSON을 라이선스별로 그룹핑해 `NOTICE.txt`와 `NOTICE.html`을 낸다. HTML은 모든 필드를 escape해 XSS를 막는다. 렌더 구조는 TRUSCA `services/obligation_service.py`에서 차용했다.
 
 ### 보안 보고서 — Trivy 기반 JSON + Markdown + HTML
 - 엔진: 버전을 고정한 Trivy로 `trivy sbom --format json --input <bom.json>`을 실행한다. NVD+OSV+GHSA DB를 쓴다.
-- 구현: `docker/lib/scan-security.sh`가 Trivy JSON의 severity를 정규화·집계해 `_security.json`과 `_security.md`, `_security.html`을 낸다. trustedoss-portal `integrations/trivy.py`와 `services/report_service.py` 패턴을 차용했다.
+- 구현: `docker/lib/scan-security.sh`가 Trivy JSON의 severity를 정규화·집계해 `_security.json`과 `_security.md`, `_security.html`을 낸다. TRUSCA `integrations/trivy.py`와 `services/report_service.py` 패턴을 차용했다.
 - 공급망 안전: Trivy를 CLI 바이너리로 버전 고정해 설치한다(문제됐던 `trivy-action@master`와 다르다). `.github/workflows/docker-publish.yml`의 비활성화 스텝도 핀 고정으로 재활성화했다.
 
 ### 호출 방식 — `scan-sbom.sh` 플래그 확장
@@ -196,7 +196,7 @@ SKT 공급망 가이드([for-suppliers](https://sktelecom.github.io/guide/supply
 - 상태: 검증, 분석, 보고서, 웹 UI 업로드를 모두 구현·머지 완료.
 - 구현: `--analyze <sbom>`(CycloneDX/SPDX)로 받아 `validate-sbom.sh`로 요구사항 충족을 검증하고, `convert-to-cdx.sh`로 SPDX를 CDX로 바꾼 뒤, 기존 normalize/notice/security를 재사용하고 `generate-risk-report.sh`(Critical 7일/High 30일)로 마무리한다. 웹 UI는 "SBOM 업로드"로 동일하게 처리한다. 관련: `docker/lib/{validate-sbom,convert-to-cdx,generate-risk-report}.sh`, `entrypoint.sh` ANALYZE case, `server.py` 업로드.
 - 참고: 위 위험분석보고서(`generate-risk-report.sh`)는 ANALYZE 전용이 아니라 모든 모드에서 기본 생성되도록 일반화됐다(`--no-report`로 opt-out).
-- 역할 경계: sbom-tools는 로컬 단일 SBOM의 검증·분석·보고서를 맡고, 전사 등록과 triage, 대응 추적은 TOSCA/trustedoss-portal 범위다.
+- 역할 경계: sbom-tools는 로컬 단일 SBOM의 검증·분석·보고서를 맡고, 전사 등록과 triage, 대응 추적은 TOSCA/TRUSCA 범위다.
 
 ---
 
@@ -206,7 +206,7 @@ SKT 공급망 가이드([for-suppliers](https://sktelecom.github.io/guide/supply
 |----------------|----------|
 | 실증 비교 방법론 | `bd-scan/tests/level3/e2e_compare_legacy_vs_current.sh` |
 | 빌드환경/컴포넌트 감지 | `bd-scan/local-scan/scan.sh` (`detect_build_env`, `detect_components`) |
-| 고지문 렌더 | `trustedoss-portal/apps/backend/services/obligation_service.py` |
-| Trivy 통합 | `trustedoss-portal/apps/backend/integrations/trivy.py` |
-| 취약점 보고서 | `trustedoss-portal/apps/backend/services/report_service.py` |
-| byte-stable SBOM | `trustedoss-portal` SBOM export (BUG-006) |
+| 고지문 렌더 | `trusca/apps/backend/services/obligation_service.py` |
+| Trivy 통합 | `trusca/apps/backend/integrations/trivy.py` |
+| 취약점 보고서 | `trusca/apps/backend/services/report_service.py` |
+| byte-stable SBOM | TRUSCA SBOM export (BUG-006) |

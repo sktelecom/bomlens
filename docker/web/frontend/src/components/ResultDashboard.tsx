@@ -11,9 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DoneEvent } from "@/lib/api";
 
 import { ComponentsTable } from "./ComponentsTable";
+import { DependenciesPanel } from "./DependenciesPanel";
 import { KpiCards } from "./KpiCards";
 import { ResultsList } from "./ResultsList";
 import { SeverityBar } from "./SeverityBar";
+import { SourceTreePanel } from "./SourceTreePanel";
 import { VulnerabilitiesTable } from "./VulnerabilitiesTable";
 
 export function ResultDashboard({ result }: { result: DoneEvent }) {
@@ -21,6 +23,10 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
   const ok = result.ok;
   const componentCount = result.sbom?.components ?? 0;
   const vulnCount = result.security?.TOTAL ?? 0;
+
+  // Raw artifacts the dependency/source views fetch and parse client-side.
+  const sbomFile = result.results.find((r) => r.name.endsWith("_bom.json"))?.name;
+  const scancodeFile = result.results.find((r) => r.name.includes("_scancode"))?.name;
 
   return (
     <Card className="animate-fade-in">
@@ -56,6 +62,14 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
                 {vulnCount}
               </span>
             </TabsTrigger>
+            {sbomFile && (
+              <TabsTrigger value="deps">{t("result.tabDependencies")}</TabsTrigger>
+            )}
+            {scancodeFile && (
+              <TabsTrigger value="sourceTree">
+                {t("result.tabSourceTree")}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="summary" className="space-y-6 pt-4">
@@ -89,6 +103,18 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
               </p>
             )}
           </TabsContent>
+
+          {sbomFile && (
+            <TabsContent value="deps" className="pt-4">
+              <DependenciesPanel sbomFile={sbomFile} />
+            </TabsContent>
+          )}
+
+          {scancodeFile && (
+            <TabsContent value="sourceTree" className="pt-4">
+              <SourceTreePanel scancodeFile={scancodeFile} />
+            </TabsContent>
+          )}
         </Tabs>
       </CardContent>
     </Card>
