@@ -1,3 +1,7 @@
+---
+description: Install BomLens and generate your first SBOM. A step-by-step guide to set up a Docker engine and produce a CycloneDX SBOM, an open-source notice, and a security report from the web UI or the CLI.
+---
+
 # Getting started
 
 > **한국어**: [시작하기](getting-started.md) · **Related**: [Usage guide](usage-guide.en.md)

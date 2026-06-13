@@ -1,3 +1,7 @@
+---
+description: BomLens 설치부터 첫 SBOM 생성까지. Docker 엔진을 준비하고, 웹 UI와 CLI로 소스 코드에서 CycloneDX SBOM과 오픈소스 고지문, 보안 보고서를 만드는 단계별 가이드입니다.
+---
+
 # 시작하기
 
 > **관련 문서**: [사용 가이드](usage-guide.md) | [예제 가이드](examples-guide.md) | [시나리오 가이드](scenarios-guide.md)

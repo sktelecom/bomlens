@@ -1,5 +1,5 @@
 ---
-title: BomLens
+description: BomLens는 SaaS 없이 로컬에서 SBOM(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다.
 hide:
   - toc
 ---
