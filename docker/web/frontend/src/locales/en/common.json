@@ -103,6 +103,8 @@
     "tabSummary": "Summary",
     "tabComponents": "Components",
     "tabVulns": "Vulnerabilities",
+    "tabDependencies": "Dependencies",
+    "tabSourceTree": "Source tree",
     "componentsEmpty": "No components were detected.",
     "componentsSearch": "Search name, license, type…",
     "componentsCount": "{{shown}} of {{total}} components",
@@ -118,6 +120,26 @@
     "colPackage": "Package",
     "colInstalled": "Installed",
     "colFixed": "Fixed"
+  },
+  "deps": {
+    "loading": "Loading dependencies…",
+    "loadError": "Could not load the SBOM for the dependency view.",
+    "viewGraph": "Graph",
+    "viewTree": "Tree",
+    "direct": "Direct",
+    "cycle": "cycle",
+    "empty": "No dependency relationships were recorded.",
+    "flatFallback": "This SBOM has no dependency graph; showing a flat component list.",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "tooLarge": "The graph has {{count}} nodes (over {{cap}}); use the tree view instead.",
+    "graphError": "The dependency graph could not be rendered.",
+    "graphLegend": "Red nodes are direct dependencies; arrows point from a package to what it depends on."
+  },
+  "sourceTree": {
+    "loading": "Loading source tree…",
+    "loadError": "Could not load the ScanCode results.",
+    "empty": "No source files were scanned."
   },
   "severity": {
     "CRITICAL": "Critical",
