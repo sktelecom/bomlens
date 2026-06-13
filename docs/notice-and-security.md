@@ -42,7 +42,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
   ```
 - 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 
-> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. trustedoss-portal(Dependency-Track 호환) 자동 업로드를 함께 쓰려면 생략하세요.
+> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. TRUSCA(구 TrustedOSS Portal, Dependency-Track 호환) 자동 업로드를 함께 쓰려면 생략하세요.
 
 ---
 
@@ -138,7 +138,7 @@ EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURIT
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "Critical 취약점 ${crit}건"; exit 1; }
   ```
-- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 BomLens의 범위를 넘습니다. SBOM을 trustedoss-portal에 업로드해 처리하세요.
+- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 BomLens의 범위를 넘습니다. SBOM을 TRUSCA에 업로드해 처리하세요.
 
 ---
 

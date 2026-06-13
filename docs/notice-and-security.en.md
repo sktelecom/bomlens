@@ -42,7 +42,7 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` (notice) and `MyApp_1.0.0_secur
   ```
 - Run every example from the root of the project to scan.
 
-> Output flags are best used together with `--generate-only` (save locally). Omit it to also use the trustedoss-portal (Dependency-Track compatible) auto-upload.
+> Output flags are best used together with `--generate-only` (save locally). Omit it to also use the TRUSCA (formerly TrustedOSS Portal, Dependency-Track compatible) auto-upload.
 
 ---
 
@@ -138,7 +138,7 @@ EPSS and KEV require external API lookups. On an air-gapped network, set `SECURI
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "${crit} Critical vulnerabilities"; exit 1; }
   ```
-- Triage such as judging false positives (no real impact), approving exceptions, and history management is beyond the scope of sbom-tools. Upload the SBOM to trustedoss-portal to handle it.
+- Triage such as judging false positives (no real impact), approving exceptions, and history management is beyond the scope of sbom-tools. Upload the SBOM to TRUSCA to handle it.
 
 ---
 

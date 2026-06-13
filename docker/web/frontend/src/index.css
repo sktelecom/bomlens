@@ -5,7 +5,7 @@
 /* ---------------------------------------------------------------------------
  * sbom-tools local UI — design tokens.
  *
- * Mirrors trustedoss-portal's "W11-A" language (Vercel light base + Linear
+ * Mirrors TRUSCA's "W11-A" language (Vercel light base + Linear
  * polish) so the two surfaces feel like one product. Unlike the portal,
  * sbom-tools SHIPS a dark theme: the `.dark` block below is fully populated
  * (the portal left it as a TODO placeholder).

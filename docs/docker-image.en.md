@@ -117,7 +117,7 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | Generate the open-source notice (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Generate the Trivy security report (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
-| `API_KEY`, `API_URL` | For uploads | — | Authentication for trustedoss-portal (Dependency-Track compatible) uploads |
+| `API_KEY`, `API_URL` | For uploads | — | Authentication for TRUSCA (formerly TrustedOSS Portal, Dependency-Track compatible) uploads |
 
 For the full mapping between CLI flags and environment variables, see the flag mapping in [Architecture](architecture.en.md).
 

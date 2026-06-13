@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * Badge — risk-tinted variants pair a status word with the design-system color
  * token (color is never the only signal). Text shades are darkened to clear
- * WCAG AA on the low-alpha tint (same approach as trustedoss-portal).
+ * WCAG AA on the low-alpha tint (same approach as TRUSCA).
  */
 const badgeVariants = cva(
   "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium transition-colors duration-fast ease-out-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 whitespace-nowrap",

@@ -117,7 +117,7 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | 오픈소스 고지문 생성 (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Trivy 보안 보고서 생성 (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
-| `API_KEY`, `API_URL` | 업로드 시 | — | trustedoss-portal(Dependency-Track 호환) 업로드 인증 |
+| `API_KEY`, `API_URL` | 업로드 시 | — | TRUSCA(구 TrustedOSS Portal, Dependency-Track 호환) 업로드 인증 |
 
 CLI 플래그와 환경 변수의 전체 대응은 [아키텍처의 플래그 매핑](architecture.md#플래그--단계-매핑)을 참고하세요.
 

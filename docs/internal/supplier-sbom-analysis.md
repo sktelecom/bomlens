@@ -13,7 +13,7 @@ SK텔레콤은 [공급망 보안 가이드](https://sktelecom.github.io/guide/su
 - 현재: 후처리 파이프라인(`POSTPROCESS` 모드)이 절반을 담당하지만, 임의 SBOM 파일을 입력하는 경로가 없고 요구사항 충족 검증(conformance) 기능이 전무하며 SPDX를 입력하면 라이선스 분석이 안 됩니다.
 - 방향: `--analyze` 진입점에 검증기(`validate-sbom.sh`), SPDX를 CycloneDX로 바꾸는 변환기(`convert-to-cdx.sh`), 위험 보고서(`generate-risk-report.sh`)를 더합니다. 기존 normalize/notice/security 파이프라인은 단일 경로로 손대지 않고 재사용합니다.
 
-역할 경계: sbom-tools는 로컬에서 단일 SBOM을 검증·분석·보고하는 데까지입니다. 전사 등록, triage, 대응 추적, 이력 관리는 SKT 내부 시스템(TOSCA)과 자매 프로젝트(trustedoss-portal)의 몫입니다.
+역할 경계: sbom-tools는 로컬에서 단일 SBOM을 검증·분석·보고하는 데까지입니다. 전사 등록, triage, 대응 추적, 이력 관리는 SKT 내부 시스템(TOSCA)과 자매 프로젝트 TRUSCA(구 TrustedOSS Portal)의 몫입니다.
 
 ---
 
@@ -178,4 +178,4 @@ flowchart TD
 - transitive 의존성을 포함했는지는 dependency graph의 edge 유무로 추정합니다. 그래프가 완전하다는 증명은 아닙니다.
 - SPDX를 CycloneDX로 변환할 때 일부 SPDX 고유 메타데이터가 정규화되거나 사라질 수 있어, 검증은 원본을 기준으로 수행합니다.
 - 취약점·라이선스 분석의 정확도는 입력 SBOM의 품질, 특히 PURL과 version 정확성에 직접 좌우됩니다.
-- 이 도구는 로컬에서 단일 SBOM을 분석하는 용도이며, 전사 등록과 대응 추적, 정책 게이트는 TOSCA와 trustedoss-portal의 범위입니다.
+- 이 도구는 로컬에서 단일 SBOM을 분석하는 용도이며, 전사 등록과 대응 추적, 정책 게이트는 TOSCA와 TRUSCA의 범위입니다.

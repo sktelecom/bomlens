@@ -232,7 +232,7 @@ flowchart TD
     R -->|--no-report| G
     R1 --> G
     G["⑦ 산출물 호스트 복사 — 항상"] --> H
-    H{"⑧ UPLOAD_ENABLED"} -->|기본| H1["curl → trustedoss-portal"]
+    H{"⑧ UPLOAD_ENABLED"} -->|기본| H1["curl → TRUSCA"]
     H -->|"false (--generate-only)"| Z([종료])
     H1 --> Z
 
@@ -251,7 +251,7 @@ flowchart TD
 | ⑤ | **서명** | `cosign sign-blob` | `--sign` + `COSIGN_KEY` | `bom.json.sig` |
 | ⑥ | **위험분석보고서** | `generate-risk-report.sh` | 기본 (`--no-report`로 생략) | `_risk-report.{md,html}` (+ ANALYZE면 `_conformance.*`) |
 | ⑦ | **호스트 복사** | `cp` | 항상 | `HOST_OUTPUT_DIR`로 복사 |
-| ⑧ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | trustedoss-portal(Dependency-Track 호환) 등록 |
+| ⑧ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | TRUSCA(Dependency-Track 호환) 등록 |
 
 > **순서가 고정인 이유**: 정규화는 이후 모든 단계의 입력을 안정화하므로 가장 먼저, 서명은 최종 `bom.json`을 대상으로 해야 하므로 가장 나중에 실행됩니다. 각 단계는 실패해도 `|| true`/경고로 처리되어 전체 스캔을 중단시키지 않습니다(서명·업로드 제외).
 
@@ -361,9 +361,9 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 ---
 
-## 역할 분담 (trustedoss-portal)
+## 역할 분담 (TRUSCA)
 
-BomLens는 **생성(generation)** 전문 도구입니다. 전사(全社) 프로젝트 관리·취약점 triage·라이선스 정책 게이트 같은 **거버넌스**는 자매 프로젝트 [`trustedoss-portal`](https://github.com/sktelecom/trustedoss-portal)에 위임합니다. 두 도구 모두 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환됩니다.
+BomLens는 **생성(generation)** 전문 도구입니다. 전사(全社) 프로젝트 관리·취약점 triage·라이선스 정책 게이트 같은 **거버넌스**는 자매 프로젝트 [TRUSCA](https://github.com/trustedoss/trusca)(구 TrustedOSS Portal)에 위임합니다. 두 도구 모두 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환됩니다.
 
 ```mermaid
 flowchart TB
@@ -376,7 +376,7 @@ flowchart TB
     end
     subgraph org["조직 · 전체 관리"]
         direction LR
-        F["trustedoss-portal"] --> G["취약점 triage"]
+        F["TRUSCA"] --> G["취약점 triage"]
         F --> H["라이선스 정책 게이트"]
         F --> I["프로젝트 대시보드"]
     end
