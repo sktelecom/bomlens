@@ -1,3 +1,7 @@
+---
+description: How to read and use the open-source notice (NOTICE) and the Trivy security report BomLens produces, plus how to scan from the browser UI without the CLI.
+---
+
 # Notice · security report · web UI guide
 
 > **한국어**: [고지문과 보안 보고서, 웹 UI 가이드](notice-and-security.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)

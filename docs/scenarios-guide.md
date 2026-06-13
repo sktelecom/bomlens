@@ -1,3 +1,7 @@
+---
+description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어 등 5가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
+---
+
 # 5가지 입력 시나리오별 처리 가이드
 
 > **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)
