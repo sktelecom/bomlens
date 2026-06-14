@@ -100,12 +100,13 @@ export function DependencyGraph({
               selector: "node",
               style: {
                 label: "data(label)",
-                "font-size": "9px",
+                "font-size": "10px",
                 "background-color": c.node,
                 color: c.text,
                 "text-valign": "center",
                 "text-halign": "right",
-                "text-margin-x": 4,
+                "text-margin-x": 6,
+                "min-zoomed-font-size": 7,
                 width: 10,
                 height: 10,
               },
@@ -135,7 +136,11 @@ export function DependencyGraph({
               },
             },
           ],
-          layout: { name: "dagre", rankDir: "LR", nodeSep: 16, rankSep: 60 },
+          layout: { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 },
+          // Cap zoom so small graphs (a few nodes) don't blow up to fill the
+          // canvas — that's what made labels huge and overlap.
+          minZoom: 0.2,
+          maxZoom: 1.4,
           wheelSensitivity: 0.2,
         };
         cy = cytoscape(config);
