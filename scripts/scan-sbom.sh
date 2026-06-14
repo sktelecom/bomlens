@@ -31,8 +31,14 @@ FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/sbom-scanner-firmware:l
 # shellcheck source=docker/lib/source-detect.sh
 . "$REPO_DIR/docker/lib/source-detect.sh"
 
-SERVER_URL="http://host.docker.internal:8081"
+SERVER_URL="${API_URL:-http://host.docker.internal:8081}"
 DEFAULT_API_KEY="${API_KEY:-odt_YOUR_REAL_API_KEY_HERE}"
+
+# Upload target: dependency-track (default, DT-compatible) or trusca (native
+# CycloneDX ingest — Bearer auth, requires a pre-existing project id).
+UPLOAD_TARGET="${UPLOAD_TARGET:-dependency-track}"
+TRUSCA_PROJECT_ID="${TRUSCA_PROJECT_ID:-}"
+TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
@@ -54,6 +60,8 @@ while [[ "$#" -gt 0 ]]; do
         --branch|--ref) GIT_REF="$2"; shift ;;
         --no-report) NO_REPORT="true" ;;
         --generate-only) GENERATE_ONLY="true" ;;
+        --upload-target) UPLOAD_TARGET="$2"; shift ;;
+        --trusca) UPLOAD_TARGET="trusca"; TRUSCA_PROJECT_ID="$2"; shift ;;
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true" ;;
         --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true" ;;
@@ -79,6 +87,10 @@ Options:
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
   --generate-only        Save locally without uploading
+  --trusca <project_id>  Upload the SBOM to TRUSCA's native ingest endpoint
+                         (shorthand for --upload-target trusca with the id).
+                         Needs API_URL (TRUSCA base) and API_KEY (Bearer token).
+  --upload-target <t>    Upload destination: dependency-track (default) | trusca
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
   --all                  --notice --security
@@ -100,6 +112,12 @@ Environment:
   COSIGN_KEY             Signing key for --sign
   SBOM_SCANNER_IMAGE     Override the scanner image
   SBOM_FIRMWARE_IMAGE    Override the firmware image
+  API_URL                Upload server base URL (DT server, or TRUSCA base)
+  API_KEY                Upload credential (DT: X-Api-Key; TRUSCA: Bearer token)
+  UPLOAD_TARGET          dependency-track (default) | trusca
+  TRUSCA_PROJECT_ID      Target TRUSCA project id (UUID, required for trusca)
+  TRUSCA_REF             Ingest ref label (default: main)
+  TRUSCA_RELEASE         Ingest release label (default: --version value)
 
 Architecture: source SBOM generation uses cdxgen's per-language images
 (on-demand); this tool orchestrates + post-processes. See docs/direction-study.md.
@@ -138,6 +156,9 @@ fi
 # Validate
 # ========================================================
 [ -n "$PROJECT_NAME" ] && [ -n "$PROJECT_VERSION" ] || { echo "[ERROR] --project and --version are required ($0 --help)."; exit 1; }
+if [ "$UPLOAD_TARGET" = "trusca" ] && [ "$GENERATE_ONLY" != "true" ] && [ -z "$TRUSCA_PROJECT_ID" ]; then
+    echo "[ERROR] TRUSCA upload requires a project id: --trusca <id> or TRUSCA_PROJECT_ID env."; exit 1
+fi
 docker_check
 
 SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
@@ -155,8 +176,8 @@ trap cleanup EXIT INT TERM
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private

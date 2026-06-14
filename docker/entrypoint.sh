@@ -315,10 +315,43 @@ else
 fi
 
 # ========================================================
-# Upload handling (optional Dependency-Track)
+# Upload handling (optional — Dependency-Track or TRUSCA)
 # ========================================================
+# UPLOAD_TARGET selects the wire contract:
+#   dependency-track (default) — POST /api/v1/bom, X-Api-Key, autoCreate
+#   trusca                     — POST /v1/projects/{id}/sbom-ingest, Bearer token.
+#                                TRUSCA's native ingest is NOT Dependency-Track
+#                                compatible (different path/auth/fields), so it
+#                                needs a distinct uploader mode.
 if [ "${UPLOAD_ENABLED:-true}" = "false" ]; then
     echo "[INFO] Generate-only mode. Done."
+    exit 0
+fi
+
+if [ "${UPLOAD_TARGET:-dependency-track}" = "trusca" ]; then
+    echo "[2/2] Uploading to TRUSCA..."
+    if [ -z "$API_URL" ] || [ -z "$API_KEY" ] || [ -z "${TRUSCA_PROJECT_ID:-}" ]; then
+        echo "[ERROR] TRUSCA upload needs API_URL, API_KEY (Bearer token), and TRUSCA_PROJECT_ID."; exit 1
+    fi
+    # The ingest endpoint accepts the already-generated CycloneDX SBOM and runs
+    # the back half of TRUSCA's scan pipeline (components + trivy + findings).
+    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/v1/projects/$TRUSCA_PROJECT_ID/sbom-ingest" \
+        -H "Authorization: Bearer $API_KEY" \
+        -F "sbom=@$OUTPUT_FILE" \
+        -F "ref=${TRUSCA_REF:-main}" \
+        -F "release=${TRUSCA_RELEASE:-$PROJECT_VERSION}")
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+    BODY=$(echo "$RESPONSE" | sed '$d')
+    # A successful ingest is accepted asynchronously (202 + queued scan id). We
+    # confirm acceptance and print the scan id; tracking to completion is done
+    # in the TRUSCA UI (GET /v1/scans/{id}).
+    if [ "$HTTP_CODE" = "202" ]; then
+        SCAN_ID=$(echo "$BODY" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        echo "[SUCCESS] Accepted by TRUSCA (HTTP 202). scan id: ${SCAN_ID:-unknown}"
+        [ -n "$SCAN_ID" ] && echo "[INFO] Track status: $API_URL/v1/scans/$SCAN_ID"
+    else
+        echo "[ERROR] TRUSCA ingest failed (HTTP $HTTP_CODE)"; echo "Response: $BODY"; exit 1
+    fi
     exit 0
 fi
 

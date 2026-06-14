@@ -117,7 +117,13 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | 오픈소스 고지문 생성 (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Trivy 보안 보고서 생성 (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
-| `API_KEY`, `API_URL` | 업로드 시 | — | TRUSCA(구 TrustedOSS Portal, Dependency-Track 호환) 업로드 인증 |
+| `API_KEY`, `API_URL` | 업로드 시 | — | 업로드 자격과 서버 주소. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰입니다 |
+| `UPLOAD_TARGET` | — | `dependency-track` | 업로드 대상. `dependency-track`(DT 호환) 또는 `trusca`(네이티브 ingest, DT 비호환) |
+| `TRUSCA_PROJECT_ID` | `trusca`일 때 | — | 업로드할 TRUSCA 프로젝트 id(UUID). 사전에 존재해야 합니다(자동 생성 없음) |
+| `TRUSCA_REF` | — | `main` | ingest ref 라벨 |
+| `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | ingest release 라벨 |
+
+> TRUSCA(구 TrustedOSS Portal)의 네이티브 ingest 엔드포인트(`POST /v1/projects/{id}/sbom-ingest`, Bearer 인증)는 Dependency-Track와 호환되지 않습니다. 일반 Dependency-Track 서버로 올릴 때는 `UPLOAD_TARGET=dependency-track`(기본값)을 그대로 두세요.
 
 CLI 플래그와 환경 변수의 전체 대응은 [아키텍처의 플래그 매핑](architecture.md#플래그--단계-매핑)을 참고하세요.
 

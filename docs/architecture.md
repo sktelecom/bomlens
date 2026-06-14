@@ -251,7 +251,7 @@ flowchart TD
 | ⑤ | **서명** | `cosign sign-blob` | `--sign` + `COSIGN_KEY` | `bom.json.sig` |
 | ⑥ | **위험분석보고서** | `generate-risk-report.sh` | 기본 (`--no-report`로 생략) | `_risk-report.{md,html}` (+ ANALYZE면 `_conformance.*`) |
 | ⑦ | **호스트 복사** | `cp` | 항상 | `HOST_OUTPUT_DIR`로 복사 |
-| ⑧ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | TRUSCA(Dependency-Track 호환) 등록 |
+| ⑧ | **업로드** | `curl` | 기본 (`--generate-only`이면 생략) | Dependency-Track 서버 또는 TRUSCA 네이티브 ingest로 업로드 (`UPLOAD_TARGET`로 선택) |
 
 > **순서가 고정인 이유**: 정규화는 이후 모든 단계의 입력을 안정화하므로 가장 먼저, 서명은 최종 `bom.json`을 대상으로 해야 하므로 가장 나중에 실행됩니다. 각 단계는 실패해도 `|| true`/경고로 처리되어 전체 스캔을 중단시키지 않습니다(서명·업로드 제외).
 
