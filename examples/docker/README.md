@@ -1,6 +1,6 @@
 # Docker 이미지 예제
 
-> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/getting-started.en.md) and the [usage guide](../../docs/usage-guide.en.md).
+> **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
 
 멀티 스테이지 빌드를 사용한 Node.js 애플리케이션 Docker 이미지입니다. Docker 이미지의 SBOM 생성 테스트를 위한 예제로 사용됩니다.
 
@@ -41,7 +41,7 @@ docker build -t sbom-example:1.0.0 -t sbom-example:latest .
 
 ### 방법 1: BomLens 스크립트 사용 (권장)
 
-> **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/getting-started.md) 참고.
+> **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/start/first-scan.ko.md) 참고.
 
 ```bash
 # 이미지 빌드 후
@@ -393,8 +393,8 @@ trivy image --severity HIGH,CRITICAL sbom-example:latest
 
 ## 다음 단계
 
-- [사용 가이드](../../docs/usage-guide.md) - Docker 이미지 분석 상세
-- [시작하기](../../docs/getting-started.md) - 첫 SBOM 생성
+- [사용 가이드](../../docs/reference/cli.ko.md) - Docker 이미지 분석 상세
+- [시작하기](../../docs/start/first-scan.ko.md) - 첫 SBOM 생성
 - [Docker README](../../docker/README.md) - Scanner 이미지 가이드
 
 ## 참고

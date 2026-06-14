@@ -4,7 +4,7 @@
 
 BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 문서 개선, 새로운 언어 지원 추가 등 어떤 형태의 기여든 환영합니다.
 
-> **관련 문서**: [아키텍처](docs/architecture.md) | [테스트 가이드](docs/contributing/testing-guide.md) | [패키지 매니저 추가](docs/contributing/package-manager-guide.md)
+> **관련 문서**: [아키텍처](docs/concepts/architecture.ko.md) | [테스트 가이드](docs/contribute/testing.ko.md) | [패키지 매니저 추가](docs/contribute/package-managers.ko.md)
 
 ## 목차
 
@@ -25,9 +25,9 @@ BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 
 | 유형 | 방법 |
 |------|------|
 | 버그 수정 | [Issues](https://github.com/sktelecom/sbom-tools/issues)에서 버그를 찾아 수정 |
-| 새 언어 지원 | [패키지 매니저 추가 가이드](docs/contributing/package-manager-guide.md) 참고 |
+| 새 언어 지원 | [패키지 매니저 추가 가이드](docs/contribute/package-managers.ko.md) 참고 |
 | 문서 개선 | 오타 수정, 예제 추가, 설명 보완 |
-| 테스트 작성 | [테스트 가이드](docs/contributing/testing-guide.md) 참고 |
+| 테스트 작성 | [테스트 가이드](docs/contribute/testing.ko.md) 참고 |
 | 기능 제안 | [Discussions](https://github.com/sktelecom/sbom-tools/discussions)에서 먼저 논의 |
 
 한국어 문서를 작성·수정할 때는 [한국어 문서 문체 가이드](docs/korean-style-guide.md)를 따른다.

@@ -1,58 +1,40 @@
 ---
-description: BomLens는 SaaS 없이 로컬에서 SBOM(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다.
+description: BomLens is a local-first SBOM generator and open-source risk assessor. From source code, containers, binaries, firmware, or an SBOM you received, it produces a CycloneDX SBOM, an open-source notice, and a security and license risk report — CLI or web UI, no SaaS.
 hide:
   - toc
 ---
 
-# 로컬에서 SBOM 생성과 오픈소스 위험 평가를 한 번에
+# Generate SBOMs and assess open-source risk, all locally
 
-SaaS 없이 로컬에서 단일 프로젝트의 SBOM(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드나 컨테이너 이미지, 바이너리, 받은 SBOM에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다.
+A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
 
-[시작하기](getting-started.md){ .md-button .md-button--primary }
-[Windows용 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button }
+[Get started](start/first-scan.md){ .md-button .md-button--primary }
+[Download for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button }
 
-CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
+Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough (Korean) is in the no-CLI quick start.
 
-![스캔 결과 화면 — SBOM과 고지문, 위험분석보고서를 종류별 카드로 보고 내려받는다](images/app-results.png){ .home-shot }
+![The scan results screen — view and download the SBOM, notice, and risk report as grouped cards](images/web-ui-en.png){ .home-shot }
 
-## 무엇부터 볼까
+## Where to go next
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch: __시작하기__
+-   :material-rocket-launch: __Getting started__
 
-    설치부터 첫 SBOM 생성까지 (웹 UI와 CLI).
+    Install through your first SBOM (web UI and CLI).
 
-    [:octicons-arrow-right-24: 시작하기](getting-started.md)
+    [:octicons-arrow-right-24: Getting started](start/first-scan.md)
 
--   :material-cursor-default-click: __비개발자 빠른 시작__
+-   :material-format-list-bulleted: __Input scenarios__
 
-    CLI 없이 데스크톱 앱으로 SBOM과 고지문 만들기.
+    GitHub URL, ZIP, local source, an existing SBOM, firmware.
 
-    [:octicons-arrow-right-24: 빠른 시작](quickstart-no-cli.md)
+    [:octicons-arrow-right-24: Scenarios guide](guides/by-input.md)
 
--   :material-format-list-bulleted: __입력 시나리오__
+-   :material-cog: __Usage guide__
 
-    GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어별 처리.
+    Every option, analysis modes, CI/CD.
 
-    [:octicons-arrow-right-24: 시나리오 가이드](scenarios-guide.md)
-
--   :material-file-document-check: __공급사 SBOM 검증__
-
-    받은 SBOM의 요구사항 충족 검증과 위험 보고서 발행.
-
-    [:octicons-arrow-right-24: 공급사 SBOM 검증](supplier-sbom-validation.md)
-
--   :material-cog: __사용 가이드__
-
-    전체 옵션, 분석 모드, CI/CD 연동.
-
-    [:octicons-arrow-right-24: 사용 가이드](usage-guide.md)
-
--   :material-shield-check: __고지문과 보안 보고서__
-
-    산출물 생성과 해석, 웹 UI 사용법.
-
-    [:octicons-arrow-right-24: 고지문·보안 보고서](notice-and-security.md)
+    [:octicons-arrow-right-24: Usage guide](reference/cli.md)
 
 </div>

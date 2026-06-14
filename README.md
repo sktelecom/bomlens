@@ -16,8 +16,8 @@
 
 **Where to start:**
 
-- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
-- **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/architecture.en.md).
+- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [First scan](docs/start/first-scan.md) ([한국어](docs/start/first-scan.ko.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/start/no-cli.ko.md) (Korean) walks through it.
+- **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md).
 
 A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
 
@@ -59,7 +59,7 @@ Enter the project name and version, pick a scan target (current folder, GitHub U
 
 #### Windows, no CLI — from a source ZIP you received
 
-A common case: a dev team handed you a source archive and you need its SBOM. The [no-CLI quick start](docs/quickstart-no-cli.md) walks through this step by step in Korean for non-developers; the short version is below.
+A common case: a dev team handed you a source archive and you need its SBOM. The [no-CLI quick start](docs/start/no-cli.ko.md) walks through this step by step in Korean for non-developers; the short version is below.
 
 1. Install and start a Docker engine. **Rancher Desktop** is a free, drop-in choice for this double-click flow; Docker Desktop also works (with licensing caveats for organizations).
 2. Get this repo: on the GitHub page use the green Code button, then Download ZIP, and unzip it.
@@ -67,7 +67,7 @@ A common case: a dev team handed you a source archive and you need its SBOM. The
 4. Double-click `scripts\sbom-ui.bat`. A browser opens at http://localhost:8080.
 5. Enter a project name and version, choose ZIP upload as the scan target, upload the source ZIP you received, run the scan, then download the SBOM, the notice, and the risk report.
 
-The [getting-started guide](docs/getting-started.md) covers this in more detail and shows the CLI path.
+The [first-scan guide](docs/start/first-scan.md) covers this in more detail and shows the CLI path.
 
 Prefer a real app over a `.bat`? A desktop app wraps this same flow with no console window — it checks Docker, pulls the image, and opens the UI on double-click. Download `SBOM-Generator-*.exe` (or `.dmg`) from the [latest release](https://github.com/sktelecom/sbom-tools/releases/latest). It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. Build details are in [`electron/`](electron/README.md).
 
@@ -88,36 +88,19 @@ Prefer a real app over a `.bat`? A desktop app wraps this same flow with no cons
 
 On Windows, run the same commands through `scripts\scan-sbom.bat`, which forwards them to the script via Git Bash (Git for Windows required).
 
-Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [scenarios guide](docs/scenarios-guide.md).
+Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy). Each input form is covered in the [input-scenarios guide](docs/guides/by-input.md).
 
 ## Documentation
 
-Read the docs as a navigable site at **[sktelecom.github.io/sbom-tools](https://sktelecom.github.io/sbom-tools/)** (search, sidebar, English/Korean). The same content lives under [docs/](docs/) in this repo.
+The full docs — getting started, task guides, reference, and concepts — are a navigable site at **[sktelecom.github.io/sbom-tools](https://sktelecom.github.io/sbom-tools/)** (search, sidebar, English/Korean). The same content lives under [docs/](docs/) in this repo. The site and the web UI are bilingual, English by default with Korean available.
 
-The web UI itself is bilingual (English and Korean, English by default). The core docs are available in English; the most detailed and complete guides — including the non-developer quick start — are in Korean.
+A few entry points:
 
-### English
-
-| Doc | What |
-|-----|------|
-| [Getting started](docs/getting-started.en.md) | Install and your first SBOM (web UI + CLI) |
-| [Usage guide](docs/usage-guide.en.md) | Every option, analysis modes, CI/CD |
-| [Input scenarios](docs/scenarios-guide.en.md) | GitHub URL, ZIP, local C/C++, existing SBOM, firmware |
-
-Building or extending the tool? Start with the [architecture](docs/architecture.en.md); design notes live under [docs/internal/](docs/internal/) (Korean).
-
-### 한국어
-
-| 문서 | 설명 |
-|------|------|
-| [비개발자 빠른 시작](docs/quickstart-no-cli.md) | CLI 없이 데스크톱 앱과 웹 UI로 SBOM과 고지문 만들기 |
-| [시작하기](docs/getting-started.md) | 설치와 첫 SBOM (웹 UI 포함) |
-| [시나리오 가이드](docs/scenarios-guide.md) | 입력 형태별(GitHub, ZIP, 로컬, SBOM, 펌웨어) 처리 |
-| [고지문·보안 보고서](docs/notice-and-security.md) | 산출물 생성·해석과 웹 UI 사용법 |
-| [사용 가이드](docs/usage-guide.md) | 전체 옵션, 분석 모드, CI/CD |
-| [예제 가이드](docs/examples-guide.md) | 언어별 예제 프로젝트 실습 |
-
-> 내부 구조([아키텍처](docs/architecture.md))와 설계 배경, 메인테이너용 조사 문서는 [docs/internal/](docs/internal/)에 있습니다. Docker 이미지의 가치(cdxgen 대비 측정)는 [방향성 조사 보고서](docs/internal/direction-study.md), Windows 데스크톱 앱 도입 검토는 [데스크톱 앱 검토 보고서](docs/internal/desktop-app-study.md)를 참고하세요. 전체 문서 목록은 [docs/](docs/)에 있습니다.
+- [First scan](docs/start/first-scan.md) — install and your first SBOM (web UI + CLI)
+- [No-CLI quick start](docs/start/no-cli.ko.md) — desktop app or `.bat`, for non-developers (Korean)
+- [CLI reference](docs/reference/cli.md) — every option and environment variable
+- [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, existing SBOM, firmware
+- [Architecture](docs/concepts/architecture.md) — the two-stage pipeline; maintainer design notes live under [docs/internal/](docs/internal/) (Korean)
 
 ## Contributing & License
 

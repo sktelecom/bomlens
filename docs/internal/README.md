@@ -2,7 +2,7 @@
 
 이 폴더는 sbom-tools 메인테이너를 위한 의사결정과 조사 문서를 모아 둔 곳입니다. 도구를 사용하려는 분은 이 폴더가 아니라 [docs/](../) 상위의 사용자 가이드를 보세요.
 
-아키텍처 문서는 사용자 문서 사이트로 옮겼습니다. [docs/architecture.md](../architecture.md)를 보세요.
+아키텍처 문서는 사용자 문서 사이트로 옮겼습니다. [docs/architecture.md](../concepts/architecture.ko.md)를 보세요.
 
 | 문서 | 내용 |
 |------|------|
@@ -15,4 +15,4 @@
 | [외부 등록 채널](seo-external-listings.md) | 검색·AI 노출용 큐레이션 목록과 레지스트리 제출 자료 |
 | [배포 절차](release-guide.md) | 태그 기반 릴리스 체크리스트와 실행 절차 |
 
-> 사용자용 경량 가이드는 상위 [docs/](../)에 있습니다. 펌웨어는 [펌웨어 분석 가이드](../firmware-analysis-guide.md), 공급사 SBOM 검증은 [공급사 SBOM 검증 가이드](../supplier-sbom-validation.md)를 참고하세요.
+> 사용자용 경량 가이드는 상위 [docs/](../)에 있습니다. 펌웨어는 [펌웨어 분석 가이드](../guides/firmware.ko.md), 공급사 SBOM 검증은 [공급사 SBOM 검증 가이드](../guides/supplier-sbom.ko.md)를 참고하세요.
