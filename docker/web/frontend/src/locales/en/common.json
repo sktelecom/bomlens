@@ -108,6 +108,8 @@
     "tabSourceTree": "Source tree",
     "componentsEmpty": "No components were detected.",
     "componentsSearch": "Search name, license, type…",
+    "allTypes": "All types",
+    "allLicenses": "All licenses",
     "componentsCount": "{{shown}} of {{total}} components",
     "truncated": "list truncated",
     "noMatch": "No matching rows.",

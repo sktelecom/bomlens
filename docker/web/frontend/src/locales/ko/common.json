@@ -108,6 +108,8 @@
     "tabSourceTree": "소스 트리",
     "componentsEmpty": "검출된 컴포넌트가 없습니다.",
     "componentsSearch": "이름, 라이선스, 타입 검색…",
+    "allTypes": "모든 타입",
+    "allLicenses": "모든 라이선스",
     "componentsCount": "{{total}}개 중 {{shown}}개",
     "truncated": "목록 일부만 표시",
     "noMatch": "일치하는 항목이 없습니다.",
