@@ -246,6 +246,14 @@ cd ~/sbom-output      # 산출물 저장 폴더 (어디든 무방)
 
 ![취약점 탭 — 심각도 배지와 CVE 상세 표](images/web-ui-vulns.png)
 
+의존성 탭에서는 SBOM에 기록된 의존성 관계를 그래프나 트리로 살펴봅니다. 그래프 보기는 직접 의존성을 빨간 노드로 강조하고, 화살표로 각 패키지가 의존하는 대상을 보여줍니다. 트리 보기로 바꾸면 직접 의존성과 간접 의존성을 계층으로 펼쳐 라이선스와 함께 확인할 수 있습니다.
+
+![의존성 탭 — 의존성 그래프, 직접 의존성은 빨간 노드](images/web-ui-dependency-graph.png)
+
+소스 트리 탭은 정밀 라이선스 옵션(`--deep-license`)으로 스캔했을 때만 나타납니다. 소스 파일과 디렉터리 구조를 트리로 탐색하고, 파일마다 탐지된 라이선스를 배지로 표시합니다.
+
+![소스 트리 탭 — 소스 파일 트리와 파일별 라이선스](images/web-ui-source-tree.png)
+
 > SBOM 업로드(ANALYZE)를 선택하면 위험분석을 위해 고지문과 보안이 자동 활성화됩니다.
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
