@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-06-14
+
 ### Added
 
+- `--trusca <project_id>` (or `--upload-target trusca`) uploads the generated SBOM to TRUSCA's native ingest endpoint as an alternative to the default Dependency-Track upload. (#148, #149)
 - Vulnerability rows in the web UI expand in place to show the CVSS score and vector, the full advisory description, and reference links — surfacing data already in the Trivy report without an extra fetch.
 - The components table in the web UI can now sort by name, version, or type and filter by component type and license, alongside the existing search.
 - The vulnerabilities table can be filtered by severity, and the summary tab shows a license distribution (component count per license, plus unlicensed).
@@ -136,7 +139,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.3.0...HEAD
+[v1.3.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.3.0
+[v1.2.2]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.2
+[v1.2.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.1
+[v1.2.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.0
 [v1.1.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.0.0
