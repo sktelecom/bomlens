@@ -4,7 +4,7 @@ description: Validate that a supplier-submitted SBOM (CycloneDX/SPDX) meets the 
 
 # Supplier SBOM validation guide
 
-> **한국어**: [공급사 SBOM 검증 가이드](supplier-sbom-validation.md) · **Related**: [Getting started](getting-started.en.md) | [Scenarios guide](scenarios-guide.en.md) | [Notice and security guide](notice-and-security.en.md)
+> **한국어**: [공급사 SBOM 검증 가이드](supplier-sbom-validation.md)
 
 How to validate that an SBOM (JSON) submitted by a supplier meets the submission requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report to send back to the supplier. You only need the SBOM file — no source code required.
 
@@ -88,3 +88,7 @@ Company-wide registration, response tracking, and history management are out of 
 - Validation is based on the presence and coverage of required fields. It does not guarantee semantic accuracy such as whether a PURL points to the exact package or whether a version is real.
 - Whether transitive dependencies are included is inferred from the presence of edges in the dependency graph; it is not proof that the graph is complete.
 - The accuracy of vulnerability and license analysis depends directly on the quality of the input SBOM, especially PURL and version accuracy.
+
+---
+
+> **Related**: [Getting started](getting-started.en.md) | [Scenarios guide](scenarios-guide.en.md) | [Notice and security guide](notice-and-security.en.md)

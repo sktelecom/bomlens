@@ -11,7 +11,7 @@ SaaS 없이 로컬에서 단일 프로젝트의 SBOM(CycloneDX 1.6)을 생성하
 [시작하기](getting-started.md){ .md-button .md-button--primary }
 [Windows용 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe){ .md-button }
 
-명령줄이 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
+CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](quickstart-no-cli.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
 
 ![스캔 결과 화면 — SBOM과 고지문, 위험분석보고서를 종류별 카드로 보고 내려받는다](images/app-results.png){ .home-shot }
 
@@ -27,7 +27,7 @@ SaaS 없이 로컬에서 단일 프로젝트의 SBOM(CycloneDX 1.6)을 생성하
 
 -   :material-cursor-default-click: __비개발자 빠른 시작__
 
-    명령줄 없이 데스크톱 앱으로 SBOM과 고지문 만들기.
+    CLI 없이 데스크톱 앱으로 SBOM과 고지문 만들기.
 
     [:octicons-arrow-right-24: 빠른 시작](quickstart-no-cli.md)
 

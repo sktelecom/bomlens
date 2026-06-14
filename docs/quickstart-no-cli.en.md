@@ -1,7 +1,5 @@
 # No-CLI quick start (no command line)
 
-> **Related**: [Getting started](getting-started.md) | [Notice and security guide](notice-and-security.md)
-
 You do not need to have ever typed a command. This page covers the shortest path for an open-source license manager to turn source code received from a dev team into an open-source notice. It is all clicks in a browser.
 
 ## What is an open-source notice
@@ -94,3 +92,7 @@ When the scan finishes, download the notice from the results screen as per-forma
 - **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself.
 
 For more detail and command-line usage, see [Getting started](getting-started.md) and the [Notice and security guide](notice-and-security.md).
+
+---
+
+> **Related**: [Getting started](getting-started.md) | [Notice and security guide](notice-and-security.md)

@@ -1,6 +1,6 @@
 # Testing guide
 
-> **한국어**: [테스트 가이드](testing-guide.md) · **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../architecture.en.md) | [Adding a package manager](package-manager-guide.en.md)
+> **한국어**: [테스트 가이드](testing-guide.md)
 
 This guide explains the test structure of BomLens, how to run and write tests, and how to debug failures.
 
@@ -189,3 +189,7 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 2. Run `scan-sbom.sh` directly in the example directory of the failing language.
 3. Update the Docker image to the latest version: `docker pull ghcr.io/sktelecom/bomlens:latest`
 4. If the problem persists, report it on [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues) with your environment details and logs.
+
+---
+
+> **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../architecture.en.md) | [Adding a package manager](package-manager-guide.en.md)

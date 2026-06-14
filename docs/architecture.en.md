@@ -1,6 +1,6 @@
 # Architecture
 
-> **한국어**: [아키텍처](architecture.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md) | [Use the Docker image directly](docker-image.en.md)
+> **한국어**: [아키텍처](architecture.md)
 
 This document describes the overall system structure of BomLens and explains which tool runs at which step of the scan pipeline, and in what order.
 
@@ -382,3 +382,7 @@ flowchart TB
     end
     C -. upload .-> F
 ```
+
+---
+
+> **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md) | [Use the Docker image directly](docker-image.en.md)

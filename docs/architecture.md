@@ -1,7 +1,5 @@
 # 아키텍처
 
-> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [Docker 이미지 직접 사용](docker-image.md) | [패키지 매니저 추가](contributing/package-manager-guide.md)
-
 BomLens의 전체 시스템 구조와, 스캔 파이프라인에서 각 도구가 어느 단계에서 어떤 순서로 호출되는지 설명합니다.
 
 > 이 문서는 현재 구현된 2단계(2-stage) 아키텍처를 기준으로 작성되었습니다. 소스 코드의 Stage 1 라우팅(언어 감지 후 cdxgen 공식 언어 이미지 실행)은 `scripts/scan-sbom.sh`에 구현되어 동작합니다.
@@ -382,3 +380,7 @@ flowchart TB
     end
     C -. 업로드 .-> F
 ```
+
+---
+
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [Docker 이미지 직접 사용](docker-image.md) | [패키지 매니저 추가](contributing/package-manager-guide.md)
