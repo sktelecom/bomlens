@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, ArrowUpDown, Package, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -15,10 +16,6 @@ interface Props {
 
 type SortKey = "name" | "version" | "type";
 type Sort = { key: SortKey; dir: "asc" | "desc" };
-
-const SELECT_CLASS =
-  "h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Distinct, sorted, non-empty values. */
 function distinct(values: string[]): string[] {
@@ -133,10 +130,9 @@ export function ComponentsTable({ items, total, truncated }: Props) {
           />
         </div>
         {types.length > 1 && (
-          <select
+          <Select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className={SELECT_CLASS}
             aria-label={t("result.allTypes")}
           >
             <option value="">{t("result.allTypes")}</option>
@@ -145,13 +141,12 @@ export function ComponentsTable({ items, total, truncated }: Props) {
                 {ty}
               </option>
             ))}
-          </select>
+          </Select>
         )}
         {licenses.length > 1 && (
-          <select
+          <Select
             value={licenseFilter}
             onChange={(e) => setLicenseFilter(e.target.value)}
-            className={SELECT_CLASS}
             aria-label={t("result.allLicenses")}
           >
             <option value="">{t("result.allLicenses")}</option>
@@ -160,7 +155,7 @@ export function ComponentsTable({ items, total, truncated }: Props) {
                 {l}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 
