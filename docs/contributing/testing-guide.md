@@ -1,7 +1,5 @@
 # 테스트 가이드
 
-> **관련 문서**: [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) | [아키텍처](../architecture.md) | [패키지 매니저 추가](package-manager-guide.md)
-
 BomLens의 테스트 구조와 실행 방법, 테스트 작성 방법, 디버깅 절차를 설명합니다.
 
 ## 테스트 구조
@@ -189,3 +187,7 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 2. 실패한 언어의 예제 디렉토리에서 `scan-sbom.sh`를 직접 실행합니다.
 3. Docker 이미지를 최신 버전으로 업데이트합니다: `docker pull ghcr.io/sktelecom/bomlens:latest`
 4. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues)에 환경 정보와 로그를 첨부해 리포트해 주세요.
+
+---
+
+> **관련 문서**: [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) | [아키텍처](../architecture.md) | [패키지 매니저 추가](package-manager-guide.md)

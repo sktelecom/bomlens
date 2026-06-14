@@ -1,6 +1,6 @@
 # Adding a package manager
 
-> **한국어**: [패키지 매니저 추가 가이드](package-manager-guide.md) · **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../architecture.en.md) | [Testing guide](testing-guide.en.md)
+> **한국어**: [패키지 매니저 추가 가이드](package-manager-guide.md)
 
 This guide walks through adding support for a new programming language or package manager, step by step.
 
@@ -155,3 +155,7 @@ Confirm every item before submitting a PR that adds a new language.
 - [ ] The supported language list in `README.md` is updated.
 - [ ] An example section is added to the examples guide.
 - [ ] The troubleshooting table in the usage guide is updated.
+
+---
+
+> **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../architecture.en.md) | [Testing guide](testing-guide.en.md)

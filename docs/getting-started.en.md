@@ -4,7 +4,7 @@ description: Install BomLens and generate your first SBOM. A step-by-step guide 
 
 # Getting started
 
-> **한국어**: [시작하기](getting-started.md) · **Related**: [Usage guide](usage-guide.en.md)
+> **한국어**: [시작하기](getting-started.md)
 
 A step-by-step path from install to your first SBOM.
 
@@ -112,3 +112,7 @@ jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 - [Usage guide](usage-guide.en.md) — every option, analysis modes, CI/CD integration
 - [Architecture](architecture.en.md) — the two-stage pipeline (cdxgen + syft, then post-processing)
 - [README](https://github.com/sktelecom/sbom-tools/blob/main/README.md) — overview and the two core roles
+
+---
+
+> **Related**: [Usage guide](usage-guide.en.md)

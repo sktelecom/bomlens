@@ -1,6 +1,6 @@
 # Use the Docker image directly
 
-> **한국어**: [Docker 이미지 직접 사용](docker-image.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md) | [Architecture](architecture.en.md)
+> **한국어**: [Docker 이미지 직접 사용](docker-image.md)
 
 For everyday use we recommend the [`scan-sbom.sh`](usage-guide.en.md) script, which handles language detection, image selection, and volume mounts for you. This document explains how to call the image directly with `docker run` in environments where the script cannot live (CI runners, Kubernetes jobs, and so on).
 
@@ -130,3 +130,7 @@ For the full mapping between CLI flags and environment variables, see the flag m
 ## Building and publishing the image
 
 The procedure for building the image yourself or publishing it for multiple platforms is in the contributor-facing [docker/README](https://github.com/sktelecom/sbom-tools/blob/main/docker/README.md).
+
+---
+
+> **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md) | [Architecture](architecture.en.md)

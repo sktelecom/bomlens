@@ -4,7 +4,7 @@ description: How BomLens produces an SBOM, an open-source notice, and a risk rep
 
 # Input scenarios guide
 
-> **한국어**: [시나리오 가이드](scenarios-guide.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)
+> **한국어**: [시나리오 가이드](scenarios-guide.md)
 
 ## Overview
 
@@ -165,3 +165,7 @@ As it runs, logs stream live; when done you can view or download the notice, SBO
 - **C/C++**: pure source without a package manager produces a sparse SBOM (see [Scenario 3](#scenario-3--local-cc-source-directory)).
 - **Firmware**: statically linked libraries and vendor-modified squashfs have limited detection (see the [firmware analysis guide](firmware-analysis-guide.md) (Korean), Limits).
 - **SBOM analysis**: converting SPDX to CycloneDX may simplify some license expressions.
+
+---
+
+> **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)

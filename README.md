@@ -110,7 +110,7 @@ Building or extending the tool? Start with the [architecture](docs/architecture.
 
 | 문서 | 설명 |
 |------|------|
-| [비개발자 빠른 시작](docs/quickstart-no-cli.md) | 명령줄 없이 데스크톱 앱과 웹 UI로 SBOM과 고지문 만들기 |
+| [비개발자 빠른 시작](docs/quickstart-no-cli.md) | CLI 없이 데스크톱 앱과 웹 UI로 SBOM과 고지문 만들기 |
 | [시작하기](docs/getting-started.md) | 설치와 첫 SBOM (웹 UI 포함) |
 | [시나리오 가이드](docs/scenarios-guide.md) | 입력 형태별(GitHub, ZIP, 로컬, SBOM, 펌웨어) 처리 |
 | [고지문·보안 보고서](docs/notice-and-security.md) | 산출물 생성·해석과 웹 UI 사용법 |

@@ -4,8 +4,6 @@ description: Try BomLens hands-on with per-language example projects (Java, Pyth
 
 # Examples guide
 
-> **Related**: [Getting started](getting-started.md) | [Usage guide](usage-guide.md)
-
 A hands-on guide using the per-language example projects under `examples/`. Run each example to see the SBOM output right away.
 
 ## Example directory structure
@@ -216,3 +214,7 @@ The PURL (Package URL) format in the generated SBOM differs by language.
 ## Troubleshooting
 
 If you run into trouble running an example, see [the troubleshooting section of the usage guide](usage-guide.md#troubleshooting).
+
+---
+
+> **Related**: [Getting started](getting-started.md) | [Usage guide](usage-guide.md)

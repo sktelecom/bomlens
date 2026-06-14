@@ -4,8 +4,6 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어 등 5가지 
 
 # 5가지 입력 시나리오별 처리 가이드
 
-> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)
-
 ## 개요
 
 여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 5가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다.
@@ -26,7 +24,7 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어 등 5가지 
 >
 > - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
 > - WSL2에서는 명령을 그대로 실행합니다.
-> - 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
+> - CLI 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭합니다.
 
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지 1회 받기(또는 직접 빌드).
@@ -165,3 +163,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 - **C/C++**: 패키지 매니저가 없는 순수 소스는 SBOM이 희소합니다([시나리오 3](#시나리오-3--로컬-cc-소스-디렉터리) 참고).
 - **펌웨어**: 정적 링크 라이브러리와 벤더 변형 squashfs는 탐지율이 제한적입니다([펌웨어 분석](firmware-analysis-guide.md) §한계).
 - **SBOM 분석**: SPDX를 CycloneDX로 변환할 때 일부 라이선스 표현이 단순화될 수 있습니다.
+
+---
+
+> **관련 문서**: [시작하기](getting-started.md) | [사용 가이드](usage-guide.md) | [고지문·보안 보고서 가이드](notice-and-security.md)

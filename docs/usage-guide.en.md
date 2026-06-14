@@ -4,7 +4,7 @@ description: Complete BomLens reference — every CLI option, analysis modes (so
 
 # Usage guide
 
-> **한국어**: [사용 가이드](usage-guide.md) · **Related**: [Getting started](getting-started.en.md)
+> **한국어**: [사용 가이드](usage-guide.md)
 
 Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens.
 
@@ -411,3 +411,7 @@ If source analysis finds no dependencies, check for the lockfile below.
 1. Check verbose logs with `VERBOSE=true ./tests/test-scan.sh`.
 2. Update the Docker image: `docker pull ghcr.io/sktelecom/bomlens:latest`.
 3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/sbom-tools/issues) with your environment info and logs.
+
+---
+
+> **Related**: [Getting started](getting-started.en.md)

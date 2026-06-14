@@ -4,7 +4,7 @@ description: How to read and use the open-source notice (NOTICE) and the Trivy s
 
 # Notice · security report · web UI guide
 
-> **한국어**: [고지문과 보안 보고서, 웹 UI 가이드](notice-and-security.md) · **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)
+> **한국어**: [고지문과 보안 보고서, 웹 UI 가이드](notice-and-security.md)
 
 Beyond SBOM generation, BomLens produces an open-source notice (NOTICE) and a security vulnerability report in one run, and provides a web UI for users not comfortable with the CLI. This page covers how to read and use the outputs (the notice and the security report) after generating an SBOM, and how to use the web UI.
 
@@ -296,3 +296,7 @@ UI_PORT=9090 ./scripts/scan-sbom.sh --ui      # http://localhost:9090
 | Port conflict (`--ui`) | specify a different port with `UI_PORT`. |
 
 For the detailed design background, see the [direction study](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) (Korean).
+
+---
+
+> **Related**: [Getting started](getting-started.en.md) | [Usage guide](usage-guide.en.md)
