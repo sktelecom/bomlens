@@ -31,6 +31,8 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--firmware` | false | Force firmware mode on the `--target` file (opt-in firmware image) |
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
 | `--generate-only` | false | Save locally only, without uploading |
+| `--upload-target <target>` | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest) |
+| `--trusca <project_id>` | — | Upload to TRUSCA (= `--upload-target trusca` + project id). Needs `API_URL` and a Bearer `API_KEY` |
 | `--notice` | (on by default) | Generate the open-source notice (NOTICE, txt+html) |
 | `--security` | (on by default) | Generate the Trivy security report (json+md+html), including CVSS, EPSS, and CISA KEV priority signals |
 | `--all` | — | `--notice --security` |
@@ -51,6 +53,12 @@ Environment variables adjust the behavior.
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
 | `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |
+| `API_URL` | — | Upload server URL (a DT server, or the TRUSCA base) |
+| `API_KEY` | — | Upload credential. Used as `X-Api-Key` for DT, as a Bearer token for TRUSCA |
+| `UPLOAD_TARGET` | `dependency-track` | Upload destination: `dependency-track` or `trusca` |
+| `TRUSCA_PROJECT_ID` | — | TRUSCA project id (UUID). Required when `trusca` |
+| `TRUSCA_REF` | `main` | Ingest ref label |
+| `TRUSCA_RELEASE` | `--version` value | Ingest release label |
 
 Output flags are detailed in the [notice and security guide](notice-and-security.en.md); validating a received supplier SBOM is covered in the [supplier SBOM validation guide](supplier-sbom-validation.en.md).
 
@@ -188,6 +196,30 @@ When CI needs a byte-for-byte identical SBOM for the same input, use `--byte-sta
   --project "MyApp" --version "1.0.0" \
   --all --generate-only
 ```
+
+## Upload (TRUSCA / Dependency-Track)
+
+After a scan, the SBOM is uploaded by default (`--generate-only` saves locally and skips the upload). Choose the destination with `UPLOAD_TARGET`.
+
+- `dependency-track` (default): a regular Dependency-Track server. Authenticates with `API_URL` and `API_KEY` (`X-Api-Key`) and auto-creates the project.
+- `trusca`: TRUSCA's native ingest endpoint. It is not Dependency-Track compatible, so the auth and inputs differ.
+
+To upload to TRUSCA, prepare three things.
+
+- `API_URL`: the TRUSCA server URL
+- `API_KEY`: a Bearer token issued by TRUSCA (starts with `tos_`, developer role)
+- project_id: the target TRUSCA project id (UUID). It must already exist; there is no auto-create.
+
+```bash
+API_URL="https://<TRUSCA host>" API_KEY="tos_..." \
+  ./scripts/scan-sbom.sh \
+  --project "MyApp" --version "1.2.3" --all \
+  --trusca "<project_id>"
+```
+
+`--trusca <id>` is shorthand for `--upload-target trusca` plus `TRUSCA_PROJECT_ID`. Adjust the ref and release labels with `TRUSCA_REF` (default `main`) and `TRUSCA_RELEASE` (default the `--version` value). On acceptance it prints `202` and a scan id; track progress in the TRUSCA UI (`GET /v1/scans/{id}`).
+
+> TRUSCA ingest fills components, vulnerabilities, declared licenses, the dependency graph, and the build gate. It cannot fill scancode-detected licenses (`--deep-license`), the cosign signature (`--sign`), or source preservation, since there is no source tree. Generate those locally with `--generate-only` if you need them.
 
 ## CI/CD integration
 

@@ -197,7 +197,7 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
   --generate-only
 ```
 
-> `--generate-only` 옵션은 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`을 함께 쓰면 고지문, SBOM, 오픈소스 위험분석 보고서가 한 번에 생성됩니다. 전체 옵션은 [사용 가이드](usage-guide.md#옵션-레퍼런스)를 참고하세요.
+> `--generate-only` 옵션은 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`을 함께 쓰면 고지문, SBOM, 오픈소스 위험분석 보고서가 한 번에 생성됩니다. 전체 옵션은 [사용 가이드](usage-guide.md#옵션-레퍼런스)를 참고하세요. 결과를 TRUSCA나 Dependency-Track에 올리려면 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)를 쓰며, 절차는 [사용 가이드의 업로드 섹션](usage-guide.md)에 있습니다.
 
 ## 결과 파일 이해하기
 
