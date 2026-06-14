@@ -104,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cosign signing of generated artifacts via `--sign`, with the key and password passed into the container at runtime.
 - Multi-architecture Docker images, with architecture detected at runtime for Trivy and cosign.
 - Governance and community-health documents: `CODE_OF_CONDUCT.md` and `SECURITY.md`.
-- Korean documentation style guide and a `/humanize` helper, enforced by a doc-style check.
+- Korean documentation style guide, enforced by a doc-style check.
 
 ### Changed
 

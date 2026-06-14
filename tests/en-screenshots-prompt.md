@@ -1,7 +1,7 @@
-# 영어 스크린샷 캡처 지시문 (Claude on Windows)
+# 영어 스크린샷 캡처 지시문 (Windows)
 
-이 파일은 실제 Windows PC에서 Claude Code를 열고 그대로 시키는 지시문이다. 저장소를 클론하면
-이 파일이 함께 오므로, Claude에게 "tests/en-screenshots-prompt.md 대로 진행해"라고 하면 된다.
+이 파일은 실제 Windows PC에서 터미널 코딩 에이전트를 열고 그대로 시키는 지시문이다. 저장소를 클론하면
+이 파일이 함께 오므로, 에이전트에게 "tests/en-screenshots-prompt.md 대로 진행해"라고 하면 된다.
 
 ## 미션
 
@@ -9,7 +9,7 @@
 넣고, README가 그 영어 파일을 가리키도록 한 PR을 마무리한다. README 본문 영문화와 이미지 참조
 교체는 이미 `docs/readme-english` 브랜치에 들어가 있으므로, 이 브랜치에 캡처만 추가하면 된다.
 
-GUI 조작(앱 실행·토글·화면 띄우기)은 사람이, 캡처와 파일 배치와 커밋과 PR은 Claude가 맡는다.
+GUI 조작(앱 실행·토글·화면 띄우기)은 사람이, 캡처와 파일 배치와 커밋과 PR은 에이전트가 맡는다.
 
 ## 캡처할 3장
 
@@ -26,7 +26,7 @@ GUI 조작(앱 실행·토글·화면 띄우기)은 사람이, 캡처와 파일 
 
 ## 사전 준비
 
-- Claude Code for Windows, `git`, GitHub CLI(`gh auth login` 완료)
+- 터미널 코딩 에이전트, `git`, GitHub CLI(`gh auth login` 완료)
 - Docker 엔진([Rancher Desktop](https://rancherdesktop.io/) 권장) 실행
 - 저장소 클론 후 작업 브랜치로 이동:
 
@@ -44,8 +44,8 @@ git pull
 `sbom-ui.bat` 어느 쪽으로 띄워도 된다.
 
 - 사람: 앱을 띄우고 우측 상단 **EN**을 누른다.
-- 사람: `web-ui-en` 화면(초기 설정)을 맨 앞에 둔다. Claude가 캡처한다.
-- 사람: ZIP 등으로 스캔을 시작해 로그가 흐르는 상태를 맨 앞에 둔다. Claude가 `web-ui-scan-en`을 캡처한다.
+- 사람: `web-ui-en` 화면(초기 설정)을 맨 앞에 둔다. 에이전트가 캡처한다.
+- 사람: ZIP 등으로 스캔을 시작해 로그가 흐르는 상태를 맨 앞에 둔다. 에이전트가 `web-ui-scan-en`을 캡처한다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Capture web-ui-en -Window
@@ -65,7 +65,7 @@ $env:SBOM_LANG="en"; npm start
 ```
 
 - 사람: Docker 점검·다운로드·컨테이너 시작 로그가 보이는 시작 화면을 맨 앞에 둔다.
-- Claude가 캡처한다:
+- 에이전트가 캡처한다:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Capture desktop-startup-en -Window

@@ -90,3 +90,9 @@ temp/
 
 # Compressed Files (Excluding Releases)
 release-assets/
+
+# Local agent tooling (kept on disk, not published)
+.claude/
+.claudeignore
+CLAUDE.md
+scripts/check-doc-style.sh
