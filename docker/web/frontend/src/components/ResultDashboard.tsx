@@ -14,6 +14,7 @@ import type { DoneEvent } from "@/lib/api";
 import { ComponentsTable } from "./ComponentsTable";
 import { DependenciesPanel } from "./DependenciesPanel";
 import { KpiCards } from "./KpiCards";
+import { LicenseSummary } from "./LicenseSummary";
 import { ResultsList } from "./ResultsList";
 import { SeverityBar } from "./SeverityBar";
 import { SourceTreePanel } from "./SourceTreePanel";
@@ -79,6 +80,7 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
             ) : (
               <EmptyState>{t("result.noSecurity")}</EmptyState>
             )}
+            <LicenseSummary components={result.sbom?.componentList ?? []} />
             <div className="space-y-3">
               <div className="text-sm font-medium">{t("result.artifacts")}</div>
               <ResultsList results={result.results} />

@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, ExternalLink, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/state";
 import { SEVERITY_ORDER, type SecuritySummary, type VulnItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ export function VulnerabilitiesTable({ security }: Props) {
   const { t } = useTranslation();
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [severityFilter, setSeverityFilter] = useState("");
 
   const sorted = useMemo(() => {
     const rank = (s: string) => {
@@ -100,13 +102,37 @@ export function VulnerabilitiesTable({ security }: Props) {
     return [...items].sort((a, b) => rank(a.severity) - rank(b.severity));
   }, [items]);
 
+  const severities = useMemo(
+    () => SEVERITY_ORDER.filter((s) => items.some((v) => v.severity === s)),
+    [items],
+  );
+
   if (security.TOTAL === 0 || items.length === 0) {
     return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
 
+  const visible = severityFilter
+    ? sorted.filter((v) => v.severity === severityFilter)
+    : sorted;
+
   return (
-    <div className="max-h-[28rem] overflow-auto rounded-md border">
-      <table className="w-full text-left text-xs">
+    <div className="space-y-3">
+      {severities.length > 1 && (
+        <Select
+          value={severityFilter}
+          onChange={(e) => setSeverityFilter(e.target.value)}
+          aria-label={t("result.allSeverities")}
+        >
+          <option value="">{t("result.allSeverities")}</option>
+          {severities.map((s) => (
+            <option key={s} value={s}>
+              {t(`severity.${s}`)}
+            </option>
+          ))}
+        </Select>
+      )}
+      <div className="max-h-[28rem] overflow-auto rounded-md border">
+        <table className="w-full text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">
             <th className="px-3 py-2 font-medium">{t("result.colSeverity")}</th>
@@ -117,7 +143,7 @@ export function VulnerabilitiesTable({ security }: Props) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((v, i) => {
+          {visible.map((v, i) => {
             const key = `${v.id}-${v.pkg}-${i}`;
             const isOpen = openKey === key;
             const links = vulnLinks(v);
@@ -199,6 +225,7 @@ export function VulnerabilitiesTable({ security }: Props) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
