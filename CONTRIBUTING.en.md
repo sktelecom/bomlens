@@ -4,7 +4,7 @@
 
 Thanks for your interest in BomLens! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
 
-> **Related**: [Architecture](docs/architecture.en.md) | [Testing guide](docs/contributing/testing-guide.md) | [Adding a package manager](docs/contributing/package-manager-guide.md)
+> **Related**: [Architecture](docs/concepts/architecture.md) | [Testing guide](docs/contribute/testing.md) | [Adding a package manager](docs/contribute/package-managers.md)
 
 ## Contents
 
@@ -25,9 +25,9 @@ This project follows a [Code of Conduct](CODE_OF_CONDUCT.en.md) based on the [Co
 | Type | How |
 |------|-----|
 | Bug fix | Find and fix a bug from [Issues](https://github.com/sktelecom/sbom-tools/issues) |
-| New language support | See [adding a package manager](docs/contributing/package-manager-guide.md) |
+| New language support | See [adding a package manager](docs/contribute/package-managers.md) |
 | Documentation | Fix typos, add examples, improve explanations |
-| Tests | See the [testing guide](docs/contributing/testing-guide.md) |
+| Tests | See the [testing guide](docs/contribute/testing.md) |
 | Feature proposal | Discuss first in [Discussions](https://github.com/sktelecom/sbom-tools/discussions) |
 
 When writing or editing Korean documentation, follow the [Korean style guide](docs/korean-style-guide.md).

@@ -89,10 +89,10 @@ jobs:
             
             ### Documentation
             
-            - [Getting Started](https://github.com/${{ github.repository }}/blob/main/docs/getting-started.md)
+            - [Getting Started](https://github.com/${{ github.repository }}/blob/main/docs/start/first-scan.md)
             - [License-manager quickstart](https://github.com/${{ github.repository }}/blob/main/docs/notice-quickstart.md)
-            - [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/usage-guide.md)
-            - [Examples](https://github.com/${{ github.repository }}/blob/main/docs/examples-guide.md)
+            - [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/reference/cli.md)
+            - [Examples](https://github.com/${{ github.repository }}/blob/main/docs/reference/ecosystems.md)
           draft: false
           prerelease: false
   

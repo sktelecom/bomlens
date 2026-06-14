@@ -14,7 +14,7 @@ copyright: SK Telecom
 theme:
   name: material
   custom_dir: overrides
-  language: ko
+  language: en
   logo: images/logo.svg
   favicon: images/logo-mark.svg
   font:
@@ -27,14 +27,14 @@ theme:
       accent: custom
       toggle:
         icon: material/weather-night
-        name: 다크 모드로
+        name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: custom
       accent: custom
       toggle:
         icon: material/weather-sunny
-        name: 라이트 모드로
+        name: Switch to light mode
   features:
     - navigation.sections
     - navigation.expand
@@ -82,21 +82,21 @@ plugins:
   - i18n:
       docs_structure: suffix
       languages:
-        - locale: ko
-          name: 한국어
-          default: true
-          build: true
         - locale: en
           name: English
+          default: true
+          build: true
+        - locale: ko
+          name: 한국어
           build: true
           nav_translations:
-            홈: Home
-            빠른 시작: Quick start
-            사용 가이드: Guides
-            검증과 분석: Validate & analyze
-            참고: Reference
-            기여: Contributing
-            릴리스 노트: Release notes
+            Home: 홈
+            Get started: 빠른 시작
+            Guides: 가이드
+            Reference: 레퍼런스
+            Concepts: 개념
+            Contributing: 기여
+            Release notes: 릴리스 노트
 
 extra:
   # 방문 분석(GoatCounter, 쿠키·개인정보 없음). goatcounter.com에서 사이트를 등록한 뒤
@@ -108,22 +108,28 @@ exclude_docs: |
   korean-style-guide.md
 
 nav:
-  - 홈: index.md
-  - 빠른 시작:
-      - getting-started.md
-      - quickstart-no-cli.md
-  - 사용 가이드:
-      - usage-guide.md
-      - scenarios-guide.md
-      - notice-and-security.md
-      - examples-guide.md
-  - 검증과 분석:
-      - supplier-sbom-validation.md
-      - firmware-analysis-guide.md
-  - 참고:
-      - docker-image.md
-      - architecture.md
-      - 릴리스 노트: https://github.com/sktelecom/sbom-tools/releases
-  - 기여:
-      - contributing/package-manager-guide.md
-      - contributing/testing-guide.md
+  - Home: index.md
+  - Get started:
+      - start/first-scan.md
+      - start/no-cli.md
+  - Guides:
+      - guides/by-input.md
+      - guides/reports.md
+      - guides/supplier-sbom.md
+      - guides/firmware.md
+      - guides/upload.md
+      - guides/ci-cd.md
+  - Reference:
+      - reference/cli.md
+      - reference/artifacts.md
+      - reference/ecosystems.md
+      - reference/ui.md
+      - reference/docker-image.md
+  - Concepts:
+      - concepts/architecture.md
+      - concepts/local-first.md
+      - concepts/reports-explained.md
+  - Contributing:
+      - contribute/package-managers.md
+      - contribute/testing.md
+  - Release notes: https://github.com/sktelecom/sbom-tools/releases

@@ -1,0 +1,41 @@
+---
+description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, 파일명 규칙, SBOM 구조 요약입니다.
+---
+
+# 산출물 레퍼런스
+
+생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다.
+
+파일명은 `{ProjectName}_{Version}_bom.json`입니다(예: `MyApp_1.0.0_bom.json`).
+
+## 산출물 파일
+
+| 파일 | 생성 조건 | 설명 |
+|------|----------|------|
+| `{P}_{V}_bom.json` | 항상 | SBOM (CycloneDX 1.6) |
+| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 | 오픈소스 고지문 |
+| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
+| `{P}_{V}_risk-report.md` / `.html` | 기본(전 모드) — `--no-report`로 생략 | 오픈소스위험분석보고서 |
+| `{P}_{V}_conformance.json` / `.md` / `.html` | `--analyze` | 포맷 적합성 보고서 |
+| `{P}_{V}_scancode.json` | `--deep-license` | scancode 원본 결과 |
+| `{P}_{V}_bom.json.sig` | `--sign` | cosign 서명 |
+
+`{P}`=프로젝트 이름, `{V}`=버전 (특수문자는 `_`로 정규화).
+
+## SBOM 구조
+
+```
+bomFormat          "CycloneDX"
+specVersion        "1.6"
+metadata
+  ├── timestamp    생성 시각 (ISO 8601)
+  └── component    프로젝트 정보 (name, version, type)
+components[]
+  ├── type         "library" | "framework" | "application"
+  ├── name         컴포넌트 이름
+  ├── version      버전
+  ├── purl         Package URL (고유 식별자)
+  └── licenses[]   라이선스 정보 (SPDX ID)
+```
+
+언어별 PURL 형식은 [지원 생태계](ecosystems.ko.md)를 참고하세요.

@@ -1,0 +1,54 @@
+---
+description: How to read and interpret the open-source notice, the security report, and the open-source risk report that BomLens produces.
+---
+
+# What the reports mean
+
+This page explains how to read and interpret BomLens reports after a scan. For how to produce them, see [Generating reports](../guides/reports.md).
+
+## What the notice handles
+
+The open-source notice (NOTICE) groups components by license. Beyond that grouping, it also handles the following.
+
+- It normalizes license names to SPDX identifiers. For example, "Apache License, version 2.0" is gathered as `Apache-2.0`. Entries that were duplicated because the same license was written differently are merged into one.
+- If the SBOM has a copyright value, it is shown per component.
+- The full SPDX standard texts of 21 major open-source licenses (`Apache-2.0`, `MIT`, `BSD-3-Clause`, the `GPL`/`LGPL` families, and so on) are bundled at the end of the notice. This satisfies the obligation of licenses that require the full text, without separate collection. The bundled originals are in `docker/lib/licenses/*.txt`.
+
+## Priority signals (CVSS, EPSS, CISA KEV)
+
+Severity alone makes it hard to decide what to fix first. To help with that, the security report shows three more signals beyond severity. The Markdown and HTML table columns are `Severity | KEV | CVSS | EPSS | CVE | Package | Installed | Fixed`.
+
+- **CVSS** — the technical severity score of the vulnerability (0–10). The V3 score is used first, falling back to V2 if absent.
+- **EPSS** — the probability of real-world exploitation within the next 30 days (0–1). Queried from FIRST.org; a higher score means a greater chance of being used in an attack.
+- **CISA KEV** — whether it is on the "known exploited vulnerabilities" list maintained by the US CISA. If it is, the HTML report marks it with a ⚠️ badge.
+
+The table puts KEV-listed items at the top, then sorts by severity, and finally by EPSS descending. Working top-down naturally addresses the highest-risk items first.
+
+EPSS and KEV require external API lookups. On an air-gapped network, set `SECURITY_ENRICH=false` to omit the two columns and still generate the rest of the report.
+
+## Interpreting results & follow-up
+
+| Severity | Meaning | Recommended action |
+|----------|---------|--------------------|
+| **Critical** | immediately exploitable, severe | top-priority patch — upgrade to the `Fixed` version immediately |
+| **High** | high risk | plan a patch in the short term |
+| **Medium / Low** | limited impact | handle during regular maintenance |
+| **Unknown** | severity not assessed | check the CVE directly and classify |
+
+- If the report's `Fixed` column has a version, raising the dependency to that version or higher resolves it. This is the fastest first response.
+- CI gate example. Fail the build if there is even one Critical:
+  ```bash
+  crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
+  [ "$crit" -gt 0 ] && { echo "${crit} Critical vulnerabilities"; exit 1; }
+  ```
+- Triage such as judging false positives (no real impact), approving exceptions, and history management is beyond the scope of BomLens. Upload the SBOM to TRUSCA to handle it.
+
+## The open-source risk report
+
+The open-source risk report aggregates vulnerabilities by severity with response deadlines (Critical 7 days, High 30 days). It includes a license summary, and for a supplier SBOM it adds the format conformance result.
+
+## Related
+
+- [Generating reports](../guides/reports.md)
+- [Artifacts reference](../reference/artifacts.md)
+- [How BomLens works](architecture.md)
