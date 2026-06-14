@@ -92,10 +92,28 @@ plugins:
           nav_translations:
             Home: 홈
             Get started: 빠른 시작
+            First scan: 시작하기
+            No-CLI quickstart: 비개발자 빠른 시작
             Guides: 가이드
+            By input type: 입력 시나리오
+            Reports: 보고서 생성
+            Supplier SBOM: 공급사 SBOM
+            Firmware: 펌웨어 분석
+            Upload: 업로드
+            CI/CD: CI/CD 연동
             Reference: 레퍼런스
+            CLI options: CLI 옵션
+            Artifacts: 산출물
+            Ecosystems: 지원 생태계
+            Web UI & app: 웹 UI·데스크톱
+            Docker image: Docker 이미지
             Concepts: 개념
+            Architecture: 아키텍처
+            Local-first: 로컬 우선 설계
+            Reading reports: 보고서 읽는 법
             Contributing: 기여
+            Package managers: 패키지 매니저
+            Testing: 테스트
             Release notes: 릴리스 노트
 
 extra:
@@ -110,26 +128,26 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Get started:
-      - start/first-scan.md
-      - start/no-cli.md
+      - First scan: start/first-scan.md
+      - No-CLI quickstart: start/no-cli.md
   - Guides:
-      - guides/by-input.md
-      - guides/reports.md
-      - guides/supplier-sbom.md
-      - guides/firmware.md
-      - guides/upload.md
-      - guides/ci-cd.md
+      - By input type: guides/by-input.md
+      - Reports: guides/reports.md
+      - Supplier SBOM: guides/supplier-sbom.md
+      - Firmware: guides/firmware.md
+      - Upload: guides/upload.md
+      - CI/CD: guides/ci-cd.md
   - Reference:
-      - reference/cli.md
-      - reference/artifacts.md
-      - reference/ecosystems.md
-      - reference/ui.md
-      - reference/docker-image.md
+      - CLI options: reference/cli.md
+      - Artifacts: reference/artifacts.md
+      - Ecosystems: reference/ecosystems.md
+      - Web UI & app: reference/ui.md
+      - Docker image: reference/docker-image.md
   - Concepts:
-      - concepts/architecture.md
-      - concepts/local-first.md
-      - concepts/reports-explained.md
+      - Architecture: concepts/architecture.md
+      - Local-first: concepts/local-first.md
+      - Reading reports: concepts/reports-explained.md
   - Contributing:
-      - contribute/package-managers.md
-      - contribute/testing.md
+      - Package managers: contribute/package-managers.md
+      - Testing: contribute/testing.md
   - Release notes: https://github.com/sktelecom/sbom-tools/releases
