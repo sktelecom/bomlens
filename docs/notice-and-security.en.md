@@ -246,6 +246,14 @@ The Vulnerabilities tab shows the severity distribution and CVE details (includi
 
 ![Vulnerabilities tab — severity badges and a CVE detail table](images/web-ui-vulns.png)
 
+The Dependencies tab shows the dependency relationships recorded in the SBOM as a graph or a tree. The graph view highlights direct dependencies as red nodes, with arrows pointing from each package to what it depends on. Switch to the tree view to expand direct and transitive dependencies as a hierarchy, with their licenses.
+
+![Dependencies tab — dependency graph, with direct dependencies as red nodes](images/web-ui-dependency-graph-en.png)
+
+The Source tree tab appears only when you scan with the deep license option (`--deep-license`). It lets you browse the source files and directory structure as a tree, with the detected license shown per file.
+
+![Source tree tab — source file tree with a license per file](images/web-ui-source-tree-en.png)
+
 > Choosing SBOM upload (ANALYZE) automatically enables notice and security for the risk analysis.
 > The firmware upload tab is enabled only when the UI runs from an image that includes the firmware tools:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
