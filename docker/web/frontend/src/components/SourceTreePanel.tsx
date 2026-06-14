@@ -1,7 +1,7 @@
-import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ErrorState, LoadingState } from "@/components/ui/state";
 import { loadScanCode, parseScanCode, type FileNode } from "@/lib/scancode";
 
 import { SourceFileTree } from "./SourceFileTree";
@@ -14,6 +14,7 @@ export function SourceTreePanel({ scancodeFile }: { scancodeFile: string }) {
   const { t } = useTranslation();
   const [nodes, setNodes] = useState<FileNode[] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -30,19 +31,19 @@ export function SourceTreePanel({ scancodeFile }: { scancodeFile: string }) {
     return () => {
       active = false;
     };
-  }, [scancodeFile]);
+  }, [scancodeFile, reloadKey]);
 
   if (state === "loading") {
-    return (
-      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("sourceTree.loading")}
-      </div>
-    );
+    return <LoadingState>{t("sourceTree.loading")}</LoadingState>;
   }
   if (state === "error" || !nodes) {
     return (
-      <p className="py-8 text-sm text-muted-foreground">{t("sourceTree.loadError")}</p>
+      <ErrorState
+        onRetry={() => setReloadKey((k) => k + 1)}
+        retryLabel={t("retry")}
+      >
+        {t("sourceTree.loadError")}
+      </ErrorState>
     );
   }
 

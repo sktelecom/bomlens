@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/state";
 import { SEVERITY_ORDER, type SecuritySummary } from "@/lib/api";
 
 const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
@@ -29,7 +31,7 @@ export function VulnerabilitiesTable({ security }: Props) {
   }, [items]);
 
   if (security.TOTAL === 0 || items.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t("result.noVulns")}</p>;
+    return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
 
   return (

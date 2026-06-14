@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmptyState } from "@/components/ui/state";
 import type { DoneEvent } from "@/lib/api";
 
 import { ComponentsTable } from "./ComponentsTable";
@@ -76,9 +77,7 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
             {result.security ? (
               <SeverityBar security={result.security} />
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("result.noSecurity")}
-              </p>
+              <EmptyState>{t("result.noSecurity")}</EmptyState>
             )}
             <div className="space-y-3">
               <div className="text-sm font-medium">{t("result.artifacts")}</div>
@@ -98,9 +97,7 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
             {result.security ? (
               <VulnerabilitiesTable security={result.security} />
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("result.noSecurity")}
-              </p>
+              <EmptyState>{t("result.noSecurity")}</EmptyState>
             )}
           </TabsContent>
 

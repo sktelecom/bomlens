@@ -1,6 +1,7 @@
 {
   "appTitle": "BomLens",
   "subtitle": "SBOM, open-source notices and security reports for a single project — in one run",
+  "retry": "Retry",
   "form": {
     "title": "Scan settings",
     "description": "Enter your project details and pick what to generate.",
