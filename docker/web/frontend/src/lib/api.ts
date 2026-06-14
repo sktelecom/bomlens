@@ -46,6 +46,16 @@ export interface VulnItem {
   installed: string;
   fixed: string;
   title: string;
+  /** Highest CVSS score across Trivy's sources (null when none scored). */
+  cvss?: number | null;
+  /** CVSS vector for that score, when present. */
+  cvssVector?: string;
+  /** Full advisory description (capped server-side). */
+  description?: string;
+  /** Primary advisory URL. */
+  url?: string;
+  /** Reference links (capped server-side). */
+  refs?: string[];
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */

@@ -120,7 +120,12 @@
     "colCve": "CVE",
     "colPackage": "Package",
     "colInstalled": "Installed",
-    "colFixed": "Fixed"
+    "colFixed": "Fixed",
+    "vulnCvss": "CVSS",
+    "vulnDescription": "Description",
+    "vulnReferences": "References",
+    "vulnNoDetail": "No additional details available.",
+    "vulnRowToggle": "Show vulnerability details"
   },
   "deps": {
     "loading": "Loading dependencies…",
