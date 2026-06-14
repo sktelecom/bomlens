@@ -10,6 +10,10 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
 
+<p align="center">
+  <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI reviewing a scan result: KPI cards and severity/license summary, filtering the components table, and expanding a vulnerability row to its CVSS score, description and references" width="860" />
+</p>
+
 **Where to start:**
 
 - **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [Getting started](docs/getting-started.en.md) ([한국어](docs/getting-started.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/quickstart-no-cli.md) (Korean) walks through it.
