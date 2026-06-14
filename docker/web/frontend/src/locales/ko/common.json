@@ -120,7 +120,12 @@
     "colCve": "CVE",
     "colPackage": "패키지",
     "colInstalled": "설치 버전",
-    "colFixed": "수정 버전"
+    "colFixed": "수정 버전",
+    "vulnCvss": "CVSS",
+    "vulnDescription": "설명",
+    "vulnReferences": "참고 링크",
+    "vulnNoDetail": "추가 상세 정보가 없습니다.",
+    "vulnRowToggle": "취약점 상세 보기"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",

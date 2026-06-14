@@ -119,6 +119,8 @@ def list_results():
 # (sbom.components, severity totals) stay exact; only the detail lists are capped.
 MAX_COMPONENT_ROWS = 2000
 MAX_VULN_ROWS = 2000
+MAX_VULN_REFS = 12  # reference links per CVE in the detail view
+MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 
 
 def _component_licenses(c):
@@ -130,6 +132,28 @@ def _component_licenses(c):
         if val:
             out.append(val)
     return out
+
+
+def _cvss_best(v):
+    """Highest CVSS score and its vector across Trivy's sources (V3, fallback V2).
+
+    Mirrors scan-security.sh so the web detail view and the rendered report agree.
+    Returns (score, vector) with score None when no source carries a score.
+    """
+    best_score = None
+    best_vector = ""
+    for src in (v.get("CVSS") or {}).values():
+        if not isinstance(src, dict):
+            continue
+        score = src.get("V3Score")
+        vector = src.get("V3Vector") or ""
+        if score is None:
+            score = src.get("V2Score")
+            vector = src.get("V2Vector") or ""
+        if score is not None and (best_score is None or score > best_score):
+            best_score = score
+            best_vector = vector
+    return best_score, best_vector
 
 
 def security_summary(project, version):
@@ -151,6 +175,8 @@ def security_summary(project, version):
                 s = "UNKNOWN"
             sev[s] += 1
             if len(vulns) < MAX_VULN_ROWS:
+                score, vector = _cvss_best(v)
+                desc = (v.get("Description") or "")[:MAX_VULN_DESC]
                 vulns.append({
                     "id": v.get("VulnerabilityID") or "",
                     "severity": s,
@@ -158,6 +184,11 @@ def security_summary(project, version):
                     "installed": v.get("InstalledVersion") or "",
                     "fixed": v.get("FixedVersion") or "",
                     "title": v.get("Title") or "",
+                    "cvss": score,
+                    "cvssVector": vector,
+                    "description": desc,
+                    "url": v.get("PrimaryURL") or "",
+                    "refs": (v.get("References") or [])[:MAX_VULN_REFS],
                 })
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
