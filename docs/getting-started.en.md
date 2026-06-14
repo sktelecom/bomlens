@@ -84,6 +84,8 @@ On Windows the folder you run from is where outputs are saved, and it must be in
 
 This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report in the current directory.
 
+> To upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`); the steps are in the upload section of the [usage guide](usage-guide.en.md).
+
 ## Understanding the results
 
 Outputs are named `{Project}_{Version}_…`:
