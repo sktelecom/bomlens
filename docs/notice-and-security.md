@@ -42,7 +42,7 @@ $SBOM --ui            # http://localhost:8080 자동 오픈 (포트 충돌 시 U
   ```
 - 모든 예시는 스캔할 프로젝트 루트에서 실행합니다.
 
-> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. TRUSCA(구 TrustedOSS Portal, Dependency-Track 호환) 자동 업로드를 함께 쓰려면 생략하세요.
+> 옵션 플래그는 `--generate-only`(로컬 저장)와 함께 쓰는 것을 권장합니다. Dependency-Track 서버나 TRUSCA(구 TrustedOSS Portal) 자동 업로드를 함께 쓰려면 생략하세요. 대상은 `UPLOAD_TARGET`으로 고릅니다.
 
 ---
 

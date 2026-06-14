@@ -251,7 +251,7 @@ Step details:
 | ⑤ | **Signing** | `cosign sign-blob` | `--sign` and `COSIGN_KEY` | `bom.json.sig` |
 | ⑥ | **Risk report** | `generate-risk-report.sh` | Default (skip with `--no-report`) | `_risk-report.{md,html}` (plus `_conformance.*` in ANALYZE mode) |
 | ⑦ | **Copy to host** | `cp` | Always | Copied to `HOST_OUTPUT_DIR` |
-| ⑧ | **Upload** | `curl` | Default (skipped with `--generate-only`) | Registered with TRUSCA (Dependency-Track compatible) |
+| ⑧ | **Upload** | `curl` | Default (skipped with `--generate-only`) | Upload to a Dependency-Track server or TRUSCA's native ingest (select with `UPLOAD_TARGET`) |
 
 > **Why the order is fixed**: normalization stabilizes the input for every later step, so it runs first; signing must target the final `bom.json`, so it runs last. Each step is best-effort — failures are handled with `|| true` or a warning and do not abort the whole scan (signing and upload excepted).
 

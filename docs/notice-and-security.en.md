@@ -42,7 +42,7 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` (notice) and `MyApp_1.0.0_secur
   ```
 - Run every example from the root of the project to scan.
 
-> Output flags are best used together with `--generate-only` (save locally). Omit it to also use the TRUSCA (formerly TrustedOSS Portal, Dependency-Track compatible) auto-upload.
+> Output flags are best used together with `--generate-only` (save locally). Omit it to also auto-upload to a Dependency-Track server or TRUSCA (formerly TrustedOSS Portal); pick the target with `UPLOAD_TARGET`.
 
 ---
 

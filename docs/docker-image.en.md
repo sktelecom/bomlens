@@ -117,7 +117,13 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | Generate the open-source notice (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Generate the Trivy security report (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
-| `API_KEY`, `API_URL` | For uploads | — | Authentication for TRUSCA (formerly TrustedOSS Portal, Dependency-Track compatible) uploads |
+| `API_KEY`, `API_URL` | For uploads | — | Upload credential and server URL. DT uses `X-Api-Key`; TRUSCA uses a Bearer token |
+| `UPLOAD_TARGET` | — | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest, not DT-compatible) |
+| `TRUSCA_PROJECT_ID` | When `trusca` | — | Target TRUSCA project id (UUID). Must already exist (no auto-create) |
+| `TRUSCA_REF` | — | `main` | Ingest ref label |
+| `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | Ingest release label |
+
+> TRUSCA's (formerly TrustedOSS Portal) native ingest endpoint (`POST /v1/projects/{id}/sbom-ingest`, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep `UPLOAD_TARGET=dependency-track` (the default).
 
 For the full mapping between CLI flags and environment variables, see the flag mapping in [Architecture](architecture.en.md).
 
