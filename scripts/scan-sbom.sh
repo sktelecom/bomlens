@@ -182,7 +182,7 @@ pp_env() {
 
 # cosign key mount + env, only when --sign is set with a real key. The private
 # key dir is mounted READ-ONLY and the password comes from the host env — never
-# hardcoded (CLAUDE.md security). Without this the container's COSIGN_KEY is
+# hardcoded (credentials must not be baked in). Without this the container's COSIGN_KEY is
 # unset and entrypoint.sh skips signing, so `--sign` produced no .sig.
 cosign_run() {
     [ "$SIGN_SBOM" = "true" ] && [ -n "${COSIGN_KEY:-}" ] && [ -f "$COSIGN_KEY" ] || return 0

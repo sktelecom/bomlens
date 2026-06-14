@@ -8,20 +8,20 @@
 검증 캡처는 `docs/quickstart-no-cli.md`의 스크린샷 자리표시(`TODO(windows-capture)`)를 실제
 화면으로 교체하는 데 씁니다.
 
-## 역할 분담 (Claude와 사람)
+## 역할 분담 (에이전트와 사람)
 
-이 PC에서 Claude Code를 켜서 검증을 맡길 수 있습니다. 다만 Claude는 터미널 에이전트라
+이 PC에서 터미널 코딩 에이전트를 켜서 검증을 맡길 수 있습니다. 다만 에이전트는 터미널에서만 동작하므로
 스크립트 실행과 화면 캡처, 문서 반영, 커밋은 하지만 버튼 클릭이나 드래그 같은 GUI 조작은
 사람이 합니다.
 
 | 일 | 담당 |
 |----|------|
-| 자동 스모크 실행(`windows-verify.ps1 -Smoke`) | Claude |
-| 화면 캡처, 크롭, `docs/images` 반영, PR | Claude |
+| 자동 스모크 실행(`windows-verify.ps1 -Smoke`) | 에이전트 |
+| 화면 캡처, 크롭, `docs/images` 반영, PR | 에이전트 |
 | SmartScreen 경고 진행, Rancher 설치, 더블클릭, 브라우저 업로드 | 사람 |
-| 캡처할 GUI 화면을 맨 앞으로 띄워 두기 | 사람(그 뒤 캡처는 Claude) |
+| 캡처할 GUI 화면을 맨 앞으로 띄워 두기 | 사람(그 뒤 캡처는 에이전트) |
 
-요령: 사람이 캡처할 화면을 띄워 둔 다음, Claude가 `windows-verify.ps1 -Capture <이름>`을
+요령: 사람이 캡처할 화면을 띄워 둔 다음, 에이전트가 `windows-verify.ps1 -Capture <이름>`을
 실행하면 카운트다운 뒤 그 화면을 PNG로 저장합니다.
 
 ## 사전: 자동 스모크 먼저 실행
@@ -111,14 +111,14 @@ powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Capture smart
 
 | 캡처 이름 | 화면 | GUI 띄우기 | 캡처 |
 |-----------|------|-----------|------|
-| `smartscreen` | "Windows가 PC를 보호했습니다" 경고 | 사람(exe 더블클릭) | Claude |
-| `rancher-install` | Rancher Desktop 설치 화면 | 사람 | Claude |
-| `app-running` | 앱 창에 웹 UI가 로드된 화면 | 사람(앱 실행) | Claude |
-| `app-results` | 결과 목록에서 NOTICE 파일이 보이는 화면 | 사람(스캔 완료) | Claude |
-| `bat-console` | `sbom-ui.bat` 첫 실행 시 다운로드 안내가 뜬 검은 창 | 사람(bat 실행) | Claude |
+| `smartscreen` | "Windows가 PC를 보호했습니다" 경고 | 사람(exe 더블클릭) | 에이전트 |
+| `rancher-install` | Rancher Desktop 설치 화면 | 사람 | 에이전트 |
+| `app-running` | 앱 창에 웹 UI가 로드된 화면 | 사람(앱 실행) | 에이전트 |
+| `app-results` | 결과 목록에서 NOTICE 파일이 보이는 화면 | 사람(스캔 완료) | 에이전트 |
+| `bat-console` | `sbom-ui.bat` 첫 실행 시 다운로드 안내가 뜬 검은 창 | 사람(bat 실행) | 에이전트 |
 
 캡처한 PNG를 문서 자리표시와 바꾸려면, 해당 `<!-- TODO(windows-capture): ... -->` 줄을
-`![설명](images/<이름>.png)`로 교체하고 PR을 올립니다. 이 작업도 Claude가 합니다.
+`![설명](images/<이름>.png)`로 교체하고 PR을 올립니다. 이 작업도 에이전트가 합니다.
 
 > 전체 화면을 찍으려면 `-Window`를 빼고, 대기 시간을 조절하려면 `-Delay 8`을 붙입니다.
 > 자세한 사용법은 `Get-Help tests\windows-verify.ps1 -Full`.
