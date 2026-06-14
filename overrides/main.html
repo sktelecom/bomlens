@@ -23,4 +23,13 @@
   <meta name="twitter:title" content="{{ page_title }}">
   <meta name="twitter:description" content="{{ page_desc }}">
   <meta name="twitter:image" content="{{ og_image }}">
+
+  <!--
+    방문 분석(GoatCounter): 쿠키도 개인정보도 수집하지 않는다. config.extra.goatcounter에
+    사이트 코드가 있을 때만 켜진다(없으면 출력하지 않으므로 등록 전에는 비활성).
+  -->
+  {% if config.extra and config.extra.goatcounter %}
+  <script data-goatcounter="https://{{ config.extra.goatcounter }}.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
+  {% endif %}
 {% endblock %}

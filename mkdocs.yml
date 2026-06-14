@@ -96,6 +96,12 @@ plugins:
             검증과 분석: Validate & analyze
             참고: Reference
             기여: Contributing
+            릴리스 노트: Release notes
+
+extra:
+  # 방문 분석(GoatCounter, 쿠키·개인정보 없음). goatcounter.com에서 사이트를 등록한 뒤
+  # 받은 사이트 코드를 넣으면 켜진다. 비워두면 분석 스크립트를 출력하지 않는다.
+  goatcounter: ""
 
 exclude_docs: |
   internal/
@@ -117,6 +123,7 @@ nav:
   - 참고:
       - docker-image.md
       - architecture.md
+      - 릴리스 노트: https://github.com/sktelecom/sbom-tools/releases
   - 기여:
       - contributing/package-manager-guide.md
       - contributing/testing-guide.md
