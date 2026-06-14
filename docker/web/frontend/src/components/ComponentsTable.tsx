@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Package, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 
 interface Props {
@@ -27,9 +28,7 @@ export function ComponentsTable({ items, total, truncated }: Props) {
   }, [items, q]);
 
   if (total === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">{t("result.componentsEmpty")}</p>
-    );
+    return <EmptyState icon={Package}>{t("result.componentsEmpty")}</EmptyState>;
   }
 
   return (

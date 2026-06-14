@@ -1,8 +1,9 @@
-import { GitFork, ListTree, Loader2 } from "lucide-react";
+import { GitFork, ListTree } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { ErrorState, LoadingState } from "@/components/ui/state";
 import { loadSbom, parseSbomGraph, type SbomGraph } from "@/lib/sbomGraph";
 
 import { DependencyGraph } from "./DependencyGraph";
@@ -20,6 +21,7 @@ export function DependenciesPanel({ sbomFile }: { sbomFile: string }) {
   const [graph, setGraph] = useState<SbomGraph | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [view, setView] = useState<View>("graph");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -36,18 +38,20 @@ export function DependenciesPanel({ sbomFile }: { sbomFile: string }) {
     return () => {
       active = false;
     };
-  }, [sbomFile]);
+  }, [sbomFile, reloadKey]);
 
   if (state === "loading") {
-    return (
-      <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("deps.loading")}
-      </div>
-    );
+    return <LoadingState>{t("deps.loading")}</LoadingState>;
   }
   if (state === "error" || !graph) {
-    return <p className="py-8 text-sm text-muted-foreground">{t("deps.loadError")}</p>;
+    return (
+      <ErrorState
+        onRetry={() => setReloadKey((k) => k + 1)}
+        retryLabel={t("retry")}
+      >
+        {t("deps.loadError")}
+      </ErrorState>
+    );
   }
 
   return (

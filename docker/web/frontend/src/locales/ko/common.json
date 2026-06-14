@@ -1,6 +1,7 @@
 {
   "appTitle": "BomLens",
   "subtitle": "단일 프로젝트의 SBOM · 고지문 · 보안 보고서를 한 번에",
+  "retry": "다시 시도",
   "form": {
     "title": "스캔 설정",
     "description": "프로젝트 정보를 입력하고 생성할 항목을 선택하세요.",
