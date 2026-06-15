@@ -7,7 +7,7 @@ BomLens Docker 이미지를 직접 빌드하고 배포하려는 기여자를 위
 ## 이미지 정보
 
 - 대표 이름: `ghcr.io/sktelecom/bomlens` (별칭 `sbom-generator`, `sbom-scanner` — 같은 다이제스트)
-- 펌웨어 분석용: `ghcr.io/sktelecom/sbom-scanner-firmware` (opt-in)
+- 펌웨어 분석용: `ghcr.io/sktelecom/bomlens-firmware` (opt-in) (legacy alias: sbom-scanner-firmware)
 - 플랫폼: `linux/amd64`, `linux/arm64`
 - 베이스: `python:3.12-slim`. 언어 toolchain 없는 경량 후처리 이미지이며, 포함 도구와 버전은 `Dockerfile`의 `ARG`로 고정됩니다 (syft, Trivy, cosign, scancode 등).
 

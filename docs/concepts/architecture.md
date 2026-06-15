@@ -177,7 +177,7 @@ The per-language cdxgen image mapping is as follows (`scan-sbom.sh:158-177`; the
 | node | `cdxgen-node20` |
 | php | `cdxgen-debian-php84` |
 | dotnet | `cdxgen-debian-dotnet9` |
-| android | self-built `sbom-scanner-android-sdk<API>` (compileSdk extracted automatically) |
+| android | self-built `bomlens-android-sdk<API>` (compileSdk extracted automatically) |
 | mixed / unknown | cdxgen all-in-one (`CDXGEN_ALLINONE`) |
 
 Two steps run inside the image:
@@ -284,7 +284,7 @@ flowchart TD
 |------|--------|-----------|------|
 | `SOURCE` | No target, `--git <url>`, or `--target *.zip/*.tar.gz` | cdxgen | Language detection selects the per-language image. Git targets are cloned; archives are extracted and treated as source. (The web UI's SOURCE uses `syft dir:` inside the container) |
 | `ANALYZE` | `--analyze <sbom>` (alias `--sbom`) | — | Validates a supplier SBOM (CycloneDX/SPDX), converts it to CDX, and re-aggregates. Produces `_conformance.*` |
-| `FIRMWARE` | `--target <file> --firmware`, or a firmware file extension | unblob + syft + cve-bin-tool | **Opt-in image** `sbom-scanner-firmware`. Details in the [firmware analysis guide](../guides/firmware.md) |
+| `FIRMWARE` | `--target <file> --firmware`, or a firmware file extension | unblob + syft + cve-bin-tool | **Opt-in image** `bomlens-firmware`. Details in the [firmware analysis guide](../guides/firmware.md) |
 | `BINARY` | `--target <file>` | syft | `file:` scheme |
 | `ROOTFS` | `--target <directory>` | syft | `dir:` scheme |
 | `IMAGE` | `--target <image name>` | syft | docker.sock mount |

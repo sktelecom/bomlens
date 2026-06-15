@@ -120,7 +120,7 @@ $SBOM --project team5-fw --version 1.0.0 \
   --all --generate-only
 ```
 
-- Firmware analysis needs the opt-in firmware image, which includes GPL tools (unblob, cve-bin-tool, etc.). Set it via `SBOM_FIRMWARE_IMAGE`, or pull the default (`ghcr.io/sktelecom/sbom-scanner-firmware:latest`).
+- Firmware analysis needs the opt-in firmware image, which includes GPL tools (unblob, cve-bin-tool, etc.). Set it via `SBOM_FIRMWARE_IMAGE`, or pull the default (`ghcr.io/sktelecom/bomlens-firmware:latest`).
 - Recognized extensions (`.bin/.img/.squashfs/.ubi/...`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - For behavior and limits, see the [firmware analysis guide](../guides/firmware.md) (Korean).
 
@@ -154,7 +154,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report (plus the conformance report when relevant). The conformance result (pass/fail) is shown as a card at the top.
 
 > The firmware upload tab is only enabled when the UI runs from an image that includes the firmware tools:
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest $SBOM --ui`
+> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
 
 ## Troubleshooting / limits
 

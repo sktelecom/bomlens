@@ -120,7 +120,7 @@ $SBOM --project team5-fw --version 1.0.0 \
   --all --generate-only
 ```
 
-- 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정하거나, 기본값(`ghcr.io/sktelecom/sbom-scanner-firmware:latest`)을 받습니다.
+- 펌웨어 분석은 GPL 도구(unblob/cve-bin-tool 등)를 포함하는 opt-in 펌웨어 이미지가 필요합니다. 환경변수 `SBOM_FIRMWARE_IMAGE`로 지정하거나, 기본값(`ghcr.io/sktelecom/bomlens-firmware:latest`)을 받습니다.
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 자세한 동작과 한계는 [펌웨어 분석](../guides/firmware.ko.md)을 참고하세요.
 
@@ -154,7 +154,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서(필요하면 적합성 보고서까지)를 화면에서 보거나 내려받을 수 있습니다. 적합성 결과(적합/부적합)는 상단 카드로 표시됩니다.
 
 > 펌웨어 업로드 탭은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다:
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest $SBOM --ui`
+> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
 
 ## 트러블슈팅 / 한계
 

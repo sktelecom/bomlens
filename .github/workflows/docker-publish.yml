@@ -1,8 +1,8 @@
 name: Build and Publish Docker Images
 
 # Two-stage architecture: we build only the images cdxgen does NOT provide —
-#   (1) the lightweight post-process image (sbom-scanner)
-#   (2) Android SDK images per compileSdk (sbom-scanner-android-sdk<API>)
+#   (1) the lightweight post-process image (bomlens; sbom-generator/sbom-scanner aliases)
+#   (2) Android SDK images per compileSdk (bomlens-android-sdk<API>; sbom-scanner-android-sdk<API> alias)
 # All language SBOM generation uses cdxgen's official images (pulled on-demand),
 # so they are NOT built here.
 
@@ -195,7 +195,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk${{ matrix.api }}
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-android-sdk${{ matrix.api }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk${{ matrix.api }}
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
@@ -240,7 +242,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-firmware
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-firmware
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-firmware
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -268,7 +272,10 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           OWNER: ${{ github.repository_owner }}
-        run: cosign sign --yes "${REGISTRY}/${OWNER}/sbom-scanner-firmware@${DIGEST}"
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${REGISTRY}/${OWNER}/bomlens-firmware@${DIGEST}"
+          cosign sign --yes "${REGISTRY}/${OWNER}/sbom-scanner-firmware@${DIGEST}"
 
   summary:
     name: Build summary
@@ -282,7 +289,7 @@ jobs:
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens\` (post-process, featured)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-generator\` (post-process, alias)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` (post-process, legacy alias)" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-android-sdk{30..35}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/sbom-scanner-firmware\` (firmware unpack/ID, GPL tools)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-android-sdk{30..35}\` (legacy alias: sbom-scanner-android-sdk{30..35})" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-firmware\` (firmware unpack/ID, GPL tools; legacy alias: sbom-scanner-firmware)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Language SBOM generation uses cdxgen official images (pulled on-demand by scan-sbom.sh)." >> $GITHUB_STEP_SUMMARY

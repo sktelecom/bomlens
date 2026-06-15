@@ -22,7 +22,7 @@ Firmware is a single file that packs and seals an operating system and dozens of
 Firmware analysis needs a separate image that bundles the unpacking and binary-identification tools (unblob, cve-bin-tool, and so on). These are GPL-family tools, so they are kept out of the lightweight base image and split into an opt-in firmware image.
 
 ```bash
-docker pull ghcr.io/sktelecom/sbom-scanner-firmware:latest
+docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 ```
 
 This image is the default, so adding `--firmware` pulls it without any extra setting. To use a different tag, set the environment variable `SBOM_FIRMWARE_IMAGE`.
@@ -43,7 +43,7 @@ $SBOM --project device-fw --version 1.0.0 \
 - The outputs are the same three as a normal scan: the notice (`_NOTICE`), the SBOM (`_bom.json`), and the risk report (`_risk-report`).
 
 > **Web UI**: the firmware upload tab is enabled only when the UI runs from the firmware image.
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest $SBOM --ui`
+> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
 
 ## License note
 

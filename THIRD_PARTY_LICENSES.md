@@ -7,7 +7,7 @@
 - `sbom-tools`의 셸 스크립트는 번들 도구를 별도 프로세스로 호출(exec)할 뿐 도구 소스를 수정하지 않습니다. 그래서 GPL/AGPL의 copyleft가 `sbom-tools`의 Apache-2.0 코드로 전파되지 않습니다(FSF 기준: 파이프/CLI/exec = 별개 프로그램, 컨테이너 번들 = mere aggregation).
 - 다만 도구 바이너리를 이미지로 재배포하므로, 각 도구의 라이선스 텍스트와 (GPL 도구의) 대응 소스 접근 경로를 제공합니다(아래 표의 Source URL이 그 경로입니다).
 - AGPL 라이선스 도구는 포함하지 않습니다. 따라서 웹 UI(`--ui`)를 써도 AGPL §13 네트워크 조항은 트리거되지 않습니다.
-- GPL 도구는 별도 opt-in 이미지(`sbom-scanner-firmware`)에만 들어가고, 기본 이미지(`sbom-scanner`)는 permissive-only로 유지됩니다.
+- GPL 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어가고, 기본 이미지(`sbom-scanner`)는 permissive-only로 유지됩니다.
 
 ## 기본 이미지 — `ghcr.io/sktelecom/sbom-scanner` (permissive-only)
 
@@ -23,10 +23,10 @@
 
 > 데이터: NVD(취약점 출처)는 public domain이며 "NIST/NVD" 출처 표시가 요구됩니다.
 
-## 펌웨어 이미지 — `ghcr.io/sktelecom/sbom-scanner-firmware` (GPL 포함, opt-in)
+## 펌웨어 이미지 — `ghcr.io/sktelecom/bomlens-firmware` (GPL 포함, opt-in)
 
 > 무거운 언팩·바이너리 분석 도구와 GPL 컴포넌트를 격리하기 위한 별도 opt-in 이미지입니다.
-> 빌드: `docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware ./docker`.
+> 빌드: `docker build --build-arg SBOM_FIRMWARE=true -t bomlens-firmware ./docker`.
 > 설계는 [docs/internal/firmware-analysis.md](docs/internal/firmware-analysis.md) 참조.
 
 아래 버전은 `docker/Dockerfile`의 빌드 ARG 기본값과 일치합니다(공급망 위생을 위한 핀; ARG로 재정의 가능).

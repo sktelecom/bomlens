@@ -8,7 +8,7 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 |--------|------|
 | `ghcr.io/sktelecom/bomlens` | Scanning and post-processing (canonical name) |
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | Aliases of the same image (former names, same digest) |
-| `ghcr.io/sktelecom/sbom-scanner-firmware` | Firmware analysis (includes GPL tools, opt-in) |
+| `ghcr.io/sktelecom/bomlens-firmware` | Firmware analysis (includes GPL tools, opt-in) (legacy alias: sbom-scanner-firmware) |
 
 `latest` and version tags are available, and both `linux/amd64` and `linux/arm64` are supported. Images are signed with cosign before publishing.
 
