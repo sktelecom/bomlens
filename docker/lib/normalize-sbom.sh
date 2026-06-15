@@ -13,6 +13,8 @@ set -e
 SBOM="$1"
 MODE="${2:-}"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[normalize] SBOM file not found: $SBOM" >&2
     exit 1
@@ -43,6 +45,29 @@ SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name //
 # component name/version are retained); valid namespaced swift purls are untouched.
 PURL_FIX='(.metadata.component) |= (if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) | (.components) |= (if type=="array" then map(if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) else . end)'
 
+# Always: normalize component license aliases to SPDX ids. cdxgen records some
+# licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3
+# web UI surfaces (license filter, distribution card, dependency tree) read these
+# raw, so the same license splits into several buckets. normalize() (shared with
+# generate-notice.sh) maps only recognized aliases — a non-alias string and a
+# valid-but-wrong upstream id (e.g. cdxgen mislabeling a package 0BSD) are left
+# as-is rather than guessed. Free text that maps to a single SPDX id is promoted
+# from .license.name / .expression to a proper .license.id; the source url is kept.
+NORMALIZE_DEF="$(cat "$SCRIPT_DIR/spdx-normalize.jq")"
+LICENSE_FIX='(.components) |= (if type=="array" then map(
+  if (.licenses|type)=="array" then
+    .licenses |= map(
+      if (has("expression") and (.expression|type)=="string") then
+        (normalize(.expression)) as $n |
+        (if $n != .expression then {license:{id:$n}} else . end)
+      elif ((.license|type)=="object" and (.license.id == null) and ((.license.name // null) != null)) then
+        .license |= (normalize(.name) as $n |
+          (if $n != .name then ({id:$n} + (if .url then {url:.url} else {} end)) else . end))
+      else . end
+    )
+  else . end
+) else . end)'
+
 if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
@@ -51,8 +76,10 @@ if [ "$MODE" = "--stable" ]; then
     # resolve python deps (cdxgen-venv-XXXXXX) into component evidence values, so
     # the same input yields a different byte stream each run; pin that suffix too.
     jq -S "
+        ${NORMALIZE_DEF}
         ${NULL_FIX}
         | ${PURL_FIX}
+        | ${LICENSE_FIX}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
         | walk(if type==\"string\" then gsub(\"cdxgen-venv-[A-Za-z0-9]+\"; \"cdxgen-venv\") else . end)
@@ -64,7 +91,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S "${NULL_FIX} | ${PURL_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S "${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${LICENSE_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

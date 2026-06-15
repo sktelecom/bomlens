@@ -88,6 +88,26 @@ else
     fail "generate-notice.sh did not produce $NOTICE"
 fi
 
+echo "== V13-2: normalize-sbom.sh maps bom.json license aliases to SPDX ids =="
+cp "$FIX/license-aliases.json" "$WORK/c.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/c.json" >/dev/null 2>&1
+# Free-text alias in .expression is promoted to a proper .license.id.
+mccabe_id=$(jq -r '.components[] | select(.name=="mccabe") | .licenses[0].license.id // "ABSENT"' "$WORK/c.json")
+[ "$mccabe_id" = "MIT" ] && pass "Expat expression promoted to license id MIT" || fail "mccabe license id='$mccabe_id', expected MIT"
+# Free-text alias in .license.name is promoted as well.
+cov_id=$(jq -r '.components[] | select(.name=="coverage") | .licenses[0].license.id // "ABSENT"' "$WORK/c.json")
+[ "$cov_id" = "Apache-2.0" ] && pass "free-text license name promoted to id Apache-2.0" || fail "coverage license id='$cov_id', expected Apache-2.0"
+# A valid-but-wrong upstream id (cdxgen 0BSD mislabel) is preserved, not guessed.
+flask_id=$(jq -r '.components[] | select(.name=="flask") | .licenses[0].license.id // "ABSENT"' "$WORK/c.json")
+flask_url=$(jq -r '.components[] | select(.name=="flask") | .licenses[0].license.url // "ABSENT"' "$WORK/c.json")
+[ "$flask_id" = "0BSD" ] && pass "valid-but-wrong upstream id (0BSD) preserved, not rewritten" || fail "flask license id='$flask_id', expected 0BSD"
+[ "$flask_url" = "https://opensource.org/licenses/0BSD" ] && pass "license url preserved" || fail "flask license url='$flask_url'"
+# A non-mappable free-text string and a genuine compound expression are untouched.
+date_expr=$(jq -r '.components[] | select(.name=="python-dateutil") | .licenses[0].expression // "ABSENT"' "$WORK/c.json")
+[ "$date_expr" = "Dual License" ] && pass "unmappable free text (Dual License) left untouched" || fail "dateutil expression='$date_expr', expected Dual License"
+pkg_expr=$(jq -r '.components[] | select(.name=="packaging") | .licenses[0].expression // "ABSENT"' "$WORK/c.json")
+[ "$pkg_expr" = "Apache-2.0 OR BSD-2-Clause" ] && pass "compound expression left untouched" || fail "packaging expression='$pkg_expr'"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

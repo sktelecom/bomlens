@@ -37,12 +37,18 @@ export function ProgressLog({ logs, status }: Props) {
       <CardContent className="space-y-3">
         <Progress
           value={value}
+          aria-label={t("progress.title")}
           indicatorClassName={cn(
             status === "error" && "bg-destructive",
             status === "done" && "bg-emerald-500",
           )}
         />
-        <div className="h-72 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
+        <div
+          role="log"
+          aria-label={t("progress.title")}
+          tabIndex={0}
+          className="h-72 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           {logs.length === 0 ? (
             <p className="text-muted-foreground">{t("progress.waiting")}</p>
           ) : (
