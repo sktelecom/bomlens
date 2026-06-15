@@ -125,6 +125,17 @@ exclude_docs: |
   internal/
   korean-style-guide.md
 
+# Validate internal links and heading anchors against the rendered site. Anchors
+# are checked with this config's own pymdownx slugify, so the result matches what
+# the site actually serves (a generic GitHub-style checker disagrees on slugs that
+# contain a removed symbol such as an em-dash). With `mkdocs build --strict` in CI,
+# a link to a missing page or a stale heading anchor fails the build.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 nav:
   - Home: index.md
   - Get started:

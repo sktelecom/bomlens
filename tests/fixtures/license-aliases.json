@@ -25,6 +25,14 @@
     {
       "type": "library", "name": "six", "version": "1.16.0",
       "licenses": [ { "license": { "id": "MIT" } } ]
+    },
+    {
+      "type": "library", "name": "flask", "version": "3.0.0",
+      "licenses": [ { "license": { "id": "0BSD", "url": "https://opensource.org/licenses/0BSD" } } ]
+    },
+    {
+      "type": "library", "name": "python-dateutil", "version": "2.9.0",
+      "licenses": [ { "expression": "Dual License" } ]
     }
   ]
 }
