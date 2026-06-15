@@ -62,7 +62,7 @@ The Source tree tab appears only when you scan with the deep license option (`--
 
 > Choosing SBOM upload (ANALYZE) automatically enables notice and security for the risk analysis.
 > The firmware upload tab is enabled only when the UI runs from an image that includes the firmware tools:
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/sbom-scanner-firmware:latest ./scripts/scan-sbom.sh --ui`
+> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui`
 >
 > **Note:** the UI's source scan (current folder/ZIP/GitHub) analyzes the directory with syft inside the container. Components are captured only when there is a lock file (`package-lock.json`, `go.sum`, and so on) or installed dependencies. If you only have a manifest and need deeper resolution, use the CLI source mode (cdxgen).
 

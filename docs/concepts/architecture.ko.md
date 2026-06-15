@@ -177,7 +177,7 @@ sequenceDiagram
 | node | `cdxgen-node20` |
 | php | `cdxgen-debian-php84` |
 | dotnet | `cdxgen-debian-dotnet9` |
-| android | 자체 빌드 `sbom-scanner-android-sdk<API>` (compileSdk 자동 추출) |
+| android | 자체 빌드 `bomlens-android-sdk<API>` (compileSdk 자동 추출) |
 | mixed / unknown | cdxgen all-in-one (`CDXGEN_ALLINONE`) |
 
 이미지 안에서의 두 단계:
@@ -284,7 +284,7 @@ flowchart TD
 |------|--------|-----------|------|
 | `SOURCE` | target 미지정 · `--git <url>` · `--target *.zip/*.tar.gz` | cdxgen | 언어 감지 → 언어별 이미지. git는 clone, 아카이브는 자동 해제 후 소스로 처리. (웹 UI의 SOURCE는 컨테이너 내 `syft dir:`) |
 | `ANALYZE` | `--analyze <sbom>` (별칭 `--sbom`) | — | 공급사 SBOM(CycloneDX/SPDX) 검증 → CDX 변환 → 재집계. `_conformance.*` 생성 |
-| `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `sbom-scanner-firmware`. 상세 [펌웨어 분석 가이드](../guides/firmware.ko.md) |
+| `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `bomlens-firmware`. 상세 [펌웨어 분석 가이드](../guides/firmware.ko.md) |
 | `BINARY` | `--target <파일>` | syft | `file:` 스킴 |
 | `ROOTFS` | `--target <디렉터리>` | syft | `dir:` 스킴 |
 | `IMAGE` | `--target <이미지명>` | syft | docker.sock 마운트 |

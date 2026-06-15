@@ -14,7 +14,7 @@ set -e
 # SBOM Scan Orchestrator (2-stage architecture)
 #
 #   Stage 1 (SBOM): source -> cdxgen language image (+ build-prep) OR
-#                   Android -> self-built sbom-scanner-android-sdk<API> OR
+#                   Android -> self-built bomlens-android-sdk<API> OR
 #                   mixed   -> cdxgen all-in-one
 #   Stage 2 (post): post-process image -> normalize/notice/security/sign
 #   image/binary/rootfs: post-process image (syft) does both stages in one.
@@ -24,8 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
 
-POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
-FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/sbom-scanner-firmware:latest}"  # opt-in (unblob/cve-bin-tool)
+POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
+FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/bomlens-firmware:latest}"     # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
 # Language detection + cdxgen image selection are shared with the web UI source
 # path (docker/entrypoint.sh) so both resolve transitive deps identically.
 # shellcheck source=docker/lib/source-detect.sh

@@ -8,7 +8,7 @@
 |--------|------|
 | `ghcr.io/sktelecom/bomlens` | 스캔과 후처리 (대표 이름) |
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | 같은 이미지의 별칭 (이전 이름, 같은 다이제스트) |
-| `ghcr.io/sktelecom/sbom-scanner-firmware` | 펌웨어 분석용 (GPL 도구 포함, opt-in) |
+| `ghcr.io/sktelecom/bomlens-firmware` | 펌웨어 분석용 (GPL 도구 포함, opt-in) (legacy alias: sbom-scanner-firmware) |
 
 `latest`와 버전 태그를 제공하며, `linux/amd64`와 `linux/arm64`를 지원합니다. 이미지는 cosign으로 서명되어 발행됩니다.
 

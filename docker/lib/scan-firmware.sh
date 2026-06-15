@@ -13,7 +13,7 @@
 #   ③ binaries : cve-bin-tool --sbom-output   -> stripped static binaries (Phase 2)
 #   ④ merge    : jq, dedupe by purl (fallback name@version)
 #
-# Tools live ONLY in the opt-in `sbom-scanner-firmware` image. Everything here is
+# Tools live ONLY in the opt-in `bomlens-firmware` image. Everything here is
 # best-effort: a missing/failed stage degrades gracefully rather than aborting,
 # so the common post-processing pipeline always receives a valid SBOM.
 set -e
@@ -33,7 +33,7 @@ fi
 
 if ! command -v syft >/dev/null 2>&1; then
     echo "[firmware] ERROR: syft not installed in this image." >&2
-    echo "[firmware]   Rebuild the firmware image: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware ./docker" >&2
+    echo "[firmware]   Rebuild the firmware image: docker build --build-arg SBOM_FIRMWARE=true -t bomlens-firmware ./docker" >&2
     exit 1
 fi
 
