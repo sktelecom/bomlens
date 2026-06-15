@@ -14,7 +14,11 @@
 
 CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen language image tag
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
-ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/bomlens-android-sdk}"  # legacy alias: sbom-scanner-android-sdk
+# Default to the sbom-scanner-android-sdk name: Android images publish only on
+# release (not main pushes), so the featured bomlens-android-sdk images do not
+# exist until the next release. The two names share the same digest; flip this
+# default to bomlens-android-sdk once those images are published.
+ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/sbom-scanner-android-sdk}"
 ANDROID_API_DEFAULT="${ANDROID_API_DEFAULT:-34}"
 # cdxgen does not resolve dependency licenses by default, leaving the SBOM (and
 # the NOTICE derived from it) without license data. FETCH_LICENSE=true makes
