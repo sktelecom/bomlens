@@ -13,7 +13,7 @@ A local-first SBOM generator and open-source risk assessor for a single project 
 
 Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough (Korean) is in the no-CLI quick start.
 
-![The scan results screen — view and download the SBOM, notice, and risk report as grouped cards](images/web-ui-en.png){ .home-shot }
+![BomLens web UI reviewing a scan result: KPI cards and severity/license summary, filtering the components table, expanding a vulnerability row to its CVSS score, description and references, viewing dependencies as a graph and tree, and browsing the source tree](images/web-ui-demo.gif){ .home-shot }
 
 ## Where to go next
 
