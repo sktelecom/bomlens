@@ -8,15 +8,16 @@ description: How a supplier builds an SBOM for a delivered server — scan the O
 
 A delivered server is not a single source tree. It is an operating system, the application installed on top of it, and libraries that were linked into the binaries during the build. A scan of any one of these misses the others, which is the usual reason a server SBOM is rejected.
 
-This guide treats a server as three layers and scans each one with BomLens. Submit the three SBOMs separately — that is the default, and it keeps each layer reviewable on its own. Merge them into one product SBOM only when a submission system asks for a single file (see [Optional: merge into one SBOM](#optional-merge-into-one-sbom)).
+This guide treats a server as two layers — the OS and the application — and scans each with BomLens. Submit the layer SBOMs separately — that is the default, and it keeps each reviewable on its own. Merge them into one product SBOM only when a submission system asks for a single file (see [Optional: merge into one SBOM](#optional-merge-into-one-sbom)).
 
 | Layer | What it covers | Symptom if omitted |
 |-------|----------------|--------------------|
 | OS | The OS and its installed packages (e.g. CentOS plus everything in the rpm database) | OS vulnerabilities missing |
 | Application | The delivered application and its package-manager dependencies, direct and transitive | Application dependencies missing |
-| Static-link | Libraries statically linked or built by hand (e.g. a statically linked openssl, liblfds) | The most common rejection cause |
 
-One tool, BomLens, produces all three. Only the input changes per layer. The requirement is that all three layers are generated with a tool — not that they end up in one file.
+Beyond the two layers, statically linked libraries (for example an openssl or liblfds built into the binary) are a blind spot. A package manager does not declare them and the OS package database does not list them, so neither layer's scan finds them. They have to be detected and recorded separately, and missing them is the most common rejection cause — see [Static-link libraries](#static-link-libraries-a-blind-spot-of-both-layers) below.
+
+One tool, BomLens, produces both layers; only the input changes. The requirement is that the OS, the application, and the static-link libraries are all accounted for — not that they end up in one file.
 
 ## Common setup
 
@@ -59,9 +60,9 @@ $SBOM --project mms-relay-app --version 2.0.0 --all --generate-only
 
 Build first. Scanning before the build or install leaves transitive dependencies unresolved. For a pure CMake/Make application with no manifest, the component list is sparse; add `--deep-license` to record the first-party source licenses.
 
-## Layer 3 — Static-link dependencies
+## Static-link libraries (a blind spot of both layers)
 
-Source scanners do not see libraries that were statically linked into a binary, which is exactly where this layer matters. There is no fully automatic path, so combine two approaches.
+Source scanners do not see libraries that were statically linked into a binary, and neither does the OS package database — this is the blind spot the two layers leave. There is no fully automatic path, so combine two approaches.
 
 Analyze the delivered binary or firmware image to catch what tooling can find:
 
@@ -75,7 +76,7 @@ For what the scan still misses, record the source and version by hand from the b
 
 ## Verify each layer before submitting
 
-Submit the three SBOMs as they are. Check each one — not a combined file — so a gap is caught in the layer it belongs to. Confirm it is well formed and that its components carry real purls.
+Submit the per-layer SBOMs (and the static-link SBOM) as they are. Check each one — not a combined file — so a gap is caught where it belongs. Confirm it is well formed and that its components carry real purls.
 
 ```bash
 for bom in mms-relay-os_6.10_bom.json mms-relay-app_2.0.0_bom.json mms-relay-bin_2.0.0_bom.json; do
