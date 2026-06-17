@@ -87,7 +87,7 @@ done
 
 The two counts should be close for each layer. A large gap means many components lack a purl, which usually points to a raw-directory scan or a hand-written entry. Then validate the schema with the [CycloneDX validator](https://github.com/CycloneDX/cyclonedx-cli).
 
-Keeping the layers separate is the default for a reason: a reviewer sees at a glance which layer is missing or where a vulnerability sits, and each SBOM keeps its own dependency graph (`dependencies`).
+Keeping the layers separate is the default for a reason: a reviewer sees at a glance which layer is missing or where a vulnerability sits, and each layer's dependency graph stays cleanly scoped to that layer.
 
 ## Optional: merge into one SBOM
 
@@ -103,7 +103,7 @@ $SBOM --project mms-relay-server --version 1.0.0 \
 
 This writes `mms-relay-server_1.0.0_bom.json` with `metadata.component` set to the server product, plus the notice and risk report over the merged set. Each component keeps a `bomlens:layer` property, so you can still filter by layer (`jq '.components[] | select(.properties[]?.value == "centos")'`).
 
-One trade-off: the merge drops the per-layer `dependencies` trees (their `bom-ref` namespaces collide). If the transitive-dependency graph matters for review, submit the layers separately instead.
+The merge preserves each layer's `dependencies` graph (edges unioned by ref), so the merged BOM keeps its transitive-dependency information and passes the SKT conformance check. Cross-ecosystem `bom-ref` collisions are rare; identical refs have their dependsOn lists unioned.
 
 ## What gets a server SBOM rejected
 

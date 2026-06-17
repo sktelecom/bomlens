@@ -87,7 +87,7 @@ done
 
 각 층에서 두 값은 비슷해야 합니다. 차이가 크면 purl 없는 컴포넌트가 많다는 뜻이고, 보통 원시 디렉터리 스캔이나 수기 작성이 원인입니다. 그다음 [CycloneDX validator](https://github.com/CycloneDX/cyclonedx-cli)로 스키마 유효성을 확인합니다.
 
-층을 분리해 두는 것이 기본인 이유가 있습니다. 검토자가 어느 층이 빠졌는지, 취약점이 어디 있는지 한눈에 보고, 각 SBOM이 자체 의존성 그래프(`dependencies`)를 그대로 유지하기 때문입니다.
+층을 분리해 두는 것이 기본인 이유가 있습니다. 검토자가 어느 층이 빠졌는지, 취약점이 어디 있는지 한눈에 보고, 각 층의 의존성 그래프가 그 층 범위로 깔끔하게 유지되기 때문입니다.
 
 ## 선택: 단일 SBOM으로 병합
 
@@ -103,7 +103,7 @@ $SBOM --project mms-relay-server --version 1.0.0 \
 
 이 명령은 `mms-relay-server_1.0.0_bom.json`을 만들고, `metadata.component`를 서버 제품으로 설정하며, 병합된 컴포넌트 집합 위에 고지문과 위험분석보고서를 생성합니다. 각 컴포넌트에는 `bomlens:layer` 속성이 남으므로 층별로 걸러 볼 수 있습니다(`jq '.components[] | select(.properties[]?.value == "centos")'`).
 
-한 가지 절충이 있습니다. 병합은 층별 `dependencies` 트리를 버립니다(`bom-ref` 네임스페이스가 충돌하기 때문). 전이 의존성 그래프가 검토에 중요하면 층을 분리해 제출하세요.
+병합본은 각 층의 `dependencies` 그래프를 보존합니다(ref 기준으로 엣지를 합침). 따라서 전이 의존성 정보가 그대로 남아 SKT 적합성 검증의 전이 의존성 항목을 통과합니다. 생태계가 달라 `bom-ref` 충돌은 드물고, 같은 ref는 dependsOn 목록을 합칩니다.
 
 ## 서버 SBOM이 반려되는 경우
 
