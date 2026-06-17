@@ -14,9 +14,10 @@
 # root component name/version with the caller's --project/--version and drop the
 # now-stale purl (optional in CycloneDX) since it encoded the old coordinates.
 #
-# Only meaningful for cdxgen-backed modes (SOURCE/POSTPROCESS); IMAGE/BINARY/
-# ROOTFS/FIRMWARE/ANALYZE carry their own meaningful root component and should
-# not call this.
+# Called for cdxgen-backed modes (SOURCE/POSTPROCESS) and for ROOTFS, where syft
+# names the root component after the scan path (/target) — meaningless and leaking
+# the mount path, the same problem described above. IMAGE/BINARY/FIRMWARE/ANALYZE
+# carry their own meaningful root component and should not call this.
 set -e
 
 SBOM="$1"

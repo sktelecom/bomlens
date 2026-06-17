@@ -22,11 +22,12 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 |--------|---------|-------------|
 | `--project <name>` | — | **(required)** Project name |
 | `--version <version>` | — | **(required)** Project version |
-| `--target <target>` | current directory | What to analyze (directory, Docker image, binary file, or a `.zip`/`.tar.gz` archive) |
+| `--target <target>` | current directory | What to analyze: a directory (source tree, or an OS rootfs / staging build output), a Docker image, a binary file, or a `.zip`/`.tar.gz` archive |
 | `--git <url>` | — | Shallow-clone a git/GitHub URL and analyze it as source (private repos: `GIT_TOKEN` env var) |
 | `--branch <ref>` | default branch | Branch, tag, or commit of the `--git` target |
 | `--firmware` | false | Force firmware mode on the `--target` file (opt-in firmware image) |
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
+| `--merge <a.json> <b.json> …` | — | Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with `--project`/`--version`. Optional — for server delivery when a submission system needs a single product BOM; otherwise submit the layers separately (see the [server delivery guide](../guides/server-delivery.md)). Mutually exclusive with `--target`/`--analyze`/`--git` |
 | `--generate-only` | false | Save locally only, without uploading |
 | `--upload-target <target>` | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest) |
 | `--trusca <project_id>` | — | Upload to TRUSCA (= `--upload-target trusca` + project id). Needs `API_URL` and a Bearer `API_KEY` |

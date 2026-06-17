@@ -46,6 +46,7 @@ SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-808
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
+MERGE_FILES=()
 
 # ========================================================
 # Parse arguments
@@ -56,6 +57,15 @@ while [[ "$#" -gt 0 ]]; do
         --version) PROJECT_VERSION="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
         --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
+        --merge)
+            # Variadic: absorb every following token until the next option (a
+            # token starting with '-'). These are already-generated SBOMs to
+            # combine, not scan targets, so they get their own flag.
+            shift
+            while [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; do
+                MERGE_FILES+=("$1"); shift
+            done
+            continue ;;   # we already consumed our args; skip the trailing shift
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
         --no-report) NO_REPORT="true" ;;
@@ -86,6 +96,11 @@ Options:
   --firmware             Force firmware mode for --target file (opt-in image)
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
+  --merge <a.json> <b.json> [...]
+                         Merge 2+ CycloneDX SBOMs into one, dedupe by purl, and
+                         stamp the root component with --project/--version. For
+                         layered server delivery (OS rootfs + app + static-link).
+                         Mutually exclusive with --target/--analyze/--git.
   --generate-only        Save locally without uploading
   --trusca <project_id>  Upload the SBOM to TRUSCA's native ingest endpoint
                          (shorthand for --upload-target trusca with the id).
@@ -221,6 +236,21 @@ is_git_url() {
     [[ "$1" =~ ^(https?://|git@|ssh://git@|file://)[A-Za-z0-9._~:@/+-]+$ ]]
 }
 
+# A CycloneDX SBOM we accept as a --merge input. Anti-injection: reject '-'
+# prefixes and '..' traversal. When the host has jq, also verify it is CycloneDX;
+# without jq, existence is enough (the container re-validates during the merge).
+is_sbom_file() {
+    case "$1" in
+        -*|*..*) return 1 ;;
+    esac
+    [ -f "$1" ] || return 1
+    if command -v jq >/dev/null 2>&1; then
+        jq -e '.bomFormat == "CycloneDX"' "$1" >/dev/null 2>&1
+    else
+        return 0
+    fi
+}
+
 # A source archive we auto-extract and scan as SOURCE.
 is_archive() {
     case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
@@ -321,7 +351,18 @@ elif [ -n "$TARGET" ] && [ -f "$TARGET" ] && is_archive "$TARGET"; then
 fi
 
 MODE="SOURCE"
-if [ "$INGEST_SOURCE" = "true" ]; then
+if [ "${#MERGE_FILES[@]}" -gt 0 ]; then
+    # Merge several already-generated SBOMs. Exclusive with every scan input.
+    [ -z "$TARGET" ]      || { echo "[ERROR] --merge is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --merge is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$GIT_URL" ]     || { echo "[ERROR] --merge is mutually exclusive with --git."; exit 1; }
+    [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --merge cannot be combined with --firmware."; exit 1; }
+    [ "${#MERGE_FILES[@]}" -ge 2 ] || { echo "[ERROR] --merge needs at least 2 SBOM files."; exit 1; }
+    for mf in "${MERGE_FILES[@]}"; do
+        is_sbom_file "$mf" || { echo "[ERROR] not a CycloneDX SBOM (or unsafe path): $mf"; exit 1; }
+    done
+    MODE="MERGE"
+elif [ "$INGEST_SOURCE" = "true" ]; then
     # A git clone / extracted archive is always scanned as SOURCE (the temp dir
     # would otherwise be detected as ROOTFS below).
     MODE="SOURCE"
@@ -416,8 +457,9 @@ if [ "$MODE" = "SOURCE" ]; then
         -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
-    # image / binary / rootfs / firmware: scanner image runs syft + pipeline in one shot.
-    # Firmware needs the heavier opt-in image (unblob/cve-bin-tool); others use the base image.
+    # image / binary / rootfs / firmware / analyze / merge: scanner image runs the
+    # syft (or merge/convert) step + common pipeline in one shot. Firmware needs
+    # the heavier opt-in image (unblob/cve-bin-tool); others use the base image.
     VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
         IMAGE)  VOL="-v \"$SOURCE_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
@@ -425,6 +467,18 @@ else
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
         ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$SOURCE_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
+        MERGE)
+            # Mount each input's directory read-only under its own index so files
+            # that share a basename (three layers all named *_bom.json) don't
+            # collide. MERGE_FILES carries the container-side paths.
+            VOL="-v \"$SOURCE_DIR\":/host-output"; MF_CONTAINER=""; i=0
+            for mf in "${MERGE_FILES[@]}"; do
+                FD="$(cd "$(dirname "$mf")" && pwd)"; FN="$(basename "$mf")"
+                VOL="$VOL -v \"$FD\":/merge-in-$i:ro"
+                MF_CONTAINER="$MF_CONTAINER /merge-in-$i/$FN"
+                i=$((i + 1))
+            done
+            ENVV="-e MERGE_FILES=\"${MF_CONTAINER# }\"" ;;
     esac
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \

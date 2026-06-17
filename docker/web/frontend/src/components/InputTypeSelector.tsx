@@ -13,6 +13,7 @@ interface Props {
 
 const LABEL_KEY: Record<SourceType, string> = {
   "current-dir": "source.currentDir",
+  "rootfs-dir": "source.rootfsDir",
   "git-url": "source.gitUrl",
   "zip-upload": "source.zipUpload",
   "sbom-upload": "source.sbomUpload",

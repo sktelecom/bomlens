@@ -42,6 +42,27 @@ const ACCEPT: Record<UploadKind, string> = {
   firmware: ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf",
 };
 
+// Free-text inputs: the single `target` field, with per-source i18n keys.
+const TEXT_INPUT: Partial<
+  Record<SourceType, { label: string; placeholder: string; hint: string }>
+> = {
+  "git-url": {
+    label: "source.gitUrl",
+    placeholder: "source.gitPlaceholder",
+    hint: "source.gitHint",
+  },
+  "docker-image": {
+    label: "source.dockerImage",
+    placeholder: "source.dockerPlaceholder",
+    hint: "source.dockerHint",
+  },
+  "rootfs-dir": {
+    label: "source.rootfsDir",
+    placeholder: "source.rootfsPlaceholder",
+    hint: "source.rootfsHint",
+  },
+};
+
 export function ScanForm({ running, capabilities, onRun }: Props) {
   const { t } = useTranslation();
   const [project, setProject] = useState("");
@@ -58,7 +79,8 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
   const [uploading, setUploading] = useState(false);
 
   const uploadKind = UPLOAD_KIND[source];
-  const isText = source === "git-url" || source === "docker-image";
+  const textInput = TEXT_INPUT[source];
+  const isText = textInput !== undefined;
   const isAnalyze = source === "sbom-upload";
   const busy = running || uploading;
 
@@ -193,25 +215,17 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
           </div>
         )}
 
-        {isText && (
+        {textInput && (
           <div className="space-y-2">
-            <Label htmlFor="target">
-              {source === "git-url" ? t("source.gitUrl") : t("source.dockerImage")}
-            </Label>
+            <Label htmlFor="target">{t(textInput.label)}</Label>
             <Input
               id="target"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              placeholder={
-                source === "git-url"
-                  ? t("source.gitPlaceholder")
-                  : t("source.dockerPlaceholder")
-              }
+              placeholder={t(textInput.placeholder)}
               disabled={busy}
             />
-            <p className="text-xs text-muted-foreground">
-              {source === "git-url" ? t("source.gitHint") : t("source.dockerHint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t(textInput.hint)}</p>
           </div>
         )}
 

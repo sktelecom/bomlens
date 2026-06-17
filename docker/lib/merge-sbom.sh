@@ -1,0 +1,106 @@
+#!/bin/bash
+# Copyright 2026 SK Telecom Co., Ltd.
+# Licensed under the Apache License, Version 2.0.
+#
+# merge-sbom.sh — merge several CycloneDX SBOMs into one.
+#
+# Usage: merge-sbom.sh <output.json> <project_name> <project_version> <in1> <in2> [...]
+#   produces <output.json> (CycloneDX 1.6) whose root component is the project,
+#   with every input's components flattened and deduped by purl.
+#
+# Built for layered server SBOMs: an OS rootfs layer, an application layer, and a
+# static-link layer are each scanned separately, then merged here so the
+# downstream pipeline (notice/security/risk-report) sees one component set.
+#
+# Each component keeps a `bomlens:layer` property naming the source layer (the
+# input's root component name, or layer-<index>), so provenance survives the
+# merge. Dedup keeps the first occurrence, so the first layer listed wins.
+#
+# `dependencies` trees are NOT merged: bom-ref namespaces collide across inputs
+# and the downstream pipeline only walks `.components[]`, so a merged tree would
+# add risk without value.
+set -e
+
+OUTPUT="$1"
+NAME="$2"
+VERSION="$3"
+shift 3 2>/dev/null || true
+
+if [ -z "$OUTPUT" ] || [ -z "$NAME" ] || [ -z "$VERSION" ]; then
+    echo "[merge] usage: merge-sbom.sh <output.json> <name> <version> <in1> <in2> [...]" >&2
+    exit 1
+fi
+if [ "$#" -lt 2 ]; then
+    echo "[merge] need at least 2 input SBOMs to merge (got $#)." >&2
+    exit 1
+fi
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[merge] ERROR: jq not installed in this image." >&2
+    exit 1
+fi
+
+GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+# Collect each input's components into a temp file, tagging each with its source
+# layer. Drop components without a real name (syft's empty "os:unknown" noise). A
+# malformed input is skipped with a warning rather than aborting the whole merge.
+# Components are passed between jq steps via FILES, not argv — a real server SBOM
+# has hundreds/thousands of components and `--argjson <big-json>` overflows
+# ARG_MAX ("Argument list too long").
+i=0
+valid=0
+for f in "$@"; do
+    if [ ! -s "$f" ] || ! jq empty "$f" >/dev/null 2>&1; then
+        echo "[merge] WARN: skipping missing or invalid SBOM: $f" >&2
+        i=$((i + 1))
+        continue
+    fi
+    LAYER=$(jq -r '.metadata.component.name // empty' "$f" 2>/dev/null)
+    [ -n "$LAYER" ] || LAYER="layer-$i"
+    jq -c --arg L "$LAYER" '
+        [ .components[]?
+          | select((.name // "") != "")
+          | .properties = ((.properties // []) + [{name: "bomlens:layer", value: $L}]) ]' \
+        "$f" > "$WORK/comps-$i.json"
+    valid=$((valid + 1))
+    i=$((i + 1))
+done
+
+if [ "$valid" -eq 0 ]; then
+    echo "[merge] ERROR: no valid CycloneDX inputs to merge." >&2
+    exit 1
+fi
+
+# Merge all per-layer component files, dedupe by purl (fallback name@version).
+# `jq -s` slurps each file as one array element; `add` concatenates them.
+jq -s '
+    add
+    | group_by(.purl // ((.name // "") + "@" + (.version // "")))
+    | map(.[0])
+    | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
+' "$WORK"/comps-*.json > "$WORK/merged.json"
+
+NTOTAL=$(jq 'length' "$WORK/merged.json")
+
+# --slurpfile reads the merged components from a file (again, ARG_MAX safe).
+jq -n \
+    --slurpfile comps "$WORK/merged.json" \
+    --arg name "$NAME" \
+    --arg version "$VERSION" \
+    --arg ts "$GEN_AT" '
+{
+  bomFormat: "CycloneDX",
+  specVersion: "1.6",
+  version: 1,
+  metadata: {
+    timestamp: $ts,
+    tools: { components: [ { type: "application", name: "bomlens-merge" } ] },
+    component: { type: "application", name: $name, version: $version }
+  },
+  components: $comps[0]
+}' > "$OUTPUT"
+
+echo "[merge] SBOM written: $OUTPUT (components=${NTOTAL} from ${valid} layer(s))"
