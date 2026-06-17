@@ -16,9 +16,10 @@
 # input's root component name, or layer-<index>), so provenance survives the
 # merge. Dedup keeps the first occurrence, so the first layer listed wins.
 #
-# `dependencies` trees are NOT merged: bom-ref namespaces collide across inputs
-# and the downstream pipeline only walks `.components[]`, so a merged tree would
-# add risk without value.
+# The per-layer `dependencies` graphs are merged too (edges unioned by ref), so
+# the merged BOM keeps transitive-dependency information — required by the SKT
+# conformance check. bom-refs rarely collide across ecosystems; identical refs
+# have their dependsOn lists unioned.
 set -e
 
 OUTPUT="$1"
@@ -65,6 +66,9 @@ for f in "$@"; do
           | select((.name // "") != "")
           | .properties = ((.properties // []) + [{name: "bomlens:layer", value: $L}]) ]' \
         "$f" > "$WORK/comps-$i.json"
+    # Keep each layer's dependency graph so the merged BOM retains transitive
+    # edges (a mandatory SKT conformance check; dropping them fails it).
+    jq -c '[ .dependencies[]? ]' "$f" > "$WORK/deps-$i.json"
     valid=$((valid + 1))
     i=$((i + 1))
 done
@@ -85,9 +89,23 @@ jq -s '
 
 NTOTAL=$(jq 'length' "$WORK/merged.json")
 
-# --slurpfile reads the merged components from a file (again, ARG_MAX safe).
+# Merge the per-layer dependency graphs. Edges are preserved so the merged BOM
+# keeps transitive-dependency information. bom-refs rarely collide across
+# ecosystems (pkg:rpm vs pkg:npm …); when the same ref appears in more than one
+# layer, its dependsOn lists are unioned. Entries with no edges are dropped.
+jq -s '
+    add
+    | group_by(.ref)
+    | map({ ref: .[0].ref, dependsOn: ([ .[].dependsOn[]? ] | unique) })
+    | map(select((.ref != null) and ((.dependsOn | length) > 0)))
+' "$WORK"/deps-*.json > "$WORK/deps.json"
+
+NEDGES=$(jq '[.[].dependsOn[]?] | length' "$WORK/deps.json")
+
+# --slurpfile reads the merged components/dependencies from files (ARG_MAX safe).
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
+    --slurpfile deps "$WORK/deps.json" \
     --arg name "$NAME" \
     --arg version "$VERSION" \
     --arg ts "$GEN_AT" '
@@ -100,7 +118,8 @@ jq -n \
     tools: { components: [ { type: "application", name: "bomlens-merge" } ] },
     component: { type: "application", name: $name, version: $version }
   },
-  components: $comps[0]
+  components: $comps[0],
+  dependencies: $deps[0]
 }' > "$OUTPUT"
 
-echo "[merge] SBOM written: $OUTPUT (components=${NTOTAL} from ${valid} layer(s))"
+echo "[merge] SBOM written: $OUTPUT (components=${NTOTAL}, dependency edges=${NEDGES}, from ${valid} layer(s))"
