@@ -81,6 +81,7 @@ export interface DoneEvent {
 /** Input types the UI offers; each maps to a backend MODE in server.py. */
 export type SourceType =
   | "current-dir"
+  | "rootfs-dir"
   | "git-url"
   | "zip-upload"
   | "sbom-upload"
@@ -89,6 +90,7 @@ export type SourceType =
 
 export const SOURCE_TYPES: SourceType[] = [
   "current-dir",
+  "rootfs-dir",
   "git-url",
   "zip-upload",
   "sbom-upload",

@@ -14,6 +14,7 @@
 #
 # Input types (the `source` query param on /scan-stream):
 #   current-dir   -> MODE=SOURCE  (syft dir scan of /src)
+#   rootfs-dir    -> MODE=ROOTFS  (syft dir scan of <target>, a subfolder of /src)
 #   git-url       -> clone <target> then MODE=SOURCE
 #   zip-upload    -> extract uploaded zip then MODE=SOURCE
 #   sbom-upload   -> MODE=ANALYZE on the uploaded SBOM
@@ -94,6 +95,30 @@ def safe_output_path(name):
     if not path.startswith(os.path.realpath(OUTPUT_DIR) + os.sep):
         return None
     return path
+
+
+# Directories the UI is allowed to scan as a ROOTFS target. Only /src is mounted
+# into the UI container today; a future `--ui --mount <host-path>` would append
+# its container path here, and the boundary check below extends to it for free.
+ALLOWED_SCAN_ROOTS = [SRC_DIR]
+
+
+def safe_scan_dir(rel):
+    """Resolve a user-supplied directory path strictly inside an allowed scan
+    root (block path traversal and symlink escape). Returns the real path on
+    success, or None. Used by the rootfs-dir input — a relative path under /src.
+    """
+    if not rel or any(c in rel for c in ("\x00", "\n", "\r")):
+        return None
+    # Treat input as relative to /src: stripping any leading '/' folds an
+    # absolute path like /etc back under /src, so it can't escape the boundary.
+    rel = rel.lstrip("/")
+    real = os.path.realpath(os.path.join(SRC_DIR, rel))
+    for root in ALLOWED_SCAN_ROOTS:
+        r = os.path.realpath(root)
+        if (real == r or real.startswith(r + os.sep)) and os.path.isdir(real):
+            return real
+    return None
 
 
 def firmware_capable():
@@ -628,6 +653,18 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
                 env["SOURCE_ROOT"] = SRC_DIR
+
+            elif source == "rootfs-dir":
+                # Scan an OS rootfs (or any subfolder) under /src as a directory.
+                # The path is validated to stay inside the mounted folder so it
+                # can't reach /host-output uploads or container system paths.
+                scan_dir = safe_scan_dir(target)
+                if not scan_dir:
+                    fail("Invalid or out-of-bounds directory path "
+                         "(must be a folder inside the current folder)"); return
+                mode = "ROOTFS"
+                env["MODE"] = "ROOTFS"
+                env["TARGET_DIR"] = scan_dir
 
             elif source == "git-url":
                 if not target:
