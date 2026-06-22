@@ -61,4 +61,6 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendore
 
 버전은 근사값입니다. 파일 매치는 그 파일 내용이 처음 등장한 릴리스를 버전으로 보고하므로, 같은 라이브러리라도 파일마다 버전이 조금씩 다르게 나오거나 실제보다 한 단계 어긋난 릴리스로 보고될 수 있습니다. 버전(과 그로부터 도출된 CVE)은 최종 판정이 아니라 검토의 출발점으로 삼으세요.
 
+귀속(어느 프로젝트인지)도 틀릴 수 있습니다. 여러 프로젝트가 흔히 복사하는 파일(예: zlib의 `deflate.c`)은 정식 upstream이 아니라 그것을 vendored한 다운스트림 프로젝트로 매치될 수 있어, 실제 zlib 사본이 다른 이름으로 보고되고 그 CVE를 놓칠 수 있습니다. 이는 지식 베이스의 랭킹·커버리지 한계이며 무료 OSSKB에서 더 두드러집니다. 더 정확한 귀속이 필요하면 `SCANOSS_API_URL`을 SCANOSS 상용·자체 호스팅 엔드포인트로 지정하세요. 또한 공개 저장소에 이미 게시된 소스를 스캔하면 그 저장소로 매치됩니다(자기 1st-party 파일이 자기 공개 프로젝트로 매치) — 의도한 용도인 비공개 공급사 소스에서는 발생하지 않습니다.
+
 결과는 사람 검토가 도움이 되는 best-effort 추정입니다. OSSKB 약관과 라이선스 설명은 [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참조하세요.

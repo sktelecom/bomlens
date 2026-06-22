@@ -61,4 +61,6 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendore
 
 Version precision is approximate. A file match reports the release where that file content first appeared, so different files of the same library can resolve to slightly different versions and a copied-in library may be reported a point release off. Treat the version (and any CVEs derived from it) as a starting point for review, not a final verdict.
 
+Attribution can also point at the wrong project. A file that many projects copy (for example zlib's `deflate.c`) may match a downstream project that vendored it rather than the canonical upstream — so a real zlib copy can be reported under another name, and its CVEs missed. This is a ranking and coverage limit of the knowledge base; it is more pronounced on the free OSSKB. For higher-fidelity attribution, point `SCANOSS_API_URL` at a SCANOSS commercial or self-hosted endpoint. Relatedly, scanning source that is itself published in a public repository will match that repository (your own first-party files can match your own public project) — this does not occur for the intended case of private supplier source.
+
 Results are a best-effort estimate that benefits from human review. See the OSSKB terms and license notes in [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md).
