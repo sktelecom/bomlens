@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test --grep-invert @capture",
+    "capture:ui": "playwright test --grep @capture"
   },
   "dependencies": {
     "@radix-ui/react-label": "2.1.9",

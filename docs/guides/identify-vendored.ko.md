@@ -12,6 +12,8 @@ C/C++ 임베디드 소스를 스캔했는데 BomLens가 거의 아무것도 못 
 
 이 상황이 되면 BomLens가 이 옵션을 권하는 한 줄 안내를 출력하고, 웹 UI도 스캔 후 같은 안내를 보여줍니다. 사용자가 직접 상황을 알아챌 필요는 없습니다.
 
+![희소한 C/C++ 스캔에서 identify-vendored를 권하는 결과 배너](../images/web-ui-vendored-banner-en.png)
+
 `--identify-vendored`는 소스 파일의 지문을 공개 OSSKB 지식 베이스와 대조해, 일치한 항목을 이름·버전·PURL을 갖춘 컴포넌트로 기록합니다. 그러면 복사돼 들어간 오픈소스가 SBOM에 드러나고, 알려진 CVE가 있는 라이브러리는 보안 보고서에도 나타납니다.
 
 ## 무엇이 전송되나
@@ -41,6 +43,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 
 웹 UI에서는 **고급**을 펼쳐 **내장 오픈소스 식별**을 켭니다. 이 옵션은 소스 스캔이면서 이미지가 지원할 때만 보입니다.
 
+![고급 섹션의 내장 오픈소스 식별 토글](../images/web-ui-identify-vendored-en.png)
+
 ## 결과
 
 - 복사된 오픈소스가 버전을 가진 컴포넌트로 SBOM에 나타나며, 각 항목에 `vendored` 표시(`bomlens:layer=vendored` 속성)가 붙습니다.
@@ -48,6 +52,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 - 취약점 데이터베이스에 기록이 없는 흔치 않은 라이브러리(예: `liblfds`, `libaes`, `djbdns`)는 이름과 버전까지 식별됩니다. 보고할 CVE가 없을 뿐이며, 이는 스캔이 아니라 공개 데이터의 한계입니다.
 
 파일 단위 전체 일치만 컴포넌트가 됩니다. 부분(스니펫) 일치는 노이즈가 커서 제외하므로 보고서가 깔끔하게 유지됩니다.
+
+![vendored 표시와 일치도가 달린 컴포넌트 표](../images/web-ui-vendored-badge-en.png)
 
 ## 엔드포인트와 제한
 

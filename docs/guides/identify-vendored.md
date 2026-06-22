@@ -12,6 +12,8 @@ A normal scan reads a package manager (npm, Maven, pip, Go, Conan, and so on) to
 
 When that happens, BomLens prints a one-line hint suggesting this option, and the web UI shows the same hint after the scan. You do not need to recognize the situation yourself.
 
+![Result banner suggesting identify-vendored for a sparse C/C++ scan](../images/web-ui-vendored-banner-en.png)
+
 `--identify-vendored` matches the file fingerprints of your sources against the public OSSKB knowledge base and records each match as a real component (name, version, PURL), so the copied-in open source shows up in the SBOM — and, where the library has known CVEs, in the security report.
 
 ## What is sent
@@ -41,6 +43,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 
 In the web UI, open **Advanced** and turn on **Identify bundled open source**. The option appears only for a source scan when the image supports it.
 
+![The Advanced section with the Identify bundled open source toggle](../images/web-ui-identify-vendored-en.png)
+
 ## What you get
 
 - Copied-in open source appears in the SBOM as named components with versions, each tagged `vendored` (a `bomlens:layer=vendored` property).
@@ -48,6 +52,8 @@ In the web UI, open **Advanced** and turn on **Identify bundled open source**. T
 - Niche libraries with no entry in the vulnerability databases (for example `liblfds`, `libaes`, `djbdns`) are still identified by name and version; they simply have no CVEs to report, which is a limit of the public data, not of the scan.
 
 Only full-file matches become components. Partial (snippet) matches are noisy and are left out, so the report stays clean.
+
+![Components table with vendored components tagged and their match confidence](../images/web-ui-vendored-badge-en.png)
 
 ## Endpoint and limits
 
