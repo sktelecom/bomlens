@@ -139,6 +139,136 @@ date_expr=$(jq -r '.components[] | select(.name=="python-dateutil") | .licenses[
 pkg_expr=$(jq -r '.components[] | select(.name=="packaging") | .licenses[0].expression // "ABSENT"' "$WORK/c.json")
 [ "$pkg_expr" = "Apache-2.0 OR BSD-2-Clause" ] && pass "compound expression left untouched" || fail "packaging expression='$pkg_expr'"
 
+echo "== vendored: identify-vendored.sh promotes file matches, drops snippets =="
+# Mock scanoss-py (no network/image needed): write the raw SCANOSS fixture to the
+# tool's --output path so identify-vendored.sh's jq transform is exercised.
+mkdir -p "$WORK/bin" "$WORK/srctree/src"
+echo 'int main(void){return 0;}' > "$WORK/srctree/src/main.c"
+cat > "$WORK/bin/scanoss-py" <<'MOCK'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done
+[ -n "$out" ] && cp "$SCANOSS_RAW_FIXTURE" "$out"
+exit 0
+MOCK
+chmod +x "$WORK/bin/scanoss-py"
+export SCANOSS_RAW_FIXTURE="$FIX/scanoss-raw.json"
+PATH="$WORK/bin:$PATH" bash "$LIB/identify-vendored.sh" "$WORK/srctree" "$WORK/vend.json" "26.4.0" >/dev/null 2>&1
+vn=$(jq '[.components[]?] | length' "$WORK/vend.json" 2>/dev/null || echo 0)
+[ "$vn" = "2" ] && pass "two full-file matches promoted (openssl, liblfds)" || fail "vendored components=$vn, expected 2"
+if jq -e '[.components[] | select(.name=="somelib")] | length == 0' "$WORK/vend.json" >/dev/null 2>&1; then
+    pass "snippet-only match (somelib) not promoted to a component"
+else
+    fail "snippet match leaked into components"
+fi
+if jq -e '.components[] | select(.name=="openssl") | .properties[]? | select(.name=="bomlens:identifiedBy" and .value=="scanoss")' "$WORK/vend.json" >/dev/null 2>&1; then
+    pass "vendored components carry bomlens:identifiedBy=scanoss"
+else
+    fail "missing bomlens:identifiedBy=scanoss provenance"
+fi
+
+echo "== vendored: identify -> merge -> normalize completes the PURL->CVE chain =="
+# Merge the vendored components with a sparse cdxgen C/C++ SBOM, then normalize.
+bash "$LIB/merge-sbom.sh" "$WORK/merged.json" "trelay" "26.4.0" \
+    "$FIX/cdxgen-cpp-sparse.json" "$WORK/vend.json" >/dev/null 2>&1
+if jq -e '.components[] | select(.name=="openssl")' "$WORK/merged.json" >/dev/null 2>&1; then
+    pass "vendored openssl survived the merge into the project SBOM"
+else
+    fail "openssl missing after merge"
+fi
+bash "$LIB/normalize-sbom.sh" "$WORK/merged.json" >/dev/null 2>&1
+# openssl: no SCANOSS cpe, but the map yields one -> Trivy can now match CVEs.
+ssl_cpe=$(jq -r '.components[] | select(.name=="openssl") | .cpe // "ABSENT"' "$WORK/merged.json")
+[ "$ssl_cpe" = "cpe:2.3:a:openssl:openssl:1.1.1w:*:*:*:*:*:*:*" ] \
+    && pass "openssl PURL mapped to a Trivy-matchable cpe ($ssl_cpe)" \
+    || fail "openssl cpe='$ssl_cpe' (PURL->CVE chain broken)"
+# niche liblfds: no NVD record -> identified only, original PURL preserved.
+lfds_cpe=$(jq -r '.components[] | select(.name=="liblfds") | .cpe // "ABSENT"' "$WORK/merged.json")
+lfds_purl=$(jq -r '.components[] | select(.name=="liblfds") | .purl // "ABSENT"' "$WORK/merged.json")
+[ "$lfds_cpe" = "ABSENT" ] && pass "niche liblfds left without a cpe (no NVD record)" || fail "liblfds unexpectedly got cpe='$lfds_cpe'"
+[ "$lfds_purl" = "pkg:github/liblfds/liblfds" ] && pass "liblfds keeps its identifying PURL" || fail "liblfds purl='$lfds_purl'"
+if jq -e '.components[] | select(.name=="openssl") | .properties[]? | select(.name=="bomlens:layer" and .value=="vendored")' "$WORK/merged.json" >/dev/null 2>&1; then
+    pass "vendored provenance (bomlens:layer=vendored) survives normalize"
+else
+    fail "vendored layer marker lost"
+fi
+
+echo "== suggest: nudge only for C/C++ source, no manifest, sparse SBOM =="
+mkdir -p "$WORK/csrc"
+echo 'int main(void){return 0;}' > "$WORK/csrc/main.c"
+cp "$FIX/cdxgen-cpp-sparse.json" "$WORK/sug.json"
+IDENTIFY_VENDORED=false bash "$LIB/suggest-vendored.sh" "$WORK/sug.json" "$WORK/csrc" >/dev/null 2>&1
+if jq -e '.metadata.properties[]? | select(.name=="bomlens:suggest-identify-vendored" and .value=="true")' "$WORK/sug.json" >/dev/null 2>&1; then
+    pass "C/C++ + no manifest + sparse SBOM -> suggestion recorded"
+else
+    fail "expected suggestion property was not set"
+fi
+# Negative: a package manager manifest present -> no nudge (cdxgen already resolves).
+mkdir -p "$WORK/nodesrc"
+echo 'int main(void){return 0;}' > "$WORK/nodesrc/main.c"
+echo '{"name":"x"}' > "$WORK/nodesrc/package.json"
+cp "$FIX/cdxgen-cpp-sparse.json" "$WORK/sug2.json"
+IDENTIFY_VENDORED=false bash "$LIB/suggest-vendored.sh" "$WORK/sug2.json" "$WORK/nodesrc" >/dev/null 2>&1
+if jq -e '.metadata.properties[]? | select(.name=="bomlens:suggest-identify-vendored")' "$WORK/sug2.json" >/dev/null 2>&1; then
+    fail "suggested even though a package manifest is present"
+else
+    pass "no nudge when a package manager manifest exists"
+fi
+# Negative: already enabled -> never nudge.
+cp "$FIX/cdxgen-cpp-sparse.json" "$WORK/sug3.json"
+IDENTIFY_VENDORED=true bash "$LIB/suggest-vendored.sh" "$WORK/sug3.json" "$WORK/csrc" >/dev/null 2>&1
+if jq -e '.metadata.properties[]? | select(.name=="bomlens:suggest-identify-vendored")' "$WORK/sug3.json" >/dev/null 2>&1; then
+    fail "nudged even though --identify-vendored is already on"
+else
+    pass "no nudge when --identify-vendored is already enabled"
+fi
+
+echo "== vendored: reconciliation prevents over-detection on a managed project =="
+# A SCANOSS result that file-matches a declared dependency (lodash, already found
+# by the package manager) plus a genuine vendored find (liblfds). Reconciliation
+# must drop the duplicate and keep the new one, so enabling --identify-vendored on
+# a normal managed project does not balloon the SBOM or invent false CVEs.
+mkdir -p "$WORK/bin2" "$WORK/mtree/src"
+echo 'int main(void){return 0;}' > "$WORK/mtree/src/main.c"
+cat > "$WORK/bin2/scanoss-py" <<'MOCK'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done
+[ -n "$out" ] && cp "$SCANOSS_RAW_FIXTURE" "$out"
+exit 0
+MOCK
+chmod +x "$WORK/bin2/scanoss-py"
+export SCANOSS_RAW_FIXTURE="$FIX/scanoss-raw-managed.json"
+PATH="$WORK/bin2:$PATH" bash "$LIB/identify-vendored.sh" "$WORK/mtree" "$WORK/vend2.json" "1.0.0" >/dev/null 2>&1
+vraw=$(jq '[.components[]?]|length' "$WORK/vend2.json" 2>/dev/null || echo 0)
+[ "$vraw" = "2" ] && pass "SCANOSS produced 2 matches (lodash + liblfds)" || fail "expected 2 raw vendored matches, got $vraw"
+
+# Reconcile against the managed cdxgen SBOM (which already declares lodash).
+dropped=$(bash "$LIB/reconcile-vendored.sh" "$FIX/cdxgen-node-managed.json" "$WORK/vend2.json")
+[ "$dropped" = "1" ] && pass "reconcile drops 1 match already covered by the package manager" || fail "reconcile dropped '$dropped', expected 1"
+if jq -e '[.components[] | select((.name|ascii_downcase)=="lodash")] | length == 0' "$WORK/vend2.json" >/dev/null 2>&1; then
+    pass "duplicate lodash removed from the vendored set"
+else
+    fail "duplicate lodash survived reconciliation (over-detection)"
+fi
+if jq -e '[.components[] | select(.name=="liblfds")] | length == 1' "$WORK/vend2.json" >/dev/null 2>&1; then
+    pass "genuine vendored find (liblfds) preserved"
+else
+    fail "real vendored component liblfds was wrongly dropped"
+fi
+
+# Merge the reconciled set into the managed SBOM: lodash stays single (the npm
+# authoritative one), liblfds is added — no double counting.
+bash "$LIB/merge-sbom.sh" "$WORK/mmerged.json" "webapp" "1.0.0" \
+    "$FIX/cdxgen-node-managed.json" "$WORK/vend2.json" >/dev/null 2>&1
+lodash_n=$(jq '[.components[] | select((.name|ascii_downcase)=="lodash")] | length' "$WORK/mmerged.json")
+total_n=$(jq '[.components[]?] | length' "$WORK/mmerged.json")
+[ "$lodash_n" = "1" ] && pass "merged SBOM has exactly one lodash (no duplicate)" || fail "lodash appears ${lodash_n}x after merge"
+[ "$total_n" = "4" ] && pass "merged total = 3 managed + 1 new vendored (no double count)" || fail "merged total=$total_n, expected 4"
+# The surviving lodash is the authoritative package-manager identity (pkg:npm).
+lodash_purl=$(jq -r '.components[] | select((.name|ascii_downcase)=="lodash") | .purl' "$WORK/mmerged.json")
+[ "$lodash_purl" = "pkg:npm/lodash@4.17.21" ] && pass "package-manager identity (pkg:npm) wins over the SCANOSS pkg:github match" || fail "lodash purl='$lodash_purl', expected pkg:npm"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

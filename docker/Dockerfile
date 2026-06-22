@@ -40,6 +40,11 @@ ARG TRIVY_VERSION=v0.70.0
 ARG COSIGN_VERSION=v2.4.1
 ARG SCANCODE_VERSION=32.3.0
 ARG SBOM_DEEP_LICENSE=false
+# Vendored-OSS identification (opt-in: --build-arg SBOM_SCANOSS=true). scanoss.py
+# is MIT, so unlike the firmware GPL tools it can live in the base image; kept
+# opt-in only to keep the default image lean and free of outbound API calls.
+ARG SBOM_SCANOSS=false
+ARG SCANOSS_VERSION=1.25.2
 ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
@@ -105,6 +110,17 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
       echo "[build] scancode-toolkit skipped (SBOM_DEEP_LICENSE=false)"; \
     fi
 
+# scanoss.py (opt-in vendored-OSS identification: --build-arg SBOM_SCANOSS=true).
+# MIT-licensed client; talks to the hosted OSSKB API (or SCANOSS_API_URL). It does
+# NOT bundle the GPL-2.0 SCANOSS engine. See identify-vendored.sh and
+# THIRD_PARTY_LICENSES.md for the OSSKB terms (identification-only, no redistribution).
+RUN if [ "$SBOM_SCANOSS" = "true" ]; then \
+      pip3 install --no-cache-dir "scanoss==${SCANOSS_VERSION}" \
+      && scanoss-py --version; \
+    else \
+      echo "[build] scanoss skipped (SBOM_SCANOSS=false)"; \
+    fi
+
 # Firmware unpack + binary identification (opt-in: --build-arg SBOM_FIRMWARE=true).
 #   unblob = MIT (primary unpacker); cve-bin-tool/ubi_reader = GPL (binary ID, UBI).
 #   squashfs-tools/e2fsprogs/p7zip/unar/jefferson/... are the extractor binaries
@@ -131,6 +147,7 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # Reflects the firmware build flavor. When SBOM_FIRMWARE=true the image bundles GPL
 # tools (cve-bin-tool, ubi_reader); the source-offer label points to the inventory.
 LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
+      com.sktelecom.sbom.scanoss-tools="${SBOM_SCANOSS}" \
       com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan

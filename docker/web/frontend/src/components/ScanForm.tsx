@@ -74,6 +74,7 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
   const [notice, setNotice] = useState(true);
   const [security, setSecurity] = useState(true);
   const [deepLicense, setDeepLicense] = useState(false);
+  const [identifyVendored, setIdentifyVendored] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -82,6 +83,10 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
   const textInput = TEXT_INPUT[source];
   const isText = textInput !== undefined;
   const isAnalyze = source === "sbom-upload";
+  // Vendored-OSS identification only applies to a scanned source tree.
+  const isSourceScan =
+    source === "current-dir" || source === "git-url" || source === "zip-upload";
+  const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
   const busy = running || uploading;
 
   const submit = async () => {
@@ -139,6 +144,7 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
       notice: isAnalyze ? true : notice,
       security: isAnalyze ? true : security,
       deepLicense,
+      identifyVendored: showVendored ? identifyVendored : false,
       // Byte-stable (reproducible) output is a CI concern; not exposed in the UI
       // so the default deliverable keeps a real timestamp + serialNumber.
       byteStable: false,
@@ -297,6 +303,33 @@ export function ScanForm({ running, capabilities, onRun }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Advanced: vendored-OSS identification. Hidden by default — only shown
+            when the running image supports it (SBOM_SCANOSS) and the input is a
+            source tree, since it sends file fingerprints to an external service. */}
+        {showVendored && (
+          <details className="pt-1">
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+              {t("form.advanced")}
+            </summary>
+            <label className="mt-3 flex cursor-pointer items-start justify-between gap-4">
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium">
+                  {t("options.identifyVendored")}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {t("options.identifyVendoredHint")}
+                </span>
+              </span>
+              <Switch
+                checked={identifyVendored}
+                onCheckedChange={setIdentifyVendored}
+                disabled={busy}
+                aria-label={t("options.identifyVendored")}
+              />
+            </label>
+          </details>
+        )}
 
         {invalid && (
           <p className="text-sm text-destructive" role="alert">

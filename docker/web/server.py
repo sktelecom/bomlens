@@ -126,6 +126,11 @@ def firmware_capable():
     return shutil.which("unblob") is not None
 
 
+def scanoss_capable():
+    """Vendored-OSS identification (scanoss-py) is only built in with SBOM_SCANOSS."""
+    return shutil.which("scanoss-py") is not None
+
+
 def docker_capable():
     return os.path.exists("/var/run/docker.sock")
 
@@ -233,6 +238,17 @@ def sbom_summary(project, version):
     comps = data.get("components") or []
     rows = []
     for c in comps[:MAX_COMPONENT_ROWS]:
+        props = c.get("properties") or []
+        vendored = any(
+            p.get("name") == "bomlens:layer" and p.get("value") == "vendored"
+            for p in props
+        )
+        # SCANOSS match confidence, surfaced read-only so a reviewer can eyeball it
+        # (no accept/reject workflow — match triage belongs to TRUSCA).
+        match = next(
+            (p.get("value") for p in props if p.get("name") == "bomlens:scanoss:match"),
+            "",
+        )
         rows.append({
             "name": c.get("name") or "",
             "version": c.get("version") or "",
@@ -240,11 +256,21 @@ def sbom_summary(project, version):
             "purl": c.get("purl") or "",
             "type": c.get("type") or "",
             "licenses": _component_licenses(c),
+            "vendored": vendored,
+            "matchConfidence": match,
         })
+    # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like
+    # C/C++ embedded source with no package manager. Drives the result banner.
+    meta_props = (data.get("metadata") or {}).get("properties") or []
+    suggest = any(
+        p.get("name") == "bomlens:suggest-identify-vendored" and p.get("value") == "true"
+        for p in meta_props
+    )
     return {
         "components": len(comps),
         "componentList": rows,
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
+        "suggestIdentifyVendored": suggest,
     }
 
 
@@ -427,6 +453,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/capabilities":
             self._send(200, json.dumps({
                 "firmware": firmware_capable(),
+                "scanoss": scanoss_capable(),
                 "docker": docker_capable(),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
@@ -633,6 +660,9 @@ class Handler(BaseHTTPRequestHandler):
             "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
             "GENERATE_REPORT": "true",  # 오픈소스위험분석보고서: default-on (mirrors CLI)
             "DEEP_LICENSE": "true" if g("deep_license") == "true" else "false",
+            # Vendored-OSS identification (SCANOSS). SCANOSS_API_URL/KEY, if set in
+            # the server's environment, pass through via env.copy() above.
+            "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
         })
         cwd = OUTPUT_DIR

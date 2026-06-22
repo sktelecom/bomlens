@@ -1,0 +1,14 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "application", "name": "trelay", "version": "26.4.0" }
+  },
+  "components": [
+    { "type": "file", "name": "ssl_lib.c", "purl": "pkg:generic/ssl_lib.c" },
+    { "type": "file", "name": "lfds.c", "purl": "pkg:generic/lfds.c" },
+    { "type": "file", "name": "main.c", "purl": "pkg:generic/main.c" },
+    { "type": "file", "name": "config.c", "purl": "pkg:generic/config.c" }
+  ]
+}

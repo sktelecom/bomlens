@@ -20,6 +20,10 @@ export interface ComponentItem {
   purl: string;
   type: string;
   licenses: string[];
+  /** Identified by SCANOSS as open source copied (vendored) into the sources. */
+  vendored?: boolean;
+  /** SCANOSS file-match confidence (e.g. "100%"), shown read-only on vendored rows. */
+  matchConfidence?: string;
 }
 
 export interface SbomSummary {
@@ -28,6 +32,9 @@ export interface SbomSummary {
   componentList?: ComponentItem[];
   /** True when the SBOM has more components than the server returned. */
   truncated?: boolean;
+  /** Set when the scan looks like C/C++ embedded source with no package manager,
+   *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
+  suggestIdentifyVendored?: boolean;
 }
 
 export const SEVERITY_ORDER = [
@@ -110,6 +117,7 @@ export interface ScanParams {
   notice: boolean;
   security: boolean;
   deepLicense: boolean;
+  identifyVendored: boolean;
   byteStable: boolean;
 }
 
@@ -121,6 +129,8 @@ export interface ScanHandlers {
 
 export interface Capabilities {
   firmware: boolean;
+  /** scanoss-py present (built with SBOM_SCANOSS) — enables --identify-vendored. */
+  scanoss?: boolean;
   docker: boolean;
   firmwareImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
@@ -130,10 +140,10 @@ export interface Capabilities {
 export async function getCapabilities(): Promise<Capabilities> {
   try {
     const res = await fetch("/capabilities");
-    if (!res.ok) return { firmware: false, docker: true };
+    if (!res.ok) return { firmware: false, scanoss: false, docker: true };
     return (await res.json()) as Capabilities;
   } catch {
-    return { firmware: false, docker: true };
+    return { firmware: false, scanoss: false, docker: true };
   }
 }
 
@@ -222,6 +232,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     notice: String(params.notice),
     security: String(params.security),
     deep_license: String(params.deepLicense),
+    identify_vendored: String(params.identifyVendored),
     byte_stable: String(params.byteStable),
   });
 

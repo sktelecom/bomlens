@@ -202,6 +202,18 @@ export function ComponentsTable({ items, total, truncated }: Props) {
                       {c.group ? `${c.group} / ` : ""}
                       {c.name}
                     </span>
+                    {c.vendored && (
+                      <Badge
+                        variant="muted"
+                        title={
+                          c.matchConfidence
+                            ? `${t("result.vendoredBadgeHint")} (${t("result.vendoredMatch", { pct: c.matchConfidence })})`
+                            : t("result.vendoredBadgeHint")
+                        }
+                      >
+                        {t("result.vendoredBadge")}
+                      </Badge>
+                    )}
                   </div>
                 </td>
                 <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">

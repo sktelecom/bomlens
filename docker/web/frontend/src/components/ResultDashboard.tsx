@@ -43,6 +43,15 @@ export function ResultDashboard({ result }: { result: DoneEvent }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Off-by-default discovery: the scan looked like C/C++ embedded source
+            with no package manager and found little. Nudge — don't auto-run. */}
+        {result.sbom?.suggestIdentifyVendored && (
+          <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
+            <div className="text-sm font-medium">{t("result.vendoredHintTitle")}</div>
+            <p className="mt-1 text-xs">{t("result.vendoredHintBody")}</p>
+          </div>
+        )}
+
         <KpiCards
           sbom={result.sbom}
           security={result.security}

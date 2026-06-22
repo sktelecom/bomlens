@@ -10,6 +10,7 @@
     "version": "Version",
     "versionPlaceholder": "1.0.0",
     "options": "Generation options",
+    "advanced": "Advanced",
     "run": "Run scan",
     "running": "Scanning…"
   },
@@ -45,7 +46,9 @@
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "Deep license",
-    "deepLicenseHint": "ScanCode deep license detection (slow)"
+    "deepLicenseHint": "ScanCode deep license detection (slow)",
+    "identifyVendored": "Identify bundled open source",
+    "identifyVendoredHint": "For C/C++ source with no package manager. Sends file fingerprints (not source) to the OSSKB service."
   },
   "progress": {
     "title": "Run log",
@@ -58,6 +61,11 @@
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
+    "vendoredHintTitle": "Few components found — is this C/C++ embedded source?",
+    "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"Identify bundled open source\" under Advanced and run again. Only file fingerprints are sent — your source stays local.",
+    "vendoredBadge": "vendored",
+    "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
+    "vendoredMatch": "match {{pct}}",
     "severityTitle": "Severity distribution",
     "noVulns": "No vulnerabilities found",
     "artifacts": "Generated artifacts",

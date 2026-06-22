@@ -147,6 +147,7 @@ nav:
       - Reports: guides/reports.md
       - Supplier SBOM: guides/supplier-sbom.md
       - Firmware: guides/firmware.md
+      - Identify bundled OSS (C/C++): guides/identify-vendored.md
       - Upload: guides/upload.md
       - CI/CD: guides/ci-cd.md
   - Reference:
