@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-label": "2.1.9",
@@ -30,6 +31,7 @@
     "tailwindcss-animate": "1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.49.1",
     "@types/cytoscape-dagre": "2.3.3",
     "@types/node": "22.19.20",
     "@types/react": "18.3.12",

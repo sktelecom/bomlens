@@ -1,0 +1,5 @@
+# Playwright UI test output (the specs under tests/ui/ are tracked; results are not)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+.last-run.json
