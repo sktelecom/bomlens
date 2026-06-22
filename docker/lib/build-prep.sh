@@ -85,16 +85,28 @@ if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
     swift package resolve >/dev/null 2>&1 || true
 fi
 
+# --- build the cdxgen argument list (shared across the per-image binary paths) ---
+# Pass the caller's project name/version up front so the root component carries a
+# unique identity instead of cdxgen's scan-path default (src@latest), which collides
+# in Black Duck. PROJECT_NAME/PROJECT_VERSION arrive via `docker run -e`. Build the
+# list with `set --` (not ${VAR:+...}) so a name with spaces stays one argument.
+# stamp-metadata.sh still overwrites this post-hoc as the final guarantee (it also
+# covers the syft fallback path), so an unknown flag here cannot break the SBOM.
+set -- -r --spec-version "$SPEC" -o "$OUT"
+[ -n "$PROJECT_NAME" ]    && set -- "$@" --project-name "$PROJECT_NAME"
+[ -n "$PROJECT_VERSION" ] && set -- "$@" --project-version "$PROJECT_VERSION"
+set -- "$@" "$SRC"
+
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
 if command -v cdxgen >/dev/null 2>&1; then
     log "cdxgen (PATH)"
-    cdxgen -r --spec-version "$SPEC" -o "$OUT" "$SRC"
+    cdxgen "$@"
 elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
     log "cdxgen (/opt/cdxgen/bin/cdxgen.js)"
-    node /opt/cdxgen/bin/cdxgen.js -r --spec-version "$SPEC" -o "$OUT" "$SRC"
+    node /opt/cdxgen/bin/cdxgen.js "$@"
 elif [ -f /opt/bin/cdxgen ]; then
     log "cdxgen (/opt/bin/cdxgen)"
-    /opt/bin/cdxgen -r --spec-version "$SPEC" -o "$OUT" "$SRC"
+    /opt/bin/cdxgen "$@"
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1

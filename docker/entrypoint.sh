@@ -81,6 +81,8 @@ generate_sbom_cdxgen() {
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
+        -e PROJECT_NAME="$PROJECT_NAME" \
+        -e PROJECT_VERSION="$PROJECT_VERSION" \
         --entrypoint sh "$img" \
         -c "$prep" _ /app "/app/$out" 1.6 || rc=$?
     [ "$rc" -eq 0 ] || { echo "[WARN] cdxgen sibling container failed (rc=$rc)."; return 1; }
@@ -244,7 +246,10 @@ ARTIFACTS=("$OUTPUT_FILE")
 # See stamp-metadata.sh for the rationale.
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS|ROOTFS)
-        bash "$LIBDIR/stamp-metadata.sh" "$OUTPUT_FILE" "$PROJECT_NAME" "$PROJECT_VERSION" || true
+        # No `|| true`: a stamp failure means the SBOM still carries a leaked/placeholder
+        # root name (e.g. src@latest), which collides in Black Duck. Fail closed under
+        # set -e so a mis-named SBOM is never normalized, signed, or uploaded.
+        bash "$LIBDIR/stamp-metadata.sh" "$OUTPUT_FILE" "$PROJECT_NAME" "$PROJECT_VERSION"
         ;;
 esac
 

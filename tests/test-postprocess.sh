@@ -65,6 +65,37 @@ else
     fail "temp upload path still present in metadata"
 fi
 
+echo "== src-latest: cdxgen src@latest root is stamped over, never delivered as 'src' =="
+# Regression for the Black Duck codelocation collision: two unrelated source SBOMs
+# both came out as metadata.component = src/latest (pkg:generic/src@latest), so the
+# second import was blocked as a duplicate codelocation. The stamp must replace it
+# with the caller's project name.
+cp "$FIX/src-latest-root.json" "$WORK/s.json"
+bash "$LIB/stamp-metadata.sh" "$WORK/s.json" "AcmeApp" "1.2.3" >/dev/null 2>&1
+sname=$(jq -r '.metadata.component.name' "$WORK/s.json")
+spurl=$(jq -r '.metadata.component.purl // "ABSENT"' "$WORK/s.json")
+[ "$sname" = "AcmeApp" ] && pass "src@latest root renamed to input project" || fail "name='$sname', expected AcmeApp"
+[ "$sname" != "src" ] && pass "root name is no longer the generic 'src'" || fail "root name still 'src'"
+[ "$spurl" = "ABSENT" ] && pass "pkg:generic/src@latest purl dropped" || fail "purl still present: $spurl"
+
+echo "== final net: stamp fails closed on the placeholder name and on bad input =="
+# The engine-agnostic net must reject 'src'/'app' as the stamped name (a colliding
+# codelocation), not silently pass it through.
+cp "$FIX/src-latest-root.json" "$WORK/g.json"
+if bash "$LIB/stamp-metadata.sh" "$WORK/g.json" "src" "1.0.0" >/dev/null 2>&1; then
+    fail "stamp accepted the generic placeholder 'src' as a project name"
+else
+    pass "stamp rejects 'src' as a project name (exit != 0)"
+fi
+# A missing jq or invalid JSON is a build/runtime defect; stamp must fail closed so a
+# mis-named SBOM is never delivered, rather than warn-and-exit-0 as before.
+printf 'not json{' > "$WORK/bad.json"
+if bash "$LIB/stamp-metadata.sh" "$WORK/bad.json" "AcmeApp" "1.0.0" >/dev/null 2>&1; then
+    fail "stamp exited 0 on invalid JSON (should fail closed)"
+else
+    pass "stamp fails closed on invalid JSON (exit != 0)"
+fi
+
 echo "== B-4: NOTICE dedupes license texts and normalizes Expat to MIT =="
 cp "$FIX/license-aliases.json" "$WORK/l.json"
 bash "$LIB/generate-notice.sh" "$WORK/l.json" "$WORK/notice" "FixtureProj" >/dev/null 2>&1
