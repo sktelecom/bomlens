@@ -233,6 +233,46 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 # ========================================================
+# Vendored open source (opt-in, SCANOSS) — only meaningful for a source tree.
+# Runs for both the CLI source scan (MODE=POSTPROCESS, tree mounted at /src) and
+# the web-UI source scan (SOURCE mode, SOURCE_ROOT). When enabled, identify the
+# open source copied straight into the sources and merge it into the SBOM before
+# stamping/normalizing, so the PURL->CPE fix and the security scan pick it up.
+# When disabled, suggest-vendored.sh decides whether to nudge the user (C/C++,
+# no package manager, near-empty scan) — off-by-default discovery.
+# ========================================================
+VENDORED_SRC="${SOURCE_ROOT:-/src}"
+if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
+    echo "[INFO] Identifying vendored open source (SCANOSS)..."
+    VEND_SBOM="${OUT_PREFIX}_vendored.cdx.json"
+    if bash "$LIBDIR/identify-vendored.sh" "$VENDORED_SRC" "$VEND_SBOM" "$PROJECT_VERSION"; then
+        VEND_N=$(jq '[.components[]?] | length' "$VEND_SBOM" 2>/dev/null || echo 0)
+        # Reconcile against the package-manager scan before merging: drop vendored
+        # matches whose name a cdxgen/syft component already carries (see
+        # reconcile-vendored.sh). Prevents duplicate pkg:github components / false
+        # CVEs when this option is enabled on a normal managed project.
+        if [ "${VEND_N:-0}" -gt 0 ]; then
+            DROPPED_N=$(bash "$LIBDIR/reconcile-vendored.sh" "$OUTPUT_FILE" "$VEND_SBOM")
+            [ "${DROPPED_N:-0}" -gt 0 ] && echo "[INFO] vendored: reconciled ${DROPPED_N} match(es) already covered by the package-manager scan."
+            VEND_N=$(jq '[.components[]?] | length' "$VEND_SBOM" 2>/dev/null || echo 0)
+        fi
+        if [ "${VEND_N:-0}" -gt 0 ]; then
+            echo "[INFO] vendored components identified: $VEND_N — merging into SBOM."
+            if bash "$LIBDIR/merge-sbom.sh" "${OUTPUT_FILE}.merged" "$PROJECT_NAME" "$PROJECT_VERSION" "$OUTPUT_FILE" "$VEND_SBOM"; then
+                mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
+            else
+                echo "[WARN] merge of vendored components failed; keeping the original SBOM." >&2
+                rm -f "${OUTPUT_FILE}.merged"
+            fi
+        else
+            echo "[INFO] no new vendored open source to add (after reconciliation)."
+        fi
+    fi
+elif [ -d "$VENDORED_SRC" ]; then
+    bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC" || true
+fi
+
+# ========================================================
 # Common pipeline: normalize / deep-license / notice / security / sign
 # ========================================================
 ARTIFACTS=("$OUTPUT_FILE")

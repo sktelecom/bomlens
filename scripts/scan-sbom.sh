@@ -44,6 +44,8 @@ GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""
+IDENTIFY_VENDORED="false"
+SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
@@ -76,6 +78,7 @@ while [[ "$#" -gt 0 ]]; do
         --security) GENERATE_SECURITY="true" ;;
         --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
+        --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
@@ -113,6 +116,10 @@ Options:
                          the risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
   --deep-license         scancode deep license (opt-in image)
+  --identify-vendored    Identify open source copied (vendored) into C/C++ source
+                         that has no package manager. Matches file fingerprints
+                         against the OSSKB service (opt-in image; sends hashes,
+                         not source). See docs/guides/identify-vendored.md
   --byte-stable          Deterministic SBOM output
   --sign                 cosign sign (requires COSIGN_KEY)
   --ui                   Launch local web UI
@@ -127,6 +134,10 @@ Environment:
   COSIGN_KEY             Signing key for --sign
   SBOM_SCANNER_IMAGE     Override the scanner image
   SBOM_FIRMWARE_IMAGE    Override the firmware image
+  SCANOSS_API_URL        Vendored-OSS endpoint for --identify-vendored
+                         (default: the free OSSKB API; set to a self-hosted
+                         SCANOSS endpoint for air-gapped or high-volume use)
+  SCANOSS_API_KEY        Credential for SCANOSS_API_URL (if the endpoint needs one)
   API_URL                Upload server base URL (DT server, or TRUSCA base)
   API_KEY                Upload credential (DT: X-Api-Key; TRUSCA: Bearer token)
   UPLOAD_TARGET          dependency-track (default) | trusca
@@ -191,8 +202,8 @@ trap cleanup EXIT INT TERM
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -423,9 +434,11 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$LANG_DET" = "cpp" ]; then
             echo "[WARN] C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
             echo "[WARN]   Raw CMake/Make sources yield a sparse SBOM; add --deep-license for 1st-party license headers."
+            echo "[WARN]   For open source copied (vendored) into the sources, add --identify-vendored (opt-in image)."
         fi
         if [ "$LANG_DET" = "unknown" ]; then
             echo "[WARN] No package manifest detected; using cdxgen all-in-one (results may be sparse)."
+            echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
         fi
     fi
     echo "[1/2] Generating SBOM (cdxgen)..."

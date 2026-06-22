@@ -1,0 +1,21 @@
+{
+  "_comment": "PURL -> CPE map for vendored (statically-copied) open source. SCANOSS labels C/C++ matches with pkg:github/<owner>/<repo> PURLs, which Trivy does NOT use for CVE matching (it matches OS/language PURLs and CPEs). normalize-sbom.sh looks up the version-stripped PURL coordinate here and attaches a cpe:2.3 so the identify->CVE chain completes. Keyed by PURL coordinate (no @version). cpe_vendor/cpe_product follow the NVD CPE dictionary. Only libraries that actually carry CVEs need an entry; niche libraries with no NVD record (liblfds, libdjbresolv, libaes) are identified by name+version without a CPE. Extend as needed. Entries starting with '_' are ignored.",
+  "pkg:github/openssl/openssl": { "cpe_vendor": "openssl", "cpe_product": "openssl" },
+  "pkg:github/madler/zlib": { "cpe_vendor": "zlib", "cpe_product": "zlib" },
+  "pkg:github/curl/curl": { "cpe_vendor": "curl", "cpe_product": "curl" },
+  "pkg:github/libexpat/libexpat": { "cpe_vendor": "libexpat_project", "cpe_product": "libexpat" },
+  "pkg:github/glennrp/libpng": { "cpe_vendor": "libpng", "cpe_product": "libpng" },
+  "pkg:github/sqlite/sqlite": { "cpe_vendor": "sqlite", "cpe_product": "sqlite" },
+  "pkg:github/mirror/busybox": { "cpe_vendor": "busybox", "cpe_product": "busybox" },
+  "pkg:github/mkj/dropbear": { "cpe_vendor": "dropbear_ssh_project", "cpe_product": "dropbear_ssh" },
+  "pkg:github/Mbed-TLS/mbedtls": { "cpe_vendor": "arm", "cpe_product": "mbed_tls" },
+  "pkg:github/ARMmbed/mbedtls": { "cpe_vendor": "arm", "cpe_product": "mbed_tls" },
+  "pkg:github/nghttp2/nghttp2": { "cpe_vendor": "nghttp2", "cpe_product": "nghttp2" },
+  "pkg:github/libssh2/libssh2": { "cpe_vendor": "libssh2", "cpe_product": "libssh2" },
+  "pkg:github/PCRE2Project/pcre2": { "cpe_vendor": "pcre", "cpe_product": "pcre2" },
+  "pkg:github/json-c/json-c": { "cpe_vendor": "json-c", "cpe_product": "json-c" },
+  "pkg:github/facebook/zstd": { "cpe_vendor": "facebook", "cpe_product": "zstandard" },
+  "pkg:github/GNOME/libxml2": { "cpe_vendor": "xmlsoft", "cpe_product": "libxml2" },
+  "pkg:github/openssh/openssh-portable": { "cpe_vendor": "openbsd", "cpe_product": "openssh" },
+  "pkg:github/the-tcpdump-group/libpcap": { "cpe_vendor": "tcpdump", "cpe_product": "libpcap" }
+}

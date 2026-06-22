@@ -19,9 +19,22 @@
 | trivy-db | 취약점 DB | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM 서명 | Apache-2.0 | https://github.com/sigstore/cosign |
 | scancode-toolkit | 정밀 라이선스(opt-in) | Apache-2.0 (데이터셋 일부 CC-BY-4.0 등) | https://github.com/aboutcode-org/scancode-toolkit |
+| scanoss (scanoss.py) | vendored 오픈소스 식별(opt-in `SBOM_SCANOSS`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | jq | SBOM 가공(헬퍼) | MIT (일부 컴포넌트 BSD/ICU/Lucent) | https://github.com/jqlang/jq |
 
 > 데이터: NVD(취약점 출처)는 public domain이며 "NIST/NVD" 출처 표시가 요구됩니다.
+
+### vendored 오픈소스 식별과 OSSKB API (opt-in)
+
+`--identify-vendored`(빌드: `docker build --build-arg SBOM_SCANOSS=true`)는 클라이언트 `scanoss.py`(MIT)만 번들합니다. SBOM 매칭을 수행하는 SCANOSS Engine(GPL-2.0)은 **포함하지 않으며**, 호스팅 OSSKB API(`api.osskb.org`)를 호출합니다. 그래서 firmware 이미지의 GPL 도구와 달리 base 이미지에 둘 수 있습니다(MIT). 동봉 데이터셋 `osadl-copyleft.json`은 코드가 아닌 CC-BY-4.0 데이터로, 출처 표기만 요구됩니다.
+
+OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
+
+- 전송되는 것은 소스 코드가 아니라 **파일 지문(해시)**뿐입니다.
+- 반환 데이터는 **소프트웨어 식별 목적으로만** 사용할 수 있고, OSSKB 데이터를 **재배포·별도 DB로 캐싱하는 것은 금지**됩니다. `sbom-tools`는 스캔별 SBOM 컴포넌트로만 결과를 내보내므로 이 범위 안입니다.
+- 무료·best-effort이며 **요청 빈도 제한(rate limit)**이 있습니다. 대량·전사 운용이나 에어갭 환경에서는 `SCANOSS_API_URL`/`SCANOSS_API_KEY`로 SCANOSS 상용 서비스나 자체 호스팅 엔드포인트를 지정하세요.
+- 결과는 "사람 검토가 필요한 식별 힌트"로 제공됩니다(정확도 무보증).
+- 약관 원문: https://www.softwaretransparency.org/terms
 
 ## 펌웨어 이미지 — `ghcr.io/sktelecom/bomlens-firmware` (GPL 포함, opt-in)
 

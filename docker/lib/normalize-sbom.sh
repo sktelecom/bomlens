@@ -45,6 +45,28 @@ SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name //
 # component name/version are retained); valid namespaced swift purls are untouched.
 PURL_FIX='(.metadata.component) |= (if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) | (.components) |= (if type=="array" then map(if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) else . end)'
 
+# Make vendored (SCANOSS-identified) components reachable by the security scan.
+# SCANOSS labels C/C++ matches with pkg:github/<owner>/<repo> PURLs, which Trivy
+# does NOT use for CVE matching — it matches OS/language PURLs and CPEs. Without a
+# CPE these components are identified but carry no vulnerabilities, breaking the
+# identify->CVE chain. For components SCANOSS already gave a cpe we leave it alone;
+# otherwise we look the version-stripped PURL coordinate up in vendored-purl-map.json
+# and synthesize a cpe:2.3 (NVD). Coordinates not in the map (niche libraries with
+# no NVD record) keep their PURL and are simply identified, not vuln-matched.
+VMAP_JSON='{}'
+[ -f "$SCRIPT_DIR/vendored-purl-map.json" ] && VMAP_JSON=$(cat "$SCRIPT_DIR/vendored-purl-map.json")
+VENDORED_CPE_FIX='(.components) |= (if type=="array" then map(
+  if ( ((.properties // []) | map(select(.name=="bomlens:identifiedBy" and .value=="scanoss")) | length) > 0 )
+     and (.cpe == null) and (.purl != null) and ((.version // "") != "")
+  then
+    ( .purl | split("@")[0] | split("?")[0] ) as $coord
+    | ($vmap[$coord]) as $m
+    | (if ($m != null)
+        then . + { cpe: ("cpe:2.3:a:" + $m.cpe_vendor + ":" + $m.cpe_product + ":" + .version + ":*:*:*:*:*:*:*") }
+        else . end)
+  else . end
+) else . end)'
+
 # Always: normalize component license aliases to SPDX ids. cdxgen records some
 # licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3
 # web UI surfaces (license filter, distribution card, dependency tree) read these
@@ -75,10 +97,11 @@ if [ "$MODE" = "--stable" ]; then
     # cdxgen further leaks the random name of the temp virtualenv it builds to
     # resolve python deps (cdxgen-venv-XXXXXX) into component evidence values, so
     # the same input yields a different byte stream each run; pin that suffix too.
-    jq -S "
+    jq -S --argjson vmap "$VMAP_JSON" "
         ${NORMALIZE_DEF}
         ${NULL_FIX}
         | ${PURL_FIX}
+        | ${VENDORED_CPE_FIX}
         | ${LICENSE_FIX}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
@@ -91,7 +114,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S "${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${LICENSE_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

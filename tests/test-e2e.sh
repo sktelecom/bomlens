@@ -542,6 +542,80 @@ EOF
 fi
 
 # --------------------------------------------------------
+# Group 4b2: vendored-OSS identification (SCANOSS). Network + opt-in image, so
+# it is gated behind SCANOSS_E2E=1 and never part of the default/CI run (OSSKB
+# is rate-limited and identification-only). The deterministic half (the
+# off-by-default suggestion) runs whenever the image is available.
+# --------------------------------------------------------
+section "Vendored-OSS identification E2E"
+
+have_scanoss=0
+if [ "$have_image" = 1 ] && \
+   docker run --rm --entrypoint sh "$SCANNER_IMG" -c 'command -v scanoss-py' >/dev/null 2>&1; then
+    have_scanoss=1
+fi
+
+if [ "$have_image" != 1 ]; then
+    skip "vendored-OSS identification (scanner image not available)"
+else
+    # Deterministic: a C/C++ tree with no package manager and a near-empty scan
+    # must record the off-by-default suggestion (no SCANOSS needed for this).
+    w="$(mktemp -d "$WORK_ROOT/vend.XXXXXX")"
+    mkdir -p "$w/src"
+    cat > "$w/src/main.c" <<'EOF'
+int main(void) { return 0; }
+EOF
+    ( cd "$w" && bash "$SCAN" --project "vendtest" --version "1.0" \
+        --generate-only ) > "$w/_suggest.log" 2>&1 || true
+    sbom="$w/vendtest_1.0_bom.json"
+    if [ -f "$sbom" ] && jq -e '.metadata.properties[]? | select(.name=="bomlens:suggest-identify-vendored" and .value=="true")' "$sbom" >/dev/null 2>&1; then
+        pass "C/C++ source with no manifest records the identify-vendored suggestion"
+    else
+        fail "vendored suggestion not recorded for a bare C/C++ tree" "$(tail -5 "$w/_suggest.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+
+    # Real identification needs scanoss-py in the image + OSSKB reachability.
+    if [ "$have_scanoss" != 1 ]; then
+        skip "vendored identification scan (image lacks scanoss-py — build --build-arg SBOM_SCANOSS=true)"
+    elif [ "${SCANOSS_E2E:-0}" != "1" ]; then
+        skip "vendored identification scan (set SCANOSS_E2E=1 to hit the OSSKB API)"
+    else
+        ( cd "$w" && bash "$SCAN" --project "vendtest2" --version "1.0" \
+            --identify-vendored --all --generate-only ) > "$w/_identify.log" 2>&1 || true
+        # Wiring check is deterministic; a specific match is not (depends on OSSKB).
+        if grep -q "Identifying vendored open source" "$w/_identify.log" 2>/dev/null; then
+            pass "--identify-vendored runs the SCANOSS step inside the container"
+        else
+            fail "--identify-vendored did not invoke the SCANOSS step" "$(tail -8 "$w/_identify.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        sbom2="$w/vendtest2_1.0_bom.json"
+        if [ -f "$sbom2" ] && jq -e '.bomFormat=="CycloneDX"' "$sbom2" >/dev/null 2>&1; then
+            pass "--identify-vendored produces a valid CycloneDX SBOM"
+        else
+            fail "--identify-vendored SBOM invalid/missing"
+        fi
+
+        # Over-detection guard (the scenario raised in review): enabling
+        # --identify-vendored on a normal package-managed project must NOT balloon
+        # the component count. Reconciliation drops SCANOSS matches that the npm
+        # scan already declared, so the count stays ~equal to baseline.
+        if [ -d "$EXAMPLES/nodejs" ]; then
+            wb="$(run_source_scan "$EXAMPLES/nodejs" --all)"
+            base_n=$(jq '[.components[]?]|length' "$wb/testapp_1.0_bom.json" 2>/dev/null || echo 0)
+            wv="$(run_source_scan "$EXAMPLES/nodejs" --all --identify-vendored)"
+            vend_n=$(jq '[.components[]?]|length' "$wv/testapp_1.0_bom.json" 2>/dev/null || echo 0)
+            if [ "${base_n:-0}" -gt 0 ] && [ "${vend_n:-0}" -le "$((base_n + 3))" ]; then
+                pass "managed project: --identify-vendored does not over-detect (base=$base_n, with=$vend_n)"
+            else
+                fail "managed project over-detection" "base=$base_n, with=$vend_n (expected with <= base+3)"
+            fi
+            rm -rf "$wb" "$wv"
+        fi
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
 # Group 4c: supplier SBOM analysis E2E through the container (requires image)
 # --------------------------------------------------------
 section "Supplier SBOM analysis E2E"

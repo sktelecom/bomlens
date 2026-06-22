@@ -82,7 +82,7 @@ jobs:
           shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
           echo ""
           echo "Checking docker/lib post-process scripts..."
-          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh || true
+          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/identify-vendored.sh docker/lib/suggest-vendored.sh docker/lib/reconcile-vendored.sh || true
           echo ""
           echo "Checking tests/test-scan.sh..."
           shellcheck tests/test-scan.sh || true

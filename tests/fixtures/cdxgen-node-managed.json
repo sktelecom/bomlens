@@ -1,0 +1,13 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "application", "name": "webapp", "version": "1.0.0" }
+  },
+  "components": [
+    { "type": "library", "name": "lodash", "version": "4.17.21", "purl": "pkg:npm/lodash@4.17.21" },
+    { "type": "library", "name": "express", "version": "4.18.2", "purl": "pkg:npm/express@4.18.2" },
+    { "type": "library", "name": "axios", "version": "1.6.0", "purl": "pkg:npm/axios@1.6.0" }
+  ]
+}

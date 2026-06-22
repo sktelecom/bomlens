@@ -10,6 +10,7 @@
     "version": "버전",
     "versionPlaceholder": "1.0.0",
     "options": "생성 옵션",
+    "advanced": "고급",
     "run": "스캔 실행",
     "running": "스캔 중…"
   },
@@ -45,7 +46,9 @@
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "정밀 라이선스",
-    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)"
+    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)",
+    "identifyVendored": "내장 오픈소스 식별",
+    "identifyVendoredHint": "패키지 매니저가 없는 C/C++ 소스용. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다."
   },
   "progress": {
     "title": "실행 로그",
@@ -58,6 +61,11 @@
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
+    "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
+    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스가 소스째 복사(vendored)돼 있는 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급에서 \"내장 오픈소스 식별\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
+    "vendoredBadge": "vendored",
+    "vendoredBadgeHint": "소스에 복사된 오픈소스로 SCANOSS가 식별",
+    "vendoredMatch": "일치도 {{pct}}",
     "severityTitle": "심각도 분포",
     "noVulns": "발견된 취약점이 없습니다",
     "artifacts": "생성된 결과물",
