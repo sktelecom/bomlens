@@ -4,7 +4,7 @@
       "id": "file",
       "component": "openssl",
       "vendor": "openssl",
-      "version": "1.1.1w",
+      "version": "openssl-3.0.0",
       "purl": ["pkg:github/openssl/openssl"],
       "licenses": [{ "name": "Apache-2.0" }],
       "matched": "100%"

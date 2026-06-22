@@ -109,6 +109,9 @@ fi
 #   - keep only full-file matches (.id == "file")
 #   - carry SCANOSS' cpe through when present (lets Trivy match CVEs directly;
 #     normalize-sbom.sh fills the gap for libraries SCANOSS gives no cpe for)
+#   - normalize the version: OSSKB returns git-tag forms (e.g. "openssl-3.0.0",
+#     "v1.2.13"), which would otherwise produce a malformed CPE and miss CVEs.
+#     Strip a leading "<component>-"/"<component>_" and a leading "v" before a digit.
 #   - tag provenance: bomlens:layer=vendored, identifiedBy=scanoss, match %, source file
 #   - dedupe by purl (fallback name@version), matching merge-sbom.sh
 COMPS=$(jq -c '
@@ -119,7 +122,10 @@ COMPS=$(jq -c '
       | {
           type: "library",
           name: (.component // ((.purl[0] // "") | sub("^pkg:[^/]+/"; ""))),
-          version: (.version // ""),
+          version: ( (.component // "") as $c
+                     | (.version // "")
+                     | ltrimstr($c + "-") | ltrimstr($c + "_")
+                     | sub("^[vV](?=[0-9])"; "") ),
           purl: (.purl[0] // null),
           cpe: (.cpe[0]? // null),
           licenses: ( [ .licenses[]?.name // empty ]

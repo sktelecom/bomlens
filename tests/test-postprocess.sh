@@ -166,6 +166,11 @@ if jq -e '.components[] | select(.name=="openssl") | .properties[]? | select(.na
 else
     fail "missing bomlens:identifiedBy=scanoss provenance"
 fi
+# OSSKB returns git-tag versions (e.g. "openssl-3.0.0"); they must be normalized
+# or the synthesized CPE is malformed and Trivy matches nothing (found via the
+# real-OSSKB spike). The component version must be the bare "3.0.0".
+ssl_ver=$(jq -r '.components[] | select(.name=="openssl") | .version' "$WORK/vend.json")
+[ "$ssl_ver" = "3.0.0" ] && pass "git-tag version normalized (openssl-3.0.0 -> 3.0.0)" || fail "version='$ssl_ver', expected 3.0.0 (normalization)"
 
 echo "== vendored: identify -> merge -> normalize completes the PURL->CVE chain =="
 # Merge the vendored components with a sparse cdxgen C/C++ SBOM, then normalize.
@@ -179,7 +184,7 @@ fi
 bash "$LIB/normalize-sbom.sh" "$WORK/merged.json" >/dev/null 2>&1
 # openssl: no SCANOSS cpe, but the map yields one -> Trivy can now match CVEs.
 ssl_cpe=$(jq -r '.components[] | select(.name=="openssl") | .cpe // "ABSENT"' "$WORK/merged.json")
-[ "$ssl_cpe" = "cpe:2.3:a:openssl:openssl:1.1.1w:*:*:*:*:*:*:*" ] \
+[ "$ssl_cpe" = "cpe:2.3:a:openssl:openssl:3.0.0:*:*:*:*:*:*:*" ] \
     && pass "openssl PURL mapped to a Trivy-matchable cpe ($ssl_cpe)" \
     || fail "openssl cpe='$ssl_cpe' (PURL->CVE chain broken)"
 # niche liblfds: no NVD record -> identified only, original PURL preserved.

@@ -59,4 +59,6 @@ SCANOSS_API_KEY=your-key \
 scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendored --all --generate-only
 ```
 
+버전은 근사값입니다. 파일 매치는 그 파일 내용이 처음 등장한 릴리스를 버전으로 보고하므로, 같은 라이브러리라도 파일마다 버전이 조금씩 다르게 나오거나 실제보다 한 단계 어긋난 릴리스로 보고될 수 있습니다. 버전(과 그로부터 도출된 CVE)은 최종 판정이 아니라 검토의 출발점으로 삼으세요.
+
 결과는 사람 검토가 도움이 되는 best-effort 추정입니다. OSSKB 약관과 라이선스 설명은 [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참조하세요.

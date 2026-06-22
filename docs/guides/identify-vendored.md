@@ -59,4 +59,6 @@ SCANOSS_API_KEY=your-key \
 scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendored --all --generate-only
 ```
 
+Version precision is approximate. A file match reports the release where that file content first appeared, so different files of the same library can resolve to slightly different versions and a copied-in library may be reported a point release off. Treat the version (and any CVEs derived from it) as a starting point for review, not a final verdict.
+
 Results are a best-effort estimate that benefits from human review. See the OSSKB terms and license notes in [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md).
