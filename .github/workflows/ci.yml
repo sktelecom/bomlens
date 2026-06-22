@@ -88,7 +88,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-vendored-adversarial.sh tests/check-examples-sync.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -133,6 +133,9 @@ jobs:
       # test-all.sh. Guards the verification-report defects B-1..B-6 cheaply.
       - name: Post-process unit tests
         run: bash tests/test-postprocess.sh
+
+      - name: Vendored-OSS adversarial tests
+        run: bash tests/test-vendored-adversarial.sh
 
       - name: Examples / docs / test-all.sh sync check
         run: bash tests/check-examples-sync.sh
