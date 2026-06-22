@@ -90,6 +90,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 
 - With a package manager (Conan `conanfile.txt` / vcpkg `vcpkg.json`), dependencies resolve and appear in the SBOM.
 - Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server delivery — OS rootfs, application, and static-link dependencies as separate layers — see the [server delivery guide](server-delivery.md).
+- When the open source is copied (vendored) straight into the sources and the scan finds almost nothing, add `--identify-vendored` to identify it as named components — see [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
 **Deliverables**: notice, SBOM, risk report (three)
