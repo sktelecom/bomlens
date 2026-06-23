@@ -10,7 +10,6 @@
 | [데스크톱 앱 검토 보고서](desktop-app-study.md) | Windows 데스크톱 앱(Electron) 도입 검토 |
 | [공급사 제출 SBOM 검증·분석](supplier-sbom-analysis.md) | ANALYZE 모드 검증·변환·위험 보고 설계 |
 | [펌웨어 분석](firmware-analysis.md) | FIRMWARE 모드 언팩·바이너리 식별 설계와 도구 선정 |
-| [AI SBOM 대응 준비](ai-sbom-readiness.md) | AI SBOM 규제·가이드 분석, 갭 분석, 포맷·도구 평가와 우선 역량 로드맵 |
 | [개선 로드맵](improvement-roadmap.md) | 스캔 결과에서 드러난 미비점과 우선순위 |
 | [문서 사용성 검토 보고서](docs-usability-review.md) | 신규 사용자 관점의 README와 가이드 검토, 우선순위 개선안 |
 | [외부 등록 채널](seo-external-listings.md) | 검색·AI 노출용 큐레이션 목록과 레지스트리 제출 자료 |
