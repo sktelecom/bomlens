@@ -76,7 +76,7 @@ jobs:
           shellcheck docker/entrypoint.sh || true
           echo ""
           echo "Checking docker/lib/scan-firmware.sh..."
-          shellcheck docker/lib/scan-firmware.sh || true
+          shellcheck docker/lib/scan-firmware.sh docker/lib/scan-aibom.sh || true
           echo ""
           echo "Checking docker/lib analyze scripts..."
           shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
@@ -88,7 +88,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/check-examples-sync.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -136,6 +136,9 @@ jobs:
 
       - name: Output regression snapshots
         run: bash tests/test-snapshot.sh
+
+      - name: AI SBOM post-process tests
+        run: bash tests/test-aibom.sh
 
       - name: Vendored-OSS adversarial tests
         run: bash tests/test-vendored-adversarial.sh

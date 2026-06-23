@@ -174,6 +174,17 @@ EOF
         bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION"
         ;;
 
+    AIBOM)
+        # AI model SBOM: the OWASP AIBOM Generator (opt-in bomlens-aibom image)
+        # reads the HuggingFace model card and emits CycloneDX 1.7. The common
+        # post-processing runs on it unchanged (normalize keeps the 1.7 specVersion
+        # and the modelCard; notice/risk cover the model & dataset licenses). It
+        # sets its own metadata.component, so no stamp pass is needed below.
+        if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode."; exit 1; fi
+        echo "[1/2] aibom: generate AI SBOM for $MODEL_ID"
+        bash "$LIBDIR/scan-aibom.sh" "$MODEL_ID" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        ;;
+
     MERGE)
         # Combine several already-generated CycloneDX SBOMs into one (e.g. a
         # server's OS rootfs layer + application layer + static-link layer).
@@ -214,7 +225,7 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/ANALYZE/MERGE/POSTPROCESS/UI)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/ANALYZE/MERGE/POSTPROCESS/UI)"
         exit 1
         ;;
 esac

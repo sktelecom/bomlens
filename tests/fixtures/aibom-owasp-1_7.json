@@ -1,0 +1,149 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "serialNumber": "urn:uuid:f8c747e7-e4dd-4a6b-9962-711df2a6542f",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-23T13:18:25+00:00",
+    "tools": {
+      "components": [
+        {
+          "bom-ref": "pkg:generic/owasp-genai/owasp-aibom-generator@1.0.2",
+          "type": "application",
+          "name": "owasp-aibom-generator",
+          "version": "1.0.2",
+          "manufacturer": {
+            "name": "OWASP GenAI Security Project"
+          }
+        }
+      ]
+    },
+    "component": {
+      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-06-23-22:18:25@1782220705",
+      "type": "application",
+      "name": "job-2026-06-23-22:18:25",
+      "description": "Generating SBOM for google-bert/bert-base-uncased",
+      "version": "1782220705",
+      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-06-23-22:18:25@1782220705",
+      "manufacturer": {
+        "name": "OWASP AIBOM Generator"
+      },
+      "supplier": {
+        "name": "OWASP AIBOM Generator"
+      }
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "type": "machine-learning-model",
+      "group": "google-bert",
+      "name": "bert-base-uncased",
+      "version": "86b5e093",
+      "purl": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "description": "No description available",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "modelCard": {
+        "modelParameters": {
+          "task": "fill-mask",
+          "modelArchitecture": "bert",
+          "datasets": [
+            {
+              "type": "dataset",
+              "name": "bookcorpus",
+              "contents": {
+                "url": "https://huggingface.co/datasets/bookcorpus"
+              }
+            },
+            {
+              "type": "dataset",
+              "name": "wikipedia",
+              "contents": {
+                "url": "https://huggingface.co/datasets/wikipedia"
+              }
+            }
+          ]
+        },
+        "considerations": {
+          "technicalLimitations": [
+            "You can use the raw model for either masked language modeling or next sentence prediction, but it's mostly intended to be fine-tuned on a downstream task"
+          ]
+        },
+        "properties": [
+          {
+            "name": "genai:aibom:modelcard:vocabSize",
+            "value": "30522"
+          },
+          {
+            "name": "serialNumber",
+            "value": "urn:uuid:google-bert-bert-base-uncased"
+          },
+          {
+            "name": "safetyRiskAssessment",
+            "value": "Even if the training data used for this model could be characterized as fairly neutral, this model can have biased predictions: ```python >>> from transformers import pipeline >>> unmasker = pipeline('fill-mask', model='bert-base-uncased') >>> unmasker(\"The man worked as a [MASK]"
+          }
+        ]
+      },
+      "manufacturer": {
+        "name": "google-bert",
+        "url": [
+          "https://huggingface.co/google-bert"
+        ]
+      },
+      "supplier": {
+        "name": "google-bert"
+      },
+      "authors": [
+        {
+          "name": "google-bert"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased",
+          "comment": "Model repository"
+        },
+        {
+          "type": "distribution",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/tree/main",
+          "comment": "Model files"
+        },
+        {
+          "type": "vcs",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/commit/86b5e0934494bd15c9632b12f734a8a67f723594",
+          "comment": "Specific commit"
+        },
+        {
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/bookcorpus",
+          "comment": "Training dataset: bookcorpus"
+        },
+        {
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/wikipedia",
+          "comment": "Training dataset: wikipedia"
+        },
+        {
+          "type": "documentation",
+          "url": "https://arxiv.org/abs/1810.04805",
+          "comment": "ArXiv Paper"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/google-bert/bert-base-uncased@86b5e093",
+      "dependsOn": [
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ]
+    }
+  ]
+}

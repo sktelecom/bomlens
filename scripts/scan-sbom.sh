@@ -26,6 +26,7 @@ BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/bomlens-firmware:latest}"     # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
+AIBOM_IMAGE="${SBOM_AIBOM_IMAGE:-ghcr.io/sktelecom/bomlens-aibom:latest}"               # opt-in (OWASP AIBOM Generator; HuggingFace network)
 # Language detection + cdxgen image selection are shared with the web UI source
 # path (docker/entrypoint.sh) so both resolve transitive deps identically.
 # shellcheck source=docker/lib/source-detect.sh
@@ -43,7 +44,7 @@ TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
-FORCE_FIRMWARE="false"; ANALYZE_SBOM=""
+FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
 SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
@@ -59,6 +60,7 @@ while [[ "$#" -gt 0 ]]; do
         --version) PROJECT_VERSION="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
         --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
+        --model) MODEL="$2"; shift ;;
         --merge)
             # Variadic: absorb every following token until the next option (a
             # token starting with '-'). These are already-generated SBOMs to
@@ -99,6 +101,10 @@ Options:
   --firmware             Force firmware mode for --target file (opt-in image)
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
+  --model <owner/name>   Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a
+                         HuggingFace model via the OWASP AIBOM Generator (opt-in
+                         image; fetches model-card metadata over the network).
+                         Mutually exclusive with --target/--analyze/--git/--merge.
   --merge <a.json> <b.json> [...]
                          Merge 2+ CycloneDX SBOMs into one, dedupe by purl, and
                          stamp the root component with --project/--version. For
@@ -134,6 +140,7 @@ Environment:
   COSIGN_KEY             Signing key for --sign
   SBOM_SCANNER_IMAGE     Override the scanner image
   SBOM_FIRMWARE_IMAGE    Override the firmware image
+  SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
   SCANOSS_API_URL        Vendored-OSS endpoint for --identify-vendored
                          (default: the free OSSKB API; set to a self-hosted
                          SCANOSS endpoint for air-gapped or high-volume use)
@@ -354,6 +361,7 @@ fi
 if [ -n "$GIT_URL" ]; then
     [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
     [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --git is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$MODEL" ]       || { echo "[ERROR] --git is mutually exclusive with --model."; exit 1; }
     [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --git cannot be combined with --firmware."; exit 1; }
     ingest_git "$GIT_URL"
 elif [ -n "$TARGET" ] && [ -f "$TARGET" ] && is_archive "$TARGET"; then
@@ -367,6 +375,7 @@ if [ "${#MERGE_FILES[@]}" -gt 0 ]; then
     [ -z "$TARGET" ]      || { echo "[ERROR] --merge is mutually exclusive with --target."; exit 1; }
     [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --merge is mutually exclusive with --analyze."; exit 1; }
     [ -z "$GIT_URL" ]     || { echo "[ERROR] --merge is mutually exclusive with --git."; exit 1; }
+    [ -z "$MODEL" ]       || { echo "[ERROR] --merge is mutually exclusive with --model."; exit 1; }
     [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --merge cannot be combined with --firmware."; exit 1; }
     [ "${#MERGE_FILES[@]}" -ge 2 ] || { echo "[ERROR] --merge needs at least 2 SBOM files."; exit 1; }
     for mf in "${MERGE_FILES[@]}"; do
@@ -385,6 +394,15 @@ elif [ -n "$ANALYZE_SBOM" ]; then
     MODE="ANALYZE"
     # The risk report needs both license and vulnerability data, so enable them.
     GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
+elif [ -n "$MODEL" ]; then
+    # AI model SBOM via the OWASP AIBOM Generator (opt-in bomlens-aibom image).
+    [ -z "$TARGET" ]      || { echo "[ERROR] --model is mutually exclusive with --target."; exit 1; }
+    [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --model is mutually exclusive with --analyze."; exit 1; }
+    [ -z "$GIT_URL" ]     || { echo "[ERROR] --model is mutually exclusive with --git."; exit 1; }
+    [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --model cannot be combined with --firmware."; exit 1; }
+    MODE="AIBOM"
+    # Default the project name to the model's last segment (owner/name -> name).
+    [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${MODEL##*/}"
 elif [ -n "$TARGET" ]; then
     if [ -f "$TARGET" ]; then
         if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then MODE="FIRMWARE"; else MODE="BINARY"; fi
@@ -472,15 +490,16 @@ if [ "$MODE" = "SOURCE" ]; then
         -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
-    # image / binary / rootfs / firmware / analyze / merge: scanner image runs the
-    # syft (or merge/convert) step + common pipeline in one shot. Firmware needs
-    # the heavier opt-in image (unblob/cve-bin-tool); others use the base image.
+    # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
+    # runs the generation step + common pipeline in one shot. Firmware and aibom
+    # need their heavier opt-in images; others use the base image.
     VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
         IMAGE)  VOL="-v \"$SOURCE_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
+        AIBOM)  VOL="-v \"$SOURCE_DIR\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
         ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$SOURCE_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files
