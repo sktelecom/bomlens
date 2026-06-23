@@ -56,7 +56,7 @@ ARG SCANOSS_VERSION=1.25.2
 ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
-# renovate: datasource=github-releases depName=docker/cli extractVersion=^v(?<version>.+)$
+# renovate: datasource=github-tags depName=docker/cli extractVersion=^v(?<version>.+)$
 ARG DOCKER_CLI_VERSION=27.5.1
 
 # Firmware analysis (opt-in image `sbom-scanner-firmware`). GPL tools are isolated
