@@ -69,6 +69,15 @@ ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
 ARG UBI_READER_VERSION=0.8.13
 
+# AI SBOM generation (opt-in image `bomlens-aibom`). owasp-aibom-generator is
+# Apache-2.0 and fetches HuggingFace model-card metadata over the network at scan
+# time. Kept opt-in (network + extra deps) like SCANOSS so the base image stays
+# local-first. No PyPI release yet, so it is pinned to a commit; when the project
+# tags releases, Renovate's github-tags datasource picks them up.
+ARG SBOM_AIBOM=false
+# renovate: datasource=github-tags depName=GenAI-Security-Project/aibom-generator
+ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
+
 # jq (helper scripts), curl/tar (installers), file (binary mode),
 # git (web UI 'GitHub URL' ingestion: server.py clones into a temp source tree).
 # python3 + pip are already in the python:3.12-slim base (web UI + scancode).
@@ -156,10 +165,26 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi
 
+# OWASP AIBOM Generator (opt-in: --build-arg SBOM_AIBOM=true). Generates an AI
+# SBOM (CycloneDX 1.7) for a HuggingFace model id; see scan-aibom.sh and
+# docs/internal/ai-sbom-readiness.md. Apache-2.0, pinned to a commit (no PyPI
+# release yet). Cloned into /opt/aibom-generator and run as `python -m src.cli`
+# from there: a bare `pip install` drops the tool's data files (model-field
+# registry, SPDX schema), so we keep the repo layout. git is in the base layer.
+RUN if [ "$SBOM_AIBOM" = "true" ]; then \
+      git clone --quiet https://github.com/GenAI-Security-Project/aibom-generator /opt/aibom-generator \
+      && git -C /opt/aibom-generator checkout --quiet "${AIBOM_GENERATOR_REF}" \
+      && pip3 install --no-cache-dir -r /opt/aibom-generator/requirements.txt \
+      && ( cd /opt/aibom-generator && python3 -m src.cli --help >/dev/null ); \
+    else \
+      echo "[build] aibom generator skipped (SBOM_AIBOM=false)"; \
+    fi
+
 # Reflects the firmware build flavor. When SBOM_FIRMWARE=true the image bundles GPL
 # tools (cve-bin-tool, ubi_reader); the source-offer label points to the inventory.
 LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
       com.sktelecom.sbom.scanoss-tools="${SBOM_SCANOSS}" \
+      com.sktelecom.sbom.aibom-tools="${SBOM_AIBOM}" \
       com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan
