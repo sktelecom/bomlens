@@ -10,7 +10,29 @@
       "matched": "100%"
     }
   ],
+  "node_modules_copy/lodash/core.js": [
+    {
+      "id": "file",
+      "component": "lodash",
+      "vendor": "lodash",
+      "version": "4.17.21",
+      "purl": ["pkg:github/lodash/lodash"],
+      "licenses": [{ "name": "MIT" }],
+      "matched": "100%"
+    }
+  ],
   "src/liblfds/lfds.c": [
+    {
+      "id": "file",
+      "component": "liblfds",
+      "vendor": "liblfds",
+      "version": "6.1.1",
+      "purl": ["pkg:github/liblfds/liblfds"],
+      "licenses": [{ "name": "Unlicense" }],
+      "matched": "100%"
+    }
+  ],
+  "src/liblfds/btree.c": [
     {
       "id": "file",
       "component": "liblfds",

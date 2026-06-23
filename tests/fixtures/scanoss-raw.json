@@ -10,7 +10,29 @@
       "matched": "100%"
     }
   ],
+  "src/openssl/aes_core.c": [
+    {
+      "id": "file",
+      "component": "openssl",
+      "vendor": "openssl",
+      "version": "openssl-3.0.0",
+      "purl": ["pkg:github/openssl/openssl"],
+      "licenses": [{ "name": "Apache-2.0" }],
+      "matched": "100%"
+    }
+  ],
   "src/liblfds/lfds.c": [
+    {
+      "id": "file",
+      "component": "liblfds",
+      "vendor": "liblfds",
+      "version": "6.1.1",
+      "purl": ["pkg:github/liblfds/liblfds"],
+      "licenses": [{ "name": "Unlicense" }],
+      "matched": "100%"
+    }
+  ],
+  "src/liblfds/btree.c": [
     {
       "id": "file",
       "component": "liblfds",

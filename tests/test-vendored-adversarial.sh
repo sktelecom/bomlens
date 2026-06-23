@@ -34,10 +34,13 @@ printf '%s\n' '#!/bin/bash' \
 chmod +x "$WORK/bin/scanoss-py"
 
 # identify <raw_file> <out_file> — run identify-vendored.sh with the mock.
+# SCANOSS_MIN_FILES=1 keeps single-file matches so these cases (which probe CPE
+# grammar, version forms, injection, volume — not coverage) behave 1:1 with the
+# crafted raw. The coverage filter itself is exercised in its own section below.
 identify() {
     local raw="$1" out="$2" src="$WORK/src"
     rm -rf "$src"; mkdir -p "$src"; echo 'int main(void){return 0;}' > "$src/m.c"
-    SCANOSS_RAW_FIXTURE="$raw" PATH="$WORK/bin:$PATH" \
+    SCANOSS_RAW_FIXTURE="$raw" SCANOSS_MIN_FILES=1 PATH="$WORK/bin:$PATH" \
         bash "$LIB/identify-vendored.sh" "$src" "$out" "1.0" >/dev/null 2>&1
 }
 # valid_cdx <file> — true if it parses and components is an array.
@@ -178,6 +181,41 @@ identify "$WORK/raw.json" "$WORK/s1.json"; identify "$WORK/raw.json" "$WORK/s2.j
 bash "$LIB/normalize-sbom.sh" "$WORK/s1.json" --stable >/dev/null 2>&1
 bash "$LIB/normalize-sbom.sh" "$WORK/s2.json" --stable >/dev/null 2>&1
 if diff -q "$WORK/s1.json" "$WORK/s2.json" >/dev/null 2>&1; then pass "two identical scans are byte-identical after --stable"; else fail "byte-stable diff" "$(diff "$WORK/s1.json" "$WORK/s2.json" | head)"; fi
+
+echo "== coverage filter: single-file fork noise dropped, real lib consolidated =="
+# Models the real-OSSKB failure mode: a widely-copied library (openssl) matches
+# scattered downstream forks (same NAME, differing purl/version), plus one-off
+# single-file matches to unrelated projects. The default SCANOSS_MIN_FILES=2
+# should drop the one-off noise and consolidate openssl to one component with the
+# CONSENSUS version/purl (not the minority wrong one).
+cat > "$WORK/cov.json" <<'COV'
+{
+ "f1.c":[{"id":"file","component":"openssl","version":"3.0.0","purl":["pkg:github/openssl/openssl"],"matched":"100%"}],
+ "f2.c":[{"id":"file","component":"openssl","version":"3.0.0","purl":["pkg:github/openssl/openssl"],"matched":"100%"}],
+ "f3.c":[{"id":"file","component":"openssl","version":"3.0.0","purl":["pkg:github/openssl/openssl"],"matched":"100%"}],
+ "f4.c":[{"id":"file","component":"openssl","version":"OpenSSL_0_9_1c","purl":["pkg:github/bilibili/openssl"],"matched":"100%"}],
+ "g1.c":[{"id":"file","component":"globus-toolkit","version":"1.0","purl":["pkg:github/globus/globus-toolkit"],"matched":"100%"}],
+ "h1.c":[{"id":"file","component":"halite","version":"0.4","purl":["pkg:github/x/halite"],"matched":"100%"}],
+ "l1.c":[{"id":"file","component":"liblfds","version":"6.1.1","purl":["pkg:github/liblfds/liblfds"],"matched":"100%"}],
+ "l2.c":[{"id":"file","component":"liblfds","version":"6.1.1","purl":["pkg:github/liblfds/liblfds"],"matched":"100%"}]
+}
+COV
+mkdir -p "$WORK/srctree"; echo 'int x;' > "$WORK/srctree/a.c"
+SCANOSS_RAW_FIXTURE="$WORK/cov.json" PATH="$WORK/bin:$PATH" \
+    bash "$LIB/identify-vendored.sh" "$WORK/srctree" "$WORK/cov-out.json" "1.0" >/dev/null 2>&1
+names=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/cov-out.json" 2>/dev/null)
+[ "$names" = "liblfds,openssl" ] && pass "default threshold keeps only multi-file libs (openssl, liblfds); fork noise dropped" || fail "coverage filter result='$names', expected liblfds,openssl"
+ov=$(jq -r '.components[]|select(.name=="openssl")|.version' "$WORK/cov-out.json" 2>/dev/null)
+op=$(jq -r '.components[]|select(.name=="openssl")|.purl' "$WORK/cov-out.json" 2>/dev/null)
+[ "$ov" = "3.0.0" ] && pass "openssl resolves to the consensus version (3.0.0, not the minority 0.9.1c)" || fail "openssl version='$ov', expected 3.0.0"
+[ "$op" = "pkg:github/openssl/openssl" ] && pass "openssl resolves to the consensus PURL (canonical, not the fork)" || fail "openssl purl='$op'"
+ofiles=$(jq -r '.components[]|select(.name=="openssl")|.properties[]|select(.name=="bomlens:scanoss:files")|.value' "$WORK/cov-out.json" 2>/dev/null)
+[ "$ofiles" = "4" ] && pass "openssl carries its file-support count (bomlens:scanoss:files=4)" || fail "openssl files='$ofiles', expected 4"
+# Disabling the filter keeps every single-file match (back-compat escape hatch).
+SCANOSS_RAW_FIXTURE="$WORK/cov.json" SCANOSS_MIN_FILES=1 PATH="$WORK/bin:$PATH" \
+    bash "$LIB/identify-vendored.sh" "$WORK/srctree" "$WORK/cov1.json" "1.0" >/dev/null 2>&1
+n1=$(jq '[.components[]?]|length' "$WORK/cov1.json" 2>/dev/null)
+[ "$n1" = "4" ] && pass "SCANOSS_MIN_FILES=1 disables the filter (all 4 names kept)" || fail "min_files=1 produced $n1 components, expected 4"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
