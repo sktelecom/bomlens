@@ -68,12 +68,13 @@ flowchart TB
 | **syft** | `v1.18.1` | Stage 1 | 이미지·바이너리·RootFS 스캔 | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | SBOM 정규화·정렬 | 항상 |
 | **ScanCode Toolkit** | `32.3.0` | Stage 2 | 1st-party 소스 정밀 라이선스 탐지 | `--deep-license` (opt-in 빌드) |
+| **SCANOSS** | `1.25.2` | Stage 2 | 패키지 매니저 없는 C/C++ 소스의 vendored 오픈소스 식별 | `--identify-vendored` (opt-in 빌드) |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | 오픈소스 고지문(NOTICE) 생성 | `--notice` / `--all` |
 | **Trivy** | `v0.70.0` | Stage 2 | 취약점(CVE) 보안 보고서 | `--security` / `--all` |
 | **Cosign** | `v2.4.1` | Stage 2 | SBOM detached 서명 | `--sign` |
 | **curl** | — | Stage 2 | Dependency-Track 업로드 | 기본(=`--generate-only` 아님) |
 
-> 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다. ScanCode는 이미지 비대화를 막기 위해 `--build-arg SBOM_DEEP_LICENSE=true`로 빌드할 때만 포함되는 **opt-in**입니다.
+> 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다. 이미지 경량화를 위해 일부 도구는 **opt-in** 빌드 인자입니다: ScanCode(`--build-arg SBOM_DEEP_LICENSE=true`)와 SCANOSS 클라이언트(`--build-arg SBOM_SCANOSS=true`, 발행 이미지엔 포함). 펌웨어 언팩·식별(unblob, cve-bin-tool)은 별도 opt-in `bomlens-firmware` 이미지에 들어갑니다.
 
 ---
 
