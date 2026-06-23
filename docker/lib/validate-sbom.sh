@@ -18,6 +18,9 @@
 #   mandatory : timestamp, tool info, top component, name+version coverage,
 #               PURL coverage (>= threshold), no pkg:generic, transitive edges
 #   recommended (warn only): license coverage, hash coverage
+#   AI SBOMs (machine-learning-model present): G7 minimum-element checks are
+#               appended (model id/license/card/integrity, datasets, openness),
+#               all recommended — see docs/internal/ai-sbom-readiness.md.
 set -e
 
 SBOM="$1"
@@ -112,6 +115,41 @@ cdx_checks() {
       ]" "$SBOM"
 }
 
+# G7 AI SBOM minimum-element checks (appended for CycloneDX SBOMs that carry a
+# machine-learning-model component). Maps the model/dataset/metadata clusters of
+# the G7 "minimum elements for AI SBOMs" to fields present in a CycloneDX 1.7
+# ML-BOM. All are recommended (required:false) — G7 is a non-binding guideline,
+# and several fields (integrity hashes, the openness 4-axis) depend on what the
+# model publisher declared, so the report surfaces coverage and a human judges.
+# System-level / infrastructure / KPI clusters are not checkable from a
+# single-model AI SBOM and are intentionally omitted.
+g7_ai_checks() {
+    jq -c --argjson cap "$MISSING_CAP" '
+    def cov($missing; $tot; $label; $id):
+      {id:$id, label:$label, required:false,
+       status:(if $tot==0 then "warn" elif ($missing|length)==0 then "pass" else "warn" end),
+       detail:"\($tot - ($missing|length))/\($tot) model component(s)", missing:($missing[0:$cap])};
+    ([.components[]? | select(.type=="machine-learning-model")]) as $m
+    | ($m|length) as $mtot
+    | ([$m[] | select(((.purl//"")=="") and ((.cpe//"")=="")) | (.name // "(unnamed)")]) as $no_id
+    | ([$m[] | select(((.hashes//[])|length)==0) | (.name // "(unnamed)")]) as $no_hash
+    | ([$m[] | select(((.licenses//[])|length)==0) | (.name // "(unnamed)")]) as $no_lic
+    | ([$m[] | select((.modelCard.modelParameters//null)==null) | (.name // "(unnamed)")]) as $no_mc
+    | (([.. | objects | select(has("datasets")) | .datasets[]?] + [.components[]? | select(.type=="data")]) | length) as $ds_count
+    | ([.. | strings | select(test("open[ _-]?(weight|architecture|data|training)";"i"))] | length) as $open_hits
+    | [
+        cov($no_id;   $mtot; "G7 model identifier (PURL/CPE)"; "g7-model-id"),
+        cov($no_lic;  $mtot; "G7 model license"; "g7-model-license"),
+        cov($no_mc;   $mtot; "G7 model card (architecture/training parameters)"; "g7-model-card"),
+        cov($no_hash; $mtot; "G7 model integrity (hashes)"; "g7-model-hash"),
+        {id:"g7-datasets", label:"G7 dataset provenance (datasets referenced)", required:false,
+         status:(if $ds_count>0 then "pass" else "warn" end), detail:"\($ds_count) dataset reference(s)", missing:[]},
+        {id:"g7-openness", label:"G7 model openness (weight/architecture/data/training)", required:false,
+         status:(if $open_hits>0 then "pass" else "warn" end),
+         detail:(if $open_hits>0 then "declared" else "not declared in the SBOM" end), missing:[]}
+      ]' "$SBOM"
+}
+
 spdx_json_checks() {
     jq -c \
        --argjson purlmin "$PURL_MIN_PCT" \
@@ -191,7 +229,17 @@ spdx_tv_checks() {
 # Compute checks for the detected format.
 # --------------------------------------------------------
 case "$FORMAT" in
-    CycloneDX)     CHECKS=$(cdx_checks) ;;
+    CycloneDX)
+        CHECKS=$(cdx_checks)
+        # Append G7 AI minimum-element checks when this is an AI SBOM (carries a
+        # machine-learning-model component) — works for both a generated AIBOM and
+        # a supplier-submitted AI SBOM under ANALYZE.
+        if jq -e '[.components[]? | select(.type=="machine-learning-model")] | length > 0' "$SBOM" >/dev/null 2>&1; then
+            G7=$(g7_ai_checks)
+            CHECKS=$(printf '%s\n%s' "$CHECKS" "$G7" | jq -cs 'add')
+            echo "[validate] AI SBOM detected -> added G7 minimum-element checks"
+        fi
+        ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;
     SPDX-TagValue) CHECKS=$(spdx_tv_checks) ;;
     *)

@@ -79,6 +79,26 @@ else
     fail "NOTICE missing or has no Apache-2.0 entry"
 fi
 
+echo "== validate-sbom.sh adds G7 minimum-element checks for an AI SBOM =="
+bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf" "bert-base-uncased" >/dev/null 2>&1
+CONF="$WORK/conf_conformance.json"
+if [ -f "$CONF" ]; then
+    g7n=$(jq '[.checks[] | select(.id|startswith("g7-"))] | length' "$CONF")
+    [ "$g7n" -ge 5 ] && pass "G7 checks present ($g7n)" || fail "expected >=5 G7 checks, got $g7n"
+    licst=$(jq -r '.checks[] | select(.id=="g7-model-license") | .status' "$CONF")
+    [ "$licst" = "pass" ] && pass "g7-model-license passes (Apache-2.0 present)" || fail "g7-model-license='$licst', expected pass"
+    # The known engine gaps (no hashes, no openness axis) must surface as warnings.
+    hashst=$(jq -r '.checks[] | select(.id=="g7-model-hash") | .status' "$CONF")
+    [ "$hashst" = "warn" ] && pass "g7-model-hash warns (integrity gap surfaced)" || fail "g7-model-hash='$hashst', expected warn"
+    openst=$(jq -r '.checks[] | select(.id=="g7-openness") | .status' "$CONF")
+    [ "$openst" = "warn" ] && pass "g7-openness warns (4-axis not declared)" || fail "g7-openness='$openst', expected warn"
+    # G7 checks are advisory: they must not flip the overall result to fail.
+    res=$(jq -r '.result' "$CONF")
+    [ "$res" != "fail" ] && pass "advisory G7 warnings do not fail the overall result" || fail "overall result is fail; G7 should be warn-only"
+else
+    fail "validate-sbom.sh did not produce a conformance report"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
