@@ -45,6 +45,8 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 
 > Every command also needs `--project <name> --version <version>` (see examples below).
+>
+> C/C++ without a package manager (Conan/vcpkg): add `--identify-vendored` so open source copied straight into the sources is detected as named components. Strongly recommended for this case — see [Scenario 3](#scenario-3--local-cc-source-directory).
 
 ## Scenario 1 — GitHub URL
 
@@ -90,7 +92,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 
 - With a package manager (Conan `conanfile.txt` / vcpkg `vcpkg.json`), dependencies resolve and appear in the SBOM.
 - Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server delivery — OS rootfs, application, and static-link dependencies as separate layers — see the [server delivery guide](server-delivery.md).
-- When the open source is copied (vendored) straight into the sources and the scan finds almost nothing, add `--identify-vendored` to identify it as named components — see [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
+- When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
 **Deliverables**: notice, SBOM, risk report (three)
