@@ -34,27 +34,39 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Pinned tool versions (supply-chain hygiene)
+# Pinned tool versions (supply-chain hygiene). The `# renovate:` comments let
+# Renovate (renovate.json customManagers) track each upstream and open bump PRs;
+# Dependabot cannot see these ARG-pinned, curl/pip-installed tools. See
+# docs/internal/dependency-upgrade-policy.md.
+# renovate: datasource=github-releases depName=anchore/syft
 ARG SYFT_VERSION=v1.18.1
+# renovate: datasource=github-releases depName=aquasecurity/trivy
 ARG TRIVY_VERSION=v0.70.0
+# renovate: datasource=github-releases depName=sigstore/cosign
 ARG COSIGN_VERSION=v2.4.1
+# renovate: datasource=pypi depName=scancode-toolkit
 ARG SCANCODE_VERSION=32.3.0
 ARG SBOM_DEEP_LICENSE=false
 # Vendored-OSS identification (opt-in: --build-arg SBOM_SCANOSS=true). scanoss.py
 # is MIT, so unlike the firmware GPL tools it can live in the base image; kept
 # opt-in only to keep the default image lean and free of outbound API calls.
 ARG SBOM_SCANOSS=false
+# renovate: datasource=pypi depName=scanoss
 ARG SCANOSS_VERSION=1.25.2
 ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
+# renovate: datasource=github-releases depName=docker/cli extractVersion=^v(?<version>.+)$
 ARG DOCKER_CLI_VERSION=27.5.1
 
 # Firmware analysis (opt-in image `sbom-scanner-firmware`). GPL tools are isolated
 # here so the base image stays permissive-only; see THIRD_PARTY_LICENSES.md.
 ARG SBOM_FIRMWARE=false
+# renovate: datasource=pypi depName=unblob
 ARG UNBLOB_VERSION=26.3.30
+# renovate: datasource=pypi depName=cve-bin-tool
 ARG CVE_BIN_TOOL_VERSION=3.4
+# renovate: datasource=pypi depName=ubi_reader
 ARG UBI_READER_VERSION=0.8.13
 
 # jq (helper scripts), curl/tar (installers), file (binary mode),

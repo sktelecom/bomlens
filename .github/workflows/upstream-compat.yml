@@ -1,0 +1,109 @@
+# Upstream compatibility early-warning. examples.yml runs with PINNED tool
+# versions, so it never tells us that the NEXT version will break. This job pulls
+# the latest cdxgen images at runtime, scans representative examples, and checks
+# the output is still well-formed CycloneDX with resolvable components. If a
+# future cdxgen breaks generation, this fires BEFORE we attempt the bump and
+# opens a tracking issue.
+#
+# Scope: cdxgen (pulled at runtime via CDXGEN_TAG / CDXGEN_ALLINONE, so it can
+# drift even on the moving v12 tag). syft/trivy are baked into the image by ARG;
+# their drift surfaces on the Renovate bump PR, which runs the full CI (example
+# scans + output snapshots). See docs/internal/dependency-upgrade-policy.md.
+name: Upstream compatibility
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # weekly Monday 06:00 UTC, after Renovate / examples
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  compat:
+    name: Latest cdxgen vs examples
+    runs-on: ubuntu-latest
+    env:
+      # Preview the newest cdxgen instead of the pinned tag.
+      CDXGEN_TAG: latest
+      CDXGEN_ALLINONE: ghcr.io/cyclonedx/cdxgen:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build SBOM Scanner image
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          load: true
+          tags: sbom-scanner:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan examples with the latest cdxgen
+        id: scan
+        env:
+          SBOM_SCANNER_IMAGE: sbom-scanner:test
+        run: |
+          set -u
+          # Examples that resolve real transitive dependencies (so a collapse to
+          # zero components is a meaningful regression signal).
+          EXAMPLES="python nodejs java-maven go"
+          report=""
+          failed=0
+          for ex in $EXAMPLES; do
+            echo "::group::$ex"
+            ( cd "examples/$ex" && ../../scripts/scan-sbom.sh \
+                --project "${ex}-compat" --version "1.0.0" --generate-only ) || {
+              report="${report}- ❌ ${ex}: scan-sbom.sh failed (latest cdxgen)\n"
+              failed=1; echo "::endgroup::"; continue; }
+            sbom=$(find "examples/$ex" -maxdepth 1 -name '*_bom.json' 2>/dev/null | head -1)
+            if [ -z "$sbom" ] || ! jq empty "$sbom" 2>/dev/null; then
+              report="${report}- ❌ ${ex}: no valid SBOM produced\n"; failed=1; echo "::endgroup::"; continue
+            fi
+            if ! jq -e '.bomFormat=="CycloneDX"' "$sbom" >/dev/null; then
+              report="${report}- ❌ ${ex}: output is not CycloneDX\n"; failed=1; echo "::endgroup::"; continue
+            fi
+            spec=$(jq -r '.specVersion' "$sbom")
+            count=$(jq '.components | length' "$sbom")
+            if [ "$count" -eq 0 ]; then
+              report="${report}- ❌ ${ex}: 0 components (dependency resolution broke)\n"; failed=1
+            else
+              report="${report}- ✅ ${ex}: ${count} components, specVersion ${spec}\n"
+            fi
+            echo "::endgroup::"
+          done
+          {
+            echo "## Latest-cdxgen compatibility"
+            echo ""
+            printf '%b' "$report"
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "report<<EOF"
+            printf '%b' "$report"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update tracking issue on failure
+        if: steps.scan.outputs.failed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ steps.scan.outputs.report }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Upstream compatibility: latest cdxgen breaks example scans"
+          body=$(printf '%b\n\nRun: %s\n\nThe pinned version still works; this is an early warning that bumping cdxgen will need attention. See docs/internal/dependency-upgrade-policy.md.' "$REPORT" "$RUN_URL")
+          existing=$(gh issue list --label upstream-compat --state open \
+            --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create upstream-compat --color FBCA04 --description "Upstream tool compatibility early warning" 2>/dev/null || true
+            gh issue create --title "$title" --label upstream-compat --body "$body"
+          fi

@@ -1,0 +1,146 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "name": "config.c",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "trelay"
+        }
+      ],
+      "purl": "pkg:generic/config.c",
+      "type": "file"
+    },
+    {
+      "name": "lfds.c",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "trelay"
+        }
+      ],
+      "purl": "pkg:generic/lfds.c",
+      "type": "file"
+    },
+    {
+      "name": "main.c",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "trelay"
+        }
+      ],
+      "purl": "pkg:generic/main.c",
+      "type": "file"
+    },
+    {
+      "name": "ssl_lib.c",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "trelay"
+        }
+      ],
+      "purl": "pkg:generic/ssl_lib.c",
+      "type": "file"
+    },
+    {
+      "licenses": [
+        {
+          "license": {
+            "name": "Unlicense"
+          }
+        }
+      ],
+      "name": "liblfds",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "vendored"
+        },
+        {
+          "name": "bomlens:identifiedBy",
+          "value": "scanoss"
+        },
+        {
+          "name": "bomlens:scanoss:files",
+          "value": "2"
+        },
+        {
+          "name": "bomlens:scanoss:match",
+          "value": "100%"
+        },
+        {
+          "name": "bomlens:scanoss:purl",
+          "value": "pkg:github/liblfds/liblfds"
+        },
+        {
+          "name": "bomlens:layer",
+          "value": "layer-1"
+        }
+      ],
+      "purl": "pkg:github/liblfds/liblfds",
+      "type": "library",
+      "version": "6.1.1"
+    },
+    {
+      "cpe": "cpe:2.3:a:openssl:openssl:3.0.0:*:*:*:*:*:*:*",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "openssl",
+      "properties": [
+        {
+          "name": "bomlens:layer",
+          "value": "vendored"
+        },
+        {
+          "name": "bomlens:identifiedBy",
+          "value": "scanoss"
+        },
+        {
+          "name": "bomlens:scanoss:files",
+          "value": "2"
+        },
+        {
+          "name": "bomlens:scanoss:match",
+          "value": "100%"
+        },
+        {
+          "name": "bomlens:scanoss:purl",
+          "value": "pkg:github/openssl/openssl"
+        },
+        {
+          "name": "bomlens:layer",
+          "value": "layer-1"
+        }
+      ],
+      "purl": "pkg:github/openssl/openssl",
+      "type": "library",
+      "version": "3.0.0"
+    }
+  ],
+  "dependencies": [],
+  "metadata": {
+    "component": {
+      "name": "trelay",
+      "type": "application",
+      "version": "26.4.0"
+    },
+    "tools": {
+      "components": [
+        {
+          "name": "bomlens-merge",
+          "type": "application"
+        }
+      ]
+    }
+  },
+  "specVersion": "1.6",
+  "version": 1
+}

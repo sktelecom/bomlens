@@ -63,6 +63,18 @@ git push origin vX.Y.Z
 - 태그 릴리스는 main push보다 무겁고 느리다. Android SDK 이미지 6종(멀티아치)과 firmware
   이미지를 추가로 빌드하기 때문이다. 전체가 그린이 될 때까지 기다려 확인한다.
 
+## 도구 버전 업그레이드
+
+외부 도구(cdxgen·trivy·syft·scanoss·unblob·cve-bin-tool·scancode 등)를 올릴 때 따르는 절차다. 전체 안전장치 설계는 [도구 버전 업그레이드 안전장치](dependency-upgrade-policy.md)를 보세요.
+
+버전 정본은 `docker/Dockerfile`의 ARG와 `docker/lib/source-detect.sh`의 cdxgen 태그다. Renovate가 이들을 추적해 bump PR을 연다. PR이 왔을 때 확인한다.
+
+1. **스냅샷 diff를 본다.** PR의 CI에서 `tests/test-snapshot.sh`가 출력 변화를 diff로 보여 준다. 변화가 없으면 안전한 bump다.
+2. **출력이 의도대로 바뀌었으면 golden을 갱신한다.** `UPDATE_SNAPSHOTS=1 bash tests/test-snapshot.sh`로 다시 떠서 같은 PR에 커밋하고, diff가 합당한지 검토한다.
+3. **cdxgen 메이저(예: v12에서 v13으로)**는 영향이 크다. 대표 예제 전체 스캔으로 컴포넌트 수와 specVersion이 유지되는지 확인하고, 필드 호환을 점검한다. `upstream-compat.yml`을 `workflow_dispatch`로 미리 돌려 최신 버전 결과를 본다.
+4. **trivy 메이저**는 보안 리포트의 검출 범위·심각도 판정을 바꿀 수 있다. 같은 SBOM에 대한 보안 리포트 요약이 어떻게 달라지는지 확인한다.
+5. **`upstream-compat`가 연 이슈**가 있으면 해당 bump PR을 연결해 닫는다.
+
 ## 재릴리스 주의
 
 같은 버전을 다시 발행하려면 태그, 릴리스, GHCR 이미지 태그를 모두 지우고 덮어야 한다. 실수가

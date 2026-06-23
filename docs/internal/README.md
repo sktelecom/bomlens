@@ -14,5 +14,6 @@
 | [문서 사용성 검토 보고서](docs-usability-review.md) | 신규 사용자 관점의 README와 가이드 검토, 우선순위 개선안 |
 | [외부 등록 채널](seo-external-listings.md) | 검색·AI 노출용 큐레이션 목록과 레지스트리 제출 자료 |
 | [배포 절차](release-guide.md) | 태그 기반 릴리스 체크리스트와 실행 절차 |
+| [도구 버전 업그레이드 안전장치](dependency-upgrade-policy.md) | 외부 도구 신규 버전 도입을 지키는 4계층(감지·스냅샷·정본·호환성 점검) |
 
 > 사용자용 경량 가이드는 상위 [docs/](../)에 있습니다. 펌웨어는 [펌웨어 분석 가이드](../guides/firmware.ko.md), 공급사 SBOM 검증은 [공급사 SBOM 검증 가이드](../guides/supplier-sbom.ko.md)를 참고하세요.
