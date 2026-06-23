@@ -114,7 +114,13 @@ fi
 #     Strip a leading "<component>-"/"<component>_" and a leading "v" before a digit.
 #   - tag provenance: bomlens:layer=vendored, identifiedBy=scanoss, match %, source file
 #   - dedupe by purl (fallback name@version), matching merge-sbom.sh
-COMPS=$(jq -c '
+#
+# Components are written to a file and passed to the final jq via --slurpfile, NOT
+# --argjson: a large source tree yields thousands of matches, and a multi-hundred-KB
+# --argjson string overflows Linux's per-argument limit (MAX_ARG_STRLEN, 128 KB),
+# which would silently produce an empty/invalid SBOM on the (Linux) scanner image.
+COMPS_FILE="$WORK/comps.json"
+jq -c '
     [ to_entries[]
       | .key as $file
       | .value[]?
@@ -145,12 +151,16 @@ COMPS=$(jq -c '
     | group_by(.purl // ((.name // "") + "@" + (.version // "")))
     | map(.[0])
     | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
-' "$RAW" 2>/dev/null || echo '[]')
+' "$RAW" > "$COMPS_FILE" 2>/dev/null || true
+# Guard: ensure a valid JSON array even if the transform failed.
+if [ ! -s "$COMPS_FILE" ] || ! jq -e 'type=="array"' "$COMPS_FILE" >/dev/null 2>&1; then
+    echo '[]' > "$COMPS_FILE"
+fi
 
-NCOMP=$(echo "$COMPS" | jq 'length' 2>/dev/null || echo 0)
+NCOMP=$(jq 'length' "$COMPS_FILE" 2>/dev/null || echo 0)
 
 jq -n \
-    --argjson comps "$COMPS" \
+    --slurpfile comps "$COMPS_FILE" \
     --arg version "$VERSION" \
     --arg ts "$GEN_AT" '
 {
@@ -161,7 +171,7 @@ jq -n \
     timestamp: $ts,
     tools: { components: [ { type: "application", name: "scanoss" } ] }
   },
-  components: $comps
+  components: $comps[0]
 }' > "$OUTPUT"
 
 echo "[vendored] SBOM written: $OUTPUT (vendored components=${NCOMP})"

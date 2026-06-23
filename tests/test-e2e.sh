@@ -611,6 +611,30 @@ EOF
             fi
             rm -rf "$wb" "$wv"
         fi
+
+        # False-positive probe: unique proprietary C must NOT match any OSS, so a
+        # genuinely-private source tree gains no spurious vendored components.
+        fp="$(mktemp -d "$WORK_ROOT/fp.XXXXXX")"; mkdir -p "$fp/src"
+        cat > "$fp/src/widget.c" <<'EOF'
+/* Proprietary, not open source. */
+static int skt_widget_counter_xyz9f3a = 0;
+int skt_widget_frobnicate_9f3a(int zorp){ skt_widget_counter_xyz9f3a += zorp*7+13; return skt_widget_counter_xyz9f3a ^ 0xC0FFEE; }
+int main(void){ return skt_widget_frobnicate_9f3a(42); }
+EOF
+        wf="$(run_source_scan "$fp" --identify-vendored)"
+        fpn=$(jq '[.components[]? | select(.properties[]?|select(.name=="bomlens:identifiedBy" and .value=="scanoss"))] | length' "$wf/testapp_1.0_bom.json" 2>/dev/null || echo 0)
+        [ "${fpn:-0}" = "0" ] && pass "proprietary C tree -> no false vendored matches" || fail "false positive: $fpn vendored component(s) on proprietary code"
+        rm -rf "$wf"
+
+        # Graceful degrade: a bad SCANOSS endpoint must not abort the scan; a valid
+        # SBOM is still produced (vendored step degrades to empty).
+        wg="$(SCANOSS_API_URL=https://invalid.nonexistent.invalid run_source_scan "$fp" --identify-vendored 2>/dev/null)"
+        if [ -f "$wg/testapp_1.0_bom.json" ] && jq -e '.bomFormat=="CycloneDX"' "$wg/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "bad SCANOSS endpoint degrades gracefully (valid SBOM still produced)"
+        else
+            fail "bad SCANOSS endpoint did not degrade gracefully"
+        fi
+        rm -rf "$fp" "$wg"
     fi
     rm -rf "$w"
 fi

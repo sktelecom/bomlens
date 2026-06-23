@@ -53,11 +53,20 @@ PURL_FIX='(.metadata.component) |= (if (has("purl") and (.purl|test("^pkg:swift/
 # otherwise we look the version-stripped PURL coordinate up in vendored-purl-map.json
 # and synthesize a cpe:2.3 (NVD). Coordinates not in the map (niche libraries with
 # no NVD record) keep their PURL and are simply identified, not vuln-matched.
+#
+# The version goes verbatim into the CPE's version field, so it MUST be CPE-safe:
+# a `:` (field separator), space, or wildcard (`*`/`?`) in the version would shift
+# or break the 13-field cpe:2.3 grammar and could make Trivy reject the whole SBOM
+# (the same failure class as the swift-purl bug above). SCANOSS versions are
+# attacker-influenceable (they come from the matched upstream), so only synthesize
+# a CPE when the version matches a conservative token; otherwise leave the
+# component identified-only (PURL kept, no CPE) rather than emit a malformed one.
 VMAP_JSON='{}'
 [ -f "$SCRIPT_DIR/vendored-purl-map.json" ] && VMAP_JSON=$(cat "$SCRIPT_DIR/vendored-purl-map.json")
 VENDORED_CPE_FIX='(.components) |= (if type=="array" then map(
   if ( ((.properties // []) | map(select(.name=="bomlens:identifiedBy" and .value=="scanoss")) | length) > 0 )
-     and (.cpe == null) and (.purl != null) and ((.version // "") != "")
+     and (.cpe == null) and (.purl != null)
+     and ((.version // "") | test("^[A-Za-z0-9][A-Za-z0-9_.+-]*$"))
   then
     ( .purl | split("@")[0] | split("?")[0] ) as $coord
     | ($vmap[$coord]) as $m

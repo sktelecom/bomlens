@@ -12,6 +12,8 @@ A normal scan reads a package manager (npm, Maven, pip, Go, Conan, and so on) to
 
 When that happens, BomLens prints a one-line hint suggesting this option, and the web UI shows the same hint after the scan. You do not need to recognize the situation yourself.
 
+![Result banner suggesting identify-vendored for a sparse C/C++ scan](../images/web-ui-vendored-banner-en.png)
+
 `--identify-vendored` matches the file fingerprints of your sources against the public OSSKB knowledge base and records each match as a real component (name, version, PURL), so the copied-in open source shows up in the SBOM — and, where the library has known CVEs, in the security report.
 
 ## What is sent
@@ -41,6 +43,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 
 In the web UI, open **Advanced** and turn on **Identify bundled open source**. The option appears only for a source scan when the image supports it.
 
+![The Advanced section with the Identify bundled open source toggle](../images/web-ui-identify-vendored-en.png)
+
 ## What you get
 
 - Copied-in open source appears in the SBOM as named components with versions, each tagged `vendored` (a `bomlens:layer=vendored` property).
@@ -48,6 +52,8 @@ In the web UI, open **Advanced** and turn on **Identify bundled open source**. T
 - Niche libraries with no entry in the vulnerability databases (for example `liblfds`, `libaes`, `djbdns`) are still identified by name and version; they simply have no CVEs to report, which is a limit of the public data, not of the scan.
 
 Only full-file matches become components. Partial (snippet) matches are noisy and are left out, so the report stays clean.
+
+![Components table with vendored components tagged and their match confidence](../images/web-ui-vendored-badge-en.png)
 
 ## Endpoint and limits
 
@@ -60,5 +66,7 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendore
 ```
 
 Version precision is approximate. A file match reports the release where that file content first appeared, so different files of the same library can resolve to slightly different versions and a copied-in library may be reported a point release off. Treat the version (and any CVEs derived from it) as a starting point for review, not a final verdict.
+
+Attribution can also point at the wrong project. A file that many projects copy (for example zlib's `deflate.c`) may match a downstream project that vendored it rather than the canonical upstream — so a real zlib copy can be reported under another name, and its CVEs missed. This is a ranking and coverage limit of the knowledge base; it is more pronounced on the free OSSKB. For higher-fidelity attribution, point `SCANOSS_API_URL` at a SCANOSS commercial or self-hosted endpoint. Relatedly, scanning source that is itself published in a public repository will match that repository (your own first-party files can match your own public project) — this does not occur for the intended case of private supplier source.
 
 Results are a best-effort estimate that benefits from human review. See the OSSKB terms and license notes in [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md).

@@ -12,6 +12,8 @@ C/C++ 임베디드 소스를 스캔했는데 BomLens가 거의 아무것도 못 
 
 이 상황이 되면 BomLens가 이 옵션을 권하는 한 줄 안내를 출력하고, 웹 UI도 스캔 후 같은 안내를 보여줍니다. 사용자가 직접 상황을 알아챌 필요는 없습니다.
 
+![희소한 C/C++ 스캔에서 identify-vendored를 권하는 결과 배너](../images/web-ui-vendored-banner-en.png)
+
 `--identify-vendored`는 소스 파일의 지문을 공개 OSSKB 지식 베이스와 대조해, 일치한 항목을 이름·버전·PURL을 갖춘 컴포넌트로 기록합니다. 그러면 복사돼 들어간 오픈소스가 SBOM에 드러나고, 알려진 CVE가 있는 라이브러리는 보안 보고서에도 나타납니다.
 
 ## 무엇이 전송되나
@@ -41,6 +43,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 
 웹 UI에서는 **고급**을 펼쳐 **내장 오픈소스 식별**을 켭니다. 이 옵션은 소스 스캔이면서 이미지가 지원할 때만 보입니다.
 
+![고급 섹션의 내장 오픈소스 식별 토글](../images/web-ui-identify-vendored-en.png)
+
 ## 결과
 
 - 복사된 오픈소스가 버전을 가진 컴포넌트로 SBOM에 나타나며, 각 항목에 `vendored` 표시(`bomlens:layer=vendored` 속성)가 붙습니다.
@@ -48,6 +52,8 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 - 취약점 데이터베이스에 기록이 없는 흔치 않은 라이브러리(예: `liblfds`, `libaes`, `djbdns`)는 이름과 버전까지 식별됩니다. 보고할 CVE가 없을 뿐이며, 이는 스캔이 아니라 공개 데이터의 한계입니다.
 
 파일 단위 전체 일치만 컴포넌트가 됩니다. 부분(스니펫) 일치는 노이즈가 커서 제외하므로 보고서가 깔끔하게 유지됩니다.
+
+![vendored 표시와 일치도가 달린 컴포넌트 표](../images/web-ui-vendored-badge-en.png)
 
 ## 엔드포인트와 제한
 
@@ -60,5 +66,7 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendore
 ```
 
 버전은 근사값입니다. 파일 매치는 그 파일 내용이 처음 등장한 릴리스를 버전으로 보고하므로, 같은 라이브러리라도 파일마다 버전이 조금씩 다르게 나오거나 실제보다 한 단계 어긋난 릴리스로 보고될 수 있습니다. 버전(과 그로부터 도출된 CVE)은 최종 판정이 아니라 검토의 출발점으로 삼으세요.
+
+귀속(어느 프로젝트인지)도 틀릴 수 있습니다. 여러 프로젝트가 흔히 복사하는 파일(예: zlib의 `deflate.c`)은 정식 upstream이 아니라 그것을 vendored한 다운스트림 프로젝트로 매치될 수 있어, 실제 zlib 사본이 다른 이름으로 보고되고 그 CVE를 놓칠 수 있습니다. 이는 지식 베이스의 랭킹·커버리지 한계이며 무료 OSSKB에서 더 두드러집니다. 더 정확한 귀속이 필요하면 `SCANOSS_API_URL`을 SCANOSS 상용·자체 호스팅 엔드포인트로 지정하세요. 또한 공개 저장소에 이미 게시된 소스를 스캔하면 그 저장소로 매치됩니다(자기 1st-party 파일이 자기 공개 프로젝트로 매치) — 의도한 용도인 비공개 공급사 소스에서는 발생하지 않습니다.
 
 결과는 사람 검토가 도움이 되는 best-effort 추정입니다. OSSKB 약관과 라이선스 설명은 [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참조하세요.

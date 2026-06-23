@@ -36,6 +36,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--all` | — | `--notice --security` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
+| `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (opt-in image `SBOM_SCANOSS`; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
 | `--ui` | — | Launch the local web UI |
@@ -47,6 +48,8 @@ Environment variables adjust the behavior.
 |----------|---------|-------------|
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | Override the scanner image (same image as `bomlens`) |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
+| `SCANOSS_API_URL` | OSSKB free API | Endpoint for `--identify-vendored`. Point at a SCANOSS commercial or self-hosted endpoint for air-gapped or high-volume use |
+| `SCANOSS_API_KEY` | — | Credential for `SCANOSS_API_URL`, if the endpoint requires one |
 | `GIT_TOKEN` | — | Token for cloning private git repositories |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
