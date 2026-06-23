@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex"],
+  "dependencyDashboard": true,
+  "labels": ["dependencies", "tool-upgrade"],
+  "commitMessagePrefix": "chore(deps):",
+  "prConcurrentLimit": 5,
+  "separateMajorMinor": true,
+  "packageRules": [
+    {
+      "description": "Surface tool major bumps (e.g. cdxgen v12 -> v13) as their own PR for a deliberate, snapshot-reviewed upgrade.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major-upgrade"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tools pinned as ARG in the scanner Dockerfile (curl/pip installed; invisible to Dependabot).",
+      "fileMatch": ["(^|/)docker/Dockerfile$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\nARG \\w+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "cdxgen language-image tag and all-in-one image pinned as shell vars in source-detect.sh.",
+      "fileMatch": ["(^|/)docker/lib/source-detect\\.sh$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nCDXGEN_\\w+=\"\\$\\{CDXGEN_\\w+:-(?:ghcr\\.io/cyclonedx/cdxgen:)?(?<currentValue>[^}\"]+)\\}\""
+      ]
+    }
+  ]
+}

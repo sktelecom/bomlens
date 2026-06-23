@@ -102,9 +102,10 @@ jobs:
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
       - name: Install syft (pinned release tarball)
         if: steps.flags.outputs.push == 'true'
-        env:
-          SYFT_VERSION: v1.18.1   # keep in sync with docker/Dockerfile
         run: |
+          # Single source of truth: read the pinned version from docker/Dockerfile
+          # (no separate literal to keep in sync).
+          SYFT_VERSION=$(grep -oP 'ARG SYFT_VERSION=\K\S+' docker/Dockerfile)
           ver="${SYFT_VERSION#v}"
           curl -sSfL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${ver}_linux_amd64.tar.gz" -o /tmp/syft.tgz
           sudo tar -C /usr/local/bin -xzf /tmp/syft.tgz syft
@@ -135,12 +136,12 @@ jobs:
         continue-on-error: true
 
       # Supply-chain note: use a pinned Trivy CLI (not the trivy-action that had
-      # a supply-chain incident). Keep TRIVY_VERSION in sync with docker/Dockerfile.
+      # a supply-chain incident). The version is read from docker/Dockerfile so
+      # there is a single source of truth.
       - name: Install Trivy (pinned release tarball)
         if: github.event_name != 'pull_request'
-        env:
-          TRIVY_VERSION: v0.70.0
         run: |
+          TRIVY_VERSION=$(grep -oP 'ARG TRIVY_VERSION=\K\S+' docker/Dockerfile)
           ver="${TRIVY_VERSION#v}"
           curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${ver}_Linux-64bit.tar.gz" -o /tmp/trivy.tgz
           sudo tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy

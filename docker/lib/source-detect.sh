@@ -12,7 +12,9 @@
 # Defaults use ${VAR:-default} so a caller that already exported these (the CLI)
 # keeps its values; a caller that did not (the UI) gets the defaults.
 
+# renovate: datasource=docker depName=ghcr.io/cyclonedx/cdxgen
 CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen language image tag
+# renovate: datasource=docker depName=ghcr.io/cyclonedx/cdxgen
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
 ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/bomlens-android-sdk}"  # legacy alias: sbom-scanner-android-sdk (same digest)
 ANDROID_API_DEFAULT="${ANDROID_API_DEFAULT:-34}"
