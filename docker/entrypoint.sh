@@ -310,6 +310,16 @@ else
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
 fi
 
+# AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
+# detects the machine-learning-model component and appends the G7 checks (model
+# id/license/card/integrity, datasets, openness — all advisory). Best-effort
+# (exit 0); the resulting _conformance.* files are collected by the [ -f ] guard
+# in the risk-report block below.
+if [ "$SCAN_MODE" = "AIBOM" ]; then
+    echo "[2/2] aibom: G7 minimum-element conformance"
+    bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" || true
+fi
+
 # Deep license detection (scancode, opt-in). Only meaningful for source trees.
 if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
     if command -v scancode >/dev/null 2>&1; then
@@ -352,8 +362,8 @@ fi
 # Risk report (오픈소스위험분석보고서): always for ANALYZE, and for every other
 # mode when GENERATE_REPORT=true (the CLI/UI default, opt-out via --no-report).
 # It re-aggregates the notice + security artifacts already produced above.
-# Conformance artifacts only exist in ANALYZE; the [ -f ] guard skips them
-# elsewhere, and generate-risk-report.sh drops the 포맷 검증 section accordingly.
+# Conformance artifacts exist in ANALYZE and AIBOM; the [ -f ] guard skips them
+# in other modes, and generate-risk-report.sh drops the 포맷 검증 section accordingly.
 if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; then
     for ext in json md html; do
         [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
