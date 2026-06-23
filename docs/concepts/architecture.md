@@ -68,12 +68,13 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 | **syft** | `v1.18.1` | Stage 1 | Scans images, binaries, and root filesystems | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | Normalizes and sorts the SBOM | Always |
 | **ScanCode Toolkit** | `32.3.0` | Stage 2 | Precise license detection on first-party source | `--deep-license` (opt-in build) |
+| **SCANOSS** | `1.25.2` | Stage 2 | Identify vendored open source in C/C++ source with no package manager | `--identify-vendored` (opt-in build) |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | Generates the open source notice (NOTICE) | `--notice` / `--all` |
 | **Trivy** | `v0.70.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
 | **Cosign** | `v2.4.1` | Stage 2 | Detached SBOM signature | `--sign` |
 | **curl** | — | Stage 2 | Upload to Dependency-Track | Default (unless `--generate-only`) |
 
-> Versions are pinned as `ARG`s in `docker/Dockerfile`. To keep the image from bloating, ScanCode is **opt-in**: it is included only when the image is built with `--build-arg SBOM_DEEP_LICENSE=true`.
+> Versions are pinned as `ARG`s in `docker/Dockerfile`. To keep the image lean, some tools are **opt-in** build args: ScanCode (`--build-arg SBOM_DEEP_LICENSE=true`) and the SCANOSS client (`--build-arg SBOM_SCANOSS=true`, included in the published image). Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in `bomlens-firmware` image.
 
 ---
 
