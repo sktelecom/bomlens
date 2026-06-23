@@ -119,37 +119,59 @@ fi
 # --argjson: a large source tree yields thousands of matches, and a multi-hundred-KB
 # --argjson string overflows Linux's per-argument limit (MAX_ARG_STRLEN, 128 KB),
 # which would silently produce an empty/invalid SBOM on the (Linux) scanner image.
+# Coverage filter (precision over noise). The free OSSKB often matches a
+# widely-copied file to a downstream project that vendored the library rather than
+# the canonical upstream, so a real source tree produces many one-off matches to
+# unrelated forks. Group file matches by library NAME and promote a component only
+# when at least SCANOSS_MIN_FILES files agree on it; single-file fork noise is
+# dropped. Within a kept group the version and PURL are the consensus (most common)
+# value, which also fixes per-file version disagreement. Set SCANOSS_MIN_FILES=1 to
+# disable the filter (keep every single-file match).
+MIN_FILES="${SCANOSS_MIN_FILES:-2}"
+case "$MIN_FILES" in ''|*[!0-9]*) MIN_FILES=2 ;; esac
 COMPS_FILE="$WORK/comps.json"
-jq -c '
+jq -c --argjson minfiles "$MIN_FILES" '
     [ to_entries[]
       | .key as $file
       | .value[]?
       | select((.id // "") == "file")
-      | {
-          type: "library",
-          name: (.component // ((.purl[0] // "") | sub("^pkg:[^/]+/"; ""))),
+      | { name: (.component // ((.purl[0] // "") | sub("^pkg:[^/]+/"; ""))),
           version: ( (.component // "") as $c
                      | (.version // "")
                      | ltrimstr($c + "-") | ltrimstr($c + "_")
                      | sub("^[vV](?=[0-9])"; "") ),
           purl: (.purl[0] // null),
           cpe: (.cpe[0]? // null),
-          licenses: ( [ .licenses[]?.name // empty ]
-                      | map(select(. != null and . != "")) | unique
-                      | map({ license: { name: . } }) ),
-          properties: ( [
-              { name: "bomlens:layer",          value: "vendored" },
-              { name: "bomlens:identifiedBy",   value: "scanoss" },
-              { name: "bomlens:scanoss:match",  value: (.matched // "") },
-              { name: "bomlens:scanoss:file",   value: $file },
-              { name: "bomlens:scanoss:purl",   value: (.purl[0] // "") }
-            ] | map(select((.value // "") != "")) )
-        }
-      | with_entries(select(.value != null and .value != "" and .value != []))
+          matched: (.matched // ""),
+          licenses: [ .licenses[]?.name // empty ] }
       | select((.name // "") != "")
     ]
-    | group_by(.purl // ((.name // "") + "@" + (.version // "")))
-    | map(.[0])
+    | group_by(.name | ascii_downcase)
+    | map(
+        . as $g
+        | ($g | length) as $files
+        | select($files >= $minfiles)
+        | ($g | map(.version) | map(select(. != ""))) as $vers
+        | ($g | map(.purl) | map(select(. != null))) as $purls
+        | (if ($purls | length) > 0 then ($purls | group_by(.) | max_by(length) | .[0]) else null end) as $purl
+        | (if ($vers | length) > 0 then ($vers | group_by(.) | max_by(length) | .[0]) else "" end) as $ver
+        | { type: "library",
+            name: ($g[0].name),
+            version: $ver,
+            purl: $purl,
+            cpe: ($g | map(.cpe) | map(select(. != null)) | (.[0] // null)),
+            licenses: ( [ $g[].licenses[]? ] | map(select(. != null and . != ""))
+                        | unique | map({ license: { name: . } }) ),
+            properties: ( [
+                { name: "bomlens:layer",         value: "vendored" },
+                { name: "bomlens:identifiedBy",  value: "scanoss" },
+                { name: "bomlens:scanoss:files", value: ($files | tostring) },
+                { name: "bomlens:scanoss:match", value: ($g[0].matched) },
+                { name: "bomlens:scanoss:purl",  value: ($purl // "") }
+              ] | map(select((.value // "") != "")) )
+          }
+        | with_entries(select(.value != null and .value != "" and .value != []))
+      )
     | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
 ' "$RAW" > "$COMPS_FILE" 2>/dev/null || true
 # Guard: ensure a valid JSON array even if the transform failed.
