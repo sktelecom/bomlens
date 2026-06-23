@@ -33,7 +33,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(WEB_DIR, "dist")  # built React SPA (Vite output)
-OUTPUT_DIR = "/host-output"
+# /host-output inside the container; overridable so the server can run standalone
+# (e.g. the No-Docker UI contract test points it at a temp dir).
+OUTPUT_DIR = os.environ.get("SBOM_OUTPUT_DIR", "/host-output")
 SRC_DIR = "/src"
 UPLOAD_DIR = os.path.join(OUTPUT_DIR, ".uploads")  # uploaded files + extracted/cloned trees
 PORT = int(os.environ.get("UI_PORT", "8080"))
