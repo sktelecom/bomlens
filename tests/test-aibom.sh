@@ -99,6 +99,31 @@ else
     fail "validate-sbom.sh did not produce a conformance report"
 fi
 
+echo "== generate-notice.sh flags AI restrictive licenses for review =="
+bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
+RTXT="$WORK/rev_NOTICE.txt"
+if [ -f "$RTXT" ] && grep -q "License review needed" "$RTXT"; then
+    pass "NOTICE has a license-review section"
+    grep -q "behavioral-use" "$RTXT" && grep -q "Llama" "$RTXT" && pass "Llama community license flagged behavioral-use" || fail "Llama not flagged behavioral-use"
+    grep -q "non-commercial" "$RTXT" && grep -q "CC-BY-NC-4.0" "$RTXT" && pass "CC-BY-NC flagged non-commercial" || fail "CC-BY-NC not flagged non-commercial"
+    # An ordinary MIT component must NOT land in the review section.
+    if awk '/License review needed/{f=1} /SPDX standard/{f=0} f&&/ordinary-lib/{bad=1} END{exit !bad}' "$RTXT"; then
+        fail "MIT component wrongly listed for review"
+    else
+        pass "ordinary MIT component not flagged"
+    fi
+else
+    fail "NOTICE has no license-review section for restrictive licenses"
+fi
+
+echo "== a normal (non-AI) NOTICE has no review section =="
+bash "$LIB/generate-notice.sh" "$FIX/license-aliases.json" "$WORK/norm" "x" >/dev/null 2>&1
+if grep -q "License review needed" "$WORK/norm_NOTICE.txt" 2>/dev/null; then
+    fail "review section appeared for a normal software scan"
+else
+    pass "no review section for a normal software scan"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

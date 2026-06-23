@@ -35,6 +35,9 @@ HTML="${OUT_PREFIX}_NOTICE.html"
 # The normalize() definition is shared with normalize-sbom.sh via spdx-normalize.jq
 # so the NOTICE and the bom.json the web UI reads group licenses identically.
 NORMALIZE_DEF="$(cat "$SCRIPT_DIR/spdx-normalize.jq")"
+# AI-relevant restrictive-license classifier (behavioral-use / non-commercial),
+# shared with normalize-sbom.sh. Drives the "license review" section below.
+LICENSE_FLAGS_DEF="$(cat "$SCRIPT_DIR/license-flags.jq")"
 
 # Build { license, components:[ {comp, copyright} ] } grouped by normalized id.
 LICENSE_MAP=$(jq -r "$NORMALIZE_DEF"'
@@ -60,6 +63,14 @@ TOTAL_COMP=$(jq '[.components[]?] | length' "$SBOM")
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Licenses needing human review (AI behavioral-use / non-commercial). Empty for a
+# normal software scan; populated when a model/dataset carries e.g. a Llama/RAIL
+# or CC-BY-NC license. The tool surfaces the class; a human judges applicability.
+REVIEW=$(echo "$LICENSE_MAP" | jq -c "$LICENSE_FLAGS_DEF"'
+  [ .[] | (license_flag(.license)) as $f | select($f != "")
+    | { license: .license, flag: $f, components: [ .components[].comp ] } ]')
+REVIEW_N=$(echo "$REVIEW" | jq 'length')
+
 # Used licenses that have a bundled SPDX full text. Read one license per line
 # (IFS=newline) so a compound expression like "Apache-2.0 OR BSD-2-Clause" is
 # matched whole — it has no bundled .txt, so it is skipped — instead of being
@@ -83,6 +94,16 @@ done)
         "\nLicense: \(.license)\nComponents (\(.components | length)):",
         (.components[] | "  - \(.comp)" + (if .copyright then "  (© \(.copyright))" else "" end))'
     echo ""
+    if [ "$REVIEW_N" -gt 0 ]; then
+        echo "================================================================================"
+        echo "License review needed — AI / restrictive terms (human review required)"
+        echo "================================================================================"
+        echo "behavioral-use = use-based restrictions (RAIL/Llama/Gemma 등); non-commercial = 상업적 사용 제한."
+        echo "$REVIEW" | jq -r '.[] |
+            "\n[\(.flag)] \(.license)  (\(.components|length) component(s)):",
+            (.components[] | "  - \(.)")'
+        echo ""
+    fi
     if [ -n "$LICENSES_WITH_TEXT" ]; then
         echo "================================================================================"
         echo "License texts (SPDX standard)"
@@ -113,6 +134,8 @@ done)
  .meta{color:#666;font-size:.9rem;}
  .lic{margin:1.4rem 0;padding:1rem;border:1px solid #e3e3e3;border-radius:6px;background:#fafafa;}
  .lic h2{margin:.2rem 0;}
+ .review{margin:1.2rem 0;padding:1rem;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;}
+ .review h2{color:#b45309;margin:.2rem 0;}
  ul{margin:.4rem 0 0 1rem;} li{font-family:ui-monospace,monospace;font-size:.85rem;}
  .cr{color:#666;}
  .texts{margin-top:2rem;border-top:2px solid #ddd;padding-top:1rem;}
@@ -124,6 +147,16 @@ done)
 <h1>Third-party Open Source Notice</h1>
 <p class="meta">Project: ${PROJECT} &middot; Generated: ${GEN_AT} &middot; Components: ${TOTAL_COMP} &middot; Licenses: ${TOTAL_LIC}</p>
 HTMLHEAD
+
+    # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
+    if [ "$REVIEW_N" -gt 0 ]; then
+        echo '<div class="review"><h2>License review needed — AI / restrictive terms</h2>'
+        echo '<p class="meta">behavioral-use = use-based restrictions (RAIL/Llama/Gemma 등); non-commercial = restricted commercial use. Human review required.</p><ul>'
+        echo "$REVIEW" | jq -r '.[] |
+            "<li><b>[" + (.flag|@html) + "]</b> " + (.license|@html) + " — "
+            + (.components | map(@html) | join(", ")) + "</li>"'
+        echo "</ul></div>"
+    fi
 
     # jq @html escapes license names, component identifiers, and copyright.
     echo "$LICENSE_MAP" | jq -r '.[] |

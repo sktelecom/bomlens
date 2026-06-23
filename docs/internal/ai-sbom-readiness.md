@@ -148,7 +148,7 @@ AI SBOM 영역에서 검토 대상 도구와 BomLens 2단계 아키텍처에 붙
 권고 착수 순서는 적합성 검사부터입니다. 외부에서 받은 AIBOM(또는 cdxgen으로 만든 샘플)을 G7 7클러스터 기준으로 점검하는 기능은 의존이 적고, 우리가 무엇을 생성해야 하는지 기준을 먼저 세워 줍니다. 이 기준이 곧 AIBOM 생성 모드의 출력 명세가 됩니다.
 
 1. **G7 최소요소 적합성 검사** (구현됨). `validate-sbom.sh`를 확장해 SBOM에 machine-learning-model 컴포넌트가 있으면 G7 모델·데이터셋·메타데이터 클러스터 검사를 `_conformance.*` 리포트에 덧붙입니다(모델 식별자 PURL/CPE, 라이선스, 모델 카드 파라미터, 무결성 해시, 데이터셋 참조, 개방성 4축). 모두 권고(warn)라 전체 result를 fail시키지 않고, OWASP 엔진이 못 채우는 무결성 해시·개방성 4축은 WARN으로 정직하게 표면화합니다. AIBOM 모드와 ANALYZE(공급사 AI SBOM) 양쪽에서 동작. 시스템·인프라·KPI 클러스터는 단일 모델 AI SBOM에서 점검 불가라 제외.
-2. **모델·데이터셋 라이선스 검토**. `spdx-normalize.jq`에 RAIL, Llama 커뮤니티 라이선스와 개방성 4축 표기를 추가하고, 고지문과 위험 보고서에 비표준 라이선스와 행동 사용 제한 조항을 표시합니다. 해석의 한계는 7절에 명시합니다.
+2. **모델·데이터셋 라이선스 검토** (구현됨). 공유 분류기 `docker/lib/license-flags.jq`가 AI 특화 제한 라이선스를 두 부류로 분류합니다 — 행동 사용 제한(RAIL/OpenRAIL, Llama·Gemma·Falcon 커뮤니티 라이선스)과 비상업(CC-BY-NC 등). `generate-notice.sh`가 고지문(텍스트·HTML)에 "License review needed" 절로 해당 컴포넌트를 표시합니다. SPDX 매핑 전용인 `spdx-normalize.jq`와 분리했고(비SPDX 라이선스엔 부적합), 일반 소프트웨어 스캔의 고지문은 영향받지 않습니다(MIT·Apache·GPL은 비대상). 적용 여부 판단은 사람·법무 몫으로 8절에 명시. 구조적 속성(`bomlens:licenseReview`)과 위험 보고서 노출은 UI(7) 시점의 후속.
 3. **AIBOM 생성 모드**. cdxgen `aibom`을 1차 엔진으로 HuggingFace 모델 디렉토리·GGUF·Modelfile 입력을 CycloneDX 1.7 ML-BOM으로 생성하고, 기존 후처리 파이프라인에 합류시킵니다. 가장 큰 신규 작업이며, 앞의 두 역량이 만든 검사·라이선스 기준을 출력 목표로 삼습니다.
 
 각 역량은 독립적으로 가치를 내므로 한 번에 모두 구현할 필요는 없습니다.

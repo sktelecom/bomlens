@@ -1,0 +1,14 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "metadata": { "component": { "type": "machine-learning-model", "name": "demo-ai-system" } },
+  "components": [
+    { "type": "machine-learning-model", "name": "some-llama-model", "version": "1.0",
+      "licenses": [ { "license": { "name": "Llama 3.1 Community License" } } ] },
+    { "type": "data", "name": "some-nc-dataset", "version": "1.0",
+      "licenses": [ { "license": { "id": "CC-BY-NC-4.0" } } ] },
+    { "type": "library", "name": "ordinary-lib", "version": "2.0",
+      "licenses": [ { "license": { "id": "MIT" } } ] }
+  ]
+}
