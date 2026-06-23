@@ -36,7 +36,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--all` | — | `--notice --security` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
-| `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (opt-in image `SBOM_SCANOSS`; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
+| `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
 | `--ui` | — | Launch the local web UI |

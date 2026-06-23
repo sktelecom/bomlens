@@ -83,6 +83,11 @@ jobs:
           context: ./docker
           platforms: linux/amd64,linux/arm64
           push: ${{ steps.flags.outputs.push == 'true' }}
+          # scanoss.py is MIT, so unlike the GPL firmware tools it ships in the base
+          # image; --identify-vendored then works out of the box (runtime-gated by
+          # the flag). The Dockerfile default stays false for lean local builds.
+          build-args: |
+            SBOM_SCANOSS=true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
