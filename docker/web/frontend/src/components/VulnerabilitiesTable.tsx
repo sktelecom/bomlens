@@ -1,10 +1,18 @@
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ExternalLink, ShieldCheck } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronRight,
+  ExternalLink,
+  ShieldCheck,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/state";
 import { SEVERITY_ORDER, type SecuritySummary, type VulnItem } from "@/lib/api";
+import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
 
 const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
@@ -17,6 +25,44 @@ const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
 
 interface Props {
   security: SecuritySummary;
+}
+
+type Sort = { key: VulnSortKey; dir: SortDir };
+
+/** Sortable column header for the Severity / CVSS columns. */
+function SortableTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: VulnSortKey;
+  sort: Sort;
+  onSort: (key: VulnSortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={cn("px-3 py-2 font-medium", className)}
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-foreground"
+      >
+        {label}
+        <Icon
+          className={cn("h-3 w-3", active ? "text-foreground" : "text-muted-foreground/60")}
+          aria-hidden
+        />
+      </button>
+    </th>
+  );
 }
 
 /** Primary advisory URL first, then references, de-duplicated. */
@@ -93,14 +139,17 @@ export function VulnerabilitiesTable({ security }: Props) {
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("");
+  // Default: most severe first, highest CVSS within a severity band.
+  const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 
-  const sorted = useMemo(() => {
-    const rank = (s: string) => {
-      const i = SEVERITY_ORDER.indexOf(s as (typeof SEVERITY_ORDER)[number]);
-      return i === -1 ? SEVERITY_ORDER.length : i;
-    };
-    return [...items].sort((a, b) => rank(a.severity) - rank(b.severity));
-  }, [items]);
+  const sorted = useMemo(
+    () => [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir)),
+    [items, sort],
+  );
+  const onSort = (key: VulnSortKey) =>
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
+    );
 
   const severities = useMemo(
     () => SEVERITY_ORDER.filter((s) => items.some((v) => v.severity === s)),
@@ -135,7 +184,8 @@ export function VulnerabilitiesTable({ security }: Props) {
         <table className="w-full text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">
-            <th className="px-3 py-2 font-medium">{t("result.colSeverity")}</th>
+            <SortableTh label={t("result.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
+            <SortableTh label={t("result.vulnCvss")} sortKey="cvss" sort={sort} onSort={onSort} />
             <th className="px-3 py-2 font-medium">{t("result.colCve")}</th>
             <th className="px-3 py-2 font-medium">{t("result.colPackage")}</th>
             <th className="px-3 py-2 font-medium">{t("result.colInstalled")}</th>
@@ -191,6 +241,13 @@ export function VulnerabilitiesTable({ security }: Props) {
                       </Badge>
                     </div>
                   </td>
+                  <td className="px-3 py-2 font-mono tabular-nums">
+                    {v.cvss != null ? (
+                      v.cvss
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <span className="font-mono">{v.id}</span>
                     {v.title ? (
@@ -215,7 +272,7 @@ export function VulnerabilitiesTable({ security }: Props) {
                 </tr>
                 {isOpen && (
                   <tr className="border-b last:border-0">
-                    <td colSpan={5} className="bg-muted/30 px-3 py-3">
+                    <td colSpan={6} className="bg-muted/30 px-3 py-3">
                       <VulnDetail vuln={v} links={links} />
                     </td>
                   </tr>
