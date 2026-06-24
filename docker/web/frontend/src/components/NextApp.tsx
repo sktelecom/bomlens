@@ -6,6 +6,7 @@ import { AppShell } from "./AppShell";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { ResultSection } from "./ResultSections";
+import { ScanRunning } from "./ScanRunning";
 import { Button } from "@/components/ui/button";
 import {
   getCapabilities,
@@ -108,32 +109,36 @@ export function NextApp() {
           </h1>
           <NewScan running={false} capabilities={capabilities} onRun={run} />
         </div>
+      ) : !result ? (
+        <div className="mx-auto max-w-5xl px-6 py-8">
+          <ScanRunning
+            logs={logs}
+            status={status === "error" ? "error" : "running"}
+            projectLabel={projectLabel}
+          />
+        </div>
       ) : (
         <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              {result ? t(`nav.${activeSection}`) : t("form.running")}
+              {t(`nav.${activeSection}`)}
             </h1>
-            {result && (
-              <span
-                className={
-                  result.ok
-                    ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
-                    : "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
-                }
-              >
-                {result.ok ? t("result.succeeded") : t("result.failed")}
-              </span>
-            )}
+            <span
+              className={
+                result.ok
+                  ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                  : "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+              }
+            >
+              {result.ok ? t("result.succeeded") : t("result.failed")}
+            </span>
           </div>
 
-          {result && (
-            <ResultSection
-              section={activeSection}
-              result={result}
-              onNavigate={setActiveSection}
-            />
-          )}
+          <ResultSection
+            section={activeSection}
+            result={result}
+            onNavigate={setActiveSection}
+          />
 
           <ProgressLog logs={logs} status={status} />
         </div>

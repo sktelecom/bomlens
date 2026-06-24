@@ -71,6 +71,35 @@ test("New scan groups sources and switches the source-specific input", async ({ 
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });
 
+test("Scan running shows the pipeline stages while scanning", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  // Delay the stream so the running view is observable before the done event.
+  await page.route("**/scan-stream**", async (r) => {
+    await new Promise((res) => setTimeout(res, 2500));
+    await r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` });
+  });
+  await page.goto("/?ui=next");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByRole("button", { name: /Run scan/i }).click();
+
+  // Running view: the headline and the pipeline stage stepper.
+  await expect(page.getByText("Scanning…")).toBeVisible();
+  await expect(page.getByText("Generate SBOM")).toBeVisible();
+  await expect(page.getByText("Security", { exact: true })).toBeVisible();
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+
+  // The scan then completes into the result sections.
+  await expect(page.getByRole("button", { name: /^Overview/ })).toBeVisible();
+});
+
 // A finished scan with an SBOM, a ScanCode artifact and vulnerabilities — enough
 // to exercise data-gated rail sections (Dependencies, Source tree) and counts.
 const DONE = {
@@ -181,6 +210,7 @@ test("overview has no axe violations", async ({ page }) => {
 test("overview section matches baseline — light/en @visual", async ({ page }) => {
   await stubAndRun(page);
   await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
     animations: "disabled",
   });
@@ -274,6 +304,7 @@ test("models section matches baseline — light/en @visual", async ({ page }) =>
   await stubAiAndRun(page);
   await page.getByRole("button", { name: /Models & datasets/ }).click();
   await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
     animations: "disabled",
   });
@@ -301,6 +332,7 @@ test("g7 section matches baseline — light/en @visual", async ({ page }) => {
   await stubAiAndRun(page);
   await page.getByRole("button", { name: /G7 conformance/ }).click();
   await expect(page.getByText("4/6 present")).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("g7-light-en.png", {
     animations: "disabled",
   });
@@ -358,6 +390,7 @@ test("licenses section matches baseline — light/en @visual", async ({ page }) 
   await stubLicensesAndRun(page);
   await page.getByRole("button", { name: /^Licenses/ }).click();
   await expect(page.getByText("License review needed")).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("licenses-light-en.png", {
     animations: "disabled",
   });
@@ -385,6 +418,7 @@ test("dependencies tree matches baseline — light/en @visual", async ({ page })
   await page.getByRole("button", { name: /^Dependencies/ }).click();
   await page.getByRole("button", { name: "Tree", exact: true }).click();
   await expect(page.getByText("openssl").first()).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("dependencies-tree-light-en.png", {
     animations: "disabled",
   });
@@ -417,6 +451,7 @@ test("vulnerabilities section matches baseline — light/en @visual", async ({ p
   await stubAndRun(page);
   await page.getByRole("button", { name: /^Vulnerabilities/ }).click();
   await expect(page.getByText("9.8", { exact: true })).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("vulnerabilities-light-en.png", {
     animations: "disabled",
   });
@@ -448,6 +483,7 @@ test("components section matches baseline — light/en @visual", async ({ page }
   await stubAndRun(page);
   await page.getByRole("button", { name: /^Components/ }).click();
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("components-light-en.png", {
     animations: "disabled",
   });
