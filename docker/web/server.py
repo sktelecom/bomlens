@@ -154,6 +154,9 @@ MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 
+# Severity ranking for picking a component's worst vulnerability.
+_SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
+
 
 def _component_licenses(c):
     """SPDX ids / names / expressions for one CycloneDX component (notice parity)."""
@@ -227,6 +230,84 @@ def security_summary(project, version):
     return sev
 
 
+def _norm_purl(purl):
+    """purl without qualifiers/subpath, lowercased — a stable join key across the
+    SBOM (cdxgen) and the security report (Trivy), which may differ in qualifiers."""
+    if not purl:
+        return ""
+    return purl.split("?", 1)[0].split("#", 1)[0].strip().lower()
+
+
+def _component_risk_index(project, version):
+    """Join the Trivy security report to packages: worst severity + count per
+    package, keyed by normalized purl and by (name, version). Uncapped (unlike
+    the detail list) so a component's Risk reflects every finding against it.
+    Returns (by_purl, by_nv); both empty when there is no security report."""
+    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+    p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
+    by_purl, by_nv = {}, {}
+    if not os.path.isfile(p):
+        return by_purl, by_nv
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return by_purl, by_nv
+
+    def bump(index, key, sev):
+        cur = index.get(key)
+        if cur is None:
+            index[key] = {"sev": sev, "count": 1}
+        else:
+            cur["count"] += 1
+            if _SEV_RANK.get(sev, 0) > _SEV_RANK.get(cur["sev"], 0):
+                cur["sev"] = sev
+
+    for r in (data.get("Results") or []):
+        for v in (r.get("Vulnerabilities") or []):
+            sev = (v.get("Severity") or "UNKNOWN").upper()
+            if sev not in _SEV_RANK:
+                sev = "UNKNOWN"
+            ident = v.get("PkgIdentifier")
+            purl = ident.get("PURL") if isinstance(ident, dict) else None
+            if purl:
+                bump(by_purl, _norm_purl(purl), sev)
+            name = (v.get("PkgName") or "").lower()
+            if name:
+                bump(by_nv, (name, v.get("InstalledVersion") or ""), sev)
+    return by_purl, by_nv
+
+
+def _scope_index(data):
+    """Per-ref dependency scope from CycloneDX dependencies[]: 'direct' (the root
+    component depends on it) vs 'transitive'. Mirrors the client sbomGraph: roots
+    are the metadata component's dependsOn, or refs nothing depends on when the
+    root has no entry. Returns (scope_by_ref, has_dependencies)."""
+    deps = data.get("dependencies") or []
+    adjacency, depended_on = {}, set()
+    for d in deps:
+        if not isinstance(d, dict) or not isinstance(d.get("ref"), str):
+            continue
+        targets = [t for t in (d.get("dependsOn") or []) if isinstance(t, str)]
+        adjacency[d["ref"]] = targets
+        depended_on.update(targets)
+    if not any(adjacency.values()):
+        return {}, False
+
+    meta_comp = (data.get("metadata") or {}).get("component") or {}
+    meta_ref = meta_comp.get("bom-ref") or meta_comp.get("purl")
+    if meta_ref and meta_ref in adjacency:
+        roots = adjacency[meta_ref]
+    else:
+        roots = [r for r in adjacency if r not in depended_on]
+    direct = set(roots)
+
+    refs = set(adjacency)
+    for targets in adjacency.values():
+        refs.update(targets)
+    return {ref: ("direct" if ref in direct else "transitive") for ref in refs}, True
+
+
 def sbom_summary(project, version):
     prefix = "%s_%s" % (safe_name(project), safe_name(version))
     p = os.path.join(OUTPUT_DIR, prefix + "_bom.json")
@@ -238,6 +319,8 @@ def sbom_summary(project, version):
     except (OSError, json.JSONDecodeError):
         return None
     comps = data.get("components") or []
+    risk_by_purl, risk_by_nv = _component_risk_index(project, version)
+    scope_by_ref, has_deps = _scope_index(data)
     rows = []
     for c in comps[:MAX_COMPONENT_ROWS]:
         props = c.get("properties") or []
@@ -251,7 +334,7 @@ def sbom_summary(project, version):
             (p.get("value") for p in props if p.get("name") == "bomlens:scanoss:match"),
             "",
         )
-        rows.append({
+        row = {
             "name": c.get("name") or "",
             "version": c.get("version") or "",
             "group": c.get("group") or "",
@@ -260,7 +343,27 @@ def sbom_summary(project, version):
             "licenses": _component_licenses(c),
             "vendored": vendored,
             "matchConfidence": match,
-        })
+        }
+
+        # Scope: direct/transitive from the dependency graph (a component may be
+        # addressed by bom-ref or purl). Omitted when the SBOM has no graph.
+        if has_deps:
+            scope = scope_by_ref.get(c.get("bom-ref")) or scope_by_ref.get(c.get("purl"))
+            if scope:
+                row["scope"] = scope
+
+        # Risk: worst severity + count of vulnerabilities hitting this component.
+        # Prefer the purl join; fall back to (name, version). Use one index only
+        # so the count is not doubled.
+        npurl = _norm_purl(c.get("purl"))
+        risk = risk_by_purl.get(npurl) if npurl else None
+        if risk is None:
+            risk = risk_by_nv.get(((c.get("name") or "").lower(), c.get("version") or ""))
+        if risk:
+            row["maxSeverity"] = risk["sev"]
+            row["vulnCount"] = risk["count"]
+
+        rows.append(row)
     # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like
     # C/C++ embedded source with no package manager. Drives the result banner.
     meta_props = (data.get("metadata") or {}).get("properties") or []

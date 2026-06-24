@@ -24,6 +24,13 @@ export interface ComponentItem {
   vendored?: boolean;
   /** SCANOSS file-match confidence (e.g. "100%"), shown read-only on vendored rows. */
   matchConfidence?: string;
+  /** Worst severity of the vulnerabilities affecting this component (Risk). */
+  maxSeverity?: Severity;
+  /** How many vulnerabilities affect this component. */
+  vulnCount?: number;
+  /** Direct dependency of the root, or transitive — from the dependency graph.
+   *  Omitted when the SBOM carries no dependency graph (scope unknown). */
+  scope?: "direct" | "transitive";
 }
 
 export interface SbomSummary {

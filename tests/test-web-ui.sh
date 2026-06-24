@@ -92,6 +92,65 @@ cid=$(curl -fsS -X POST -H "Content-Type: application/json" -d '{"token":"ghp_de
       | python3 -c "import sys,json;print(json.load(sys.stdin).get('credId',''))" 2>/dev/null)
 [ -n "$cid" ] && pass "POST /git-cred returns a credId" || fail "/git-cred did not return a credId"
 
+echo "== component Risk/Scope join (sbom_summary) =="
+# Fixtures: flask is a direct dep; werkzeug/jinja2 are transitive. werkzeug has
+# two CVEs (one CRITICAL) — the second's purl carries a qualifier to prove the
+# join normalizes. openssl (flat SBOM, no graph) joins risk by name/version and
+# has no scope. Malformed security must not crash the summary.
+cat > "$OUT/demo_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "metadata":{"component":{"bom-ref":"root","name":"demo","version":"1.0"}},
+ "components":[
+   {"bom-ref":"pkg:pypi/flask@2.0","name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"},
+   {"bom-ref":"pkg:pypi/werkzeug@2.0","name":"werkzeug","version":"2.0","type":"library","purl":"pkg:pypi/werkzeug@2.0"},
+   {"bom-ref":"pkg:pypi/jinja2@3.0","name":"jinja2","version":"3.0","type":"library","purl":"pkg:pypi/jinja2@3.0"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["pkg:pypi/flask@2.0"]},
+   {"ref":"pkg:pypi/flask@2.0","dependsOn":["pkg:pypi/werkzeug@2.0","pkg:pypi/jinja2@3.0"]}
+ ]}
+JSON
+cat > "$OUT/demo_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-1","Severity":"CRITICAL","PkgName":"werkzeug","InstalledVersion":"2.0","PkgIdentifier":{"PURL":"pkg:pypi/werkzeug@2.0"}},
+  {"VulnerabilityID":"CVE-2","Severity":"LOW","PkgName":"werkzeug","InstalledVersion":"2.0","PkgIdentifier":{"PURL":"pkg:pypi/werkzeug@2.0?foo=bar"}}
+]}]}
+JSON
+cat > "$OUT/flat_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","components":[{"name":"openssl","version":"3.0","type":"library","purl":"pkg:generic/openssl@3.0"}]}
+JSON
+cat > "$OUT/flat_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[{"VulnerabilityID":"CVE-X","Severity":"HIGH","PkgName":"openssl","InstalledVersion":"3.0"}]}]}
+JSON
+cat > "$OUT/bad_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","components":[{"name":"a","version":"1","type":"library"}]}
+JSON
+printf 'not json{' > "$OUT/bad_1.0_security.json"
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+demo = {r["name"]: r for r in server.sbom_summary("demo", "1.0")["componentList"]}
+assert demo["flask"]["scope"] == "direct", demo["flask"]
+assert demo["werkzeug"]["scope"] == "transitive", demo["werkzeug"]
+assert demo["jinja2"]["scope"] == "transitive", demo["jinja2"]
+assert demo["werkzeug"]["maxSeverity"] == "CRITICAL", demo["werkzeug"]
+assert demo["werkzeug"]["vulnCount"] == 2, demo["werkzeug"]
+assert "maxSeverity" not in demo["flask"], demo["flask"]
+flat = {r["name"]: r for r in server.sbom_summary("flat", "1.0")["componentList"]}
+assert "scope" not in flat["openssl"], flat["openssl"]
+assert flat["openssl"]["maxSeverity"] == "HIGH", flat["openssl"]
+assert flat["openssl"]["vulnCount"] == 1, flat["openssl"]
+bad = {r["name"]: r for r in server.sbom_summary("bad", "1.0")["componentList"]}
+assert "maxSeverity" not in bad["a"], bad["a"]
+PY
+then
+    pass "Risk/Scope join (direct/transitive, purl + name/version, no-graph, malformed)"
+else
+    fail "Risk/Scope join produced wrong values (see assertion above)"
+fi
+rm -f "$OUT"/demo_1.0_* "$OUT"/flat_1.0_* "$OUT"/bad_1.0_*
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
