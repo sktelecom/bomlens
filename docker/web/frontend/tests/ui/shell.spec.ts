@@ -65,7 +65,7 @@ const DONE = {
   security: {
     CRITICAL: 1, HIGH: 1, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 2,
     vulnerabilities: [
-      { id: "CVE-2024-0001", severity: "CRITICAL", pkg: "openssl", installed: "3.0.0", fixed: "3.0.1", title: "buffer overflow", cvss: 9.8 },
+      { id: "CVE-2024-0001", severity: "CRITICAL", pkg: "openssl", installed: "3.0.0", fixed: "3.0.1", title: "buffer overflow", cvss: 9.8, cvssVector: "CVSS:3.1/AV:N/AC:L", description: "A heap buffer overflow in the TLS handshake.", url: "https://example.test/CVE-2024-0001" },
       { id: "CVE-2024-0002", severity: "HIGH", pkg: "zlib", installed: "1.2.0", fixed: "1.2.1", title: "oob read", cvss: 7.5 },
     ],
   },
@@ -146,6 +146,38 @@ test("overview section matches baseline — light/en @visual", async ({ page }) 
   await stubAndRun(page);
   await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
   await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
+    animations: "disabled",
+  });
+});
+
+test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Vulnerabilities/ }).click();
+
+  // CVSS is a column now, with the scores visible (default: most severe first).
+  await expect(page.getByRole("button", { name: "CVSS", exact: true })).toBeVisible();
+  await expect(page.getByText("9.8", { exact: true })).toBeVisible();
+  await expect(page.getByText("7.5", { exact: true })).toBeVisible();
+
+  // Sorting by CVSS toggles the column's aria-sort.
+  const cvssTh = page.locator("th", {
+    has: page.getByRole("button", { name: "CVSS", exact: true }),
+  });
+  await expect(cvssTh).toHaveAttribute("aria-sort", "none");
+  await page.getByRole("button", { name: "CVSS", exact: true }).click();
+  await expect(cvssTh).toHaveAttribute("aria-sort", /ascending|descending/);
+
+  // A row expands in place to show the vector, description and references.
+  await page.getByText("CVE-2024-0001").click();
+  await expect(page.getByText(/heap buffer overflow/)).toBeVisible();
+  await expect(page.getByText("CVSS:3.1/AV:N/AC:L")).toBeVisible();
+});
+
+test("vulnerabilities section matches baseline — light/en @visual", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Vulnerabilities/ }).click();
+  await expect(page.getByText("9.8", { exact: true })).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("vulnerabilities-light-en.png", {
     animations: "disabled",
   });
 });
