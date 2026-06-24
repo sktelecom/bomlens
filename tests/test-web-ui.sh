@@ -151,6 +151,37 @@ else
 fi
 rm -f "$OUT"/demo_1.0_* "$OUT"/flat_1.0_* "$OUT"/bad_1.0_*
 
+echo "== conformance checks exposure (G7 split) =="
+# Generate a real conformance report for the AI fixture, then check that
+# conformance_summary surfaces the per-check array with the G7 (g7-*) checks.
+if command -v jq >/dev/null 2>&1; then
+    PROJECT=conf GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
+        "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" "$OUT/conf_1.0" >/dev/null 2>&1
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+c = server.conformance_summary("conf", "1.0")
+assert c is not None, "no conformance summary"
+checks = c.get("checks") or []
+assert len(checks) > 0, "checks not exposed"
+g7 = [x for x in checks if x["id"].startswith("g7-")]
+base = [x for x in checks if not x["id"].startswith("g7-")]
+assert len(g7) == 6, ("expected 6 G7 checks", len(g7))
+assert len(base) >= 1, "no base checks"
+assert all(x["required"] is False for x in g7), "G7 checks must be advisory"
+assert all(set(x) >= {"id", "label", "required", "status", "detail"} for x in checks)
+PY
+    then
+        pass "conformance_summary exposes checks with the 6 G7 elements"
+    else
+        fail "conformance checks exposure / G7 split is wrong"
+    fi
+    rm -f "$OUT"/conf_1.0_*
+else
+    echo "  SKIP: jq not available for conformance generation"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

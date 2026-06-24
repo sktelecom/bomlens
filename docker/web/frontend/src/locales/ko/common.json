@@ -249,6 +249,19 @@
     "limitations": "한계",
     "datasets": "데이터셋"
   },
+  "g7": {
+    "empty": "기록된 적합성 검사가 없습니다.",
+    "subtitle": "AI G7 최소 요소",
+    "present": "{{present}}/{{total}} 충족",
+    "advisory": "권고 {{count}}건",
+    "allAdvisory": "G7 요소는 모두 권고이며 비구속 지침입니다.",
+    "formatTitle": "형식 적합성",
+    "basePassed": "{{passed}}/{{total}} 통과",
+    "required": "필수",
+    "sPass": "충족",
+    "sFail": "실패",
+    "sWarn": "권고"
+  },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",
     "file": "분석할 파일을 선택하세요."

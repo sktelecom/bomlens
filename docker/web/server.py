@@ -153,6 +153,7 @@ MAX_COMPONENT_ROWS = 2000
 MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
+MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -390,7 +391,26 @@ def conformance_summary(project, version):
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    return {"result": data.get("result", "unknown"), "format": data.get("format", "")}
+    # Per-check results drive the conformance / G7 section. The report is ours
+    # (validate-sbom.sh), so it is trusted and already bounded, but normalize
+    # defensively to a known shape and cap the missing lists.
+    checks = []
+    for c in (data.get("checks") or []):
+        if not isinstance(c, dict):
+            continue
+        checks.append({
+            "id": str(c.get("id") or ""),
+            "label": str(c.get("label") or ""),
+            "required": bool(c.get("required")),
+            "status": str(c.get("status") or "warn"),
+            "detail": str(c.get("detail") or ""),
+            "missing": [str(m) for m in (c.get("missing") or [])][:MAX_CONFORMANCE_MISSING],
+        })
+    return {
+        "result": data.get("result", "unknown"),
+        "format": data.get("format", ""),
+        "checks": checks,
+    }
 
 
 # --------------------------------------------------------------------------

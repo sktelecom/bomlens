@@ -13,12 +13,14 @@ const SOURCE_SCAN: ScanContext = {
   isAiScan: false,
   hasDependencies: true,
   hasSourceTree: false,
+  hasG7: false,
 };
 const AI_SCAN: ScanContext = {
   mode: "ANALYZE",
   isAiScan: true,
   hasDependencies: true,
   hasSourceTree: true,
+  hasG7: true,
 };
 
 describe("visibleGroups — scan-type + data adaptation", () => {
@@ -32,10 +34,16 @@ describe("visibleGroups — scan-type + data adaptation", () => {
 
   it("hides AI-only sections for non-AI scans", () => {
     expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("models");
+    expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("g7");
   });
 
   it("shows AI-only sections for AI/ANALYZE scans", () => {
     expect(visibleSectionIds(AI_SCAN)).toContain("models");
+    expect(visibleSectionIds(AI_SCAN)).toContain("g7"); // hasG7 true
+  });
+
+  it("hides g7 when an AI scan has no G7 conformance checks", () => {
+    expect(visibleSectionIds({ ...AI_SCAN, hasG7: false })).not.toContain("g7");
   });
 
   it("gates dependencies/sourceTree on their data being present", () => {

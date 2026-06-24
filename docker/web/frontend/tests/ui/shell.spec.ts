@@ -175,7 +175,20 @@ const AI_DONE = {
   mode: "ANALYZE",
   results: [{ name: "model_1.0_bom.json", size: 200 }],
   security: null,
-  conformance: null,
+  conformance: {
+    result: "pass",
+    format: "CycloneDX",
+    checks: [
+      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
+      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "0%" },
+      { id: "g7-model-id", label: "G7 model identifier (PURL/CPE)", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-license", label: "G7 model license", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-card", label: "G7 model card (architecture/training parameters)", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-hash", label: "G7 model integrity (hashes)", required: false, status: "warn", detail: "0/1 model component(s)" },
+      { id: "g7-datasets", label: "G7 dataset provenance (datasets referenced)", required: false, status: "pass", detail: "2 dataset reference(s)" },
+      { id: "g7-openness", label: "G7 model openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM" },
+    ],
+  },
   sbom: {
     components: 1,
     componentList: [
@@ -244,6 +257,33 @@ test("models section matches baseline — light/en @visual", async ({ page }) =>
   await page.getByRole("button", { name: /Models & datasets/ }).click();
   await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
   await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
+    animations: "disabled",
+  });
+});
+
+test("AI scan exposes G7 conformance with present/advisory split", async ({ page }) => {
+  await stubAiAndRun(page);
+  await expect(page.getByRole("button", { name: /G7 conformance/ })).toBeVisible();
+  await page.getByRole("button", { name: /G7 conformance/ }).click();
+
+  // Headline tally comes straight from the check statuses: 4 of 6 present.
+  await expect(page.getByText("4/6 present")).toBeVisible();
+  await expect(page.getByText(/2 advisory/)).toBeVisible();
+  // Base checks are split out under their own heading.
+  await expect(page.getByText("Format conformance")).toBeVisible();
+  await expect(page.getByText("G7 model openness (weight/architecture/data/training)")).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("g7 section matches baseline — light/en @visual", async ({ page }) => {
+  await stubAiAndRun(page);
+  await page.getByRole("button", { name: /G7 conformance/ }).click();
+  await expect(page.getByText("4/6 present")).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("g7-light-en.png", {
     animations: "disabled",
   });
 });

@@ -78,9 +78,21 @@ export type SecuritySummary = Record<Severity, number> & {
   vulnerabilities?: VulnItem[];
 };
 
+/** One conformance check (base format requirement or a G7 AI minimum element). */
+export interface ConformanceCheck {
+  id: string;
+  label: string;
+  required: boolean;
+  status: "pass" | "fail" | "warn";
+  detail: string;
+  missing?: string[];
+}
+
 export interface ConformanceSummary {
   result: string; // "pass" | "fail" | "unknown"
   format?: string;
+  /** Per-check results; G7 checks have ids prefixed "g7-". */
+  checks?: ConformanceCheck[];
 }
 
 export interface DoneEvent {
