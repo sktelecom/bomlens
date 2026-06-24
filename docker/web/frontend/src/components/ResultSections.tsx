@@ -8,6 +8,7 @@ import { sbomFileName, scancodeFileName } from "@/lib/results";
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { DependenciesPanel } from "./DependenciesPanel";
+import { ModelsDatasets } from "./ModelsDatasets";
 import { SourceTreePanel } from "./SourceTreePanel";
 import { VulnerabilitiesTable } from "./VulnerabilitiesTable";
 
@@ -65,7 +66,12 @@ export function ResultSection({
     case "artifacts":
       return <ArtifactsSection result={result} />;
 
-    // g7 / models are AI surfaces wired in Phase 3.
+    case "models": {
+      const sbomFile = sbomFileName(result);
+      return sbomFile ? <ModelsDatasets sbomFile={sbomFile} /> : null;
+    }
+
+    // g7 is an AI surface wired in a later phase (needs the backend G7 checks).
     default:
       return null;
   }

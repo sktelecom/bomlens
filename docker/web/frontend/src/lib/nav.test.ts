@@ -31,15 +31,11 @@ describe("visibleGroups — scan-type + data adaptation", () => {
   });
 
   it("hides AI-only sections for non-AI scans", () => {
-    const ids = visibleSectionIds(SOURCE_SCAN);
-    expect(ids).not.toContain("g7");
-    expect(ids).not.toContain("models");
+    expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("models");
   });
 
   it("shows AI-only sections for AI/ANALYZE scans", () => {
-    const ids = visibleSectionIds(AI_SCAN);
-    expect(ids).toContain("g7");
-    expect(ids).toContain("models");
+    expect(visibleSectionIds(AI_SCAN)).toContain("models");
   });
 
   it("gates dependencies/sourceTree on their data being present", () => {

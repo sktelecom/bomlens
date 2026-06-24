@@ -21,11 +21,22 @@ export function deriveScanContext(result: DoneEvent | null): ScanContext {
   if (!result) return EMPTY_SCAN;
   return {
     mode: result.mode ?? null,
-    // AI detection is wired in Phase 3; non-AI until then.
-    isAiScan: false,
+    isAiScan: isAiScan(result),
     hasDependencies: Boolean(sbomFileName(result)),
     hasSourceTree: Boolean(scancodeFileName(result)),
   };
+}
+
+/**
+ * An AI scan is one whose SBOM carries a machine-learning-model component —
+ * the same signal validate-sbom.sh uses to add the G7 AI checks. Content-based,
+ * since the web UI has no dedicated AI mode (AI SBOMs arrive via ANALYZE or a
+ * generated AIBOM).
+ */
+export function isAiScan(result: DoneEvent): boolean {
+  return (result.sbom?.componentList ?? []).some(
+    (c) => c.type === "machine-learning-model",
+  );
 }
 
 /** Counts shown as trailing rail badges (mirrors the classic tab counts). */
@@ -36,5 +47,8 @@ export function sectionCounts(
     components: result.sbom?.components ?? 0,
     vulnerabilities: result.security?.TOTAL ?? 0,
     artifacts: result.results.length,
+    models: (result.sbom?.componentList ?? []).filter(
+      (c) => c.type === "machine-learning-model",
+    ).length,
   };
 }
