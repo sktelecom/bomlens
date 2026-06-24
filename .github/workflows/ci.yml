@@ -88,7 +88,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -151,6 +151,37 @@ jobs:
 
       - name: Examples manifest validation
         run: bash examples/test-all.sh
+
+  web-e2e:
+    name: Web UI E2E (container scan -> done)
+    runs-on: ubuntu-latest
+    # Heavy (builds a scanner image, boots the UI container, runs real scans), so
+    # it stays off the per-PR critical path: it runs on main/develop pushes and on
+    # manual dispatch. The lightweight API contract (tests/test-web-ui.sh) still
+    # guards every PR in the postprocess job.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Base image + SCANOSS only: gives us server.py, run-scan, syft and
+      # scanoss-py — enough for the sbom-upload (ANALYZE), docker-image (IMAGE),
+      # current-dir (SOURCE/syft) cases and the dot-path SCANOSS regression. The
+      # 15GB cdxgen language image and firmware/aibom flavors are deliberately
+      # excluded to keep the build light; those scan paths fall back to syft.
+      - name: Build scanner image (base + scanoss)
+        run: |
+          docker build --build-arg SBOM_SCANOSS=true \
+            -t bomlens-e2e:ci ./docker
+
+      - name: Run web UI e2e (SSE scan-stream -> done)
+        env:
+          SBOM_E2E_IMAGE: bomlens-e2e:ci
+        run: bash tests/test-web-e2e.sh
 
   validate-docs:
     name: Validate Documentation
@@ -387,7 +418,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test, contract, postprocess, lint, validate-docs, validate-examples, ui, visual]
+    needs: [test, contract, postprocess, web-e2e, lint, validate-docs, validate-examples, ui, visual]
     if: always()
 
     steps:
@@ -400,6 +431,7 @@ jobs:
           echo "| Integration Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| No-Docker Contract (ubuntu+windows) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Post-process & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web UI E2E | ${{ needs.web-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Script Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation | ${{ needs.validate-docs.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -416,6 +448,9 @@ jobs:
             exit 1
           elif [ "${{ needs.postprocess.result }}" == "failure" ]; then
             echo "❌ Post-process / sync tests failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.web-e2e.result }}" == "failure" ]; then
+            echo "❌ Web UI e2e failed" >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [ "${{ needs.validate-examples.result }}" == "failure" ]; then
             echo "❌ Example validation failed" >> $GITHUB_STEP_SUMMARY
