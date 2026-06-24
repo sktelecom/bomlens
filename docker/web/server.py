@@ -938,6 +938,14 @@ class Handler(BaseHTTPRequestHandler):
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
         })
+        # Optional SCANOSS token (single-use, stashed via POST /git-cred). Lets a
+        # web-UI user supply their own OSSKB key, since the free anonymous endpoint
+        # is heavily rate-limited. Overrides any key from the server environment.
+        scanoss_cred = g("scanoss_cred").strip()
+        if scanoss_cred:
+            tok = _GIT_CREDS.pop(scanoss_cred, None)
+            if tok:
+                env["SCANOSS_API_KEY"] = tok
         cwd = OUTPUT_DIR
         cleanup_dir = None
         mode = None
@@ -1092,7 +1100,7 @@ class Handler(BaseHTTPRequestHandler):
             done = {
                 "ok": ok,
                 "mode": mode,
-                "results": list_results(),
+                "results": list_results(prefix),
                 "sbom": sbom_summary(prefix),
                 "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(prefix),
@@ -1113,5 +1121,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    print("[ui] SBOM Generator Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
+    print("[ui] BomLens Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
