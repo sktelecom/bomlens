@@ -50,9 +50,11 @@
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "License scan (ScanCode)",
-    "deepLicenseHint": "Scans source files directly to find their real licenses, instead of trusting the license declared by each package (slow).",
+    "deepLicenseHint": "Downloads each package's source and scans it for license information, instead of trusting the license the package declares (slow).",
     "identifyVendored": "File-level identification (SCANOSS)",
-    "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service."
+    "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service.",
+    "scanossTokenPlaceholder": "SCANOSS token (optional)",
+    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged."
   },
   "progress": {
     "title": "Run log",
@@ -66,7 +68,7 @@
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
     "vendoredHintTitle": "Few components found — is this C/C++ embedded source?",
-    "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"Identify bundled open source\" under Advanced and run again. Only file fingerprints are sent — your source stays local.",
+    "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"File-level identification (SCANOSS)\" under Advanced scan options and run again. Only file fingerprints are sent — your source stays local.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
     "vendoredMatch": "match {{pct}}",

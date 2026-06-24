@@ -50,9 +50,11 @@
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "라이선스 스캔 (ScanCode)",
-    "deepLicenseHint": "패키지에 선언된 라이선스 대신, 소스 파일을 직접 스캔해 실제 라이선스를 찾아냅니다 (느림).",
+    "deepLicenseHint": "패키지에 선언된 라이선스 대신, 패키지의 소스 파일을 다운 받아 스캔해 라이선스 정보를 찾아냅니다 (느림).",
     "identifyVendored": "파일 단위 식별 (SCANOSS)",
-    "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다."
+    "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
+    "scanossTokenPlaceholder": "SCANOSS 토큰 (선택)",
+    "scanossTokenHint": "무료 OSSKB는 익명 호출 한도가 있어 빈 결과가 나올 수 있습니다. scanoss.com에서 발급한 토큰을 넣으면 안정적으로 식별합니다. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다."
   },
   "progress": {
     "title": "실행 로그",
@@ -66,7 +68,7 @@
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
     "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
-    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스가 소스째 복사(vendored)돼 있는 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급에서 \"내장 오픈소스 식별\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
+    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"파일 단위 식별 (SCANOSS)\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "소스에 복사된 오픈소스로 SCANOSS가 식별",
     "vendoredMatch": "일치도 {{pct}}",
