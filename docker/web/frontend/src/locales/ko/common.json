@@ -210,6 +210,7 @@
     "dependencies": "의존성",
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
+    "licenses": "라이선스",
     "g7": "G7 적합성",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물"
@@ -261,6 +262,14 @@
     "sPass": "충족",
     "sFail": "실패",
     "sWarn": "권고"
+  },
+  "licenses": {
+    "empty": "감지된 라이선스가 없습니다.",
+    "reviewTitle": "라이선스 검토 필요",
+    "reviewHint": "AI 제한 조항 — 사람 검토가 필요합니다.",
+    "flagBehavioral": "행위 기반 제한",
+    "flagNonCommercial": "비상업",
+    "distribution": "라이선스 분포"
   },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",

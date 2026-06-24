@@ -9,6 +9,7 @@ import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { DependenciesPanel } from "./DependenciesPanel";
 import { G7Conformance } from "./G7Conformance";
+import { Licenses } from "./Licenses";
 import { ModelsDatasets } from "./ModelsDatasets";
 import { SourceTreePanel } from "./SourceTreePanel";
 import { VulnerabilitiesTable } from "./VulnerabilitiesTable";
@@ -48,6 +49,9 @@ export function ResultSection({
       ) : (
         <EmptyState>{t("result.noSecurity")}</EmptyState>
       );
+
+    case "licenses":
+      return <Licenses components={result.sbom?.componentList ?? []} />;
 
     case "dependencies": {
       const sbomFile = sbomFileName(result);

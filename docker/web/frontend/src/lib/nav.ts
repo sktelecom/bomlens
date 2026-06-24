@@ -15,6 +15,7 @@ import {
   type LucideIcon,
   LayoutDashboard,
   Package,
+  ScrollText,
   ShieldAlert,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export type SectionId =
   | "dependencies"
   | "sourceTree"
   | "vulnerabilities"
+  | "licenses"
   | "g7"
   | "models"
   | "artifacts";
@@ -110,6 +112,7 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.risk",
     sections: [
       { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
+      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
       {
         id: "g7",
         labelKey: "nav.g7",

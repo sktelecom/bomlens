@@ -99,6 +99,22 @@ LICENSE_FIX='(.components) |= (if type=="array" then map(
   else . end
 ) else . end)'
 
+# Tag components whose declared license needs human review (AI behavioral-use /
+# non-commercial) with a bomlens:licenseReview property, so the web UI can badge
+# them from structural data. Uses the SAME classifier as the NOTICE's review
+# section (license-flags.jq), so badge and notice never disagree. Runs after
+# LICENSE_FIX so normalized .license.id is in place; permissive/copyleft are not
+# flagged (license_flag returns "" → no property added).
+LICENSE_FLAGS_DEF="$(cat "$SCRIPT_DIR/license-flags.jq")"
+LICENSE_REVIEW_FIX='(.components) |= (if type=="array" then map(
+  ([ (.licenses // [])[] | (.license.id // .license.name // .expression // "") | license_flag(.) ]
+    | map(select(. != "")) | (.[0] // "")) as $flag
+  | if $flag != "" then
+      .properties = (((.properties // []) | map(select(.name != "bomlens:licenseReview")))
+        + [{name:"bomlens:licenseReview", value:$flag}])
+    else . end
+) else . end)'
+
 if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
@@ -107,11 +123,13 @@ if [ "$MODE" = "--stable" ]; then
     # resolve python deps (cdxgen-venv-XXXXXX) into component evidence values, so
     # the same input yields a different byte stream each run; pin that suffix too.
     jq -S --argjson vmap "$VMAP_JSON" "
+        ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
         | ${LICENSE_FIX}
+        | ${LICENSE_REVIEW_FIX}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
         | walk(if type==\"string\" then gsub(\"cdxgen-venv-[A-Za-z0-9]+\"; \"cdxgen-venv\") else . end)
@@ -123,7 +141,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
