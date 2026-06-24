@@ -219,6 +219,14 @@
     "previewBadge": "Preview",
     "newScan": "New scan"
   },
+  "newscan": {
+    "source": "Source",
+    "settings": "Scan settings",
+    "outputs": "Outputs",
+    "catCode": "Code",
+    "catArtifact": "Artifact",
+    "catSbom": "SBOM"
+  },
   "overview": {
     "needsAttention": "Needs attention",
     "allClear": "Nothing needs attention",

@@ -53,6 +53,24 @@ for (const { theme, lang } of COMBOS) {
   });
 }
 
+test("New scan groups sources and switches the source-specific input", async ({ page }) => {
+  await openShell(page, "light", "en");
+
+  // Sources are grouped into categories.
+  await expect(page.getByText("Code", { exact: true })).toBeVisible();
+  await expect(page.getByText("Artifact", { exact: true })).toBeVisible();
+
+  // Selecting the GitHub tile reveals the URL target input; Docker keeps it.
+  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await expect(page.locator("#target")).toBeVisible();
+  await page.getByRole("button", { name: "Docker image" }).click();
+  await expect(page.locator("#target")).toBeVisible();
+
+  // The settings pane keeps the project field and the generate button.
+  await expect(page.locator("#project")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
+});
+
 // A finished scan with an SBOM, a ScanCode artifact and vulnerabilities — enough
 // to exercise data-gated rail sections (Dependencies, Source tree) and counts.
 const DONE = {

@@ -219,6 +219,14 @@
     "previewBadge": "미리보기",
     "newScan": "새 스캔"
   },
+  "newscan": {
+    "source": "소스",
+    "settings": "스캔 설정",
+    "outputs": "산출물",
+    "catCode": "코드",
+    "catArtifact": "아티팩트",
+    "catSbom": "SBOM"
+  },
   "overview": {
     "needsAttention": "주의 필요",
     "allClear": "주의할 항목이 없습니다",

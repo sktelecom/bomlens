@@ -1,0 +1,185 @@
+import { Loader2, Play, Upload } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
+
+/**
+ * Shared scan-form pieces rendered identically by the classic ScanForm and the
+ * new two-pane NewScan, so there is one markup source for the source controls,
+ * generation options, validation messages and the run button.
+ */
+
+/** Source-specific control: current-folder hint / free-text target / git token / upload. */
+export function SourceControls({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { source, target, setTarget, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities } = state;
+
+  return (
+    <>
+      {source === "current-dir" && (
+        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          {capabilities.hostDir && (
+            <div className="mb-1">
+              <span className="text-foreground">{t("source.currentDirPath")}: </span>
+              <span className="break-all font-mono">{capabilities.hostDir}</span>
+            </div>
+          )}
+          {t("source.currentDirHint")}
+        </div>
+      )}
+
+      {textInput && (
+        <div className="space-y-2">
+          <Label htmlFor="target">{t(textInput.label)}</Label>
+          <Input
+            id="target"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            placeholder={t(textInput.placeholder)}
+            disabled={busy}
+          />
+          <p className="text-xs text-muted-foreground">{t(textInput.hint)}</p>
+        </div>
+      )}
+
+      {source === "git-url" && (
+        <div className="space-y-2">
+          <Label htmlFor="gitToken">{t("source.gitToken")}</Label>
+          <Input
+            id="gitToken"
+            type="password"
+            autoComplete="off"
+            value={gitToken}
+            onChange={(e) => setGitToken(e.target.value)}
+            placeholder={t("source.gitTokenPlaceholder")}
+            disabled={busy}
+          />
+          <p className="text-xs text-muted-foreground">{t("source.gitTokenHint")}</p>
+        </div>
+      )}
+
+      {uploadKind && (
+        <div className="space-y-2">
+          <Label htmlFor="file">
+            {uploadKind === "zip"
+              ? t("source.zipUpload")
+              : uploadKind === "sbom"
+                ? t("source.sbomUpload")
+                : t("source.firmwareUpload")}
+          </Label>
+          <input
+            id="file"
+            type="file"
+            accept={ACCEPT[uploadKind]}
+            disabled={busy}
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="block w-full rounded-md border bg-background text-sm text-muted-foreground file:mr-3 file:cursor-pointer file:border-0 file:border-r file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
+          />
+          {isAnalyze && (
+            <p className="text-xs text-muted-foreground">{t("source.sbomAnalyzeHint")}</p>
+          )}
+          {source === "firmware-upload" && (
+            <p className="text-xs text-muted-foreground">{t("source.firmwareHint")}</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Generation options (notice/security/deep-license) + advanced vendored toggle. */
+export function GenerationOptions({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { options, identifyVendored, setIdentifyVendored, showVendored, busy } = state;
+
+  return (
+    <>
+      <div className="space-y-3">
+        {options.map((o) => (
+          <label key={o.key} className="flex cursor-pointer items-start justify-between gap-4">
+            <span className="space-y-0.5">
+              <span className="block text-sm font-medium">{t(`options.${o.key}`)}</span>
+              <span className="block text-xs text-muted-foreground">{t(`options.${o.key}Hint`)}</span>
+            </span>
+            <Switch
+              checked={o.value}
+              onCheckedChange={o.set}
+              disabled={busy || o.forced}
+              aria-label={t(`options.${o.key}`)}
+            />
+          </label>
+        ))}
+      </div>
+
+      {showVendored && (
+        <details className="pt-1">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+            {t("form.advanced")}
+          </summary>
+          <label className="mt-3 flex cursor-pointer items-start justify-between gap-4">
+            <span className="space-y-0.5">
+              <span className="block text-sm font-medium">{t("options.identifyVendored")}</span>
+              <span className="block text-xs text-muted-foreground">{t("options.identifyVendoredHint")}</span>
+            </span>
+            <Switch
+              checked={identifyVendored}
+              onCheckedChange={setIdentifyVendored}
+              disabled={busy}
+              aria-label={t("options.identifyVendored")}
+            />
+          </label>
+        </details>
+      )}
+    </>
+  );
+}
+
+/** Validation / upload error messages. */
+export function FormMessages({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { invalid, uploadError, uploadKind, file } = state;
+  return (
+    <>
+      {invalid && (
+        <p className="text-sm text-destructive" role="alert">
+          {uploadKind && !file ? t("validation.file") : t("validation.required")}
+        </p>
+      )}
+      {uploadError && (
+        <p className="text-sm text-destructive" role="alert">
+          {t("source.uploadFailed", { msg: uploadError })}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** The run / uploading / scanning button. */
+export function RunButton({ state, running }: { state: ScanFormState; running: boolean }) {
+  const { t } = useTranslation();
+  const { submit, busy, uploading } = state;
+  return (
+    <Button className="w-full" onClick={submit} disabled={busy}>
+      {uploading ? (
+        <>
+          <Upload className="h-4 w-4 animate-pulse" />
+          {t("source.uploading")}
+        </>
+      ) : running ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t("form.running")}
+        </>
+      ) : (
+        <>
+          <Play className="h-4 w-4" />
+          {t("form.run")}
+        </>
+      )}
+    </Button>
+  );
+}
