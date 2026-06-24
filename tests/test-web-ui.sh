@@ -130,18 +130,18 @@ if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
 import server
-demo = {r["name"]: r for r in server.sbom_summary("demo", "1.0")["componentList"]}
+demo = {r["name"]: r for r in server.sbom_summary("demo_1.0")["componentList"]}
 assert demo["flask"]["scope"] == "direct", demo["flask"]
 assert demo["werkzeug"]["scope"] == "transitive", demo["werkzeug"]
 assert demo["jinja2"]["scope"] == "transitive", demo["jinja2"]
 assert demo["werkzeug"]["maxSeverity"] == "CRITICAL", demo["werkzeug"]
 assert demo["werkzeug"]["vulnCount"] == 2, demo["werkzeug"]
 assert "maxSeverity" not in demo["flask"], demo["flask"]
-flat = {r["name"]: r for r in server.sbom_summary("flat", "1.0")["componentList"]}
+flat = {r["name"]: r for r in server.sbom_summary("flat_1.0")["componentList"]}
 assert "scope" not in flat["openssl"], flat["openssl"]
 assert flat["openssl"]["maxSeverity"] == "HIGH", flat["openssl"]
 assert flat["openssl"]["vulnCount"] == 1, flat["openssl"]
-bad = {r["name"]: r for r in server.sbom_summary("bad", "1.0")["componentList"]}
+bad = {r["name"]: r for r in server.sbom_summary("bad_1.0")["componentList"]}
 assert "maxSeverity" not in bad["a"], bad["a"]
 PY
 then
@@ -161,7 +161,7 @@ if command -v jq >/dev/null 2>&1; then
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
 import server
-c = server.conformance_summary("conf", "1.0")
+c = server.conformance_summary("conf_1.0")
 assert c is not None, "no conformance summary"
 checks = c.get("checks") or []
 assert len(checks) > 0, "checks not exposed"
@@ -192,7 +192,7 @@ if command -v jq >/dev/null 2>&1; then
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
 import server
-rows = {r["name"]: r for r in server.sbom_summary("lic", "1.0")["componentList"]}
+rows = {r["name"]: r for r in server.sbom_summary("lic_1.0")["componentList"]}
 assert rows["some-llama-model"]["licenseReview"] == "behavioral-use", rows["some-llama-model"]
 assert rows["some-nc-dataset"]["licenseReview"] == "non-commercial", rows["some-nc-dataset"]
 assert "licenseReview" not in rows["ordinary-lib"], rows["ordinary-lib"]
@@ -204,6 +204,45 @@ PY
     fi
     rm -f "$OUT"/lic_1.0_*
 fi
+
+echo "== recent scans (/scans + /scan) =="
+# Reuse the demo fixtures left in OUT: list past scans, re-open one, block traversal.
+cat > "$OUT/demo_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"demo","version":"1.0"}},
+ "components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/demo_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[{"VulnerabilityID":"CVE-1","Severity":"HIGH","PkgName":"flask","InstalledVersion":"2.0"}]}]}
+JSON
+scans=$(curl -fsS "$BASE/scans" 2>/dev/null)
+if echo "$scans" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert isinstance(d, list) and len(d) >= 1, d
+s = next(x for x in d if x['id'] == 'demo_1.0')
+assert s['project'] == 'demo' and s['version'] == '1.0', s
+assert s['maxSeverity'] == 'HIGH', s
+assert s['components'] == 1, s
+"; then
+    pass "/scans lists past scans with project/version/severity"
+else
+    fail "/scans summary is wrong" "$scans"
+fi
+if curl -fsS "$BASE/scan?id=demo_1.0" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['ok'] is True and d['sbom']['components'] == 1, d
+assert d['security']['TOTAL'] == 1, d
+"; then
+    pass "/scan?id= re-opens a past scan"
+else
+    fail "/scan?id= did not return the scan detail"
+fi
+c_bad=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=../../etc/passwd")
+[ "$c_bad" = "400" ] && pass "/scan blocks traversal id (400)" || fail "/scan traversal id returned $c_bad (expected 400)"
+c_missing=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=nope_9.9")
+[ "$c_missing" = "404" ] && pass "/scan unknown id returns 404" || fail "/scan unknown id returned $c_missing (expected 404)"
+rm -f "$OUT"/demo_1.0_*
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

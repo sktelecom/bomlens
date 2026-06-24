@@ -88,6 +88,11 @@ def safe_name(s):
     return s
 
 
+def output_prefix(project, version):
+    """The {project}_{version} filename prefix every artifact of a scan shares."""
+    return "%s_%s" % (safe_name(project), safe_name(version))
+
+
 def safe_output_path(name):
     """Resolve a filename strictly inside OUTPUT_DIR (block path traversal)."""
     base = os.path.basename(name)
@@ -137,14 +142,25 @@ def docker_capable():
     return os.path.exists("/var/run/docker.sock")
 
 
-def list_results():
+def list_results(prefix=None):
+    """Generated artifacts in OUTPUT_DIR. With a prefix, only that scan's files
+    ({prefix}_*) — used when re-opening a past scan."""
     out = []
     if os.path.isdir(OUTPUT_DIR):
         for name in sorted(os.listdir(OUTPUT_DIR)):
             p = os.path.join(OUTPUT_DIR, name)
-            if os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES):
-                out.append({"name": name, "size": os.path.getsize(p)})
+            if not (os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES)):
+                continue
+            if prefix and not name.startswith(prefix + "_"):
+                continue
+            out.append({"name": name, "size": os.path.getsize(p)})
     return out
+
+
+def scan_id_ok(sid):
+    """A scan id is a filename prefix; allow only the safe_name charset (no
+    path separators / traversal)."""
+    return bool(sid) and re.fullmatch(r"[A-Za-z0-9._-]+", sid) is not None
 
 
 # Row caps so a huge SBOM/scan can't bloat the SSE 'done' payload. The counts
@@ -192,8 +208,7 @@ def _cvss_best(v):
     return best_score, best_vector
 
 
-def security_summary(project, version):
-    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+def security_summary(prefix):
     p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
     if not os.path.isfile(p):
         return None
@@ -239,12 +254,11 @@ def _norm_purl(purl):
     return purl.split("?", 1)[0].split("#", 1)[0].strip().lower()
 
 
-def _component_risk_index(project, version):
+def _component_risk_index(prefix):
     """Join the Trivy security report to packages: worst severity + count per
     package, keyed by normalized purl and by (name, version). Uncapped (unlike
     the detail list) so a component's Risk reflects every finding against it.
     Returns (by_purl, by_nv); both empty when there is no security report."""
-    prefix = "%s_%s" % (safe_name(project), safe_name(version))
     p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
     by_purl, by_nv = {}, {}
     if not os.path.isfile(p):
@@ -309,8 +323,7 @@ def _scope_index(data):
     return {ref: ("direct" if ref in direct else "transitive") for ref in refs}, True
 
 
-def sbom_summary(project, version):
-    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+def sbom_summary(prefix):
     p = os.path.join(OUTPUT_DIR, prefix + "_bom.json")
     if not os.path.isfile(p):
         return None
@@ -320,7 +333,7 @@ def sbom_summary(project, version):
     except (OSError, json.JSONDecodeError):
         return None
     comps = data.get("components") or []
-    risk_by_purl, risk_by_nv = _component_risk_index(project, version)
+    risk_by_purl, risk_by_nv = _component_risk_index(prefix)
     scope_by_ref, has_deps = _scope_index(data)
     rows = []
     for c in comps[:MAX_COMPONENT_ROWS]:
@@ -389,9 +402,8 @@ def sbom_summary(project, version):
     }
 
 
-def conformance_summary(project, version):
+def conformance_summary(prefix):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
-    prefix = "%s_%s" % (safe_name(project), safe_name(version))
     p = os.path.join(OUTPUT_DIR, prefix + "_conformance.json")
     if not os.path.isfile(p):
         return None
@@ -419,6 +431,67 @@ def conformance_summary(project, version):
         "result": data.get("result", "unknown"),
         "format": data.get("format", ""),
         "checks": checks,
+    }
+
+
+def _max_severity(security):
+    """Highest severity with a non-zero count in a security summary, else None."""
+    if not security:
+        return None
+    for s in SEVERITY_ORDER:
+        if security.get(s, 0) > 0:
+            return s
+    return None
+
+
+SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
+
+
+def list_scans():
+    """Past scans in OUTPUT_DIR — one per {prefix}_bom.json, newest first. The
+    real project/version come from the SBOM's metadata.component. Local files
+    only; no account, no database."""
+    scans = []
+    if not os.path.isdir(OUTPUT_DIR):
+        return scans
+    for name in os.listdir(OUTPUT_DIR):
+        if not name.endswith("_bom.json"):
+            continue
+        prefix = name[: -len("_bom.json")]
+        p = os.path.join(OUTPUT_DIR, name)
+        try:
+            mtime = int(os.path.getmtime(p))
+            with open(p) as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        comps = data.get("components") or []
+        meta = (data.get("metadata") or {}).get("component") or {}
+        scans.append({
+            "id": prefix,
+            "project": meta.get("name") or prefix,
+            "version": meta.get("version") or "",
+            "components": len(comps),
+            "maxSeverity": _max_severity(security_summary(prefix)),
+            "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
+            "generatedAt": mtime,
+        })
+    scans.sort(key=lambda s: s["generatedAt"], reverse=True)
+    return scans
+
+
+def scan_detail(prefix):
+    """A past scan as a done-event payload (its own artifacts only)."""
+    sbom = sbom_summary(prefix)
+    if sbom is None:
+        return None
+    return {
+        "ok": True,
+        "mode": None,
+        "results": list_results(prefix),
+        "sbom": sbom,
+        "security": security_summary(prefix),
+        "conformance": conformance_summary(prefix),
     }
 
 
@@ -594,6 +667,10 @@ class Handler(BaseHTTPRequestHandler):
             }))
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
+        elif path == "/scans":
+            self._send(200, json.dumps(list_scans()))
+        elif path == "/scan":
+            self._serve_scan(urllib.parse.parse_qs(parsed.query))
         elif path == "/scan-stream":
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
         else:
@@ -709,6 +786,18 @@ class Handler(BaseHTTPRequestHandler):
             ctype = "text/plain; charset=utf-8"
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype)
+
+    def _serve_scan(self, qs):
+        """Re-open a past scan by id (its {prefix}). Traversal-safe."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "invalid scan id"}))
+            return
+        detail = scan_detail(sid)
+        if detail is None:
+            self._send(404, json.dumps({"error": "not found"}))
+            return
+        self._send(200, json.dumps(detail))
 
     def _download_all(self):
         """Bundle every generated artifact into one in-memory zip.
@@ -933,13 +1022,14 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:  # noqa: BLE001
                 sse("error", json.dumps("Failed to launch scan: %s" % exc))
 
+            prefix = output_prefix(project, version)
             done = {
                 "ok": ok,
                 "mode": mode,
                 "results": list_results(),
-                "sbom": sbom_summary(project, version),
-                "security": security_summary(project, version) if env["GENERATE_SECURITY"] == "true" else None,
-                "conformance": conformance_summary(project, version),
+                "sbom": sbom_summary(prefix),
+                "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,
+                "conformance": conformance_summary(prefix),
             }
             sse("done", json.dumps(done))
         finally:
