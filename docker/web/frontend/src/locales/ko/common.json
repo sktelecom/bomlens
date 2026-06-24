@@ -226,6 +226,29 @@
     "explore": "둘러보기",
     "jumpHint": "{{section}} 보기"
   },
+  "models": {
+    "loading": "모델 정보를 불러오는 중…",
+    "loadError": "모델 SBOM을 불러오지 못했습니다.",
+    "empty": "모델 컴포넌트가 없습니다.",
+    "architecture": "아키텍처",
+    "task": "태스크",
+    "supplier": "공급자",
+    "identifier": "식별자",
+    "integrity": "무결성",
+    "integrityYes": "해시 있음",
+    "integrityNo": "해시 없음",
+    "disclosure": "공개 정보",
+    "disclosureHint": "각 항목이 모델 카드에 문서화되어 있는지를 나타냅니다. 모델 자체의 개방성을 단정하지 않습니다.",
+    "axisWeights": "가중치",
+    "axisArchitecture": "아키텍처",
+    "axisTrainingData": "학습 데이터",
+    "axisTrainingProcess": "학습 과정",
+    "documented": "문서화됨",
+    "notDocumented": "미문서화",
+    "references": "참조",
+    "limitations": "한계",
+    "datasets": "데이터셋"
+  },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",
     "file": "분석할 파일을 선택하세요."

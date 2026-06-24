@@ -226,6 +226,29 @@
     "explore": "Explore",
     "jumpHint": "View {{section}}"
   },
+  "models": {
+    "loading": "Loading model details…",
+    "loadError": "Could not load the model SBOM.",
+    "empty": "No model components found.",
+    "architecture": "Architecture",
+    "task": "Task",
+    "supplier": "Supplier",
+    "identifier": "Identifier",
+    "integrity": "Integrity",
+    "integrityYes": "Hash present",
+    "integrityNo": "No hash",
+    "disclosure": "Disclosure",
+    "disclosureHint": "Whether each axis is documented in the model card — not a claim about the model itself.",
+    "axisWeights": "Weights",
+    "axisArchitecture": "Architecture",
+    "axisTrainingData": "Training data",
+    "axisTrainingProcess": "Training process",
+    "documented": "Documented",
+    "notDocumented": "Not documented",
+    "references": "References",
+    "limitations": "Limitations",
+    "datasets": "Datasets"
+  },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
     "file": "Choose a file to analyze."

@@ -9,7 +9,6 @@
 import {
   Boxes,
   Cpu,
-  FileCheck2,
   FileText,
   GitBranch,
   type LucideIcon,
@@ -107,7 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.risk",
     sections: [
       { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
-      { id: "g7", labelKey: "nav.g7", icon: FileCheck2, aiOnly: true },
+      // g7 (AI conformance) returns once the backend exposes the G7 checks.
     ],
   },
   {

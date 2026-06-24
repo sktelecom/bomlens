@@ -168,6 +168,86 @@ test("overview section matches baseline — light/en @visual", async ({ page }) 
   });
 });
 
+// An AI scan: the SBOM carries a machine-learning-model component, so the rail
+// exposes Models & Datasets. /file returns the matching ML-BOM (CycloneDX 1.7).
+const AI_DONE = {
+  ok: true,
+  mode: "ANALYZE",
+  results: [{ name: "model_1.0_bom.json", size: 200 }],
+  security: null,
+  conformance: null,
+  sbom: {
+    components: 1,
+    componentList: [
+      { name: "bert-base-uncased", version: "86b5e093", group: "google-bert", purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", type: "machine-learning-model", licenses: ["Apache-2.0"] },
+    ],
+  },
+};
+const AI_SBOM = {
+  bomFormat: "CycloneDX",
+  specVersion: "1.7",
+  metadata: { component: { "bom-ref": "root", name: "model", version: "1.0" } },
+  components: [
+    {
+      type: "machine-learning-model", "bom-ref": "m", name: "bert-base-uncased", version: "86b5e093", group: "google-bert",
+      purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", description: "A BERT model.",
+      licenses: [{ license: { id: "Apache-2.0" } }], supplier: { name: "google-bert" }, authors: [{ name: "google-bert" }],
+      externalReferences: [{ type: "distribution", url: "https://huggingface.co/google-bert/bert-base-uncased/tree/main" }],
+      modelCard: {
+        modelParameters: {
+          task: "fill-mask", modelArchitecture: "bert",
+          datasets: [
+            { type: "dataset", name: "bookcorpus", contents: { url: "https://huggingface.co/datasets/bookcorpus" } },
+            { type: "dataset", name: "wikipedia", contents: { url: "https://huggingface.co/datasets/wikipedia" } },
+          ],
+        },
+        considerations: { technicalLimitations: ["Intended to be fine-tuned."] },
+      },
+    },
+  ],
+};
+
+async function stubAiAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(AI_SBOM) }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(AI_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next");
+  await page.fill("#project", "model");
+  await page.fill("#version", "1.0");
+  await page.getByRole("button", { name: /Run scan/i }).click();
+}
+
+test("AI scan exposes Models & Datasets with the model card", async ({ page }) => {
+  await stubAiAndRun(page);
+  await expect(page.getByRole("button", { name: /Models & datasets/ })).toBeVisible();
+  await page.getByRole("button", { name: /Models & datasets/ }).click();
+
+  await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
+  await expect(page.getByText("bert", { exact: true })).toBeVisible(); // architecture
+  await expect(page.getByText("fill-mask")).toBeVisible(); // task
+  await expect(page.getByText("bookcorpus").first()).toBeVisible();
+  await expect(page.getByText("wikipedia").first()).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("models section matches baseline — light/en @visual", async ({ page }) => {
+  await stubAiAndRun(page);
+  await page.getByRole("button", { name: /Models & datasets/ }).click();
+  await expect(page.getByText("bert-base-uncased")).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
+    animations: "disabled",
+  });
+});
+
 test("Dependencies tree marks vulnerable packages and direct deps", async ({ page }) => {
   await stubAndRun(page);
   await page.getByRole("button", { name: /^Dependencies/ }).click();
