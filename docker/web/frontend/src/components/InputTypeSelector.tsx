@@ -57,7 +57,9 @@ export function InputTypeSelector({
               "disabled:pointer-events-none disabled:opacity-50",
               active
                 ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                : // muted-foreground on the muted tray is only 4.37:1 (fails AA);
+                  // foreground/70 keeps the de-emphasis while passing contrast.
+                  "text-foreground/70 hover:text-foreground",
             )}
           >
             {t(LABEL_KEY[s])}

@@ -15,6 +15,10 @@ interface SidebarProps {
   activeSection: SectionId;
   onSelect: (id: SectionId) => void;
   recent?: RecentScanLink[];
+  /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
+  counts?: Partial<Record<SectionId, number>>;
+  /** Hide the section groups (e.g. before any scan); the Recent area stays. */
+  showSections?: boolean;
   /** Icon-only rail when collapsed (narrow widths / user toggle). */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
@@ -39,11 +43,13 @@ export function Sidebar({
   activeSection,
   onSelect,
   recent = [],
+  counts = {},
+  showSections = true,
   collapsed = false,
   onToggleCollapsed,
 }: SidebarProps) {
   const { t } = useTranslation();
-  const groups = visibleGroups(scan);
+  const groups = showSections ? visibleGroups(scan) : [];
 
   return (
     <nav
@@ -87,6 +93,7 @@ export function Sidebar({
               const Icon = section.icon;
               const active = section.id === activeSection;
               const label = t(section.labelKey);
+              const count = counts[section.id];
               return (
                 <li key={section.id}>
                   <button
@@ -117,6 +124,11 @@ export function Sidebar({
                       aria-hidden
                     />
                     {!collapsed && <span className="truncate">{label}</span>}
+                    {!collapsed && count !== undefined && (
+                      <span className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground">
+                        {count}
+                      </span>
+                    )}
                   </button>
                 </li>
               );

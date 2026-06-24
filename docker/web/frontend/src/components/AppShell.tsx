@@ -14,6 +14,10 @@ interface AppShellProps {
   activeSection: SectionId;
   onSelectSection: (id: SectionId) => void;
   recent?: RecentScanLink[];
+  /** Per-section counts shown as trailing rail badges. */
+  counts?: Partial<Record<SectionId, number>>;
+  /** Hide the rail's section groups (e.g. before any scan). */
+  showSections?: boolean;
   /** Project context shown in the top bar, e.g. "my-app · 1.0.0". */
   projectLabel?: string;
   /** Optional top-bar action (e.g. New scan button). */
@@ -35,6 +39,8 @@ export function AppShell({
   activeSection,
   onSelectSection,
   recent,
+  counts,
+  showSections,
   projectLabel,
   topBarActions,
   children,
@@ -62,6 +68,8 @@ export function AppShell({
           activeSection={activeSection}
           onSelect={onSelectSection}
           recent={recent}
+          counts={counts}
+          showSections={showSections}
           collapsed={collapsed}
           onToggleCollapsed={() => setManualCollapsed(!collapsed)}
         />

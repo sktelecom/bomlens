@@ -5,8 +5,8 @@ import { useTranslation } from "react-i18next";
 import { Header } from "./components/Header";
 import { ProgressLog } from "./components/ProgressLog";
 import { ResultDashboard } from "./components/ResultDashboard";
+import { NextApp } from "./components/NextApp";
 import { ScanForm } from "./components/ScanForm";
-import { ShellPreview } from "./components/ShellPreview";
 import {
   getCapabilities,
   startScan,
@@ -22,7 +22,7 @@ export default function App() {
   // New shell (Phase 0+) lives behind `?ui=next`; the classic UI is the default
   // until section parity is reached. Read once at mount — the flag is a URL
   // switch, not reactive state.
-  if (isNextUi()) return <ShellPreview />;
+  if (isNextUi()) return <NextApp />;
   return <ClassicApp />;
 }
 
