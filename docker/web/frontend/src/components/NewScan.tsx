@@ -1,5 +1,6 @@
 import {
   Box,
+  Brain,
   Cpu,
   FileArchive,
   FileJson,
@@ -38,13 +39,16 @@ const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = 
   "docker-image": { labelKey: "source.dockerImage", icon: Box },
   "firmware-upload": { labelKey: "source.firmwareUpload", icon: Cpu },
   "sbom-upload": { labelKey: "source.sbomUpload", icon: FileJson },
+  "ai-model": { labelKey: "source.aiModel", icon: Brain },
 };
 
-// Grouped tiles: scan source code, scan a built artifact, or analyze an SBOM.
+// Grouped tiles: scan source code, scan a built artifact, analyze an SBOM, or
+// generate an SBOM for an AI model.
 const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
   { key: "catCode", sources: ["current-dir", "rootfs-dir", "git-url", "zip-upload"] },
   { key: "catArtifact", sources: ["docker-image", "firmware-upload"] },
   { key: "catSbom", sources: ["sbom-upload"] },
+  { key: "catAiModel", sources: ["ai-model"] },
 ];
 
 /**
@@ -72,13 +76,21 @@ export function NewScan({ running, capabilities, onRun }: Props) {
                     const { labelKey, icon: Icon } = SOURCE_META[s];
                     const active = state.source === s;
                     const fwLocked = s === "firmware-upload" && !capabilities.firmware;
+                    const aiLocked = s === "ai-model" && !capabilities.aibom;
+                    const locked = fwLocked || aiLocked;
                     return (
                       <button
                         key={s}
                         type="button"
                         aria-pressed={active}
-                        disabled={state.busy || fwLocked}
-                        title={fwLocked ? t("source.firmwareUnavailable") : undefined}
+                        disabled={state.busy || locked}
+                        title={
+                          fwLocked
+                            ? t("source.firmwareUnavailable")
+                            : aiLocked
+                              ? t("source.aiModelUnavailable")
+                              : undefined
+                        }
                         onClick={() => state.changeSource(s)}
                         className={cn(
                           "flex items-center gap-2 rounded-lg border p-3 text-left text-sm",

@@ -53,6 +53,24 @@ for (const { theme, lang } of COMBOS) {
   });
 }
 
+test("AI model source is gated on the AIBOM image", async ({ page }) => {
+  // Without the AIBOM image, the tile is disabled.
+  await openShell(page, "light", "en");
+  await expect(page.getByRole("button", { name: "AI model" })).toBeDisabled();
+
+  // With the AIBOM image, selecting it reveals the HuggingFace model id input.
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true, aibom: true }) }),
+  );
+  await page.reload();
+  await page.getByRole("navigation").first().waitFor();
+  const tile = page.getByRole("button", { name: "AI model" });
+  await expect(tile).toBeEnabled();
+  await tile.click();
+  await expect(page.locator("#target")).toBeVisible();
+  await expect(page.locator("#target")).toHaveAttribute("placeholder", /bert-base-uncased/);
+});
+
 test("New scan groups sources and switches the source-specific input", async ({ page }) => {
   await openShell(page, "light", "en");
 

@@ -19,6 +19,7 @@
 #   zip-upload    -> extract uploaded zip then MODE=SOURCE
 #   sbom-upload   -> MODE=ANALYZE on the uploaded SBOM
 #   firmware-upload -> MODE=FIRMWARE (only when unblob is present in this image)
+#   ai-model      -> MODE=AIBOM on <model id> (only in the bomlens-aibom image)
 #   docker-image  -> MODE=IMAGE on <target>
 import io
 import json
@@ -41,6 +42,9 @@ UPLOAD_DIR = os.path.join(OUTPUT_DIR, ".uploads")  # uploaded files + extracted/
 PORT = int(os.environ.get("UI_PORT", "8080"))
 FIRMWARE_IMAGE = os.environ.get(
     "SBOM_FIRMWARE_IMAGE", "ghcr.io/sktelecom/sbom-scanner-firmware:latest"
+)
+AIBOM_IMAGE = os.environ.get(
+    "SBOM_AIBOM_IMAGE", "ghcr.io/sktelecom/bomlens-aibom:latest"
 )
 
 # Per-kind upload size caps (bytes).
@@ -136,6 +140,13 @@ def firmware_capable():
 def scanoss_capable():
     """Vendored-OSS identification (scanoss-py) is only built in with SBOM_SCANOSS."""
     return shutil.which("scanoss-py") is not None
+
+
+def aibom_capable():
+    """AI-model SBOM generation (OWASP AIBOM Generator) lives only in the opt-in
+    bomlens-aibom image — mirror scan-aibom.sh's detection."""
+    aibom_dir = os.environ.get("AIBOM_DIR", "/opt/aibom-generator")
+    return os.path.isfile(os.path.join(aibom_dir, "src", "cli.py")) or shutil.which("aibom") is not None
 
 
 def docker_capable():
@@ -662,7 +673,9 @@ class Handler(BaseHTTPRequestHandler):
                 "firmware": firmware_capable(),
                 "scanoss": scanoss_capable(),
                 "docker": docker_capable(),
+                "aibom": aibom_capable(),
                 "firmwareImage": FIRMWARE_IMAGE,
+                "aibomImage": AIBOM_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
             }))
         elif path == "/file":
@@ -995,6 +1008,22 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "FIRMWARE"
                 env["MODE"] = "FIRMWARE"
                 env["TARGET_FILE"] = up
+
+            elif source == "ai-model":
+                # Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace
+                # model via the OWASP AIBOM Generator (opt-in bomlens-aibom image).
+                if not target:
+                    fail("HuggingFace model id required (owner/name)"); return
+                # owner/name (optional owner), HuggingFace charset only; no traversal.
+                if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$", target):
+                    fail("Unsupported model id (expected owner/name)"); return
+                if not aibom_capable():
+                    fail("AI-model SBOM generation requires the AIBOM image. Relaunch the UI with "
+                         "SBOM_SCANNER_IMAGE=%s ./scan-sbom.sh --ui" % AIBOM_IMAGE)
+                    return
+                mode = "AIBOM"
+                env["MODE"] = "AIBOM"
+                env["MODEL_ID"] = target
 
             else:
                 fail("unknown input type: %s" % source); return
