@@ -52,7 +52,7 @@ test("ZIP upload flow uploads then renders the scan result", async ({ page }) =>
 
   // The upload endpoint was called, and the run produced results (no "Failed to fetch").
   await expect.poll(() => uploaded).toBe(true);
-  await page.getByRole("tab", { name: /Components/i }).click();
+  await page.getByRole("button", { name: /^Components/ }).click();
   await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Failed to fetch/i)).toHaveCount(0);
 });

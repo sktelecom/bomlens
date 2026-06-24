@@ -75,7 +75,7 @@ test("vendored badge + match confidence render; XSS name is inert", async ({ pag
   await page.goto("/");
   await fillAndRun(page);
   // Open the Components tab where the per-component table (and badge) lives.
-  await page.getByRole("tab", { name: /Components/i }).click();
+  await page.getByRole("button", { name: /^Components/ }).click();
 
   // vendored badge present with a match-confidence tooltip.
   const badge = page.getByText("vendored", { exact: true }).first();
