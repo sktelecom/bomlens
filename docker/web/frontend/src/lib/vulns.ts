@@ -5,7 +5,7 @@
  */
 import { SEVERITY_ORDER, type VulnItem } from "./api";
 
-export type VulnSortKey = "severity" | "cvss";
+export type VulnSortKey = "severity" | "cvss" | "epss";
 export type SortDir = "asc" | "desc";
 
 /** Higher = more severe (CRITICAL highest). Unknown/absent severities sort last. */
@@ -19,10 +19,19 @@ function cvssValue(v: VulnItem): number {
   return typeof v.cvss === "number" ? v.cvss : -1;
 }
 
+/** EPSS as a comparable number; missing scores sort below any real score. */
+function epssValue(v: VulnItem): number {
+  return typeof v.epss === "number" ? v.epss : -1;
+}
+
+function primaryValue(v: VulnItem, key: VulnSortKey): number {
+  return key === "cvss" ? cvssValue(v) : key === "epss" ? epssValue(v) : severityValue(v);
+}
+
 /**
- * Compare two vulnerabilities by the active key/direction. The non-primary
- * metric is always a "highest first" tiebreak (direction-independent), then the
- * CVE id, so order is stable and intuitive within a severity band.
+ * Compare two vulnerabilities by the active key/direction. The tiebreak is
+ * always severity (highest first, direction-independent) then the CVE id, so
+ * order is stable and intuitive within a band.
  */
 export function compareVulns(
   a: VulnItem,
@@ -32,12 +41,16 @@ export function compareVulns(
 ): number {
   const factor = dir === "asc" ? 1 : -1;
 
-  const primary = key === "cvss" ? cvssValue(a) - cvssValue(b) : severityValue(a) - severityValue(b);
+  const primary = primaryValue(a, key) - primaryValue(b, key);
   if (primary !== 0) return factor * primary;
 
-  const secondary =
-    key === "cvss" ? severityValue(a) - severityValue(b) : cvssValue(a) - cvssValue(b);
-  if (secondary !== 0) return -secondary; // higher first, regardless of direction
+  if (key !== "severity") {
+    const sev = severityValue(a) - severityValue(b);
+    if (sev !== 0) return -sev; // most severe first, regardless of direction
+  } else {
+    const cvss = cvssValue(a) - cvssValue(b);
+    if (cvss !== 0) return -cvss;
+  }
 
   return a.id.localeCompare(b.id);
 }

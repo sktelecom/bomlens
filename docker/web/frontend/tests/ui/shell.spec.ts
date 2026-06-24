@@ -154,8 +154,8 @@ const DONE = {
   security: {
     CRITICAL: 1, HIGH: 1, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 2,
     vulnerabilities: [
-      { id: "CVE-2024-0001", severity: "CRITICAL", pkg: "openssl", installed: "3.0.0", fixed: "3.0.1", title: "buffer overflow", cvss: 9.8, cvssVector: "CVSS:3.1/AV:N/AC:L", description: "A heap buffer overflow in the TLS handshake.", url: "https://example.test/CVE-2024-0001" },
-      { id: "CVE-2024-0002", severity: "HIGH", pkg: "zlib", installed: "1.2.0", fixed: "1.2.1", title: "oob read", cvss: 7.5 },
+      { id: "CVE-2024-0001", severity: "CRITICAL", pkg: "openssl", installed: "3.0.0", fixed: "3.0.1", title: "buffer overflow", cvss: 9.8, cvssVector: "CVSS:3.1/AV:N/AC:L", description: "A heap buffer overflow in the TLS handshake.", url: "https://example.test/CVE-2024-0001", epss: 0.972, kev: true },
+      { id: "CVE-2024-0002", severity: "HIGH", pkg: "zlib", installed: "1.2.0", fixed: "1.2.1", title: "oob read", cvss: 7.5, epss: 0.004 },
     ],
   },
   conformance: null,
@@ -474,6 +474,11 @@ test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page
   await expect(page.getByRole("button", { name: "CVSS", exact: true })).toBeVisible();
   await expect(page.getByText("9.8", { exact: true })).toBeVisible();
   await expect(page.getByText("7.5", { exact: true })).toBeVisible();
+
+  // EPSS column (enriched run) and the KEV badge on the actively-exploited CVE.
+  await expect(page.getByRole("button", { name: "EPSS", exact: true })).toBeVisible();
+  await expect(page.getByText("97.2%")).toBeVisible();
+  await expect(page.getByText("KEV", { exact: true })).toBeVisible();
 
   // Sorting by CVSS toggles the column's aria-sort.
   const cvssTh = page.locator("th", {

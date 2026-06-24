@@ -219,6 +219,20 @@ def _cvss_best(v):
     return best_score, best_vector
 
 
+def _epss_kev_map(prefix):
+    """Per-CVE EPSS probability + CISA KEV flag, written by scan-security.sh as a
+    sidecar (Trivy's _security.json carries neither). Empty when absent/offline."""
+    p = os.path.join(OUTPUT_DIR, prefix + "_security_epss.json")
+    if not os.path.isfile(p):
+        return {}
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def security_summary(prefix):
     p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
     if not os.path.isfile(p):
@@ -228,6 +242,7 @@ def security_summary(prefix):
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
+    priority = _epss_kev_map(prefix)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
     for r in (data.get("Results") or []):
@@ -239,8 +254,10 @@ def security_summary(prefix):
             if len(vulns) < MAX_VULN_ROWS:
                 score, vector = _cvss_best(v)
                 desc = (v.get("Description") or "")[:MAX_VULN_DESC]
-                vulns.append({
-                    "id": v.get("VulnerabilityID") or "",
+                cid = v.get("VulnerabilityID") or ""
+                pr = priority.get(cid) or {}
+                row = {
+                    "id": cid,
                     "severity": s,
                     "pkg": v.get("PkgName") or "",
                     "installed": v.get("InstalledVersion") or "",
@@ -251,7 +268,14 @@ def security_summary(prefix):
                     "description": desc,
                     "url": v.get("PrimaryURL") or "",
                     "refs": (v.get("References") or [])[:MAX_VULN_REFS],
-                })
+                }
+                # EPSS (exploit probability, 0..1) + CISA KEV (actively exploited).
+                epss = pr.get("epss")
+                if isinstance(epss, (int, float)):
+                    row["epss"] = epss
+                if pr.get("kev"):
+                    row["kev"] = True
+                vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
     return sev

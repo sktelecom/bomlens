@@ -73,6 +73,10 @@ export interface VulnItem {
   url?: string;
   /** Reference links (capped server-side). */
   refs?: string[];
+  /** EPSS exploit probability (0..1), when the report was enriched. */
+  epss?: number;
+  /** On CISA's Known Exploited Vulnerabilities list (actively exploited). */
+  kev?: boolean;
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */

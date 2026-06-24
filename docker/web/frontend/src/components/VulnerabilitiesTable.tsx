@@ -142,6 +142,9 @@ export function VulnerabilitiesTable({ security }: Props) {
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 
+  // EPSS column appears only when the report was enriched (online run).
+  const anyEpss = useMemo(() => items.some((v) => typeof v.epss === "number"), [items]);
+
   const sorted = useMemo(
     () => [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir)),
     [items, sort],
@@ -186,6 +189,9 @@ export function VulnerabilitiesTable({ security }: Props) {
           <tr className="border-b">
             <SortableTh label={t("result.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
             <SortableTh label={t("result.vulnCvss")} sortKey="cvss" sort={sort} onSort={onSort} />
+            {anyEpss && (
+              <SortableTh label={t("result.colEpss")} sortKey="epss" sort={sort} onSort={onSort} />
+            )}
             <th className="px-3 py-2 font-medium">{t("result.colCve")}</th>
             <th className="px-3 py-2 font-medium">{t("result.colPackage")}</th>
             <th className="px-3 py-2 font-medium">{t("result.colInstalled")}</th>
@@ -239,6 +245,11 @@ export function VulnerabilitiesTable({ security }: Props) {
                       <Badge tone={TONE[v.severity] ?? "info"}>
                         {t(`severity.${v.severity}`)}
                       </Badge>
+                      {v.kev && (
+                        <Badge tone="critical" title={t("result.kevHint")}>
+                          {t("result.kevBadge")}
+                        </Badge>
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-2 font-mono tabular-nums">
@@ -248,6 +259,11 @@ export function VulnerabilitiesTable({ security }: Props) {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
+                  {anyEpss && (
+                    <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
+                      {typeof v.epss === "number" ? `${(v.epss * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  )}
                   <td className="px-3 py-2">
                     <span className="font-mono">{v.id}</span>
                     {v.title ? (
@@ -272,7 +288,7 @@ export function VulnerabilitiesTable({ security }: Props) {
                 </tr>
                 {isOpen && (
                   <tr className="border-b last:border-0">
-                    <td colSpan={6} className="bg-muted/30 px-3 py-3">
+                    <td colSpan={anyEpss ? 7 : 6} className="bg-muted/30 px-3 py-3">
                       <VulnDetail vuln={v} links={links} />
                     </td>
                   </tr>

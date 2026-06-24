@@ -90,6 +90,12 @@ FINDINGS=$(echo "$FINDINGS" | jq --argjson epss "$EPSS_MAP" --argjson kev "$KEV_
               (- (.epss // 0)) ])
 ')
 
+# Persist the EPSS/KEV enrichment as a sidecar map (keyed by CVE id) so the web
+# UI can surface it — the raw _security.json from Trivy carries neither. Always
+# written (null epss / false kev when offline), so the reader has a stable shape.
+echo "$FINDINGS" | jq 'map({key: .id, value: {epss: .epss, kev: .kev}}) | from_entries' \
+    > "${OUT_PREFIX}_security_epss.json" 2>/dev/null || echo "{}" > "${OUT_PREFIX}_security_epss.json"
+
 count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
