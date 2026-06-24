@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
+import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { ResultSection } from "./ResultSections";
-import { ScanForm } from "./ScanForm";
 import { Button } from "@/components/ui/button";
 import {
   getCapabilities,
@@ -102,11 +102,11 @@ export function NextApp() {
       }
     >
       {status === "idle" ? (
-        <div className="mx-auto max-w-2xl px-6 py-8">
+        <div className="mx-auto max-w-5xl px-6 py-8">
           <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">
             {t("shell.newScan")}
           </h1>
-          <ScanForm running={false} capabilities={capabilities} onRun={run} />
+          <NewScan running={false} capabilities={capabilities} onRun={run} />
         </div>
       ) : (
         <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
