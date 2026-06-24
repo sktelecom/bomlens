@@ -12,15 +12,15 @@ An open-source compliance manager receives deliverables from many teams in diffe
 
 | Deliverable | File | Meaning |
 |-------------|------|---------|
-| Open-source notice | `{P}_{V}_NOTICE.{txt,html}` | the notice that satisfies license obligations |
-| SBOM | `{P}_{V}_bom.json` | CycloneDX 1.6 component inventory |
-| Open-source risk report | `{P}_{V}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
+| Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | the notice that satisfies license obligations |
+| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 component inventory |
+| Open-source risk report | `{Project}_{Version}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
 
 For any input form, adding `--all --generate-only` produces all three at once (the risk report is on by default and is only turned off with `--no-report`).
 
 ## Common setup
 
-> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](../start/first-scan.md#installation) for installation.
+> **Windows**: the commands here are for macOS/Linux. Pick one of the following. See [Getting started](../start/first-scan.md) for installation.
 >
 > - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (needs Git Bash).
 > - Under WSL2, run the commands as-is.

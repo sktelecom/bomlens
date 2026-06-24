@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
@@ -64,6 +64,23 @@ export function NextApp() {
   useEffect(() => {
     getCapabilities().then(setCapabilities);
     void refreshRecent();
+  }, []);
+
+  // Section navigation drives the browser history so the back button steps
+  // through visited sections (the result stays in memory — only the active
+  // section is restored from the URL hash).
+  const selectSection = useCallback((id: SectionId) => {
+    setActiveSection(id);
+    window.history.pushState({ section: id }, "", `#${id}`);
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => {
+      const id = window.location.hash.slice(1) as SectionId;
+      setActiveSection(id || "overview");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
@@ -131,7 +148,7 @@ export function NextApp() {
     <AppShell
       scan={scan}
       activeSection={activeSection}
-      onSelectSection={setActiveSection}
+      onSelectSection={selectSection}
       counts={counts}
       showSections={Boolean(result)}
       recent={recentLinks}
@@ -184,7 +201,7 @@ export function NextApp() {
             onNavigate={setActiveSection}
           />
 
-          <ProgressLog logs={logs} status={status} />
+          <ProgressLog logs={logs} status={status} collapsible />
         </div>
       )}
     </AppShell>

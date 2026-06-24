@@ -29,21 +29,31 @@ docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 
 ## 실행하기
 
+펌웨어 분석에는 위의 펌웨어 이미지가 필요합니다. 웹 UI든 CLI든 마찬가지입니다.
+
+### 웹 UI에서
+
+펌웨어 이미지로 UI를 실행하면 펌웨어 업로드 타일이 활성화됩니다. 그 뒤 파일을 올리고 스캔합니다.
+
+```bash
+SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
+#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_SCANNER_IMAGE를 지정
+```
+
+프로젝트 이름과 버전을 입력하고, 펌웨어 업로드 타일을 골라 파일을 올린 뒤 스캔을 실행합니다.
+
+### CLI에서
+
 받은 펌웨어 파일을 `--target`에 넘기고 `--firmware`를 붙입니다.
 
 ```bash
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
-
-$SBOM --project device-fw --version 1.0.0 \
+./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
   --target "./device.bin" --firmware \
   --all --generate-only
 ```
 
 - 인식 가능한 확장자(`.bin`, `.img`, `.squashfs`, `.ubi`, `.ubifs`, `.trx`, `.chk`, `.fw`, `.rom`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 산출물은 일반 스캔과 같은 3종입니다. 고지문(`_NOTICE`), SBOM(`_bom.json`), 위험분석보고서(`_risk-report`).
-
-> **웹 UI**: 펌웨어 업로드 탭은 펌웨어 이미지에서 UI를 실행할 때만 활성화됩니다.
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
 
 ## 라이선스 주의
 

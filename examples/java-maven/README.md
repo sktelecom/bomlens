@@ -52,7 +52,7 @@ docker run --rm \
   -e HOST_OUTPUT_DIR=/host-output \
   -e PROJECT_NAME="JavaMavenExample" \
   -e PROJECT_VERSION="1.0.0" \
-  ghcr.io/sktelecom/sbom-scanner:v1
+  ghcr.io/sktelecom/bomlens:latest
 ```
 
 ### 방법 3: Maven 플러그인 사용

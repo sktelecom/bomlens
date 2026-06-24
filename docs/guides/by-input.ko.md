@@ -12,15 +12,15 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어 등 5가지 
 
 | 산출물 | 파일 | 의미 |
 |--------|------|------|
-| 오픈소스 고지문 | `{P}_{V}_NOTICE.{txt,html}` | 라이선스 의무 이행을 위한 고지문 |
-| SBOM | `{P}_{V}_bom.json` | CycloneDX 1.6 구성요소 명세 |
-| 오픈소스위험분석보고서 | `{P}_{V}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
+| 오픈소스 고지문 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스 의무 이행을 위한 고지문 |
+| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 구성요소 명세 |
+| 오픈소스위험분석보고서 | `{Project}_{Version}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
 
 어떤 입력 형태든 `--all --generate-only`를 붙이면 위 3종이 한 번에 생성됩니다(위험분석보고서는 기본 생성이며 `--no-report`로만 끕니다).
 
 ## 공통 준비
 
-> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](../start/first-scan.ko.md#설치)를 참고하세요.
+> **Windows 사용자**: 아래 명령은 macOS/Linux 기준입니다. 다음 중 하나를 고르세요. 설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.
 >
 > - `./scripts/scan-sbom.sh`를 `scripts\scan-sbom.bat`로 바꿔 실행합니다 (Git Bash 필요).
 > - WSL2에서는 명령을 그대로 실행합니다.

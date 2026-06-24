@@ -22,6 +22,7 @@ import {
   FormMessages,
   GenerationOptions,
   RunButton,
+  ScanOptions,
   SourceControls,
 } from "./ScanFormFields";
 
@@ -61,7 +62,9 @@ export function NewScan({ running, capabilities, onRun }: Props) {
   const state = useScanForm({ running, capabilities, onRun });
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="space-y-4">
+      {/* Source picker spans the full width so the tiles sit on one balanced
+          row block, and the selected source's input lands directly below. */}
       <Card className="animate-fade-in">
         <CardContent className="space-y-4 p-4">
           <Label>{t("newscan.source")}</Label>
@@ -71,7 +74,7 @@ export function NewScan({ running, capabilities, onRun }: Props) {
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t(`newscan.${group.key}`)}
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {group.sources.map((s) => {
                     const { labelKey, icon: Icon } = SOURCE_META[s];
                     const active = state.source === s;
@@ -114,15 +117,23 @@ export function NewScan({ running, capabilities, onRun }: Props) {
               </div>
             ))}
           </div>
-
-          <SourceControls state={state} />
         </CardContent>
       </Card>
 
-      <Card className="h-fit animate-fade-in">
-        <CardContent className="space-y-5 p-4">
-          <div className="space-y-2">
-            <Label htmlFor="project">{t("form.project")}</Label>
+      {/* Below the picker: the selected source's input (left) and the scan
+          settings + run action (right), in a balanced two-column row. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="h-fit animate-fade-in">
+          <CardContent className="space-y-4 p-4">
+            <Label>{t(SOURCE_META[state.source].labelKey)}</Label>
+            <SourceControls state={state} />
+          </CardContent>
+        </Card>
+
+        <Card className="h-fit animate-fade-in">
+          <CardContent className="space-y-5 p-4">
+            <div className="space-y-2">
+              <Label htmlFor="project">{t("form.project")}</Label>
             <Input
               id="project"
               value={state.project}
@@ -146,6 +157,11 @@ export function NewScan({ running, capabilities, onRun }: Props) {
           <div className="space-y-3 pt-1">
             <Label>{t("newscan.outputs")}</Label>
             <GenerationOptions state={state} />
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <Label>{t("newscan.scanOptions")}</Label>
+            <ScanOptions state={state} />
           </div>
 
           <FormMessages state={state} />

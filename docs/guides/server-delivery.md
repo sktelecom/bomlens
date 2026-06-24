@@ -21,7 +21,7 @@ One tool, BomLens, produces both layers; only the input changes. The requirement
 
 ## Common setup
 
-> **Windows**: the commands here are for macOS/Linux. See [Getting started](../start/first-scan.md#installation) for the `scan-sbom.bat` and WSL2 equivalents.
+> **Windows**: the commands here are for macOS/Linux. See [Getting started](../start/first-scan.md) for the `scan-sbom.bat` and WSL2 equivalents.
 
 ```bash
 # Docker 20.10+ required. Pull the scanner image once.

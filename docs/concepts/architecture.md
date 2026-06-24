@@ -325,13 +325,13 @@ For how to use each feature, see the [notice and security report guide](../guide
 
 | File | Generated when |
 |------|-----------|
-| `{P}_{V}_bom.json` | Always (CycloneDX 1.6) |
-| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` / default risk report generation |
-| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` / default risk report generation |
-| `{P}_{V}_risk-report.md` / `.html` | Default (all modes) — skip with `--no-report` |
-| `{P}_{V}_conformance.json` / `.md` / `.html` | `--analyze` (supplier SBOM validation) |
-| `{P}_{V}_scancode.json` | `--deep-license` |
-| `{P}_{V}_bom.json.sig` | `--sign` |
+| `{Project}_{Version}_bom.json` | Always (CycloneDX 1.6) |
+| `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / default risk report generation |
+| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / default risk report generation |
+| `{Project}_{Version}_risk-report.md` / `.html` | Default (all modes) — skip with `--no-report` |
+| `{Project}_{Version}_conformance.json` / `.md` / `.html` | `--analyze` (supplier SBOM validation) |
+| `{Project}_{Version}_scancode.json` | `--deep-license` |
+| `{Project}_{Version}_bom.json.sig` | `--sign` |
 
 ---
 

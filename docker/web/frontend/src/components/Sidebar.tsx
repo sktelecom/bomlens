@@ -84,6 +84,12 @@ export function Sidebar({
         </button>
       </div>
 
+      {!showSections && !collapsed && (
+        <p className="px-2 py-3 text-xs leading-relaxed text-muted-foreground">
+          {t("nav.sectionsHint")}
+        </p>
+      )}
+
       {groups.map((group) => (
         <div key={group.id} className="mb-2">
           {!collapsed && (

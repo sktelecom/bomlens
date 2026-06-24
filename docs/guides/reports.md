@@ -8,26 +8,29 @@ Beyond SBOM generation, BomLens produces an open-source notice (NOTICE) and a se
 
 ## Quickstart (5 minutes)
 
-If this is your first time, this is all you need. With the Docker engine running, move to the project folder you want to scan and run one of the two (replace `SBOM` with the real path to `scan-sbom.sh`):
+If this is your first time, this is all you need. With the Docker engine running, generate the SBOM, notice, and security report in one run — from the browser or the CLI.
 
-> **Windows users**: the commands below assume macOS/Linux. Pick one of the following. For installation, see [Getting started](../start/first-scan.md).
->
-> - Replace `./scripts/scan-sbom.sh` with `scripts\scan-sbom.bat` (Git Bash required).
-> - Under WSL2, run the commands as-is.
-> - To work without the command line, double-click `scripts\sbom-ui.bat`.
+### Browser UI (no command line)
+
+Launch the UI, then enter a project name and version, pick a scan target, run, and download the notice and security report.
 
 ```bash
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
-
-# (A) CLI — SBOM + notice + security report in one run
-cd /path/to/your-project
-$SBOM --project MyApp --version 1.0.0 --all --generate-only
-
-# (B) Browser UI — if the CLI feels like too much
-$SBOM --ui            # opens http://localhost:8080 automatically (on a port conflict: UI_PORT=9090 $SBOM --ui)
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080 (port taken? UI_PORT=9090 ./scripts/scan-sbom.sh --ui)
+#   Windows: double-click scripts\sbom-ui.bat
 ```
 
-When it finishes, open `MyApp_1.0.0_NOTICE.html` (notice) and `MyApp_1.0.0_security.html` (security) created in the same folder in a browser to check the results right away. See below for the detailed options.
+### CLI
+
+From the project folder you want to scan:
+
+```bash
+cd /path/to/your-project
+/path/to/sbom-tools/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
+```
+
+On Windows, use `scripts\scan-sbom.bat` (Git Bash) or run as-is under WSL2. Installation is in [Getting started](../start/first-scan.md).
+
+When it finishes, open `MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0_security.html` in the same folder to check the results right away. See below for the detailed options.
 
 ---
 
@@ -119,10 +122,12 @@ The basic notice covers the licenses of dependencies (3rd-party). `--deep-licens
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-> scancode is heavy and slow (minutes to tens of minutes for a large repo). It is not in the base image; to use it, build the image as follows:
+In the web UI, deep license detection is one of the Generation options. Either way it relies on scancode, which is heavy and slow (minutes to tens of minutes for a large repo) and is not in the base image. To use it, run from an image that bundles scancode:
+
 > ```bash
-> docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner:deep ./docker
-> SBOM_SCANNER_IMAGE=sbom-scanner:deep ./scripts/scan-sbom.sh ... --deep-license
+> docker build --build-arg SBOM_DEEP_LICENSE=true -t bomlens:deep ./docker
+> # CLI:    SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh ... --deep-license
+> # Web UI: SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh --ui
 > ```
 
 Additional output: `MyApp_1.0.0_scancode.json`
@@ -148,7 +153,7 @@ Creates a detached signature on the SBOM with cosign to establish supply-chain t
 ```bash
 # 1) Generate a key (first time only). For a passwordless key, use COSIGN_PASSWORD=""
 docker run --rm -v "$PWD":/keys -w /keys -e COSIGN_PASSWORD="" \
-  --entrypoint cosign ghcr.io/sktelecom/sbom-scanner:latest generate-key-pair
+  --entrypoint cosign ghcr.io/sktelecom/bomlens:latest generate-key-pair
 
 # 2) Scan while signing (COSIGN_KEY=private key path, COSIGN_PASSWORD=key password)
 COSIGN_KEY="$PWD/cosign.key" COSIGN_PASSWORD="" \
@@ -156,7 +161,7 @@ COSIGN_KEY="$PWD/cosign.key" COSIGN_PASSWORD="" \
 
 # 3) Verify
 docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
-  ghcr.io/sktelecom/sbom-scanner:latest \
+  ghcr.io/sktelecom/bomlens:latest \
   verify-blob --key cosign.pub --signature MyApp_1.0.0_bom.json.sig \
   --insecure-ignore-tlog MyApp_1.0.0_bom.json
 ```

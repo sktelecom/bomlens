@@ -19,7 +19,7 @@
     "currentDir": "현재 폴더",
     "currentDirPath": "현재 폴더",
     "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 그 폴더에서 --ui를 실행하세요.",
-    "rootfsDir": "디렉터리 경로",
+    "rootfsDir": "디렉터리 / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (현재 폴더 기준 상대경로)",
     "rootfsHint": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 Docker 이미지 입력을 사용하세요.",
     "gitUrl": "GitHub URL",
@@ -49,10 +49,10 @@
     "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
-    "deepLicense": "정밀 라이선스",
-    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)",
-    "identifyVendored": "내장 오픈소스 식별",
-    "identifyVendoredHint": "패키지 매니저가 없는 C/C++ 소스용. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다."
+    "deepLicense": "라이선스 스캔 (ScanCode)",
+    "deepLicenseHint": "패키지에 선언된 라이선스 대신, 소스 파일을 직접 스캔해 실제 라이선스를 찾아냅니다 (느림).",
+    "identifyVendored": "파일 단위 식별 (SCANOSS)",
+    "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다."
   },
   "progress": {
     "title": "실행 로그",
@@ -71,6 +71,7 @@
     "vendoredBadgeHint": "소스에 복사된 오픈소스로 SCANOSS가 식별",
     "vendoredMatch": "일치도 {{pct}}",
     "severityTitle": "심각도 분포",
+    "severityFilterHint": "심각도를 클릭하면 필터됩니다",
     "noVulns": "발견된 취약점이 없습니다",
     "artifacts": "생성된 결과물",
     "artifactsEmpty": "생성된 결과물이 없습니다.",
@@ -206,6 +207,7 @@
     "expand": "사이드바 펼치기",
     "recent": "최근 스캔",
     "recentEmpty": "최근 스캔이 아직 없습니다",
+    "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
     "group": {
       "inventory": "인벤토리",
       "risk": "위험 · 컴플라이언스",
@@ -229,6 +231,7 @@
     "source": "소스",
     "settings": "스캔 설정",
     "outputs": "산출물",
+    "scanOptions": "고급 스캔 옵션",
     "catCode": "코드",
     "catArtifact": "아티팩트",
     "catSbom": "SBOM",

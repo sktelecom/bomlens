@@ -325,13 +325,13 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 | 파일 | 생성 조건 |
 |------|-----------|
-| `{P}_{V}_bom.json` | 항상 (CycloneDX 1.6) |
-| `{P}_{V}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 생성 시 |
-| `{P}_{V}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 생성 시 |
-| `{P}_{V}_risk-report.md` / `.html` | 기본 (전 모드) — `--no-report`로 생략 |
-| `{P}_{V}_conformance.json` / `.md` / `.html` | `--analyze` (공급사 SBOM 검증) |
-| `{P}_{V}_scancode.json` | `--deep-license` |
-| `{P}_{V}_bom.json.sig` | `--sign` |
+| `{Project}_{Version}_bom.json` | 항상 (CycloneDX 1.6) |
+| `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 생성 시 |
+| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 생성 시 |
+| `{Project}_{Version}_risk-report.md` / `.html` | 기본 (전 모드) — `--no-report`로 생략 |
+| `{Project}_{Version}_conformance.json` / `.md` / `.html` | `--analyze` (공급사 SBOM 검증) |
+| `{Project}_{Version}_scancode.json` | `--deep-license` |
+| `{Project}_{Version}_bom.json.sig` | `--sign` |
 
 ---
 

@@ -9,11 +9,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/state";
-import { SEVERITY_ORDER, type SecuritySummary, type VulnItem } from "@/lib/api";
+import { type SecuritySummary, type Severity, type VulnItem } from "@/lib/api";
 import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
+
+import { SeverityBar } from "./SeverityBar";
 
 const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -154,11 +155,6 @@ export function VulnerabilitiesTable({ security }: Props) {
       s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
     );
 
-  const severities = useMemo(
-    () => SEVERITY_ORDER.filter((s) => items.some((v) => v.severity === s)),
-    [items],
-  );
-
   if (security.TOTAL === 0 || items.length === 0) {
     return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
@@ -168,21 +164,12 @@ export function VulnerabilitiesTable({ security }: Props) {
     : sorted;
 
   return (
-    <div className="space-y-3">
-      {severities.length > 1 && (
-        <Select
-          value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          aria-label={t("result.allSeverities")}
-        >
-          <option value="">{t("result.allSeverities")}</option>
-          {severities.map((s) => (
-            <option key={s} value={s}>
-              {t(`severity.${s}`)}
-            </option>
-          ))}
-        </Select>
-      )}
+    <div className="space-y-4">
+      <SeverityBar
+        security={security}
+        selected={severityFilter as Severity | ""}
+        onSelect={(s) => setSeverityFilter((f) => (f === s ? "" : s))}
+      />
       <div className="max-h-[28rem] overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">

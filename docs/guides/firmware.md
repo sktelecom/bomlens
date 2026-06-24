@@ -29,21 +29,31 @@ This image is the default, so adding `--firmware` pulls it without any extra set
 
 ## Running it
 
-Pass the firmware file you received to `--target` and add `--firmware`.
+Firmware analysis needs the firmware image (above), whether you use the web UI or the CLI.
+
+### From the web UI
+
+Launch the UI from the firmware image — that is what enables the firmware upload tile — then upload the file and run:
 
 ```bash
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
+#   Windows: set SBOM_SCANNER_IMAGE before double-clicking sbom-ui.bat
+```
 
-$SBOM --project device-fw --version 1.0.0 \
+Enter a project name and version, choose the firmware upload tile, upload the file, and run.
+
+### From the CLI
+
+Pass the firmware file you received to `--target` and add `--firmware`:
+
+```bash
+./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
   --target "./device.bin" --firmware \
   --all --generate-only
 ```
 
 - Recognized extensions (`.bin`, `.img`, `.squashfs`, `.ubi`, `.ubifs`, `.trx`, `.chk`, `.fw`, `.rom`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - The outputs are the same three as a normal scan: the notice (`_NOTICE`), the SBOM (`_bom.json`), and the risk report (`_risk-report`).
-
-> **Web UI**: the firmware upload tab is enabled only when the UI runs from the firmware image.
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
 
 ## License note
 

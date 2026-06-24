@@ -137,10 +137,11 @@ export function useScanForm({
     });
   };
 
+  // "Outputs" = what gets generated. Scan-method options (deep license / vendored
+  // identification) are surfaced separately, not as outputs.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
     { key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze },
-    { key: "deepLicense", value: deepLicense, set: setDeepLicense },
   ];
 
   return {
@@ -150,6 +151,7 @@ export function useScanForm({
     target, setTarget,
     gitToken, setGitToken,
     file, setFile,
+    deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
     invalid, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, showVendored,

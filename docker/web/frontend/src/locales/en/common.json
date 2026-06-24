@@ -19,7 +19,7 @@
     "currentDir": "Current folder",
     "currentDirPath": "Current folder",
     "currentDirHint": "Scans the source in this folder (mounted as /src). To scan a different folder, run --ui from there.",
-    "rootfsDir": "Directory path",
+    "rootfsDir": "Directory / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (relative to the current folder)",
     "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. Paths outside the folder are rejected — place the rootfs under the launch folder, or use a Docker image instead.",
     "gitUrl": "GitHub URL",
@@ -49,10 +49,10 @@
     "noticeHint": "Generate the open-source license NOTICE",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
-    "deepLicense": "Deep license",
-    "deepLicenseHint": "ScanCode deep license detection (slow)",
-    "identifyVendored": "Identify bundled open source",
-    "identifyVendoredHint": "For C/C++ source with no package manager. Sends file fingerprints (not source) to the OSSKB service."
+    "deepLicense": "License scan (ScanCode)",
+    "deepLicenseHint": "Scans source files directly to find their real licenses, instead of trusting the license declared by each package (slow).",
+    "identifyVendored": "File-level identification (SCANOSS)",
+    "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service."
   },
   "progress": {
     "title": "Run log",
@@ -71,6 +71,7 @@
     "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
     "vendoredMatch": "match {{pct}}",
     "severityTitle": "Severity distribution",
+    "severityFilterHint": "Click a severity to filter",
     "noVulns": "No vulnerabilities found",
     "artifacts": "Generated artifacts",
     "artifactsEmpty": "No artifacts were generated.",
@@ -206,6 +207,7 @@
     "expand": "Expand sidebar",
     "recent": "Recent scans",
     "recentEmpty": "No recent scans yet",
+    "sectionsHint": "Run a scan to see result sections here.",
     "group": {
       "inventory": "Inventory",
       "risk": "Risk & compliance",
@@ -229,6 +231,7 @@
     "source": "Source",
     "settings": "Scan settings",
     "outputs": "Outputs",
+    "scanOptions": "Advanced scan options",
     "catCode": "Code",
     "catArtifact": "Artifact",
     "catSbom": "SBOM",

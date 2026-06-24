@@ -9,7 +9,7 @@ chcp 65001 >nul
 setlocal
 
 set DOCKER_IMAGE=%SBOM_SCANNER_IMAGE%
-if "%DOCKER_IMAGE%"=="" set DOCKER_IMAGE=ghcr.io/sktelecom/sbom-generator:latest
+if "%DOCKER_IMAGE%"=="" set DOCKER_IMAGE=ghcr.io/sktelecom/bomlens:latest
 set UI_PORT=%UI_PORT%
 if "%UI_PORT%"=="" set UI_PORT=8080
 set PROBLEMS=0
