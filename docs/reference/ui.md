@@ -1,12 +1,12 @@
 ---
-description: Reference for the BomLens web UI and desktop app — how to launch it, the screen layout, scan targets, and the results screen tabs.
+description: Reference for the BomLens web UI and desktop app — how to launch it, the shell layout, scan targets, and the result sections.
 ---
 
 # Web UI & desktop app
 
 Scan from a browser without the CLI. The UI server is built into the scanner image, so no extra install is needed.
 
-![The BomLens web UI](../images/web-ui.png)
+![The BomLens New scan screen](../images/web-ui.png)
 
 **macOS / Linux:**
 ```bash
@@ -17,54 +17,84 @@ cd ~/sbom-output      # output folder (anywhere is fine)
 
 **Windows — double-click (no command line):** in the unzipped folder, double-click `scripts\sbom-ui.bat` and a browser opens `http://localhost:8080` shortly after. Docker just needs to be running, and `sbom-ui.bat` works on Rancher Desktop or Docker Desktop (on WSL2, run `scan-sbom.sh --ui` inside WSL).
 
-> The run location is the output folder, and it scans that folder's source only when you choose "current folder" as the scan target. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter.
+> The run location is the output folder, and it scans that folder's source only when you choose "Current folder" as the scan target. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter.
 
-Screen layout:
-1. **Scan settings** — project name and version (required, inline validation), scan target selection, generation options (notice, security, deep license).
-2. **Scan target** — choose one of six and enter or upload accordingly:
+## The shell
 
-   | Scan target | Input method | Backend mode |
-   |-------------|--------------|--------------|
-   | Current folder | scans the source in the UI's run folder | SOURCE |
-   | GitHub URL | enter the repository URL | SOURCE (clone) |
-   | ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
-   | SBOM upload | upload an existing SBOM (JSON) | ANALYZE |
-   | Firmware upload | upload a `.bin`, etc. | FIRMWARE |
-   | Docker image | enter the image name | IMAGE |
+The interface has a left rail, a top bar, and a content area:
 
-3. **Run the scan** — a real-time log streams during the run. Errors (clone failure, no socket, unsupported file, and so on) are shown clearly in the log.
-4. **Summary** — when done, it shows the component count, vulnerability severity badges, and, for a [supplier SBOM](../guides/supplier-sbom.md), a conformance (pass/fail) card.
-5. **Outputs** — open or download the SBOM, notice, open-source risk report, security report, and conformance directly from a table. The risk report is highlighted.
+- **Left rail** — result sections grouped under Inventory, Risk & compliance, AI and Outputs, plus a Recent scans list at the bottom. The rail adapts to the scan: AI sections appear only for AI/ML SBOMs, and a section appears only when its data exists. The rail collapses to icons on narrow windows.
+- **Top bar** — the product mark, the current project, and the language (한국어 / EN) and light/dark toggles.
+- **Content** — the New scan form, the running view, or the active result section.
 
-Use the 한국어 / EN toggle at the top right to change the display language.
+## New scan
 
-## Results screen
+The New scan screen is two panes. On the left, pick a source — grouped into **Code** (current folder, a directory path, a GitHub URL, a ZIP upload), **Artifact** (a Docker image, a firmware image) and **SBOM** (analyze an existing SBOM) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
 
-When the scan finishes, the results card shows the summary and the outputs together. Outputs are grouped by kind with a title and description, downloadable as per-format chips (HTML/Markdown/JSON) or as a single ZIP. The risk report is highlighted at the top.
+| Scan target | Input method | Backend mode |
+|-------------|--------------|--------------|
+| Current folder | scans the source in the UI's run folder | SOURCE |
+| Directory path | a subfolder under the run folder (e.g. an OS rootfs) | ROOTFS |
+| GitHub URL | enter the repository URL | SOURCE (clone) |
+| ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
+| SBOM upload | upload an existing SBOM (JSON) | ANALYZE |
+| Firmware upload | upload a `.bin`, etc. | FIRMWARE |
+| Docker image | enter the image name | IMAGE |
 
-![Results screen — output cards by kind, format chips, full ZIP download](../images/app-results.png)
+Generation options cover the open-source notice, the security (vulnerability) report and ScanCode deep license detection. Identifying bundled open source for C/C++ sources is under Advanced. Choosing SBOM upload (ANALYZE) enables the notice and security reports automatically for the risk analysis.
 
-The Components tab lets you browse and search the detected components by name, version, type, and license.
+## Scan running
 
-![Components tab — list and search of detected components](../images/web-ui-components.png)
+During a run the screen shows the pipeline stages — generate, normalize, notices, security, report — advancing as the live log streams, so you can see where the scan is and read any error (clone failure, no Docker socket, an unsupported file) as it happens.
 
-The Vulnerabilities tab shows the severity distribution and CVE details (including installed and fixed versions).
+## Result sections
 
-![Vulnerabilities tab — severity badges and a CVE detail table](../images/web-ui-vulns.png)
+When the scan finishes, the left rail fills with the sections for that scan.
 
-The Dependencies tab shows the dependency relationships recorded in the SBOM as a graph or a tree. The graph view highlights direct dependencies as red nodes, with arrows pointing from each package to what it depends on. Switch to the tree view to expand direct and transitive dependencies as a hierarchy, with their licenses.
+**Overview** leads with what needs attention — critical or high vulnerabilities and components flagged for license review — then the at-a-glance counts, the severity distribution and the license summary, with cards that jump to each detail section.
 
-![Dependencies tab — dependency graph, with direct dependencies as red nodes](../images/web-ui-dependency-graph-en.png)
+![Overview — needs-attention, counts, severity and jump cards](../images/app-results.png)
 
-The Source tree tab appears only when you scan with the deep license option (`--deep-license`). It lets you browse the source files and directory structure as a tree, with the detected license shown per file.
+**Components** lists everything detected, with search and filters (has vulnerabilities, direct only, needs review) and columns for Scope (direct vs transitive) and Risk (the worst vulnerability severity and count). Large SBOMs render in pages.
 
-![Source tree tab — source file tree with a license per file](../images/web-ui-source-tree-en.png)
+![Components — Scope and Risk columns with filters](../images/web-ui-components.png)
 
-> Choosing SBOM upload (ANALYZE) automatically enables notice and security for the risk analysis.
-> The firmware upload tab is enabled only when the UI runs from an image that includes the firmware tools:
+**Vulnerabilities** sorts by severity then CVSS, with a CVSS column and the fixed version, and each row expands in place to show the CVSS vector, description and references.
+
+![Vulnerabilities — CVSS column and expandable rows](../images/web-ui-vulns.png)
+
+**Dependencies** shows the relationships recorded in the SBOM as a graph or a tree. Direct dependencies are highlighted and packages with known vulnerabilities are marked with their severity. Switch to the tree to expand direct and transitive dependencies as a hierarchy.
+
+![Dependencies — direct and vulnerable packages marked](../images/web-ui-dependencies.png)
+
+**Licenses** leads with components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — then the full license distribution.
+
+![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
+
+**Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when you scan with deep license detection (`--deep-license`), showing the source files with the license detected per file.
+
+### AI surfaces
+
+For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), the rail adds:
+
+**Models & datasets** — each model card's identifier, architecture, task, license, supplier and integrity, a four-axis disclosure panel (weights / architecture / training data / training process, as documented in the BOM), and the datasets the model references.
+
+![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
+
+**G7 conformance** — the G7 minimum-element checks for AI (all advisory) with an "N of 6 present" headline, split from the base format-conformance checks.
+
+![G7 conformance — present/advisory split](../images/web-ui-g7.png)
+
+## Recent scans
+
+Past scans in the output folder appear in the rail's Recent list (newest first, with the worst severity). Click one to re-open its results. This is local files only — no account, no database.
+
+## Notes
+
+> The firmware upload tile is enabled only when the UI runs from an image that includes the firmware tools:
 > `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui`
 >
-> **Note:** the UI's source scan (current folder/ZIP/GitHub) analyzes the directory with syft inside the container. Components are captured only when there is a lock file (`package-lock.json`, `go.sum`, and so on) or installed dependencies. If you only have a manifest and need deeper resolution, use the CLI source mode (cdxgen).
+> **Note:** the UI's source scan (current folder / ZIP / GitHub) analyzes the directory with syft inside the container. Components are captured only when there is a lock file (`package-lock.json`, `go.sum`, and so on) or installed dependencies. If you only have a manifest and need deeper resolution, use the CLI source mode (cdxgen).
 
 **Changing the port / on a conflict:** if the default port (8080) is taken by another service, specify a different port:
 ```bash

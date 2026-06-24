@@ -82,7 +82,7 @@ test("@capture vendored badge in components table", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true }, DONE);
   await page.goto("/");
   await fillAndRun(page);
-  await page.getByRole("tab", { name: /Components/i }).click();
+  await page.getByRole("button", { name: /^Components/ }).click();
   const table = page.locator("table").first();
   await table.waitFor({ state: "visible" });
   await killAnim(page);
