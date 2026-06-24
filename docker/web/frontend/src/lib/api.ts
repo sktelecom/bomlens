@@ -115,6 +115,7 @@ export type SourceType =
   | "zip-upload"
   | "sbom-upload"
   | "firmware-upload"
+  | "ai-model"
   | "docker-image";
 
 export const SOURCE_TYPES: SourceType[] = [
@@ -124,6 +125,7 @@ export const SOURCE_TYPES: SourceType[] = [
   "zip-upload",
   "sbom-upload",
   "firmware-upload",
+  "ai-model",
   "docker-image",
 ];
 
@@ -154,7 +156,10 @@ export interface Capabilities {
   /** scanoss-py present (built with SBOM_SCANOSS) — enables --identify-vendored. */
   scanoss?: boolean;
   docker: boolean;
+  /** OWASP AIBOM Generator present (bomlens-aibom image) — enables AI-model SBOMs. */
+  aibom?: boolean;
   firmwareImage?: string;
+  aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
 }
 

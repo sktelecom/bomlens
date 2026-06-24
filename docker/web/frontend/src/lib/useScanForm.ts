@@ -34,6 +34,7 @@ export const TEXT_INPUT: Partial<
   "git-url": { label: "source.gitUrl", placeholder: "source.gitPlaceholder", hint: "source.gitHint" },
   "docker-image": { label: "source.dockerImage", placeholder: "source.dockerPlaceholder", hint: "source.dockerHint" },
   "rootfs-dir": { label: "source.rootfsDir", placeholder: "source.rootfsPlaceholder", hint: "source.rootfsHint" },
+  "ai-model": { label: "source.aiModel", placeholder: "source.aiModelPlaceholder", hint: "source.aiModelHint" },
 };
 
 export interface OptionToggle {

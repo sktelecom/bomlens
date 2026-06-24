@@ -37,6 +37,10 @@
     "dockerImage": "Docker 이미지",
     "dockerHint": "로컬/원격 Docker 이미지를 스캔합니다(Docker 소켓 필요).",
     "dockerPlaceholder": "nginx:latest",
+    "aiModel": "AI 모델",
+    "aiModelPlaceholder": "google-bert/bert-base-uncased",
+    "aiModelHint": "HuggingFace 모델의 CycloneDX ML-BOM을 생성합니다(모델 카드 메타데이터를 네트워크로 가져옵니다).",
+    "aiModelUnavailable": "AI 모델 SBOM은 AIBOM 이미지에서 UI를 실행해야 사용할 수 있습니다.",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드 실패: {{msg}}"
   },
@@ -224,7 +228,8 @@
     "outputs": "산출물",
     "catCode": "코드",
     "catArtifact": "아티팩트",
-    "catSbom": "SBOM"
+    "catSbom": "SBOM",
+    "catAiModel": "AI 모델"
   },
   "run": {
     "stageGenerate": "SBOM 생성",
