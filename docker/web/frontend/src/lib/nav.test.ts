@@ -27,6 +27,7 @@ describe("visibleGroups — scan-type + data adaptation", () => {
     expect(ids).toContain("overview");
     expect(ids).toContain("components");
     expect(ids).toContain("vulnerabilities");
+    expect(ids).toContain("artifacts");
   });
 
   it("hides AI-only sections for non-AI scans", () => {

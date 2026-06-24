@@ -200,7 +200,8 @@
     "group": {
       "inventory": "Inventory",
       "risk": "Risk & compliance",
-      "ai": "AI"
+      "ai": "AI",
+      "outputs": "Outputs"
     },
     "overview": "Overview",
     "components": "Components",
@@ -208,11 +209,20 @@
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
     "g7": "G7 conformance",
-    "models": "Models & datasets"
+    "models": "Models & datasets",
+    "artifacts": "Artifacts"
   },
   "shell": {
     "previewBadge": "Preview",
     "newScan": "New scan"
+  },
+  "overview": {
+    "needsAttention": "Needs attention",
+    "allClear": "Nothing needs attention",
+    "attnVulns": "{{count}} critical or high vulnerabilities",
+    "attnReview": "{{count}} components flagged for review",
+    "explore": "Explore",
+    "jumpHint": "View {{section}}"
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",

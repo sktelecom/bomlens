@@ -14,6 +14,7 @@ import {
   GitBranch,
   type LucideIcon,
   LayoutDashboard,
+  Package,
   ShieldAlert,
 } from "lucide-react";
 
@@ -25,7 +26,8 @@ export type SectionId =
   | "sourceTree"
   | "vulnerabilities"
   | "g7"
-  | "models";
+  | "models"
+  | "artifacts";
 
 export interface NavSection {
   id: SectionId;
@@ -113,6 +115,13 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.ai",
     sections: [
       { id: "models", labelKey: "nav.models", icon: Cpu, aiOnly: true },
+    ],
+  },
+  {
+    id: "outputs",
+    labelKey: "nav.group.outputs",
+    sections: [
+      { id: "artifacts", labelKey: "nav.artifacts", icon: Package },
     ],
   },
 ];

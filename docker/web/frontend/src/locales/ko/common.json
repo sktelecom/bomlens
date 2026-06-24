@@ -200,7 +200,8 @@
     "group": {
       "inventory": "인벤토리",
       "risk": "위험 · 컴플라이언스",
-      "ai": "AI"
+      "ai": "AI",
+      "outputs": "산출물"
     },
     "overview": "개요",
     "components": "컴포넌트",
@@ -208,11 +209,20 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "g7": "G7 적합성",
-    "models": "모델 · 데이터셋"
+    "models": "모델 · 데이터셋",
+    "artifacts": "산출물"
   },
   "shell": {
     "previewBadge": "미리보기",
     "newScan": "새 스캔"
+  },
+  "overview": {
+    "needsAttention": "주의 필요",
+    "allClear": "주의할 항목이 없습니다",
+    "attnVulns": "심각·높음 취약점 {{count}}건",
+    "attnReview": "검토가 필요한 컴포넌트 {{count}}개",
+    "explore": "둘러보기",
+    "jumpHint": "{{section}} 보기"
   },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",
