@@ -17,6 +17,8 @@ interface SidebarProps {
   recent?: RecentScanLink[];
   /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
   counts?: Partial<Record<SectionId, number>>;
+  /** Hide the section groups (e.g. before any scan); the Recent area stays. */
+  showSections?: boolean;
   /** Icon-only rail when collapsed (narrow widths / user toggle). */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
@@ -42,11 +44,12 @@ export function Sidebar({
   onSelect,
   recent = [],
   counts = {},
+  showSections = true,
   collapsed = false,
   onToggleCollapsed,
 }: SidebarProps) {
   const { t } = useTranslation();
-  const groups = visibleGroups(scan);
+  const groups = showSections ? visibleGroups(scan) : [];
 
   return (
     <nav

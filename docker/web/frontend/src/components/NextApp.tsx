@@ -90,6 +90,7 @@ export function NextApp() {
       activeSection={activeSection}
       onSelectSection={setActiveSection}
       counts={counts}
+      showSections={Boolean(result)}
       projectLabel={status === "idle" ? undefined : projectLabel}
       topBarActions={
         status !== "idle" ? (
