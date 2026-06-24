@@ -73,8 +73,8 @@ const DONE = {
   sbom: {
     components: 2,
     componentList: [
-      { name: "openssl", version: "3.0.0", group: "", purl: "pkg:github/openssl/openssl", type: "library", licenses: ["Apache-2.0"] },
-      { name: "zlib", version: "1.2.0", group: "", purl: "pkg:github/madler/zlib", type: "library", licenses: ["Zlib"] },
+      { name: "openssl", version: "3.0.0", group: "", purl: "pkg:github/openssl/openssl", type: "library", licenses: ["Apache-2.0"], scope: "direct", maxSeverity: "CRITICAL", vulnCount: 1 },
+      { name: "zlib", version: "1.2.0", group: "", purl: "pkg:github/madler/zlib", type: "library", licenses: ["Zlib"], scope: "transitive" },
     ],
   },
 };
@@ -113,6 +113,37 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   // Vulnerabilities section shows the CVE rows.
   await page.getByRole("button", { name: /^Vulnerabilities/ }).click();
   await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
+});
+
+test("Components table shows Scope/Risk and filters on the full set", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Components/ }).click();
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+
+  // Scope + Risk columns render from the joined data.
+  await expect(page.getByRole("button", { name: "Scope", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Risk", exact: true })).toBeVisible();
+  await expect(page.getByText("zlib", { exact: true })).toBeVisible();
+
+  // "Has vulnerabilities" narrows to the component with a CVE (openssl only).
+  await page.getByRole("button", { name: "Has vulnerabilities" }).click();
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
+
+  // Clearing it brings zlib back; "Direct only" then also excludes the transitive zlib.
+  await page.getByRole("button", { name: "Has vulnerabilities" }).click();
+  await page.getByRole("button", { name: "Direct only" }).click();
+  await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+});
+
+test("components section matches baseline — light/en @visual", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Components/ }).click();
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("components-light-en.png", {
+    animations: "disabled",
+  });
 });
 
 test("results view has no axe violations", async ({ page }) => {
