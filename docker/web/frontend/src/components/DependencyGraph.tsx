@@ -4,7 +4,16 @@ import { Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SEVERITY_ORDER, type Severity } from "@/lib/api";
 import type { GraphEdge, GraphNode } from "@/lib/sbomGraph";
+
+const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
+  CRITICAL: "critical",
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low",
+  UNKNOWN: "info",
+};
 
 /**
  * Node-link dependency graph rendered with Cytoscape.js (+ dagre hierarchical
@@ -34,12 +43,21 @@ function themeColors() {
     const channels = css.getPropertyValue(name).trim().replace(/\s+/g, ", ");
     return `hsl(${channels})`;
   };
+  // Risk tokens are stored as hex, so read them raw (Cytoscape accepts hex).
+  const raw = (name: string) => css.getPropertyValue(name).trim();
   return {
     node: hsl("--muted-foreground"),
     text: hsl("--foreground"),
     edge: hsl("--border"),
     // Direct-dependency accent — SK red brand token (legend mark).
     direct: hsl("--brand"),
+    risk: {
+      CRITICAL: raw("--risk-critical"),
+      HIGH: raw("--risk-high"),
+      MEDIUM: raw("--risk-medium"),
+      LOW: raw("--risk-low"),
+      UNKNOWN: raw("--risk-info"),
+    } as Record<Severity, string>,
   };
 }
 
@@ -90,7 +108,12 @@ export function DependencyGraph({
           container: containerRef.current,
           elements: [
             ...nodes.map((n) => ({
-              data: { id: n.id, label: n.label, direct: n.direct ? "1" : "0" },
+              data: {
+                id: n.id,
+                label: n.label,
+                direct: n.direct ? "1" : "0",
+                vuln: n.vuln ?? "",
+              },
             })),
             ...edges.map((e) => ({
               data: { id: `${e.source}->${e.target}`, source: e.source, target: e.target },
@@ -116,6 +139,11 @@ export function DependencyGraph({
               selector: 'node[direct = "1"]',
               style: { "background-color": c.direct, width: 14, height: 14 },
             },
+            // Vulnerable nodes get a severity-coloured ring.
+            ...SEVERITY_ORDER.map((sev) => ({
+              selector: `node[vuln = "${sev}"]`,
+              style: { "border-width": 3, "border-color": c.risk[sev] },
+            })),
             {
               selector: "node.match",
               style: { "border-width": 2, "border-color": c.text },
@@ -211,7 +239,7 @@ export function DependencyGraph({
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        {t("deps.graphLegend")} {t("deps.clickHint")}
+        {t("deps.graphLegend")} {t("deps.vulnLegend")} {t("deps.clickHint")}
       </p>
       <div
         ref={containerRef}
@@ -221,7 +249,12 @@ export function DependencyGraph({
         <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-xs">
           <div className="flex items-center gap-2">
             <span className="font-mono font-medium">{selected.label}</span>
-            {selected.direct && <Badge tone="critical">{t("deps.direct")}</Badge>}
+            {selected.vuln && (
+              <Badge tone={VULN_TONE[selected.vuln]} title={t("deps.hasVuln")}>
+                {t(`severity.${selected.vuln}`)}
+              </Badge>
+            )}
+            {selected.direct && <Badge tone="info">{t("deps.direct")}</Badge>}
           </div>
           {selected.type && (
             <div>

@@ -166,7 +166,9 @@
     "graphError": "The dependency graph could not be rendered.",
     "graphLegend": "Red nodes are direct dependencies; arrows point from a package to what it depends on.",
     "search": "Search packages…",
-    "clickHint": "Click a node for details."
+    "clickHint": "Click a node for details.",
+    "vulnLegend": "Ringed nodes have known vulnerabilities.",
+    "hasVuln": "Has known vulnerabilities"
   },
   "sourceTree": {
     "loading": "Loading source tree…",

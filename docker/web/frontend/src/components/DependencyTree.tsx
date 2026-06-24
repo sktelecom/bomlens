@@ -3,7 +3,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import type { Severity } from "@/lib/api";
 import type { TreeNode } from "@/lib/sbomGraph";
+
+const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
+  CRITICAL: "critical",
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low",
+  UNKNOWN: "info",
+};
 
 /**
  * Collapsible package hierarchy built from CycloneDX `dependencies[]`. Direct
@@ -48,6 +57,11 @@ function TreeRow({ node }: { node: TreeNode }) {
           ) : null}
         </span>
 
+        {node.vuln && (
+          <Badge tone={VULN_TONE[node.vuln]} className="ml-1" title={t("deps.hasVuln")}>
+            {t(`severity.${node.vuln}`)}
+          </Badge>
+        )}
         {node.depth === 0 && (
           <Badge tone="info" className="ml-1">
             {t("deps.direct")}

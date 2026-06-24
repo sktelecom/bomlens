@@ -1,9 +1,11 @@
 import { GitFork, ListTree } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/state";
+import type { ComponentItem } from "@/lib/api";
+import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
 import { loadSbom, parseSbomGraph, type SbomGraph } from "@/lib/sbomGraph";
 
 import { DependencyGraph } from "./DependencyGraph";
@@ -14,14 +16,23 @@ type View = "graph" | "tree";
 /**
  * Fetches the raw `_bom.json` (lazily, when its tab opens), parses the
  * dependency graph client-side, and toggles between the node-link graph and
- * the package hierarchy tree.
+ * the package hierarchy tree. Components carrying a Risk join (Phase 2a) mark
+ * their nodes as vulnerable.
  */
-export function DependenciesPanel({ sbomFile }: { sbomFile: string }) {
+export function DependenciesPanel({
+  sbomFile,
+  components = [],
+}: {
+  sbomFile: string;
+  components?: ComponentItem[];
+}) {
   const { t } = useTranslation();
   const [graph, setGraph] = useState<SbomGraph | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [view, setView] = useState<View>("graph");
   const [reloadKey, setReloadKey] = useState(0);
+
+  const vulnIndex = useMemo(() => vulnSeverityIndex(components), [components]);
 
   useEffect(() => {
     let active = true;
@@ -29,7 +40,7 @@ export function DependenciesPanel({ sbomFile }: { sbomFile: string }) {
     void loadSbom(sbomFile)
       .then((sbom) => {
         if (!active) return;
-        setGraph(parseSbomGraph(sbom));
+        setGraph(parseSbomGraph(sbom, (n, v) => severityFor(vulnIndex, n, v)));
         setState("ready");
       })
       .catch(() => {
@@ -38,7 +49,7 @@ export function DependenciesPanel({ sbomFile }: { sbomFile: string }) {
     return () => {
       active = false;
     };
-  }, [sbomFile, reloadKey]);
+  }, [sbomFile, reloadKey, vulnIndex]);
 
   if (state === "loading") {
     return <LoadingState>{t("deps.loading")}</LoadingState>;
