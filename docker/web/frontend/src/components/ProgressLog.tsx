@@ -19,10 +19,13 @@ interface Props {
 
 export function ProgressLog({ logs, status }: Props) {
   const { t } = useTranslation();
-  const endRef = useRef<HTMLDivElement>(null);
+  const logBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Auto-scroll the log box itself — never scrollIntoView, which would also
+    // scroll the page canvas to the bottom on mount.
+    const box = logBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
   }, [logs]);
 
   // No real percentage from the backend — approximate from log volume while
@@ -44,6 +47,7 @@ export function ProgressLog({ logs, status }: Props) {
           )}
         />
         <div
+          ref={logBoxRef}
           role="log"
           aria-label={t("progress.title")}
           tabIndex={0}
@@ -62,7 +66,6 @@ export function ProgressLog({ logs, status }: Props) {
               </div>
             ))
           )}
-          <div ref={endRef} />
         </div>
       </CardContent>
     </Card>
