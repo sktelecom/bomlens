@@ -54,7 +54,7 @@ export function ProgressLog({ logs, status, collapsible = false }: Props) {
         role="log"
         aria-label={t("progress.title")}
         tabIndex={0}
-        className="h-72 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="h-72 min-h-40 max-h-[80vh] resize-y overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {logs.length === 0 ? (
           // foreground/70 (not muted-foreground) clears AA on the muted log panel.

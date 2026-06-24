@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
@@ -59,6 +59,15 @@ export function NextApp() {
   });
   const [recent, setRecent] = useState<RecentScan[]>([]);
 
+  // The live scan's SSE stream. Held so leaving the running view (new scan,
+  // opening a past scan) can close it — otherwise a backgrounded scan finishes
+  // later and hijacks whatever the user is now looking at.
+  const streamRef = useRef<EventSource | null>(null);
+  const closeStream = () => {
+    streamRef.current?.close();
+    streamRef.current = null;
+  };
+
   const refreshRecent = () => listScans().then(setRecent);
 
   useEffect(() => {
@@ -83,10 +92,15 @@ export function NextApp() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Close the live scan stream if the app unmounts.
+  useEffect(() => () => streamRef.current?.close(), []);
+
   const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
 
-  // Re-open a past scan from the Recent list.
+  // Re-open a past scan from the Recent list. Abandons any in-flight scan so it
+  // can't overwrite the past result we're about to show.
   const openRecent = (id: string) => {
+    closeStream();
     void loadScan(id).then((done) => {
       if (!done) return;
       const meta = recent.find((s) => s.id === id);
@@ -115,6 +129,7 @@ export function NextApp() {
   }, [result, scan, activeSection]);
 
   const run = (params: ScanParams) => {
+    closeStream(); // drop any previous stream before starting a new one
     setStatus("running");
     setLogs([]);
     setResult(null);
@@ -122,9 +137,10 @@ export function NextApp() {
     setProjectLabel(
       params.version ? `${params.project} · ${params.version}` : params.project,
     );
-    startScan(params, {
+    streamRef.current = startScan(params, {
       onLog: (line) => setLogs((prev) => [...prev, line]),
       onDone: (done) => {
+        streamRef.current = null;
         setResult(done);
         setStatus(done.ok ? "done" : "error");
         void refreshRecent(); // the finished scan is now in history
@@ -137,6 +153,7 @@ export function NextApp() {
   };
 
   const newScan = () => {
+    closeStream();
     setStatus("idle");
     setLogs([]);
     setResult(null);
