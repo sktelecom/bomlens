@@ -192,22 +192,19 @@
     "group": {
       "inventory": "Inventory",
       "risk": "Risk & compliance",
-      "ai": "AI",
-      "outputs": "Outputs"
+      "ai": "AI"
     },
     "overview": "Overview",
     "components": "Components",
     "dependencies": "Dependencies",
+    "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
-    "licenses": "Licenses",
     "g7": "G7 conformance",
-    "models": "Models & datasets",
-    "artifacts": "Artifacts"
+    "models": "Models & datasets"
   },
   "shell": {
-    "previewBadge": "New UI preview",
-    "placeholderTitle": "Nothing to show yet",
-    "placeholderBody": "This is the new interface shell. Run a scan in the classic UI to populate it — full results land in upcoming phases."
+    "previewBadge": "Preview",
+    "newScan": "New scan"
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
