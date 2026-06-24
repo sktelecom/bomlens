@@ -71,6 +71,35 @@ test("New scan groups sources and switches the source-specific input", async ({ 
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });
 
+test("Scan running shows the pipeline stages while scanning", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  // Delay the stream so the running view is observable before the done event.
+  await page.route("**/scan-stream**", async (r) => {
+    await new Promise((res) => setTimeout(res, 2500));
+    await r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` });
+  });
+  await page.goto("/?ui=next");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByRole("button", { name: /Run scan/i }).click();
+
+  // Running view: the headline and the pipeline stage stepper.
+  await expect(page.getByText("Scanning…")).toBeVisible();
+  await expect(page.getByText("Generate SBOM")).toBeVisible();
+  await expect(page.getByText("Security", { exact: true })).toBeVisible();
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+
+  // The scan then completes into the result sections.
+  await expect(page.getByRole("button", { name: /^Overview/ })).toBeVisible();
+});
+
 // A finished scan with an SBOM, a ScanCode artifact and vulnerabilities — enough
 // to exercise data-gated rail sections (Dependencies, Source tree) and counts.
 const DONE = {

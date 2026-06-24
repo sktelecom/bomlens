@@ -227,6 +227,13 @@
     "catArtifact": "Artifact",
     "catSbom": "SBOM"
   },
+  "run": {
+    "stageGenerate": "Generate SBOM",
+    "stageNormalize": "Normalize",
+    "stageNotice": "Notices",
+    "stageSecurity": "Security",
+    "stageReport": "Report"
+  },
   "overview": {
     "needsAttention": "Needs attention",
     "allClear": "Nothing needs attention",

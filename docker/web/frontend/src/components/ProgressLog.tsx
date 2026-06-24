@@ -50,7 +50,8 @@ export function ProgressLog({ logs, status }: Props) {
           className="h-72 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {logs.length === 0 ? (
-            <p className="text-muted-foreground">{t("progress.waiting")}</p>
+            // foreground/70 (not muted-foreground) clears AA on the muted log panel.
+            <p className="text-foreground/70">{t("progress.waiting")}</p>
           ) : (
             logs.map((line, i) => (
               <div
