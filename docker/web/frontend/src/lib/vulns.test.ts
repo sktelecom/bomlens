@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { Severity, VulnItem } from "./api";
 import { compareVulns, sortVulns } from "./vulns";
 
-function v(id: string, severity: Severity, cvss: number | null): VulnItem {
-  return { id, severity, cvss, pkg: "p", installed: "1", fixed: "", title: "" };
+function v(id: string, severity: Severity, cvss: number | null, epss?: number): VulnItem {
+  return { id, severity, cvss, pkg: "p", installed: "1", fixed: "", title: "", epss };
 }
 
 const ITEMS = [
@@ -32,6 +32,18 @@ describe("compareVulns — CVSS key", () => {
     const ids = [...ITEMS].sort((a, b) => compareVulns(a, b, "cvss", "asc")).map((x) => x.id);
     expect(ids[0]).toBe("CVE-none"); // -1 sentinel sorts first ascending
     expect(ids[ids.length - 1]).toBe("CVE-crit-b");
+  });
+});
+
+describe("compareVulns — EPSS key", () => {
+  const items = [
+    v("CVE-a", "HIGH", 7, 0.2),
+    v("CVE-b", "HIGH", 7, 0.9),
+    v("CVE-c", "HIGH", 7, undefined), // no EPSS sorts last (desc)
+  ];
+  it("sorts by EPSS descending, missing scores last", () => {
+    const ids = [...items].sort((a, b) => compareVulns(a, b, "epss", "desc")).map((x) => x.id);
+    expect(ids).toEqual(["CVE-b", "CVE-a", "CVE-c"]);
   });
 });
 

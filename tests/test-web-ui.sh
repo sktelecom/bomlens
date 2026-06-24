@@ -149,6 +149,35 @@ then
 else
     fail "Risk/Scope join produced wrong values (see assertion above)"
 fi
+echo "== EPSS / KEV enrichment join (security_summary) =="
+# The raw _security.json has no EPSS/KEV; scan-security.sh writes them as a
+# sidecar map. security_summary must join them onto the matching CVE rows.
+cat > "$OUT/sec_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-1","Severity":"CRITICAL","PkgName":"openssl","InstalledVersion":"3.0"},
+  {"VulnerabilityID":"CVE-2","Severity":"LOW","PkgName":"zlib","InstalledVersion":"1.2"}
+]}]}
+JSON
+cat > "$OUT/sec_1.0_security_epss.json" <<'JSON'
+{"CVE-1":{"epss":0.97,"kev":true},"CVE-2":{"epss":0.001,"kev":false}}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+vulns = {x["id"]: x for x in server.security_summary("sec_1.0")["vulnerabilities"]}
+assert vulns["CVE-1"]["epss"] == 0.97, vulns["CVE-1"]
+assert vulns["CVE-1"]["kev"] is True, vulns["CVE-1"]
+assert vulns["CVE-2"]["epss"] == 0.001, vulns["CVE-2"]
+assert "kev" not in vulns["CVE-2"], vulns["CVE-2"]   # kev false -> omitted
+PY
+then
+    pass "EPSS/KEV joined onto vulnerabilities from the sidecar map"
+else
+    fail "EPSS/KEV join is wrong"
+fi
+rm -f "$OUT"/sec_1.0_*
+
 rm -f "$OUT"/demo_1.0_* "$OUT"/flat_1.0_* "$OUT"/bad_1.0_*
 
 echo "== conformance checks exposure (G7 split) =="
