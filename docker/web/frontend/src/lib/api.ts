@@ -219,6 +219,40 @@ export function fileUrl(name: string): string {
   return `/file?name=${encodeURIComponent(name)}`;
 }
 
+/** A past scan in the local output dir (history; no account / DB). */
+export interface RecentScan {
+  id: string;
+  project: string;
+  version: string;
+  components: number;
+  maxSeverity: Severity | null;
+  isAiScan: boolean;
+  /** Unix seconds of the SBOM file mtime. */
+  generatedAt: number;
+}
+
+/** List past scans (newest first). Empty on any failure — history is optional. */
+export async function listScans(): Promise<RecentScan[]> {
+  try {
+    const res = await fetch("/scans");
+    if (!res.ok) return [];
+    return (await res.json()) as RecentScan[];
+  } catch {
+    return [];
+  }
+}
+
+/** Re-open a past scan by id; null if it is gone or invalid. */
+export async function loadScan(id: string): Promise<DoneEvent | null> {
+  try {
+    const res = await fetch(`/scan?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as DoneEvent;
+  } catch {
+    return null;
+  }
+}
+
 /** Absolute artifact URL (origin + path) — for the "copy link" action. */
 export function absoluteFileUrl(name: string): string {
   return new URL(fileUrl(name), window.location.origin).toString();

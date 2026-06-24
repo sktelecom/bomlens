@@ -15,6 +15,8 @@ interface SidebarProps {
   activeSection: SectionId;
   onSelect: (id: SectionId) => void;
   recent?: RecentScanLink[];
+  /** Re-open a past scan from the Recent list. */
+  onSelectRecent?: (id: string) => void;
   /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the section groups (e.g. before any scan); the Recent area stays. */
@@ -43,6 +45,7 @@ export function Sidebar({
   activeSection,
   onSelect,
   recent = [],
+  onSelectRecent,
   counts = {},
   showSections = true,
   collapsed = false,
@@ -157,6 +160,7 @@ export function Sidebar({
                 <button
                   type="button"
                   title={collapsed ? scanItem.label : undefined}
+                  onClick={() => onSelectRecent?.(scanItem.id)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
                     "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",

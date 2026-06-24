@@ -10,13 +10,33 @@ import { ScanRunning } from "./ScanRunning";
 import { Button } from "@/components/ui/button";
 import {
   getCapabilities,
+  listScans,
+  loadScan,
   startScan,
   type Capabilities,
   type DoneEvent,
+  type RecentScan,
   type ScanParams,
 } from "@/lib/api";
-import { type SectionId, visibleSectionIds } from "@/lib/nav";
+import {
+  type RecentScanLink,
+  type SectionId,
+  visibleSectionIds,
+} from "@/lib/nav";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
+
+/** Map a stored scan to the Sidebar's Recent link shape. */
+function toRecentLink(s: RecentScan): RecentScanLink {
+  const sev = s.maxSeverity;
+  return {
+    id: s.id,
+    label: s.version ? `${s.project} · ${s.version}` : s.project,
+    topSeverity:
+      sev === "CRITICAL" || sev === "HIGH" || sev === "MEDIUM" || sev === "LOW"
+        ? sev
+        : "NONE",
+  };
+}
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -37,10 +57,31 @@ export function NextApp() {
     firmware: false,
     docker: true,
   });
+  const [recent, setRecent] = useState<RecentScan[]>([]);
+
+  const refreshRecent = () => listScans().then(setRecent);
 
   useEffect(() => {
     getCapabilities().then(setCapabilities);
+    void refreshRecent();
   }, []);
+
+  const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
+
+  // Re-open a past scan from the Recent list.
+  const openRecent = (id: string) => {
+    void loadScan(id).then((done) => {
+      if (!done) return;
+      const meta = recent.find((s) => s.id === id);
+      setLogs([]);
+      setResult(done);
+      setStatus(done.ok ? "done" : "error");
+      setActiveSection("overview");
+      setProjectLabel(
+        meta ? (meta.version ? `${meta.project} · ${meta.version}` : meta.project) : undefined,
+      );
+    });
+  };
 
   const scan = useMemo(() => deriveScanContext(result), [result]);
   const counts = useMemo(
@@ -69,6 +110,7 @@ export function NextApp() {
       onDone: (done) => {
         setResult(done);
         setStatus(done.ok ? "done" : "error");
+        void refreshRecent(); // the finished scan is now in history
       },
       onError: (message) => {
         if (message) setLogs((prev) => [...prev, `✖ ${message}`]);
@@ -92,6 +134,8 @@ export function NextApp() {
       onSelectSection={setActiveSection}
       counts={counts}
       showSections={Boolean(result)}
+      recent={recentLinks}
+      onSelectRecent={openRecent}
       projectLabel={status === "idle" ? undefined : projectLabel}
       topBarActions={
         status !== "idle" ? (
