@@ -47,6 +47,19 @@ const config: Config = {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+        // Brand accent — SKT (SK Red primary / SK Orange secondary). Active nav,
+        // selection accents, primary CTAs. Distinct from neutral `primary`.
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          foreground: "hsl(var(--brand-foreground))",
+          accent: "hsl(var(--brand-accent))",
+        },
+        // Sidebar surface — the left rail reads as its own plane.
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          border: "hsl(var(--sidebar-border))",
+        },
         // Risk severity tokens — domain semantics fixed (shared with portal).
         risk: {
           critical: "var(--risk-critical)",

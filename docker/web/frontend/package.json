@@ -10,8 +10,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:ui": "playwright test --grep-invert @capture",
-    "capture:ui": "playwright test --grep @capture"
+    "test:unit": "vitest run",
+    "test:ui": "playwright test --grep-invert \"@capture|@visual\"",
+    "test:visual": "playwright test --grep @visual",
+    "capture:ui": "playwright test --grep @capture",
+    "token:lint": "node scripts/token-lint.mjs",
+    "i18n:check": "node scripts/i18n-coverage.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "2.1.9",
@@ -32,6 +36,7 @@
     "tailwindcss-animate": "1.0.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "1.49.1",
     "@types/cytoscape-dagre": "2.3.3",
     "@types/node": "22.19.20",
@@ -42,6 +47,7 @@
     "postcss": "8.5.15",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
-    "vite": "5.4.21"
+    "vite": "5.4.21",
+    "vitest": "^2.1.9"
   }
 }

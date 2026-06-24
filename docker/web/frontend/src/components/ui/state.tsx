@@ -66,6 +66,45 @@ export function EmptyState({
   );
 }
 
+/**
+ * A single shimmering placeholder bar. Compose several to mirror the shape of
+ * the content that is loading (rows, cards). Token-driven so it matches the
+ * surface in both themes.
+ */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn("animate-pulse rounded-md bg-muted", className)}
+      aria-hidden
+    />
+  );
+}
+
+/**
+ * Busy placeholder for a list/table region: a stack of skeleton rows wrapped in
+ * a busy live region so assistive tech announces the load. Use instead of a
+ * bare spinner when the eventual content has a known row shape.
+ */
+export function SkeletonRows({
+  rows = 5,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("space-y-2", className)}
+      role="status"
+      aria-busy="true"
+    >
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-9 w-full" />
+      ))}
+    </div>
+  );
+}
+
 /** Failed state with an optional retry action. */
 export function ErrorState({
   children,

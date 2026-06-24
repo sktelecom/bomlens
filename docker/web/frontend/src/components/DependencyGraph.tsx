@@ -20,7 +20,6 @@ import type { GraphEdge, GraphNode } from "@/lib/sbomGraph";
  * the canvas and point the user at the tree view instead.
  */
 const NODE_CAP = 1500;
-const DIRECT_COLOR = "#ea002c"; // SK red — direct dependencies (legend)
 
 let dagreRegistered = false;
 
@@ -39,6 +38,8 @@ function themeColors() {
     node: hsl("--muted-foreground"),
     text: hsl("--foreground"),
     edge: hsl("--border"),
+    // Direct-dependency accent — SK red brand token (legend mark).
+    direct: hsl("--brand"),
   };
 }
 
@@ -113,7 +114,7 @@ export function DependencyGraph({
             },
             {
               selector: 'node[direct = "1"]',
-              style: { "background-color": DIRECT_COLOR, width: 14, height: 14 },
+              style: { "background-color": c.direct, width: 14, height: 14 },
             },
             {
               selector: "node.match",
