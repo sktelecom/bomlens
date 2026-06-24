@@ -335,6 +335,12 @@ def sbom_summary(project, version):
             (p.get("value") for p in props if p.get("name") == "bomlens:scanoss:match"),
             "",
         )
+        # AI-relevant restrictive license class (behavioral-use / non-commercial),
+        # set by normalize-sbom.sh via the shared license-flags.jq classifier.
+        review = next(
+            (p.get("value") for p in props if p.get("name") == "bomlens:licenseReview"),
+            "",
+        )
         row = {
             "name": c.get("name") or "",
             "version": c.get("version") or "",
@@ -363,6 +369,9 @@ def sbom_summary(project, version):
         if risk:
             row["maxSeverity"] = risk["sev"]
             row["vulnCount"] = risk["count"]
+
+        if review:
+            row["licenseReview"] = review
 
         rows.append(row)
     # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like

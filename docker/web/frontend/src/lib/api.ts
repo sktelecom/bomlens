@@ -31,6 +31,9 @@ export interface ComponentItem {
   /** Direct dependency of the root, or transitive — from the dependency graph.
    *  Omitted when the SBOM carries no dependency graph (scope unknown). */
   scope?: "direct" | "transitive";
+  /** AI-relevant restrictive license class needing human review, set by
+   *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
+  licenseReview?: "behavioral-use" | "non-commercial";
 }
 
 export interface SbomSummary {

@@ -182,6 +182,29 @@ else
     echo "  SKIP: jq not available for conformance generation"
 fi
 
+echo "== license review property (normalize -> sbom_summary) =="
+# Normalize the AI-license fixture (adds bomlens:licenseReview), then check
+# sbom_summary surfaces the behavioral-use / non-commercial class per component.
+if command -v jq >/dev/null 2>&1; then
+    cp "$ROOT_DIR/tests/fixtures/notice-ai-licenses.json" "$OUT/lic_1.0_bom.json"
+    bash "$ROOT_DIR/docker/lib/normalize-sbom.sh" "$OUT/lic_1.0_bom.json" >/dev/null 2>&1
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+rows = {r["name"]: r for r in server.sbom_summary("lic", "1.0")["componentList"]}
+assert rows["some-llama-model"]["licenseReview"] == "behavioral-use", rows["some-llama-model"]
+assert rows["some-nc-dataset"]["licenseReview"] == "non-commercial", rows["some-nc-dataset"]
+assert "licenseReview" not in rows["ordinary-lib"], rows["ordinary-lib"]
+PY
+    then
+        pass "licenseReview surfaced (behavioral-use / non-commercial; MIT unflagged)"
+    else
+        fail "licenseReview not surfaced correctly"
+    fi
+    rm -f "$OUT"/lic_1.0_*
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

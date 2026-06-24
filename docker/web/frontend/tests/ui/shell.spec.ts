@@ -288,6 +288,63 @@ test("g7 section matches baseline — light/en @visual", async ({ page }) => {
   });
 });
 
+// A scan with AI-restrictive licenses, for the Licenses review section.
+const LIC_DONE = {
+  ok: true,
+  mode: "ANALYZE",
+  results: [{ name: "lic_1.0_bom.json", size: 100 }],
+  security: null,
+  conformance: null,
+  sbom: {
+    components: 3,
+    componentList: [
+      { name: "some-llama-model", version: "1", group: "", purl: "", type: "machine-learning-model", licenses: ["LLaMA-3.1"], licenseReview: "behavioral-use" },
+      { name: "some-nc-dataset", version: "1", group: "", purl: "", type: "data", licenses: ["CC-BY-NC-4.0"], licenseReview: "non-commercial" },
+      { name: "ordinary-lib", version: "1", group: "", purl: "", type: "library", licenses: ["MIT"] },
+    ],
+  },
+};
+
+async function stubLicensesAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(LIC_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next");
+  await page.fill("#project", "lic");
+  await page.fill("#version", "1.0");
+  await page.getByRole("button", { name: /Run scan/i }).click();
+}
+
+test("Licenses section flags AI-restrictive licenses for review", async ({ page }) => {
+  await stubLicensesAndRun(page);
+  await page.getByRole("button", { name: /^Licenses/ }).click();
+
+  await expect(page.getByText("License review needed")).toBeVisible();
+  await expect(page.getByText("Behavioral-use")).toBeVisible();
+  await expect(page.getByText("Non-commercial")).toBeVisible();
+  await expect(page.getByText("some-llama-model")).toBeVisible();
+  await expect(page.getByText("some-nc-dataset")).toBeVisible();
+  await expect(page.getByText("License distribution")).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("licenses section matches baseline — light/en @visual", async ({ page }) => {
+  await stubLicensesAndRun(page);
+  await page.getByRole("button", { name: /^Licenses/ }).click();
+  await expect(page.getByText("License review needed")).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("licenses-light-en.png", {
+    animations: "disabled",
+  });
+});
+
 test("Dependencies tree marks vulnerable packages and direct deps", async ({ page }) => {
   await stubAndRun(page);
   await page.getByRole("button", { name: /^Dependencies/ }).click();

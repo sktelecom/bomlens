@@ -210,6 +210,7 @@
     "dependencies": "Dependencies",
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
+    "licenses": "Licenses",
     "g7": "G7 conformance",
     "models": "Models & datasets",
     "artifacts": "Artifacts"
@@ -261,6 +262,14 @@
     "sPass": "Present",
     "sFail": "Failed",
     "sWarn": "Advisory"
+  },
+  "licenses": {
+    "empty": "No licenses were detected.",
+    "reviewTitle": "License review needed",
+    "reviewHint": "AI-restrictive terms — human review required.",
+    "flagBehavioral": "Behavioral-use",
+    "flagNonCommercial": "Non-commercial",
+    "distribution": "License distribution"
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
