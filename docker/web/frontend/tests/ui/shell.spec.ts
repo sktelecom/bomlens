@@ -242,7 +242,7 @@ test("AI scan exposes Models & Datasets with the model card", async ({ page }) =
 test("models section matches baseline — light/en @visual", async ({ page }) => {
   await stubAiAndRun(page);
   await page.getByRole("button", { name: /Models & datasets/ }).click();
-  await expect(page.getByText("bert-base-uncased")).toBeVisible();
+  await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
   await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
     animations: "disabled",
   });
