@@ -24,6 +24,7 @@ export function deriveScanContext(result: DoneEvent | null): ScanContext {
     isAiScan: isAiScan(result),
     hasDependencies: Boolean(sbomFileName(result)),
     hasSourceTree: Boolean(scancodeFileName(result)),
+    hasG7: (result.conformance?.checks ?? []).some((c) => c.id.startsWith("g7-")),
   };
 }
 

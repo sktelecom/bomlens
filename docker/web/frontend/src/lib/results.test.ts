@@ -23,6 +23,7 @@ describe("deriveScanContext", () => {
       isAiScan: false,
       hasDependencies: false,
       hasSourceTree: false,
+      hasG7: false,
     });
   });
 

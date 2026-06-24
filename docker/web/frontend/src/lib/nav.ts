@@ -9,6 +9,7 @@
 import {
   Boxes,
   Cpu,
+  FileCheck2,
   FileText,
   GitBranch,
   type LucideIcon,
@@ -66,6 +67,8 @@ export interface ScanContext {
   hasDependencies: boolean;
   /** A ScanCode artifact exists, so the source tree can be shown. */
   hasSourceTree: boolean;
+  /** The conformance report carries G7 AI checks (so the G7 section applies). */
+  hasG7: boolean;
 }
 
 export const EMPTY_SCAN: ScanContext = {
@@ -73,6 +76,7 @@ export const EMPTY_SCAN: ScanContext = {
   isAiScan: false,
   hasDependencies: false,
   hasSourceTree: false,
+  hasG7: false,
 };
 
 /**
@@ -106,7 +110,12 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.risk",
     sections: [
       { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
-      // g7 (AI conformance) returns once the backend exposes the G7 checks.
+      {
+        id: "g7",
+        labelKey: "nav.g7",
+        icon: FileCheck2,
+        requires: (c) => c.hasG7,
+      },
     ],
   },
   {

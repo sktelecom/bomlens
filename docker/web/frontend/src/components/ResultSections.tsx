@@ -8,6 +8,7 @@ import { sbomFileName, scancodeFileName } from "@/lib/results";
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { DependenciesPanel } from "./DependenciesPanel";
+import { G7Conformance } from "./G7Conformance";
 import { ModelsDatasets } from "./ModelsDatasets";
 import { SourceTreePanel } from "./SourceTreePanel";
 import { VulnerabilitiesTable } from "./VulnerabilitiesTable";
@@ -71,7 +72,11 @@ export function ResultSection({
       return sbomFile ? <ModelsDatasets sbomFile={sbomFile} /> : null;
     }
 
-    // g7 is an AI surface wired in a later phase (needs the backend G7 checks).
+    case "g7":
+      return result.conformance ? (
+        <G7Conformance conformance={result.conformance} />
+      ) : null;
+
     default:
       return null;
   }

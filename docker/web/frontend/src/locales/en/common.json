@@ -249,6 +249,19 @@
     "limitations": "Limitations",
     "datasets": "Datasets"
   },
+  "g7": {
+    "empty": "No conformance checks were recorded.",
+    "subtitle": "G7 minimum elements for AI",
+    "present": "{{present}}/{{total}} present",
+    "advisory": "{{count}} advisory",
+    "allAdvisory": "All G7 elements are advisory (a non-binding guideline).",
+    "formatTitle": "Format conformance",
+    "basePassed": "{{passed}}/{{total}} passed",
+    "required": "Required",
+    "sPass": "Present",
+    "sFail": "Failed",
+    "sWarn": "Advisory"
+  },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
     "file": "Choose a file to analyze."
