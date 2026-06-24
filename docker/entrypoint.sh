@@ -34,7 +34,7 @@ SCAN_MODE="${MODE:-POSTPROCESS}"
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
-    echo "[INFO] Starting SBOM Generator Web UI on port ${UI_PORT:-8080}..."
+    echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
 fi
 
@@ -95,7 +95,7 @@ generate_sbom_cdxgen() {
 }
 
 echo "=========================================="
-echo " SKT SBOM Generator (post-process)"
+echo " BomLens (post-process)"
 echo " Mode: $SCAN_MODE"
 echo " Project: $PROJECT_NAME ($PROJECT_VERSION)"
 echo "=========================================="
