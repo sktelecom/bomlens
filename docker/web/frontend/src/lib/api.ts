@@ -142,6 +142,7 @@ export interface ScanParams {
   target?: string; // git URL OR docker image name
   token?: string; // server-side token from /upload
   cred?: string; // single-use credId from /git-cred (private git URL)
+  scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
   deepLicense: boolean;
@@ -294,6 +295,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     target: params.target ?? "",
     token: params.token ?? "",
     cred: params.cred ?? "",
+    scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
     deep_license: String(params.deepLicense),

@@ -68,14 +68,12 @@ export function NewScan({ running, capabilities, onRun }: Props) {
       <Card className="animate-fade-in">
         <CardContent className="space-y-4 p-4">
           <Label>{t("newscan.source")}</Label>
-          <div role="group" aria-label={t("newscan.source")} className="space-y-4">
-            {SOURCE_GROUPS.map((group) => (
-              <div key={group.key} className="space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t(`newscan.${group.key}`)}
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                  {group.sources.map((s) => {
+          <div
+            role="group"
+            aria-label={t("newscan.source")}
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4"
+          >
+            {SOURCE_GROUPS.flatMap((group) => group.sources).map((s) => {
                     const { labelKey, icon: Icon } = SOURCE_META[s];
                     const active = state.source === s;
                     const fwLocked = s === "firmware-upload" && !capabilities.firmware;
@@ -96,78 +94,78 @@ export function NewScan({ running, capabilities, onRun }: Props) {
                         }
                         onClick={() => state.changeSource(s)}
                         className={cn(
-                          "flex items-center gap-2 rounded-lg border p-3 text-left text-sm",
+                          "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
                           "transition-colors duration-fast ease-out-soft",
                           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                           "disabled:pointer-events-none disabled:opacity-50",
                           active
                             ? "border-brand/40 bg-brand/10 font-medium text-foreground"
-                            : "text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground",
+                            : "text-foreground hover:border-brand/40 hover:bg-muted/50",
                         )}
                       >
                         <Icon
-                          className={cn("h-4 w-4 shrink-0", active && "text-brand")}
+                          className={cn(
+                            "h-4 w-4 shrink-0",
+                            active ? "text-brand" : "text-muted-foreground",
+                          )}
                           aria-hidden
                         />
                         <span className="truncate">{t(labelKey)}</span>
                       </button>
                     );
-                  })}
-                </div>
-              </div>
-            ))}
+            })}
           </div>
+
+          <SourceControls state={state} />
         </CardContent>
       </Card>
 
-      {/* Below the picker: the selected source's input (left) and the scan
-          settings + run action (right), in a balanced two-column row. */}
+      {/* Settings below the source, in two balanced columns: project meta +
+          outputs on the left, scan method + run action on the right. */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="h-fit animate-fade-in">
-          <CardContent className="space-y-4 p-4">
-            <Label>{t(SOURCE_META[state.source].labelKey)}</Label>
-            <SourceControls state={state} />
+          <CardContent className="space-y-5 p-4">
+            <div className="space-y-2">
+              <Label htmlFor="project">{t("form.project")}</Label>
+              <Input
+                id="project"
+                value={state.project}
+                onChange={(e) => state.setProject(e.target.value)}
+                placeholder={t("form.projectPlaceholder")}
+                disabled={state.busy}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="version">{t("form.version")}</Label>
+              <Input
+                id="version"
+                value={state.version}
+                onChange={(e) => state.setVersion(e.target.value)}
+                placeholder={t("form.versionPlaceholder")}
+                disabled={state.busy}
+              />
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <Label>{t("newscan.outputs")}</Label>
+              <GenerationOptions state={state} />
+            </div>
           </CardContent>
         </Card>
 
         <Card className="h-fit animate-fade-in">
           <CardContent className="space-y-5 p-4">
-            <div className="space-y-2">
-              <Label htmlFor="project">{t("form.project")}</Label>
-            <Input
-              id="project"
-              value={state.project}
-              onChange={(e) => state.setProject(e.target.value)}
-              placeholder={t("form.projectPlaceholder")}
-              disabled={state.busy}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="version">{t("form.version")}</Label>
-            <Input
-              id="version"
-              value={state.version}
-              onChange={(e) => state.setVersion(e.target.value)}
-              placeholder={t("form.versionPlaceholder")}
-              disabled={state.busy}
-            />
-          </div>
+            <div className="space-y-3">
+              <Label>{t("newscan.scanOptions")}</Label>
+              <ScanOptions state={state} />
+            </div>
 
-          <div className="space-y-3 pt-1">
-            <Label>{t("newscan.outputs")}</Label>
-            <GenerationOptions state={state} />
-          </div>
-
-          <div className="space-y-3 pt-1">
-            <Label>{t("newscan.scanOptions")}</Label>
-            <ScanOptions state={state} />
-          </div>
-
-          <FormMessages state={state} />
-          <RunButton state={state} running={running} />
-        </CardContent>
-      </Card>
+            <FormMessages state={state} />
+            <RunButton state={state} running={running} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -140,16 +140,44 @@ export function GenerationOptions({ state }: { state: ScanFormState }) {
 
 /** Scan method: how the source is analyzed (deep license / vendored identification). */
 export function ScanOptions({ state }: { state: ScanFormState }) {
-  const { deepLicense, setDeepLicense, identifyVendored, setIdentifyVendored, showVendored, busy } = state;
+  const { t } = useTranslation();
+  const {
+    deepLicense,
+    setDeepLicense,
+    identifyVendored,
+    setIdentifyVendored,
+    scanossToken,
+    setScanossToken,
+    showVendored,
+    busy,
+  } = state;
   return (
     <div className="space-y-3">
       {showVendored && (
-        <ToggleRow
-          labelKey="identifyVendored"
-          checked={identifyVendored}
-          onChange={setIdentifyVendored}
-          disabled={busy}
-        />
+        <div className="space-y-2">
+          <ToggleRow
+            labelKey="identifyVendored"
+            checked={identifyVendored}
+            onChange={setIdentifyVendored}
+            disabled={busy}
+          />
+          {identifyVendored && (
+            <div className="space-y-1">
+              <Input
+                id="scanossToken"
+                type="password"
+                autoComplete="off"
+                value={scanossToken}
+                onChange={(e) => setScanossToken(e.target.value)}
+                placeholder={t("options.scanossTokenPlaceholder")}
+                disabled={busy}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("options.scanossTokenHint")}
+              </p>
+            </div>
+          )}
+        </div>
       )}
       <ToggleRow
         labelKey="deepLicense"

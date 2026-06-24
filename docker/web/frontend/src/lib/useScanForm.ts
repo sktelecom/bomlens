@@ -63,6 +63,7 @@ export function useScanForm({
   const [security, setSecurity] = useState(true);
   const [deepLicense, setDeepLicense] = useState(false);
   const [identifyVendored, setIdentifyVendored] = useState(false);
+  const [scanossToken, setScanossToken] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -96,6 +97,7 @@ export function useScanForm({
 
     let token: string | undefined;
     let cred: string | undefined;
+    let scanossCred: string | undefined;
     if (uploadKind && file) {
       try {
         setUploading(true);
@@ -120,6 +122,20 @@ export function useScanForm({
       setUploading(false);
     }
 
+    // SCANOSS token: stashed the same single-use way so the OSSKB key never hits
+    // the scan-stream query string. Only relevant when vendored ID is active.
+    if (showVendored && identifyVendored && scanossToken.trim()) {
+      try {
+        setUploading(true);
+        scanossCred = (await stashGitCred(scanossToken.trim())).credId;
+      } catch (e) {
+        setUploadError((e as Error).message);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
     onRun({
       project: project.trim(),
       version: version.trim(),
@@ -127,6 +143,7 @@ export function useScanForm({
       target: isText ? target.trim() : undefined,
       token,
       cred,
+      scanossCred,
       // ANALYZE forces notice+security on (needed for the risk report).
       notice: isAnalyze ? true : notice,
       security: isAnalyze ? true : security,
@@ -153,6 +170,7 @@ export function useScanForm({
     file, setFile,
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
+    scanossToken, setScanossToken,
     invalid, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, showVendored,
     options, submit,
