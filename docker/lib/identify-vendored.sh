@@ -90,9 +90,15 @@ SKIP_ARGS+=(--skip-size 256)
 # faster/lighter on the API. We take the RAW result (default JSON, keyed by file
 # path) rather than scanoss' own CycloneDX so we fully control which matches are
 # promoted and which provenance properties are attached.
+#
+# --all-hidden: web-UI uploads and git clones are extracted UNDER the server's
+# .uploads/ directory, and scanoss-py skips any path with a dot-prefixed
+# component by default — so without this flag every uploaded/cloned source
+# fingerprints zero files and never matches. The SKIP_FOLDERS list below still
+# excludes .git/.gradle/etc., so this only re-includes the real source tree.
 echo "[vendored] SCANOSS: fingerprinting $SRC (file hashes only; source stays local)..."
 # shellcheck disable=SC2086
-if ! scanoss-py scan "$SRC" --skip-snippets "${SKIP_ARGS[@]}" --output "$RAW" \
+if ! scanoss-py scan "$SRC" --all-hidden --skip-snippets "${SKIP_ARGS[@]}" --output "$RAW" \
         ${SCANOSS_API_URL:+--apiurl "$SCANOSS_API_URL"} \
         ${SCANOSS_API_KEY:+--key "$SCANOSS_API_KEY"} >/dev/null 2>&1; then
     echo "[vendored] WARN: SCANOSS scan failed (no network / rate limit / bad endpoint); no vendored components." >&2
