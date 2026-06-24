@@ -23,9 +23,6 @@ export function TopBar({ projectLabel, actions }: TopBarProps) {
         alt={t("appTitle")}
         className="h-7 w-auto shrink-0"
       />
-      <span className="hidden shrink-0 rounded-full border border-brand/30 bg-brand/10 px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-foreground sm:inline">
-        {t("shell.previewBadge")}
-      </span>
       {projectLabel && (
         <>
           <span className="h-5 w-px shrink-0 bg-border" aria-hidden />

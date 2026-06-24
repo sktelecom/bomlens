@@ -216,7 +216,6 @@
     "artifacts": "Artifacts"
   },
   "shell": {
-    "previewBadge": "Preview",
     "newScan": "New scan"
   },
   "newscan": {
