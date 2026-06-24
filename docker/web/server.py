@@ -108,6 +108,19 @@ def safe_output_path(name):
     return path
 
 
+def safe_prefix_path(prefix, suffix):
+    """Resolve OUTPUT_DIR/<prefix><suffix> strictly inside OUTPUT_DIR. The prefix
+    is normally already sanitized (output_prefix / scan_id_ok), but the summary
+    helpers take it as a parameter, so re-check here: reject separators/traversal
+    and confirm the realpath stays in OUTPUT_DIR. Returns None on a bad prefix."""
+    if not isinstance(prefix, str) or not prefix or "/" in prefix or "\\" in prefix or ".." in prefix:
+        return None
+    path = os.path.realpath(os.path.join(OUTPUT_DIR, prefix + suffix))
+    if not path.startswith(os.path.realpath(OUTPUT_DIR) + os.sep):
+        return None
+    return path
+
+
 # Directories the UI is allowed to scan as a ROOTFS target. Only /src is mounted
 # into the UI container today; a future `--ui --mount <host-path>` would append
 # its container path here, and the boundary check below extends to it for free.
@@ -222,8 +235,8 @@ def _cvss_best(v):
 def _epss_kev_map(prefix):
     """Per-CVE EPSS probability + CISA KEV flag, written by scan-security.sh as a
     sidecar (Trivy's _security.json carries neither). Empty when absent/offline."""
-    p = os.path.join(OUTPUT_DIR, prefix + "_security_epss.json")
-    if not os.path.isfile(p):
+    p = safe_prefix_path(prefix, "_security_epss.json")
+    if not p or not os.path.isfile(p):
         return {}
     try:
         with open(p) as f:
@@ -234,8 +247,8 @@ def _epss_kev_map(prefix):
 
 
 def security_summary(prefix):
-    p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
-    if not os.path.isfile(p):
+    p = safe_prefix_path(prefix, "_security.json")
+    if not p or not os.path.isfile(p):
         return None
     try:
         with open(p) as f:
@@ -294,9 +307,9 @@ def _component_risk_index(prefix):
     package, keyed by normalized purl and by (name, version). Uncapped (unlike
     the detail list) so a component's Risk reflects every finding against it.
     Returns (by_purl, by_nv); both empty when there is no security report."""
-    p = os.path.join(OUTPUT_DIR, prefix + "_security.json")
+    p = safe_prefix_path(prefix, "_security.json")
     by_purl, by_nv = {}, {}
-    if not os.path.isfile(p):
+    if not p or not os.path.isfile(p):
         return by_purl, by_nv
     try:
         with open(p) as f:
@@ -359,8 +372,8 @@ def _scope_index(data):
 
 
 def sbom_summary(prefix):
-    p = os.path.join(OUTPUT_DIR, prefix + "_bom.json")
-    if not os.path.isfile(p):
+    p = safe_prefix_path(prefix, "_bom.json")
+    if not p or not os.path.isfile(p):
         return None
     try:
         with open(p) as f:
@@ -439,8 +452,8 @@ def sbom_summary(prefix):
 
 def conformance_summary(prefix):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
-    p = os.path.join(OUTPUT_DIR, prefix + "_conformance.json")
-    if not os.path.isfile(p):
+    p = safe_prefix_path(prefix, "_conformance.json")
+    if not p or not os.path.isfile(p):
         return None
     try:
         with open(p) as f:
