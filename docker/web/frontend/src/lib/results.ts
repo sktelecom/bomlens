@@ -35,5 +35,6 @@ export function sectionCounts(
   return {
     components: result.sbom?.components ?? 0,
     vulnerabilities: result.security?.TOTAL ?? 0,
+    artifacts: result.results.length,
   };
 }

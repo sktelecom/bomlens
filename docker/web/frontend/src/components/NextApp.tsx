@@ -127,7 +127,13 @@ export function NextApp() {
             )}
           </div>
 
-          {result && <ResultSection section={activeSection} result={result} />}
+          {result && (
+            <ResultSection
+              section={activeSection}
+              result={result}
+              onNavigate={setActiveSection}
+            />
+          )}
 
           <ProgressLog logs={logs} status={status} />
         </div>

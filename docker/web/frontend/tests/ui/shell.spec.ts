@@ -102,6 +102,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("button", { name: /^Vulnerabilities/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Dependencies/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Source tree/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Models & datasets/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /G7 conformance/ })).toHaveCount(0);
 
@@ -113,6 +114,40 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   // Vulnerabilities section shows the CVE rows.
   await page.getByRole("button", { name: /^Vulnerabilities/ }).click();
   await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
+});
+
+test("Overview leads with needs-attention and jumps into sections", async ({ page }) => {
+  await stubAndRun(page);
+
+  // Needs-attention surfaces the critical/high vulnerabilities (1+1) and links out.
+  const attention = page.getByRole("button", { name: /critical or high vulnerabilities/ });
+  await expect(attention).toBeVisible();
+  await attention.click();
+  await expect(page.getByRole("button", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
+
+  // Back to Overview; a jump card navigates into Components.
+  await page.getByRole("button", { name: /^Overview/ }).click();
+  await page.getByRole("button", { name: "View Components" }).click();
+  await expect(page.getByRole("button", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+});
+
+test("overview has no axe violations", async ({ page }) => {
+  await stubAndRun(page);
+  await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("overview section matches baseline — light/en @visual", async ({ page }) => {
+  await stubAndRun(page);
+  await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
+    animations: "disabled",
+  });
 });
 
 test("Components table shows Scope/Risk and filters on the full set", async ({ page }) => {
