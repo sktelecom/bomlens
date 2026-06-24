@@ -43,6 +43,21 @@
 
     --ring: 240 6% 10%;
 
+    /* Brand — SKT accent (SK Red #EA002C primary, SK Orange #F47725 secondary).
+     * Used for active navigation, selection/focus accents and primary calls to
+     * action. Stored as HSL triplets so `bg-brand/10`, `text-brand` etc. compose.
+     * Neutral `--primary` (near-black) is intentionally left untouched so the
+     * existing UI keeps working while the new shell adopts the brand accent. */
+    --brand: 349 100% 46%; /* SK Red #EA002C */
+    --brand-foreground: 0 0% 100%;
+    --brand-accent: 24 90% 55%; /* SK Orange #F47725 */
+
+    /* Sidebar surface — a hair off the canvas so the rail reads as its own
+     * plane (Google AI Studio shell language). */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 240 6% 10%;
+    --sidebar-border: 240 5% 91%;
+
     --radius: 0.375rem;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
@@ -90,6 +105,16 @@
     --destructive-foreground: 0 0% 98%;
 
     --ring: 240 5% 65%;
+
+    /* Brand — slightly lifted lightness so SK Red/Orange stay vivid against the
+     * near-black canvas without glowing. */
+    --brand: 349 100% 56%;
+    --brand-foreground: 0 0% 100%;
+    --brand-accent: 24 90% 60%;
+
+    --sidebar: 240 5% 9%; /* one step above --background (6%) */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-border: 240 4% 16%;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.3);

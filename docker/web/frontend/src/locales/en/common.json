@@ -183,6 +183,32 @@
   "lang": {
     "label": "Language"
   },
+  "nav": {
+    "label": "Sections",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "recent": "Recent scans",
+    "recentEmpty": "No recent scans yet",
+    "group": {
+      "inventory": "Inventory",
+      "risk": "Risk & compliance",
+      "ai": "AI",
+      "outputs": "Outputs"
+    },
+    "overview": "Overview",
+    "components": "Components",
+    "dependencies": "Dependencies",
+    "vulnerabilities": "Vulnerabilities",
+    "licenses": "Licenses",
+    "g7": "G7 conformance",
+    "models": "Models & datasets",
+    "artifacts": "Artifacts"
+  },
+  "shell": {
+    "previewBadge": "New UI preview",
+    "placeholderTitle": "Nothing to show yet",
+    "placeholderBody": "This is the new interface shell. Run a scan in the classic UI to populate it — full results land in upcoming phases."
+  },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
     "file": "Choose a file to analyze."

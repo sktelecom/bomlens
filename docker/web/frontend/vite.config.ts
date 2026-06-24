@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { defineConfig } from "vite";
@@ -9,6 +10,12 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
+  },
+  // Unit tests (Vitest): data/display logic only — pure modules, no DOM.
+  // Playwright owns interaction/visual/a11y coverage.
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts"],
   },
   build: {
     outDir: "dist",

@@ -1,0 +1,74 @@
+import { type ReactNode, useEffect, useState } from "react";
+
+import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
+import {
+  EMPTY_SCAN,
+  type RecentScanLink,
+  type ScanContext,
+  type SectionId,
+} from "@/lib/nav";
+
+interface AppShellProps {
+  scan?: ScanContext;
+  activeSection: SectionId;
+  onSelectSection: (id: SectionId) => void;
+  recent?: RecentScanLink[];
+  /** Project context shown in the top bar, e.g. "my-app · 1.0.0". */
+  projectLabel?: string;
+  /** Optional top-bar action (e.g. New scan button). */
+  topBarActions?: ReactNode;
+  /** The active section's content fills the canvas. */
+  children: ReactNode;
+}
+
+/** Below this width the rail auto-collapses to an icon strip. */
+const COLLAPSE_QUERY = "(max-width: 1024px)";
+
+/**
+ * The application frame: a sticky top bar over a left rail + scrolling canvas.
+ * Every result surface renders inside it. The rail adapts to the scan type and
+ * collapses automatically on narrow viewports (and via the in-rail toggle).
+ */
+export function AppShell({
+  scan = EMPTY_SCAN,
+  activeSection,
+  onSelectSection,
+  recent,
+  projectLabel,
+  topBarActions,
+  children,
+}: AppShellProps) {
+  // `null` until the user toggles manually; until then we follow the viewport.
+  const [manualCollapsed, setManualCollapsed] = useState<boolean | null>(null);
+  const [narrow, setNarrow] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(COLLAPSE_QUERY);
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const collapsed = manualCollapsed ?? narrow;
+
+  return (
+    <div className="flex h-screen flex-col bg-background">
+      <TopBar projectLabel={projectLabel} actions={topBarActions} />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          scan={scan}
+          activeSection={activeSection}
+          onSelect={onSelectSection}
+          recent={recent}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setManualCollapsed(!collapsed)}
+        />
+        <main className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
