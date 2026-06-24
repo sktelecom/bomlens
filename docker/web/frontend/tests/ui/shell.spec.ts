@@ -79,11 +79,29 @@ const DONE = {
   },
 };
 
+// Raw SBOM served by /file for the dependency views: openssl (direct,
+// vulnerable per the component join) → zlib (transitive).
+const SBOM = {
+  bomFormat: "CycloneDX",
+  metadata: { component: { "bom-ref": "root", name: "demo", version: "1.0" } },
+  components: [
+    { "bom-ref": "o", name: "openssl", version: "3.0.0", type: "library", purl: "o", licenses: [{ license: { id: "Apache-2.0" } }] },
+    { "bom-ref": "z", name: "zlib", version: "1.2.0", type: "library", purl: "z" },
+  ],
+  dependencies: [
+    { ref: "root", dependsOn: ["o"] },
+    { ref: "o", dependsOn: ["z"] },
+  ],
+};
+
 async function stubAndRun(page: Page) {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
   await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
   await page.route("**/scan-stream**", (r) =>
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` }),
   );
@@ -146,6 +164,33 @@ test("overview section matches baseline — light/en @visual", async ({ page }) 
   await stubAndRun(page);
   await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
   await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
+    animations: "disabled",
+  });
+});
+
+test("Dependencies tree marks vulnerable packages and direct deps", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Dependencies/ }).click();
+  await page.getByRole("button", { name: "Tree", exact: true }).click();
+
+  // openssl is a direct dependency and vulnerable → Critical + Direct badges.
+  const opensslRow = page.locator("li", { hasText: "openssl" }).first();
+  await expect(opensslRow.getByText("Critical", { exact: true })).toBeVisible();
+  await expect(opensslRow.getByText("Direct", { exact: true })).toBeVisible();
+
+  // The tree view has no axe violations.
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("dependencies tree matches baseline — light/en @visual", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("button", { name: /^Dependencies/ }).click();
+  await page.getByRole("button", { name: "Tree", exact: true }).click();
+  await expect(page.getByText("openssl").first()).toBeVisible();
+  await expect(page.locator("main")).toHaveScreenshot("dependencies-tree-light-en.png", {
     animations: "disabled",
   });
 });

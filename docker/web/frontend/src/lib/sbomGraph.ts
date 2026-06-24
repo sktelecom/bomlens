@@ -9,7 +9,10 @@
  * When the SBOM carries no dependency graph (syft output, or a language whose
  * cdxgen image doesn't emit one) we fall back to a flat component list.
  */
-import { fileUrl } from "./api";
+import { fileUrl, type Severity } from "./api";
+
+/** Resolve a node's worst vulnerability severity by name/version, if any. */
+export type VulnLookup = (name: string, version: string) => Severity | undefined;
 
 export interface RawComponent {
   "bom-ref"?: string;
@@ -37,6 +40,8 @@ export interface GraphNode {
   licenses: string[];
   /** true when this node is a direct dependency of the root component. */
   direct: boolean;
+  /** worst severity of this package's known vulnerabilities, if any. */
+  vuln?: Severity;
 }
 
 export interface GraphEdge {
@@ -52,6 +57,8 @@ export interface TreeNode {
   licenses: string[];
   depth: number;
   children: TreeNode[];
+  /** worst severity of this package's known vulnerabilities, if any. */
+  vuln?: Severity;
   /** set when expanding this node would revisit an ancestor (cycle guard). */
   cycle?: boolean;
 }
@@ -101,7 +108,7 @@ export async function loadSbom(name: string): Promise<RawSbom> {
   return (await res.json()) as RawSbom;
 }
 
-export function parseSbomGraph(sbom: RawSbom): SbomGraph {
+export function parseSbomGraph(sbom: RawSbom, vulnOf?: VulnLookup): SbomGraph {
   const components = Array.isArray(sbom.components) ? sbom.components : [];
 
   // Index every component by both bom-ref and purl so dependency refs resolve.
@@ -121,6 +128,7 @@ export function parseSbomGraph(sbom: RawSbom): SbomGraph {
       type: c?.type || "",
       licenses: readLicenses(c?.licenses),
       label: labelOf(name, version),
+      vuln: vulnOf?.(name, version),
     };
   };
 
@@ -165,6 +173,7 @@ export function parseSbomGraph(sbom: RawSbom): SbomGraph {
       type: m.type,
       licenses: m.licenses,
       direct: directRefs.has(id),
+      vuln: m.vuln,
     };
   });
   const edges: GraphEdge[] = [];
@@ -187,6 +196,7 @@ export function parseSbomGraph(sbom: RawSbom): SbomGraph {
         licenses: m.licenses,
         depth: 0,
         children: [],
+        vuln: m.vuln,
       };
     });
   } else {
@@ -200,6 +210,7 @@ export function parseSbomGraph(sbom: RawSbom): SbomGraph {
         licenses: m.licenses,
         depth,
         children: [],
+        vuln: m.vuln,
       };
       if (ancestors.has(ref)) {
         node.cycle = true;

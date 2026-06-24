@@ -49,7 +49,12 @@ export function ResultSection({
 
     case "dependencies": {
       const sbomFile = sbomFileName(result);
-      return sbomFile ? <DependenciesPanel sbomFile={sbomFile} /> : null;
+      return sbomFile ? (
+        <DependenciesPanel
+          sbomFile={sbomFile}
+          components={result.sbom?.componentList ?? []}
+        />
+      ) : null;
     }
 
     case "sourceTree": {
