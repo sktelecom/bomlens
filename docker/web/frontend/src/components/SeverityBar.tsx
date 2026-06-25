@@ -50,24 +50,39 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
         <>
           <div
             className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
-            role="img"
+            role={interactive ? "group" : "img"}
             aria-label={t("result.severityTitle")}
           >
-            {SEVERITY_ORDER.map((s) =>
-              security[s] > 0 ? (
-                <div
+            {SEVERITY_ORDER.map((s) => {
+              if (security[s] === 0) return null;
+              const segClass = cn(
+                BAR[s],
+                "h-full transition-[opacity,filter] duration-fast ease-out-soft",
+                // Dim the non-selected bands while a filter is active.
+                selected && selected !== s && "opacity-30",
+              );
+              const segStyle = { width: `${(security[s] / total) * 100}%` };
+              const segTitle = `${t(`severity.${s}`)}: ${security[s]}`;
+              if (!interactive) {
+                return <div key={s} className={segClass} style={segStyle} title={segTitle} />;
+              }
+              return (
+                <button
                   key={s}
+                  type="button"
+                  aria-pressed={selected === s}
+                  aria-label={`${t(`severity.${s}`)} ${security[s]}`}
+                  onClick={() => onSelect?.(s)}
                   className={cn(
-                    BAR[s],
-                    "transition-opacity duration-fast ease-out-soft",
-                    // Dim the non-selected bands while a filter is active.
-                    selected && selected !== s && "opacity-30",
+                    segClass,
+                    "cursor-pointer hover:brightness-110",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   )}
-                  style={{ width: `${(security[s] / total) * 100}%` }}
-                  title={`${t(`severity.${s}`)}: ${security[s]}`}
+                  style={segStyle}
+                  title={segTitle}
                 />
-              ) : null,
-            )}
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {SEVERITY_ORDER.map((s) => {

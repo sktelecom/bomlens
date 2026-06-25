@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
 import { type SecuritySummary, type Severity, type VulnItem } from "@/lib/api";
 import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
@@ -140,6 +141,7 @@ export function VulnerabilitiesTable({ security }: Props) {
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("");
+  const [query, setQuery] = useState("");
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 
@@ -159,9 +161,12 @@ export function VulnerabilitiesTable({ security }: Props) {
     return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
 
-  const visible = severityFilter
-    ? sorted.filter((v) => v.severity === severityFilter)
-    : sorted;
+  const q = query.trim().toLowerCase();
+  const visible = sorted.filter((v) => {
+    if (severityFilter && v.severity !== severityFilter) return false;
+    if (q && !`${v.id} ${v.pkg} ${v.title}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -170,7 +175,21 @@ export function VulnerabilitiesTable({ security }: Props) {
         selected={severityFilter as Severity | ""}
         onSelect={(s) => setSeverityFilter((f) => (f === s ? "" : s))}
       />
-      <div className="max-h-[28rem] overflow-auto rounded-md border">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("result.vulnSearchPlaceholder")}
+          className="h-9 max-w-xs"
+          aria-label={t("result.vulnSearchPlaceholder")}
+        />
+        {(q || severityFilter) && (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {t("result.vulnShown", { shown: visible.length, total: items.length })}
+          </span>
+        )}
+      </div>
+      <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">
