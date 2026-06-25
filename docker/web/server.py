@@ -834,29 +834,41 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     SSE UX is identical to an in-process scan.
     """
     # Gate every user-influenced value with an inline full-match allowlist right
-    # before it reaches the command line. Each `re.fullmatch(<const>, value)`
-    # test is a barrier the value MUST pass to flow into the docker-run argv, so
-    # only a charset-constrained token (no leading '-', whitespace, ':' or shell
-    # metacharacter) can ever be interpolated. The guards sit in this scope (not
-    # behind a helper) so the constraint is local to the flow.
-    if not image or _REF_RE.fullmatch(image) is None:
+    # before it reaches the command line, and REBIND each name to the match's
+    # group(0). The value that flows into the docker-run argv is then the freshly
+    # extracted match, not the original (taint-carrying) string — a guard that
+    # merely returns on a failed re.fullmatch but reuses the original variable
+    # does NOT break command-injection taint, whereas `m.group(0)` does. The
+    # charsets admit no leading '-', whitespace, ':' (which would split a -v
+    # mount) or shell metacharacter.
+    _m = _REF_RE.fullmatch(image) if image else None
+    if _m is None:
         on_log("[ui] refusing to launch sibling: invalid image reference")
         return -1
+    image = _m.group(0)
     if mode not in _SIBLING_MODES:
         on_log("[ui] refusing to launch sibling: unsupported mode")
         return -1
     # Pin MODE to the exact matched literal (drops the caller's string identity).
     mode = _SIBLING_MODES[_SIBLING_MODES.index(mode)]
-    if not host_out or _HOSTPATH_RE.fullmatch(host_out) is None:
+    _m = _HOSTPATH_RE.fullmatch(host_out) if host_out else None
+    if _m is None:
         on_log("[ui] cannot launch sibling: host output dir unknown or unsafe "
                "(SBOM_UI_HOST_DIR unset — relaunch the UI via the desktop app or scan-sbom.sh --ui)")
         return -1
-    if host_file is not None and _HOSTPATH_RE.fullmatch(host_file) is None:
-        on_log("[ui] refusing to launch sibling: unsafe host input path")
-        return -1
-    if model_id is not None and _MODEL_RE.fullmatch(model_id) is None:
-        on_log("[ui] refusing to launch sibling: invalid model id")
-        return -1
+    host_out = _m.group(0)
+    if host_file is not None:
+        _m = _HOSTPATH_RE.fullmatch(host_file)
+        if _m is None:
+            on_log("[ui] refusing to launch sibling: unsafe host input path")
+            return -1
+        host_file = _m.group(0)
+    if model_id is not None:
+        _m = _MODEL_RE.fullmatch(model_id)
+        if _m is None:
+            on_log("[ui] refusing to launch sibling: invalid model id")
+            return -1
+        model_id = _m.group(0)
 
     env = dict(os.environ)
     if extra_env:
@@ -880,11 +892,11 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     ]
     if host_file is not None:
         # Mount the upload read-only under a fixed in-sibling path. Reduce to a
-        # bare basename and re-gate it so the in-sibling path is a single
-        # allowlisted file name (host_file itself passed _HOSTPATH_RE above).
-        base = os.path.basename(host_file)
-        if not base or _BASENAME_RE.fullmatch(base) is None:
-            base = "upload.bin"
+        # bare basename and take it from the allowlist match so the in-sibling
+        # path is a single charset-constrained file name (host_file itself was
+        # rebound from _HOSTPATH_RE above).
+        _bm = _BASENAME_RE.fullmatch(os.path.basename(host_file))
+        base = _bm.group(0) if _bm else "upload.bin"
         args += ["-v", "%s:/input/%s:ro" % (host_file, base),
                  "-e", "TARGET_FILE=/input/%s" % base]
     if model_id is not None:
