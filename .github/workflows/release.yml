@@ -89,10 +89,10 @@ jobs:
             
             ### Documentation
             
-            - [Getting Started](https://github.com/${{ github.repository }}/blob/main/docs/start/first-scan.md)
-            - [License-manager quickstart](https://github.com/${{ github.repository }}/blob/main/docs/notice-quickstart.md)
-            - [Usage Guide](https://github.com/${{ github.repository }}/blob/main/docs/reference/cli.md)
-            - [Examples](https://github.com/${{ github.repository }}/blob/main/docs/reference/ecosystems.md)
+            - [Getting Started](https://sktelecom.github.io/sbom-tools/start/first-scan/)
+            - [Notice, security & risk reports](https://sktelecom.github.io/sbom-tools/guides/reports/)
+            - [Usage Guide](https://sktelecom.github.io/sbom-tools/reference/cli/)
+            - [Examples](https://sktelecom.github.io/sbom-tools/reference/ecosystems/)
           draft: false
           prerelease: false
   
