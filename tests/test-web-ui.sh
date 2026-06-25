@@ -272,6 +272,68 @@ c_bad=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=../../etc/passwd")
 c_missing=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=nope_9.9")
 [ "$c_missing" = "404" ] && pass "/scan unknown id returns 404" || fail "/scan unknown id returned $c_missing (expected 404)"
 
+echo "== source-tree fallback (_files.json artifact + script shape) =="
+# The structure-only source tree (_files.json) lets the UI show a source tree
+# without the opt-in ScanCode scan. It must be a listed/downloadable artifact and
+# re-open with the scan, so the frontend can fetch it (it prefers _scancode when
+# both exist; here only _files is present).
+cat > "$OUT/demo_1.0_files.json" <<'JSON'
+{"files":[{"path":"src","type":"directory"},{"path":"src/main.py","type":"file"}]}
+JSON
+if curl -fsS "$BASE/results" 2>/dev/null | python3 -c "
+import sys, json
+names = [r['name'] for r in json.load(sys.stdin)]
+assert 'demo_1.0_files.json' in names, names
+"; then
+    pass "/results lists the _files.json source tree"
+else
+    fail "/results did not list _files.json"
+fi
+if curl -fsS "$BASE/file?name=demo_1.0_files.json" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert any(f['type'] == 'file' for f in d['files']), d
+"; then
+    pass "/file serves the _files.json source tree"
+else
+    fail "/file did not serve _files.json"
+fi
+if curl -fsS "$BASE/scan?id=demo_1.0" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+names = [r['name'] for r in d['results']]
+assert 'demo_1.0_files.json' in names, names
+"; then
+    pass "/scan?id= re-open includes the _files.json source tree"
+else
+    fail "/scan?id= re-open omitted _files.json"
+fi
+rm -f "$OUT/demo_1.0_files.json"
+
+# The scanner script emits the ScanCode 'files[]' shape the frontend parser
+# consumes, with noise dirs (.git/node_modules) pruned.
+sft_dir="$WORK/sft-src"
+mkdir -p "$sft_dir/app/sub" "$sft_dir/.git/objects" "$sft_dir/node_modules/dep"
+: > "$sft_dir/app/main.py"
+: > "$sft_dir/app/sub/util.go"
+: > "$sft_dir/node_modules/dep/index.js"
+: > "$sft_dir/.git/objects/blob"
+if bash "$ROOT_DIR/docker/lib/source-file-tree.sh" "$sft_dir" "$WORK/sft.json" >/dev/null 2>&1 \
+   && python3 -c "
+import json
+d = json.load(open('$WORK/sft.json'))
+paths = {f['path'] for f in d['files']}
+types = {f['type'] for f in d['files']}
+assert 'app/main.py' in paths and 'app/sub/util.go' in paths, paths
+assert 'app' in paths, paths
+assert not any('node_modules' in p or '.git' in p for p in paths), paths
+assert types <= {'file', 'directory'}, types
+"; then
+    pass "source-file-tree.sh emits a pruned ScanCode-shaped files[] tree"
+else
+    fail "source-file-tree.sh output is wrong" "$(cat "$WORK/sft.json" 2>/dev/null)"
+fi
+
 # /scan-delete removes a past scan's artifacts, and fails closed on a bad id.
 # The delete builds an OUTPUT_DIR path from the id, so cover the traversal guard.
 del_bad=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/scan-delete?id=../../etc/passwd")
