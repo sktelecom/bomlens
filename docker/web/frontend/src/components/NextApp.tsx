@@ -177,6 +177,7 @@ export function NextApp() {
       recent={recentLinks}
       onSelectRecent={openRecent}
       onDeleteRecent={deleteRecent}
+      onHome={status === "idle" ? undefined : newScan}
       projectLabel={status === "idle" ? undefined : projectLabel}
       topBarActions={
         status !== "idle" ? (

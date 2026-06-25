@@ -26,6 +26,8 @@ interface AppShellProps {
   projectLabel?: string;
   /** Optional top-bar action (e.g. New scan button). */
   topBarActions?: ReactNode;
+  /** Clicking the logo goes home (new scan). */
+  onHome?: () => void;
   /** The active section's content fills the canvas. */
   children: ReactNode;
 }
@@ -49,6 +51,7 @@ export function AppShell({
   showSections,
   projectLabel,
   topBarActions,
+  onHome,
   children,
 }: AppShellProps) {
   // `null` until the user toggles manually; until then we follow the viewport.
@@ -67,7 +70,7 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <TopBar projectLabel={projectLabel} actions={topBarActions} />
+      <TopBar projectLabel={projectLabel} actions={topBarActions} onHome={onHome} />
       <div className="flex min-h-0 flex-1">
         <Sidebar
           scan={scan}

@@ -149,6 +149,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     scanossToken,
     setScanossToken,
     showVendored,
+    showDeepLicense,
     busy,
   } = state;
   return (
@@ -179,12 +180,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           )}
         </div>
       )}
-      <ToggleRow
-        labelKey="deepLicense"
-        checked={deepLicense}
-        onChange={setDeepLicense}
-        disabled={busy}
-      />
+      {showDeepLicense && (
+        <ToggleRow
+          labelKey="deepLicense"
+          checked={deepLicense}
+          onChange={setDeepLicense}
+          disabled={busy}
+        />
+      )}
     </div>
   );
 }

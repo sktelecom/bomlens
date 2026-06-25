@@ -74,10 +74,18 @@ export function useScanForm({
   const textInput = TEXT_INPUT[source];
   const isText = textInput !== undefined;
   const isAnalyze = source === "sbom-upload";
+  // AI-model scans have no source tree and no package CVEs, so the security
+  // report (Trivy → 0 results) and deep-license (needs /src) don't apply.
+  const isAiModel = source === "ai-model";
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
   const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
+  // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
+  // applies to source scans — not Docker images, SBOM uploads, firmware or AI
+  // models, where there is nothing to scan and the toggle would be a no-op.
+  const showDeepLicense = isSourceScan;
+  const showScanOptions = showDeepLicense || showVendored;
   const busy = running || uploading;
 
   /** Switching source resets the dependent inputs. */
@@ -146,10 +154,11 @@ export function useScanForm({
       token,
       cred,
       scanossCred,
-      // ANALYZE forces notice+security on (needed for the risk report).
+      // ANALYZE forces notice+security on (needed for the risk report). AI-model
+      // scans have no package CVEs, so security is off there.
       notice: isAnalyze ? true : notice,
-      security: isAnalyze ? true : security,
-      deepLicense,
+      security: isAiModel ? false : isAnalyze ? true : security,
+      deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // Byte-stable (reproducible) output is a CI concern; not exposed in the UI.
       byteStable: false,
@@ -160,7 +169,10 @@ export function useScanForm({
   // identification) are surfaced separately, not as outputs.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
-    { key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze },
+    // AI-model scans skip the (empty) security report.
+    ...(isAiModel
+      ? []
+      : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
   ];
 
   return {
@@ -175,6 +187,7 @@ export function useScanForm({
     scanossToken, setScanossToken,
     invalid, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, showVendored,
+    showDeepLicense, showScanOptions,
     options, submit,
     capabilities,
   };

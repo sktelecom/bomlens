@@ -149,15 +149,22 @@ export function NewScan({ running, capabilities, onRun }: Props) {
             </div>
           </div>
 
-          <div className="grid gap-x-8 gap-y-5 border-t pt-5 sm:grid-cols-2">
+          <div
+            className={cn(
+              "grid gap-x-8 gap-y-5 border-t pt-5",
+              state.showScanOptions && "sm:grid-cols-2",
+            )}
+          >
             <div className="space-y-3">
               <Label>{t("newscan.outputs")}</Label>
               <GenerationOptions state={state} />
             </div>
-            <div className="space-y-3">
-              <Label>{t("newscan.scanOptions")}</Label>
-              <ScanOptions state={state} />
-            </div>
+            {state.showScanOptions && (
+              <div className="space-y-3">
+                <Label>{t("newscan.scanOptions")}</Label>
+                <ScanOptions state={state} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 border-t pt-5">

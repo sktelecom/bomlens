@@ -34,6 +34,10 @@ export interface ComponentItem {
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
   licenseReview?: "behavioral-use" | "non-commercial";
+  /** Source / download location (externalReferences vcs/distribution/website). */
+  source?: string;
+  /** Copyright holder line, when the SBOM captured one. */
+  copyright?: string;
 }
 
 export interface SbomSummary {
