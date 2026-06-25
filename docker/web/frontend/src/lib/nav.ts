@@ -27,7 +27,7 @@ export type SectionId =
   | "sourceTree"
   | "vulnerabilities"
   | "licenses"
-  | "g7"
+  | "conformance"
   | "models"
   | "artifacts";
 
@@ -69,8 +69,11 @@ export interface ScanContext {
   hasDependencies: boolean;
   /** A ScanCode artifact exists, so the source tree can be shown. */
   hasSourceTree: boolean;
-  /** The conformance report carries G7 AI checks (so the G7 section applies). */
-  hasG7: boolean;
+  /**
+   * An SBOM conformance report exists (ANALYZE produced format/G7 checks), so
+   * the conformance section applies — regardless of AI content.
+   */
+  hasConformance: boolean;
 }
 
 export const EMPTY_SCAN: ScanContext = {
@@ -78,7 +81,7 @@ export const EMPTY_SCAN: ScanContext = {
   isAiScan: false,
   hasDependencies: false,
   hasSourceTree: false,
-  hasG7: false,
+  hasConformance: false,
 };
 
 /**
@@ -111,6 +114,15 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "risk",
     labelKey: "nav.group.risk",
     sections: [
+      // Supplier-SBOM conformance: shown whenever an ANALYZE produced a
+      // conformance report, regardless of AI content. The G7 AI minimum-element
+      // checks (when present) render as a sub-block inside this section.
+      {
+        id: "conformance",
+        labelKey: "nav.conformance",
+        icon: FileCheck2,
+        requires: (c) => c.hasConformance,
+      },
       { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
       { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
     ],
@@ -120,9 +132,6 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.ai",
     sections: [
       { id: "models", labelKey: "nav.models", icon: Cpu, aiOnly: true },
-      // G7 is the AI model conformance check (model identifier/license/card/
-      // integrity/dataset/openness), so it lives under AI, not Risk.
-      { id: "g7", labelKey: "nav.g7", icon: FileCheck2, requires: (c) => c.hasG7 },
     ],
   },
   {

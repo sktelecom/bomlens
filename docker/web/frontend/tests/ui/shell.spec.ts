@@ -275,7 +275,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /G7 conformance/ })).toHaveCount(0);
+  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toHaveCount(0);
 
   // Overview leads; switching to Components shows the table content.
   await page.getByRole("link", { name: /^Components/ }).first().click();
@@ -421,8 +421,8 @@ test("models section matches baseline — light/en @visual", async ({ page }) =>
 
 test("AI scan exposes G7 conformance with present/advisory split", async ({ page }) => {
   await stubAiAndRun(page);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /G7 conformance/ })).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: /G7 conformance/ }).click();
+  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toBeVisible();
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
 
   // Headline tally comes straight from the check statuses: 4 of 6 present.
   await expect(page.getByText("4/6 present")).toBeVisible();
@@ -437,9 +437,9 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   expect(results.violations).toEqual([]);
 });
 
-test("g7 section matches baseline — light/en @visual", async ({ page }) => {
+test("conformance section matches baseline — light/en @visual", async ({ page }) => {
   await stubAiAndRun(page);
-  await page.getByRole("navigation").getByRole("link", { name: /G7 conformance/ }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
   await expect(page.getByText("4/6 present")).toBeVisible();
   await expect(
     page.getByText("G7 model openness (weight/architecture/data/training)"),
@@ -451,7 +451,7 @@ test("g7 section matches baseline — light/en @visual", async ({ page }) => {
   // transform has settled to translateY(0) before the screenshot.
   await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("g7-light-en.png", {
+  await expect(page.locator("main")).toHaveScreenshot("conformance-light-en.png", {
     animations: "disabled",
   });
 });
