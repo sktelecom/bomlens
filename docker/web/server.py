@@ -58,7 +58,10 @@ UPLOAD_EXTS = {
     "sbom": (".json", ".xml", ".spdx", ".cdx.json", ".spdx.json"),
     "zip": (".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar"),
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
-                 ".trx", ".chk", ".fw", ".rom", ".dlf"),
+                 ".trx", ".chk", ".fw", ".rom", ".dlf",
+                 # Compressed firmware images (unblob unpacks these), e.g. the
+                 # OpenWRT *.img.gz releases.
+                 ".gz", ".tgz", ".tar", ".xz", ".bz2", ".lzma", ".zst"),
 }
 
 # Content types for the static SPA bundle.
@@ -77,12 +80,16 @@ STATIC_CTYPES = {
 }
 
 ARTIFACT_SUFFIXES = (
-    "_bom.json", "_NOTICE.txt", "_NOTICE.html",
+    "_bom.json", "_NOTICE.txt", "_NOTICE.html", "_NOTICE.pdf",
     "_security.json", "_security.md", "_security.html",
     "_conformance.json", "_conformance.md", "_conformance.html",
     "_risk-report.md", "_risk-report.html",
     "_bom.json.sig", "_scancode.json",
 )
+
+# Recent-scans sidebar shows the newest N; older scans stay on disk but are not
+# listed (the user deletes via the UI or the output folder).
+RECENT_SCANS_CAP = 20
 
 
 def safe_name(s):
@@ -536,17 +543,29 @@ def list_scans():
             continue
         comps = data.get("components") or []
         meta = (data.get("metadata") or {}).get("component") or {}
+        # The OWASP AIBOM generator names the root metadata.component after its
+        # job id (job-<timestamp>), which is meaningless in the Recent list. For
+        # AI scans, label by the model component instead.
+        model = next(
+            (c for c in comps if c.get("type") == "machine-learning-model"), None
+        )
+        if model:
+            project = model.get("name") or prefix
+            version = model.get("version") or ""
+        else:
+            project = meta.get("name") or prefix
+            version = meta.get("version") or ""
         scans.append({
             "id": prefix,
-            "project": meta.get("name") or prefix,
-            "version": meta.get("version") or "",
+            "project": project,
+            "version": version,
             "components": len(comps),
             "maxSeverity": _max_severity(security_summary(prefix)),
             "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
             "generatedAt": mtime,
         })
     scans.sort(key=lambda s: s["generatedAt"], reverse=True)
-    return scans
+    return scans[:RECENT_SCANS_CAP]
 
 
 def scan_detail(prefix):
@@ -755,8 +774,28 @@ class Handler(BaseHTTPRequestHandler):
             self._upload(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/git-cred":
             self._git_cred()
+        elif parsed.path == "/scan-delete":
+            self._scan_delete(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
+
+    def _scan_delete(self, qs):
+        """Delete one past scan: remove every {id}_* artifact from OUTPUT_DIR.
+        Local-only housekeeping (no account/db); the id is a validated prefix."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "bad scan id"}))
+            return
+        removed = 0
+        for suf in ARTIFACT_SUFFIXES:
+            p = os.path.join(OUTPUT_DIR, sid + suf)
+            if os.path.isfile(p):
+                try:
+                    os.remove(p)
+                    removed += 1
+                except OSError:
+                    pass
+        self._send(200, json.dumps({"deleted": sid, "removed": removed}))
 
     def _git_cred(self):
         """Stash a private-repo token; return a single-use credId."""
