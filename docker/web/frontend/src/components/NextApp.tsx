@@ -9,6 +9,7 @@ import { ResultSection } from "./ResultSections";
 import { ScanRunning } from "./ScanRunning";
 import { Button } from "@/components/ui/button";
 import {
+  deleteScan,
   getCapabilities,
   listScans,
   loadScan,
@@ -114,6 +115,11 @@ export function NextApp() {
     });
   };
 
+  // Delete a past scan (its artifacts) and refresh the Recent list.
+  const deleteRecent = (id: string) => {
+    void deleteScan(id).then(() => void refreshRecent());
+  };
+
   const scan = useMemo(() => deriveScanContext(result), [result]);
   const counts = useMemo(
     () => (result ? sectionCounts(result) : undefined),
@@ -170,6 +176,7 @@ export function NextApp() {
       showSections={Boolean(result)}
       recent={recentLinks}
       onSelectRecent={openRecent}
+      onDeleteRecent={deleteRecent}
       projectLabel={status === "idle" ? undefined : projectLabel}
       topBarActions={
         status !== "idle" ? (
@@ -218,7 +225,9 @@ export function NextApp() {
             onNavigate={setActiveSection}
           />
 
-          <ProgressLog logs={logs} status={status} collapsible />
+          {activeSection === "overview" && (
+            <ProgressLog logs={logs} status={status} collapsible />
+          )}
         </div>
       )}
     </AppShell>

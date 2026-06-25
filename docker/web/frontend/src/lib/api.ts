@@ -255,6 +255,18 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
+/** Delete one past scan (removes its {id}_* artifacts on disk). */
+export async function deleteScan(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/scan-delete?id=${encodeURIComponent(id)}`, {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Re-open a past scan by id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {

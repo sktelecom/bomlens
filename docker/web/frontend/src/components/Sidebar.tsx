@@ -1,4 +1,4 @@
-import { Clock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Clock, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -17,6 +17,8 @@ interface SidebarProps {
   recent?: RecentScanLink[];
   /** Re-open a past scan from the Recent list. */
   onSelectRecent?: (id: string) => void;
+  /** Delete a past scan from the Recent list (removes its artifacts). */
+  onDeleteRecent?: (id: string) => void;
   /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the section groups (e.g. before any scan); the Recent area stays. */
@@ -46,6 +48,7 @@ export function Sidebar({
   onSelect,
   recent = [],
   onSelectRecent,
+  onDeleteRecent,
   counts = {},
   showSections = true,
   collapsed = false,
@@ -162,7 +165,7 @@ export function Sidebar({
         ) : (
           <ul className="flex flex-col gap-0.5">
             {recent.map((scanItem) => (
-              <li key={scanItem.id}>
+              <li key={scanItem.id} className="group/recent relative">
                 <button
                   type="button"
                   title={collapsed ? scanItem.label : undefined}
@@ -171,7 +174,7 @@ export function Sidebar({
                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
                     "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-                    collapsed && "justify-center",
+                    collapsed ? "justify-center" : onDeleteRecent && "pr-7",
                   )}
                 >
                   <span
@@ -183,6 +186,22 @@ export function Sidebar({
                   />
                   {!collapsed && <span className="truncate">{scanItem.label}</span>}
                 </button>
+                {!collapsed && onDeleteRecent && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteRecent(scanItem.id)}
+                    aria-label={t("nav.recentDelete")}
+                    title={t("nav.recentDelete")}
+                    className={cn(
+                      "absolute right-1 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded",
+                      "text-muted-foreground opacity-0 transition-opacity duration-fast",
+                      "hover:bg-muted hover:text-foreground group-hover/recent:opacity-100",
+                      "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    )}
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

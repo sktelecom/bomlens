@@ -150,9 +150,15 @@ export function parseSbomGraph(sbom: RawSbom, vulnOf?: VulnLookup): SbomGraph {
   const metaRef = sbom.metadata?.component
     ? sbom.metadata.component["bom-ref"] || sbom.metadata.component.purl
     : undefined;
+  // Prefer the metadata component's direct dependencies. But some tools emit a
+  // root entry with an EMPTY dependsOn while still recording component-to-
+  // component edges (the graph renders, yet the tree would be empty), so fall
+  // back to "refs nothing depends on" whenever the root yields no children.
+  const rootChildren =
+    metaRef && adjacency.has(metaRef) ? adjacency.get(metaRef)! : [];
   const rootRefs =
-    metaRef && adjacency.has(metaRef)
-      ? adjacency.get(metaRef)!
+    rootChildren.length > 0
+      ? rootChildren
       : Array.from(adjacency.keys()).filter((ref) => !dependedOn.has(ref));
   const directRefs = new Set<string>(rootRefs);
 
