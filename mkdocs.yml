@@ -100,6 +100,7 @@ plugins:
             Reports: 보고서 생성
             Supplier SBOM: 공급사 SBOM
             Firmware: 펌웨어 분석
+            AI model: AI 모델
             Identify bundled OSS (C/C++): 번들 OSS 식별 (C/C++)
             Server delivery: 서버 전달
             Upload: 업로드
@@ -150,6 +151,7 @@ nav:
       - Reports: guides/reports.md
       - Supplier SBOM: guides/supplier-sbom.md
       - Firmware: guides/firmware.md
+      - AI model: guides/ai-model.md
       - Identify bundled OSS (C/C++): guides/identify-vendored.md
       - Server delivery: guides/server-delivery.md
       - Upload: guides/upload.md
