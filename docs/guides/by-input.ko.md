@@ -1,12 +1,12 @@
 ---
-description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어 등 5가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
+description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어, HuggingFace AI 모델 등 6가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
 ---
 
-# 5가지 입력 시나리오별 처리 가이드
+# 입력 시나리오별 처리 가이드
 
 ## 개요
 
-여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 5가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다.
+여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 6가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다. (AI 모델은 약간 다릅니다. ML-BOM이고 보안 보고서가 없습니다. 시나리오 6 참고.)
 
 **3종 산출물**
 
@@ -43,6 +43,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
 | 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃 + 적합성 보고서 |
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
+| AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 
 > 모든 명령에 `--project <이름> --version <버전>`이 필요합니다(아래 예시 참고).
 >
@@ -129,6 +130,23 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 **산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
+## 시나리오 6 — AI 모델(HuggingFace)
+
+개발팀이 코드 대신 HuggingFace 모델을 가리킨 경우. 모델 id만으로 ML-BOM을 생성합니다. 소스 코드도, 모델 가중치 다운로드도 필요 없습니다.
+
+```bash
+$SBOM --project bert-base --version 1.0.0 \
+  --model "google-bert/bert-base-uncased" \
+  --generate-only
+```
+
+- opt-in aibom 이미지(`ghcr.io/sktelecom/bomlens-aibom:latest`)가 필요하며 자동으로 받습니다. 다른 태그는 `SBOM_AIBOM_IMAGE`로 지정합니다.
+- `--model`은 `--target`/`--analyze`/`--git`/`--merge`와 함께 쓸 수 없습니다.
+- CycloneDX 1.7 **ML-BOM**(1.6 아님), 고지문, 위험분석보고서와 G7 최소 요소 적합성 검사를 만듭니다. **보안 보고서는 없습니다.** 모델에는 패키지 CVE가 없습니다.
+- 모델 카드, 데이터셋, G7 세부는 [AI 모델 가이드](ai-model.ko.md)를 참고하세요.
+
+**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, G7 적합성
+
 ## 산출물 3종 해석
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
@@ -153,6 +171,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | SBOM 업로드 | 기존 SBOM(JSON) 업로드, 분석(ANALYZE) 모드 |
 | 펌웨어 업로드 | `.bin` 등 업로드(펌웨어 이미지에서 UI 실행 필요) |
 | Docker 이미지 | 이미지명 입력 |
+| AI 모델 | HuggingFace 모델 id 입력(aibom 이미지에서 UI 실행 필요) |
 
 실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서(필요하면 적합성 보고서까지)를 화면에서 보거나 내려받을 수 있습니다. 적합성 결과(적합/부적합)는 상단 카드로 표시됩니다.
 

@@ -793,6 +793,26 @@ _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)
 _HOSTPATH_RE = re.compile(r"/[A-Za-z0-9._@/-]*")                # absolute bind-mount path
 _BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
 
+# scan-firmware.sh emits `[firmware-cvedb-progress] NN%` on stdout while the
+# (large, one-time) firmware CVE database downloads. The server turns each such
+# marker into an SSE `progress` event instead of a plain log line.
+_CVEDB_PROGRESS_RE = re.compile(r"^\[firmware-cvedb-progress\]\s+(\d+)%\s*$")
+
+
+def _emit_or_log(line, on_log, on_progress=None):
+    """Route a captured child-process line to the right SSE channel.
+
+    If the line is a firmware CVE-DB progress marker and a progress handler is
+    given, emit the clamped (0..100) percent via on_progress; otherwise pass the
+    line through to on_log unchanged (preserving the existing log behaviour)."""
+    m = _CVEDB_PROGRESS_RE.match(line) if on_progress is not None else None
+    if m is not None:
+        percent = max(0, min(100, int(m.group(1))))
+        on_progress(percent)
+    else:
+        on_log(line)
+
+
 # Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
 # caller string) is interpolated into the docker-run command line, so the MODE
 # argument can only ever be one of these literals.
@@ -830,7 +850,7 @@ def _env_flag_value(value):
 
 
 def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=None,
-                     extra_env=None):
+                     extra_env=None, on_progress=None):
     """Run a firmware/aibom SBOM scan in a SIBLING container.
 
     The desktop app's base UI image is permissive-only (no GPL firmware tools,
@@ -911,6 +931,16 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
     ]
+    # Opt-in OSV advisories for firmware: forward only the two fixed control
+    # values the UI may have set on the firmware path. We re-derive each from a
+    # closed allowlist (never the env string itself) so no user-influenced text
+    # can reach the docker-run argv. Absent/any-other value -> not forwarded,
+    # so scan-firmware.sh keeps its offline-bundle default.
+    if mode == "FIRMWARE":
+        if env.get("CVE_BIN_TOOL_DISABLE_SOURCES") == "GAD":
+            args += ["-e", "CVE_BIN_TOOL_DISABLE_SOURCES=GAD"]
+        if env.get("CVE_BIN_TOOL_MODE") == "online":
+            args += ["-e", "CVE_BIN_TOOL_MODE=online"]
     if host_file is not None:
         # Mount the upload read-only under a fixed in-sibling path. Reduce to a
         # bare basename and take it from the allowlist match so the in-sibling
@@ -933,7 +963,7 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
         _stream_cmd(["docker", "pull", image], on_log)
 
     on_log("[ui] launching %s in a sibling container (%s)..." % (mode.lower(), image))
-    return _stream_cmd(args, on_log)
+    return _stream_cmd(args, on_log, on_progress=on_progress)
 
 
 def _sibling_image_present(image):
@@ -945,9 +975,13 @@ def _sibling_image_present(image):
         return False
 
 
-def _stream_cmd(args, on_log):
+def _stream_cmd(args, on_log, on_progress=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
-    Returns the exit code, or -1 if the binary could not be launched."""
+    Returns the exit code, or -1 if the binary could not be launched.
+
+    rich (used by the firmware tools) rewrites the same terminal line via '\\r',
+    so a single read can carry several logical lines; split on '\\r' and route
+    each non-empty piece through _emit_or_log so progress markers are caught."""
     try:
         proc = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -956,8 +990,10 @@ def _stream_cmd(args, on_log):
     except OSError as exc:
         on_log("[ui] failed to launch: %s" % exc)
         return -1
-    for line in proc.stdout:
-        on_log(line.rstrip("\n"))
+    for raw in proc.stdout:
+        for piece in raw.rstrip("\n").split("\r"):
+            if piece:
+                _emit_or_log(piece, on_log, on_progress)
     proc.wait()
     return proc.returncode
 
@@ -1367,6 +1403,15 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "FIRMWARE"
                 env["MODE"] = "FIRMWARE"
                 env["TARGET_FILE"] = up
+                # Opt-in: also pull OSV advisories from osv.dev for this scan.
+                # Default (off) keeps scan-firmware.sh's offline bundle matching
+                # (CVE_BIN_TOOL_DISABLE_SOURCES=GAD,OSV, auto/offline). When the
+                # user enables it we re-enable only OSV (leave GAD disabled) and
+                # force the online updater. The wire field is a plain boolean,
+                # and only these two fixed literals are injected (no user text).
+                if g("includeOsv") == "true":
+                    env["CVE_BIN_TOOL_DISABLE_SOURCES"] = "GAD"
+                    env["CVE_BIN_TOOL_MODE"] = "online"
                 if firmware_capable():
                     # Tools are in THIS image (UI launched from the firmware image):
                     # run in-process exactly as before.
@@ -1430,6 +1475,7 @@ class Handler(BaseHTTPRequestHandler):
                     host_file=sibling.get("host_file"),
                     model_id=sibling.get("model_id"),
                     extra_env=env,
+                    on_progress=lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
                 )
                 ok = rc == 0
                 if rc == -1:
@@ -1441,8 +1487,14 @@ class Handler(BaseHTTPRequestHandler):
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )
-                    for line in proc.stdout:
-                        sse("log", json.dumps(line.rstrip("\n")))
+                    for raw in proc.stdout:
+                        for piece in raw.rstrip("\n").split("\r"):
+                            if piece:
+                                _emit_or_log(
+                                    piece,
+                                    lambda ln: sse("log", json.dumps(ln)),
+                                    lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
+                                )
                     proc.wait()
                     ok = proc.returncode == 0
                 except Exception as exc:  # noqa: BLE001

@@ -137,15 +137,46 @@ echo '[]' > "$CVE_JSON"
 #     a clear reason — never silently drop the CVE stage.
 # CVE_BIN_TOOL_MODE: auto (default) | offline | online | components-only.
 CVE_BIN_TOOL_MODE="${CVE_BIN_TOOL_MODE:-auto}"
-CVE_BIN_TOOL_CACHE="${CVE_BIN_TOOL_CACHE:-/opt/cve-bin-tool-db}"
+# cve-bin-tool 3.x hard-codes its DB cache to $HOME/.cache/cve-bin-tool/cve.db and
+# ignores CVE_DATA_DIR, so we control the location through HOME. The image bundles
+# the DB under CVE_BIN_TOOL_HOME; offline scans read it in place, online updates use
+# a writable per-run copy so an update never mutates/removes the bundled DB.
+CVE_BIN_TOOL_HOME="${CVE_BIN_TOOL_HOME:-/opt/cve-bin-tool-home}"
+BUNDLED_DB="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"
+# Data sources to disable. GAD (GitLab Advisory) crashes cve-bin-tool 3.4 with a
+# UnicodeDecodeError on fetch; OSV is excluded because some constituent feeds
+# carry share-alike terms (see CVE-DATA-NOTICE.txt). Override with
+# CVE_BIN_TOOL_DISABLE_SOURCES.
+CVE_BIN_TOOL_DISABLE_SOURCES="${CVE_BIN_TOOL_DISABLE_SOURCES:-GAD,OSV}"
+disable_args=()
+if [ -n "$CVE_BIN_TOOL_DISABLE_SOURCES" ]; then disable_args=(-d "$CVE_BIN_TOOL_DISABLE_SOURCES"); fi
+
+# Surface cve-bin-tool's rich download progress as parseable one-line markers on
+# stdout: "[firmware-cvedb-progress] NN%". rich repaints the same line with \r and
+# mixes in ANSI escapes, so split on \r, strip ANSI, and emit only when the
+# percentage advances (monotonic, de-duplicated). server.py turns these into SSE
+# progress events; every other line is dropped here so the noisy table never leaks.
+_cvedb_progress_filter() {
+    awk '
+      BEGIN { RS = "\r|\n"; last = -1 }
+      {
+        line = $0
+        gsub(/\x1b\[[0-9;?]*[ -\/]*[@-~]/, "", line)
+        if (match(line, /([0-9]+)%/)) {
+          p = substr(line, RSTART, RLENGTH - 1) + 0
+          if (p > last) { last = p; printf "[firmware-cvedb-progress] %d%%\n", p; fflush() }
+        }
+      }'
+}
 
 if command -v cve-bin-tool >/dev/null 2>&1; then
     echo "[firmware] cve-bin-tool: scanning binaries for known components + CVEs..."
+    # Required NVD attribution (the bundled-DB path does not print cve-bin-tool's banner).
+    echo "[firmware] This product uses the NVD API but is not endorsed or certified by the NVD."
 
-    # Is a usable DB already present? cve-bin-tool stores cve.db under its cache dir.
+    # Is a usable DB already bundled at the HOME-controlled cache path?
     db_present=0
-    if [ -f "$CVE_BIN_TOOL_CACHE/cve.db" ]; then db_present=1; fi
-    export CVE_DATA_DIR="$CVE_BIN_TOOL_CACHE"
+    if [ -f "$BUNDLED_DB" ]; then db_present=1; fi
 
     # Decide offline vs online based on mode + DB presence (+ a cheap net probe).
     run_cve=1
@@ -156,7 +187,7 @@ if command -v cve-bin-tool >/dev/null 2>&1; then
             echo "[firmware] CVE_BIN_TOOL_MODE=components-only: skipping CVE matching." ;;
         offline)
             if [ "$db_present" = 0 ]; then
-                echo "[firmware] WARN: CVE_BIN_TOOL_MODE=offline but no DB at $CVE_BIN_TOOL_CACHE/cve.db; CVEs will be empty." >&2
+                echo "[firmware] WARN: CVE_BIN_TOOL_MODE=offline but no DB at $BUNDLED_DB; CVEs will be empty." >&2
             fi
             update_flag="--update=never" ;;
         online)
@@ -164,28 +195,53 @@ if command -v cve-bin-tool >/dev/null 2>&1; then
         *)  # auto: prefer the bundled DB; only reach out if there is none AND a net.
             if [ "$db_present" = 1 ]; then
                 update_flag="--update=never"
-                echo "[firmware] using bundled CVE DB at $CVE_BIN_TOOL_CACHE (offline matching)."
+                echo "[firmware] using bundled CVE DB at $CVE_BIN_TOOL_HOME (offline matching)."
             elif curl -sSf --max-time 5 -o /dev/null https://services.nvd.nist.gov 2>/dev/null; then
                 update_flag="--update=latest"
                 echo "[firmware] no bundled CVE DB; updating from network (first run is slow)..."
             else
                 run_cve=0
-                echo "[firmware] WARN: no bundled CVE DB at $CVE_BIN_TOOL_CACHE and no network; emitting component-only SBOM (no CVEs)." >&2
-                echo "[firmware]       Build the firmware image with the DB bundled, mount a cache at $CVE_BIN_TOOL_CACHE, or set CVE_BIN_TOOL_MODE=online." >&2
+                echo "[firmware] WARN: no bundled CVE DB at $BUNDLED_DB and no network; emitting component-only SBOM (no CVEs)." >&2
+                echo "[firmware]       Build the firmware image with the DB bundled, mount a cache, or set CVE_BIN_TOOL_MODE=online." >&2
             fi ;;
     esac
+
+    # cve-bin-tool reads/writes $HOME/.cache/cve-bin-tool; give it a writable HOME
+    # under $WORK so it works regardless of the runtime user. Offline symlinks the
+    # read-only bundled DB in (no update => no rebuild, safe); online copies it so a
+    # rebuild never harms the bundle.
+    CVE_HOME="$WORK/cve-home"
+    mkdir -p "$CVE_HOME/.cache/cve-bin-tool"
+    if [ "$db_present" = 1 ]; then
+        if [ "$update_flag" = "--update=never" ]; then
+            ln -sf "$BUNDLED_DB" "$CVE_HOME/.cache/cve-bin-tool/cve.db"
+        else
+            cp -f "$BUNDLED_DB" "$CVE_HOME/.cache/cve-bin-tool/cve.db" 2>/dev/null || true
+        fi
+    fi
 
     if [ "$run_cve" = 1 ]; then
         # One pass produces BOTH the component SBOM (--sbom-output) and the CVE
         # report (--format json -o). cve-bin-tool exits non-zero when it finds
         # CVEs; ignore the exit code and validate the output files afterwards.
-        cve-bin-tool --quiet "$update_flag" \
-            --sbom-output "$BIN_SBOM" --sbom-type cyclonedx --sbom-format json \
-            --format json --output-file "$CVE_JSON" \
-            "$ROOTFS" >/dev/null 2>&1 || true
+        if [ "$update_flag" = "--update=latest" ]; then
+            # Online: a DB download happens — surface rich progress as markers.
+            # stderr (progress) -> filter; stdout (result table) -> /dev/null.
+            echo "[firmware-cvedb-progress] 0%"
+            env HOME="$CVE_HOME" cve-bin-tool "$update_flag" "${disable_args[@]}" \
+                --sbom-output "$BIN_SBOM" --sbom-type cyclonedx --sbom-format json \
+                --format json --output-file "$CVE_JSON" \
+                "$ROOTFS" 2>&1 1>/dev/null | _cvedb_progress_filter || true
+            echo "[firmware-cvedb-progress] 100%"
+        else
+            env HOME="$CVE_HOME" cve-bin-tool --quiet "$update_flag" "${disable_args[@]}" \
+                --sbom-output "$BIN_SBOM" --sbom-type cyclonedx --sbom-format json \
+                --format json --output-file "$CVE_JSON" \
+                "$ROOTFS" >/dev/null 2>&1 || true
+        fi
     else
         # Component identification only (no DB/network): still catalog binaries.
-        cve-bin-tool --quiet --update=never \
+        env HOME="$CVE_HOME" cve-bin-tool --quiet --update=never "${disable_args[@]}" \
             --sbom-output "$BIN_SBOM" --sbom-type cyclonedx --sbom-format json \
             "$ROOTFS" >/dev/null 2>&1 || true
     fi

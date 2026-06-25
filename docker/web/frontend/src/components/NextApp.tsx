@@ -17,6 +17,7 @@ import {
   type DoneEvent,
   type RecentScan,
   type ScanParams,
+  type ScanProgress,
 } from "@/lib/api";
 import {
   type RecentScanLink,
@@ -71,6 +72,7 @@ export function NextApp() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
   const [projectInfo, setProjectInfo] = useState<{
     name: string;
@@ -209,6 +211,7 @@ export function NextApp() {
     runningIdRef.current = null;
     setStatus("running");
     setLogs([]);
+    setProgress(null);
     setResult(null);
     setActiveSection("overview");
     setProjectInfo({
@@ -217,6 +220,7 @@ export function NextApp() {
     });
     streamRef.current = startScan(params, {
       onLog: (line) => setLogs((prev) => [...prev, line]),
+      onProgress: (p) => setProgress(p),
       onDone: (done) => {
         streamRef.current = null;
         setResult(done);
@@ -271,6 +275,7 @@ export function NextApp() {
           <ScanRunning
             logs={logs}
             status={status === "error" ? "error" : "running"}
+            progress={status === "running" ? progress : null}
             projectLabel={
               projectInfo &&
               (projectInfo.version

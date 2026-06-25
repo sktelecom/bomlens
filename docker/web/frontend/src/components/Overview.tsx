@@ -30,6 +30,7 @@ const TONE_ICON: Record<AttentionItem["tone"], string> = {
   info: "text-risk-info",
 };
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
+  conformance: FileCheck2,
   vulns: ShieldAlert,
   review: Eye,
 };
@@ -51,9 +52,7 @@ export function Overview({
   const attention = needsAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
   const ai = isAiScan(result);
-  const hasG7 = Boolean(
-    result.conformance?.checks?.some((c) => c.id?.startsWith("g7-")),
-  );
+  const hasConformance = Boolean(result.conformance?.checks?.length);
 
   return (
     <div className="space-y-6">
@@ -95,9 +94,11 @@ export function Overview({
               {attention.map((item) => {
                 const Icon = ATTN_ICON[item.id];
                 const label =
-                  item.id === "vulns"
-                    ? t("overview.attnVulns", { count: item.count })
-                    : t("overview.attnReview", { count: item.count });
+                  item.id === "conformance"
+                    ? t("overview.attnConformance", { count: item.count })
+                    : item.id === "vulns"
+                      ? t("overview.attnVulns", { count: item.count })
+                      : t("overview.attnReview", { count: item.count });
                 return (
                   <li key={item.id}>
                     <a
@@ -128,7 +129,7 @@ export function Overview({
         result={result}
         hasDeps={hasDeps}
         ai={ai}
-        hasG7={hasG7}
+        hasConformance={hasConformance}
         scanId={scanId}
       />
     </div>
@@ -147,13 +148,13 @@ function JumpCards({
   result,
   hasDeps,
   ai,
-  hasG7,
+  hasConformance,
   scanId,
 }: {
   result: DoneEvent;
   hasDeps: boolean;
   ai: boolean;
-  hasG7: boolean;
+  hasConformance: boolean;
   scanId: string | null;
 }) {
   const { t } = useTranslation();
@@ -181,7 +182,9 @@ function JumpCards({
         ]
       : []),
     ...(ai ? [{ id: "models" as SectionId, icon: Cpu, value: modelCount }] : []),
-    ...(hasG7 ? [{ id: "g7" as SectionId, icon: FileCheck2, value: null }] : []),
+    ...(hasConformance
+      ? [{ id: "conformance" as SectionId, icon: FileCheck2, value: null }]
+      : []),
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 

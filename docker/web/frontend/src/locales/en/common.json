@@ -48,6 +48,7 @@
   "options": {
     "notice": "Notice",
     "noticeHint": "Generate the open-source license NOTICE",
+    "aiNoticeHint": "For an AI model the notice lists the model and dataset licenses and flags use-restricted ones (RAIL, non-commercial) for review — worth keeping on.",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "License scan (ScanCode)",
@@ -55,11 +56,14 @@
     "identifyVendored": "File-level identification (SCANOSS)",
     "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service.",
     "scanossTokenPlaceholder": "SCANOSS token (optional)",
-    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged."
+    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged.",
+    "includeOsv": "Include OSV advisories",
+    "includeOsvHint": "Adds OSV.dev advisories to the firmware vulnerability match. The OSV database is not bundled in the image, so it downloads from osv.dev on this run (progress is shown below)."
   },
   "progress": {
     "title": "Run log",
-    "waiting": "Live logs will appear here once a scan starts."
+    "waiting": "Live logs will appear here once a scan starts.",
+    "cvedbDownloading": "Downloading CVE database"
   },
   "result": {
     "title": "Results",
@@ -244,7 +248,7 @@
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
     "licenses": "Licenses",
-    "g7": "G7 conformance",
+    "conformance": "Conformance",
     "models": "Models & datasets",
     "artifacts": "Artifacts"
   },
@@ -273,6 +277,7 @@
   "overview": {
     "needsAttention": "Needs attention",
     "allClear": "Nothing needs attention",
+    "attnConformance": "{{count}} mandatory conformance check(s) failed",
     "attnVulns": "{{count}} critical or high vulnerabilities",
     "attnReview": "{{count}} components flagged for review",
     "explore": "Explore",

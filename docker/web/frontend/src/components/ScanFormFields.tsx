@@ -141,7 +141,8 @@ function ToggleRow({
 
 /** Outputs: what the scan generates (notice / security report). */
 export function GenerationOptions({ state }: { state: ScanFormState }) {
-  const { options, busy } = state;
+  const { options, busy, isAiModel } = state;
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
       {options.map((o) => (
@@ -153,6 +154,9 @@ export function GenerationOptions({ state }: { state: ScanFormState }) {
           disabled={busy || o.forced}
         />
       ))}
+      {isAiModel && (
+        <p className="text-xs text-muted-foreground">{t("options.aiNoticeHint")}</p>
+      )}
     </div>
   );
 }
@@ -165,10 +169,13 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepLicense,
     identifyVendored,
     setIdentifyVendored,
+    includeOsv,
+    setIncludeOsv,
     scanossToken,
     setScanossToken,
     showVendored,
     showDeepLicense,
+    showIncludeOsv,
     busy,
   } = state;
   return (
@@ -204,6 +211,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="deepLicense"
           checked={deepLicense}
           onChange={setDeepLicense}
+          disabled={busy}
+        />
+      )}
+      {showIncludeOsv && (
+        <ToggleRow
+          labelKey="includeOsv"
+          checked={includeOsv}
+          onChange={setIncludeOsv}
           disabled={busy}
         />
       )}

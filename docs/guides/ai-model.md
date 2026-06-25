@@ -56,9 +56,9 @@ In the web UI, an AI/ML SBOM adds two sections to the left rail.
 
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
-**G7 conformance** — the G7 minimum-element checks for AI (all advisory) with an "N of 6 present" headline, separate from the base format-conformance checks. Each element shows what it is and how to satisfy it.
+**Conformance** — for an AI-model SBOM this section adds the G7 minimum-element checks (all advisory) with an "N of 6 present" headline, alongside the base format-conformance checks. Each element shows what it is and how to satisfy it.
 
-![G7 conformance — present/advisory split](../images/web-ui-g7.png)
+![Conformance — the G7 advisory sub-block for an AI SBOM](../images/web-ui-g7.png)
 
 The same data is in the artifacts: the ML-BOM (`_bom.json`, CycloneDX 1.7) and the conformance report (`_conformance.*`).
 

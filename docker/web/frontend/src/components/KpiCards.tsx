@@ -36,12 +36,11 @@ export function KpiCards({ sbom, security, conformance, scanId }: Props) {
 
   if (conformance) {
     const pass = conformance.result === "pass";
-    const hasG7 = Boolean(conformance.checks?.some((c) => c.id?.startsWith("g7-")));
     items.push({
       label: t("result.conformance"),
       value: pass ? t("result.verdictPass") : t("result.verdictFail"),
       valueClass: pass ? "text-emerald-500" : "text-destructive",
-      target: hasG7 ? "g7" : undefined,
+      target: "conformance",
     });
   }
 

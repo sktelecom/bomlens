@@ -48,6 +48,7 @@
   "options": {
     "notice": "고지문",
     "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
+    "aiNoticeHint": "AI 모델은 고지문이 모델과 데이터셋 라이선스를 정리하고, 사용 제한이 있는 라이선스(RAIL·비상업)를 검토 대상으로 표시합니다. 켜 두기를 권장합니다.",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "라이선스 스캔 (ScanCode)",
@@ -55,11 +56,14 @@
     "identifyVendored": "파일 단위 식별 (SCANOSS)",
     "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
     "scanossTokenPlaceholder": "SCANOSS 토큰 (선택)",
-    "scanossTokenHint": "무료 OSSKB는 익명 호출 한도가 있어 빈 결과가 나올 수 있습니다. scanoss.com에서 발급한 토큰을 넣으면 안정적으로 식별합니다. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다."
+    "scanossTokenHint": "무료 OSSKB는 익명 호출 한도가 있어 빈 결과가 나올 수 있습니다. scanoss.com에서 발급한 토큰을 넣으면 안정적으로 식별합니다. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다.",
+    "includeOsv": "OSV 권고 포함",
+    "includeOsvHint": "펌웨어 취약점 매칭에 OSV.dev 권고를 추가합니다. OSV 데이터베이스는 이미지에 포함돼 있지 않아, 이 실행에서 osv.dev로부터 내려받습니다(진행률은 아래에 표시됩니다)."
   },
   "progress": {
     "title": "실행 로그",
-    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다."
+    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다.",
+    "cvedbDownloading": "CVE 데이터베이스 다운로드 중"
   },
   "result": {
     "title": "결과",
@@ -244,7 +248,7 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "licenses": "라이선스",
-    "g7": "G7 적합성",
+    "conformance": "적합성",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물"
   },
@@ -273,6 +277,7 @@
   "overview": {
     "needsAttention": "주의 필요",
     "allClear": "주의할 항목이 없습니다",
+    "attnConformance": "필수 적합성 검사 {{count}}건 실패",
     "attnVulns": "심각·높음 취약점 {{count}}건",
     "attnReview": "검토가 필요한 컴포넌트 {{count}}개",
     "explore": "둘러보기",

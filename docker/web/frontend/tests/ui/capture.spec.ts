@@ -94,3 +94,62 @@ test("@capture vendored badge in components table", async ({ page }) => {
   await killAnim(page);
   await table.screenshot({ path: `${IMAGES}/web-ui-vendored-badge-en.png` });
 });
+
+// An analyzed AI SBOM: the conformance report carries the base format checks and
+// the G7 AI minimum-element checks, so the Conformance section shows the verdict
+// with the G7 advisory sub-block. Full 1040x664 window, matching the other guide
+// screenshots.
+const CONFORMANCE_DONE = {
+  ok: true,
+  mode: "ANALYZE",
+  id: "model_1.0",
+  results: [{ name: "model_1.0_bom.json", size: 200 }],
+  security: null,
+  conformance: {
+    result: "pass",
+    format: "CycloneDX",
+    checks: [
+      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
+      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "0%" },
+      { id: "g7-model-id", label: "G7 model identifier (PURL/CPE)", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-license", label: "G7 model license", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-card", label: "G7 model card (architecture/training parameters)", required: false, status: "pass", detail: "1/1 model component(s)" },
+      { id: "g7-model-hash", label: "G7 model integrity (hashes)", required: false, status: "warn", detail: "0/1 model component(s)" },
+      { id: "g7-datasets", label: "G7 dataset provenance (datasets referenced)", required: false, status: "pass", detail: "2 dataset reference(s)" },
+      { id: "g7-openness", label: "G7 model openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM" },
+    ],
+  },
+  sbom: {
+    components: 1,
+    componentList: [
+      { name: "bert-base-uncased", version: "86b5e093", group: "google-bert", purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", type: "machine-learning-model", licenses: ["Apache-2.0"] },
+    ],
+  },
+};
+
+test("@capture conformance section", async ({ page }) => {
+  await page.setViewportSize({ width: 1040, height: 664 });
+  await stub(page, { firmware: false, scanoss: false, docker: true }, CONFORMANCE_DONE);
+  await page.goto("/");
+  await fillAndRun(page);
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
+  await page.getByText(/present/).first().waitFor({ state: "visible" });
+  await killAnim(page);
+  // Reset the content scroll container to the top so the "Conformance" title
+  // sits below the top bar, not a mid-panel slice.
+  await page.evaluate(() => {
+    const h = Array.from(document.querySelectorAll("h1")).find(
+      (e) => e.textContent?.trim() === "Conformance",
+    );
+    let el = h?.parentElement ?? null;
+    while (el) {
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === "auto" || oy === "scroll") {
+        el.scrollTop = 0;
+        break;
+      }
+      el = el.parentElement;
+    }
+  });
+  await page.screenshot({ path: `${IMAGES}/web-ui-g7.png` });
+});

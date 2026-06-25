@@ -27,8 +27,19 @@ describe("deriveScanContext", () => {
       isAiScan: false,
       hasDependencies: false,
       hasSourceTree: false,
-      hasG7: false,
+      hasConformance: false,
     });
+  });
+
+  it("flags conformance when the report carries checks", () => {
+    expect(deriveScanContext(makeResult()).hasConformance).toBe(false);
+    const withConf = makeResult({
+      conformance: {
+        result: "fail",
+        checks: [{ id: "purl", label: "PURL", required: true, status: "fail", detail: "" }],
+      },
+    });
+    expect(deriveScanContext(withConf).hasConformance).toBe(true);
   });
 
   it("flags dependencies when a CycloneDX SBOM artifact exists", () => {

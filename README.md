@@ -11,7 +11,7 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
 
 <p align="center">
-  <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI reviewing a scan result: KPI cards and severity/license summary, filtering the components table, expanding a vulnerability row to its CVSS score, description and references, viewing dependencies as a graph and tree, and browsing the source tree" width="860" />
+  <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI showing a scan result: the Overview with counts and a severity/license summary, the Components table with filters, the Vulnerabilities list, the Dependencies as a graph and tree, and the Licenses section" width="860" />
 </p>
 
 **Where to start:**
