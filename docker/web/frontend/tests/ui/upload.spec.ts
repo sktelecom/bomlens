@@ -18,6 +18,7 @@ async function stub(page: Page, opts: { uploadOk: boolean }) {
   );
   const done = {
     ok: true, mode: "SOURCE",
+    id: "demo_1.0",
     results: [{ name: "demo_1.0_bom.json", size: 100 }],
     security: null, conformance: null,
     sbom: { components: 1, suggestIdentifyVendored: false, componentList: [
@@ -52,7 +53,7 @@ test("ZIP upload flow uploads then renders the scan result", async ({ page }) =>
 
   // The upload endpoint was called, and the run produced results (no "Failed to fetch").
   await expect.poll(() => uploaded).toBe(true);
-  await page.getByRole("button", { name: /^Components/ }).click();
+  await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Failed to fetch/i)).toHaveCount(0);
 });

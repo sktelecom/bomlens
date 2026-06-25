@@ -58,9 +58,15 @@ test("@capture advanced toggle", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true });
   await page.goto("/");
   await killAnim(page);
-  await page.getByText("Advanced", { exact: true }).click();
-  await page.getByText("Identify bundled open source").waitFor({ state: "visible" });
-  await page.locator("details").screenshot({ path: `${IMAGES}/web-ui-identify-vendored-en.png` });
+  // The vendored-ID toggle now sits inline under "Advanced scan options" for a
+  // source scan — capture the scan-options column that holds it.
+  const toggle = page.getByText("File-level identification (SCANOSS)");
+  await toggle.waitFor({ state: "visible" });
+  // Screenshot the settings card (the last card on the New scan screen) that
+  // holds the scan-options column with the vendored toggle.
+  await page.locator(".rounded-2xl, [class*='rounded-']").last().screenshot({
+    path: `${IMAGES}/web-ui-identify-vendored-en.png`,
+  });
 });
 
 test("@capture result banner", async ({ page }) => {
@@ -82,7 +88,7 @@ test("@capture vendored badge in components table", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true }, DONE);
   await page.goto("/");
   await fillAndRun(page);
-  await page.getByRole("button", { name: /^Components/ }).click();
+  await page.getByRole("link", { name: /^Components/ }).first().click();
   const table = page.locator("table").first();
   await table.waitFor({ state: "visible" });
   await killAnim(page);
