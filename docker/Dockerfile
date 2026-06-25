@@ -186,9 +186,15 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 #   RELEASE GATE: the build now FAILS if the DB ends up empty (cve_severity=0), so a
 #   broken/keyless build can never ship a silent 0-CVE image again.
 #   Size: the populated cve.db is ~0.5–1.5 GB; bundle it only in the firmware image.
-ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD"
+# GAD crashes cve-bin-tool 3.4; OSV is excluded because some constituent feeds
+# (e.g. Ubuntu, CC-BY-SA 4.0) carry share-alike terms we do not want to take on in
+# a redistributed image. See CVE-DATA-NOTICE.txt. Override to widen coverage.
+ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
 ARG SBOM_FIRMWARE_NVD_METHOD=""
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
+# Attribution + required notices for the bundled CVE data (NVD non-endorsement,
+# Red Hat CC-BY, MIT for curl/purl2cpe, EPSS). Shipped alongside the DB.
+COPY CVE-DATA-NOTICE.txt /opt/cve-bin-tool-home/CVE-DATA-NOTICE.txt
 RUN --mount=type=secret,id=nvd_api_key \
     if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] pre-fetching cve-bin-tool CVE DB into $CVE_BIN_TOOL_HOME ..."; \

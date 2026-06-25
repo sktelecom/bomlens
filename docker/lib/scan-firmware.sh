@@ -144,9 +144,10 @@ CVE_BIN_TOOL_MODE="${CVE_BIN_TOOL_MODE:-auto}"
 CVE_BIN_TOOL_HOME="${CVE_BIN_TOOL_HOME:-/opt/cve-bin-tool-home}"
 BUNDLED_DB="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"
 # Data sources to disable. GAD (GitLab Advisory) crashes cve-bin-tool 3.4 with a
-# UnicodeDecodeError on fetch; the full set is finalised by native-amd64
-# verification (plan Phase 0). Override with CVE_BIN_TOOL_DISABLE_SOURCES.
-CVE_BIN_TOOL_DISABLE_SOURCES="${CVE_BIN_TOOL_DISABLE_SOURCES:-GAD}"
+# UnicodeDecodeError on fetch; OSV is excluded because some constituent feeds
+# carry share-alike terms (see CVE-DATA-NOTICE.txt). Override with
+# CVE_BIN_TOOL_DISABLE_SOURCES.
+CVE_BIN_TOOL_DISABLE_SOURCES="${CVE_BIN_TOOL_DISABLE_SOURCES:-GAD,OSV}"
 disable_args=()
 if [ -n "$CVE_BIN_TOOL_DISABLE_SOURCES" ]; then disable_args=(-d "$CVE_BIN_TOOL_DISABLE_SOURCES"); fi
 
@@ -170,6 +171,8 @@ _cvedb_progress_filter() {
 
 if command -v cve-bin-tool >/dev/null 2>&1; then
     echo "[firmware] cve-bin-tool: scanning binaries for known components + CVEs..."
+    # Required NVD attribution (the bundled-DB path does not print cve-bin-tool's banner).
+    echo "[firmware] This product uses the NVD API but is not endorsed or certified by the NVD."
 
     # Is a usable DB already bundled at the HOME-controlled cache path?
     db_present=0
