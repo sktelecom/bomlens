@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/ui/state";
 import type { DoneEvent } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
-import { sbomFileName, scancodeFileName } from "@/lib/results";
+import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/results";
 
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
@@ -65,8 +65,12 @@ export function ResultSection({
     }
 
     case "sourceTree": {
-      const scancodeFile = scancodeFileName(result);
-      return scancodeFile ? <SourceTreePanel scancodeFile={scancodeFile} /> : null;
+      const sourceFile = sourceTreeFileName(result);
+      if (!sourceFile) return null;
+      // ScanCode output carries per-file licenses; the structure-only
+      // `_files.json` fallback does not, so hint that licenses need ScanCode.
+      const hasLicenses = Boolean(scancodeFileName(result));
+      return <SourceTreePanel sourceFile={sourceFile} hasLicenses={hasLicenses} />;
     }
 
     case "artifacts":

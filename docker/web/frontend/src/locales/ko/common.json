@@ -193,8 +193,9 @@
   },
   "sourceTree": {
     "loading": "소스 트리를 불러오는 중…",
-    "loadError": "ScanCode 결과를 불러오지 못했습니다.",
-    "empty": "스캔된 소스 파일이 없습니다."
+    "loadError": "소스 파일 트리를 불러오지 못했습니다.",
+    "empty": "스캔된 소스 파일이 없습니다.",
+    "noLicenseHint": "라이선스 정보는 ScanCode(딥 라이선스) 스캔을 실행하면 표시됩니다."
   },
   "severity": {
     "CRITICAL": "심각",
