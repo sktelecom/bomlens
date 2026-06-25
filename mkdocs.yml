@@ -113,6 +113,7 @@ plugins:
             Ecosystems: 지원 생태계
             About: 프로젝트 정보
             Architecture: 아키텍처
+            Pipeline by input: 입력 형태별 파이프라인
             Local-first: 로컬 우선 설계
             Package managers: 패키지 매니저
             Testing: 테스트
@@ -162,6 +163,7 @@ nav:
       - Ecosystems: reference/ecosystems.md
   - About:
       - Architecture: concepts/architecture.md
+      - Pipeline by input: concepts/pipeline-by-input.md
       - Local-first: concepts/local-first.md
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md

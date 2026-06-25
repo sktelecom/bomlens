@@ -27,9 +27,11 @@ The interface has a left rail, a top bar, and a content area:
 - **Top bar** — the product mark, the current project, and the language (한국어 / EN) and light/dark toggles.
 - **Content** — the New scan form, the running view, or the active result section.
 
+Every navigation element — the logo, New scan, the sidebar sections, the jump cards and recent scans — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
+
 ## New scan
 
-The New scan screen is two panes. On the left, pick a source — grouped into **Code** (current folder, a directory path, a GitHub URL, a ZIP upload), **Artifact** (a Docker image, a firmware image) and **SBOM** (analyze an existing SBOM) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
+The New scan screen is two panes. On the left, pick a source — grouped into **Code** (current folder, a directory path, a GitHub URL, a ZIP upload), **Artifact** (a Docker image, a firmware image), **SBOM** (analyze an existing SBOM) and **AI model** (generate an ML-BOM from a HuggingFace model) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
 
 | Scan target | Input method | Backend mode |
 |-------------|--------------|--------------|
@@ -40,8 +42,9 @@ The New scan screen is two panes. On the left, pick a source — grouped into **
 | SBOM upload | upload an existing SBOM (JSON) | ANALYZE |
 | Firmware upload | upload a `.bin`, etc. | FIRMWARE |
 | Docker image | enter the image name | IMAGE |
+| AI model | enter a HuggingFace model id (`org/model`) | AIBOM |
 
-Generation options cover the open-source notice, the security (vulnerability) report and ScanCode deep license detection. Identifying bundled open source for C/C++ sources is under Advanced. Choosing SBOM upload (ANALYZE) enables the notice and security reports automatically for the risk analysis.
+Generation options are the open-source notice and the security (vulnerability) report. Advanced scan options — ScanCode deep license detection and SCANOSS bundled-OSS identification for C/C++ — apply to source-code scans only (current folder, GitHub URL, ZIP upload); Docker images, firmware, SBOM uploads and AI models have none. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
 
 ## Scan running
 
@@ -51,15 +54,15 @@ During a run the screen shows the pipeline stages — generate, normalize, notic
 
 When the scan finishes, the left rail fills with the sections for that scan.
 
-**Overview** leads with what needs attention — critical or high vulnerabilities and components flagged for license review — then the at-a-glance counts, the severity distribution and the license summary, with cards that jump to each detail section.
+**Overview** leads with what needs attention — critical or high vulnerabilities and components flagged for license review — then the at-a-glance counts, the severity distribution and the license summary, with cards that jump to each detail section. If a scan is still running, its live log appears here on the Overview, not under every section.
 
 ![Overview — needs-attention, counts, severity and jump cards](../images/app-results.png)
 
-**Components** lists everything detected, with search and filters (has vulnerabilities, direct only, needs review) and columns for Scope (direct vs transitive) and Risk (the worst vulnerability severity and count). Large SBOMs render in pages.
+**Components** lists everything detected, with search and filters (has vulnerabilities, direct only, needs review) and columns for Scope (direct vs transitive) and Risk (the worst vulnerability severity and count). Large SBOMs render in pages. Click a row to expand its detail in place — the PURL, source/download location, copyright, licenses and any vulnerabilities.
 
 ![Components — Scope and Risk columns with filters](../images/web-ui-components.png)
 
-**Vulnerabilities** sorts by severity then CVSS, with a CVSS column and the fixed version, and each row expands in place to show the CVSS vector, description and references.
+**Vulnerabilities** sorts by severity then CVSS, with a CVSS column and the fixed version, and each row expands in place to show the CVSS vector, description and references. Click a band in the severity bar to filter to that severity, or search by CVE or package; the table columns are drag-resizable.
 
 ![Vulnerabilities — CVSS column and expandable rows](../images/web-ui-vulns.png)
 
@@ -67,11 +70,11 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 ![Dependencies — direct and vulnerable packages marked](../images/web-ui-dependencies.png)
 
-**Licenses** leads with components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — then the full license distribution.
+**Licenses** leads with components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — then the full license distribution. Click a license to list the components that use it; copyleft and reciprocal licenses (GPL, LGPL, MPL, EPL, …) are toned for review.
 
 ![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
 
-**Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when you scan with deep license detection (`--deep-license`), showing the source files with the license detected per file.
+**Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when ScanCode results are available — that is, from a source scan run with deep license detection — showing the source files with the license detected per file.
 
 ### AI surfaces
 
@@ -87,7 +90,7 @@ For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), th
 
 ## Recent scans
 
-Past scans in the output folder appear in the rail's Recent list (newest first, with the worst severity). Click one to re-open its results. This is local files only — no account, no database.
+Past scans in the output folder appear in the rail's Recent list (the newest 20, with the worst severity). Click one to re-open its results, or delete one to remove its artifacts. This is local files only — no account, no database.
 
 ## Notes
 

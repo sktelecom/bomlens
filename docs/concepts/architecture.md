@@ -2,6 +2,8 @@
 
 This document describes the overall system structure of BomLens and explains which tool runs at which step of the scan pipeline, and in what order.
 
+For the per-input tool flow — source code (with the ScanCode and SCANOSS options), firmware, a received SBOM, and an AI model — see [Pipeline by input type](pipeline-by-input.md).
+
 > This document reflects the 2-stage architecture as currently implemented. The Stage 1 routing in the source code (detect the language, then run the official cdxgen language image) is implemented and working in `scripts/scan-sbom.sh`.
 
 ## At a glance
@@ -384,4 +386,4 @@ flowchart TB
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Usage guide](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)
+> **Related**: [Pipeline by input type](pipeline-by-input.md) | [Getting started](../start/first-scan.md) | [Usage guide](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)
