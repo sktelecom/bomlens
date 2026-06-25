@@ -47,6 +47,7 @@
   "options": {
     "notice": "Notice",
     "noticeHint": "Generate the open-source license NOTICE",
+    "aiNoticeHint": "For an AI model the notice lists the model and dataset licenses and flags use-restricted ones (RAIL, non-commercial) for review — worth keeping on.",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "License scan (ScanCode)",

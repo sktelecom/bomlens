@@ -122,7 +122,8 @@ function ToggleRow({
 
 /** Outputs: what the scan generates (notice / security report). */
 export function GenerationOptions({ state }: { state: ScanFormState }) {
-  const { options, busy } = state;
+  const { options, busy, isAiModel } = state;
+  const { t } = useTranslation();
   return (
     <div className="space-y-3">
       {options.map((o) => (
@@ -134,6 +135,9 @@ export function GenerationOptions({ state }: { state: ScanFormState }) {
           disabled={busy || o.forced}
         />
       ))}
+      {isAiModel && (
+        <p className="text-xs text-muted-foreground">{t("options.aiNoticeHint")}</p>
+      )}
     </div>
   );
 }
