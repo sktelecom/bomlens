@@ -11,7 +11,7 @@ For the per-input tool flow — source code (with the ScanCode and SCANOSS optio
 BomLens is a 2-stage pipeline in which two kinds of Docker images work together.
 
 - **Stage 1 — Generation**: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6); for container images, binaries, and directories, syft does.
-- **Stage 2 — Post-processing**: the lightweight `sbom-scanner` image takes the SBOM and runs normalization, (deep license detection), notice generation, the security report, signing, and upload in order.
+- **Stage 2 — Post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, (deep license detection), notice generation, the security report, signing, and upload in order.
 
 ```mermaid
 flowchart TB
@@ -23,7 +23,7 @@ flowchart TB
         SYFT --> BOM
     end
 
-    subgraph S2["② Stage 2 — Post-processing (sbom-scanner image)"]
+    subgraph S2["② Stage 2 — Post-processing (bomlens image)"]
         direction LR
         NORM["normalize (jq)"] --> SCAN["scancode<br/>(opt-in)"]
         SCAN --> NOTICE["notice (jq)"]
@@ -48,7 +48,7 @@ The single entry point for orchestration is `scripts/scan-sbom.sh` (`scan-sbom.b
 
 Previously, every language runtime plus every analysis tool lived in a single huge image. The redesigned pipeline splits the responsibilities in two (see the maintainer-facing [direction study report](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) (Korean) §1 and §5 for the rationale).
 
-| | Stage 1 image | Stage 2 image (`sbom-scanner`) |
+| | Stage 1 image | Stage 2 image (`bomlens`) |
 |---|---|---|
 | **Role** | **Generates** the SBOM from source | SBOM **post-processing** (normalization, notice, security, signing, upload) plus syft scans |
 | **Contents** | Official **per-language** cdxgen images (java, python, node, ...) | **No** language toolchain — lightweight `debian:12-slim` |
@@ -76,7 +76,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 | **Cosign** | `v2.4.1` | Stage 2 | Detached SBOM signature | `--sign` |
 | **curl** | — | Stage 2 | Upload to Dependency-Track | Default (unless `--generate-only`) |
 
-> Versions are pinned as `ARG`s in `docker/Dockerfile`. To keep the image lean, some tools are **opt-in** build args: ScanCode (`--build-arg SBOM_DEEP_LICENSE=true`) and the SCANOSS client (`--build-arg SBOM_SCANOSS=true`, included in the published image). Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in `bomlens-firmware` image.
+> Versions are pinned as `ARG`s in `docker/Dockerfile`. To keep the image lean, some tools are **opt-in** build args: ScanCode (`--build-arg SBOM_DEEP_LICENSE=true`) and the SCANOSS client (`--build-arg SBOM_SCANOSS=true`, included in the published image). Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in `bomlens-firmware` image, and AI-model SBOM generation (OWASP AIBOM Generator) in `bomlens-aibom`. For the per-input tool flow, see [Pipeline by input type](pipeline-by-input.md).
 
 ---
 
@@ -138,7 +138,7 @@ sequenceDiagram
     participant S as scan-sbom.sh
     participant D as Docker
     participant L as Stage 1 language image
-    participant P as sbom-scanner (run-scan)
+    participant P as bomlens (run-scan)
 
     U->>S: scan-sbom.sh --project App --version 1.0 --all
     S->>S: Parse arguments, detect target type
@@ -150,7 +150,7 @@ sequenceDiagram
     end
     rect rgb(241,248,233)
     note over S,P: Stage 2 — Post-processing
-    S->>D: sbom-scanner docker run (MODE=POSTPROCESS)
+    S->>D: bomlens docker run (MODE=POSTPROCESS)
     D->>P: run-scan (entrypoint)
     P->>P: normalize → scancode → notice → Trivy → cosign
     P->>P: Copy artifacts to host
@@ -199,7 +199,7 @@ Two steps run inside the image:
 
 ### Image / binary / directory — syft
 
-**syft**, included in the `sbom-scanner` image, generates the SBOM directly. (`docker/entrypoint.sh`)
+**syft**, included in the `bomlens` image, generates the SBOM directly. (`docker/entrypoint.sh`)
 
 | MODE | Input | syft invocation |
 |------|------|-----------|
@@ -211,7 +211,7 @@ Two steps run inside the image:
 
 ## Stage 2 — post-processing pipeline
 
-The `sbom-scanner` image's entry point `run-scan` (`docker/entrypoint.sh`) takes the SBOM and runs the steps in a **fixed order**. Each step is enabled by an environment variable (equivalent to a CLI flag), and outputs accumulate in the `ARTIFACTS` list.
+The `bomlens` image's entry point `run-scan` (`docker/entrypoint.sh`) takes the SBOM and runs the steps in a **fixed order**. Each step is enabled by an environment variable (equivalent to a CLI flag), and outputs accumulate in the `ARTIFACTS` list.
 
 ```mermaid
 flowchart TD
@@ -291,7 +291,8 @@ flowchart TD
 | `BINARY` | `--target <file>` | syft | `file:` scheme |
 | `ROOTFS` | `--target <directory>` | syft | `dir:` scheme |
 | `IMAGE` | `--target <image name>` | syft | docker.sock mount |
-| `UI` | `--ui` | — | Browser UI; runs all six scan target types through the form or file upload |
+| `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **Opt-in image** `bomlens-aibom`. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check |
+| `UI` | `--ui` | — | Browser UI; runs every scan target type through the form or file upload |
 
 ---
 
@@ -309,6 +310,7 @@ How CLI flags translate into environment variables and which steps they enable (
 | `--git <url>` / `--branch` | (cloned on the host) | SOURCE input collection |
 | `--analyze <sbom>` | `MODE=ANALYZE` | Supplier SBOM validation, conversion, and report |
 | `--firmware` | `MODE=FIRMWARE` (firmware image) | Unpack, then syft + cve-bin-tool |
+| `--model <owner/name>` | `MODE=AIBOM` (aibom image) | Generate an ML-BOM from a HuggingFace model, plus a G7 check |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
 | `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (CLI only) |
 | `--sign` | `SIGN_SBOM=true` (plus `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ signing |
@@ -327,8 +329,8 @@ For how to use each feature, see the [notice and security report guide](../guide
 
 | File | Generated when |
 |------|-----------|
-| `{Project}_{Version}_bom.json` | Always (CycloneDX 1.6) |
-| `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / default risk report generation |
+| `{Project}_{Version}_bom.json` | Always (CycloneDX 1.6; a 1.7 ML-BOM for AI models) |
+| `{Project}_{Version}_NOTICE.txt` / `.html` / `.pdf` | `--notice` / `--all` / default risk report generation (PDF only in an `SBOM_PDF` build) |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / default risk report generation |
 | `{Project}_{Version}_risk-report.md` / `.html` | Default (all modes) — skip with `--no-report` |
 | `{Project}_{Version}_conformance.json` / `.md` / `.html` | `--analyze` (supplier SBOM validation) |
