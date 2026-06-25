@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.5.1] - 2026-06-26
+
+### Added
+
+- Desktop app firmware and AI-model scans: the desktop app now runs firmware and AI-model (AIBOM) scans by launching the matching scanner image as a sibling container, pulling it on first use.
+- Source file tree without ScanCode: source scans emit a `_files.json` file inventory, and the web UI shows a source tree from it when no ScanCode result is present.
+- SBOM conformance is now a first-class result section, with per-element G7 evidence, examples and guidance links.
+- Determinate firmware CVE-database download progress: a real percentage bar during the cve-bin-tool database fetch, falling back to the previous approximation when a scan reports no progress.
+
+### Changed
+
+- Web UI design-language refresh: a redesigned visual language, a Recent-scans home, and neutralized report wording.
+- Release assets are unified under the BomLens name (for example `BomLens-Setup.*`), and the release notes link to the documentation site.
+- The AI-model scan form now explains the open-source Notice option.
+
+### Fixed
+
+- Firmware scans matched zero CVEs because the published firmware image shipped an empty cve-bin-tool database. The image now bundles a populated database with a runtime refresh, the build fails if the database ends up empty, and the database path matches the location cve-bin-tool actually uses.
+
 ## [v1.5.0] - 2026-06-25
 
 ### Added
