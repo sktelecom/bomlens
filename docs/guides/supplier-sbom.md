@@ -1,18 +1,18 @@
 ---
-description: Validate that a supplier-submitted SBOM (CycloneDX/SPDX) meets the requirements with BomLens, then analyze licenses and vulnerabilities into a risk report to send back.
+description: Validate that an SBOM (CycloneDX/SPDX) you received meets your quality requirements with BomLens, then analyze licenses and vulnerabilities into a risk report.
 ---
 
 # Supplier SBOM validation guide
 
-How to validate that an SBOM (JSON) submitted by a supplier meets the submission requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report to send back to the supplier. You only need the SBOM file — no source code required.
+How to validate that an SBOM (JSON) received from a supplier or another team meets your quality requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report. You only need the SBOM file — no source code required.
 
 For the design background and the internal validation logic, see the maintainer doc [Supplier SBOM validation and analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/supplier-sbom-analysis.md) (Korean).
 
 ## When to use it
 
-Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets the submission criteria and then check its licenses and vulnerabilities. The input can be CycloneDX or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis.
+Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets your quality criteria and then check its licenses and vulnerabilities. The input can be CycloneDX or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis.
 
-The criteria follow SK Telecom's [supply chain security guide](https://sktelecom.github.io/guide/supply-chain/for-suppliers/) and its [SBOM submission requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/).
+The criteria check whether an SBOM is good enough for dependency review. Requirements vary by organization; as one reference, see SK Telecom's [supply chain security guide](https://sktelecom.github.io/guide/supply-chain/for-suppliers/) and its [SBOM requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/).
 
 | Category | Criteria |
 |----------|----------|
@@ -51,7 +51,7 @@ Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), th
 
 | Output | File | Meaning |
 |--------|------|---------|
-| Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the submission criteria are met, and what is missing |
+| Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the quality criteria are met, and what is missing |
 | SBOM (converted) | `{Project}_{Version}_bom.json` | the input normalized to CycloneDX 1.6 |
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | components grouped by license |
 | Risk report | `{Project}_{Version}_risk-report.{md,html}` | conformance, vulnerabilities, and licenses combined, with response deadlines |
@@ -60,35 +60,35 @@ Unlike a self-generated SBOM, a received SBOM additionally produces a conformanc
 
 ## Reading the conformance report
 
-The conformance report is the per-item check of whether the received SBOM meets the submission criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
+The conformance report is the per-item check of whether the received SBOM meets the quality criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
 
 - If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — timestamp, tool info, top-level component, name/version coverage, PURL coverage (no `pkg:generic`), and transitive dependencies.
-- If a recommended item (license, hash coverage) falls short, it is a `warn`, not a rejection reason.
+- If a recommended item (license, hash coverage) falls short, it is a `warn`, not a `fail`.
 - The cards at the top of the HTML report show pass/fail and the list of missing items.
 
-When a `fail` appears, tell the supplier which fields are missing and ask for resubmission. The most common rejection reasons are a missing PURL, use of `pkg:generic`, and missing transitive dependencies (only direct dependencies submitted).
+When a `fail` appears, tell whoever sent the SBOM which fields are missing and ask them to fix it. The most common unmet items are a missing PURL, use of `pkg:generic`, and missing transitive dependencies (only direct dependencies included).
 
 ## Reading the risk report
 
-The risk report (`_risk-report`) is a document for the supplier, built by re-aggregating the outputs above without a new scan. It has four parts.
+The risk report (`_risk-report`) is a document built by re-aggregating the outputs above without a new scan. It has four parts.
 
-1. Requirements met — the conformance results table. If `fail`, the rejection reason is stated.
-2. Vulnerability tally and response deadlines — a severity tally plus the criteria that Critical must get a response plan or risk justification within 7 days and High within 30 days, laid out in a table.
+1. Requirements met — the conformance results table. If `fail`, the unmet items are stated.
+2. Vulnerability tally and response deadlines — a severity tally plus the recommended deadlines (a response plan or risk justification within 7 days for Critical and 30 days for High), laid out in a table.
 3. License summary — the notice and license coverage.
-4. Next steps — guidance on submitting a response plan.
+4. Next steps — guidance on a response plan.
 
 ## SPDX input
 
 If you supply SPDX (JSON, Tag-Value), it is converted to CycloneDX internally with `syft convert` and then analyzed through the same pipeline. Conformance validation is based on the original SPDX before conversion, because metadata such as timestamp, tools, or transitive dependencies can be normalized away during conversion. Some SPDX license expressions may be simplified when moved to CycloneDX.
 
-## Asking the supplier to remediate
+## Asking for remediation
 
-After validation and analysis, send the risk report (`_risk-report.html`) to the supplier and ask for the following.
+After validation and analysis, send the risk report (`_risk-report.html`) to whoever sent the SBOM and ask for the following.
 
-- Fix the conformance `fail` items and resubmit the SBOM.
-- Submit a response plan or risk justification for Critical vulnerabilities within 7 days and High within 30 days.
+- Fix the conformance `fail` items and send the SBOM again.
+- Prepare a response plan or risk justification for Critical vulnerabilities within 7 days and High within 30 days (recommended deadlines).
 
-Company-wide registration, response tracking, and history management are out of scope for this tool — they belong to SKT's internal system (TOSCA) and the portal. This tool covers validating, analyzing, and reporting on a single SBOM locally.
+Response tracking, exception approval, and history management are out of scope for this tool — they belong to a separate vulnerability and risk management system. This tool covers validating, analyzing, and reporting on a single SBOM locally.
 
 ## Limits
 

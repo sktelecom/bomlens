@@ -24,7 +24,7 @@ Only file **fingerprints** (hashes) are sent to the OSSKB service. Your source c
 
 This option is for source with no package manager. If your project uses npm, Maven, pip, Go, and so on, the normal scan already resolves your dependencies and you do not need it. If you turn it on anyway, BomLens reconciles the results: dependency and build directories (`node_modules`, `vendor`, `dist`, and the like) are skipped, and any match whose name a package-manager component already carries is dropped in favor of that authoritative identity. So enabling it on a managed project does not duplicate known dependencies or inflate the vulnerability count — at most it adds genuinely copied-in source the package manager could not see.
 
-Matches are recorded read-only, tagged with their source and confidence. BomLens does not provide an accept/reject audit workflow; if you need to confirm or triage matches, upload the SBOM to TRUSCA and do it there.
+Matches are recorded read-only, tagged with their source and confidence. BomLens does not provide an accept/reject audit workflow; if you need to confirm or triage matches, upload the SBOM to a vulnerability management system (Dependency-Track, TRUSCA, etc.) and do it there.
 
 ## Prerequisites
 

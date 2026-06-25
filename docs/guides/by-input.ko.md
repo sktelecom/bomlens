@@ -91,7 +91,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 **C/C++ 안내**
 
 - 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 납품 전체 흐름은 [서버 납품 가이드](server-delivery.md)를 참고하세요.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.md)를 참고하세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 위험분석보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 위험분석보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
@@ -132,8 +132,8 @@ $SBOM --project team5-fw --version 1.0.0 \
 ## 산출물 3종 해석
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
-- **SBOM**: CycloneDX 1.6. 포털이나 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
-- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
+- **SBOM**: CycloneDX 1.6. 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
+- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
 
 ## 웹 UI로 한 번에
 

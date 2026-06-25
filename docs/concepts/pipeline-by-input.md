@@ -79,7 +79,7 @@ flowchart TD
 
 ## Received SBOM
 
-An SBOM (CycloneDX or SPDX) handed to you by a supplier — no source code needed. BomLens first checks it against the submission criteria and writes a conformance report, then normalizes the input to CycloneDX so the rest of the pipeline can analyze it. SPDX is converted with `syft convert` (a `jq` fallback handles SPDX JSON if syft is unavailable). Notice, security, and the risk report are always produced in this mode.
+An SBOM (CycloneDX or SPDX) received from a supplier or another team — no source code needed. BomLens first checks it against the quality criteria and writes a conformance report, then normalizes the input to CycloneDX so the rest of the pipeline can analyze it. SPDX is converted with `syft convert` (a `jq` fallback handles SPDX JSON if syft is unavailable). Notice, security, and the risk report are always produced in this mode.
 
 ```mermaid
 flowchart TD
