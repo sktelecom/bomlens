@@ -74,7 +74,7 @@ jobs:
             ### Installation
 
             #### Desktop app (double-click, no CLI)
-            Download `SBOM-Generator-*.exe` (Windows) or `.dmg` (macOS) from the assets below. Unsigned for now; if Windows SmartScreen warns, choose "More info", then "Run anyway".
+            Download `BomLens-Setup.exe` (Windows) or `BomLens-Setup.dmg` (macOS) from the assets below. Unsigned for now; if Windows SmartScreen warns, choose "More info", then "Run anyway".
 
             #### Scripts
             ```bash
@@ -112,29 +112,29 @@ jobs:
           # Scripts
           cp scripts/scan-sbom.sh release-assets/
           chmod +x release-assets/scan-sbom.sh
-          tar -czf release-assets/scan-sbom-linux.tar.gz -C scripts scan-sbom.sh
+          tar -czf release-assets/bomlens-cli-linux.tar.gz -C scripts scan-sbom.sh
           
           # Windows runtime bundle: both launchers, the orchestration script,
           # and the one lib file scan-sbom.sh mounts into the container for
           # source scans (docker/lib/build-prep.sh). Paths are preserved so the
           # scan-sbom.bat -> scan-sbom.sh -> REPO_DIR/docker/lib resolution works
           # after unzip. sbom-ui.bat is self-contained (double-click web UI).
-          zip -r release-assets/scan-sbom-windows.zip \
+          zip -r release-assets/bomlens-cli-windows.zip \
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
             docker/lib/build-prep.sh
 
           # Examples
-          tar -czf release-assets/sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz examples/
+          tar -czf release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz examples/
 
           # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans)
-          tar -czf release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz scripts/ docker/ examples/ docs/ README.md LICENSE
+          tar -czf release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz scripts/ docker/ examples/ docs/ README.md LICENSE
 
           # Checksums so downloaders can verify integrity of these assets.
           ( cd release-assets && sha256sum \
-            scan-sbom-linux.tar.gz \
-            scan-sbom-windows.zip \
-            sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz \
-            sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz \
+            bomlens-cli-linux.tar.gz \
+            bomlens-cli-windows.zip \
+            bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz \
+            bomlens-${{ needs.create-release.outputs.version }}.tar.gz \
             > SHA256SUMS.txt )
 
       - name: Upload release assets
@@ -142,10 +142,10 @@ jobs:
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: |
-            release-assets/scan-sbom-linux.tar.gz
-            release-assets/scan-sbom-windows.zip
-            release-assets/sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz
-            release-assets/sbom-tools-${{ needs.create-release.outputs.version }}.tar.gz
+            release-assets/bomlens-cli-linux.tar.gz
+            release-assets/bomlens-cli-windows.zip
+            release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz
+            release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz
             release-assets/SHA256SUMS.txt
   
   summary:
@@ -159,9 +159,9 @@ jobs:
           echo "## 🎉 Release ${{ needs.create-release.outputs.version }} Complete!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Downloads" >> $GITHUB_STEP_SUMMARY
-          echo "- [Linux/macOS Script](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/scan-sbom-linux.tar.gz)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Windows Script](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/scan-sbom-windows.zip)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Examples](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/sbom-tools-examples-${{ needs.create-release.outputs.version }}.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Linux/macOS Script](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-cli-linux.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Windows Script](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-cli-windows.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Examples](https://github.com/${{ github.repository }}/releases/download/${{ needs.create-release.outputs.version }}/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Image" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY

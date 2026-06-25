@@ -16,7 +16,7 @@
 
 **Where to start:**
 
-- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [First scan](docs/start/first-scan.md) ([한국어](docs/start/first-scan.ko.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click — the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) walks through it.
+- **Using the tool** — generate an SBOM, an open-source notice, or a security report, or assess a binary or an SBOM you received. Start with [First scan](docs/start/first-scan.md) ([한국어](docs/start/first-scan.ko.md)). On Windows and prefer no command line? [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) and double-click — the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) walks through it.
 - **Contributing to the tool itself** — building the image, the pipeline internals, or adding a package manager? See [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md).
 
 A Docker engine is required either way; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows.
