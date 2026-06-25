@@ -56,9 +56,9 @@ SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest ./scripts/scan-sbom.sh
 
 ![모델·데이터셋 — 모델 카드와 공개 4축](../images/web-ui-models.png)
 
-**G7 적합성** — AI G7 최소 요소 검사(모두 권고)를 "6개 중 N개 충족" 형태로 보여주며, 기본 형식 적합성 검사와 분리됩니다. 각 항목은 무엇인지와 어떻게 충족하는지를 함께 안내합니다.
+**적합성** — AI 모델 SBOM에서는 이 섹션에 AI G7 최소 요소 검사(모두 권고)가 "6개 중 N개 충족" 형태로, 기본 형식 적합성 검사와 함께 더해집니다. 각 항목은 무엇인지와 어떻게 충족하는지를 함께 안내합니다.
 
-![G7 적합성 — 충족·권고 분리](../images/web-ui-g7.png)
+![적합성 — AI SBOM의 G7 권고 하위 블록](../images/web-ui-g7.png)
 
 같은 데이터는 산출물에도 있습니다. ML-BOM(`_bom.json`, CycloneDX 1.7)과 적합성 보고서(`_conformance.*`)입니다.
 
