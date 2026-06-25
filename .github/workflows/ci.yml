@@ -72,6 +72,9 @@ jobs:
           echo "Checking scripts/check-setup.sh..."
           shellcheck scripts/check-setup.sh || true
           echo ""
+          echo "Checking scripts/check-doc-coverage.sh..."
+          shellcheck scripts/check-doc-coverage.sh || true
+          echo ""
           echo "Checking docker/entrypoint.sh..."
           shellcheck docker/entrypoint.sh || true
           echo ""
@@ -415,10 +418,22 @@ jobs:
           name: visual-baselines
           path: docker/web/frontend/tests/ui/**/*-snapshots/**
 
+  doc-coverage:
+    name: Doc Coverage
+    runs-on: ubuntu-latest
+    # Reads the scan-mode list from docker/entrypoint.sh and checks every
+    # user-facing input form is documented across by-input, ui, cli, architecture,
+    # pipeline-by-input and README. A new mode missing from a page fails here.
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Check input-form documentation coverage
+        run: bash scripts/check-doc-coverage.sh
+
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test, contract, postprocess, web-e2e, lint, validate-docs, validate-examples, ui, visual]
+    needs: [test, contract, postprocess, web-e2e, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
     if: always()
 
     steps:
@@ -437,6 +452,7 @@ jobs:
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| UI (Playwright) | ${{ needs.ui.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| UI Visual Regression | ${{ needs.visual.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Doc Coverage | ${{ needs.doc-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Only fail if critical tests failed
@@ -460,6 +476,9 @@ jobs:
             exit 1
           elif [ "${{ needs.visual.result }}" == "failure" ]; then
             echo "❌ UI visual regression failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.doc-coverage.result }}" == "failure" ]; then
+            echo "❌ Documentation coverage check failed (a scan mode is missing from a page)" >> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "✅ Critical checks passed" >> $GITHUB_STEP_SUMMARY
