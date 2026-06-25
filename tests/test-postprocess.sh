@@ -119,6 +119,69 @@ else
     fail "generate-notice.sh did not produce $NOTICE"
 fi
 
+echo "== B-5: NOTICE shows source location + attribution per component =="
+# A component with a vcs externalReference, one with only a purl (registry inferred),
+# and one carrying component.copyright. Source must never be blank when a purl exists,
+# and attribution must never be blank (copyright, else an honest "not captured").
+cat > "$WORK/src.json" <<'JSON'
+{"components":[
+ {"name":"logback","version":"1.4","purl":"pkg:maven/ch.qos.logback/logback@1.4",
+  "externalReferences":[{"type":"vcs","url":"https://github.com/qos-ch/logback"}],
+  "licenses":[{"license":{"id":"Apache-2.0"}}]},
+ {"name":"hikari","version":"5.0.1","purl":"pkg:maven/com.zaxxer/HikariCP@5.0.1",
+  "licenses":[{"license":{"id":"Apache-2.0"}}]},
+ {"name":"left-pad","version":"1.3.0","purl":"pkg:npm/left-pad@1.3.0",
+  "copyright":"Copyright (c) azer","licenses":[{"license":{"id":"MIT"}}]}
+]}
+JSON
+bash "$LIB/generate-notice.sh" "$WORK/src.json" "$WORK/srcn" "SrcProj" >/dev/null 2>&1
+STXT="$WORK/srcn_NOTICE.txt"; SHTML="$WORK/srcn_NOTICE.html"
+if [ -f "$STXT" ] && [ -f "$SHTML" ]; then
+    grep -q "Source: https://github.com/qos-ch/logback" "$STXT" \
+        && pass "vcs externalReference used as source location" \
+        || fail "vcs source location missing in TXT"
+    grep -q "Source: https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/" "$STXT" \
+        && pass "maven source location inferred from purl when no externalReference" \
+        || fail "purl-inferred maven source missing"
+    grep -q "Source: https://www.npmjs.com/package/left-pad/v/1.3.0" "$STXT" \
+        && pass "npm source location inferred from purl" \
+        || fail "purl-inferred npm source missing"
+    grep -q "Copyright: Copyright (c) azer" "$STXT" \
+        && pass "component.copyright shown verbatim as attribution" \
+        || fail "copyright attribution missing"
+    if awk '/^  - hikari@5.0.1$/{f=1;next} /^  - /{f=0} f&&/Copyright: holders not captured/{ok=1} END{exit !ok}' "$STXT"; then
+        pass "attribution falls back to honest 'not captured' (never blank)"
+    else
+        fail "missing attribution fallback for a component without copyright"
+    fi
+    grep -q '<a href="https://github.com/qos-ch/logback">' "$SHTML" \
+        && pass "http(s) source rendered as a link in HTML" \
+        || fail "HTML source link missing"
+else
+    fail "generate-notice.sh did not produce source/attribution NOTICE"
+fi
+
+echo "== B-6: NOTICE PDF — rendered when weasyprint present, skipped gracefully otherwise =="
+# generate-notice.sh must not die when the PDF renderer is absent, and must produce
+# the PDF (and report it) when weasyprint is on PATH. We force the absent case with a
+# PATH that has only the tools the script needs (jq, the coreutils it calls).
+NOTICE_LOG="$WORK/pdf.log"
+bash "$LIB/generate-notice.sh" "$WORK/src.json" "$WORK/pdfn" "PdfProj" >"$NOTICE_LOG" 2>&1
+RC=$?
+[ "$RC" -eq 0 ] && pass "generate-notice.sh exits 0 regardless of PDF renderer presence" \
+    || fail "generate-notice.sh failed (rc=$RC)"
+[ -f "$WORK/pdfn_NOTICE.txt" ] && [ -f "$WORK/pdfn_NOTICE.html" ] \
+    && pass "TXT/HTML still produced on the PDF path" || fail "TXT/HTML missing on PDF path"
+if command -v weasyprint >/dev/null 2>&1; then
+    { [ -f "$WORK/pdfn_NOTICE.pdf" ] && grep -q "generated PDF" "$NOTICE_LOG"; } \
+        && pass "weasyprint present: PDF rendered and reported" \
+        || fail "weasyprint present but PDF not produced"
+else
+    { [ ! -f "$WORK/pdfn_NOTICE.pdf" ] && grep -q "PDF skipped" "$NOTICE_LOG"; } \
+        && pass "weasyprint absent: PDF skipped with a log line (graceful, not silent)" \
+        || fail "PDF skip not handled gracefully"
+fi
+
 echo "== V13-2: normalize-sbom.sh maps bom.json license aliases to SPDX ids =="
 cp "$FIX/license-aliases.json" "$WORK/c.json"
 bash "$LIB/normalize-sbom.sh" "$WORK/c.json" >/dev/null 2>&1

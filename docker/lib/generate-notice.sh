@@ -6,14 +6,26 @@
 #
 # Usage: generate-notice.sh <sbom.json> <out_prefix> <project_name>
 #   produces  <out_prefix>_NOTICE.txt  and  <out_prefix>_NOTICE.html
+#   and, when a PDF renderer is in the image, <out_prefix>_NOTICE.pdf
 #
 # License data source: components[].licenses[] of the SBOM (CycloneDX).
 #   - License ids/names/expressions are normalized to SPDX ids (common aliases),
 #     so "Apache License, version 2.0" and "Apache-2.0" group together.
-#   - component.copyright is shown per component when present (cdxgen leaves it
-#     empty; scancode --deep-license or other sources can fill it).
+#   - Per component we also show:
+#       * Source / download location — from externalReferences (vcs / distribution
+#         / website), else inferred from the purl's package registry, else the raw
+#         purl. This satisfies a copyleft notice's "where to get the source" duty.
+#       * Copyright / attribution — component.copyright when present (cdxgen leaves
+#         it empty; scancode --deep-license or other sources fill it). When absent,
+#         an honest minimal attribution (name + license + source) is shown rather
+#         than a blank.
 #   - The SPDX standard full text for each used license is appended from the
 #     bundled ./licenses/<spdx-id>.txt set (offline; no network at notice time).
+#   - When a PDF renderer (weasyprint) is present, the HTML is rendered to a PDF.
+#     The renderer is opt-in (--build-arg SBOM_PDF=true): its native deps
+#     (pango/cairo/gdk-pixbuf) are heavy, so the base image stays lean. If the
+#     renderer is absent the PDF step is skipped with a log line; TXT/HTML are
+#     always produced.
 set -e
 
 SBOM="$1"
@@ -39,23 +51,94 @@ NORMALIZE_DEF="$(cat "$SCRIPT_DIR/spdx-normalize.jq")"
 # shared with normalize-sbom.sh. Drives the "license review" section below.
 LICENSE_FLAGS_DEF="$(cat "$SCRIPT_DIR/license-flags.jq")"
 
-# Build { license, components:[ {comp, copyright} ] } grouped by normalized id.
-LICENSE_MAP=$(jq -r "$NORMALIZE_DEF"'
+# purl_src($purl): infer a human-usable package-registry/download URL from a purl
+# for the registry types we can map safely. Returns null when the type is unknown
+# (the caller then falls back to the raw purl string). Only well-known, stable URL
+# shapes are mapped — anything uncertain is left to the raw purl so we never emit a
+# wrong "source location".
+# shellcheck disable=SC2016  # this is a jq program; $purl etc. are jq variables.
+PURL_SRC_DEF='
+def purl_src($purl):
+  ($purl // "") as $p
+  | if ($p | startswith("pkg:")) | not then null
+    else
+      # pkg:<type>/<namespace>/<name>@<version>?<qual>#<sub>  (namespace optional)
+      ($p | ltrimstr("pkg:") | split("#")[0] | split("?")[0]) as $body
+      | ($body | split("@")) as $nv
+      | ($nv[1] // "") as $ver
+      | ($nv[0] | split("/")) as $seg
+      | ($seg[0] | ascii_downcase) as $type
+      | ($seg[-1]) as $name
+      | (($seg[1:-1]) | join("/")) as $ns
+      | if   $type == "maven" and ($ver != "")
+        then "https://repo1.maven.org/maven2/" + (($ns | gsub("\\."; "/")) ) + "/" + $name + "/" + $ver + "/"
+        elif $type == "npm" and ($ver != "")
+        then "https://www.npmjs.com/package/" + ($seg[1:] | join("/")) + "/v/" + $ver
+        elif $type == "npm"
+        then "https://www.npmjs.com/package/" + ($seg[1:] | join("/"))
+        elif $type == "pypi" and ($ver != "")
+        then "https://pypi.org/project/" + $name + "/" + $ver + "/"
+        elif $type == "pypi"
+        then "https://pypi.org/project/" + $name + "/"
+        elif $type == "gem" and ($ver != "")
+        then "https://rubygems.org/gems/" + $name + "/versions/" + $ver
+        elif $type == "gem"
+        then "https://rubygems.org/gems/" + $name
+        elif $type == "cargo" and ($ver != "")
+        then "https://crates.io/crates/" + $name + "/" + $ver
+        elif $type == "cargo"
+        then "https://crates.io/crates/" + $name
+        elif $type == "nuget" and ($ver != "")
+        then "https://www.nuget.org/packages/" + $name + "/" + $ver
+        elif $type == "nuget"
+        then "https://www.nuget.org/packages/" + $name
+        elif $type == "golang" and ($ver != "")
+        then "https://pkg.go.dev/" + ($seg[1:] | join("/")) + "@" + $ver
+        elif $type == "golang"
+        then "https://pkg.go.dev/" + ($seg[1:] | join("/"))
+        elif $type == "composer" and ($ver != "")
+        then "https://packagist.org/packages/" + ($ns | ascii_downcase) + "/" + $name + "#" + $ver
+        elif $type == "composer"
+        then "https://packagist.org/packages/" + ($ns | ascii_downcase) + "/" + $name
+        elif $type == "huggingface"
+        then "https://huggingface.co/" + ($seg[1:] | join("/"))
+        else null end
+    end;'
+
+# src($comp): preferred source/download location for a component object.
+# Order: externalReferences vcs > distribution > website, else inferred from purl,
+# else the raw purl string, else null. The notice never leaves source blank when a
+# purl is present.
+# shellcheck disable=SC2016  # jq program; $c / $refs are jq variables.
+SRC_DEF="$PURL_SRC_DEF"'
+def src($c):
+  ([ $c.externalReferences[]? | select(.url != null and .url != "") ]) as $refs
+  | ( [ $refs[] | select((.type // "") == "vcs") | .url ][0]
+      // [ $refs[] | select((.type // "") == "distribution") | .url ][0]
+      // [ $refs[] | select((.type // "") == "website") | .url ][0]
+      // purl_src($c.purl)
+      // ($c.purl // null) );'
+
+# Build groups keyed by normalized license id. Each component carries comp (name@ver),
+# copyright (attribution) and src (source/download location).
+LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
   [ .components[]?
-    | { comp: ((.name // "unknown") + (if .version then "@" + .version else "" end)),
-        copyright: (.copyright // null),
+    | . as $c
+    | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)),
+        copyright: ($c.copyright // null),
+        src: (src($c)),
         lic: (
-          ( [ .licenses[]?
+          ( [ $c.licenses[]?
               | (.license.id // .license.name // .expression)
             ] | map(select(. != null)) | map(normalize(.)) )
           | if length == 0 then ["NOASSERTION"] else . end
         )
       }
-    | . as $c | $c.lic[] | { key: ., comp: $c.comp, copyright: $c.copyright }
+    | . as $x | $x.lic[] | { key: ., comp: $x.comp, copyright: $x.copyright, src: $x.src }
   ]
   | group_by(.key)
   | map({ license: .[0].key,
-          components: ( [ .[] | { comp, copyright } ] | unique | sort_by(.comp) ) })
+          components: ( [ .[] | { comp, copyright, src } ] | unique | sort_by(.comp) ) })
   | sort_by(.license)
 ' "$SBOM")
 
@@ -88,11 +171,20 @@ done)
     echo "Total components: ${TOTAL_COMP} · Distinct licenses: ${TOTAL_LIC}"
     echo ""
     echo "This product includes the following open source software."
+    echo "Each component lists its source/download location and copyright/attribution."
     echo "================================================================================"
-    # license -> components, with copyright shown when present.
+    # license -> components, each with source location and copyright/attribution.
+    # Attribution falls back to an honest "not captured" line (never blank) so the
+    # notice always names the holder source even when component.copyright is empty.
     echo "$LICENSE_MAP" | jq -r '.[] |
         "\nLicense: \(.license)\nComponents (\(.components | length)):",
-        (.components[] | "  - \(.comp)" + (if .copyright then "  (© \(.copyright))" else "" end))'
+        (.components[] |
+            "  - \(.comp)",
+            (if .src then "      Source: \(.src)" else empty end),
+            (if .copyright
+                then "      Copyright: \(.copyright)"
+                else "      Copyright: holders not captured in SBOM — see source" + (if .src then " (\(.src))" else "" end)
+             end))'
     echo ""
     if [ "$REVIEW_N" -gt 0 ]; then
         echo "================================================================================"
@@ -136,8 +228,12 @@ done)
  .lic h2{margin:.2rem 0;}
  .review{margin:1.2rem 0;padding:1rem;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;}
  .review h2{color:#b45309;margin:.2rem 0;}
- ul{margin:.4rem 0 0 1rem;} li{font-family:ui-monospace,monospace;font-size:.85rem;}
+ ul{margin:.4rem 0 0 1rem;} li{font-family:ui-monospace,monospace;font-size:.85rem;margin:.35rem 0;}
  .cr{color:#666;}
+ .src{display:block;color:#555;font-size:.8rem;margin-left:1rem;}
+ .src a{color:#0b5;text-decoration:none;word-break:break-all;}
+ .attr{display:block;color:#666;font-size:.8rem;margin-left:1rem;}
+ .attr.none{font-style:italic;color:#999;}
  .texts{margin-top:2rem;border-top:2px solid #ddd;padding-top:1rem;}
  .texts pre{background:#f6f6f6;border:1px solid #e3e3e3;border-radius:6px;padding:1rem;
    overflow:auto;font-size:.78rem;line-height:1.4;white-space:pre-wrap;}
@@ -158,12 +254,25 @@ HTMLHEAD
         echo "</ul></div>"
     fi
 
-    # jq @html escapes license names, component identifiers, and copyright.
-    echo "$LICENSE_MAP" | jq -r '.[] |
+    # jq @html escapes license names, component identifiers, source URLs and
+    # copyright. An http(s) source is rendered as a link; a raw purl as plain text.
+    # Attribution always renders: component.copyright, or an honest "not captured".
+    echo "$LICENSE_MAP" | jq -r '
+        def srchtml($s):
+          if $s == null then ""
+          elif ($s | test("^https?://"))
+          then "<span class=\"src\">Source: <a href=\"" + ($s|@html) + "\">" + ($s|@html) + "</a></span>"
+          else "<span class=\"src\">Source: " + ($s|@html) + "</span>" end;
+        def attrhtml($c):
+          if $c.copyright
+          then "<span class=\"attr\">Copyright: " + ($c.copyright|@html) + "</span>"
+          else "<span class=\"attr none\">Copyright: holders not captured in SBOM — see source</span>" end;
+        .[] |
         "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
         "<p>" + (.components | length | tostring) + " component(s)</p><ul>" +
         (.components | map("<li>" + (.comp | @html)
-            + (if .copyright then " <span class=\"cr\">(© " + (.copyright | @html) + ")</span>" else "" end)
+            + srchtml(.src)
+            + attrhtml(.)
             + "</li>") | join("")) +
         "</ul></div>"'
 
@@ -179,5 +288,22 @@ HTMLHEAD
 
     echo "</body></html>"
 } > "$HTML"
+
+# ---------- PDF (opt-in renderer; graceful skip when absent) ----------
+# weasyprint renders the HTML to a print-ready PDF. It is bundled only when the
+# image was built with --build-arg SBOM_PDF=true (heavy pango/cairo/gdk-pixbuf
+# native deps). When the renderer is missing we log and skip — TXT/HTML still
+# stand — so a default-image scan is never broken by the absence of the tool.
+PDF="${OUT_PREFIX}_NOTICE.pdf"
+if command -v weasyprint >/dev/null 2>&1; then
+    if weasyprint "$HTML" "$PDF" >/dev/null 2>&1; then
+        echo "[notice] generated PDF: $PDF"
+    else
+        echo "[notice] weasyprint present but PDF render failed; keeping TXT/HTML only." >&2
+        rm -f "$PDF"
+    fi
+else
+    echo "[notice] PDF skipped: no PDF renderer in image (rebuild with --build-arg SBOM_PDF=true for weasyprint)."
+fi
 
 echo "[notice] generated: $TXT, $HTML (${TOTAL_LIC} licenses, ${TOTAL_COMP} components)"

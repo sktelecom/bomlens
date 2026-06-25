@@ -78,6 +78,14 @@ ARG SBOM_AIBOM=false
 # renovate: datasource=github-tags depName=GenAI-Security-Project/aibom-generator
 ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
 
+# NOTICE PDF rendering (opt-in: --build-arg SBOM_PDF=true). weasyprint renders the
+# generated _NOTICE.html to _NOTICE.pdf. It is Python-based (consistent with onot)
+# but needs heavy native libraries (pango/cairo/gdk-pixbuf), so it is kept out of
+# the lean base image and generate-notice.sh skips PDF gracefully when absent.
+ARG SBOM_PDF=false
+# renovate: datasource=pypi depName=weasyprint
+ARG WEASYPRINT_VERSION=63.1
+
 # jq (helper scripts), curl/tar (installers), file (binary mode),
 # git (web UI 'GitHub URL' ingestion: server.py clones into a temp source tree).
 # python3 + pip are already in the python:3.12-slim base (web UI + scancode).
@@ -180,11 +188,27 @@ RUN if [ "$SBOM_AIBOM" = "true" ]; then \
       echo "[build] aibom generator skipped (SBOM_AIBOM=false)"; \
     fi
 
+# NOTICE PDF renderer (opt-in: --build-arg SBOM_PDF=true). weasyprint (BSD-3-Clause)
+# plus its native deps (libpango/cairo/gdk-pixbuf, ~50-60 MB). generate-notice.sh
+# detects it via `command -v weasyprint` and skips the PDF step when it is absent,
+# so the default image stays lean and a scan never fails for lack of the renderer.
+RUN if [ "$SBOM_PDF" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libcairo2 libffi8 \
+        fonts-dejavu-core \
+      && pip3 install --no-cache-dir "weasyprint==${WEASYPRINT_VERSION}" \
+      && rm -rf /var/lib/apt/lists/* \
+      && weasyprint --version; \
+    else \
+      echo "[build] PDF renderer (weasyprint) skipped (SBOM_PDF=false)"; \
+    fi
+
 # Reflects the firmware build flavor. When SBOM_FIRMWARE=true the image bundles GPL
 # tools (cve-bin-tool, ubi_reader); the source-offer label points to the inventory.
 LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
       com.sktelecom.sbom.scanoss-tools="${SBOM_SCANOSS}" \
       com.sktelecom.sbom.aibom-tools="${SBOM_AIBOM}" \
+      com.sktelecom.sbom.pdf-tools="${SBOM_PDF}" \
       com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan

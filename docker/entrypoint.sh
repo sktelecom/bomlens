@@ -338,6 +338,8 @@ fi
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt" "${OUT_PREFIX}_NOTICE.html")
+        # PDF is produced only when a renderer is in the image (SBOM_PDF=true).
+        [ -f "${OUT_PREFIX}_NOTICE.pdf" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.pdf")
     fi
 fi
 
