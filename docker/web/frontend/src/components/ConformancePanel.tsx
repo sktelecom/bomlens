@@ -93,11 +93,12 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
 }
 
 /**
- * G7 conformance — the AI minimum-element checks split from the base format
- * checks. The headline "N / total present" and the advisory count come straight
- * from the check statuses (no invented numbers); G7 elements are all advisory.
+ * SBOM conformance — the supplier-SBOM verdict plus the base CycloneDX format
+ * checks, and (only when the SBOM carries an AI model) the G7 AI minimum-element
+ * checks as a sub-block. The headline "N / total present" and the advisory count
+ * come straight from the check statuses (no invented numbers); G7 is advisory.
  */
-export function G7Conformance({ conformance }: { conformance: ConformanceSummary }) {
+export function ConformancePanel({ conformance }: { conformance: ConformanceSummary }) {
   const { t } = useTranslation();
   const checks = conformance.checks ?? [];
   if (checks.length === 0) {

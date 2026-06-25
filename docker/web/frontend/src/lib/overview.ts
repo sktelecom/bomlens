@@ -4,10 +4,11 @@
  * block reflects the data, not guesswork.
  */
 import type { DoneEvent } from "./api";
+import { baseTally, splitChecks } from "./conformance";
 import type { SectionId } from "./nav";
 
 export interface AttentionItem {
-  id: "vulns" | "review";
+  id: "conformance" | "vulns" | "review";
   /** How many findings of this kind. */
   count: number;
   /** Badge tone / severity of the item. */
@@ -17,12 +18,23 @@ export interface AttentionItem {
 }
 
 /**
- * Actionable findings, most severe first: critical/high vulnerabilities, then
- * components flagged for review (vendored / copied-in open source). Returns an
- * empty list when nothing needs attention.
+ * Actionable findings, most urgent first: a failed SBOM conformance, then
+ * critical/high vulnerabilities, then components flagged for review (vendored /
+ * copied-in open source). Returns an empty list when nothing needs attention.
  */
 export function needsAttention(result: DoneEvent): AttentionItem[] {
   const items: AttentionItem[] = [];
+
+  // Supplier-SBOM review: a failed format conformance leads the list — an
+  // incomplete or non-conformant SBOM makes the vuln and license findings below
+  // unreliable, so it should be fixed first.
+  const conf = result.conformance;
+  if (conf && conf.result === "fail") {
+    const failed = baseTally(splitChecks(conf.checks ?? []).base).failed;
+    if (failed > 0) {
+      items.push({ id: "conformance", count: failed, tone: "high", target: "conformance" });
+    }
+  }
 
   const sec = result.security;
   if (sec) {

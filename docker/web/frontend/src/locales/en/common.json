@@ -237,7 +237,7 @@
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
     "licenses": "Licenses",
-    "g7": "G7 conformance",
+    "conformance": "Conformance",
     "models": "Models & datasets",
     "artifacts": "Artifacts"
   },
@@ -264,6 +264,7 @@
   "overview": {
     "needsAttention": "Needs attention",
     "allClear": "Nothing needs attention",
+    "attnConformance": "{{count}} mandatory conformance check(s) failed",
     "attnVulns": "{{count}} critical or high vulnerabilities",
     "attnReview": "{{count}} components flagged for review",
     "explore": "Explore",

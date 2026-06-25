@@ -237,7 +237,7 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "licenses": "라이선스",
-    "g7": "G7 적합성",
+    "conformance": "적합성",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물"
   },
@@ -264,6 +264,7 @@
   "overview": {
     "needsAttention": "주의 필요",
     "allClear": "주의할 항목이 없습니다",
+    "attnConformance": "필수 적합성 검사 {{count}}건 실패",
     "attnVulns": "심각·높음 취약점 {{count}}건",
     "attnReview": "검토가 필요한 컴포넌트 {{count}}개",
     "explore": "둘러보기",
