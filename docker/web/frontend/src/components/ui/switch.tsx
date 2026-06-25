@@ -30,8 +30,11 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(function Switch(
       className={cn(
         "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-fast ease-out-soft",
         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-        checked ? "bg-primary" : "bg-input",
-        disabled && "cursor-not-allowed opacity-50",
+        checked ? "bg-brand" : "bg-input",
+        // A locked-on toggle (e.g. ANALYZE forces notice/security) must still
+        // read as "on": only dim when off, so the brand fill stays vivid.
+        disabled && "cursor-not-allowed",
+        disabled && !checked && "opacity-50",
         trackClassName,
       )}
       data-state={checked ? "checked" : "unchecked"}
