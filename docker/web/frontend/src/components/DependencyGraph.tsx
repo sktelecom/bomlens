@@ -84,7 +84,9 @@ export function DependencyGraph({
   }, [nodes]);
 
   useEffect(() => {
-    if (tooLarge || nodes.length === 0) return;
+    // No edges = no dependency relationships (e.g. a firmware SBOM): a node-only
+    // graph is just overlapping dots, so we show a note instead (see render).
+    if (tooLarge || nodes.length === 0 || edges.length === 0) return;
     let destroyed = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cy: any;
@@ -165,13 +167,7 @@ export function DependencyGraph({
               },
             },
           ],
-          // With edges, a left-to-right dependency layout; without any edges
-          // (e.g. a firmware SBOM with no dependency relationships) a grid, so
-          // the nodes read as a tidy block instead of one long line.
-          layout:
-            edges.length > 0
-              ? { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 }
-              : { name: "grid", avoidOverlap: true, fit: true, padding: 24 },
+          layout: { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 },
           // Cap zoom so small graphs (a few nodes) don't blow up to fill the
           // canvas — that's what made labels huge and overlap.
           minZoom: 0.2,
@@ -180,13 +176,14 @@ export function DependencyGraph({
         };
         cy = cytoscape(config);
         cyRef.current = cy;
-        // First view: if fit zoomed too far out to read labels, clamp the zoom
-        // and anchor to the top-left so the start of the graph is legible.
+        // First view: a big graph fits to unreadable dots, so when fit zoomed
+        // far out, snap to zoom 1 (labels legible) and anchor the top-left —
+        // the user pans/scrolls from there. Small graphs keep their fit.
         cy.one("layoutstop", () => {
-          if (cy.zoom() < 0.6) {
-            cy.zoom(0.6);
+          if (cy.zoom() < 0.9) {
+            cy.zoom(1);
             const bb = cy.elements().boundingBox();
-            cy.pan({ x: 24 - bb.x1 * cy.zoom(), y: 24 - bb.y1 * cy.zoom() });
+            cy.pan({ x: 24 - bb.x1, y: 24 - bb.y1 });
           }
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,7 +225,10 @@ export function DependencyGraph({
     });
   }, [query, nodes]);
 
-  if (nodes.length === 0) {
+  // No nodes, or nodes but no edges (no dependency relationships, e.g. a
+  // firmware SBOM): a node-only graph is unreadable overlapping dots, so show
+  // the "no relationships" note and let the user use Components / Tree instead.
+  if (nodes.length === 0 || edges.length === 0) {
     return <p className="text-sm text-muted-foreground">{t("deps.empty")}</p>;
   }
   if (tooLarge) {
