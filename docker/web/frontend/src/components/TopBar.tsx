@@ -1,18 +1,17 @@
-import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { LangToggle } from "./LangToggle";
 import { ThemeToggle } from "./ThemeToggle";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface TopBarProps {
-  /** Current project context, e.g. "my-app · 1.0.0". Hidden when absent. */
-  projectLabel?: string;
-  /** Hash for the home (New scan) screen — the logo and New scan link target. */
+  /**
+   * Active project context. The name truncates (long firmware filenames) with
+   * the full value on hover; the version shows muted beside it. Hidden absent.
+   */
+  project?: { name: string; version?: string };
+  /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
-  /** Render the logo + a New scan link home. Off on the idle screen itself
-   *  (the logo stays static, no New scan action), so we don't link home to home. */
+  /** Render the logo as a link home (off on the Recent home screen itself). */
   showHomeLink?: boolean;
 }
 
@@ -20,11 +19,10 @@ interface TopBarProps {
  * Application top bar: product mark + active project context on the left,
  * global controls (language, theme) on the right. Sticky, token-driven.
  *
- * The logo and the New scan action are real `<a href="#/">` links so the New
- * scan screen can be opened in a new tab (Cmd/Ctrl/middle click); the hash
- * router handles same-tab navigation.
+ * The logo is a real `<a href="#/">` link so the home screen can be opened in a
+ * new tab (Cmd/Ctrl/middle click); the hash router handles same-tab navigation.
  */
-export function TopBar({ projectLabel, homeHref, showHomeLink }: TopBarProps) {
+export function TopBar({ project, homeHref, showHomeLink }: TopBarProps) {
   const { t } = useTranslation();
   const logo = (
     <img src="/logo.svg" alt={t("appTitle")} className="h-7 w-auto shrink-0" />
@@ -43,24 +41,25 @@ export function TopBar({ projectLabel, homeHref, showHomeLink }: TopBarProps) {
       ) : (
         logo
       )}
-      {projectLabel && (
+      {project && (
         <>
           <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
-          <span className="truncate text-sm font-medium text-foreground">
-            {projectLabel}
-          </span>
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span
+              className="truncate text-sm font-medium text-foreground"
+              title={project.name}
+            >
+              {project.name}
+            </span>
+            {project.version && (
+              <span className="shrink-0 text-sm text-muted-foreground">
+                {project.version}
+              </span>
+            )}
+          </div>
         </>
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        {showHomeLink && (
-          <a
-            href={homeHref}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            {t("shell.newScan")}
-          </a>
-        )}
         <LangToggle />
         <ThemeToggle />
       </div>

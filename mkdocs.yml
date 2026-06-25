@@ -102,7 +102,7 @@ plugins:
             Firmware: 펌웨어 분석
             AI model: AI 모델
             Identify bundled OSS (C/C++): 번들 OSS 식별 (C/C++)
-            Server delivery: 서버 전달
+            Server SBOM: 서버 SBOM
             Upload: 업로드
             CI/CD: CI/CD 연동
             Outputs: 산출물
@@ -153,7 +153,7 @@ nav:
       - Firmware: guides/firmware.md
       - AI model: guides/ai-model.md
       - Identify bundled OSS (C/C++): guides/identify-vendored.md
-      - Server delivery: guides/server-delivery.md
+      - Server SBOM: guides/server-delivery.md
       - Upload: guides/upload.md
       - CI/CD: guides/ci-cd.md
   - Outputs:

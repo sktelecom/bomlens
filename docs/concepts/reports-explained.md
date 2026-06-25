@@ -41,11 +41,11 @@ EPSS and KEV require external API lookups. On an air-gapped network, set `SECURI
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "${crit} Critical vulnerabilities"; exit 1; }
   ```
-- Triage such as judging false positives (no real impact), approving exceptions, and history management is beyond the scope of BomLens. Upload the SBOM to TRUSCA to handle it.
+- Triage such as judging false positives (no real impact), approving exceptions, and history management is beyond the scope of BomLens. Upload the SBOM to a vulnerability management system (Dependency-Track, TRUSCA, etc.) to handle it.
 
 ## The open-source risk report
 
-The open-source risk report aggregates vulnerabilities by severity with response deadlines (Critical 7 days, High 30 days). It includes a license summary, and for a supplier SBOM it adds the format conformance result.
+The open-source risk report aggregates vulnerabilities by severity with recommended response deadlines (Critical 7 days, High 30 days). It includes a license summary, and for a supplier SBOM it adds the format conformance result.
 
 ## Related
 

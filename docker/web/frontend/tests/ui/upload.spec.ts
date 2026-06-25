@@ -47,7 +47,7 @@ test("ZIP upload flow uploads then renders the scan result", async ({ page }) =>
   page.on("request", (req) => {
     if (req.url().includes("/upload")) uploaded = true;
   });
-  await page.goto("/");
+  await page.goto("/#/new");
   await selectZipAndAttach(page);
   await page.getByRole("button", { name: /Run scan/i }).click();
 
@@ -60,7 +60,7 @@ test("ZIP upload flow uploads then renders the scan result", async ({ page }) =>
 
 test("a failed upload surfaces an error instead of running the scan", async ({ page }) => {
   await stub(page, { uploadOk: false });
-  await page.goto("/");
+  await page.goto("/#/new");
   await selectZipAndAttach(page);
   await page.getByRole("button", { name: /Run scan/i }).click();
   // The upload error is shown to the user (uploadFailed message), scan not started.

@@ -314,10 +314,10 @@ if grep -qE "Critical \| High" "$atmp/rr_risk-report.md" && grep -q "CVE-2024-00
 else
     fail "risk report: severity table + CVE rows present"
 fi
-if grep -q "반려" "$atmp/rr_risk-report.md"; then
-    pass "risk report: surfaces conformance rejection reason"
+if grep -q "미충족" "$atmp/rr_risk-report.md"; then
+    pass "risk report: surfaces unmet conformance items"
 else
-    fail "risk report: surfaces conformance rejection reason"
+    fail "risk report: surfaces unmet conformance items"
 fi
 rm -rf "$atmp"
 

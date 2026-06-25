@@ -49,6 +49,13 @@ export interface SbomSummary {
   /** Set when the scan looks like C/C++ embedded source with no package manager,
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
+  /** CycloneDX root component type (application/firmware/container/…) — drives
+   *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
+  componentType?: string | null;
+  /** Direct/transitive dependency counts across the whole SBOM (0 when the SBOM
+   *  has no dependency graph). Drives the Overview dependency tile. */
+  directCount?: number;
+  transitiveCount?: number;
 }
 
 export const SEVERITY_ORDER = [
@@ -271,6 +278,12 @@ export interface RecentScan {
   components: number;
   maxSeverity: Severity | null;
   isAiScan: boolean;
+  /**
+   * CycloneDX root component type as declared by the SBOM
+   * (application/firmware/container/operating-system/data/…) — drives the
+   * honest Type label. `null` when the SBOM omits it.
+   */
+  componentType: string | null;
   /** Unix seconds of the SBOM file mtime. */
   generatedAt: number;
 }

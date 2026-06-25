@@ -92,7 +92,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 **C/C++ notes**
 
 - With a package manager (Conan `conanfile.txt` / vcpkg `vcpkg.json`), dependencies resolve and appear in the SBOM.
-- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server delivery — OS rootfs, application, and static-link dependencies as separate layers — see the [server delivery guide](server-delivery.md).
+- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow — OS rootfs, application, and static-link dependencies as separate layers — see the [server SBOM guide](server-delivery.md).
 - When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
@@ -150,8 +150,8 @@ $SBOM --project bert-base --version 1.0.0 \
 ## Reading the three deliverables
 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
-- **SBOM**: CycloneDX 1.6. The artifact you upload to a portal or vulnerability-management system.
-- **Open-source risk report**: aggregates vulnerabilities by severity with deadlines (Critical 7 days, High 30 days). Includes a license summary and (for supplier SBOMs) the format conformance result.
+- **SBOM**: CycloneDX 1.6. The artifact you upload to a vulnerability-management system.
+- **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and (for supplier SBOMs) the format conformance result.
 
 ## All at once in the web UI
 

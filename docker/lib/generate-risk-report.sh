@@ -11,9 +11,9 @@
 #          <out_prefix>_NOTICE.txt          (generate-notice.sh)
 #   writes <out_prefix>_risk-report.md  and  <out_prefix>_risk-report.html
 #
-# Mirrors the SKT review output: conformance verdict + vulnerability triage with
-# the Critical-7-day / High-30-day remediation deadlines. Missing inputs are
-# skipped gracefully. See docs/supplier-sbom-analysis.md §6.
+# Aggregates a supply-chain risk view: conformance verdict + vulnerability triage
+# with recommended Critical-7-day / High-30-day remediation deadlines. Missing
+# inputs are skipped gracefully. See docs/supplier-sbom-analysis.md §6.
 set -e
 
 OUT_PREFIX="$1"
@@ -31,7 +31,7 @@ MD="${OUT_PREFIX}_risk-report.md"
 HTML="${OUT_PREFIX}_risk-report.html"
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Remediation SLAs (SKT process step ③).
+# Recommended remediation deadlines (Critical / High).
 CRIT_DAYS=7
 HIGH_DAYS=30
 
@@ -85,7 +85,7 @@ else
     S_CONF=1; S_VULN=2; S_LIC=3; S_NEXT=4
 fi
 
-# deadline string per severity (Korean, per SKT process)
+# deadline string per severity (Korean, recommended)
 deadline_for() {
     case "$1" in
         CRITICAL) echo "${CRIT_DAYS}일 이내" ;;
@@ -118,7 +118,7 @@ fi
         echo "- 검증 결과: **$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')**"
         if [ "$CONF_RESULT" = "fail" ]; then
             echo ""
-            echo "> ⚠️ **SKT 포맷 검증 반려 사유** — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
+            echo "> ⚠️ **포맷 검증 미충족 항목** — 아래 필수 항목이 빠져 있습니다. 보완 후 재검증을 권장합니다."
             echo ""
             echo "$CONF_FAILS" | jq -r '.[] | "- " + .'
         fi
@@ -126,7 +126,7 @@ fi
     fi
     echo "## ${S_VULN}. 취약점 분석 및 대응 기한"
     echo ""
-    echo "> SKT 검증 프로세스 ③: **Critical → ${CRIT_DAYS}일 이내, High → ${HIGH_DAYS}일 이내** 대응계획 또는 위험 정당화 제출이 필요합니다."
+    echo "> 권고 대응 기한: **Critical → ${CRIT_DAYS}일 이내, High → ${HIGH_DAYS}일 이내** 대응계획 또는 위험 정당화를 마련하는 것을 권장합니다."
     echo ""
     echo "| Critical | High | Medium | Low | Unknown | Total |"
     echo "|---:|---:|---:|---:|---:|---:|"
@@ -154,13 +154,11 @@ fi
     echo ""
     echo "## ${S_NEXT}. 다음 단계"
     echo ""
-    echo "1. 위 대응 기한 내 **대응계획 또는 위험 정당화**를 SKT 검증 프로세스 ③에 따라 제출."
+    echo "1. 위 권고 대응 기한 내 **대응계획 또는 위험 정당화**를 마련."
     if [ "$HAS_CONF" = "true" ]; then
-        echo "2. 포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출."
-        echo "3. 결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위)."
+        echo "2. 포맷 검증에 실패한 경우 누락 항목을 보완하여 SBOM을 재생성."
     else
-        echo "2. 고지문(\`${OUT_PREFIX}_NOTICE.{txt,html}\`)과 SBOM(\`${OUT_PREFIX}_bom.json\`)을 납품 산출물로 함께 제출."
-        echo "3. 결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위)."
+        echo "2. 고지문(\`${OUT_PREFIX}_NOTICE.{txt,html}\`)과 SBOM(\`${OUT_PREFIX}_bom.json\`)을 함께 보관·배포."
     fi
 } > "$MD"
 
@@ -204,7 +202,7 @@ HTMLHEAD
         echo "<h2>${S_CONF}. 요구사항 충족 (포맷 검증)</h2>"
         echo "<div class=\"cards\"><div class=\"card ${conf_class}\">검증 결과: $(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')</div></div>"
         if [ "$CONF_RESULT" = "fail" ]; then
-            echo "<div class=\"note\"><b>SKT 포맷 검증 반려 사유</b> — 아래 필수 항목 미충족. 보완 후 재제출이 필요합니다."
+            echo "<div class=\"note\"><b>포맷 검증 미충족 항목</b> — 아래 필수 항목이 빠져 있습니다. 보완 후 재검증을 권장합니다."
             echo "<ul>"
             echo "$CONF_FAILS" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
             echo "</ul></div>"
@@ -213,7 +211,7 @@ HTMLHEAD
 
     cat <<HTMLSEC
 <h2>${S_VULN}. 취약점 분석 및 대응 기한</h2>
-<div class="note">SKT 검증 프로세스 ③: <b>Critical → ${CRIT_DAYS}일 이내</b>, <b>High → ${HIGH_DAYS}일 이내</b> 대응계획 또는 위험 정당화 제출이 필요합니다.</div>
+<div class="note">권고 대응 기한: <b>Critical → ${CRIT_DAYS}일 이내</b>, <b>High → ${HIGH_DAYS}일 이내</b> 대응계획 또는 위험 정당화를 마련하는 것을 권장합니다.</div>
 <div class="cards">
  <div class="card crit">Critical ${C}</div>
  <div class="card high">High ${H}</div>
@@ -245,13 +243,12 @@ HTMLSEC
 
     echo "<h2>${S_NEXT}. 다음 단계</h2>"
     echo "<ol>"
-    echo " <li>위 대응 기한 내 <b>대응계획 또는 위험 정당화</b>를 SKT 검증 프로세스 ③에 따라 제출.</li>"
+    echo " <li>위 권고 대응 기한 내 <b>대응계획 또는 위험 정당화</b>를 마련.</li>"
     if [ "$HAS_CONF" = "true" ]; then
-        echo " <li>포맷 검증이 반려(fail)된 경우 누락 항목을 보완하여 SBOM 재제출.</li>"
+        echo " <li>포맷 검증에 실패한 경우 누락 항목을 보완하여 SBOM을 재생성.</li>"
     else
-        echo " <li>고지문(NOTICE)과 SBOM을 납품 산출물로 함께 제출.</li>"
+        echo " <li>고지문(NOTICE)과 SBOM을 함께 보관·배포.</li>"
     fi
-    echo " <li>결과는 SKT 내부 시스템(TOSCA)에 등록·관리됩니다(포털 범위).</li>"
     echo "</ol>"
     echo "</body></html>"
 } > "$HTML"

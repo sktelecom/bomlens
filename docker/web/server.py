@@ -487,11 +487,28 @@ def sbom_summary(prefix):
         p.get("name") == "bomlens:suggest-identify-vendored" and p.get("value") == "true"
         for p in meta_props
     )
+    # Direct/transitive split across ALL components (not just the capped rows),
+    # so the Overview dependency tile is accurate on large SBOMs too. Zero when
+    # the SBOM has no dependency graph (flat firmware/image SBOMs).
+    direct_count = transitive_count = 0
+    if has_deps:
+        for c in comps:
+            sc = scope_by_ref.get(c.get("bom-ref")) or scope_by_ref.get(c.get("purl"))
+            if sc == "direct":
+                direct_count += 1
+            elif sc == "transitive":
+                transitive_count += 1
+    meta_comp = (data.get("metadata") or {}).get("component") or {}
     return {
         "components": len(comps),
         "componentList": rows,
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
+        # CycloneDX root component type — drives the honest scan-kind subtitle and
+        # works on re-open too, where the scan MODE isn't stored.
+        "componentType": meta_comp.get("type"),
+        "directCount": direct_count,
+        "transitiveCount": transitive_count,
     }
 
 
@@ -601,6 +618,10 @@ def list_scans():
             "components": len(comps),
             "maxSeverity": _max_severity(security_summary(prefix)),
             "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
+            # CycloneDX root component type — lets the Recent list label the scan
+            # honestly (application/firmware/container/operating-system/data),
+            # straight from what the SBOM declares (no mode is stored elsewhere).
+            "componentType": meta.get("type"),
             "generatedAt": mtime,
         })
     scans.sort(key=lambda s: s["generatedAt"], reverse=True)

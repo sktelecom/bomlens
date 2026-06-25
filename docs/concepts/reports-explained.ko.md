@@ -41,11 +41,11 @@ EPSS와 KEV는 외부 API 조회가 필요합니다. 폐쇄망에서는 `SECURIT
   crit=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' *_security.json)
   [ "$crit" -gt 0 ] && { echo "Critical 취약점 ${crit}건"; exit 1; }
   ```
-- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 BomLens의 범위를 넘습니다. SBOM을 TRUSCA에 업로드해 처리하세요.
+- 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 triage는 BomLens의 범위를 넘습니다. 취약점 관리 시스템(Dependency-Track, TRUSCA 등)에 SBOM을 업로드해 처리하세요.
 
 ## 오픈소스위험분석보고서
 
-오픈소스위험분석보고서는 취약점을 심각도별로 집계하고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
+오픈소스위험분석보고서는 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
 
 ## 관련 문서
 

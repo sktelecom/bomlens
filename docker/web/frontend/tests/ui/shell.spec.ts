@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Shell gates for the new UI behind `?ui=next`:
- *  - accessibility (axe) + visual regression for the idle "New scan" screen,
- *    across light/dark × en/ko;
+ *  - accessibility (axe) + visual regression for the idle home screen — now
+ *    "Recent scans" (`#/`), with the "New scan" screen (`#/new`) covered
+ *    separately — across light/dark × en/ko;
  *  - a stubbed end-to-end scan that proves the result content moved from tabs
  *    into the left-rail sections (Phase 1), with scan-type/data adaptation.
  *
@@ -31,7 +32,7 @@ async function waitForMainSettled(page: Page) {
   });
 }
 
-async function openShell(page: Page, theme: Theme, lang: Lang) {
+async function seedThemeLang(page: Page, theme: Theme, lang: Lang) {
   await page.addInitScript(
     ([t, l]) => {
       localStorage.setItem("sbom.theme", t);
@@ -39,8 +40,22 @@ async function openShell(page: Page, theme: Theme, lang: Lang) {
     },
     [theme, lang],
   );
+}
+
+/** Open the idle home screen (Recent scans, `#/`). */
+async function openShell(page: Page, theme: Theme, lang: Lang) {
+  await seedThemeLang(page, theme, lang);
   await page.goto("/?ui=next");
   await page.getByRole("navigation").first().waitFor();
+}
+
+/** Open the New scan screen (`#/new`) — the source tiles + settings pane. */
+async function openNewScan(page: Page, theme: Theme, lang: Lang) {
+  await seedThemeLang(page, theme, lang);
+  await page.goto("/?ui=next#/new");
+  await page.getByRole("navigation").first().waitFor();
+  // The settings pane mounts the project field on the New scan screen only.
+  await page.locator("#project").waitFor();
 }
 
 const COMBOS: Array<{ theme: Theme; lang: Lang }> = [
@@ -52,6 +67,8 @@ const COMBOS: Array<{ theme: Theme; lang: Lang }> = [
 
 for (const { theme, lang } of COMBOS) {
   test(`idle shell has no axe violations — ${theme}/${lang}`, async ({ page }) => {
+    // The idle home is now Recent scans (`#/`). With no backend the list is
+    // empty, so this also covers the Recent empty state + New scan CTA.
     await openShell(page, theme, lang);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -68,9 +85,26 @@ for (const { theme, lang } of COMBOS) {
   });
 }
 
+test("New scan screen has no axe violations", async ({ page }) => {
+  await openNewScan(page, "light", "en");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("New scan screen matches baseline — light/en @visual", async ({ page }) => {
+  await openNewScan(page, "light", "en");
+  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+  await expect(page).toHaveScreenshot("shell-new-light-en.png", {
+    fullPage: true,
+    animations: "disabled",
+  });
+});
+
 test("AI model source is gated on the AIBOM image", async ({ page }) => {
   // Without the AIBOM image, the tile is disabled.
-  await openShell(page, "light", "en");
+  await openNewScan(page, "light", "en");
   await expect(page.getByRole("button", { name: "AI model" })).toBeDisabled();
 
   // With the AIBOM image, selecting it reveals the HuggingFace model id input.
@@ -87,7 +121,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
 });
 
 test("New scan groups sources and switches the source-specific input", async ({ page }) => {
-  await openShell(page, "light", "en");
+  await openNewScan(page, "light", "en");
 
   // The source picker offers the grouped tiles in one labelled group.
   const sources = page.getByRole("group", { name: "Source" });
@@ -130,6 +164,91 @@ test("Recent scans list re-opens a past scan from the rail", async ({ page }) =>
   await expect(page.getByText("2 critical or high vulnerabilities")).toBeVisible();
 });
 
+test("Recent home renders the summary strip and the scan table", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 2, maxSeverity: "CRITICAL", isAiScan: false, componentType: "application", generatedAt: 1700000000 },
+      { id: "model_1.0", project: "model", version: "1.0", components: 1, maxSeverity: null, isAiScan: true, componentType: "machine-learning-model", generatedAt: 1700000100 },
+    ]) }),
+  );
+  await page.goto("/?ui=next");
+
+  // The home screen leads with the Recent heading and the three summary cards.
+  await expect(page.getByRole("heading", { name: "Recent scans" })).toBeVisible();
+  await expect(page.getByText("Total scans")).toBeVisible();
+  await expect(page.getByText("At risk")).toBeVisible();
+  await expect(page.getByText("AI scans")).toBeVisible();
+
+  // Both stored scans appear as table rows (scoped to the `@version` table link,
+  // distinct from the sidebar rail's `· version` link).
+  await expect(page.getByRole("link", { name: /demo @1.0/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /model @1.0/ })).toBeVisible();
+  // The AI row carries the AI-model type badge.
+  await expect(page.getByText("AI model").first()).toBeVisible();
+});
+
+test("Recent home opens a past scan from the table row", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 2, maxSeverity: "CRITICAL", isAiScan: false, componentType: "application", generatedAt: 1700000000 },
+    ]) }),
+  );
+  await page.route("**/scan?id=demo_1.0", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
+  );
+  await page.goto("/?ui=next");
+
+  await page.getByRole("link", { name: /demo @1.0/ }).click();
+  await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#/scan/demo_1.0");
+});
+
+test("Recent home deletes a scan from its row", async ({ page }) => {
+  let deleted = false;
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(deleted ? [] : [
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 2, maxSeverity: "CRITICAL", isAiScan: false, componentType: "application", generatedAt: 1700000000 },
+    ]) }),
+  );
+  await page.route("**/scan-delete**", (r) => {
+    deleted = true;
+    return r.fulfill({ status: 200, body: "" });
+  });
+  await page.goto("/?ui=next");
+
+  const row = page.getByRole("link", { name: /demo @1.0/ });
+  await expect(row).toBeVisible();
+  // The row's trash button deletes the scan; the list refreshes to empty.
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(row).toHaveCount(0);
+  await expect(page.getByText("No scans yet. Start with a New scan.")).toBeVisible();
+});
+
+test("Recent home empty state offers a New scan CTA", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.goto("/?ui=next");
+
+  await expect(page.getByText("No scans yet. Start with a New scan.")).toBeVisible();
+  // The CTA links to the New scan screen; following it lands there.
+  const cta = page.getByRole("main").getByRole("link", { name: "New scan" });
+  await expect(cta).toHaveAttribute("href", "#/new");
+  await cta.click();
+  await expect(page.locator("#project")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#/new");
+});
+
 test("a deep link to a scan section restores that scan and section (open-in-new-tab)", async ({ page }) => {
   // Stub the past-scan endpoints, then open the section URL directly — as a new
   // tab would. The hash router must load the scan and select Components.
@@ -160,7 +279,7 @@ test("a deep link to a scan section restores that scan and section (open-in-new-
   await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("href", "#/scan/demo_1.0");
 });
 
-test("an unknown scan id falls back to the New scan screen", async ({ page }) => {
+test("an unknown scan id falls back to the Recent scans home screen", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -171,8 +290,9 @@ test("an unknown scan id falls back to the New scan screen", async ({ page }) =>
 
   await page.goto("/?ui=next#/scan/missing_1.0/components");
 
-  // Falls back to the idle New scan screen and the hash resets to home.
-  await expect(page.getByRole("heading", { name: "New scan" })).toBeVisible();
+  // Falls back to the idle Recent scans home screen and the hash resets to home.
+  // The list is empty here, but the heading is shown either way.
+  await expect(page.getByRole("heading", { name: "Recent scans" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#/");
 });
 
@@ -186,7 +306,7 @@ test("Scan running shows the pipeline stages while scanning", async ({ page }) =
     await new Promise((res) => setTimeout(res, 2500));
     await r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` });
   });
-  await page.goto("/?ui=next");
+  await page.goto("/?ui=next#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
   await page.getByRole("button", { name: /Run scan/i }).click();
@@ -258,7 +378,7 @@ async function stubAndRun(page: Page) {
   await page.route("**/scan-stream**", (r) =>
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` }),
   );
-  await page.goto("/?ui=next");
+  await page.goto("/?ui=next#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
   await page.getByRole("button", { name: /Run scan/i }).click();
@@ -385,7 +505,7 @@ async function stubAiAndRun(page: Page) {
   await page.route("**/scan-stream**", (r) =>
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(AI_DONE)}\n\n` }),
   );
-  await page.goto("/?ui=next");
+  await page.goto("/?ui=next#/new");
   await page.fill("#project", "model");
   await page.fill("#version", "1.0");
   await page.getByRole("button", { name: /Run scan/i }).click();
@@ -482,7 +602,7 @@ async function stubLicensesAndRun(page: Page) {
   await page.route("**/scan-stream**", (r) =>
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(LIC_DONE)}\n\n` }),
   );
-  await page.goto("/?ui=next");
+  await page.goto("/?ui=next#/new");
   await page.fill("#project", "lic");
   await page.fill("#version", "1.0");
   await page.getByRole("button", { name: /Run scan/i }).click();

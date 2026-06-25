@@ -1,6 +1,7 @@
-import { Clock, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { Clock, PanelLeftClose, PanelLeftOpen, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { buttonVariants } from "@/components/ui/button";
 import {
   EMPTY_SCAN,
   type RecentScanLink,
@@ -8,7 +9,7 @@ import {
   type SectionId,
   visibleGroups,
 } from "@/lib/nav";
-import { scanHash } from "@/lib/route";
+import { newHash, scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -23,6 +24,10 @@ interface SidebarProps {
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the section groups (e.g. before any scan); the Recent area stays. */
   showSections?: boolean;
+  /** Hash for the home (Recent scans) screen — logo + Recent rail item link here. */
+  homeHref: string;
+  /** True when the Recent scans home screen is showing (rail active state). */
+  atRecent?: boolean;
   /** Icon-only rail when collapsed (narrow widths / user toggle). */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
@@ -50,6 +55,8 @@ export function Sidebar({
   onDeleteRecent,
   counts = {},
   showSections = true,
+  homeHref,
+  atRecent = false,
   collapsed = false,
   onToggleCollapsed,
 }: SidebarProps) {
@@ -85,6 +92,43 @@ export function Sidebar({
           )}
         </button>
       </div>
+
+      {/* New scan — primary rail action (design: sidebar top, brand pill). */}
+      <a
+        href={newHash()}
+        aria-label={t("shell.newScan")}
+        title={collapsed ? t("shell.newScan") : undefined}
+        className={cn(
+          buttonVariants({ size: collapsed ? "icon" : "lg" }),
+          "mb-2 shrink-0",
+          !collapsed && "w-full",
+        )}
+      >
+        <Plus className="h-4 w-4" aria-hidden />
+        {!collapsed && <span>{t("shell.newScan")}</span>}
+      </a>
+
+      {/* Recent scans — the home screen (logo target). */}
+      <a
+        href={homeHref}
+        aria-current={atRecent ? "page" : undefined}
+        title={collapsed ? t("nav.recentScans") : undefined}
+        className={cn(
+          "group relative mb-2 flex shrink-0 items-center gap-2.5 rounded-md px-2 py-2 text-sm",
+          "transition-colors duration-fast ease-out-soft",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
+          collapsed && "justify-center",
+          atRecent
+            ? "bg-brand/10 font-semibold text-foreground"
+            : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+      >
+        <Clock
+          className={cn("h-4 w-4 shrink-0", atRecent && "text-brand")}
+          aria-hidden
+        />
+        {!collapsed && <span className="truncate">{t("nav.recentScans")}</span>}
+      </a>
 
       {!showSections && !collapsed && (
         <p className="px-2 py-3 text-xs leading-relaxed text-muted-foreground">
@@ -123,12 +167,6 @@ export function Sidebar({
                         : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
-                    {active && (
-                      <span
-                        className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand"
-                        aria-hidden
-                      />
-                    )}
                     <Icon
                       className={cn("h-4 w-4 shrink-0", active && "text-brand")}
                       aria-hidden

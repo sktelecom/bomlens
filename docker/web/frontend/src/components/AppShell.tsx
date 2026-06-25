@@ -21,12 +21,14 @@ interface AppShellProps {
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the rail's section groups (e.g. before any scan). */
   showSections?: boolean;
-  /** Project context shown in the top bar, e.g. "my-app · 1.0.0". */
-  projectLabel?: string;
-  /** Hash for the home (New scan) screen — the logo / New scan links point here. */
+  /** Project context shown in the top bar (name + optional version). */
+  project?: { name: string; version?: string };
+  /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
-  /** Show the logo + New scan as links home (hidden on the idle screen itself). */
+  /** Show the logo as a link home (hidden on the Recent home screen itself). */
   showHomeLink?: boolean;
+  /** True on the Recent scans home screen (rail active state). */
+  atRecent?: boolean;
   /** The active section's content fills the canvas. */
   children: ReactNode;
 }
@@ -47,9 +49,10 @@ export function AppShell({
   onDeleteRecent,
   counts,
   showSections,
-  projectLabel,
+  project,
   homeHref,
   showHomeLink,
+  atRecent,
   children,
 }: AppShellProps) {
   // `null` until the user toggles manually; until then we follow the viewport.
@@ -69,7 +72,7 @@ export function AppShell({
   return (
     <div className="flex h-screen flex-col bg-background">
       <TopBar
-        projectLabel={projectLabel}
+        project={project}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
       />
@@ -82,6 +85,8 @@ export function AppShell({
           onDeleteRecent={onDeleteRecent}
           counts={counts}
           showSections={showSections}
+          homeHref={homeHref}
+          atRecent={atRecent}
           collapsed={collapsed}
           onToggleCollapsed={() => setManualCollapsed(!collapsed)}
         />

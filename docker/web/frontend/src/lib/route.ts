@@ -4,7 +4,8 @@
  * supports open-in-new-tab (Cmd/Ctrl+click, middle click, right-click → new tab).
  *
  * Scheme:
- *   `#/`                       → home (the New scan screen)
+ *   `#/`                       → Recent scans (home / logo target)
+ *   `#/new`                    → the New scan screen
  *   `#/scan/<id>`              → a scan's Overview
  *   `#/scan/<id>/<section>`    → a scan's specific section
  *
@@ -15,7 +16,8 @@
 import type { SectionId } from "./nav";
 
 export type Route =
-  | { kind: "home" }
+  | { kind: "recent" }
+  | { kind: "new" }
   | { kind: "scan"; id: string; section: SectionId };
 
 const DEFAULT_SECTION: SectionId = "overview";
@@ -26,20 +28,24 @@ export function parseHash(hash: string): Route {
   // "#scan/…" both parse.
   let h = hash.startsWith("#") ? hash.slice(1) : hash;
   if (h.startsWith("/")) h = h.slice(1);
-  if (!h) return { kind: "home" };
+  if (!h) return { kind: "recent" };
 
   const parts = h.split("/");
-  if (parts[0] !== "scan" || !parts[1]) return { kind: "home" };
-
-  const id = safeDecode(parts[1]);
-  if (!id) return { kind: "home" };
-  const section = (parts[2] ? safeDecode(parts[2]) : "") as SectionId;
-  return { kind: "scan", id, section: section || DEFAULT_SECTION };
+  if (parts[0] === "new") return { kind: "new" };
+  if (parts[0] === "scan" && parts[1]) {
+    const id = safeDecode(parts[1]);
+    if (id) {
+      const section = (parts[2] ? safeDecode(parts[2]) : "") as SectionId;
+      return { kind: "scan", id, section: section || DEFAULT_SECTION };
+    }
+  }
+  return { kind: "recent" };
 }
 
-/** Build a hash for a Route. Home is the bare `#/`. */
+/** Build a hash for a Route. Recent (home) is the bare `#/`. */
 export function buildHash(route: Route): string {
-  if (route.kind === "home") return "#/";
+  if (route.kind === "recent") return "#/";
+  if (route.kind === "new") return "#/new";
   const base = `#/scan/${encodeURIComponent(route.id)}`;
   return route.section && route.section !== DEFAULT_SECTION
     ? `${base}/${encodeURIComponent(route.section)}`
@@ -51,9 +57,14 @@ export function scanHash(id: string, section?: SectionId): string {
   return buildHash({ kind: "scan", id, section: section ?? DEFAULT_SECTION });
 }
 
-/** Hash for the home (New scan) screen. */
+/** Hash for the home screen — Recent scans (the logo target). */
 export function homeHash(): string {
   return "#/";
+}
+
+/** Hash for the New scan screen. */
+export function newHash(): string {
+  return "#/new";
 }
 
 function safeDecode(s: string): string {

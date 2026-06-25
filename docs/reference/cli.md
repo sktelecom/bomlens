@@ -28,7 +28,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--firmware` | false | Force firmware mode on the `--target` file (opt-in firmware image) |
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
 | `--model <owner/name>` | — | Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace model via the OWASP AIBOM Generator (opt-in `bomlens-aibom` image; fetches model-card metadata over the network). Mutually exclusive with `--target`/`--analyze`/`--git`/`--merge` |
-| `--merge <a.json> <b.json> …` | — | Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with `--project`/`--version`. Optional — for server delivery when a submission system needs a single product BOM; otherwise submit the layers separately (see the [server delivery guide](../guides/server-delivery.md)). Mutually exclusive with `--target`/`--analyze`/`--git` |
+| `--merge <a.json> <b.json> …` | — | Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with `--project`/`--version`. Optional — for a server SBOM when an external system needs a single product BOM; otherwise keep the layers separate (see the [server SBOM guide](../guides/server-delivery.md)). Mutually exclusive with `--target`/`--analyze`/`--git` |
 | `--generate-only` | false | Save locally only, without uploading |
 | `--upload-target <target>` | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest) |
 | `--trusca <project_id>` | — | Upload to TRUSCA (= `--upload-target trusca` + project id). Needs `API_URL` and a Bearer `API_KEY` |

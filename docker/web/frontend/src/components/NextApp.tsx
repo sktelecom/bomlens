@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AppShell } from "./AppShell";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
+import { RecentScans } from "./RecentScans";
 import { ResultSection } from "./ResultSections";
 import { ScanRunning } from "./ScanRunning";
 import {
@@ -23,7 +24,7 @@ import {
   type SectionId,
   visibleSectionIds,
 } from "@/lib/nav";
-import { homeHash, parseHash, scanHash } from "@/lib/route";
+import { homeHash, newHash, parseHash, scanHash } from "@/lib/route";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 
 /** Map a stored scan to the Sidebar's Recent link shape. */
@@ -40,6 +41,19 @@ function toRecentLink(s: RecentScan): RecentScanLink {
 }
 
 type Status = "idle" | "running" | "done" | "error";
+
+/** Scan-kind label key for the result-header subtitle, keyed by the CycloneDX
+ *  root component type (available on re-open, unlike the scan MODE). AI wins,
+ *  handled separately; unknown/absent types fall back to a generic SBOM. */
+const SCAN_KIND_KEY: Record<string, string> = {
+  application: "result.kindSource",
+  library: "result.kindSource",
+  framework: "result.kindSource",
+  firmware: "result.kindFirmware",
+  container: "result.kindImage",
+  "operating-system": "result.kindRootfs",
+  data: "result.kindAnalyze",
+};
 
 /**
  * The new shell application (behind `?ui=next`). Same scan state machine as the
@@ -60,8 +74,13 @@ export function NextApp() {
   const [logs, setLogs] = useState<string[]>([]);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
-  const [projectLabel, setProjectLabel] = useState<string>();
+  const [projectInfo, setProjectInfo] = useState<{
+    name: string;
+    version?: string;
+  }>();
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
+  // Which idle screen is shown: Recent scans (home/logo) or New scan (#/new).
+  const [homeView, setHomeView] = useState<"recent" | "new">("recent");
   const [capabilities, setCapabilities] = useState<Capabilities>({
     firmware: false,
     docker: true,
@@ -99,7 +118,7 @@ export function NextApp() {
     setStatus("idle");
     setLogs([]);
     setResult(null);
-    setProjectLabel(undefined);
+    setProjectInfo(undefined);
     setActiveSection("overview");
   }, []);
 
@@ -115,7 +134,7 @@ export function NextApp() {
       closeStream();
       runningIdRef.current = null;
       void loadScan(id).then((done) => {
-        if (parseHash(window.location.hash).kind === "home") return; // navigated away
+        if (parseHash(window.location.hash).kind !== "scan") return; // navigated away
         if (!done) {
           // Artifacts missing (e.g. a live-only scan that was never stored, or a
           // deleted one) — fall back to the New scan screen.
@@ -128,12 +147,10 @@ export function NextApp() {
         setStatus(done.ok ? "done" : "error");
         setActiveSection(section);
         const meta = recent.find((s) => s.id === id);
-        setProjectLabel(
+        setProjectInfo(
           meta
-            ? meta.version
-              ? `${meta.project} · ${meta.version}`
-              : meta.project
-            : id,
+            ? { name: meta.project, version: meta.version || undefined }
+            : { name: id },
         );
       });
     },
@@ -146,7 +163,8 @@ export function NextApp() {
   const route = useCallback(() => {
     if (status === "running") return;
     const parsed = parseHash(window.location.hash);
-    if (parsed.kind === "home") {
+    if (parsed.kind === "recent" || parsed.kind === "new") {
+      setHomeView(parsed.kind);
       if (loadedIdRef.current !== null || status !== "idle") resetToHome();
       return;
     }
@@ -196,9 +214,10 @@ export function NextApp() {
     setProgress(null);
     setResult(null);
     setActiveSection("overview");
-    setProjectLabel(
-      params.version ? `${params.project} · ${params.version}` : params.project,
-    );
+    setProjectInfo({
+      name: params.project,
+      version: params.version || undefined,
+    });
     streamRef.current = startScan(params, {
       onLog: (line) => setLogs((prev) => [...prev, line]),
       onProgress: (p) => setProgress(p),
@@ -235,15 +254,21 @@ export function NextApp() {
       recent={recentLinks}
       onDeleteRecent={deleteRecent}
       homeHref={homeHash()}
-      showHomeLink={!isHome}
-      projectLabel={isHome ? undefined : projectLabel}
+      showHomeLink={!(isHome && homeView === "recent")}
+      atRecent={isHome && homeView === "recent"}
+      project={isHome ? undefined : projectInfo}
     >
       {isHome ? (
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">
-            {t("shell.newScan")}
-          </h1>
-          <NewScan running={false} capabilities={capabilities} onRun={run} />
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          {homeView === "recent" ? (
+            <RecentScans
+              scans={recent}
+              newHref={newHash()}
+              onDelete={deleteRecent}
+            />
+          ) : (
+            <NewScan running={false} capabilities={capabilities} onRun={run} />
+          )}
         </div>
       ) : !result ? (
         <div className="mx-auto max-w-5xl px-6 py-8">
@@ -251,24 +276,39 @@ export function NextApp() {
             logs={logs}
             status={status === "error" ? "error" : "running"}
             progress={status === "running" ? progress : null}
-            projectLabel={projectLabel}
+            projectLabel={
+              projectInfo &&
+              (projectInfo.version
+                ? `${projectInfo.name} · ${projectInfo.version}`
+                : projectInfo.name)
+            }
           />
         </div>
       ) : (
         <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              {t(`nav.${activeSection}`)}
-            </h1>
-            <span
-              className={
-                result.ok
-                  ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
-                  : "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
-              }
-            >
-              {result.ok ? t("result.succeeded") : t("result.failed")}
-            </span>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                {t(`nav.${activeSection}`)}
+              </h1>
+              <span
+                className={
+                  result.ok
+                    ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                    : "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+                }
+              >
+                {result.ok ? t("result.succeeded") : t("result.failed")}
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {t(
+                scan.isAiScan
+                  ? "result.kindAi"
+                  : (SCAN_KIND_KEY[result.sbom?.componentType ?? ""] ??
+                      "result.kindSbom"),
+              )}
+            </p>
           </div>
 
           <ResultSection

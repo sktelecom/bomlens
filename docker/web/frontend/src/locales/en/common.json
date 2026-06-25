@@ -67,6 +67,13 @@
   },
   "result": {
     "title": "Results",
+    "kindAi": "AI model SBOM",
+    "kindSource": "Source SBOM",
+    "kindImage": "Container image SBOM",
+    "kindFirmware": "Firmware SBOM",
+    "kindRootfs": "Root filesystem SBOM",
+    "kindAnalyze": "SBOM analysis",
+    "kindSbom": "SBOM",
     "succeeded": "Scan complete",
     "failed": "Scan failed",
     "components": "Components",
@@ -225,6 +232,7 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "recent": "Recent scans",
+    "recentScans": "Recent scans",
     "recentEmpty": "No recent scans yet",
     "recentDelete": "Delete this scan",
     "sectionsHint": "Run a scan to see result sections here.",
@@ -248,6 +256,8 @@
     "newScan": "New scan"
   },
   "newscan": {
+    "title": "What do you want to scan?",
+    "subtitle": "Pick a target and BomLens generates the SBOM, open-source notice, and security report locally in one run.",
     "source": "Source",
     "settings": "Scan settings",
     "outputs": "Outputs",
@@ -271,7 +281,8 @@
     "attnVulns": "{{count}} critical or high vulnerabilities",
     "attnReview": "{{count}} components flagged for review",
     "explore": "Explore",
-    "jumpHint": "View {{section}}"
+    "jumpHint": "View {{section}}",
+    "depBreakdown": "{{direct}} direct · {{transitive}} transitive"
   },
   "models": {
     "loading": "Loading model details…",
@@ -347,6 +358,27 @@
     "flagNonCommercial": "Non-commercial",
     "distribution": "License distribution",
     "clickHint": "Click a license to see its components"
+  },
+  "recent": {
+    "title": "Recent scans",
+    "subtitle": "Past scans saved in this machine's local output folder · no account, no server.",
+    "total": "Total scans",
+    "atRisk": "At risk",
+    "ai": "AI scans",
+    "colScan": "Scan",
+    "colType": "Type",
+    "colGenerated": "Generated",
+    "colComponents": "Components",
+    "colSeverity": "Top severity",
+    "delete": "Delete",
+    "typeAi": "AI model",
+    "typeSbom": "SBOM",
+    "typeSource": "Source",
+    "typeFirmware": "Firmware",
+    "typeContainer": "Container",
+    "typeRootfs": "RootFS",
+    "empty": "No scans yet. Start with a New scan.",
+    "source": "Delete a file and it leaves this list too."
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",

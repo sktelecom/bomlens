@@ -48,7 +48,7 @@ async function fillAndRun(page: Page) {
 
 test("Vendored toggle is offered under scan options when scanoss is available", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true });
-  await page.goto("/");
+  await page.goto("/#/new");
   // The redesigned New scan shows the vendored-ID toggle inline under the
   // "Advanced scan options" column for a source scan (the default current-dir),
   // off by default but visible — no separate disclosure to expand.
@@ -59,20 +59,22 @@ test("Vendored toggle is offered under scan options when scanoss is available", 
 
 test("Vendored toggle hidden when scanoss is NOT available", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true });
-  await page.goto("/");
+  await page.goto("/#/new");
+  // Wait for the New scan screen to mount before asserting the toggle's absence.
+  await page.locator("#project").waitFor();
   await expect(page.getByText("File-level identification (SCANOSS)")).toHaveCount(0);
 });
 
 test("result banner appears for the C/C++ suggestion", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true }, VENDORED_DONE);
-  await page.goto("/");
+  await page.goto("/#/new");
   await fillAndRun(page);
   await expect(page.getByText(/is this C\/C\+\+ embedded source/i)).toBeVisible();
 });
 
 test("vendored badge + match confidence render; XSS name is inert", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true }, VENDORED_DONE);
-  await page.goto("/");
+  await page.goto("/#/new");
   await fillAndRun(page);
   // Open the Components section (nav is now anchor links) where the
   // per-component table (and badge) lives.
