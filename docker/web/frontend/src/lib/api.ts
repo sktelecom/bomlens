@@ -161,6 +161,11 @@ export interface ScanParams {
   security: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
+  /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
+   *  is not baked into the image, so enabling this downloads it on this run
+   *  (the determinate progress bar surfaces the download). Read server-side as
+   *  the exact `includeOsv` flag. */
+  includeOsv: boolean;
   byteStable: boolean;
 }
 
@@ -341,6 +346,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     security: String(params.security),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
+    includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
   });
 

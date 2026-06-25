@@ -55,7 +55,9 @@
     "identifyVendored": "File-level identification (SCANOSS)",
     "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service.",
     "scanossTokenPlaceholder": "SCANOSS token (optional)",
-    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged."
+    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged.",
+    "includeOsv": "Include OSV advisories",
+    "includeOsvHint": "Adds OSV.dev advisories to the firmware vulnerability match. The OSV database is not bundled in the image, so it downloads from osv.dev on this run (progress is shown below)."
   },
   "progress": {
     "title": "Run log",

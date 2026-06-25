@@ -65,6 +65,8 @@ export function useScanForm({
   const [security, setSecurity] = useState(true);
   const [deepLicense, setDeepLicense] = useState(false);
   const [identifyVendored, setIdentifyVendored] = useState(false);
+  // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
+  const [includeOsv, setIncludeOsv] = useState(false);
   const [scanossToken, setScanossToken] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -77,6 +79,10 @@ export function useScanForm({
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply.
   const isAiModel = source === "ai-model";
+  // OSV.dev advisories are only fetched for firmware scans (cve-bin-tool), and
+  // the osv.dev DB is not in the image, so it downloads on this run when on.
+  const isFirmware = source === "firmware-upload";
+  const showIncludeOsv = isFirmware;
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
@@ -85,7 +91,7 @@ export function useScanForm({
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
   // models, where there is nothing to scan and the toggle would be a no-op.
   const showDeepLicense = isSourceScan;
-  const showScanOptions = showDeepLicense || showVendored;
+  const showScanOptions = showDeepLicense || showVendored || showIncludeOsv;
   const busy = running || uploading;
 
   /** Switching source resets the dependent inputs. */
@@ -160,6 +166,8 @@ export function useScanForm({
       security: isAiModel ? false : isAnalyze ? true : security,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
+      // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
+      includeOsv: showIncludeOsv ? includeOsv : false,
       // Byte-stable (reproducible) output is a CI concern; not exposed in the UI.
       byteStable: false,
     });
@@ -184,10 +192,11 @@ export function useScanForm({
     file, setFile,
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
+    includeOsv, setIncludeOsv,
     scanossToken, setScanossToken,
     invalid, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, showVendored,
-    showDeepLicense, showScanOptions,
+    showDeepLicense, showIncludeOsv, showScanOptions,
     options, submit,
     capabilities,
   };

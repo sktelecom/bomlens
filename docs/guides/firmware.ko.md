@@ -67,6 +67,8 @@ SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbo
 
 데이터베이스는 NVD뿐 아니라 여러 출처(NVD, PURL2CPE 등)를 합친 집계 데이터입니다. cve-bin-tool은 "This product uses the NVD API but is not endorsed or certified by the NVD." 고지를 출력합니다.
 
+OSV(Open Source Vulnerabilities) 권고는 재배포 이미지에 share-alike 데이터를 포함하지 않으려고 번들하지 않습니다. 대신 웹 UI에 "Include OSV advisories" opt-in 토글이 있어, 켜면 그 스캔에 한해 osv.dev에서 OSV를 받아옵니다. 데이터가 이미지에 동봉되는 게 아니라 사용자 머신에서 직접 내려받는 방식입니다.
+
 ## 라이선스 주의
 
 펌웨어 이미지에는 GPL 도구(cve-bin-tool, BANG, unblob이 의존하는 일부 extractor)가 들어 있습니다. 셸 스크립트는 이 도구들을 별도 프로세스로 호출만 하므로 copyleft가 이 저장소의 코드로 전파되지는 않습니다. 다만 GPL 바이너리를 이미지에 담아 재배포하므로, 라이선스 텍스트 동봉과 소스 오퍼 의무는 그대로 적용됩니다. 상세 인벤토리는 [번들 도구 라이선스](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참고하세요. GPL 도구는 이 펌웨어 이미지에만 들어가고 기본 이미지는 permissive 라이선스만 유지합니다.

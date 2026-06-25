@@ -910,6 +910,16 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
     ]
+    # Opt-in OSV advisories for firmware: forward only the two fixed control
+    # values the UI may have set on the firmware path. We re-derive each from a
+    # closed allowlist (never the env string itself) so no user-influenced text
+    # can reach the docker-run argv. Absent/any-other value -> not forwarded,
+    # so scan-firmware.sh keeps its offline-bundle default.
+    if mode == "FIRMWARE":
+        if env.get("CVE_BIN_TOOL_DISABLE_SOURCES") == "GAD":
+            args += ["-e", "CVE_BIN_TOOL_DISABLE_SOURCES=GAD"]
+        if env.get("CVE_BIN_TOOL_MODE") == "online":
+            args += ["-e", "CVE_BIN_TOOL_MODE=online"]
     if host_file is not None:
         # Mount the upload read-only under a fixed in-sibling path. Reduce to a
         # bare basename and take it from the allowlist match so the in-sibling
@@ -1372,6 +1382,15 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "FIRMWARE"
                 env["MODE"] = "FIRMWARE"
                 env["TARGET_FILE"] = up
+                # Opt-in: also pull OSV advisories from osv.dev for this scan.
+                # Default (off) keeps scan-firmware.sh's offline bundle matching
+                # (CVE_BIN_TOOL_DISABLE_SOURCES=GAD,OSV, auto/offline). When the
+                # user enables it we re-enable only OSV (leave GAD disabled) and
+                # force the online updater. The wire field is a plain boolean,
+                # and only these two fixed literals are injected (no user text).
+                if g("includeOsv") == "true":
+                    env["CVE_BIN_TOOL_DISABLE_SOURCES"] = "GAD"
+                    env["CVE_BIN_TOOL_MODE"] = "online"
                 if firmware_capable():
                     # Tools are in THIS image (UI launched from the firmware image):
                     # run in-process exactly as before.

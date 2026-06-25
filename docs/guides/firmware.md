@@ -67,6 +67,8 @@ CVE matching for static binaries uses cve-bin-tool with its own vulnerability da
 
 The database is aggregated from several sources (NVD, PURL2CPE, and others), not from NVD alone. cve-bin-tool prints the notice "This product uses the NVD API but is not endorsed or certified by the NVD."
 
+OSV (Open Source Vulnerabilities) advisories are not bundled, to keep the redistributed image free of share-alike data. The web UI offers an opt-in toggle, "Include OSV advisories," that fetches OSV from osv.dev for that single scan, so the data is downloaded directly on your machine rather than shipped in the image.
+
 ## License note
 
 The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.

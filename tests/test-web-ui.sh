@@ -139,6 +139,38 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert "/host/up/fw.bin:/input/fw.bin:ro" in captured["args"], captured["args"]
 
+# Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
+# they are forwarded to the sibling as exactly two fixed -e literals. AIBOM and
+# the default (off) firmware path must NOT carry them.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+    extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
+)
+assert rc == 0, rc
+assert "CVE_BIN_TOOL_DISABLE_SOURCES=GAD" in captured["args"], captured["args"]
+assert "CVE_BIN_TOOL_MODE=online" in captured["args"], captured["args"]
+
+# Default firmware (no opt-in) forwards neither var -> offline-bundle default.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+)
+assert rc == 0, rc
+assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
+
+# AIBOM never carries the OSV control vars even if present in extra_env.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
+
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
 rc = server.run_sibling_scan(
