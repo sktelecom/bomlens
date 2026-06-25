@@ -85,6 +85,11 @@ ARTIFACT_SUFFIXES = (
     "_conformance.json", "_conformance.md", "_conformance.html",
     "_risk-report.md", "_risk-report.html",
     "_bom.json.sig", "_scancode.json",
+    # Source file tree (ScanCode-shaped, structure-only). Emitted by the scanner
+    # for source-having modes so the UI's source-tree view works without the
+    # opt-in ScanCode deep-license scan; the frontend prefers _scancode (which
+    # carries licenses) when both exist.
+    "_files.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not

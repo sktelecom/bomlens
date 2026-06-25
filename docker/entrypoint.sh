@@ -348,6 +348,28 @@ if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
     fi
 fi
 
+# Source file tree (${OUT_PREFIX}_files.json). For modes with actual source files
+# on disk, emit a ScanCode-shaped inventory so the web UI's source-tree view works
+# WITHOUT the opt-in ScanCode deep-license scan — structure only, no licenses.
+# When ScanCode already produced a _scancode.json, that one wins (it carries
+# licenses), so we skip this fallback. SOURCE/ROOTFS walk the tree here; FIRMWARE
+# already wrote it inside scan-firmware.sh (its extracted rootfs is a temp dir
+# removed before we get here). Modes with no source files (AIBOM/ANALYZE/MERGE/
+# POSTPROCESS-without-source/BINARY) are excluded. Best-effort: never aborts.
+if [ ! -f "${OUT_PREFIX}_scancode.json" ]; then
+    SRC_TREE_DIR=""
+    case "$SCAN_MODE" in
+        SOURCE) SRC_TREE_DIR="${SOURCE_ROOT:-/src}" ;;
+        ROOTFS) SRC_TREE_DIR="$TARGET_DIR" ;;
+    esac
+    if [ -n "$SRC_TREE_DIR" ] && [ -d "$SRC_TREE_DIR" ]; then
+        bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" || true
+    fi
+fi
+# Collect the file tree if any source-having mode produced one (SOURCE/ROOTFS
+# above, or FIRMWARE from scan-firmware.sh).
+[ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")
+
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt" "${OUT_PREFIX}_NOTICE.html")

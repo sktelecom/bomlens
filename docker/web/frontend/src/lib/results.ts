@@ -11,9 +11,23 @@ export function sbomFileName(result: DoneEvent): string | undefined {
   return result.results.find((r) => r.name.endsWith("_bom.json"))?.name;
 }
 
-/** The ScanCode artifact, if present (drives the source-tree view). */
+/** The ScanCode artifact, if present (carries per-file licenses). */
 export function scancodeFileName(result: DoneEvent): string | undefined {
   return result.results.find((r) => r.name.includes("_scancode"))?.name;
+}
+
+/** The structure-only source file tree (`_files.json`), if present. */
+export function sourceFilesFileName(result: DoneEvent): string | undefined {
+  return result.results.find((r) => r.name.endsWith("_files.json"))?.name;
+}
+
+/**
+ * The artifact that drives the source-tree view. Both ScanCode output and the
+ * structure-only `_files.json` share the same shape (parseScanCode reads both);
+ * ScanCode wins when present because it also carries per-file licenses.
+ */
+export function sourceTreeFileName(result: DoneEvent): string | undefined {
+  return scancodeFileName(result) ?? sourceFilesFileName(result);
 }
 
 /** Build the rail's scan context from a result (null before any scan). */
@@ -23,7 +37,7 @@ export function deriveScanContext(result: DoneEvent | null): ScanContext {
     mode: result.mode ?? null,
     isAiScan: isAiScan(result),
     hasDependencies: Boolean(sbomFileName(result)),
-    hasSourceTree: Boolean(scancodeFileName(result)),
+    hasSourceTree: Boolean(sourceTreeFileName(result)),
     hasG7: (result.conformance?.checks ?? []).some((c) => c.id.startsWith("g7-")),
   };
 }

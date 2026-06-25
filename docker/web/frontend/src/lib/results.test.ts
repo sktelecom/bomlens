@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { DoneEvent } from "./api";
-import { deriveScanContext, sectionCounts } from "./results";
+import {
+  deriveScanContext,
+  sectionCounts,
+  sourceTreeFileName,
+} from "./results";
 
 function makeResult(over: Partial<DoneEvent> = {}): DoneEvent {
   return {
@@ -32,7 +36,7 @@ describe("deriveScanContext", () => {
     expect(deriveScanContext(makeResult({ results: [] })).hasDependencies).toBe(false);
   });
 
-  it("flags the source tree only when a ScanCode artifact exists", () => {
+  it("flags the source tree when a ScanCode artifact exists", () => {
     const withScancode = makeResult({
       results: [
         { name: "demo_1.0_bom.json", size: 10 },
@@ -41,6 +45,43 @@ describe("deriveScanContext", () => {
     });
     expect(deriveScanContext(withScancode).hasSourceTree).toBe(true);
     expect(deriveScanContext(makeResult()).hasSourceTree).toBe(false);
+  });
+
+  it("flags the source tree from the structure-only _files.json fallback", () => {
+    const withFiles = makeResult({
+      results: [
+        { name: "demo_1.0_bom.json", size: 10 },
+        { name: "demo_1.0_files.json", size: 20 },
+      ],
+    });
+    expect(deriveScanContext(withFiles).hasSourceTree).toBe(true);
+  });
+});
+
+describe("sourceTreeFileName", () => {
+  it("prefers the ScanCode artifact over _files.json when both exist", () => {
+    const both = makeResult({
+      results: [
+        { name: "demo_1.0_bom.json", size: 10 },
+        { name: "demo_1.0_files.json", size: 20 },
+        { name: "demo_1.0_scancode.json", size: 30 },
+      ],
+    });
+    expect(sourceTreeFileName(both)).toBe("demo_1.0_scancode.json");
+  });
+
+  it("falls back to _files.json when no ScanCode artifact exists", () => {
+    const filesOnly = makeResult({
+      results: [
+        { name: "demo_1.0_bom.json", size: 10 },
+        { name: "demo_1.0_files.json", size: 20 },
+      ],
+    });
+    expect(sourceTreeFileName(filesOnly)).toBe("demo_1.0_files.json");
+  });
+
+  it("returns undefined when no source-tree artifact exists (e.g. AI scan)", () => {
+    expect(sourceTreeFileName(makeResult())).toBeUndefined();
   });
 
   it("carries the backend mode through", () => {

@@ -193,8 +193,9 @@
   },
   "sourceTree": {
     "loading": "Loading source tree…",
-    "loadError": "Could not load the ScanCode results.",
-    "empty": "No source files were scanned."
+    "loadError": "Could not load the source file tree.",
+    "empty": "No source files were scanned.",
+    "noLicenseHint": "License details appear when you run a ScanCode (deep-license) scan."
   },
   "severity": {
     "CRITICAL": "Critical",
