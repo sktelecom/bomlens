@@ -13,7 +13,7 @@ SaaS 없이 로컬에서 단일 프로젝트의 SBOM(CycloneDX 1.6)을 생성하
 
 CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
 
-![BomLens 웹 UI에서 스캔 결과를 살펴보는 모습 — KPI 카드와 심각도·라이선스 요약, 구성요소 표 필터링, 취약점 행을 펼쳐 CVSS 점수·설명·참조 확인, 의존성 그래프와 트리, 소스 트리 탐색](images/web-ui-demo.gif){ .home-shot }
+![BomLens 웹 UI의 스캔 결과 — 수치와 심각도·라이선스 요약이 있는 개요, 필터가 있는 컴포넌트 표, 취약점 목록, 그래프와 트리로 보는 의존성, 라이선스 섹션](images/web-ui-demo.gif){ .home-shot }
 
 ## 무엇부터 볼까
 
