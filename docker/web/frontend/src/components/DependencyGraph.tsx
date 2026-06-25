@@ -165,7 +165,13 @@ export function DependencyGraph({
               },
             },
           ],
-          layout: { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 },
+          // With edges, a left-to-right dependency layout; without any edges
+          // (e.g. a firmware SBOM with no dependency relationships) a grid, so
+          // the nodes read as a tidy block instead of one long line.
+          layout:
+            edges.length > 0
+              ? { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 }
+              : { name: "grid", avoidOverlap: true, fit: true, padding: 24 },
           // Cap zoom so small graphs (a few nodes) don't blow up to fill the
           // canvas — that's what made labels huge and overlap.
           minZoom: 0.2,
@@ -174,6 +180,15 @@ export function DependencyGraph({
         };
         cy = cytoscape(config);
         cyRef.current = cy;
+        // First view: if fit zoomed too far out to read labels, clamp the zoom
+        // and anchor to the top-left so the start of the graph is legible.
+        cy.one("layoutstop", () => {
+          if (cy.zoom() < 0.6) {
+            cy.zoom(0.6);
+            const bb = cy.elements().boundingBox();
+            cy.pan({ x: 24 - bb.x1 * cy.zoom(), y: 24 - bb.y1 * cy.zoom() });
+          }
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cy.on("tap", "node", (evt: any) => {
           setSelected(nodeById.get(evt.target.id()) ?? null);

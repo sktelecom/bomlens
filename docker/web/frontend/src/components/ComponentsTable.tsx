@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, ArrowUpDown, Package, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -111,6 +111,7 @@ export function ComponentsTable({ items, total, truncated }: Props) {
   const [filters, setFilters] = useState<ComponentFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<Sort | null>(null);
   const [limit, setLimit] = useState(RENDER_STEP);
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   const types = useMemo(() => distinct(items.map((c) => c.type)), [items]);
   const licenses = useMemo(() => distinct(items.flatMap((c) => c.licenses)), [items]);
@@ -217,7 +218,7 @@ export function ComponentsTable({ items, total, truncated }: Props) {
         {truncated ? ` · ${t("result.truncated")}` : ""}
       </div>
 
-      <div className="max-h-[28rem] overflow-auto rounded-md border">
+      <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">
@@ -234,10 +235,15 @@ export function ComponentsTable({ items, total, truncated }: Props) {
             </tr>
           </thead>
           <tbody>
-            {visible.map((c, i) => (
+            {visible.map((c, i) => {
+              const key = c.purl || `${c.name}-${i}`;
+              const isOpen = openKey === key;
+              return (
+              <Fragment key={key}>
               <tr
-                key={c.purl || `${c.name}-${i}`}
-                className="border-b last:border-0 hover:bg-accent/50"
+                className="cursor-pointer border-b last:border-0 hover:bg-accent/50"
+                onClick={() => setOpenKey(isOpen ? null : key)}
+                aria-expanded={isOpen}
               >
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
@@ -307,7 +313,60 @@ export function ComponentsTable({ items, total, truncated }: Props) {
                   )}
                 </td>
               </tr>
-            ))}
+              {isOpen && (
+                <tr className="border-b last:border-0">
+                  <td colSpan={colCount} className="bg-muted/30 px-3 py-3">
+                    <dl className="grid grid-cols-[max-content,1fr] gap-x-4 gap-y-1.5 text-xs">
+                      {c.purl ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">purl</dt>
+                          <dd className="break-all font-mono">{c.purl}</dd>
+                        </>
+                      ) : null}
+                      {c.source ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("result.colSource")}</dt>
+                          <dd>
+                            <a
+                              href={c.source}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="break-all text-primary underline-offset-2 hover:underline"
+                            >
+                              {c.source}
+                            </a>
+                          </dd>
+                        </>
+                      ) : null}
+                      {c.copyright ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("result.colCopyright")}</dt>
+                          <dd className="break-words">{c.copyright}</dd>
+                        </>
+                      ) : null}
+                      {c.licenses.length > 0 ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("result.colLicense")}</dt>
+                          <dd>{c.licenses.join(", ")}</dd>
+                        </>
+                      ) : null}
+                      {c.vulnCount ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("nav.vulnerabilities")}</dt>
+                          <dd>
+                            {c.maxSeverity ? `${t(`severity.${c.maxSeverity}`)} · ` : ""}
+                            {c.vulnCount}
+                          </dd>
+                        </>
+                      ) : null}
+                    </dl>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+              );
+            })}
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={colCount} className="px-3 py-6 text-center text-muted-foreground">

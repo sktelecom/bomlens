@@ -113,7 +113,7 @@ export function DependencyTree({
       {!hasDependencies && (
         <p className="text-xs text-muted-foreground">{t("deps.flatFallback")}</p>
       )}
-      <div className="max-h-[28rem] overflow-auto rounded-md border p-1">
+      <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border p-1">
         <ul>
           {tree.map((n, i) => (
             <TreeRow key={`${n.id}-${i}`} node={n} />

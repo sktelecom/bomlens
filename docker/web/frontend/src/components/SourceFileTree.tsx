@@ -76,7 +76,7 @@ export function SourceFileTree({ nodes }: { nodes: FileNode[] }) {
   }
 
   return (
-    <div className="max-h-[28rem] overflow-auto rounded-md border p-1">
+    <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border p-1">
       <ul>
         {nodes.map((n) => (
           <FileRow key={n.path} node={n} depth={0} />
