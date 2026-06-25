@@ -24,7 +24,9 @@ export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
 export const ACCEPT: Record<UploadKind, string> = {
   zip: ".zip,.tar.gz,.tgz,.tar.bz2,.tar.xz,.tar",
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json",
-  firmware: ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf",
+  firmware:
+    ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +
+    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
 };
 
 /** Free-text inputs: the single `target` field, with per-source i18n keys. */

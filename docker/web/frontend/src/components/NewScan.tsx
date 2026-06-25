@@ -120,11 +120,12 @@ export function NewScan({ running, capabilities, onRun }: Props) {
         </CardContent>
       </Card>
 
-      {/* Settings below the source, in two balanced columns: project meta +
-          outputs on the left, scan method + run action on the right. */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="h-fit animate-fade-in">
-          <CardContent className="space-y-5 p-4">
+      {/* Settings below the source, as one top-to-bottom card: identity first,
+          then all options side by side, then the run action — so "what to turn
+          on" reads in one place instead of split left/right. */}
+      <Card className="animate-fade-in">
+        <CardContent className="space-y-6 p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="project">{t("form.project")}</Label>
               <Input
@@ -146,26 +147,25 @@ export function NewScan({ running, capabilities, onRun }: Props) {
                 disabled={state.busy}
               />
             </div>
+          </div>
 
-            <div className="space-y-3 pt-1">
+          <div className="grid gap-x-8 gap-y-5 border-t pt-5 sm:grid-cols-2">
+            <div className="space-y-3">
               <Label>{t("newscan.outputs")}</Label>
               <GenerationOptions state={state} />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="h-fit animate-fade-in">
-          <CardContent className="space-y-5 p-4">
             <div className="space-y-3">
               <Label>{t("newscan.scanOptions")}</Label>
               <ScanOptions state={state} />
             </div>
+          </div>
 
+          <div className="space-y-3 border-t pt-5">
             <FormMessages state={state} />
             <RunButton state={state} running={running} />
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
