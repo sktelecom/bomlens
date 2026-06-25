@@ -28,10 +28,13 @@
 # server.py guarantees we test the code under review, not a stale layer (the very
 # place regression #2 hides). The entrypoint/lib scripts come from the image.
 #
-# Heavy/networked cases (cdxgen 15GB language image, real OSSKB matching, git
-# clone, firmware, ai-model) are NOT exercised here: they are flaky/slow in CI.
-# current-dir/zip therefore fall back to syft (manifest-only), which is enough to
-# prove the source path reaches a valid `done`. Skips are logged, never silent.
+# Deterministic, network-free source types run every time: sbom-upload, current-
+# dir, zip-upload, rootfs-dir (the last two fall back to syft/manifest-only, which
+# is enough to prove the path reaches a valid `done`). docker-image runs when
+# alpine can be pulled. The rest are gated and self-skip (logged, never silent):
+# firmware-upload only when unblob is in the image (SBOM_FIRMWARE=true build),
+# git-url only with WEB_GIT_E2E=1 (network clone), and ai-model / real OSSKB
+# matching / the 15GB cdxgen language image are out of scope here.
 #
 # Requirements: docker, curl, python3. A scanner image with server.py + run-scan +
 # syft (+ scanoss-py for the #1 regression). Override with SBOM_E2E_IMAGE.
@@ -87,6 +90,12 @@ JSON
 # A tiny source tree (a package manifest) for the current-dir / zip SOURCE path.
 cat > "$SRC/package.json" <<'JSON'
 {"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}
+JSON
+
+# A subfolder under /src for the rootfs-dir (MODE=ROOTFS) path.
+mkdir -p "$SRC/subapp"
+cat > "$SRC/subapp/package.json" <<'JSON'
+{"name":"sub-app","version":"2.0.0","dependencies":{"left-pad":"1.3.0"}}
 JSON
 
 # Pre-seed an UNRELATED past scan in OUTPUT_DIR. Regression #2: it must never
@@ -219,6 +228,78 @@ if stream "project=srcproj&version=1.0&source=current-dir&security=false"; then
     esac
 else
     fail "current-dir produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"
+fi
+
+echo "== zip-upload (MODE=SOURCE, syft fallback) — uploaded archive =="
+# Zip the manifest (python3 is already required by assert_done, so no zip CLI
+# dependency). The server extracts it under .uploads/<token>/ and scans as SOURCE.
+# Component discovery off the extracted tree is syft-path-dependent (min 0); what
+# this proves is that upload -> extract -> SOURCE reaches a valid, scoped done.
+( cd "$SRC" && python3 -m zipfile -c "$WORK/app.zip" package.json ) 2>/dev/null
+ztok="$(upload zip "$WORK/app.zip")"
+if [ -z "$ztok" ]; then
+    fail "zip upload returned no token"
+elif stream "project=zipproj&version=1.0&source=zip-upload&token=$ztok&security=false"; then
+    out="$(assert_done "zip-upload" SOURCE zipproj_1.0 0)"
+    case "$out" in
+        OK*) pass "zip-upload -> done.ok, SOURCE, prefix-scoped ($out)" ;;
+        *)   fail "zip-upload done event wrong" "$out" ;;
+    esac
+else
+    fail "zip-upload produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"
+fi
+
+echo "== rootfs-dir (MODE=ROOTFS) — a subfolder of /src =="
+# A directory target relative to /src routes to ROOTFS (syft dir). Component
+# discovery from a bare manifest is syft-dependent, so the check is min 0 — what
+# this proves is that the rootfs path reaches a valid, prefix-scoped done.
+if stream "project=rootfsproj&version=1.0&source=rootfs-dir&target=subapp&security=false"; then
+    out="$(assert_done "rootfs-dir" ROOTFS rootfsproj_1.0 0)"
+    case "$out" in
+        OK*) pass "rootfs-dir -> done.ok, ROOTFS, prefix-scoped ($out)" ;;
+        *)   fail "rootfs-dir done event wrong" "$out" ;;
+    esac
+else
+    fail "rootfs-dir produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"
+fi
+
+echo "== firmware-upload (MODE=FIRMWARE) — only when unblob is in this image =="
+# The base/scanoss image has no unblob, so this self-skips there; it exercises the
+# web firmware path only on a SBOM_FIRMWARE=true image. Network-independent: a
+# tiny non-firmware blob still drives upload -> FIRMWARE mode -> best-effort done.
+if docker exec "$CID" sh -c 'command -v unblob >/dev/null 2>&1'; then
+    printf 'not real firmware, just exercises the path\n' > "$WORK/fw.bin"
+    ftok="$(upload firmware "$WORK/fw.bin")"
+    if [ -z "$ftok" ]; then
+        fail "firmware upload returned no token"
+    elif stream "project=fwproj&version=1.0&source=firmware-upload&token=$ftok&security=false"; then
+        out="$(assert_done "firmware-upload" FIRMWARE fwproj_1.0 0)"
+        case "$out" in
+            OK*) pass "firmware-upload -> done.ok, FIRMWARE, prefix-scoped ($out)" ;;
+            *)   fail "firmware-upload done event wrong" "$out" ;;
+        esac
+    else
+        fail "firmware-upload produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"
+    fi
+else
+    skip "firmware-upload: unblob not in this image (use a SBOM_FIRMWARE=true build)"
+fi
+
+echo "== git-url (MODE=SOURCE via clone) — opt-in, needs network =="
+# A real clone is network-dependent and slower, so it is opt-in (WEB_GIT_E2E=1)
+# and skipped by default — logged, never silent.
+if [ "${WEB_GIT_E2E:-0}" = "1" ]; then
+    if stream "project=gitproj&version=1.0&source=git-url&target=https://github.com/octocat/Hello-World&security=false"; then
+        out="$(assert_done "git-url" SOURCE gitproj_1.0 0)"
+        case "$out" in
+            OK*) pass "git-url -> done.ok, SOURCE, prefix-scoped ($out)" ;;
+            *)   fail "git-url done event wrong" "$out" ;;
+        esac
+    else
+        fail "git-url produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"
+    fi
+else
+    skip "git-url: set WEB_GIT_E2E=1 to clone over the network"
 fi
 
 echo "== regression #1: SCANOSS must fingerprint dot-prefixed (.uploads) paths =="
