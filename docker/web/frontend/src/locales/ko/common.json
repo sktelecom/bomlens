@@ -303,6 +303,9 @@
     "sFail": "실패",
     "sWarn": "권고",
     "howToFix": "보완 방법:",
+    "evidence": "충족 근거:",
+    "example": "예시:",
+    "learnMore": "더 알아보기",
     "help": {
       "g7-model-id": {
         "what": "모델을 PURL/CPE 같은 표준 식별자로 식별합니다.",

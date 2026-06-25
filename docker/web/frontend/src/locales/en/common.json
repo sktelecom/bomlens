@@ -303,6 +303,9 @@
     "sFail": "Failed",
     "sWarn": "Advisory",
     "howToFix": "How to satisfy:",
+    "evidence": "Met with:",
+    "example": "Example:",
+    "learnMore": "Learn more",
     "help": {
       "g7-model-id": {
         "what": "Identifies the model with a standard identifier such as PURL/CPE.",

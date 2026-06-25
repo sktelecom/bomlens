@@ -97,6 +97,9 @@ export interface ConformanceCheck {
   status: "pass" | "fail" | "warn";
   detail: string;
   missing?: string[];
+  /** Actual SBOM values that satisfy this check (e.g. the PURL, license id,
+   *  hash algorithm). Shown as the "met with" evidence on passing G7 checks. */
+  evidence?: string[];
 }
 
 export interface ConformanceSummary {

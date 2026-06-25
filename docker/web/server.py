@@ -519,6 +519,7 @@ def conformance_summary(prefix):
             "status": str(c.get("status") or "warn"),
             "detail": str(c.get("detail") or ""),
             "missing": [str(m) for m in (c.get("missing") or [])][:MAX_CONFORMANCE_MISSING],
+            "evidence": [str(e) for e in (c.get("evidence") or [])][:MAX_CONFORMANCE_MISSING],
         })
     return {
         "result": data.get("result", "unknown"),

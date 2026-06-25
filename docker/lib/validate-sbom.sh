@@ -125,28 +125,36 @@ cdx_checks() {
 # single-model AI SBOM and are intentionally omitted.
 g7_ai_checks() {
     jq -c --argjson cap "$MISSING_CAP" '
-    def cov($missing; $tot; $label; $id):
+    def cov($missing; $tot; $label; $id; $ev):
       {id:$id, label:$label, required:false,
        status:(if $tot==0 then "warn" elif ($missing|length)==0 then "pass" else "warn" end),
-       detail:"\($tot - ($missing|length))/\($tot) model component(s)", missing:($missing[0:$cap])};
+       detail:"\($tot - ($missing|length))/\($tot) model component(s)",
+       missing:($missing[0:$cap]), evidence:(($ev | unique)[0:$cap])};
     ([.components[]? | select(.type=="machine-learning-model")]) as $m
     | ($m|length) as $mtot
     | ([$m[] | select(((.purl//"")=="") and ((.cpe//"")=="")) | (.name // "(unnamed)")]) as $no_id
     | ([$m[] | select(((.hashes//[])|length)==0) | (.name // "(unnamed)")]) as $no_hash
     | ([$m[] | select(((.licenses//[])|length)==0) | (.name // "(unnamed)")]) as $no_lic
     | ([$m[] | select((.modelCard.modelParameters//null)==null) | (.name // "(unnamed)")]) as $no_mc
-    | (([.. | objects | select(has("datasets")) | .datasets[]?] + [.components[]? | select(.type=="data")]) | length) as $ds_count
-    | ([.. | strings | select(test("open[ _-]?(weight|architecture|data|training)";"i"))] | length) as $open_hits
+    | ([$m[] | (.purl // .cpe) | select(. != null and . != "")]) as $ev_id
+    | ([$m[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != "")]) as $ev_lic
+    | ([$m[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // "documented")]) as $ev_mc
+    | ([$m[] | .hashes[]? | .alg | select(. != null)]) as $ev_hash
+    | (([.. | objects | select(has("datasets")) | .datasets[]?] + [.components[]? | select(.type=="data")])) as $ds
+    | ([$ds[] | (.name // .ref // (.componentData.name) // "dataset") | select(. != null and . != "")]) as $ev_ds
+    | ([.. | strings | select(test("open[ _-]?(weight|architecture|data|training)";"i"))]) as $ev_open
     | [
-        cov($no_id;   $mtot; "G7 model identifier (PURL/CPE)"; "g7-model-id"),
-        cov($no_lic;  $mtot; "G7 model license"; "g7-model-license"),
-        cov($no_mc;   $mtot; "G7 model card (architecture/training parameters)"; "g7-model-card"),
-        cov($no_hash; $mtot; "G7 model integrity (hashes)"; "g7-model-hash"),
+        cov($no_id;   $mtot; "G7 model identifier (PURL/CPE)"; "g7-model-id"; $ev_id),
+        cov($no_lic;  $mtot; "G7 model license"; "g7-model-license"; $ev_lic),
+        cov($no_mc;   $mtot; "G7 model card (architecture/training parameters)"; "g7-model-card"; $ev_mc),
+        cov($no_hash; $mtot; "G7 model integrity (hashes)"; "g7-model-hash"; $ev_hash),
         {id:"g7-datasets", label:"G7 dataset provenance (datasets referenced)", required:false,
-         status:(if $ds_count>0 then "pass" else "warn" end), detail:"\($ds_count) dataset reference(s)", missing:[]},
+         status:(if ($ds|length)>0 then "pass" else "warn" end), detail:"\($ds|length) dataset reference(s)",
+         missing:[], evidence:(($ev_ds | unique)[0:$cap])},
         {id:"g7-openness", label:"G7 model openness (weight/architecture/data/training)", required:false,
-         status:(if $open_hits>0 then "pass" else "warn" end),
-         detail:(if $open_hits>0 then "declared" else "not declared in the SBOM" end), missing:[]}
+         status:(if ($ev_open|length)>0 then "pass" else "warn" end),
+         detail:(if ($ev_open|length)>0 then "declared" else "not declared in the SBOM" end),
+         missing:[], evidence:(($ev_open | unique)[0:$cap])}
       ]' "$SBOM"
 }
 
@@ -272,10 +280,10 @@ jq -n \
     echo "- Format: ${FORMAT}"
     echo "- Result: **$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN})"
     echo ""
-    echo "| Status | Requirement | Required | Detail |"
-    echo "|--------|-------------|:--------:|--------|"
+    echo "| Status | Requirement | Required | Detail | Evidence |"
+    echo "|--------|-------------|:--------:|--------|----------|"
     echo "$CHECKS" | jq -r '.[] |
-        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" else "⚠️" end) | \(.label) | \(if .required then "yes" else "no" end) | \(.detail | gsub("[|\n]"; " ")) |"'
+        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" else "⚠️" end) | \(.label) | \(if .required then "yes" else "no" end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
     echo ""
     # Missing-item detail for failed mandatory checks.
     if echo "$CHECKS" | jq -e 'any(.[]; .required and .status=="fail" and (.missing|length>0))' >/dev/null; then
@@ -316,12 +324,13 @@ jq -n \
  <div class="card fail">Mandatory failures: ${N_FAIL}</div>
  <div class="card warn">Warnings: ${N_WARN}</div>
 </div>
-<table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th></tr>
+<table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
 HTMLHEAD
     echo "$CHECKS" | jq -r '.[] |
         "<tr><td class=\"s-\(.status)\">" + (.status|ascii_upcase|@html) + "</td>" +
         "<td>" + (.label|@html) + "</td><td>" + (if .required then "yes" else "no" end) + "</td>" +
-        "<td>" + ((.detail // "")|@html) + "</td></tr>"'
+        "<td>" + ((.detail // "")|@html) + "</td>" +
+        "<td>" + (((.evidence // []) | join(", "))|@html) + "</td></tr>"'
     echo "</table>"
     if echo "$CHECKS" | jq -e 'any(.[]; .required and .status=="fail" and (.missing|length>0))' >/dev/null; then
         echo "<h2>Missing / non-conformant items</h2>"
