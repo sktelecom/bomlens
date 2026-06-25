@@ -761,14 +761,16 @@ def host_path_of(container_path):
     return ""
 
 
-def _valid_image_ref(ref):
-    """Accept only a plain image reference (registry/name[:tag][@digest]).
-
-    The image comes from server env (SBOM_FIRMWARE_IMAGE / SBOM_AIBOM_IMAGE),
-    not user input, but we still allowlist the charset so a misconfigured env
-    can't smuggle a docker-run flag (no leading '-', no whitespace/separators)."""
-    return bool(ref) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*", ref) is not None
-
+# Allowlist charsets for every value interpolated into the sibling docker-run
+# command line. Each is enforced as an inline `re.fullmatch(<const>, value)`
+# barrier in run_sibling_scan, in the same scope as the flow it gates: string
+# substitution (re.sub) does NOT break command-injection taint, but a full-match
+# guard the value must pass to reach the sink does. None of these admit a leading
+# '-', whitespace, ':' (which would split a -v mount), or a shell metacharacter.
+_REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
+_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
+_HOSTPATH_RE = re.compile(r"/[A-Za-z0-9._@/-]*")                # absolute bind-mount path
+_BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
 
 # Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
 # caller string) is interpolated into the docker-run command line, so the MODE
@@ -776,14 +778,23 @@ def _valid_image_ref(ref):
 _SIBLING_MODES = ("FIRMWARE", "AIBOM")
 
 
-def _valid_model_id(mid):
-    """Allowlist a HuggingFace model id (owner/name; owner optional).
+def _valid_image_ref(ref):
+    """True for a plain image reference (registry/name[:tag][@digest]).
 
-    The caller already validates this, but re-checking here keeps the value that
-    reaches the docker-run command line constrained to a known-safe charset
-    regardless of call site (no leading '-', no whitespace, no path traversal)."""
-    return bool(mid) and re.fullmatch(
-        r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?", mid) is not None
+    The image comes from server env (SBOM_FIRMWARE_IMAGE / SBOM_AIBOM_IMAGE),
+    not user input, but we still allowlist the charset so a misconfigured env
+    can't smuggle a docker-run flag (no leading '-', no whitespace/separators).
+    run_sibling_scan re-applies the same _REF_RE inline as the taint barrier."""
+    return bool(ref) and _REF_RE.fullmatch(ref) is not None
+
+
+def _valid_model_id(mid):
+    """True for a HuggingFace model id (owner/name; owner optional).
+
+    Shares _MODEL_RE with the inline barrier in run_sibling_scan, so the value
+    that reaches the command line is charset-constrained (no leading '-', no
+    whitespace, no path traversal) regardless of call site."""
+    return bool(mid) and _MODEL_RE.fullmatch(mid) is not None
 
 
 def _env_flag_value(value):
@@ -822,20 +833,29 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     Streams every line (docker pull progress + scan log) through on_log so the
     SSE UX is identical to an in-process scan.
     """
-    # Re-derive every user-influenced value through an explicit allowlist/
-    # sanitizer right before it reaches the command line. The caller already
-    # validates these, but pinning them here makes the run-scan invocation
-    # depend only on locally-constrained tokens (no raw request data), the same
-    # way _valid_image_ref guards the image ref.
-    if not _valid_image_ref(image):
+    # Gate every user-influenced value with an inline full-match allowlist right
+    # before it reaches the command line. Each `re.fullmatch(<const>, value)`
+    # test is a barrier the value MUST pass to flow into the docker-run argv, so
+    # only a charset-constrained token (no leading '-', whitespace, ':' or shell
+    # metacharacter) can ever be interpolated. The guards sit in this scope (not
+    # behind a helper) so the constraint is local to the flow.
+    if not image or _REF_RE.fullmatch(image) is None:
         on_log("[ui] refusing to launch sibling: invalid image reference")
         return -1
     if mode not in _SIBLING_MODES:
         on_log("[ui] refusing to launch sibling: unsupported mode")
         return -1
-    if not host_out:
-        on_log("[ui] cannot launch sibling: host output dir unknown "
+    # Pin MODE to the exact matched literal (drops the caller's string identity).
+    mode = _SIBLING_MODES[_SIBLING_MODES.index(mode)]
+    if not host_out or _HOSTPATH_RE.fullmatch(host_out) is None:
+        on_log("[ui] cannot launch sibling: host output dir unknown or unsafe "
                "(SBOM_UI_HOST_DIR unset — relaunch the UI via the desktop app or scan-sbom.sh --ui)")
+        return -1
+    if host_file is not None and _HOSTPATH_RE.fullmatch(host_file) is None:
+        on_log("[ui] refusing to launch sibling: unsafe host input path")
+        return -1
+    if model_id is not None and _MODEL_RE.fullmatch(model_id) is None:
+        on_log("[ui] refusing to launch sibling: invalid model id")
         return -1
 
     env = dict(os.environ)
@@ -848,7 +868,7 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
 
     args = [
         "docker", "run", "--rm",
-        "-v", "%s:/host-output" % host_out,
+        "-v", "%s:/host-output" % host_out,  # host_out passed _HOSTPATH_RE above
         "-v", "/var/run/docker.sock:/var/run/docker.sock",
         "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
         "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
@@ -860,14 +880,15 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     ]
     if host_file is not None:
         # Mount the upload read-only under a fixed in-sibling path. Reduce to a
-        # bare basename here so the in-sibling path is a single sanitized name.
-        base = os.path.basename(host_file) or "upload.bin"
+        # bare basename and re-gate it so the in-sibling path is a single
+        # allowlisted file name (host_file itself passed _HOSTPATH_RE above).
+        base = os.path.basename(host_file)
+        if not base or _BASENAME_RE.fullmatch(base) is None:
+            base = "upload.bin"
         args += ["-v", "%s:/input/%s:ro" % (host_file, base),
                  "-e", "TARGET_FILE=/input/%s" % base]
     if model_id is not None:
-        if not _valid_model_id(model_id):
-            on_log("[ui] refusing to launch sibling: invalid model id")
-            return -1
+        # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
     # The sibling writes into /host-output; run-scan also cds there via cwd.
     args += ["-w", "/host-output", "--entrypoint", "/usr/local/bin/run-scan", image]

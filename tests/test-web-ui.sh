@@ -91,6 +91,17 @@ assert "$" not in server._env_flag_value("$(whoami)")
 assert "`" not in server._env_flag_value("`id`")
 assert len(server._env_flag_value("x" * 5000)) <= 256
 
+# Host bind-mount paths are gated by an inline _HOSTPATH_RE full-match barrier:
+# absolute, no ':' (which would split the mount), no flag-leading '-', no
+# whitespace or shell metacharacters. (run_sibling_scan refuses non-matching
+# paths; see the fail-closed cases below.)
+assert server._HOSTPATH_RE.fullmatch("/host/out")
+assert server._HOSTPATH_RE.fullmatch("/host/git-abc123/repo")
+assert not server._HOSTPATH_RE.fullmatch("relative/path")
+assert not server._HOSTPATH_RE.fullmatch("/etc:/etc")
+assert not server._HOSTPATH_RE.fullmatch("/path with space")
+assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
+
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
 captured = {}
@@ -112,6 +123,21 @@ args = captured["args"]
 pname = [a for a in args if a.startswith("PROJECT_NAME=")][0]
 assert not any(c in pname for c in ";`$&|<>\n"), pname
 assert "MODE=AIBOM" in args and "MODEL_ID=openai/clip" in args, args
+# The image ref and host_out pass the inline full-match barriers and reach the
+# command line as charset-constrained tokens; valid inputs are interpolated
+# verbatim (the guard rejects, it does not rewrite).
+assert "ghcr.io/sktelecom/bomlens-aibom:1.5.0" in args, args
+assert "/host/out:/host-output" in args, args
+
+# A firmware host_file passes the bind-mount barrier and is mounted read-only
+# under a basename-only in-sibling path.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+)
+assert rc == 0, rc
+assert "/host/up/fw.bin:/input/fw.bin:ro" in captured["args"], captured["args"]
 
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
@@ -124,6 +150,22 @@ assert rc == -1 and "args" not in captured, (rc, captured)
 rc = server.run_sibling_scan(
     "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
     lambda ln: None, model_id="--privileged",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A host_out that fails the bind-mount allowlist is refused before any run.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out:/evil",
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A hostile firmware host_file path is refused too.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up:ro,Z",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 PY
