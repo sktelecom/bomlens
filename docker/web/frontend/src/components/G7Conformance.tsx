@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ConformanceCheck, ConformanceSummary } from "@/lib/api";
 import { baseTally, g7Tally, splitChecks } from "@/lib/conformance";
+import { G7_GUIDANCE } from "@/lib/g7Guidance";
 import { cn } from "@/lib/utils";
 
 const STATUS = {
@@ -21,14 +22,18 @@ function statusOf(s: ConformanceCheck["status"]) {
 function CheckRow({ check }: { check: ConformanceCheck }) {
   const { t } = useTranslation();
   const { Icon, color, key } = statusOf(check.status);
-  // G7 checks carry a plain-language "what this is" line, and a "how to satisfy"
-  // hint when not yet met. Base format checks have neither (defaultValue "").
+  // G7 checks carry a plain-language "what this is" line, a "how to satisfy"
+  // hint when not yet met, and (on the pass side) the actual SBOM values that
+  // satisfied it. Base format checks have none of these (defaultValue "").
   const isG7 = check.id.startsWith("g7-");
   const what = isG7 ? t(`g7.help.${check.id}.what`, { defaultValue: "" }) : "";
+  const notMet = check.status !== "pass";
   const fix =
-    isG7 && check.status !== "pass"
-      ? t(`g7.help.${check.id}.fix`, { defaultValue: "" })
-      : "";
+    isG7 && notMet ? t(`g7.help.${check.id}.fix`, { defaultValue: "" }) : "";
+  // Evidence: the real values pulled from the SBOM (purl, license id, hash alg…)
+  // — shown only when the element is present, so it reads as "met with these".
+  const evidence = isG7 && !notMet ? (check.evidence ?? []) : [];
+  const guidance = isG7 ? G7_GUIDANCE[check.id] : undefined;
   return (
     <li className="flex items-start gap-2.5 px-3 py-2.5">
       <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} aria-hidden />
@@ -46,10 +51,41 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
         {what ? (
           <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{what}</div>
         ) : null}
+        {evidence.length > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <span className="font-medium">{t("g7.evidence")}</span>
+            {evidence.map((e, i) => (
+              <code
+                key={`${e}-${i}`}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+              >
+                {e}
+              </code>
+            ))}
+          </div>
+        ) : null}
         {fix ? (
           <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">
             <span className="font-medium">{t("g7.howToFix")}</span> {fix}
           </div>
+        ) : null}
+        {fix && guidance?.snippet ? (
+          <div className="mt-1">
+            <div className="text-xs font-medium text-muted-foreground">{t("g7.example")}</div>
+            <pre className="mt-0.5 overflow-x-auto rounded-md bg-muted px-2.5 py-2 text-[11px] leading-relaxed text-foreground">
+              <code className="font-mono">{guidance.snippet}</code>
+            </pre>
+          </div>
+        ) : null}
+        {guidance?.docUrl ? (
+          <a
+            href={guidance.docUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+          >
+            {t("g7.learnMore")}
+          </a>
         ) : null}
       </div>
     </li>

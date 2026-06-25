@@ -87,6 +87,14 @@ if [ -f "$CONF" ]; then
     [ "$g7n" -ge 5 ] && pass "G7 checks present ($g7n)" || fail "expected >=5 G7 checks, got $g7n"
     licst=$(jq -r '.checks[] | select(.id=="g7-model-license") | .status' "$CONF")
     [ "$licst" = "pass" ] && pass "g7-model-license passes (Apache-2.0 present)" || fail "g7-model-license='$licst', expected pass"
+    # Passing checks carry the actual SBOM values as evidence ("met with these").
+    licev=$(jq -r '.checks[] | select(.id=="g7-model-license") | (.evidence // []) | join(",")' "$CONF")
+    echo "$licev" | grep -q "Apache-2.0" && pass "g7-model-license evidence shows Apache-2.0" || fail "g7-model-license evidence='$licev', expected Apache-2.0"
+    idev=$(jq -r '.checks[] | select(.id=="g7-model-id") | (.evidence // []) | length' "$CONF")
+    [ "$idev" -ge 1 ] && pass "g7-model-id carries evidence (the PURL/CPE)" || fail "g7-model-id evidence is empty"
+    # A warn-status element has nothing to show, so its evidence stays empty.
+    hashev=$(jq -r '.checks[] | select(.id=="g7-model-hash") | (.evidence // []) | length' "$CONF")
+    [ "$hashev" -eq 0 ] && pass "g7-model-hash (warn) carries no evidence" || fail "g7-model-hash evidence should be empty"
     # The known engine gaps (no hashes, no openness axis) must surface as warnings.
     hashst=$(jq -r '.checks[] | select(.id=="g7-model-hash") | .status' "$CONF")
     [ "$hashst" = "warn" ] && pass "g7-model-hash warns (integrity gap surfaced)" || fail "g7-model-hash='$hashst', expected warn"

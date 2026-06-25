@@ -199,7 +199,11 @@ base = [x for x in checks if not x["id"].startswith("g7-")]
 assert len(g7) == 6, ("expected 6 G7 checks", len(g7))
 assert len(base) >= 1, "no base checks"
 assert all(x["required"] is False for x in g7), "G7 checks must be advisory"
-assert all(set(x) >= {"id", "label", "required", "status", "detail"} for x in checks)
+assert all(set(x) >= {"id", "label", "required", "status", "detail", "evidence"} for x in checks)
+# Passing G7 elements carry their satisfying SBOM values as evidence.
+lic = next(x for x in g7 if x["id"] == "g7-model-license")
+assert lic["status"] == "pass" and any("Apache-2.0" in e for e in lic["evidence"]), (
+    "g7-model-license evidence missing", lic)
 PY
     then
         pass "conformance_summary exposes checks with the 6 G7 elements"
