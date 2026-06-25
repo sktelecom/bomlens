@@ -18,6 +18,10 @@ bom.json
 *_conformance.md
 *_conformance.html
 *_scancode.json
+*_NOTICE.pdf
+*_security_epss.json
+*_vendored.cdx.json
+*.wfp
 
 # Test Workspace
 tests/test-workspace/
