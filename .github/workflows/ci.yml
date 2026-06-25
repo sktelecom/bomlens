@@ -91,7 +91,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh tests/check-docs-drift.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -151,6 +151,9 @@ jobs:
 
       - name: Examples / docs / test-all.sh sync check
         run: bash tests/check-examples-sync.sh
+
+      - name: Docs / tool drift check (flags, env vars, image names)
+        run: bash tests/check-docs-drift.sh
 
       - name: Examples manifest validation
         run: bash examples/test-all.sh
