@@ -109,6 +109,9 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
+   *  status: "unavailable" (search blocked) | "no-match" | "matched". */
+  scanoss?: { status: string | null; count: number } | null;
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */

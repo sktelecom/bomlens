@@ -57,6 +57,20 @@ export function Overview({
         </div>
       )}
 
+      {result.scanoss?.status === "unavailable" && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="text-sm font-medium">{t("result.scanossUnavailableTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.scanossUnavailableBody")}</p>
+        </div>
+      )}
+
+      {result.scanoss?.status === "no-match" && (
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
+          <div className="text-sm font-medium text-foreground">{t("result.scanossNoMatchTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.scanossNoMatchBody")}</p>
+        </div>
+      )}
+
       {attention.length > 0 && (
         <Card>
           <CardContent className="p-4">

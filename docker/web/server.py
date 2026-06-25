@@ -450,6 +450,27 @@ def sbom_summary(prefix):
     }
 
 
+def scanoss_status(prefix):
+    """SCANOSS vendored-ID outcome for the UI, read from the vendored SBOM's
+    metadata: 'unavailable' (search failed — rate limit / no network / no token),
+    'no-match' (ran clean but found nothing vendored), or 'matched'. None when
+    vendored identification wasn't run (no vendored artifact)."""
+    p = safe_prefix_path(prefix, "_vendored.cdx.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    props = (data.get("metadata") or {}).get("properties") or []
+    status = next(
+        (x.get("value") for x in props if x.get("name") == "bomlens:scanoss:status"),
+        None,
+    )
+    return {"status": status, "count": len(data.get("components") or [])}
+
+
 def conformance_summary(prefix):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
     p = safe_prefix_path(prefix, "_conformance.json")
@@ -540,6 +561,7 @@ def scan_detail(prefix):
         "sbom": sbom,
         "security": security_summary(prefix),
         "conformance": conformance_summary(prefix),
+        "scanoss": scanoss_status(prefix),
     }
 
 
@@ -1104,6 +1126,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sbom": sbom_summary(prefix),
                 "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(prefix),
+                "scanoss": scanoss_status(prefix),
             }
             sse("done", json.dumps(done))
         finally:

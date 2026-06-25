@@ -44,14 +44,19 @@ GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Always emit a valid (possibly empty) CycloneDX envelope, used on every
 # graceful-degrade path below so the caller never sees a missing/half file.
+# $1 = scanoss status recorded on metadata.properties so the UI can tell apart
+# "search failed (rate limit / no network / no token)" from "search ran, found
+# nothing". Defaults to unavailable since this is only called on failure paths.
 write_empty() {
-    jq -n --arg version "$VERSION" --arg ts "$GEN_AT" '
+    local status="${1:-unavailable}"
+    jq -n --arg version "$VERSION" --arg ts "$GEN_AT" --arg status "$status" '
     {
       bomFormat: "CycloneDX", specVersion: "1.6", version: 1,
       metadata: {
         timestamp: $ts,
         tools: { components: [ { type: "application", name: "scanoss" } ] },
-        component: { type: "application", name: "vendored", version: $version }
+        component: { type: "application", name: "vendored", version: $version },
+        properties: [ { name: "bomlens:scanoss:status", value: $status } ]
       },
       components: []
     }' > "$OUTPUT"
@@ -102,12 +107,12 @@ if ! scanoss-py scan "$SRC" --all-hidden --skip-snippets "${SKIP_ARGS[@]}" --out
         ${SCANOSS_API_URL:+--apiurl "$SCANOSS_API_URL"} \
         ${SCANOSS_API_KEY:+--key "$SCANOSS_API_KEY"} >/dev/null 2>&1; then
     echo "[vendored] WARN: SCANOSS scan failed (no network / rate limit / bad endpoint); no vendored components." >&2
-    write_empty
+    write_empty "unavailable"
     exit 0
 fi
 if [ ! -s "$RAW" ] || ! jq empty "$RAW" >/dev/null 2>&1; then
     echo "[vendored] WARN: SCANOSS produced no usable result; no vendored components." >&2
-    write_empty
+    write_empty "unavailable"
     exit 0
 fi
 
@@ -186,18 +191,24 @@ if [ ! -s "$COMPS_FILE" ] || ! jq -e 'type=="array"' "$COMPS_FILE" >/dev/null 2>
 fi
 
 NCOMP=$(jq 'length' "$COMPS_FILE" 2>/dev/null || echo 0)
+# matched when SCANOSS returned full-file hits; no-match when the search ran
+# cleanly but found nothing vendored. (The failure paths above record
+# "unavailable".) The UI uses this to explain an empty result.
+if [ "${NCOMP:-0}" -gt 0 ]; then SCANOSS_STATUS="matched"; else SCANOSS_STATUS="no-match"; fi
 
 jq -n \
     --slurpfile comps "$COMPS_FILE" \
     --arg version "$VERSION" \
-    --arg ts "$GEN_AT" '
+    --arg ts "$GEN_AT" \
+    --arg status "$SCANOSS_STATUS" '
 {
   bomFormat: "CycloneDX",
   specVersion: "1.6",
   version: 1,
   metadata: {
     timestamp: $ts,
-    tools: { components: [ { type: "application", name: "scanoss" } ] }
+    tools: { components: [ { type: "application", name: "scanoss" } ] },
+    properties: [ { name: "bomlens:scanoss:status", value: $status } ]
   },
   components: $comps[0]
 }' > "$OUTPUT"
