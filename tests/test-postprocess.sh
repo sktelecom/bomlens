@@ -356,6 +356,29 @@ unk_cpe=$(jq -r '.components[] | select(.name=="some-internal-thing") | .cpe // 
 # A whitelisted name not in our map (luci-base) keeps syft's cpe unchanged.
 lu_cpe=$(jq -r '.components[] | select(.name=="luci-base") | .cpe' "$WORK/fw.json")
 case "$lu_cpe" in cpe:2.3:a:luci-base:*) pass "non-mapped component keeps its existing cpe untouched" ;; *) fail "luci-base cpe changed unexpectedly: $lu_cpe" ;; esac
+# License enrichment: a whitelisted name with a confirmed spdx_license and no
+# license yet gets a CycloneDX licenses[] from the curated map.
+bb_lic=$(jq -r '.components[] | select(.name=="busybox") | (.licenses // [])[0].license.id // "ABSENT"' "$WORK/fw.json")
+[ "$bb_lic" = "GPL-2.0-only" ] \
+    && pass "busybox (license-null) gets confirmed SPDX GPL-2.0-only" \
+    || fail "busybox license='$bb_lic', expected GPL-2.0-only"
+# A dual/multi license is written as a single SPDX expression entry.
+dm_lic=$(jq -r '.components[] | select(.name=="dnsmasq") | (.licenses // [])[0].expression // "ABSENT"' "$WORK/fw.json")
+[ "$dm_lic" = "GPL-2.0-only OR GPL-3.0-only" ] \
+    && pass "dnsmasq dual license written as an SPDX expression" \
+    || fail "dnsmasq expression='$dm_lic', expected GPL-2.0-only OR GPL-3.0-only"
+# Provenance property marks the inferred license.
+bb_src=$(jq -r '.components[] | select(.name=="busybox") | [(.properties // [])[] | select(.name=="bomlens:licenseSource") | .value][0] // "ABSENT"' "$WORK/fw.json")
+[ "$bb_src" = "name-map" ] && pass "enriched license carries bomlens:licenseSource=name-map" || fail "busybox licenseSource='$bb_src', expected name-map"
+# A pre-existing license is NEVER overwritten (syft is trusted) and gets no marker.
+ipt_lic=$(jq -r '.components[] | select(.name=="iptables") | (.licenses // [])[0].license.id // "ABSENT"' "$WORK/fw.json")
+[ "$ipt_lic" = "Apache-2.0" ] && pass "pre-existing license preserved (no overwrite)" || fail "iptables license='$ipt_lic', expected the pre-set Apache-2.0"
+ipt_src=$(jq -r '.components[] | select(.name=="iptables") | [(.properties // [])[]? | select(.name=="bomlens:licenseSource")] | length' "$WORK/fw.json")
+[ "$ipt_src" = "0" ] && pass "untouched license gets no bomlens:licenseSource marker" || fail "iptables wrongly marked as name-map enriched"
+# A non-whitelisted name stays license-null (no guessed license).
+unk_lic=$(jq -r '.components[] | select(.name=="some-internal-thing") | (.licenses // []) | length' "$WORK/fw.json")
+[ "$unk_lic" = "0" ] && pass "non-whitelisted component left license-null (no wrong license)" || fail "unexpected license on unknown component"
+
 # Idempotent: a second run changes nothing.
 cp "$WORK/fw.json" "$WORK/fw2.json"
 bash "$LIB/enrich-cpe.sh" "$WORK/fw2.json" >/dev/null 2>&1
