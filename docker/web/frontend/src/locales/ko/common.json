@@ -19,7 +19,7 @@
     "currentDir": "현재 폴더",
     "currentDirPath": "현재 폴더",
     "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 그 폴더에서 --ui를 실행하세요.",
-    "rootfsDir": "디렉터리 경로",
+    "rootfsDir": "디렉터리 / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (현재 폴더 기준 상대경로)",
     "rootfsHint": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 Docker 이미지 입력을 사용하세요.",
     "gitUrl": "GitHub URL",
@@ -39,7 +39,7 @@
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI 모델",
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
-    "aiModelHint": "HuggingFace 모델의 CycloneDX ML-BOM을 생성합니다(모델 카드 메타데이터를 네트워크로 가져옵니다).",
+    "aiModelHint": "HuggingFace 모델 ID를 '조직/모델' 형식으로 입력합니다(예: Qwen/Qwen2.5-0.5B). 컬렉션 이름이나 전체 URL이 아닙니다. 모델 카드 메타데이터를 네트워크로 가져와 CycloneDX ML-BOM을 생성합니다.",
     "aiModelUnavailable": "AI 모델 SBOM은 AIBOM 이미지에서 UI를 실행해야 사용할 수 있습니다.",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드 실패: {{msg}}"
@@ -49,10 +49,12 @@
     "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
-    "deepLicense": "정밀 라이선스",
-    "deepLicenseHint": "ScanCode 심화 라이선스 탐지 (느림)",
-    "identifyVendored": "내장 오픈소스 식별",
-    "identifyVendoredHint": "패키지 매니저가 없는 C/C++ 소스용. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다."
+    "deepLicense": "라이선스 스캔 (ScanCode)",
+    "deepLicenseHint": "패키지에 선언된 라이선스 대신, 패키지의 소스 파일을 다운 받아 스캔해 라이선스 정보를 찾아냅니다 (느림).",
+    "identifyVendored": "파일 단위 식별 (SCANOSS)",
+    "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
+    "scanossTokenPlaceholder": "SCANOSS 토큰 (선택)",
+    "scanossTokenHint": "무료 OSSKB는 익명 호출 한도가 있어 빈 결과가 나올 수 있습니다. scanoss.com에서 발급한 토큰을 넣으면 안정적으로 식별합니다. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다."
   },
   "progress": {
     "title": "실행 로그",
@@ -65,12 +67,19 @@
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
+    "aiScanTitle": "AI 모델 SBOM (ML-BOM)",
+    "aiScanBody": "HuggingFace 모델 메타데이터로 생성된 AI SBOM입니다. 모델과 데이터셋 중심이라 일반 소프트웨어보다 컴포넌트 수가 적습니다.",
     "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
-    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스가 소스째 복사(vendored)돼 있는 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급에서 \"내장 오픈소스 식별\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
+    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"파일 단위 식별 (SCANOSS)\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
+    "scanossUnavailableTitle": "SCANOSS 검색이 완료되지 않았습니다",
+    "scanossUnavailableBody": "rate limit, 네트워크 문제, 또는 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 실행하면 결과가 나올 수 있습니다.",
+    "scanossNoMatchTitle": "복사된 오픈소스를 찾지 못했습니다",
+    "scanossNoMatchBody": "SCANOSS 검색은 정상 완료됐지만, 소스에 직접 복사된 서드파티 오픈소스를 찾지 못했습니다. 실제로 없거나 OSSKB에 등록되지 않은 코드일 수 있습니다.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "소스에 복사된 오픈소스로 SCANOSS가 식별",
     "vendoredMatch": "일치도 {{pct}}",
     "severityTitle": "심각도 분포",
+    "severityFilterHint": "심각도를 클릭하면 필터됩니다",
     "noVulns": "발견된 취약점이 없습니다",
     "artifacts": "생성된 결과물",
     "artifactsEmpty": "생성된 결과물이 없습니다.",
@@ -144,10 +153,14 @@
     "colScope": "범위",
     "colRisk": "위험",
     "colLicense": "라이선스",
+    "colSource": "소스/다운로드",
+    "colCopyright": "저작권",
     "colSeverity": "심각도",
     "colCve": "CVE",
-    "colPackage": "패키지",
+    "colPackage": "컴포넌트",
     "colInstalled": "설치 버전",
+    "vulnSearchPlaceholder": "CVE, 컴포넌트, 제목 검색",
+    "vulnShown": "{{total}}건 중 {{shown}}건 표시",
     "colFixed": "수정 버전",
     "vulnCvss": "CVSS",
     "colEpss": "EPSS",
@@ -156,7 +169,8 @@
     "vulnDescription": "설명",
     "vulnReferences": "참고 링크",
     "vulnNoDetail": "추가 상세 정보가 없습니다.",
-    "vulnRowToggle": "취약점 상세 보기"
+    "vulnRowToggle": "취약점 상세 보기",
+    "componentRowToggle": "컴포넌트 상세 보기"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -206,6 +220,8 @@
     "expand": "사이드바 펼치기",
     "recent": "최근 스캔",
     "recentEmpty": "최근 스캔이 아직 없습니다",
+    "recentDelete": "이 스캔 삭제",
+    "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
     "group": {
       "inventory": "인벤토리",
       "risk": "위험 · 컴플라이언스",
@@ -229,6 +245,7 @@
     "source": "소스",
     "settings": "스캔 설정",
     "outputs": "산출물",
+    "scanOptions": "고급 스캔 옵션",
     "catCode": "코드",
     "catArtifact": "아티팩트",
     "catSbom": "SBOM",
@@ -283,7 +300,34 @@
     "required": "필수",
     "sPass": "충족",
     "sFail": "실패",
-    "sWarn": "권고"
+    "sWarn": "권고",
+    "howToFix": "보완 방법:",
+    "help": {
+      "g7-model-id": {
+        "what": "모델을 PURL/CPE 같은 표준 식별자로 식별합니다.",
+        "fix": "SBOM의 모델 컴포넌트에 purl 또는 cpe를 추가하세요."
+      },
+      "g7-model-license": {
+        "what": "모델에 적용되는 라이선스 정보입니다.",
+        "fix": "모델 카드에 라이선스를 명시하거나 SBOM 컴포넌트의 licenses 필드를 채우세요."
+      },
+      "g7-model-card": {
+        "what": "아키텍처와 학습 파라미터 등 모델 카드 정보입니다.",
+        "fix": "HuggingFace 모델 카드(README)에 아키텍처와 하이퍼파라미터를 기재하세요."
+      },
+      "g7-model-hash": {
+        "what": "모델 가중치 파일의 무결성을 확인하는 해시입니다.",
+        "fix": "모델 파일의 해시(SHA-256 등)를 SBOM 컴포넌트의 hashes에 추가하세요."
+      },
+      "g7-datasets": {
+        "what": "학습에 사용된 데이터셋의 출처입니다.",
+        "fix": "학습 데이터셋을 SBOM에 data 컴포넌트로 참조하세요."
+      },
+      "g7-openness": {
+        "what": "가중치와 아키텍처, 데이터, 학습 과정의 공개 수준입니다.",
+        "fix": "모델의 개방성(공개 가중치·데이터·학습 코드 여부)을 SBOM이나 모델 카드에 선언하세요."
+      }
+    }
   },
   "licenses": {
     "empty": "감지된 라이선스가 없습니다.",
@@ -291,7 +335,8 @@
     "reviewHint": "AI 제한 조항 — 사람 검토가 필요합니다.",
     "flagBehavioral": "행위 기반 제한",
     "flagNonCommercial": "비상업",
-    "distribution": "라이선스 분포"
+    "distribution": "라이선스 분포",
+    "clickHint": "라이선스를 클릭하면 해당 컴포넌트를 봅니다"
   },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",

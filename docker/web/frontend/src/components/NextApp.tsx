@@ -1,5 +1,4 @@
-import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
@@ -7,8 +6,8 @@ import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { ResultSection } from "./ResultSections";
 import { ScanRunning } from "./ScanRunning";
-import { Button } from "@/components/ui/button";
 import {
+  deleteScan,
   getCapabilities,
   listScans,
   loadScan,
@@ -23,6 +22,7 @@ import {
   type SectionId,
   visibleSectionIds,
 } from "@/lib/nav";
+import { homeHash, parseHash, scanHash } from "@/lib/route";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 
 /** Map a stored scan to the Sidebar's Recent link shape. */
@@ -44,7 +44,14 @@ type Status = "idle" | "running" | "done" | "error";
  * The new shell application (behind `?ui=next`). Same scan state machine as the
  * classic app — the form, the SSE live log and the result content are reused
  * verbatim — re-laid-out into the AppShell: results move from tabs to the
- * left-rail sections. Phase 1 target is zero regression in what's shown.
+ * left-rail sections.
+ *
+ * The URL hash is the single source of truth for what's shown:
+ *   `#/`                    → the New scan screen (idle),
+ *   `#/scan/<id>`           → that scan's Overview,
+ *   `#/scan/<id>/<section>` → that scan's section.
+ * Every navigation element is a real `<a href="#/…">`, so the browser handles
+ * open-in-new-tab; a `hashchange` listener drives the in-app transition.
  */
 export function NextApp() {
   const { t } = useTranslation();
@@ -59,6 +66,21 @@ export function NextApp() {
   });
   const [recent, setRecent] = useState<RecentScan[]>([]);
 
+  // The scan id currently held in `result` — so the hash router can tell a
+  // section change (no reload) from opening a different scan (reload).
+  const loadedIdRef = useRef<string | null>(null);
+  // The id of an in-flight live scan, so its `done` can set the URL.
+  const runningIdRef = useRef<string | null>(null);
+
+  // The live scan's SSE stream. Held so leaving the running view (new scan,
+  // opening a past scan) can close it — otherwise a backgrounded scan finishes
+  // later and hijacks whatever the user is now looking at.
+  const streamRef = useRef<EventSource | null>(null);
+  const closeStream = () => {
+    streamRef.current?.close();
+    streamRef.current = null;
+  };
+
   const refreshRecent = () => listScans().then(setRecent);
 
   useEffect(() => {
@@ -66,20 +88,86 @@ export function NextApp() {
     void refreshRecent();
   }, []);
 
+  // Reset to the idle New scan screen (in-memory state only; the URL is set by
+  // the caller — clicking a `#/` anchor — or by the hash router).
+  const resetToHome = useCallback(() => {
+    closeStream();
+    runningIdRef.current = null;
+    loadedIdRef.current = null;
+    setStatus("idle");
+    setLogs([]);
+    setResult(null);
+    setProjectLabel(undefined);
+    setActiveSection("overview");
+  }, []);
+
+  // Show a past/finished scan for the given id + section. Loads it if it isn't
+  // already the current result; falls back home if its artifacts are gone.
+  const showScan = useCallback(
+    (id: string, section: SectionId) => {
+      // Same scan already loaded → just switch the section (no reload, no flash).
+      if (loadedIdRef.current === id) {
+        setActiveSection(section);
+        return;
+      }
+      closeStream();
+      runningIdRef.current = null;
+      void loadScan(id).then((done) => {
+        if (parseHash(window.location.hash).kind === "home") return; // navigated away
+        if (!done) {
+          // Artifacts missing (e.g. a live-only scan that was never stored, or a
+          // deleted one) — fall back to the New scan screen.
+          window.location.hash = homeHash();
+          return;
+        }
+        loadedIdRef.current = id;
+        setLogs([]);
+        setResult(done);
+        setStatus(done.ok ? "done" : "error");
+        setActiveSection(section);
+        const meta = recent.find((s) => s.id === id);
+        setProjectLabel(
+          meta
+            ? meta.version
+              ? `${meta.project} · ${meta.version}`
+              : meta.project
+            : id,
+        );
+      });
+    },
+    [recent],
+  );
+
+  // The hash router: parse on mount and on every hashchange. Skip while a live
+  // scan is running — that view is owned by the run() state machine, not the URL
+  // (there is no id yet), and run()'s done handler sets the URL when it finishes.
+  const route = useCallback(() => {
+    if (status === "running") return;
+    const parsed = parseHash(window.location.hash);
+    if (parsed.kind === "home") {
+      if (loadedIdRef.current !== null || status !== "idle") resetToHome();
+      return;
+    }
+    showScan(parsed.id, parsed.section);
+  }, [status, resetToHome, showScan]);
+
+  useEffect(() => {
+    route();
+    window.addEventListener("hashchange", route);
+    return () => window.removeEventListener("hashchange", route);
+  }, [route]);
+
+  // Close the live scan stream if the app unmounts.
+  useEffect(() => () => streamRef.current?.close(), []);
+
   const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
 
-  // Re-open a past scan from the Recent list.
-  const openRecent = (id: string) => {
-    void loadScan(id).then((done) => {
-      if (!done) return;
-      const meta = recent.find((s) => s.id === id);
-      setLogs([]);
-      setResult(done);
-      setStatus(done.ok ? "done" : "error");
-      setActiveSection("overview");
-      setProjectLabel(
-        meta ? (meta.version ? `${meta.project} · ${meta.version}` : meta.project) : undefined,
-      );
+  // Delete a past scan (its artifacts) and refresh the Recent list.
+  const deleteRecent = (id: string) => {
+    void deleteScan(id).then(() => {
+      void refreshRecent();
+      // If we're viewing the scan we just deleted, drop back to New scan.
+      if (loadedIdRef.current === id) window.location.hash = homeHash();
     });
   };
 
@@ -98,6 +186,9 @@ export function NextApp() {
   }, [result, scan, activeSection]);
 
   const run = (params: ScanParams) => {
+    closeStream(); // drop any previous stream before starting a new one
+    loadedIdRef.current = null;
+    runningIdRef.current = null;
     setStatus("running");
     setLogs([]);
     setResult(null);
@@ -105,12 +196,21 @@ export function NextApp() {
     setProjectLabel(
       params.version ? `${params.project} · ${params.version}` : params.project,
     );
-    startScan(params, {
+    streamRef.current = startScan(params, {
       onLog: (line) => setLogs((prev) => [...prev, line]),
       onDone: (done) => {
+        streamRef.current = null;
         setResult(done);
         setStatus(done.ok ? "done" : "error");
         void refreshRecent(); // the finished scan is now in history
+        // Point the URL at the finished scan so it has a shareable/reopenable
+        // address. Prefer the server-provided id (exact artifact prefix).
+        const id = done.id;
+        if (id) {
+          loadedIdRef.current = id;
+          runningIdRef.current = null;
+          window.history.replaceState(null, "", scanHash(id));
+        }
       },
       onError: (message) => {
         if (message) setLogs((prev) => [...prev, `✖ ${message}`]);
@@ -119,34 +219,22 @@ export function NextApp() {
     });
   };
 
-  const newScan = () => {
-    setStatus("idle");
-    setLogs([]);
-    setResult(null);
-    setProjectLabel(undefined);
-    setActiveSection("overview");
-  };
+  const isHome = status === "idle";
 
   return (
     <AppShell
       scan={scan}
       activeSection={activeSection}
-      onSelectSection={setActiveSection}
+      activeScanId={loadedIdRef.current}
       counts={counts}
       showSections={Boolean(result)}
       recent={recentLinks}
-      onSelectRecent={openRecent}
-      projectLabel={status === "idle" ? undefined : projectLabel}
-      topBarActions={
-        status !== "idle" ? (
-          <Button type="button" variant="outline" size="sm" onClick={newScan}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            {t("shell.newScan")}
-          </Button>
-        ) : undefined
-      }
+      onDeleteRecent={deleteRecent}
+      homeHref={homeHash()}
+      showHomeLink={!isHome}
+      projectLabel={isHome ? undefined : projectLabel}
     >
-      {status === "idle" ? (
+      {isHome ? (
         <div className="mx-auto max-w-5xl px-6 py-8">
           <h1 className="mb-6 text-xl font-semibold tracking-tight text-foreground">
             {t("shell.newScan")}
@@ -181,10 +269,12 @@ export function NextApp() {
           <ResultSection
             section={activeSection}
             result={result}
-            onNavigate={setActiveSection}
+            scanId={loadedIdRef.current}
           />
 
-          <ProgressLog logs={logs} status={status} />
+          {activeSection === "overview" && (
+            <ProgressLog logs={logs} status={status} collapsible />
+          )}
         </div>
       )}
     </AppShell>

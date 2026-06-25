@@ -9,11 +9,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
-import { SEVERITY_ORDER, type SecuritySummary, type VulnItem } from "@/lib/api";
+import { type SecuritySummary, type Severity, type VulnItem } from "@/lib/api";
 import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
+
+import { SeverityBar } from "./SeverityBar";
 
 const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -139,6 +141,7 @@ export function VulnerabilitiesTable({ security }: Props) {
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("");
+  const [query, setQuery] = useState("");
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 
@@ -154,36 +157,39 @@ export function VulnerabilitiesTable({ security }: Props) {
       s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
     );
 
-  const severities = useMemo(
-    () => SEVERITY_ORDER.filter((s) => items.some((v) => v.severity === s)),
-    [items],
-  );
-
   if (security.TOTAL === 0 || items.length === 0) {
     return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
 
-  const visible = severityFilter
-    ? sorted.filter((v) => v.severity === severityFilter)
-    : sorted;
+  const q = query.trim().toLowerCase();
+  const visible = sorted.filter((v) => {
+    if (severityFilter && v.severity !== severityFilter) return false;
+    if (q && !`${v.id} ${v.pkg} ${v.title}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   return (
-    <div className="space-y-3">
-      {severities.length > 1 && (
-        <Select
-          value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          aria-label={t("result.allSeverities")}
-        >
-          <option value="">{t("result.allSeverities")}</option>
-          {severities.map((s) => (
-            <option key={s} value={s}>
-              {t(`severity.${s}`)}
-            </option>
-          ))}
-        </Select>
-      )}
-      <div className="max-h-[28rem] overflow-auto rounded-md border">
+    <div className="space-y-4">
+      <SeverityBar
+        security={security}
+        selected={severityFilter as Severity | ""}
+        onSelect={(s) => setSeverityFilter((f) => (f === s ? "" : s))}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("result.vulnSearchPlaceholder")}
+          className="h-9 max-w-xs"
+          aria-label={t("result.vulnSearchPlaceholder")}
+        />
+        {(q || severityFilter) && (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {t("result.vulnShown", { shown: visible.length, total: items.length })}
+          </span>
+        )}
+      </div>
+      <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">

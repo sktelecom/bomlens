@@ -14,7 +14,7 @@
 
 set -u
 
-DOCKER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-generator:latest}"
+DOCKER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"
 UI_PORT="${UI_PORT:-8080}"
 
 OK="✅"

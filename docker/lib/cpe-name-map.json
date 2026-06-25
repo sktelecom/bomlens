@@ -1,0 +1,87 @@
+{
+  "_comment": "Component NAME -> CPE (vendor/product) whitelist for CVE matching (Plan 1, enrich-cpe.sh). Many firmware/image components arrive with name+version but NO purl/CPE, so Trivy matches 0 CVEs. enrich-cpe.sh attaches cpe:2.3:a:<vendor>:<product>:<version>:... ONLY for names in this curated list, then Trivy matches by CPE. This is a CLOSED whitelist on purpose: a name->CPE guess for an unknown component produces FALSE-POSITIVE CVEs (a wrong vuln is worse than an empty result), so a name not listed here gets NO cpe. Keys are lower-cased component names; multiple aliases may map to the same product. vendor/product follow the NVD CPE dictionary. Entries starting with '_' are ignored.",
+
+  "_comment_license": "Optional spdx_license per entry: the project's OFFICIAL license as an exact SPDX identifier (or a valid SPDX expression for dual/multi-license). enrich-cpe.sh fills CycloneDX licenses[] from this ONLY when the component has no license yet (syft leaves opkg/dpkg packages license-null). Accuracy is legal-grade: ONLY confirmed upstream licenses are listed, GPL '-only' vs '-or-later' is distinguished, and version-dependent or genuinely mixed packages (openssl, mbedtls, glibc, util-linux, ...) carry NO spdx_license on purpose (an empty license is safer than a wrong one).",
+
+  "busybox":        { "cpe_vendor": "busybox",                 "cpe_product": "busybox",        "spdx_license": "GPL-2.0-only" },
+  "dnsmasq":        { "cpe_vendor": "thekelleys",              "cpe_product": "dnsmasq",        "spdx_license": "GPL-2.0-only OR GPL-3.0-only" },
+  "dropbear":       { "cpe_vendor": "dropbear_ssh_project",    "cpe_product": "dropbear_ssh",   "spdx_license": "MIT" },
+  "dropbearmulti":  { "cpe_vendor": "dropbear_ssh_project",    "cpe_product": "dropbear_ssh",   "spdx_license": "MIT" },
+
+  "openssl":        { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libopenssl":     { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "openssl-util":   { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libssl":         { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+
+  "zlib":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib",           "spdx_license": "Zlib" },
+  "libz":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib",           "spdx_license": "Zlib" },
+
+  "curl":           { "cpe_vendor": "haxx",                    "cpe_product": "curl",           "spdx_license": "curl" },
+  "libcurl":        { "cpe_vendor": "haxx",                    "cpe_product": "libcurl",        "spdx_license": "curl" },
+
+  "wget":           { "cpe_vendor": "gnu",                     "cpe_product": "wget",           "spdx_license": "GPL-3.0-or-later" },
+  "uclibc":         { "cpe_vendor": "uclibc",                  "cpe_product": "uclibc",         "spdx_license": "LGPL-2.1-or-later" },
+  "uclibc-ng":      { "cpe_vendor": "uclibc-ng",              "cpe_product": "uclibc-ng",      "spdx_license": "LGPL-2.1-or-later" },
+  "glibc":          { "cpe_vendor": "gnu",                     "cpe_product": "glibc" },
+
+  "e2fsprogs":      { "cpe_vendor": "e2fsprogs_project",       "cpe_product": "e2fsprogs",      "spdx_license": "GPL-2.0-only" },
+  "libext2fs":      { "cpe_vendor": "e2fsprogs_project",       "cpe_product": "e2fsprogs",      "spdx_license": "GPL-2.0-only" },
+
+  "iptables":       { "cpe_vendor": "netfilter",               "cpe_product": "iptables",       "spdx_license": "GPL-2.0-only" },
+  "ip6tables":      { "cpe_vendor": "netfilter",               "cpe_product": "iptables",       "spdx_license": "GPL-2.0-only" },
+
+  "openssh":        { "cpe_vendor": "openbsd",                 "cpe_product": "openssh",        "spdx_license": "BSD-3-Clause" },
+  "openssh-server": { "cpe_vendor": "openbsd",                 "cpe_product": "openssh",        "spdx_license": "BSD-3-Clause" },
+  "openssh-client": { "cpe_vendor": "openbsd",                 "cpe_product": "openssh",        "spdx_license": "BSD-3-Clause" },
+
+  "libxml2":        { "cpe_vendor": "xmlsoft",                 "cpe_product": "libxml2",        "spdx_license": "MIT" },
+  "expat":          { "cpe_vendor": "libexpat_project",        "cpe_product": "libexpat",       "spdx_license": "MIT" },
+  "libexpat":       { "cpe_vendor": "libexpat_project",        "cpe_product": "libexpat",       "spdx_license": "MIT" },
+  "sqlite":         { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite",         "spdx_license": "blessing" },
+  "sqlite3":        { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite",         "spdx_license": "blessing" },
+  "libsqlite3":     { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite",         "spdx_license": "blessing" },
+
+  "libpng":         { "cpe_vendor": "libpng",                  "cpe_product": "libpng",         "spdx_license": "Libpng" },
+  "libjpeg":        { "cpe_vendor": "ijg",                     "cpe_product": "libjpeg",        "spdx_license": "IJG" },
+  "libjpeg-turbo":  { "cpe_vendor": "libjpeg-turbo",          "cpe_product": "libjpeg-turbo" },
+
+  "mbedtls":        { "cpe_vendor": "arm",                     "cpe_product": "mbed_tls" },
+  "libmbedtls":     { "cpe_vendor": "arm",                     "cpe_product": "mbed_tls" },
+  "wolfssl":        { "cpe_vendor": "wolfssl",                 "cpe_product": "wolfssl",        "spdx_license": "GPL-2.0-or-later" },
+  "gnutls":         { "cpe_vendor": "gnu",                     "cpe_product": "gnutls" },
+  "libgnutls":      { "cpe_vendor": "gnu",                     "cpe_product": "gnutls" },
+  "nettle":         { "cpe_vendor": "nettle_project",          "cpe_product": "nettle" },
+  "libgcrypt":      { "cpe_vendor": "gnupg",                   "cpe_product": "libgcrypt",      "spdx_license": "LGPL-2.1-or-later" },
+
+  "pcre":           { "cpe_vendor": "pcre",                    "cpe_product": "pcre",           "spdx_license": "BSD-3-Clause" },
+  "pcre2":          { "cpe_vendor": "pcre",                    "cpe_product": "pcre2",          "spdx_license": "BSD-3-Clause" },
+  "libpcap":        { "cpe_vendor": "tcpdump",                 "cpe_product": "libpcap",        "spdx_license": "BSD-3-Clause" },
+  "tcpdump":        { "cpe_vendor": "tcpdump",                 "cpe_product": "tcpdump",        "spdx_license": "BSD-3-Clause" },
+
+  "zstd":           { "cpe_vendor": "facebook",                "cpe_product": "zstandard",      "spdx_license": "BSD-3-Clause OR GPL-2.0-only" },
+  "libzstd":        { "cpe_vendor": "facebook",                "cpe_product": "zstandard",      "spdx_license": "BSD-3-Clause OR GPL-2.0-only" },
+  "xz":             { "cpe_vendor": "tukaani",                 "cpe_product": "xz" },
+  "liblzma":        { "cpe_vendor": "tukaani",                 "cpe_product": "xz" },
+  "bzip2":          { "cpe_vendor": "bzip",                    "cpe_product": "bzip2",          "spdx_license": "bzip2-1.0.6" },
+  "libbz2":         { "cpe_vendor": "bzip",                    "cpe_product": "bzip2",          "spdx_license": "bzip2-1.0.6" },
+
+  "nghttp2":        { "cpe_vendor": "nghttp2",                 "cpe_product": "nghttp2",        "spdx_license": "MIT" },
+  "libssh2":        { "cpe_vendor": "libssh2",                 "cpe_product": "libssh2",        "spdx_license": "BSD-3-Clause" },
+  "libssh":         { "cpe_vendor": "libssh",                  "cpe_product": "libssh",         "spdx_license": "LGPL-2.1-only" },
+  "json-c":         { "cpe_vendor": "json-c",                  "cpe_product": "json-c",         "spdx_license": "MIT" },
+
+  "lighttpd":       { "cpe_vendor": "lighttpd",                "cpe_product": "lighttpd",       "spdx_license": "BSD-3-Clause" },
+  "nginx":          { "cpe_vendor": "f5",                      "cpe_product": "nginx",          "spdx_license": "BSD-2-Clause" },
+  "uhttpd":         { "cpe_vendor": "openwrt",                 "cpe_product": "uhttpd",         "spdx_license": "ISC" },
+  "hostapd":        { "cpe_vendor": "w1.fi",                   "cpe_product": "hostapd",        "spdx_license": "BSD-3-Clause" },
+  "wpa_supplicant": { "cpe_vendor": "w1.fi",                   "cpe_product": "wpa_supplicant", "spdx_license": "BSD-3-Clause" },
+  "wpad":           { "cpe_vendor": "w1.fi",                   "cpe_product": "wpa_supplicant", "spdx_license": "BSD-3-Clause" },
+
+  "samba":          { "cpe_vendor": "samba",                   "cpe_product": "samba",          "spdx_license": "GPL-3.0-or-later" },
+  "ppp":            { "cpe_vendor": "ppp_project",             "cpe_product": "ppp" },
+  "ntpd":           { "cpe_vendor": "ntp",                     "cpe_product": "ntp",            "spdx_license": "NTP" },
+  "ntp":            { "cpe_vendor": "ntp",                     "cpe_product": "ntp",            "spdx_license": "NTP" },
+  "bash":           { "cpe_vendor": "gnu",                     "cpe_product": "bash",           "spdx_license": "GPL-3.0-or-later" },
+  "sudo":           { "cpe_vendor": "sudo_project",            "cpe_product": "sudo" },
+  "util-linux":     { "cpe_vendor": "kernel",                  "cpe_product": "util-linux" }
+}

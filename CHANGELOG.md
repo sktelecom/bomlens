@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.5.0] - 2026-06-25
+
+### Added
+
+- Redesigned web UI: a new shell with Overview, Components, Dependencies, Vulnerabilities, Licenses, AI (Models & datasets / G7), and Artifacts sections; a single-card New scan form; and local Recent scans (list, re-open, delete; newest 20 shown). Every navigation element is a real link, so the logo, New scan, sidebar sections, recent scans and jump cards open in a new tab (Cmd/Ctrl/middle click) via URL-hash routing.
+- AI-model SBOM (AIBOM): generate a CycloneDX ML-BOM for a HuggingFace model id — with G7 minimum-element conformance — from the web UI's AI model input. Published as the new `bomlens-aibom` image (legacy alias `sbom-scanner-aibom`).
+- EPSS exploit probability and CISA KEV (actively exploited) surfaced on vulnerabilities.
+- Component detail: click a component row to see its PURL, source/download location, copyright, licenses and vulnerabilities.
+- License explorer: click a license to list its components, with copyleft/reciprocal licenses highlighted.
+- Vulnerability view: click the severity bar to filter, plus a search box; all result tables are drag-resizable.
+- Firmware analysis: cve-bin-tool now matches CVEs online (the firmware image bundles the vulnerability DB), and an enrichment step fills CPEs and SPDX licenses for a curated whitelist of well-known OSS (busybox, dropbear, dnsmasq, …) so Trivy and the notice can use them. Compressed firmware images (`.img.gz`, `.tar.xz`, …) can be uploaded.
+- Open-source notice: per-component source/download location and copyright line, plus an optional PDF rendering (`SBOM_PDF` build).
+- SCANOSS: a token input for the OSSKB endpoint (the free anonymous endpoint is rate-limited), and a result note that distinguishes "search unavailable" from "nothing found".
+
+### Changed
+
+- Advanced scan options (deep license / SCANOSS) appear only for source scans; AI-model scans drop the deep-license toggle and the (always-empty) security report.
+- G7 conformance moved under the AI group, with per-element "what it is / how to satisfy" guidance.
+- The live run log now appears only on the Overview, not under every section.
+- The scan banner and UI startup logs are unified to "BomLens".
+
+### Fixed
+
+- SCANOSS found nothing on uploaded/cloned sources because they extract under a dot-prefixed `.uploads` path that scanoss-py skips by default (`--all-hidden`).
+- The firmware component merge hit the command-line length limit on large rootfs images (jq now reads arrays from files via `--slurpfile`).
+- The dependency graph drew edgeless SBOMs (e.g. firmware) as overlapping dots — it now shows a note — and framed large graphs too far out to read.
+- AI scans were labelled by the generator's `job-<timestamp>` instead of the model name.
+- The scan done-event listed every artifact in the output folder instead of only the current scan's.
+- Leaving a running scan no longer lets the backgrounded scan finish and hijack the screen (the live SSE stream is closed on navigation).
+
 ## [v1.4.0] - 2026-06-23
 
 ### Added

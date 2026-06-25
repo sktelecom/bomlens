@@ -271,6 +271,24 @@ c_bad=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=../../etc/passwd")
 [ "$c_bad" = "400" ] && pass "/scan blocks traversal id (400)" || fail "/scan traversal id returned $c_bad (expected 400)"
 c_missing=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=nope_9.9")
 [ "$c_missing" = "404" ] && pass "/scan unknown id returns 404" || fail "/scan unknown id returned $c_missing (expected 404)"
+
+# /scan-delete removes a past scan's artifacts, and fails closed on a bad id.
+# The delete builds an OUTPUT_DIR path from the id, so cover the traversal guard.
+del_bad=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/scan-delete?id=../../etc/passwd")
+[ "$del_bad" = "400" ] && pass "/scan-delete blocks traversal id (400)" || fail "/scan-delete traversal id returned $del_bad (expected 400)"
+del_resp=$(curl -fsS -X POST "$BASE/scan-delete?id=demo_1.0" 2>/dev/null)
+if echo "$del_resp" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['deleted'] == 'demo_1.0' and d['removed'] >= 1, d
+"; then
+    pass "/scan-delete removes the scan's artifacts"
+else
+    fail "/scan-delete did not delete the scan" "$del_resp"
+fi
+[ ! -f "$OUT/demo_1.0_bom.json" ] && pass "/scan-delete left no artifact behind" || fail "demo_1.0 artifacts still present after delete"
+del_gone=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=demo_1.0")
+[ "$del_gone" = "404" ] && pass "deleted scan is gone (404)" || fail "deleted scan returned $del_gone (expected 404)"
 rm -f "$OUT"/demo_1.0_*
 
 echo ""

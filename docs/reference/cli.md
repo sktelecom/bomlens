@@ -47,7 +47,7 @@ Environment variables adjust the behavior.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/sbom-scanner:latest` | Override the scanner image (same image as `bomlens`) |
+| `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | Override the scanner image |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
 | `SCANOSS_API_URL` | OSSKB free API | Endpoint for `--identify-vendored`. Point at a SCANOSS commercial or self-hosted endpoint for air-gapped or high-volume use |
 | `SCANOSS_API_KEY` | — | Credential for `SCANOSS_API_URL`, if the endpoint requires one |

@@ -24,28 +24,37 @@ The criteria follow SK Telecom's [supply chain security guide](https://sktelecom
 
 ## Running it all at once
 
-Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), then pass the SBOM file you received to `--analyze`.
+### From the web UI
+
+Open the web UI, choose **SBOM upload**, and upload the file you received; enter a project name and version, then run.
 
 ```bash
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080
+#   Windows: double-click scripts\sbom-ui.bat
+```
 
-$SBOM --project supplier-app --version 2.0.0 \
+Installation is in [Getting started](../start/first-scan.md).
+
+### From the CLI
+
+Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), then pass the SBOM file to `--analyze`:
+
+```bash
+./scripts/scan-sbom.sh --project supplier-app --version 2.0.0 \
   --analyze "./supplier-sbom.json" \
   --generate-only
 ```
 
 `--analyze` turns on notice and security analysis automatically, so you do not need to add `--all`. `--generate-only` leaves only the outputs in the current directory and cleans up the temporary working copy. For the remaining options, see the [usage guide](../reference/cli.md#options-reference).
 
-> **Windows**: to work without the command line, double-click `scripts\sbom-ui.bat` to open the web UI, choose "SBOM upload" at the top, and upload the file. For installation, see [Getting started](../start/first-scan.md).
-
 ## The four outputs
 
 | Output | File | Meaning |
 |--------|------|---------|
-| Conformance report | `{P}_{V}_conformance.{json,md,html}` | whether the submission criteria are met, and what is missing |
-| SBOM (converted) | `{P}_{V}_bom.json` | the input normalized to CycloneDX 1.6 |
-| Open-source notice | `{P}_{V}_NOTICE.{txt,html}` | components grouped by license |
-| Risk report | `{P}_{V}_risk-report.{md,html}` | conformance, vulnerabilities, and licenses combined, with response deadlines |
+| Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the submission criteria are met, and what is missing |
+| SBOM (converted) | `{Project}_{Version}_bom.json` | the input normalized to CycloneDX 1.6 |
+| Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | components grouped by license |
+| Risk report | `{Project}_{Version}_risk-report.{md,html}` | conformance, vulnerabilities, and licenses combined, with response deadlines |
 
 Unlike a self-generated SBOM, a received SBOM additionally produces a conformance report, and its summary goes into section 1 of the risk report.
 

@@ -113,12 +113,6 @@ export const NAV_GROUPS: NavGroup[] = [
     sections: [
       { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
       { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
-      {
-        id: "g7",
-        labelKey: "nav.g7",
-        icon: FileCheck2,
-        requires: (c) => c.hasG7,
-      },
     ],
   },
   {
@@ -126,6 +120,9 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.ai",
     sections: [
       { id: "models", labelKey: "nav.models", icon: Cpu, aiOnly: true },
+      // G7 is the AI model conformance check (model identifier/license/card/
+      // integrity/dataset/openness), so it lives under AI, not Risk.
+      { id: "g7", labelKey: "nav.g7", icon: FileCheck2, requires: (c) => c.hasG7 },
     ],
   },
   {

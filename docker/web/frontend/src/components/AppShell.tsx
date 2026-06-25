@@ -12,18 +12,21 @@ import {
 interface AppShellProps {
   scan?: ScanContext;
   activeSection: SectionId;
-  onSelectSection: (id: SectionId) => void;
+  /** The current scan's id, so the rail can build `#/scan/<id>/<section>` links. */
+  activeScanId?: string | null;
   recent?: RecentScanLink[];
-  /** Re-open a past scan from the Recent list. */
-  onSelectRecent?: (id: string) => void;
+  /** Delete a past scan from the Recent list. */
+  onDeleteRecent?: (id: string) => void;
   /** Per-section counts shown as trailing rail badges. */
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the rail's section groups (e.g. before any scan). */
   showSections?: boolean;
   /** Project context shown in the top bar, e.g. "my-app · 1.0.0". */
   projectLabel?: string;
-  /** Optional top-bar action (e.g. New scan button). */
-  topBarActions?: ReactNode;
+  /** Hash for the home (New scan) screen — the logo / New scan links point here. */
+  homeHref: string;
+  /** Show the logo + New scan as links home (hidden on the idle screen itself). */
+  showHomeLink?: boolean;
   /** The active section's content fills the canvas. */
   children: ReactNode;
 }
@@ -39,13 +42,14 @@ const COLLAPSE_QUERY = "(max-width: 1024px)";
 export function AppShell({
   scan = EMPTY_SCAN,
   activeSection,
-  onSelectSection,
+  activeScanId,
   recent,
-  onSelectRecent,
+  onDeleteRecent,
   counts,
   showSections,
   projectLabel,
-  topBarActions,
+  homeHref,
+  showHomeLink,
   children,
 }: AppShellProps) {
   // `null` until the user toggles manually; until then we follow the viewport.
@@ -64,20 +68,27 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <TopBar projectLabel={projectLabel} actions={topBarActions} />
+      <TopBar
+        projectLabel={projectLabel}
+        homeHref={homeHref}
+        showHomeLink={showHomeLink}
+      />
       <div className="flex min-h-0 flex-1">
         <Sidebar
           scan={scan}
           activeSection={activeSection}
-          onSelect={onSelectSection}
+          activeScanId={activeScanId}
           recent={recent}
-          onSelectRecent={onSelectRecent}
+          onDeleteRecent={onDeleteRecent}
           counts={counts}
           showSections={showSections}
           collapsed={collapsed}
           onToggleCollapsed={() => setManualCollapsed(!collapsed)}
         />
-        <main className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
+        {/* tabIndex makes the scrollable region keyboard-accessible (axe
+            scrollable-region-focusable / WCAG 2.1.1): a mouse-free user can
+            focus it and scroll with the arrow keys. */}
+        <main tabIndex={0} className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
           {children}
         </main>
       </div>

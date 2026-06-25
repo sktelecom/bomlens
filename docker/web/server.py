@@ -58,7 +58,10 @@ UPLOAD_EXTS = {
     "sbom": (".json", ".xml", ".spdx", ".cdx.json", ".spdx.json"),
     "zip": (".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar"),
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
-                 ".trx", ".chk", ".fw", ".rom", ".dlf"),
+                 ".trx", ".chk", ".fw", ".rom", ".dlf",
+                 # Compressed firmware images (unblob unpacks these), e.g. the
+                 # OpenWRT *.img.gz releases.
+                 ".gz", ".tgz", ".tar", ".xz", ".bz2", ".lzma", ".zst"),
 }
 
 # Content types for the static SPA bundle.
@@ -77,12 +80,16 @@ STATIC_CTYPES = {
 }
 
 ARTIFACT_SUFFIXES = (
-    "_bom.json", "_NOTICE.txt", "_NOTICE.html",
+    "_bom.json", "_NOTICE.txt", "_NOTICE.html", "_NOTICE.pdf",
     "_security.json", "_security.md", "_security.html",
     "_conformance.json", "_conformance.md", "_conformance.html",
     "_risk-report.md", "_risk-report.html",
     "_bom.json.sig", "_scancode.json",
 )
+
+# Recent-scans sidebar shows the newest N; older scans stay on disk but are not
+# listed (the user deletes via the UI or the output folder).
+RECENT_SCANS_CAP = 20
 
 
 def safe_name(s):
@@ -402,6 +409,16 @@ def sbom_summary(prefix):
             (p.get("value") for p in props if p.get("name") == "bomlens:licenseReview"),
             "",
         )
+        refs = c.get("externalReferences") or []
+        source = next(
+            (
+                r.get("url")
+                for r in refs
+                if isinstance(r.get("url"), str)
+                and r.get("type") in ("vcs", "distribution", "website")
+            ),
+            "",
+        )
         row = {
             "name": c.get("name") or "",
             "version": c.get("version") or "",
@@ -411,6 +428,8 @@ def sbom_summary(prefix):
             "licenses": _component_licenses(c),
             "vendored": vendored,
             "matchConfidence": match,
+            "source": source,
+            "copyright": c.get("copyright") or "",
         }
 
         # Scope: direct/transitive from the dependency graph (a component may be
@@ -448,6 +467,27 @@ def sbom_summary(prefix):
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
     }
+
+
+def scanoss_status(prefix):
+    """SCANOSS vendored-ID outcome for the UI, read from the vendored SBOM's
+    metadata: 'unavailable' (search failed — rate limit / no network / no token),
+    'no-match' (ran clean but found nothing vendored), or 'matched'. None when
+    vendored identification wasn't run (no vendored artifact)."""
+    p = safe_prefix_path(prefix, "_vendored.cdx.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    props = (data.get("metadata") or {}).get("properties") or []
+    status = next(
+        (x.get("value") for x in props if x.get("name") == "bomlens:scanoss:status"),
+        None,
+    )
+    return {"status": status, "count": len(data.get("components") or [])}
 
 
 def conformance_summary(prefix):
@@ -515,17 +555,29 @@ def list_scans():
             continue
         comps = data.get("components") or []
         meta = (data.get("metadata") or {}).get("component") or {}
+        # The OWASP AIBOM generator names the root metadata.component after its
+        # job id (job-<timestamp>), which is meaningless in the Recent list. For
+        # AI scans, label by the model component instead.
+        model = next(
+            (c for c in comps if c.get("type") == "machine-learning-model"), None
+        )
+        if model:
+            project = model.get("name") or prefix
+            version = model.get("version") or ""
+        else:
+            project = meta.get("name") or prefix
+            version = meta.get("version") or ""
         scans.append({
             "id": prefix,
-            "project": meta.get("name") or prefix,
-            "version": meta.get("version") or "",
+            "project": project,
+            "version": version,
             "components": len(comps),
             "maxSeverity": _max_severity(security_summary(prefix)),
             "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
             "generatedAt": mtime,
         })
     scans.sort(key=lambda s: s["generatedAt"], reverse=True)
-    return scans
+    return scans[:RECENT_SCANS_CAP]
 
 
 def scan_detail(prefix):
@@ -536,10 +588,12 @@ def scan_detail(prefix):
     return {
         "ok": True,
         "mode": None,
+        "id": prefix,
         "results": list_results(prefix),
         "sbom": sbom,
         "security": security_summary(prefix),
         "conformance": conformance_summary(prefix),
+        "scanoss": scanoss_status(prefix),
     }
 
 
@@ -733,8 +787,32 @@ class Handler(BaseHTTPRequestHandler):
             self._upload(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/git-cred":
             self._git_cred()
+        elif parsed.path == "/scan-delete":
+            self._scan_delete(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
+
+    def _scan_delete(self, qs):
+        """Delete one past scan: remove every {id}_* artifact from OUTPUT_DIR.
+        Local-only housekeeping (no account/db); the id is a validated prefix."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "bad scan id"}))
+            return
+        removed = 0
+        for suf in ARTIFACT_SUFFIXES:
+            # safe_prefix_path re-resolves {sid}{suf} with realpath and confirms
+            # it stays inside OUTPUT_DIR, so the delete cannot escape even though
+            # scan_id_ok already allowlisted the id. It also makes the boundary
+            # explicit to static analysis (no taint reaches os.remove unchecked).
+            p = safe_prefix_path(sid, suf)
+            if p and os.path.isfile(p):
+                try:
+                    os.remove(p)
+                    removed += 1
+                except OSError:
+                    pass
+        self._send(200, json.dumps({"deleted": sid, "removed": removed}))
 
     def _git_cred(self):
         """Stash a private-repo token; return a single-use credId."""
@@ -938,6 +1016,14 @@ class Handler(BaseHTTPRequestHandler):
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
         })
+        # Optional SCANOSS token (single-use, stashed via POST /git-cred). Lets a
+        # web-UI user supply their own OSSKB key, since the free anonymous endpoint
+        # is heavily rate-limited. Overrides any key from the server environment.
+        scanoss_cred = g("scanoss_cred").strip()
+        if scanoss_cred:
+            tok = _GIT_CREDS.pop(scanoss_cred, None)
+            if tok:
+                env["SCANOSS_API_KEY"] = tok
         cwd = OUTPUT_DIR
         cleanup_dir = None
         mode = None
@@ -1092,10 +1178,12 @@ class Handler(BaseHTTPRequestHandler):
             done = {
                 "ok": ok,
                 "mode": mode,
-                "results": list_results(),
+                "id": prefix,
+                "results": list_results(prefix),
                 "sbom": sbom_summary(prefix),
                 "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(prefix),
+                "scanoss": scanoss_status(prefix),
             }
             sse("done", json.dumps(done))
         finally:
@@ -1113,5 +1201,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    print("[ui] SBOM Generator Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
+    print("[ui] BomLens Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

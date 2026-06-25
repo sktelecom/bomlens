@@ -19,7 +19,7 @@
     "currentDir": "Current folder",
     "currentDirPath": "Current folder",
     "currentDirHint": "Scans the source in this folder (mounted as /src). To scan a different folder, run --ui from there.",
-    "rootfsDir": "Directory path",
+    "rootfsDir": "Directory / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (relative to the current folder)",
     "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. Paths outside the folder are rejected — place the rootfs under the launch folder, or use a Docker image instead.",
     "gitUrl": "GitHub URL",
@@ -39,7 +39,7 @@
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI model",
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
-    "aiModelHint": "Generates a CycloneDX ML-BOM for a HuggingFace model (fetches model-card metadata over the network).",
+    "aiModelHint": "Enter a HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B) — not a collection name or a full URL. Fetches model-card metadata over the network to build a CycloneDX ML-BOM.",
     "aiModelUnavailable": "AI-model SBOMs require launching the UI from the AIBOM image.",
     "uploading": "Uploading…",
     "uploadFailed": "Upload failed: {{msg}}"
@@ -49,10 +49,12 @@
     "noticeHint": "Generate the open-source license NOTICE",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
-    "deepLicense": "Deep license",
-    "deepLicenseHint": "ScanCode deep license detection (slow)",
-    "identifyVendored": "Identify bundled open source",
-    "identifyVendoredHint": "For C/C++ source with no package manager. Sends file fingerprints (not source) to the OSSKB service."
+    "deepLicense": "License scan (ScanCode)",
+    "deepLicenseHint": "Downloads each package's source and scans it for license information, instead of trusting the license the package declares (slow).",
+    "identifyVendored": "File-level identification (SCANOSS)",
+    "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service.",
+    "scanossTokenPlaceholder": "SCANOSS token (optional)",
+    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged."
   },
   "progress": {
     "title": "Run log",
@@ -65,12 +67,19 @@
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
+    "aiScanTitle": "AI model SBOM (ML-BOM)",
+    "aiScanBody": "Generated from HuggingFace model metadata. It centers on the model and its datasets, so it has fewer components than a typical software scan.",
     "vendoredHintTitle": "Few components found — is this C/C++ embedded source?",
-    "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"Identify bundled open source\" under Advanced and run again. Only file fingerprints are sent — your source stays local.",
+    "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"File-level identification (SCANOSS)\" under Advanced scan options and run again. Only file fingerprints are sent — your source stays local.",
+    "scanossUnavailableTitle": "SCANOSS search didn't complete",
+    "scanossUnavailableBody": "The OSSKB lookup was blocked (rate limit, no network, or no token). The free OSSKB endpoint is rate-limited for anonymous use — add a SCANOSS token under Advanced scan options and run again to get results.",
+    "scanossNoMatchTitle": "No copied open source found",
+    "scanossNoMatchBody": "SCANOSS searched successfully but found no third-party open source copied directly into the source — either there is none, or the code isn't in OSSKB.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
     "vendoredMatch": "match {{pct}}",
     "severityTitle": "Severity distribution",
+    "severityFilterHint": "Click a severity to filter",
     "noVulns": "No vulnerabilities found",
     "artifacts": "Generated artifacts",
     "artifactsEmpty": "No artifacts were generated.",
@@ -144,10 +153,14 @@
     "colScope": "Scope",
     "colRisk": "Risk",
     "colLicense": "License",
+    "colSource": "Source / download",
+    "colCopyright": "Copyright",
     "colSeverity": "Severity",
     "colCve": "CVE",
-    "colPackage": "Package",
+    "colPackage": "Component",
     "colInstalled": "Installed",
+    "vulnSearchPlaceholder": "Search CVE, component, title",
+    "vulnShown": "{{shown}} of {{total}} shown",
     "colFixed": "Fixed",
     "vulnCvss": "CVSS",
     "colEpss": "EPSS",
@@ -156,7 +169,8 @@
     "vulnDescription": "Description",
     "vulnReferences": "References",
     "vulnNoDetail": "No additional details available.",
-    "vulnRowToggle": "Show vulnerability details"
+    "vulnRowToggle": "Show vulnerability details",
+    "componentRowToggle": "Show component details"
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -206,6 +220,8 @@
     "expand": "Expand sidebar",
     "recent": "Recent scans",
     "recentEmpty": "No recent scans yet",
+    "recentDelete": "Delete this scan",
+    "sectionsHint": "Run a scan to see result sections here.",
     "group": {
       "inventory": "Inventory",
       "risk": "Risk & compliance",
@@ -229,6 +245,7 @@
     "source": "Source",
     "settings": "Scan settings",
     "outputs": "Outputs",
+    "scanOptions": "Advanced scan options",
     "catCode": "Code",
     "catArtifact": "Artifact",
     "catSbom": "SBOM",
@@ -283,7 +300,34 @@
     "required": "Required",
     "sPass": "Present",
     "sFail": "Failed",
-    "sWarn": "Advisory"
+    "sWarn": "Advisory",
+    "howToFix": "How to satisfy:",
+    "help": {
+      "g7-model-id": {
+        "what": "Identifies the model with a standard identifier such as PURL/CPE.",
+        "fix": "Add a purl or cpe to the model component in the SBOM."
+      },
+      "g7-model-license": {
+        "what": "The license that applies to the model.",
+        "fix": "State a license on the model card, or fill the licenses field on the SBOM component."
+      },
+      "g7-model-card": {
+        "what": "Model-card info such as architecture and training parameters.",
+        "fix": "Document architecture and hyperparameters in the HuggingFace model card (README)."
+      },
+      "g7-model-hash": {
+        "what": "Integrity hashes for the model weight files.",
+        "fix": "Add the model file hashes (e.g. SHA-256) to the component's hashes in the SBOM."
+      },
+      "g7-datasets": {
+        "what": "Provenance of the datasets used for training.",
+        "fix": "Reference the training datasets as data components in the SBOM."
+      },
+      "g7-openness": {
+        "what": "How open the weights, architecture, data and training are.",
+        "fix": "Declare the model's openness (public weights/data/training code) in the SBOM or model card."
+      }
+    }
   },
   "licenses": {
     "empty": "No licenses were detected.",
@@ -291,7 +335,8 @@
     "reviewHint": "AI-restrictive terms — human review required.",
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
-    "distribution": "License distribution"
+    "distribution": "License distribution",
+    "clickHint": "Click a license to see its components"
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",

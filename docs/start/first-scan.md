@@ -1,79 +1,47 @@
 ---
-description: Install BomLens and generate your first SBOM. A step-by-step guide to set up a Docker engine and produce a CycloneDX SBOM, an open-source notice, and a security report from the web UI or the CLI.
+description: Install BomLens and generate your first SBOM. The fastest path needs no command line — download the desktop app and double-click; or use the web UI or the CLI to produce a CycloneDX SBOM, an open-source notice, and a security report.
 ---
 
 # Getting started
 
-A step-by-step path from install to your first SBOM.
+From install to your first SBOM, step by step. The fastest path needs no command line — download the app and double-click.
 
-## Prerequisites
+> Just want an SBOM or a notice quickly, no commands? Start with the [no-CLI quick start](../start/no-cli.md).
 
-| Item | Minimum |
-|------|---------|
-| Docker | 20.10+ |
-| Disk | 4 GB+ (for the Docker image) |
-| OS | Linux, macOS, Windows |
-| Arch | AMD64, ARM64 |
+BomLens runs on a Docker engine, but the desktop app and web UI set it up and pull the image for you. You only manage Docker yourself for the CLI — see [Requirements](#requirements) below if you still need to install one.
 
-All you need is a Docker *engine* — the tool is not tied to one product. If you already run Docker (Docker Desktop, Rancher Desktop, docker-ce in WSL2, anything), just confirm it works and move on:
+## Start without the command line (recommended)
 
-```bash
-docker run --rm hello-world
-```
+Download [BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 3–4 GB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
 
-### Installing Docker on Windows for the first time
+![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
-Docker Desktop is the simplest, but it needs a paid license above a certain organization size. Free options:
+Prefer scripts over an installer? Download the repo ZIP (the green Code button, then Download ZIP), unzip it, and double-click `scripts\sbom-ui.bat` — the same flow, with no console app to install.
 
-| Option | Notes |
-|--------|-------|
-| **WSL2 + docker-ce** (free) | Install docker-ce inside WSL2 Ubuntu and run `scan-sbom.sh` there. No `.bat`, no Windows named pipe, no path-conversion issues. |
-| **Rancher Desktop** (free, GUI) | A drop-in GUI replacement for Docker Desktop with a `docker` CLI. Works with the `.bat` double-click and desktop-app flows. |
-| Docker Desktop | Easiest, but check licensing for organizational use. |
+## Web UI
 
-## Installation
-
-### Windows — download and double-click (no command line)
-
-The simplest path is the desktop app. Use [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click the file; the UI opens with no console window. It is unsigned for now, so if Windows SmartScreen warns, click **More info** and then **Run anyway**. A step-by-step Korean guide is in the [no-CLI quickstart](../start/no-cli.md).
-
-Prefer scripts? Download the repo ZIP (the green Code button, then Download ZIP), unzip it, and double-click `scripts\sbom-ui.bat`. The scanner image (about 3–4 GB) downloads automatically on first run.
-
-For the command-line wrapper, install [Git for Windows](https://git-scm.com/download/win) (Git Bash) and use `scripts\scan-sbom.bat`, or follow the macOS/Linux steps below under WSL2.
-
-### macOS / Linux — CLI
+No commands beyond launching it: run in the browser, scan, and download results.
 
 ```bash
-git clone https://github.com/sktelecom/sbom-tools.git
-cd sbom-tools
-docker pull ghcr.io/sktelecom/bomlens:latest   # legacy alias sbom-scanner serves the same image
-```
-
-The image is about 3–4 GB and may take a few minutes. Then verify:
-
-```bash
-./scripts/scan-sbom.sh --help
-```
-
-## Easiest start: the web UI
-
-No commands required — run it in the browser, scan, and download results in three steps.
-
-```bash
-# Run from the folder where you want results saved (any folder)
-cd ~/sbom-output
-/path/to/sbom-tools/scripts/scan-sbom.sh --ui     # opens http://localhost:8080
+git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-On Windows the folder you run from is where outputs are saved, and it must be inside a Docker file-sharing path; under your home directory (`C:\Users\...`) is shared by default. Then:
+The folder you run from is where outputs are saved; on Windows it must be inside a Docker file-sharing path (`C:\Users\...` is shared by default). If the port is taken, prefix `UI_PORT=9090`. To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+
+![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
 1. Enter a project name and version.
 2. Pick a scan target: current folder, GitHub URL, ZIP upload, SBOM upload, firmware upload, or Docker image.
 3. Click Run scan — logs stream live.
-4. Download the SBOM, the notice, and the risk report.
+4. View or download the SBOM, the notice, and the risk report.
+
+Screen layout and per-target details are in the [web UI reference](../reference/ui.md).
 
 ## Your first SBOM (CLI)
+
+Advanced — for automation and CI. Run from the cloned repo.
 
 ```bash
 # All deliverables for a project in the current directory
@@ -82,20 +50,29 @@ On Windows the folder you run from is where outputs are saved, and it must be in
 
 This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report in the current directory.
 
-> To upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`); the steps are in the upload section of the [upload guide](../guides/upload.md).
+```bash
+# From a GitHub URL, without cloning first
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --git "https://github.com/org/repo" --all --generate-only
+```
+
+Other inputs — ZIP archive, Docker image, binary, firmware, or an existing SBOM — are in the [input-scenarios guide](../guides/by-input.md).
+
+> To upload the result to TRUSCA or a Dependency-Track server, use `--trusca <project_id>` (or `UPLOAD_TARGET`); the steps are in the [upload guide](../guides/upload.md).
 
 ## Understanding the results
 
-Outputs are named `{Project}_{Version}_…`:
+Outputs are named `{Project}_{Version}_…`, for example `MyApp_1.0.0_bom.json`:
 
 | File | What it is |
 |------|------------|
-| `..._bom.json` | the SBOM (CycloneDX 1.6) |
-| `..._NOTICE.{txt,html}` | open-source notice (고지문) grouped by license |
-| `..._security.{json,md,html}` | Trivy vulnerability report |
-| `..._risk-report.{md,html}` | open-source risk report (licenses + vulnerabilities), generated by default |
+| `{Project}_{Version}_bom.json` | the SBOM (CycloneDX 1.6) |
+| `{Project}_{Version}_NOTICE.{txt,html}` | open-source notice (고지문) grouped by license |
+| `{Project}_{Version}_security.{json,md,html}` | Trivy vulnerability report |
+| `{Project}_{Version}_risk-report.{md,html}` | open-source risk report (licenses + vulnerabilities), generated by default |
 
-Quick checks with `jq`:
+The SBOM is [CycloneDX 1.6](https://cyclonedx.org/) JSON. Key fields: `metadata.component` (the scanned project), `components` (the open-source components found), `components[].purl` (the package identifier), and `components[].licenses` (SPDX IDs).
+
+Quick checks with `jq` (on WSL2/Ubuntu `sudo apt-get install jq`; on Windows Git Bash `winget install jqlang.jq`). If installing it is a hassle, the web UI overview shows the component count and licenses directly:
 
 ```bash
 # Component count
@@ -105,12 +82,60 @@ jq '.components | length' MyApp_1.0.0_bom.json
 jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
 ```
 
+## Requirements
+
+BomLens needs only a Docker *engine* — not a specific product.
+
+| Item | Minimum |
+|------|---------|
+| Docker | 20.10+ |
+| Disk | 4 GB+ (for the Docker image) |
+| OS | Linux, macOS, Windows |
+| Arch | AMD64, ARM64 |
+
+If you already run a Docker engine (Docker Desktop, Rancher Desktop, docker-ce in WSL2, anything), just confirm it works:
+
+```bash
+docker run --rm hello-world
+```
+
+### Installing Docker on Windows for the first time
+
+Docker Desktop is simplest, but it needs a paid license above a certain organization size. Free options:
+
+| Option | Notes |
+|--------|-------|
+| **WSL2 + docker-ce** (free) | Install docker-ce inside WSL2 Ubuntu and run `scan-sbom.sh` there. No `.bat`, no Windows named pipe, no path-conversion issues. |
+| **Rancher Desktop** (free, GUI) | A drop-in GUI replacement for Docker Desktop with a `docker` CLI. Works with the `.bat` double-click and desktop-app flows. |
+| Docker Desktop | Easiest, but check licensing for organizational use. |
+
+WSL2 + docker-ce, the short version (admin PowerShell):
+
+```powershell
+wsl --install -d Ubuntu          # reboot, then finish Ubuntu setup
+```
+
+Then inside WSL (Ubuntu):
+
+```bash
+sudo apt-get update && curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"  # log out and back in to apply
+docker pull ghcr.io/sktelecom/bomlens:latest
+```
+
+Clone the repo inside WSL and run `./scripts/scan-sbom.sh ...` as above. For the CLI on Windows without WSL2, install [Git for Windows](https://git-scm.com/download/win) (Git Bash) and use `scripts\scan-sbom.bat`.
+
 ## Next steps
 
-- [Usage guide](../reference/cli.md) — every option, analysis modes, CI/CD integration
-- [Architecture](../concepts/architecture.md) — the two-stage pipeline (cdxgen + syft, then post-processing)
-- [README](https://github.com/sktelecom/sbom-tools/blob/main/README.md) — overview and the two core roles
+| Goal | Doc |
+|------|-----|
+| Input forms (GitHub, ZIP, SBOM, firmware) | [Input scenarios](../guides/by-input.md) |
+| Notice, security & risk reports, web UI | [Reports guide](../guides/reports.md) |
+| Every option and CI/CD | [CLI reference](../reference/cli.md) |
+| Language example projects | [Ecosystems](../reference/ecosystems.md) |
+| Internals | [Architecture](../concepts/architecture.md) |
+| Contributing | [Contributing guide](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) |
 
 ---
 
-> **Related**: [Usage guide](../reference/cli.md)
+> **Related**: [CLI reference](../reference/cli.md) | [Input scenarios](../guides/by-input.md)

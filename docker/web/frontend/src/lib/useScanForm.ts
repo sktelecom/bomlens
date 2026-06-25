@@ -24,7 +24,9 @@ export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
 export const ACCEPT: Record<UploadKind, string> = {
   zip: ".zip,.tar.gz,.tgz,.tar.bz2,.tar.xz,.tar",
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json",
-  firmware: ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf",
+  firmware:
+    ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +
+    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
 };
 
 /** Free-text inputs: the single `target` field, with per-source i18n keys. */
@@ -63,6 +65,7 @@ export function useScanForm({
   const [security, setSecurity] = useState(true);
   const [deepLicense, setDeepLicense] = useState(false);
   const [identifyVendored, setIdentifyVendored] = useState(false);
+  const [scanossToken, setScanossToken] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -71,10 +74,18 @@ export function useScanForm({
   const textInput = TEXT_INPUT[source];
   const isText = textInput !== undefined;
   const isAnalyze = source === "sbom-upload";
+  // AI-model scans have no source tree and no package CVEs, so the security
+  // report (Trivy → 0 results) and deep-license (needs /src) don't apply.
+  const isAiModel = source === "ai-model";
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
   const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
+  // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
+  // applies to source scans — not Docker images, SBOM uploads, firmware or AI
+  // models, where there is nothing to scan and the toggle would be a no-op.
+  const showDeepLicense = isSourceScan;
+  const showScanOptions = showDeepLicense || showVendored;
   const busy = running || uploading;
 
   /** Switching source resets the dependent inputs. */
@@ -96,6 +107,7 @@ export function useScanForm({
 
     let token: string | undefined;
     let cred: string | undefined;
+    let scanossCred: string | undefined;
     if (uploadKind && file) {
       try {
         setUploading(true);
@@ -120,6 +132,20 @@ export function useScanForm({
       setUploading(false);
     }
 
+    // SCANOSS token: stashed the same single-use way so the OSSKB key never hits
+    // the scan-stream query string. Only relevant when vendored ID is active.
+    if (showVendored && identifyVendored && scanossToken.trim()) {
+      try {
+        setUploading(true);
+        scanossCred = (await stashGitCred(scanossToken.trim())).credId;
+      } catch (e) {
+        setUploadError((e as Error).message);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
     onRun({
       project: project.trim(),
       version: version.trim(),
@@ -127,20 +153,26 @@ export function useScanForm({
       target: isText ? target.trim() : undefined,
       token,
       cred,
-      // ANALYZE forces notice+security on (needed for the risk report).
+      scanossCred,
+      // ANALYZE forces notice+security on (needed for the risk report). AI-model
+      // scans have no package CVEs, so security is off there.
       notice: isAnalyze ? true : notice,
-      security: isAnalyze ? true : security,
-      deepLicense,
+      security: isAiModel ? false : isAnalyze ? true : security,
+      deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // Byte-stable (reproducible) output is a CI concern; not exposed in the UI.
       byteStable: false,
     });
   };
 
+  // "Outputs" = what gets generated. Scan-method options (deep license / vendored
+  // identification) are surfaced separately, not as outputs.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
-    { key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze },
-    { key: "deepLicense", value: deepLicense, set: setDeepLicense },
+    // AI-model scans skip the (empty) security report.
+    ...(isAiModel
+      ? []
+      : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
   ];
 
   return {
@@ -150,9 +182,12 @@ export function useScanForm({
     target, setTarget,
     gitToken, setGitToken,
     file, setFile,
+    deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
+    scanossToken, setScanossToken,
     invalid, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, showVendored,
+    showDeepLicense, showScanOptions,
     options, submit,
     capabilities,
   };

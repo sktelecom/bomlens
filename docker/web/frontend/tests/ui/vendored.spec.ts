@@ -25,6 +25,7 @@ async function stub(page: Page, caps: Caps, done?: unknown) {
 const VENDORED_DONE = {
   ok: true,
   mode: "SOURCE",
+  id: "testapp_1.0",
   results: [{ name: "testapp_1.0_bom.json", size: 1234 }],
   security: null,
   conformance: null,
@@ -45,22 +46,21 @@ async function fillAndRun(page: Page) {
   await page.getByRole("button", { name: /Run scan/i }).click();
 }
 
-test("Advanced vendored toggle is offered (collapsed by default) when scanoss is available", async ({ page }) => {
+test("Vendored toggle is offered under scan options when scanoss is available", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true });
   await page.goto("/");
-  // Off-by-default UX: the toggle lives inside a collapsed "Advanced" disclosure,
-  // so it is present but hidden until the user expands it.
-  const toggle = page.getByText("Identify bundled open source");
-  await expect(toggle).toHaveCount(1);
-  await expect(toggle).toBeHidden();
-  await page.getByText("Advanced", { exact: true }).click();
+  // The redesigned New scan shows the vendored-ID toggle inline under the
+  // "Advanced scan options" column for a source scan (the default current-dir),
+  // off by default but visible — no separate disclosure to expand.
+  const toggle = page.getByText("File-level identification (SCANOSS)");
   await expect(toggle).toBeVisible();
+  await expect(page.locator("#scanossToken")).toHaveCount(0);
 });
 
-test("Advanced vendored toggle hidden when scanoss is NOT available", async ({ page }) => {
+test("Vendored toggle hidden when scanoss is NOT available", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true });
   await page.goto("/");
-  await expect(page.getByText("Identify bundled open source")).toHaveCount(0);
+  await expect(page.getByText("File-level identification (SCANOSS)")).toHaveCount(0);
 });
 
 test("result banner appears for the C/C++ suggestion", async ({ page }) => {
@@ -74,8 +74,9 @@ test("vendored badge + match confidence render; XSS name is inert", async ({ pag
   await stub(page, { firmware: false, scanoss: true, docker: true }, VENDORED_DONE);
   await page.goto("/");
   await fillAndRun(page);
-  // Open the Components tab where the per-component table (and badge) lives.
-  await page.getByRole("button", { name: /^Components/ }).click();
+  // Open the Components section (nav is now anchor links) where the
+  // per-component table (and badge) lives.
+  await page.getByRole("link", { name: /^Components/ }).first().click();
 
   // vendored badge present with a match-confidence tooltip.
   const badge = page.getByText("vendored", { exact: true }).first();

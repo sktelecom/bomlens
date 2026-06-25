@@ -94,24 +94,26 @@ plugins:
             Get started: 빠른 시작
             First scan: 시작하기
             No-CLI quickstart: 비개발자 빠른 시작
+            Web UI & app: 웹 UI·데스크톱
             Guides: 가이드
             By input type: 입력 시나리오
             Reports: 보고서 생성
             Supplier SBOM: 공급사 SBOM
             Firmware: 펌웨어 분석
+            Identify bundled OSS (C/C++): 번들 OSS 식별 (C/C++)
+            Server delivery: 서버 전달
             Upload: 업로드
             CI/CD: CI/CD 연동
-            Reference: 레퍼런스
+            Outputs: 산출물
+            Artifacts: 산출물 종류
+            Reading reports: 보고서 읽는 법
+            Advanced: 고급
             CLI options: CLI 옵션
-            Artifacts: 산출물
-            Ecosystems: 지원 생태계
-            Web UI & app: 웹 UI·데스크톱
             Docker image: Docker 이미지
-            Concepts: 개념
+            Ecosystems: 지원 생태계
+            About: 프로젝트 정보
             Architecture: 아키텍처
             Local-first: 로컬 우선 설계
-            Reading reports: 보고서 읽는 법
-            Contributing: 기여
             Package managers: 패키지 매니저
             Testing: 테스트
             Release notes: 릴리스 노트
@@ -141,26 +143,26 @@ nav:
   - Get started:
       - First scan: start/first-scan.md
       - No-CLI quickstart: start/no-cli.md
+      - Web UI & app: reference/ui.md
   - Guides:
       - By input type: guides/by-input.md
-      - Server delivery: guides/server-delivery.md
       - Reports: guides/reports.md
       - Supplier SBOM: guides/supplier-sbom.md
       - Firmware: guides/firmware.md
       - Identify bundled OSS (C/C++): guides/identify-vendored.md
+      - Server delivery: guides/server-delivery.md
       - Upload: guides/upload.md
       - CI/CD: guides/ci-cd.md
-  - Reference:
-      - CLI options: reference/cli.md
+  - Outputs:
       - Artifacts: reference/artifacts.md
-      - Ecosystems: reference/ecosystems.md
-      - Web UI & app: reference/ui.md
+      - Reading reports: concepts/reports-explained.md
+  - Advanced:
+      - CLI options: reference/cli.md
       - Docker image: reference/docker-image.md
-  - Concepts:
+      - Ecosystems: reference/ecosystems.md
+  - About:
       - Architecture: concepts/architecture.md
       - Local-first: concepts/local-first.md
-      - Reading reports: concepts/reports-explained.md
-  - Contributing:
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md
   - Release notes: https://github.com/sktelecom/sbom-tools/releases

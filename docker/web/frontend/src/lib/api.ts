@@ -34,6 +34,10 @@ export interface ComponentItem {
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
   licenseReview?: "behavioral-use" | "non-commercial";
+  /** Source / download location (externalReferences vcs/distribution/website). */
+  source?: string;
+  /** Copyright holder line, when the SBOM captured one. */
+  copyright?: string;
 }
 
 export interface SbomSummary {
@@ -105,10 +109,17 @@ export interface ConformanceSummary {
 export interface DoneEvent {
   ok: boolean;
   mode?: string;
+  /** The {project}_{version} prefix this scan's artifacts share — the scan id
+   *  used for re-opening (`loadScan`) and for the `#/scan/<id>` hash route.
+   *  Set by server.py from `output_prefix`; absent on older payloads. */
+  id?: string;
   results: ResultFile[];
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
+   *  status: "unavailable" (search blocked) | "no-match" | "matched". */
+  scanoss?: { status: string | null; count: number } | null;
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */
@@ -142,6 +153,7 @@ export interface ScanParams {
   target?: string; // git URL OR docker image name
   token?: string; // server-side token from /upload
   cred?: string; // single-use credId from /git-cred (private git URL)
+  scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
   deepLicense: boolean;
@@ -251,6 +263,18 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
+/** Delete one past scan (removes its {id}_* artifacts on disk). */
+export async function deleteScan(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/scan-delete?id=${encodeURIComponent(id)}`, {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Re-open a past scan by id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {
@@ -294,6 +318,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     target: params.target ?? "",
     token: params.token ?? "",
     cred: params.cred ?? "",
+    scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
     deep_license: String(params.deepLicense),

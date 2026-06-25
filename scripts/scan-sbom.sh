@@ -175,7 +175,7 @@ docker_check() {
 if [ "$UI_MODE" = "true" ]; then
     docker_check
     echo "=========================================="
-    echo "  SBOM Generator Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
+    echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
     ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
         || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &

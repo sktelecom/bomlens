@@ -21,7 +21,7 @@ description: 공급사가 납품 서버의 SBOM을 만드는 방법. OS rootfs, 
 
 ## 공통 준비
 
-> **Windows**: 아래 명령은 macOS/Linux 기준입니다. `scan-sbom.bat`와 WSL2 사용법은 [시작 가이드](../start/first-scan.ko.md#설치)를 참고하세요.
+> **Windows**: 아래 명령은 macOS/Linux 기준입니다. `scan-sbom.bat`와 WSL2 사용법은 [시작 가이드](../start/first-scan.ko.md)를 참고하세요.
 
 ```bash
 # Docker 20.10+ 필요. 스캐너 이미지를 한 번 받습니다.

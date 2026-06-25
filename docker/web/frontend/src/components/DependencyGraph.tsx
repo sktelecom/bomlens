@@ -84,7 +84,9 @@ export function DependencyGraph({
   }, [nodes]);
 
   useEffect(() => {
-    if (tooLarge || nodes.length === 0) return;
+    // No edges = no dependency relationships (e.g. a firmware SBOM): a node-only
+    // graph is just overlapping dots, so we show a note instead (see render).
+    if (tooLarge || nodes.length === 0 || edges.length === 0) return;
     let destroyed = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let cy: any;
@@ -174,6 +176,16 @@ export function DependencyGraph({
         };
         cy = cytoscape(config);
         cyRef.current = cy;
+        // First view: a big graph fits to unreadable dots, so when fit zoomed
+        // far out, snap to zoom 1 (labels legible) and anchor the top-left —
+        // the user pans/scrolls from there. Small graphs keep their fit.
+        cy.one("layoutstop", () => {
+          if (cy.zoom() < 0.9) {
+            cy.zoom(1);
+            const bb = cy.elements().boundingBox();
+            cy.pan({ x: 24 - bb.x1, y: 24 - bb.y1 });
+          }
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cy.on("tap", "node", (evt: any) => {
           setSelected(nodeById.get(evt.target.id()) ?? null);
@@ -213,7 +225,10 @@ export function DependencyGraph({
     });
   }, [query, nodes]);
 
-  if (nodes.length === 0) {
+  // No nodes, or nodes but no edges (no dependency relationships, e.g. a
+  // firmware SBOM): a node-only graph is unreadable overlapping dots, so show
+  // the "no relationships" note and let the user use Components / Tree instead.
+  if (nodes.length === 0 || edges.length === 0) {
     return <p className="text-sm text-muted-foreground">{t("deps.empty")}</p>;
   }
   if (tooLarge) {

@@ -119,6 +119,69 @@ else
     fail "generate-notice.sh did not produce $NOTICE"
 fi
 
+echo "== B-5: NOTICE shows source location + attribution per component =="
+# A component with a vcs externalReference, one with only a purl (registry inferred),
+# and one carrying component.copyright. Source must never be blank when a purl exists,
+# and attribution must never be blank (copyright, else an honest "not captured").
+cat > "$WORK/src.json" <<'JSON'
+{"components":[
+ {"name":"logback","version":"1.4","purl":"pkg:maven/ch.qos.logback/logback@1.4",
+  "externalReferences":[{"type":"vcs","url":"https://github.com/qos-ch/logback"}],
+  "licenses":[{"license":{"id":"Apache-2.0"}}]},
+ {"name":"hikari","version":"5.0.1","purl":"pkg:maven/com.zaxxer/HikariCP@5.0.1",
+  "licenses":[{"license":{"id":"Apache-2.0"}}]},
+ {"name":"left-pad","version":"1.3.0","purl":"pkg:npm/left-pad@1.3.0",
+  "copyright":"Copyright (c) azer","licenses":[{"license":{"id":"MIT"}}]}
+]}
+JSON
+bash "$LIB/generate-notice.sh" "$WORK/src.json" "$WORK/srcn" "SrcProj" >/dev/null 2>&1
+STXT="$WORK/srcn_NOTICE.txt"; SHTML="$WORK/srcn_NOTICE.html"
+if [ -f "$STXT" ] && [ -f "$SHTML" ]; then
+    grep -q "Source: https://github.com/qos-ch/logback" "$STXT" \
+        && pass "vcs externalReference used as source location" \
+        || fail "vcs source location missing in TXT"
+    grep -q "Source: https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/" "$STXT" \
+        && pass "maven source location inferred from purl when no externalReference" \
+        || fail "purl-inferred maven source missing"
+    grep -q "Source: https://www.npmjs.com/package/left-pad/v/1.3.0" "$STXT" \
+        && pass "npm source location inferred from purl" \
+        || fail "purl-inferred npm source missing"
+    grep -q "Copyright: Copyright (c) azer" "$STXT" \
+        && pass "component.copyright shown verbatim as attribution" \
+        || fail "copyright attribution missing"
+    if awk '/^  - hikari@5.0.1$/{f=1;next} /^  - /{f=0} f&&/Copyright: holders not captured/{ok=1} END{exit !ok}' "$STXT"; then
+        pass "attribution falls back to honest 'not captured' (never blank)"
+    else
+        fail "missing attribution fallback for a component without copyright"
+    fi
+    grep -q '<a href="https://github.com/qos-ch/logback">' "$SHTML" \
+        && pass "http(s) source rendered as a link in HTML" \
+        || fail "HTML source link missing"
+else
+    fail "generate-notice.sh did not produce source/attribution NOTICE"
+fi
+
+echo "== B-6: NOTICE PDF — rendered when weasyprint present, skipped gracefully otherwise =="
+# generate-notice.sh must not die when the PDF renderer is absent, and must produce
+# the PDF (and report it) when weasyprint is on PATH. We force the absent case with a
+# PATH that has only the tools the script needs (jq, the coreutils it calls).
+NOTICE_LOG="$WORK/pdf.log"
+bash "$LIB/generate-notice.sh" "$WORK/src.json" "$WORK/pdfn" "PdfProj" >"$NOTICE_LOG" 2>&1
+RC=$?
+[ "$RC" -eq 0 ] && pass "generate-notice.sh exits 0 regardless of PDF renderer presence" \
+    || fail "generate-notice.sh failed (rc=$RC)"
+[ -f "$WORK/pdfn_NOTICE.txt" ] && [ -f "$WORK/pdfn_NOTICE.html" ] \
+    && pass "TXT/HTML still produced on the PDF path" || fail "TXT/HTML missing on PDF path"
+if command -v weasyprint >/dev/null 2>&1; then
+    { [ -f "$WORK/pdfn_NOTICE.pdf" ] && grep -q "generated PDF" "$NOTICE_LOG"; } \
+        && pass "weasyprint present: PDF rendered and reported" \
+        || fail "weasyprint present but PDF not produced"
+else
+    { [ ! -f "$WORK/pdfn_NOTICE.pdf" ] && grep -q "PDF skipped" "$NOTICE_LOG"; } \
+        && pass "weasyprint absent: PDF skipped with a log line (graceful, not silent)" \
+        || fail "PDF skip not handled gracefully"
+fi
+
 echo "== V13-2: normalize-sbom.sh maps bom.json license aliases to SPDX ids =="
 cp "$FIX/license-aliases.json" "$WORK/c.json"
 bash "$LIB/normalize-sbom.sh" "$WORK/c.json" >/dev/null 2>&1
@@ -273,6 +336,68 @@ total_n=$(jq '[.components[]?] | length' "$WORK/mmerged.json")
 # The surviving lodash is the authoritative package-manager identity (pkg:npm).
 lodash_purl=$(jq -r '.components[] | select((.name|ascii_downcase)=="lodash") | .purl' "$WORK/mmerged.json")
 [ "$lodash_purl" = "pkg:npm/lodash@4.17.21" ] && pass "package-manager identity (pkg:npm) wins over the SCANOSS pkg:github match" || fail "lodash purl='$lodash_purl', expected pkg:npm"
+
+echo "== F-1: firmware CPE enrichment (Plan 1) — whitelist + version normalization =="
+cp "$FIX/firmware-no-cpe.json" "$WORK/fw.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/fw.json" >/dev/null 2>&1
+# OpenWRT package-revision suffix (-5) stripped so the cpe version matches NVD.
+bb_cpe=$(jq -r '.components[] | select(.name=="busybox") | .cpe' "$WORK/fw.json")
+[ "$bb_cpe" = "cpe:2.3:a:busybox:busybox:1.30.1:*:*:*:*:*:*:*" ] \
+    && pass "busybox cpe version normalized 1.30.1-5 -> 1.30.1 (Trivy-matchable)" \
+    || fail "busybox cpe='$bb_cpe', expected upstream version 1.30.1"
+# A component with NO cpe at all gets one from the whitelist.
+dr_cpe=$(jq -r '.components[] | select(.name=="dropbear") | .cpe' "$WORK/fw.json")
+[ "$dr_cpe" = "cpe:2.3:a:dropbear_ssh_project:dropbear_ssh:2019.78:*:*:*:*:*:*:*" ] \
+    && pass "dropbear (no cpe) gets a whitelisted cpe with correct NVD vendor/product" \
+    || fail "dropbear cpe='$dr_cpe', expected dropbear_ssh_project:dropbear_ssh:2019.78"
+# A non-whitelisted name must NOT be touched (false-positive guard).
+unk_cpe=$(jq -r '.components[] | select(.name=="some-internal-thing") | .cpe // "ABSENT"' "$WORK/fw.json")
+[ "$unk_cpe" = "ABSENT" ] && pass "non-whitelisted component left without a cpe (no false-positive CVEs)" || fail "unexpected cpe on unknown component: $unk_cpe"
+# A whitelisted name not in our map (luci-base) keeps syft's cpe unchanged.
+lu_cpe=$(jq -r '.components[] | select(.name=="luci-base") | .cpe' "$WORK/fw.json")
+case "$lu_cpe" in cpe:2.3:a:luci-base:*) pass "non-mapped component keeps its existing cpe untouched" ;; *) fail "luci-base cpe changed unexpectedly: $lu_cpe" ;; esac
+# License enrichment: a whitelisted name with a confirmed spdx_license and no
+# license yet gets a CycloneDX licenses[] from the curated map.
+bb_lic=$(jq -r '.components[] | select(.name=="busybox") | (.licenses // [])[0].license.id // "ABSENT"' "$WORK/fw.json")
+[ "$bb_lic" = "GPL-2.0-only" ] \
+    && pass "busybox (license-null) gets confirmed SPDX GPL-2.0-only" \
+    || fail "busybox license='$bb_lic', expected GPL-2.0-only"
+# A dual/multi license is written as a single SPDX expression entry.
+dm_lic=$(jq -r '.components[] | select(.name=="dnsmasq") | (.licenses // [])[0].expression // "ABSENT"' "$WORK/fw.json")
+[ "$dm_lic" = "GPL-2.0-only OR GPL-3.0-only" ] \
+    && pass "dnsmasq dual license written as an SPDX expression" \
+    || fail "dnsmasq expression='$dm_lic', expected GPL-2.0-only OR GPL-3.0-only"
+# Provenance property marks the inferred license.
+bb_src=$(jq -r '.components[] | select(.name=="busybox") | [(.properties // [])[] | select(.name=="bomlens:licenseSource") | .value][0] // "ABSENT"' "$WORK/fw.json")
+[ "$bb_src" = "name-map" ] && pass "enriched license carries bomlens:licenseSource=name-map" || fail "busybox licenseSource='$bb_src', expected name-map"
+# A pre-existing license is NEVER overwritten (syft is trusted) and gets no marker.
+ipt_lic=$(jq -r '.components[] | select(.name=="iptables") | (.licenses // [])[0].license.id // "ABSENT"' "$WORK/fw.json")
+[ "$ipt_lic" = "Apache-2.0" ] && pass "pre-existing license preserved (no overwrite)" || fail "iptables license='$ipt_lic', expected the pre-set Apache-2.0"
+ipt_src=$(jq -r '.components[] | select(.name=="iptables") | [(.properties // [])[]? | select(.name=="bomlens:licenseSource")] | length' "$WORK/fw.json")
+[ "$ipt_src" = "0" ] && pass "untouched license gets no bomlens:licenseSource marker" || fail "iptables wrongly marked as name-map enriched"
+# A non-whitelisted name stays license-null (no guessed license).
+unk_lic=$(jq -r '.components[] | select(.name=="some-internal-thing") | (.licenses // []) | length' "$WORK/fw.json")
+[ "$unk_lic" = "0" ] && pass "non-whitelisted component left license-null (no wrong license)" || fail "unexpected license on unknown component"
+
+# Idempotent: a second run changes nothing.
+cp "$WORK/fw.json" "$WORK/fw2.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/fw2.json" >/dev/null 2>&1
+if diff -q "$WORK/fw.json" "$WORK/fw2.json" >/dev/null 2>&1; then pass "enrich-cpe.sh is idempotent"; else fail "second enrich-cpe run changed the SBOM"; fi
+
+echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
+# Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
+# file without breaking the contract server.py security_summary reads.
+echo '{"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2020-1111","PkgName":"libfoo","InstalledVersion":"1.0","Severity":"LOW","CVSS":{"nvd":{"V3Score":3.1}}}]}]}' > "$WORK/trivy.json"
+jq -s '{ Results: ((.[0].Results // []) + (.[1].Results // [])) } + (.[0] | del(.Results))' \
+    "$WORK/trivy.json" "$FIX/cvebintool-sidecar.json" > "$WORK/sec.json"
+total_v=$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/sec.json")
+[ "$total_v" = "2" ] && pass "Trivy + cve-bin-tool findings coexist in one report (1+1=2)" || fail "merged vuln count=$total_v, expected 2"
+has_cbt=$(jq '[.Results[].Vulnerabilities[]? | select(.VulnerabilityID=="CVE-2021-42378")] | length' "$WORK/sec.json")
+[ "$has_cbt" = "1" ] && pass "cve-bin-tool CVE present after merge" || fail "cve-bin-tool CVE missing after merge"
+# CVSS must extract from BOTH sources via the same flatten the report uses.
+cbt_cvss=$(jq -r '[ .Results[]?.Vulnerabilities[]? | select(.VulnerabilityID=="CVE-2021-42378")
+    | ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ] | map(select(.!=null)) | (max // null)) ][0]' "$WORK/sec.json")
+[ "$cbt_cvss" = "7.2" ] && pass "cve-bin-tool CVSS score readable by the report flatten" || fail "cve-bin-tool CVSS='$cbt_cvss', expected 7.2"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

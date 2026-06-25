@@ -34,7 +34,7 @@ SCAN_MODE="${MODE:-POSTPROCESS}"
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
-    echo "[INFO] Starting SBOM Generator Web UI on port ${UI_PORT:-8080}..."
+    echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
 fi
 
@@ -95,7 +95,7 @@ generate_sbom_cdxgen() {
 }
 
 echo "=========================================="
-echo " SKT SBOM Generator (post-process)"
+echo " BomLens (post-process)"
 echo " Mode: $SCAN_MODE"
 echo " Project: $PROJECT_NAME ($PROJECT_VERSION)"
 echo "=========================================="
@@ -171,7 +171,11 @@ EOF
         echo "[1/2] firmware: unpack + identify $TARGET_FILE"
         # scan-firmware.sh is best-effort (always emits a valid SBOM); the empty-file
         # guard below still catches a hard failure.
-        bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        # OUT_PREFIX lets scan-firmware.sh drop a Trivy-shaped cve-bin-tool CVE
+        # sidecar (${OUT_PREFIX}_security_cvebintool.json) that scan-security.sh
+        # merges into the security report — firmware binaries carry no purl/CPE,
+        # so Trivy alone matches nothing; cve-bin-tool matches by version signature.
+        bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION" "$OUT_PREFIX"
         ;;
 
     AIBOM)
@@ -310,6 +314,15 @@ else
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
 fi
 
+# CPE enrichment (Plan 1): firmware/image/rootfs components often arrive with
+# name+version but no purl/cpe, so Trivy matches no CVEs. enrich-cpe.sh attaches a
+# cpe:2.3 to WHITELISTED component names only (closed list, no guessing) so Trivy
+# can match by CPE. Skipped for AI SBOMs (no OS/library components to match) and
+# disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
+if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE" || true
+fi
+
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
 # detects the machine-learning-model component and appends the G7 checks (model
 # id/license/card/integrity, datasets, openness — all advisory). Best-effort
@@ -338,6 +351,8 @@ fi
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt" "${OUT_PREFIX}_NOTICE.html")
+        # PDF is produced only when a renderer is in the image (SBOM_PDF=true).
+        [ -f "${OUT_PREFIX}_NOTICE.pdf" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.pdf")
     fi
 fi
 

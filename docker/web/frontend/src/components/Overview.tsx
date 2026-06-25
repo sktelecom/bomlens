@@ -1,7 +1,9 @@
 import {
   Boxes,
   ChevronRight,
+  Cpu,
   Eye,
+  FileCheck2,
   GitBranch,
   type LucideIcon,
   Package,
@@ -13,7 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { DoneEvent } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
-import { sbomFileName } from "@/lib/results";
+import { isAiScan, sbomFileName } from "@/lib/results";
+import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 import { KpiCards } from "./KpiCards";
@@ -39,21 +42,47 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
  */
 export function Overview({
   result,
-  onNavigate,
+  scanId,
 }: {
   result: DoneEvent;
-  onNavigate: (section: SectionId) => void;
+  /** The scan's id; section links resolve to `#/scan/<id>/<section>`. */
+  scanId: string | null;
 }) {
   const { t } = useTranslation();
   const attention = needsAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
+  const ai = isAiScan(result);
+  const hasG7 = Boolean(
+    result.conformance?.checks?.some((c) => c.id?.startsWith("g7-")),
+  );
 
   return (
     <div className="space-y-6">
-      {result.sbom?.suggestIdentifyVendored && (
+      {ai && (
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
+          <div className="text-sm font-medium text-foreground">{t("result.aiScanTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.aiScanBody")}</p>
+        </div>
+      )}
+
+      {!ai && result.sbom?.suggestIdentifyVendored && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="text-sm font-medium">{t("result.vendoredHintTitle")}</div>
           <p className="mt-1 text-xs">{t("result.vendoredHintBody")}</p>
+        </div>
+      )}
+
+      {result.scanoss?.status === "unavailable" && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="text-sm font-medium">{t("result.scanossUnavailableTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.scanossUnavailableBody")}</p>
+        </div>
+      )}
+
+      {result.scanoss?.status === "no-match" && (
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
+          <div className="text-sm font-medium text-foreground">{t("result.scanossNoMatchTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.scanossNoMatchBody")}</p>
         </div>
       )}
 
@@ -72,9 +101,8 @@ export function Overview({
                     : t("overview.attnReview", { count: item.count });
                 return (
                   <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onNavigate(item.target)}
+                    <a
+                      href={scanId ? scanHash(scanId, item.target) : undefined}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm",
                         "transition-colors duration-fast ease-out-soft hover:bg-muted",
@@ -84,7 +112,7 @@ export function Overview({
                       <Icon className={cn("h-4 w-4 shrink-0", TONE_ICON[item.tone])} aria-hidden />
                       <span className="text-foreground">{label}</span>
                       <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </button>
+                    </a>
                   </li>
                 );
               })}
@@ -93,7 +121,12 @@ export function Overview({
         </Card>
       )}
 
-      <KpiCards sbom={result.sbom} security={result.security} conformance={result.conformance} />
+      <KpiCards
+        sbom={result.sbom}
+        security={result.security}
+        conformance={result.conformance}
+        scanId={scanId}
+      />
 
       {result.security && <SeverityBar security={result.security} />}
 
@@ -102,7 +135,9 @@ export function Overview({
       <JumpCards
         result={result}
         hasDeps={hasDeps}
-        onNavigate={onNavigate}
+        ai={ai}
+        hasG7={hasG7}
+        scanId={scanId}
       />
     </div>
   );
@@ -117,29 +152,37 @@ interface Jump {
 function JumpCards({
   result,
   hasDeps,
-  onNavigate,
+  ai,
+  hasG7,
+  scanId,
 }: {
   result: DoneEvent;
   hasDeps: boolean;
-  onNavigate: (section: SectionId) => void;
+  ai: boolean;
+  hasG7: boolean;
+  scanId: string | null;
 }) {
   const { t } = useTranslation();
+  const modelCount = (result.sbom?.componentList ?? []).filter(
+    (c) => c.type === "machine-learning-model",
+  ).length;
   const jumps: Jump[] = [
     { id: "components", icon: Boxes, value: result.sbom?.components ?? 0 },
     ...(result.security
       ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
       : []),
     ...(hasDeps ? [{ id: "dependencies" as SectionId, icon: GitBranch, value: null }] : []),
+    ...(ai ? [{ id: "models" as SectionId, icon: Cpu, value: modelCount }] : []),
+    ...(hasG7 ? [{ id: "g7" as SectionId, icon: FileCheck2, value: null }] : []),
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {jumps.map(({ id, icon: Icon, value }) => (
-        <button
+        <a
           key={id}
-          type="button"
-          onClick={() => onNavigate(id)}
+          href={scanId ? scanHash(scanId, id) : undefined}
           aria-label={t("overview.jumpHint", { section: t(`nav.${id}`) })}
           className={cn(
             "group rounded-lg border bg-card p-4 text-left",
@@ -155,7 +198,7 @@ function JumpCards({
             {value ?? "—"}
           </div>
           <div className="truncate text-xs text-muted-foreground">{t(`nav.${id}`)}</div>
-        </button>
+        </a>
       ))}
     </div>
   );

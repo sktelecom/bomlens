@@ -91,50 +91,104 @@ export function SourceControls({ state }: { state: ScanFormState }) {
   );
 }
 
-/** Generation options (notice/security/deep-license) + advanced vendored toggle. */
-export function GenerationOptions({ state }: { state: ScanFormState }) {
+/** One label + hint + switch row, shared by the output and scan-option groups. */
+function ToggleRow({
+  labelKey,
+  checked,
+  onChange,
+  disabled,
+}: {
+  labelKey: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   const { t } = useTranslation();
-  const { options, identifyVendored, setIdentifyVendored, showVendored, busy } = state;
-
   return (
-    <>
-      <div className="space-y-3">
-        {options.map((o) => (
-          <label key={o.key} className="flex cursor-pointer items-start justify-between gap-4">
-            <span className="space-y-0.5">
-              <span className="block text-sm font-medium">{t(`options.${o.key}`)}</span>
-              <span className="block text-xs text-muted-foreground">{t(`options.${o.key}Hint`)}</span>
-            </span>
-            <Switch
-              checked={o.value}
-              onCheckedChange={o.set}
-              disabled={busy || o.forced}
-              aria-label={t(`options.${o.key}`)}
-            />
-          </label>
-        ))}
-      </div>
+    <label className="flex cursor-pointer items-start justify-between gap-4">
+      <span className="space-y-0.5">
+        <span className="block text-sm font-medium">{t(`options.${labelKey}`)}</span>
+        <span className="block text-xs text-muted-foreground">{t(`options.${labelKey}Hint`)}</span>
+      </span>
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
+        disabled={disabled}
+        aria-label={t(`options.${labelKey}`)}
+      />
+    </label>
+  );
+}
 
+/** Outputs: what the scan generates (notice / security report). */
+export function GenerationOptions({ state }: { state: ScanFormState }) {
+  const { options, busy } = state;
+  return (
+    <div className="space-y-3">
+      {options.map((o) => (
+        <ToggleRow
+          key={o.key}
+          labelKey={o.key}
+          checked={o.value}
+          onChange={o.set}
+          disabled={busy || o.forced}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Scan method: how the source is analyzed (deep license / vendored identification). */
+export function ScanOptions({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const {
+    deepLicense,
+    setDeepLicense,
+    identifyVendored,
+    setIdentifyVendored,
+    scanossToken,
+    setScanossToken,
+    showVendored,
+    showDeepLicense,
+    busy,
+  } = state;
+  return (
+    <div className="space-y-3">
       {showVendored && (
-        <details className="pt-1">
-          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-            {t("form.advanced")}
-          </summary>
-          <label className="mt-3 flex cursor-pointer items-start justify-between gap-4">
-            <span className="space-y-0.5">
-              <span className="block text-sm font-medium">{t("options.identifyVendored")}</span>
-              <span className="block text-xs text-muted-foreground">{t("options.identifyVendoredHint")}</span>
-            </span>
-            <Switch
-              checked={identifyVendored}
-              onCheckedChange={setIdentifyVendored}
-              disabled={busy}
-              aria-label={t("options.identifyVendored")}
-            />
-          </label>
-        </details>
+        <div className="space-y-2">
+          <ToggleRow
+            labelKey="identifyVendored"
+            checked={identifyVendored}
+            onChange={setIdentifyVendored}
+            disabled={busy}
+          />
+          {identifyVendored && (
+            <div className="space-y-1">
+              <Input
+                id="scanossToken"
+                type="password"
+                autoComplete="off"
+                value={scanossToken}
+                onChange={(e) => setScanossToken(e.target.value)}
+                placeholder={t("options.scanossTokenPlaceholder")}
+                disabled={busy}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("options.scanossTokenHint")}
+              </p>
+            </div>
+          )}
+        </div>
       )}
-    </>
+      {showDeepLicense && (
+        <ToggleRow
+          labelKey="deepLicense"
+          checked={deepLicense}
+          onChange={setDeepLicense}
+          disabled={busy}
+        />
+      )}
+    </div>
   );
 }
 
