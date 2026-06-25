@@ -41,14 +41,15 @@ Screen layout and per-target details are in the [web UI reference](../reference/
 
 ## Your first SBOM (CLI)
 
-Advanced — for automation and CI. Run from the cloned repo.
+Advanced — for automation and CI. Run from the cloned repo. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
 
+<!-- runnable -->
 ```bash
-# All deliverables for a project in the current directory
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
+# All deliverables for the bundled example project
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target examples/nodejs --all --generate-only
 ```
 
-This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report in the current directory.
+This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report named `MyApp_1.0.0_…` in the current directory.
 
 ```bash
 # From a GitHub URL, without cloning first
@@ -74,6 +75,7 @@ The SBOM is [CycloneDX 1.6](https://cyclonedx.org/) JSON. Key fields: `metadata.
 
 Quick checks with `jq` (on WSL2/Ubuntu `sudo apt-get install jq`; on Windows Git Bash `winget install jqlang.jq`). If installing it is a hassle, the web UI overview shows the component count and licenses directly:
 
+<!-- runnable -->
 ```bash
 # Component count
 jq '.components | length' MyApp_1.0.0_bom.json

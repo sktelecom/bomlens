@@ -91,7 +91,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/test-docs-walkthrough.sh tests/check-examples-sync.sh examples/test-all.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -185,6 +185,30 @@ jobs:
         env:
           SBOM_E2E_IMAGE: bomlens-e2e:ci
         run: bash tests/test-web-e2e.sh
+
+  docs-walkthrough:
+    name: Docs Walkthrough (getting-started commands)
+    runs-on: ubuntu-latest
+    # Runs the getting-started guide's runnable blocks verbatim against a real
+    # scanner image to prove the documented commands still work. Heavy (builds an
+    # image, runs a scan), so like web-e2e it is push/dispatch only.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Base image (syft) is enough: the first-scan walkthrough scans the bundled
+      # example as a directory (ROOTFS/syft). Tag it sbom-scanner:test, the
+      # default the harness expects.
+      - name: Build scanner image (base)
+        run: docker build -t sbom-scanner:test ./docker
+
+      - name: Run docs walkthrough
+        run: bash tests/test-docs-walkthrough.sh
 
   validate-docs:
     name: Validate Documentation
@@ -433,7 +457,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test, contract, postprocess, web-e2e, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
+    needs: [test, contract, postprocess, web-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
     if: always()
 
     steps:
@@ -447,6 +471,7 @@ jobs:
           echo "| No-Docker Contract (ubuntu+windows) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Post-process & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web UI E2E | ${{ needs.web-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docs Walkthrough | ${{ needs.docs-walkthrough.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Script Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation | ${{ needs.validate-docs.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -467,6 +492,9 @@ jobs:
             exit 1
           elif [ "${{ needs.web-e2e.result }}" == "failure" ]; then
             echo "❌ Web UI e2e failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.docs-walkthrough.result }}" == "failure" ]; then
+            echo "❌ Docs walkthrough failed (a documented command broke)" >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [ "${{ needs.validate-examples.result }}" == "failure" ]; then
             echo "❌ Example validation failed" >> $GITHUB_STEP_SUMMARY
