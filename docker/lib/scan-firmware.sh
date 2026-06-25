@@ -103,6 +103,17 @@ else
     echo "[firmware] no rootfs marker found; scanning whole extraction tree"
 fi
 
+# Source file tree for the web UI (structure only, no licenses). The extracted
+# rootfs is in this script's temp dir and is removed on EXIT, so emit it here
+# while it exists. Writes ${OUT_PREFIX}_files.json into the caller's working dir
+# (where the entrypoint collects artifacts). Best-effort; never aborts the scan.
+if [ -n "$OUT_PREFIX" ]; then
+    SFT="$(cd "$(dirname "$0")" && pwd)/source-file-tree.sh"
+    if [ -f "$SFT" ]; then
+        bash "$SFT" "$ROOTFS" "${OUT_PREFIX}_files.json" || true
+    fi
+fi
+
 # --------------------------------------------------------
 # ③ Package components (syft) + binary components (cve-bin-tool).
 # --------------------------------------------------------
