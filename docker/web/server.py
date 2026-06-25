@@ -801,8 +801,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         removed = 0
         for suf in ARTIFACT_SUFFIXES:
-            p = os.path.join(OUTPUT_DIR, sid + suf)
-            if os.path.isfile(p):
+            # safe_prefix_path re-resolves {sid}{suf} with realpath and confirms
+            # it stays inside OUTPUT_DIR, so the delete cannot escape even though
+            # scan_id_ok already allowlisted the id. It also makes the boundary
+            # explicit to static analysis (no taint reaches os.remove unchecked).
+            p = safe_prefix_path(sid, suf)
+            if p and os.path.isfile(p):
                 try:
                     os.remove(p)
                     removed += 1
