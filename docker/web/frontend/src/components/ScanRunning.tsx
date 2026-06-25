@@ -2,6 +2,7 @@ import { CircleCheck, CircleDashed, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
+import type { ScanProgress } from "@/lib/api";
 import { SCAN_STAGES, stageStatuses } from "@/lib/scanProgress";
 import { cn } from "@/lib/utils";
 
@@ -18,10 +19,12 @@ type Status = "running" | "done" | "error";
 export function ScanRunning({
   logs,
   status,
+  progress,
   projectLabel,
 }: {
   logs: string[];
   status: Status;
+  progress?: ScanProgress | null;
   projectLabel?: string;
 }) {
   const { t } = useTranslation();
@@ -69,7 +72,7 @@ export function ScanRunning({
         </Card>
       )}
 
-      <ProgressLog logs={logs} status={status} />
+      <ProgressLog logs={logs} status={status} progress={progress} />
     </div>
   );
 }

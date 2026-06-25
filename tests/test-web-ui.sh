@@ -105,7 +105,7 @@ assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
 captured = {}
-def fake_stream(args, on_log):
+def fake_stream(args, on_log, on_progress=None):
     captured["args"] = args
     return 0
 server._stream_cmd = fake_stream
@@ -168,6 +168,17 @@ rc = server.run_sibling_scan(
     lambda ln: None, host_file="/host/up:ro,Z",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
+
+# Firmware CVE-DB progress markers become a `progress` channel call (clamped
+# 0..100); everything else stays a plain log line. A missing progress handler
+# falls back to log so older callers keep working.
+logs = []; progs = []
+server._emit_or_log("[firmware-cvedb-progress] 42%", logs.append, progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 250%", logs.append, progs.append)
+server._emit_or_log("regular build line", logs.append, progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 10%", logs.append, None)
+assert progs == [42, 100], progs
+assert logs == ["regular build line", "[firmware-cvedb-progress] 10%"], logs
 PY
 then
     pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"

@@ -59,7 +59,8 @@
   },
   "progress": {
     "title": "Run log",
-    "waiting": "Live logs will appear here once a scan starts."
+    "waiting": "Live logs will appear here once a scan starts.",
+    "cvedbDownloading": "Downloading CVE database"
   },
   "result": {
     "title": "Results",

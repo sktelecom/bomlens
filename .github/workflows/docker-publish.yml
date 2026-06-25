@@ -266,6 +266,11 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_FIRMWARE=true
+          # NVD key as a BuildKit secret (never baked into image history). The
+          # Dockerfile release gate FAILS the build if the bundled CVE DB ends up
+          # empty, so this secret must be set for the firmware image to build.
+          secrets: |
+            nvd_api_key=${{ secrets.NVD_API_KEY }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=firmware

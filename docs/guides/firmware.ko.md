@@ -33,14 +33,14 @@ docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 
 ### 웹 UI에서
 
-펌웨어 이미지로 UI를 실행하면 펌웨어 업로드 타일이 활성화됩니다. 그 뒤 파일을 올리고 스캔합니다.
+펌웨어 이미지에 닿을 수 있으면 웹 UI가 펌웨어 업로드 타일을 보여주고, 그 이미지에서 펌웨어 분석을 실행합니다. UI를 띄우고 파일을 올립니다.
 
 ```bash
-SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
-#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_SCANNER_IMAGE를 지정
+SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
+#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_FIRMWARE_IMAGE를 지정
 ```
 
-프로젝트 이름과 버전을 입력하고, 펌웨어 업로드 타일을 골라 파일을 올린 뒤 스캔을 실행합니다.
+프로젝트 이름과 버전을 입력하고, 펌웨어 업로드 타일을 골라 파일을 올린 뒤 스캔을 실행합니다. 온라인 첫 실행에서 CVE 데이터베이스를 받는 동안에는 UI에 다운로드 진행률 바가 표시됩니다.
 
 ### CLI에서
 
@@ -54,6 +54,18 @@ SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom
 
 - 인식 가능한 확장자(`.bin`, `.img`, `.squashfs`, `.ubi`, `.ubifs`, `.trx`, `.chk`, `.fw`, `.rom`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 산출물은 일반 스캔과 같은 3종입니다. 고지문(`_NOTICE`), SBOM(`_bom.json`), 위험분석보고서(`_risk-report`).
+
+## CVE 매칭, 온라인과 오프라인
+
+정적 바이너리의 CVE 매칭은 cve-bin-tool과 그 전용 취약점 데이터베이스로 이뤄집니다. 펌웨어 이미지는 하이브리드 방식이라, 같은 이미지로 에어갭 환경과 온라인 환경에서 모두 동작합니다.
+
+- 이미지를 빌드할 때 데이터베이스를 번들하면, 펌웨어 스캔이 스캔 시점에 오프라인으로 CVE를 매칭합니다. 빠르고 에어갭에 적합한 경로입니다.
+- 번들 데이터베이스가 없지만 네트워크에 닿을 수 있으면, cve-bin-tool이 실행 중에 NVD에서 데이터베이스를 받습니다. 첫 실행은 느리며, 받는 동안 웹 UI에 다운로드 진행률 바가 표시됩니다.
+- 번들 데이터베이스도 네트워크도 없으면, CVE 단계를 조용히 빼는 대신 사유를 로그로 남기고 구성요소 식별만 하는(CVE 없음) 동작으로 낮춥니다.
+
+`CVE_BIN_TOOL_MODE`로 동작을 고릅니다. `auto`(기본값으로, 번들 데이터베이스를 우선하고 없으면 온라인일 때 내려받음), `offline`, `online`, `components-only`입니다.
+
+데이터베이스는 NVD뿐 아니라 여러 출처(NVD, PURL2CPE 등)를 합친 집계 데이터입니다. cve-bin-tool은 "This product uses the NVD API but is not endorsed or certified by the NVD." 고지를 출력합니다.
 
 ## 라이선스 주의
 

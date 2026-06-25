@@ -33,14 +33,14 @@ Firmware analysis needs the firmware image (above), whether you use the web UI o
 
 ### From the web UI
 
-Launch the UI from the firmware image — that is what enables the firmware upload tile — then upload the file and run:
+The web UI offers the firmware upload tile whenever the firmware image is reachable, then runs the firmware analysis in that image. Launch the UI and upload the file:
 
 ```bash
-SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
-#   Windows: set SBOM_SCANNER_IMAGE before double-clicking sbom-ui.bat
+SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
+#   Windows: set SBOM_FIRMWARE_IMAGE before double-clicking sbom-ui.bat
 ```
 
-Enter a project name and version, choose the firmware upload tile, upload the file, and run.
+Enter a project name and version, choose the firmware upload tile, upload the file, and run. While the CVE database downloads on a first online run, the UI shows a download progress bar.
 
 ### From the CLI
 
@@ -54,6 +54,18 @@ Pass the firmware file you received to `--target` and add `--firmware`:
 
 - Recognized extensions (`.bin`, `.img`, `.squashfs`, `.ubi`, `.ubifs`, `.trx`, `.chk`, `.fw`, `.rom`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - The outputs are the same three as a normal scan: the notice (`_NOTICE`), the SBOM (`_bom.json`), and the risk report (`_risk-report`).
+
+## CVE matching, online and offline
+
+CVE matching for static binaries uses cve-bin-tool with its own vulnerability database. The firmware image ships in a hybrid arrangement, so the same image works both air-gapped and online.
+
+- When the image is built with the database bundled, firmware scans match CVEs offline at scan time. This is the fast, air-gap-friendly path.
+- When the bundled database is absent but the network is reachable, cve-bin-tool downloads the database from NVD at runtime. The first run is slow; the web UI shows a download progress bar while it runs.
+- When neither a bundled database nor a network is available, the scan degrades to component-only identification (no CVEs) and logs the reason rather than silently dropping the CVE stage.
+
+`CVE_BIN_TOOL_MODE` selects the behavior: `auto` (default; bundled database first, otherwise download if online), `offline`, `online`, or `components-only`.
+
+The database is aggregated from several sources (NVD, PURL2CPE, and others), not from NVD alone. cve-bin-tool prints the notice "This product uses the NVD API but is not endorsed or certified by the NVD."
 
 ## License note
 

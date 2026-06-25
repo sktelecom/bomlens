@@ -174,27 +174,41 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
     fi
 
 # Pre-fetch cve-bin-tool's vulnerability DB into the image so firmware scans match
-# CVEs OFFLINE at runtime (Plan 2): a runtime NVD/OSV download is slow (~minutes)
-# and unreliable, and air-gapped scans cannot do it at all. scan-firmware.sh reads
-# the DB from CVE_BIN_TOOL_CACHE (= CVE_DATA_DIR) and runs with --update=never when
-# the DB is present; with no DB it falls back to a runtime online update.
-#   NVD needs an API key for fast fetches (NVD_API_KEY build-arg, optional); without
-#   one the fetch is rate-limited but still works. The build NEVER fails on a DB
-#   miss — a partial/empty DB just degrades runtime CVE coverage (logged, not silent).
+# CVEs OFFLINE at runtime (Plan 2): a runtime NVD download is slow (~minutes) and
+# air-gapped scans cannot do it at all. cve-bin-tool 3.x hard-codes its DB cache to
+# $HOME/.cache/cve-bin-tool/cve.db and ignores CVE_DATA_DIR, so we set HOME to a
+# fixed location (CVE_BIN_TOOL_HOME); scan-firmware.sh reads the bundled DB from the
+# same place. The NVD key is injected as a BuildKit secret (not a build-arg) so it
+# never lands in the image history: build with
+#   docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=true ...
+#   GAD (GitLab Advisory) crashes cve-bin-tool 3.4 on fetch, so it is disabled; the
+#   source set / NVD method are build-args finalised by native-amd64 verification.
+#   RELEASE GATE: the build now FAILS if the DB ends up empty (cve_severity=0), so a
+#   broken/keyless build can never ship a silent 0-CVE image again.
 #   Size: the populated cve.db is ~0.5–1.5 GB; bundle it only in the firmware image.
-ARG NVD_API_KEY=""
-ENV CVE_DATA_DIR=/opt/cve-bin-tool-db
-RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
-      mkdir -p "$CVE_DATA_DIR" \
-      && echo "[build] pre-fetching cve-bin-tool vulnerability DB into $CVE_DATA_DIR ..." \
-      && ( if [ -n "$NVD_API_KEY" ]; then \
-             cve-bin-tool --update now --nvd-api-key "$NVD_API_KEY" --version >/dev/null 2>&1; \
-           else \
-             cve-bin-tool --update now --version >/dev/null 2>&1; \
-           fi ) || echo "[build] WARN: CVE DB pre-fetch incomplete; runtime will update online or degrade to component-only." \
-      && ( [ -f "$CVE_DATA_DIR/cve.db" ] \
-           && echo "[build] CVE DB bundled: $(du -h "$CVE_DATA_DIR/cve.db" 2>/dev/null | cut -f1)" \
-           || echo "[build] no cve.db produced (offline build?); firmware scans will update online or degrade." ); \
+ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD"
+ARG SBOM_FIRMWARE_NVD_METHOD=""
+ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
+RUN --mount=type=secret,id=nvd_api_key \
+    if [ "$SBOM_FIRMWARE" = "true" ]; then \
+      echo "[build] pre-fetching cve-bin-tool CVE DB into $CVE_BIN_TOOL_HOME ..."; \
+      key=""; [ -f /run/secrets/nvd_api_key ] && key="$(cat /run/secrets/nvd_api_key)"; \
+      [ -n "$key" ] || echo "[build] WARN: no nvd_api_key secret; NVD fetch will be rate-limited."; \
+      nvd_arg=""; [ -n "$SBOM_FIRMWARE_NVD_METHOD" ] && nvd_arg="-n $SBOM_FIRMWARE_NVD_METHOD"; \
+      dis_arg=""; [ -n "$SBOM_FIRMWARE_DISABLE_SOURCES" ] && dis_arg="-d $SBOM_FIRMWARE_DISABLE_SOURCES"; \
+      key_arg=""; [ -n "$key" ] && key_arg="--nvd-api-key $key"; \
+      mkdir -p /tmp/cvedb-probe; \
+      HOME="$CVE_BIN_TOOL_HOME" cve-bin-tool --update now $nvd_arg $dis_arg $key_arg /tmp/cvedb-probe || true; \
+      db="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"; \
+      n=0; [ -f "$db" ] && n="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_severity").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
+      echo "[build] CVE DB rows: ${n:-0} ($([ -f "$db" ] && du -h "$db" | cut -f1 || echo 'no file'))"; \
+      if [ "${n:-0}" -lt 1 ]; then \
+        echo "[build] ERROR: CVE DB is empty (cve_severity=${n:-0}); firmware scans would report 0 CVEs."; \
+        echo "[build]        Pass the NVD key as a BuildKit secret (--secret id=nvd_api_key,env=NVD_API_KEY)"; \
+        echo "[build]        and/or try --build-arg SBOM_FIRMWARE_NVD_METHOD=api2. Build aborted."; \
+        exit 1; \
+      fi; \
+      rm -rf /tmp/cvedb-probe; \
     fi
 
 # OWASP AIBOM Generator (opt-in: --build-arg SBOM_AIBOM=true). Generates an AI

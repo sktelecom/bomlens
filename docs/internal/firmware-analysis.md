@@ -153,7 +153,7 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 1. `WORK=$(mktemp -d)` (trap으로 cleanup), 언팩: unblob을 우선 시도하고 실패하거나 설치돼 있지 않으면 BANG으로 폴백.
 2. rootfs 후보 디렉터리 탐색(없으면 추출 루트 전체).
 3. `syft dir:$ROOTFS -o cyclonedx-json`로 패키지 SBOM을 만듭니다.
-4. (Phase 2) `cve-bin-tool ... --sbom-output ... cyclonedx`로 바이너리 SBOM을 만듭니다.
+4. (Phase 2) `cve-bin-tool ... --sbom-output ... cyclonedx`로 바이너리 SBOM을 만들고, 같은 패스에서 CVE 보고서(`--format json -o`)도 받습니다. CVE 매칭 경로는 아래 5.6에서 다룹니다.
 5. 병합(cyclonedx-cli 또는 jq, purl 기준 dedupe) 결과를 `$OUTPUT_FILE`에 씁니다.
 6. `metadata.component`를 펌웨어 파일명/버전/`file` 출력으로 채움.
 
@@ -162,11 +162,36 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 ### 5.4 `docker/Dockerfile`
 - `ARG SBOM_FIRMWARE=false` + `CVE_BIN_TOOL_VERSION`/`UNBLOB_VERSION` 핀.
 - scancode opt-in 블록(`Dockerfile:60-67`) 패턴 그대로, `COPY` 이전에 firmware opt-in RUN 블록 추가(unblob + cve-bin-tool, 폴백 BANG).
-- 배포는 별도 태그 `sbom-scanner-firmware:latest`로 분리해 경량 기본 이미지를 보호합니다.
+- `SBOM_FIRMWARE=true`일 때 같은 opt-in 블록에서 cve-bin-tool CVE 데이터베이스를 미리 받아 이미지에 번들합니다(아래 5.6). 이렇게 해야 스캔 시점에 오프라인으로 매칭할 수 있고, 에어갭에서도 동작합니다.
+- 배포는 별도 태그 `sbom-scanner-firmware:latest`로 분리해 경량 기본 이미지를 보호합니다. CVE 데이터베이스(약 0.5~1.5 GB)도 펌웨어 이미지에만 들어갑니다.
 
 ### 5.5 테스트
 - `tests/test-scan.sh`/`tests/test-e2e.sh`에 소형 squashfs fixture로 FIRMWARE e2e 케이스 추가.
 - 기본 이미지 회귀(firmware 도구 미설치) 확인.
+
+### 5.6 CVE 데이터베이스 (cve-bin-tool)
+
+정적 바이너리의 CVE 매칭은 cve-bin-tool과 그 전용 취약점 데이터베이스로 합니다. 데이터베이스는 하이브리드 방식입니다. opt-in 펌웨어 이미지에 데이터베이스를 번들해 오프라인/에어갭에서 즉시 매칭하고, 네트워크가 있고 번들 데이터베이스가 없으면 실행 중에 NVD에서 받습니다.
+
+**데이터베이스 경로.** cve-bin-tool 3.x는 캐시 경로를 `$HOME/.cache/cve-bin-tool/cve.db`로 하드코딩하고 `CVE_DATA_DIR`을 무시합니다. 그래서 위치는 `HOME`으로 제어합니다. 이미지는 `CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home` 기준으로 번들하므로, 실제 데이터베이스는 `/opt/cve-bin-tool-home/.cache/cve-bin-tool/cve.db`입니다. `scan-firmware.sh`는 같은 위치에서 읽습니다(`BUNDLED_DB`). 오프라인 스캔은 이 읽기 전용 데이터베이스를 per-run `HOME`에 심볼릭 링크로 걸고, 온라인 갱신은 복사본을 써서 갱신이 번들 데이터베이스를 변형/삭제하지 않게 합니다.
+
+**모드.** `CVE_BIN_TOOL_MODE`(기본 `auto`)로 동작을 고릅니다. `auto`는 번들 데이터베이스가 있으면 `--update=never`로 그걸 쓰고, 없고 NVD에 닿으면 `--update=latest`로 받고, 둘 다 없으면 구성요소만(`run_cve=0`) 내보내며 사유를 로그로 남깁니다. `offline`/`online`/`components-only`는 각각 그 분기를 강제합니다.
+
+**데이터 출처.** 데이터베이스는 NVD뿐 아니라 여러 출처(NVD, PURL2CPE 등)를 합친 집계 데이터입니다. cve-bin-tool은 "This product uses the NVD API but is not endorsed or certified by the NVD." 고지를 출력하므로, 사용자 문서에 NVD 비보증·출처 표기를 한 줄 둡니다.
+
+**GAD 비활성.** `CVE_BIN_TOOL_DISABLE_SOURCES`(기본 `GAD`)로 비활성화할 출처를 정합니다. GAD(GitLab Advisory)는 번들된 cve-bin-tool에서 fetch 시 `UnicodeDecodeError`로 크래시하므로 기본 비활성화합니다. Dockerfile 빌드 인자 `SBOM_FIRMWARE_DISABLE_SOURCES`도 같은 기본값입니다.
+
+**빌드(BuildKit secret).** 빌드 시 NVD API 키는 build-arg가 아니라 BuildKit secret으로 주입해 이미지 히스토리에 남지 않게 합니다.
+
+```
+docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=true ...
+```
+
+키가 없으면 NVD fetch가 rate-limit이 걸립니다. CI는 `docker-publish.yml`에서 `nvd_api_key=${{ secrets.NVD_API_KEY }}`로 같은 secret을 전달합니다.
+
+**빈-DB 빌드 게이트.** 빌드는 데이터베이스가 비면(`cve_severity` 행이 0이면) `exit 1`로 실패합니다. 키 누락이나 fetch 실패로 0-CVE 이미지가 조용히 배포되는 것을 막습니다.
+
+**진행률 계약.** 온라인으로 데이터베이스를 받을 때 cve-bin-tool의 rich 진행 표시를 파싱 가능한 한 줄 마커로 바꿔 stdout에 내보냅니다. 형식은 `[firmware-cvedb-progress] NN%`이고, `\r`로 덮어쓰는 줄과 ANSI escape를 걷어낸 뒤 퍼센트가 오를 때만(단조 증가, 중복 제거) 찍습니다. `docker/web/server.py`는 이 마커를 SSE `progress` 이벤트(`{"phase": "cvedb", "percent": NN}`)로 바꿔 웹 UI 다운로드 진행률 바에 연결합니다. 그 밖의 표 출력은 여기서 버려 노이즈가 새지 않게 합니다.
 
 ---
 

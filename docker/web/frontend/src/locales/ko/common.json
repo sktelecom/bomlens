@@ -59,7 +59,8 @@
   },
   "progress": {
     "title": "실행 로그",
-    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다."
+    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다.",
+    "cvedbDownloading": "CVE 데이터베이스 다운로드 중"
   },
   "result": {
     "title": "결과",

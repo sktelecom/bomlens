@@ -164,10 +164,18 @@ export interface ScanParams {
   byteStable: boolean;
 }
 
+/** A determinate progress update (e.g. CVE database download). */
+export interface ScanProgress {
+  phase: string;
+  percent: number;
+}
+
 export interface ScanHandlers {
   onLog: (line: string) => void;
   onDone: (done: DoneEvent) => void;
   onError: (message?: string) => void;
+  /** Optional determinate progress (e.g. firmware CVE DB download). */
+  onProgress?: (p: ScanProgress) => void;
 }
 
 export interface Capabilities {
@@ -345,6 +353,18 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
       handlers.onLog(JSON.parse(data));
     } catch {
       handlers.onLog(String(data));
+    }
+  });
+
+  es.addEventListener("progress", (e) => {
+    // Determinate progress (e.g. firmware CVE DB download). Best-effort: ignore
+    // anything we can't parse into a numeric percent.
+    const data = (e as MessageEvent).data;
+    try {
+      const p = JSON.parse(data) as ScanProgress;
+      if (typeof p.percent === "number") handlers.onProgress?.(p);
+    } catch {
+      /* ignore malformed progress */
     }
   });
 
