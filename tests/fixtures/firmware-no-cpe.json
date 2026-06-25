@@ -1,0 +1,15 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "firmware", "name": "openwrt-19.07.0", "version": "19.07.0" }
+  },
+  "components": [
+    { "type": "application", "name": "busybox", "version": "1.30.1-5", "cpe": "cpe:2.3:a:busybox:busybox:1.30.1-5:*:*:*:*:*:*:*" },
+    { "type": "application", "name": "dnsmasq", "version": "2.80-15", "cpe": "cpe:2.3:a:thekelleys:dnsmasq:2.80-15:*:*:*:*:*:*:*" },
+    { "type": "application", "name": "dropbear", "version": "2019.78-2" },
+    { "type": "application", "name": "luci-base", "version": "git-20.006.26738-35aa527-1", "cpe": "cpe:2.3:a:luci-base:luci-base:git-20.006.26738-35aa527-1:*:*:*:*:*:*:*" },
+    { "type": "application", "name": "some-internal-thing", "version": "1.2.3" }
+  ]
+}

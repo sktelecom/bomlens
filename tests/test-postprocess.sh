@@ -337,6 +337,45 @@ total_n=$(jq '[.components[]?] | length' "$WORK/mmerged.json")
 lodash_purl=$(jq -r '.components[] | select((.name|ascii_downcase)=="lodash") | .purl' "$WORK/mmerged.json")
 [ "$lodash_purl" = "pkg:npm/lodash@4.17.21" ] && pass "package-manager identity (pkg:npm) wins over the SCANOSS pkg:github match" || fail "lodash purl='$lodash_purl', expected pkg:npm"
 
+echo "== F-1: firmware CPE enrichment (Plan 1) — whitelist + version normalization =="
+cp "$FIX/firmware-no-cpe.json" "$WORK/fw.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/fw.json" >/dev/null 2>&1
+# OpenWRT package-revision suffix (-5) stripped so the cpe version matches NVD.
+bb_cpe=$(jq -r '.components[] | select(.name=="busybox") | .cpe' "$WORK/fw.json")
+[ "$bb_cpe" = "cpe:2.3:a:busybox:busybox:1.30.1:*:*:*:*:*:*:*" ] \
+    && pass "busybox cpe version normalized 1.30.1-5 -> 1.30.1 (Trivy-matchable)" \
+    || fail "busybox cpe='$bb_cpe', expected upstream version 1.30.1"
+# A component with NO cpe at all gets one from the whitelist.
+dr_cpe=$(jq -r '.components[] | select(.name=="dropbear") | .cpe' "$WORK/fw.json")
+[ "$dr_cpe" = "cpe:2.3:a:dropbear_ssh_project:dropbear_ssh:2019.78:*:*:*:*:*:*:*" ] \
+    && pass "dropbear (no cpe) gets a whitelisted cpe with correct NVD vendor/product" \
+    || fail "dropbear cpe='$dr_cpe', expected dropbear_ssh_project:dropbear_ssh:2019.78"
+# A non-whitelisted name must NOT be touched (false-positive guard).
+unk_cpe=$(jq -r '.components[] | select(.name=="some-internal-thing") | .cpe // "ABSENT"' "$WORK/fw.json")
+[ "$unk_cpe" = "ABSENT" ] && pass "non-whitelisted component left without a cpe (no false-positive CVEs)" || fail "unexpected cpe on unknown component: $unk_cpe"
+# A whitelisted name not in our map (luci-base) keeps syft's cpe unchanged.
+lu_cpe=$(jq -r '.components[] | select(.name=="luci-base") | .cpe' "$WORK/fw.json")
+case "$lu_cpe" in cpe:2.3:a:luci-base:*) pass "non-mapped component keeps its existing cpe untouched" ;; *) fail "luci-base cpe changed unexpectedly: $lu_cpe" ;; esac
+# Idempotent: a second run changes nothing.
+cp "$WORK/fw.json" "$WORK/fw2.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/fw2.json" >/dev/null 2>&1
+if diff -q "$WORK/fw.json" "$WORK/fw2.json" >/dev/null 2>&1; then pass "enrich-cpe.sh is idempotent"; else fail "second enrich-cpe run changed the SBOM"; fi
+
+echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
+# Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
+# file without breaking the contract server.py security_summary reads.
+echo '{"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2020-1111","PkgName":"libfoo","InstalledVersion":"1.0","Severity":"LOW","CVSS":{"nvd":{"V3Score":3.1}}}]}]}' > "$WORK/trivy.json"
+jq -s '{ Results: ((.[0].Results // []) + (.[1].Results // [])) } + (.[0] | del(.Results))' \
+    "$WORK/trivy.json" "$FIX/cvebintool-sidecar.json" > "$WORK/sec.json"
+total_v=$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/sec.json")
+[ "$total_v" = "2" ] && pass "Trivy + cve-bin-tool findings coexist in one report (1+1=2)" || fail "merged vuln count=$total_v, expected 2"
+has_cbt=$(jq '[.Results[].Vulnerabilities[]? | select(.VulnerabilityID=="CVE-2021-42378")] | length' "$WORK/sec.json")
+[ "$has_cbt" = "1" ] && pass "cve-bin-tool CVE present after merge" || fail "cve-bin-tool CVE missing after merge"
+# CVSS must extract from BOTH sources via the same flatten the report uses.
+cbt_cvss=$(jq -r '[ .Results[]?.Vulnerabilities[]? | select(.VulnerabilityID=="CVE-2021-42378")
+    | ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ] | map(select(.!=null)) | (max // null)) ][0]' "$WORK/sec.json")
+[ "$cbt_cvss" = "7.2" ] && pass "cve-bin-tool CVSS score readable by the report flatten" || fail "cve-bin-tool CVSS='$cbt_cvss', expected 7.2"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

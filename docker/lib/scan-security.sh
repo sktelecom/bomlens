@@ -46,6 +46,28 @@ if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
 fi
 
+# Merge a Trivy-shaped CVE sidecar from another engine, if present. Firmware
+# scans drop ${OUT_PREFIX}_security_cvebintool.json: cve-bin-tool matches CVEs on
+# stripped binaries by version signature (no purl/CPE), which Trivy cannot do, so
+# without this merge the firmware security report is empty. The sidecar already
+# carries the .Results[].Vulnerabilities[] contract, so we just append its
+# Results to Trivy's — the web layer and the renderer below read one unified file.
+SIDECAR="${OUT_PREFIX}_security_cvebintool.json"
+if [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1; then
+    SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
+    if [ "${SIDE_N:-0}" -gt 0 ]; then
+        tmp_m="$(mktemp)"
+        if jq -s '{ Results: ((.[0].Results // []) + (.[1].Results // [])) }
+                  + (.[0] | del(.Results))' "$JSON" "$SIDECAR" > "$tmp_m" 2>/dev/null; then
+            mv "$tmp_m" "$JSON"
+            echo "[security] merged ${SIDE_N} cve-bin-tool CVE(s) from $(basename "$SIDECAR")."
+        else
+            rm -f "$tmp_m"
+            echo "[security] WARN: failed to merge cve-bin-tool sidecar; reporting Trivy results only." >&2
+        fi
+    fi
+fi
+
 # Flatten findings: id, pkg, version, severity, fixed, cvss, title.
 # cvss = highest V3 (fallback V2) score across Trivy's CVSS sources.
 FINDINGS=$(jq -r '

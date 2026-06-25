@@ -171,7 +171,11 @@ EOF
         echo "[1/2] firmware: unpack + identify $TARGET_FILE"
         # scan-firmware.sh is best-effort (always emits a valid SBOM); the empty-file
         # guard below still catches a hard failure.
-        bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        # OUT_PREFIX lets scan-firmware.sh drop a Trivy-shaped cve-bin-tool CVE
+        # sidecar (${OUT_PREFIX}_security_cvebintool.json) that scan-security.sh
+        # merges into the security report — firmware binaries carry no purl/CPE,
+        # so Trivy alone matches nothing; cve-bin-tool matches by version signature.
+        bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION" "$OUT_PREFIX"
         ;;
 
     AIBOM)
@@ -308,6 +312,15 @@ if [ "${BYTE_STABLE:-false}" = "true" ]; then
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable || true
 else
     bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
+fi
+
+# CPE enrichment (Plan 1): firmware/image/rootfs components often arrive with
+# name+version but no purl/cpe, so Trivy matches no CVEs. enrich-cpe.sh attaches a
+# cpe:2.3 to WHITELISTED component names only (closed list, no guessing) so Trivy
+# can match by CPE. Skipped for AI SBOMs (no OS/library components to match) and
+# disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
+if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE" || true
 fi
 
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh

@@ -1,0 +1,85 @@
+{
+  "_comment": "Component NAME -> CPE (vendor/product) whitelist for CVE matching (Plan 1, enrich-cpe.sh). Many firmware/image components arrive with name+version but NO purl/CPE, so Trivy matches 0 CVEs. enrich-cpe.sh attaches cpe:2.3:a:<vendor>:<product>:<version>:... ONLY for names in this curated list, then Trivy matches by CPE. This is a CLOSED whitelist on purpose: a name->CPE guess for an unknown component produces FALSE-POSITIVE CVEs (a wrong vuln is worse than an empty result), so a name not listed here gets NO cpe. Keys are lower-cased component names; multiple aliases may map to the same product. vendor/product follow the NVD CPE dictionary. Entries starting with '_' are ignored.",
+
+  "busybox":        { "cpe_vendor": "busybox",                 "cpe_product": "busybox" },
+  "dnsmasq":        { "cpe_vendor": "thekelleys",              "cpe_product": "dnsmasq" },
+  "dropbear":       { "cpe_vendor": "dropbear_ssh_project",    "cpe_product": "dropbear_ssh" },
+  "dropbearmulti":  { "cpe_vendor": "dropbear_ssh_project",    "cpe_product": "dropbear_ssh" },
+
+  "openssl":        { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libopenssl":     { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "openssl-util":   { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libssl":         { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+
+  "zlib":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib" },
+  "libz":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib" },
+
+  "curl":           { "cpe_vendor": "haxx",                    "cpe_product": "curl" },
+  "libcurl":        { "cpe_vendor": "haxx",                    "cpe_product": "libcurl" },
+
+  "wget":           { "cpe_vendor": "gnu",                     "cpe_product": "wget" },
+  "uclibc":         { "cpe_vendor": "uclibc",                  "cpe_product": "uclibc" },
+  "uclibc-ng":      { "cpe_vendor": "uclibc-ng",              "cpe_product": "uclibc-ng" },
+  "glibc":          { "cpe_vendor": "gnu",                     "cpe_product": "glibc" },
+
+  "e2fsprogs":      { "cpe_vendor": "e2fsprogs_project",       "cpe_product": "e2fsprogs" },
+  "libext2fs":      { "cpe_vendor": "e2fsprogs_project",       "cpe_product": "e2fsprogs" },
+
+  "iptables":       { "cpe_vendor": "netfilter",               "cpe_product": "iptables" },
+  "ip6tables":      { "cpe_vendor": "netfilter",               "cpe_product": "iptables" },
+
+  "openssh":        { "cpe_vendor": "openbsd",                 "cpe_product": "openssh" },
+  "openssh-server": { "cpe_vendor": "openbsd",                 "cpe_product": "openssh" },
+  "openssh-client": { "cpe_vendor": "openbsd",                 "cpe_product": "openssh" },
+
+  "libxml2":        { "cpe_vendor": "xmlsoft",                 "cpe_product": "libxml2" },
+  "expat":          { "cpe_vendor": "libexpat_project",        "cpe_product": "libexpat" },
+  "libexpat":       { "cpe_vendor": "libexpat_project",        "cpe_product": "libexpat" },
+  "sqlite":         { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite" },
+  "sqlite3":        { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite" },
+  "libsqlite3":     { "cpe_vendor": "sqlite",                  "cpe_product": "sqlite" },
+
+  "libpng":         { "cpe_vendor": "libpng",                  "cpe_product": "libpng" },
+  "libjpeg":        { "cpe_vendor": "ijg",                     "cpe_product": "libjpeg" },
+  "libjpeg-turbo":  { "cpe_vendor": "libjpeg-turbo",          "cpe_product": "libjpeg-turbo" },
+
+  "mbedtls":        { "cpe_vendor": "arm",                     "cpe_product": "mbed_tls" },
+  "libmbedtls":     { "cpe_vendor": "arm",                     "cpe_product": "mbed_tls" },
+  "wolfssl":        { "cpe_vendor": "wolfssl",                 "cpe_product": "wolfssl" },
+  "gnutls":         { "cpe_vendor": "gnu",                     "cpe_product": "gnutls" },
+  "libgnutls":      { "cpe_vendor": "gnu",                     "cpe_product": "gnutls" },
+  "nettle":         { "cpe_vendor": "nettle_project",          "cpe_product": "nettle" },
+  "libgcrypt":      { "cpe_vendor": "gnupg",                   "cpe_product": "libgcrypt" },
+
+  "pcre":           { "cpe_vendor": "pcre",                    "cpe_product": "pcre" },
+  "pcre2":          { "cpe_vendor": "pcre",                    "cpe_product": "pcre2" },
+  "libpcap":        { "cpe_vendor": "tcpdump",                 "cpe_product": "libpcap" },
+  "tcpdump":        { "cpe_vendor": "tcpdump",                 "cpe_product": "tcpdump" },
+
+  "zstd":           { "cpe_vendor": "facebook",                "cpe_product": "zstandard" },
+  "libzstd":        { "cpe_vendor": "facebook",                "cpe_product": "zstandard" },
+  "xz":             { "cpe_vendor": "tukaani",                 "cpe_product": "xz" },
+  "liblzma":        { "cpe_vendor": "tukaani",                 "cpe_product": "xz" },
+  "bzip2":          { "cpe_vendor": "bzip",                    "cpe_product": "bzip2" },
+  "libbz2":         { "cpe_vendor": "bzip",                    "cpe_product": "bzip2" },
+
+  "nghttp2":        { "cpe_vendor": "nghttp2",                 "cpe_product": "nghttp2" },
+  "libssh2":        { "cpe_vendor": "libssh2",                 "cpe_product": "libssh2" },
+  "libssh":         { "cpe_vendor": "libssh",                  "cpe_product": "libssh" },
+  "json-c":         { "cpe_vendor": "json-c",                  "cpe_product": "json-c" },
+
+  "lighttpd":       { "cpe_vendor": "lighttpd",                "cpe_product": "lighttpd" },
+  "nginx":          { "cpe_vendor": "f5",                      "cpe_product": "nginx" },
+  "uhttpd":         { "cpe_vendor": "openwrt",                 "cpe_product": "uhttpd" },
+  "hostapd":        { "cpe_vendor": "w1.fi",                   "cpe_product": "hostapd" },
+  "wpa_supplicant": { "cpe_vendor": "w1.fi",                   "cpe_product": "wpa_supplicant" },
+  "wpad":           { "cpe_vendor": "w1.fi",                   "cpe_product": "wpa_supplicant" },
+
+  "samba":          { "cpe_vendor": "samba",                   "cpe_product": "samba" },
+  "ppp":            { "cpe_vendor": "ppp_project",             "cpe_product": "ppp" },
+  "ntpd":           { "cpe_vendor": "ntp",                     "cpe_product": "ntp" },
+  "ntp":            { "cpe_vendor": "ntp",                     "cpe_product": "ntp" },
+  "bash":           { "cpe_vendor": "gnu",                     "cpe_product": "bash" },
+  "sudo":           { "cpe_vendor": "sudo_project",            "cpe_product": "sudo" },
+  "util-linux":     { "cpe_vendor": "kernel",                  "cpe_product": "util-linux" }
+}
