@@ -153,6 +153,8 @@
     "colScope": "Scope",
     "colRisk": "Risk",
     "colLicense": "License",
+    "colSource": "Source / download",
+    "colCopyright": "Copyright",
     "colSeverity": "Severity",
     "colCve": "CVE",
     "colPackage": "Component",
@@ -332,7 +334,8 @@
     "reviewHint": "AI-restrictive terms — human review required.",
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
-    "distribution": "License distribution"
+    "distribution": "License distribution",
+    "clickHint": "Click a license to see its components"
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",

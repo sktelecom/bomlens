@@ -153,6 +153,8 @@
     "colScope": "범위",
     "colRisk": "위험",
     "colLicense": "라이선스",
+    "colSource": "소스/다운로드",
+    "colCopyright": "저작권",
     "colSeverity": "심각도",
     "colCve": "CVE",
     "colPackage": "컴포넌트",
@@ -332,7 +334,8 @@
     "reviewHint": "AI 제한 조항 — 사람 검토가 필요합니다.",
     "flagBehavioral": "행위 기반 제한",
     "flagNonCommercial": "비상업",
-    "distribution": "라이선스 분포"
+    "distribution": "라이선스 분포",
+    "clickHint": "라이선스를 클릭하면 해당 컴포넌트를 봅니다"
   },
   "validation": {
     "required": "프로젝트 이름과 버전(필요 시 입력값)을 입력하세요.",
