@@ -39,7 +39,7 @@
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI 모델",
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
-    "aiModelHint": "HuggingFace 모델의 CycloneDX ML-BOM을 생성합니다(모델 카드 메타데이터를 네트워크로 가져옵니다).",
+    "aiModelHint": "HuggingFace 모델 ID를 '조직/모델' 형식으로 입력합니다(예: Qwen/Qwen2.5-0.5B). 컬렉션 이름이나 전체 URL이 아닙니다. 모델 카드 메타데이터를 네트워크로 가져와 CycloneDX ML-BOM을 생성합니다.",
     "aiModelUnavailable": "AI 모델 SBOM은 AIBOM 이미지에서 UI를 실행해야 사용할 수 있습니다.",
     "uploading": "업로드 중…",
     "uploadFailed": "업로드 실패: {{msg}}"
@@ -67,6 +67,8 @@
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
+    "aiScanTitle": "AI 모델 SBOM (ML-BOM)",
+    "aiScanBody": "HuggingFace 모델 메타데이터로 생성된 AI SBOM입니다. 모델과 데이터셋 중심이라 일반 소프트웨어보다 컴포넌트 수가 적습니다.",
     "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
     "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"파일 단위 식별 (SCANOSS)\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
     "scanossUnavailableTitle": "SCANOSS 검색이 완료되지 않았습니다",
@@ -153,8 +155,10 @@
     "colLicense": "라이선스",
     "colSeverity": "심각도",
     "colCve": "CVE",
-    "colPackage": "패키지",
+    "colPackage": "컴포넌트",
     "colInstalled": "설치 버전",
+    "vulnSearchPlaceholder": "CVE, 컴포넌트, 제목 검색",
+    "vulnShown": "{{total}}건 중 {{shown}}건 표시",
     "colFixed": "수정 버전",
     "vulnCvss": "CVSS",
     "colEpss": "EPSS",
@@ -213,6 +217,7 @@
     "expand": "사이드바 펼치기",
     "recent": "최근 스캔",
     "recentEmpty": "최근 스캔이 아직 없습니다",
+    "recentDelete": "이 스캔 삭제",
     "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
     "group": {
       "inventory": "인벤토리",
@@ -292,7 +297,34 @@
     "required": "필수",
     "sPass": "충족",
     "sFail": "실패",
-    "sWarn": "권고"
+    "sWarn": "권고",
+    "howToFix": "보완 방법:",
+    "help": {
+      "g7-model-id": {
+        "what": "모델을 PURL/CPE 같은 표준 식별자로 식별합니다.",
+        "fix": "SBOM의 모델 컴포넌트에 purl 또는 cpe를 추가하세요."
+      },
+      "g7-model-license": {
+        "what": "모델에 적용되는 라이선스 정보입니다.",
+        "fix": "모델 카드에 라이선스를 명시하거나 SBOM 컴포넌트의 licenses 필드를 채우세요."
+      },
+      "g7-model-card": {
+        "what": "아키텍처와 학습 파라미터 등 모델 카드 정보입니다.",
+        "fix": "HuggingFace 모델 카드(README)에 아키텍처와 하이퍼파라미터를 기재하세요."
+      },
+      "g7-model-hash": {
+        "what": "모델 가중치 파일의 무결성을 확인하는 해시입니다.",
+        "fix": "모델 파일의 해시(SHA-256 등)를 SBOM 컴포넌트의 hashes에 추가하세요."
+      },
+      "g7-datasets": {
+        "what": "학습에 사용된 데이터셋의 출처입니다.",
+        "fix": "학습 데이터셋을 SBOM에 data 컴포넌트로 참조하세요."
+      },
+      "g7-openness": {
+        "what": "가중치와 아키텍처, 데이터, 학습 과정의 공개 수준입니다.",
+        "fix": "모델의 개방성(공개 가중치·데이터·학습 코드 여부)을 SBOM이나 모델 카드에 선언하세요."
+      }
+    }
   },
   "licenses": {
     "empty": "감지된 라이선스가 없습니다.",

@@ -39,7 +39,7 @@
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI model",
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
-    "aiModelHint": "Generates a CycloneDX ML-BOM for a HuggingFace model (fetches model-card metadata over the network).",
+    "aiModelHint": "Enter a HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B) — not a collection name or a full URL. Fetches model-card metadata over the network to build a CycloneDX ML-BOM.",
     "aiModelUnavailable": "AI-model SBOMs require launching the UI from the AIBOM image.",
     "uploading": "Uploading…",
     "uploadFailed": "Upload failed: {{msg}}"
@@ -67,6 +67,8 @@
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
+    "aiScanTitle": "AI model SBOM (ML-BOM)",
+    "aiScanBody": "Generated from HuggingFace model metadata. It centers on the model and its datasets, so it has fewer components than a typical software scan.",
     "vendoredHintTitle": "Few components found — is this C/C++ embedded source?",
     "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"File-level identification (SCANOSS)\" under Advanced scan options and run again. Only file fingerprints are sent — your source stays local.",
     "scanossUnavailableTitle": "SCANOSS search didn't complete",
@@ -153,8 +155,10 @@
     "colLicense": "License",
     "colSeverity": "Severity",
     "colCve": "CVE",
-    "colPackage": "Package",
+    "colPackage": "Component",
     "colInstalled": "Installed",
+    "vulnSearchPlaceholder": "Search CVE, component, title",
+    "vulnShown": "{{shown}} of {{total}} shown",
     "colFixed": "Fixed",
     "vulnCvss": "CVSS",
     "colEpss": "EPSS",
@@ -213,6 +217,7 @@
     "expand": "Expand sidebar",
     "recent": "Recent scans",
     "recentEmpty": "No recent scans yet",
+    "recentDelete": "Delete this scan",
     "sectionsHint": "Run a scan to see result sections here.",
     "group": {
       "inventory": "Inventory",
@@ -292,7 +297,34 @@
     "required": "Required",
     "sPass": "Present",
     "sFail": "Failed",
-    "sWarn": "Advisory"
+    "sWarn": "Advisory",
+    "howToFix": "How to satisfy:",
+    "help": {
+      "g7-model-id": {
+        "what": "Identifies the model with a standard identifier such as PURL/CPE.",
+        "fix": "Add a purl or cpe to the model component in the SBOM."
+      },
+      "g7-model-license": {
+        "what": "The license that applies to the model.",
+        "fix": "State a license on the model card, or fill the licenses field on the SBOM component."
+      },
+      "g7-model-card": {
+        "what": "Model-card info such as architecture and training parameters.",
+        "fix": "Document architecture and hyperparameters in the HuggingFace model card (README)."
+      },
+      "g7-model-hash": {
+        "what": "Integrity hashes for the model weight files.",
+        "fix": "Add the model file hashes (e.g. SHA-256) to the component's hashes in the SBOM."
+      },
+      "g7-datasets": {
+        "what": "Provenance of the datasets used for training.",
+        "fix": "Reference the training datasets as data components in the SBOM."
+      },
+      "g7-openness": {
+        "what": "How open the weights, architecture, data and training are.",
+        "fix": "Declare the model's openness (public weights/data/training code) in the SBOM or model card."
+      }
+    }
   },
   "licenses": {
     "empty": "No licenses were detected.",
