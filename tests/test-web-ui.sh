@@ -50,8 +50,8 @@ done
 
 echo "== capabilities + results contract =="
 caps=$(curl -fsS "$BASE/capabilities" 2>/dev/null)
-if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom'))" 2>/dev/null; then
-    pass "/capabilities reports firmware, docker, scanoss, aibom flags"
+if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling'))" 2>/dev/null; then
+    pass "/capabilities reports firmware, docker, scanoss, aibom (+ sibling) flags"
 else
     fail "/capabilities missing expected keys" "$caps"
 fi

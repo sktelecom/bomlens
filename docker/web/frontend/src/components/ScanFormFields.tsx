@@ -87,7 +87,26 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           )}
         </div>
       )}
+
+      <SiblingPullNotice state={state} />
     </>
+  );
+}
+
+/** First-run notice: when firmware/AI runs via a sibling container (the desktop
+ *  base UI image), the dedicated image is pulled on the first scan — a large,
+ *  one-time download. Shown only when the selected source needs it. */
+function SiblingPullNotice({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { source, capabilities } = state;
+  const needsPull =
+    (source === "firmware-upload" && capabilities.firmwareSibling) ||
+    (source === "ai-model" && capabilities.aibomSibling);
+  if (!needsPull) return null;
+  return (
+    <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
+      {t("source.siblingPullNotice")}
+    </div>
   );
 }
 
