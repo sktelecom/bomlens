@@ -1,7 +1,9 @@
 import {
   Boxes,
   ChevronRight,
+  Cpu,
   Eye,
+  FileCheck2,
   GitBranch,
   type LucideIcon,
   Package,
@@ -13,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { DoneEvent } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
-import { sbomFileName } from "@/lib/results";
+import { isAiScan, sbomFileName } from "@/lib/results";
 import { cn } from "@/lib/utils";
 
 import { KpiCards } from "./KpiCards";
@@ -47,10 +49,21 @@ export function Overview({
   const { t } = useTranslation();
   const attention = needsAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
+  const ai = isAiScan(result);
+  const hasG7 = Boolean(
+    result.conformance?.checks?.some((c) => c.id?.startsWith("g7-")),
+  );
 
   return (
     <div className="space-y-6">
-      {result.sbom?.suggestIdentifyVendored && (
+      {ai && (
+        <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
+          <div className="text-sm font-medium text-foreground">{t("result.aiScanTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.aiScanBody")}</p>
+        </div>
+      )}
+
+      {!ai && result.sbom?.suggestIdentifyVendored && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="text-sm font-medium">{t("result.vendoredHintTitle")}</div>
           <p className="mt-1 text-xs">{t("result.vendoredHintBody")}</p>
@@ -107,7 +120,12 @@ export function Overview({
         </Card>
       )}
 
-      <KpiCards sbom={result.sbom} security={result.security} conformance={result.conformance} />
+      <KpiCards
+        sbom={result.sbom}
+        security={result.security}
+        conformance={result.conformance}
+        onNavigate={onNavigate}
+      />
 
       {result.security && <SeverityBar security={result.security} />}
 
@@ -116,6 +134,8 @@ export function Overview({
       <JumpCards
         result={result}
         hasDeps={hasDeps}
+        ai={ai}
+        hasG7={hasG7}
         onNavigate={onNavigate}
       />
     </div>
@@ -131,19 +151,28 @@ interface Jump {
 function JumpCards({
   result,
   hasDeps,
+  ai,
+  hasG7,
   onNavigate,
 }: {
   result: DoneEvent;
   hasDeps: boolean;
+  ai: boolean;
+  hasG7: boolean;
   onNavigate: (section: SectionId) => void;
 }) {
   const { t } = useTranslation();
+  const modelCount = (result.sbom?.componentList ?? []).filter(
+    (c) => c.type === "machine-learning-model",
+  ).length;
   const jumps: Jump[] = [
     { id: "components", icon: Boxes, value: result.sbom?.components ?? 0 },
     ...(result.security
       ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
       : []),
     ...(hasDeps ? [{ id: "dependencies" as SectionId, icon: GitBranch, value: null }] : []),
+    ...(ai ? [{ id: "models" as SectionId, icon: Cpu, value: modelCount }] : []),
+    ...(hasG7 ? [{ id: "g7" as SectionId, icon: FileCheck2, value: null }] : []),
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 
