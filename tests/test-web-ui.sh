@@ -61,6 +61,78 @@ else
     fail "/results is not a JSON array"
 fi
 
+echo "== sibling docker-run dispatch is allowlist-guarded =="
+# Firmware/AI scans hand the job to a dedicated image via a sibling `docker run`.
+# Every user-influenced value (image ref, MODE, MODEL_ID, project/version env)
+# must pass an allowlist/sanitizer before it reaches the command line, so a
+# crafted request can never smuggle a docker-run flag or shell metacharacter.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# Image ref allowlist: no leading '-', no whitespace, no flag smuggling.
+assert server._valid_image_ref("ghcr.io/sktelecom/bomlens-aibom:1.5.0")
+assert not server._valid_image_ref("-v/etc:/etc")
+assert not server._valid_image_ref("img with space")
+assert not server._valid_image_ref("")
+
+# Model id allowlist (HuggingFace owner/name); reject traversal/flags.
+assert server._valid_model_id("openai/clip-vit-base")
+assert server._valid_model_id("bert-base-uncased")
+assert not server._valid_model_id("../etc/passwd")
+assert not server._valid_model_id("--privileged")
+assert not server._valid_model_id("a b")
+
+# Free-text env values are stripped to a bounded, flag-safe token.
+assert server._env_flag_value("ok-name_1.0") == "ok-name_1.0"
+assert ";" not in server._env_flag_value("a;rm -rf /")
+assert "$" not in server._env_flag_value("$(whoami)")
+assert "`" not in server._env_flag_value("`id`")
+assert len(server._env_flag_value("x" * 5000)) <= 256
+
+# A hostile project name reaches docker run only as a sanitized -e value, and
+# an out-of-allowlist mode is refused outright (returns -1 without launching).
+captured = {}
+def fake_stream(args, on_log):
+    captured["args"] = args
+    return 0
+server._stream_cmd = fake_stream
+server._sibling_image_present = lambda image: True
+
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"PROJECT_NAME": "a;rm -rf /", "PROJECT_VERSION": "1.0"},
+)
+assert rc == 0, rc
+args = captured["args"]
+# The PROJECT_NAME value reaches docker run only as one sanitized -e element
+# (shell metacharacters stripped); it can never split into a new flag.
+pname = [a for a in args if a.startswith("PROJECT_NAME=")][0]
+assert not any(c in pname for c in ";`$&|<>\n"), pname
+assert "MODE=AIBOM" in args and "MODEL_ID=openai/clip" in args, args
+
+# A bogus mode is refused before any docker run is attempted.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "EVIL", "/host/out", lambda ln: None,
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A bogus model id is refused too.
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="--privileged",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+PY
+then
+    pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"
+else
+    fail "sibling dispatch guard failed (see assertion above)"
+fi
+
 echo "== path traversal is blocked =="
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?name=../../etc/passwd")
 [ "$code" = "404" ] && pass "/file blocks path traversal (404)" || fail "/file traversal returned $code (expected 404)"

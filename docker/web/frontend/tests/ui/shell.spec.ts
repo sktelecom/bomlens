@@ -16,6 +16,21 @@ import { expect, test, type Page } from "@playwright/test";
 type Theme = "light" | "dark";
 type Lang = "en" | "ko";
 
+// `main` is the scroll container (overflow-y-auto) AND mounts with
+// `animate-fade-in` (translateY(4px) -> 0) on every section switch. Element
+// screenshots of `main` scroll it into view first, so a non-zero scrollTop or an
+// unsettled transform shifts the whole tall section a few px — a deterministic-
+// looking but flaky ~3% diff. Pin the transform to its end state, reset the
+// scroll to the top, and wait two animation frames so layout has fully settled
+// before the capture.
+async function waitForMainSettled(page: Page) {
+  await page.locator("main").evaluate(async (el) => {
+    await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined)));
+    el.scrollTop = 0;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
+}
+
 async function openShell(page: Page, theme: Theme, lang: Lang) {
   await page.addInitScript(
     ([t, l]) => {
@@ -301,6 +316,7 @@ test("overview has no axe violations", async ({ page }) => {
 test("overview section matches baseline — light/en @visual", async ({ page }) => {
   await stubAndRun(page);
   await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
     animations: "disabled",
@@ -396,6 +412,7 @@ test("models section matches baseline — light/en @visual", async ({ page }) =>
   await stubAiAndRun(page);
   await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
   await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
     animations: "disabled",
@@ -424,6 +441,15 @@ test("g7 section matches baseline — light/en @visual", async ({ page }) => {
   await stubAiAndRun(page);
   await page.getByRole("navigation").getByRole("link", { name: /G7 conformance/ }).click();
   await expect(page.getByText("4/6 present")).toBeVisible();
+  await expect(
+    page.getByText("G7 model openness (weight/architecture/data/training)"),
+  ).toBeVisible();
+  // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
+  // switch. With `animations: "disabled"`, Playwright freezes the transform to a
+  // non-deterministic frame, so the whole tall section is sometimes captured 4px
+  // low — a constant ~3% diff. Wait for main's own animations to finish so the
+  // transform has settled to translateY(0) before the screenshot.
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("g7-light-en.png", {
     animations: "disabled",
@@ -483,6 +509,7 @@ test("licenses section matches baseline — light/en @visual", async ({ page }) 
   await stubLicensesAndRun(page);
   await page.getByRole("link", { name: /^Licenses/ }).first().click();
   await expect(page.getByText("License review needed")).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("licenses-light-en.png", {
     animations: "disabled",
@@ -511,6 +538,7 @@ test("dependencies tree matches baseline — light/en @visual", async ({ page })
   await page.getByRole("link", { name: /^Dependencies/ }).first().click();
   await page.getByRole("button", { name: "Tree", exact: true }).click();
   await expect(page.getByText("openssl").first()).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("dependencies-tree-light-en.png", {
     animations: "disabled",
@@ -549,6 +577,7 @@ test("vulnerabilities section matches baseline — light/en @visual", async ({ p
   await stubAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
   await expect(page.getByText("9.8", { exact: true })).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("vulnerabilities-light-en.png", {
     animations: "disabled",
@@ -581,6 +610,7 @@ test("components section matches baseline — light/en @visual", async ({ page }
   await stubAndRun(page);
   await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
   await expect(page.locator("main")).toHaveScreenshot("components-light-en.png", {
     animations: "disabled",
