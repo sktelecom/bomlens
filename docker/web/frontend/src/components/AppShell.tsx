@@ -85,7 +85,10 @@ export function AppShell({
           collapsed={collapsed}
           onToggleCollapsed={() => setManualCollapsed(!collapsed)}
         />
-        <main className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
+        {/* tabIndex makes the scrollable region keyboard-accessible (axe
+            scrollable-region-focusable / WCAG 2.1.1): a mouse-free user can
+            focus it and scroll with the arrow keys. */}
+        <main tabIndex={0} className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
           {children}
         </main>
       </div>

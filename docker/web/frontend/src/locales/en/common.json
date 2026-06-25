@@ -169,7 +169,8 @@
     "vulnDescription": "Description",
     "vulnReferences": "References",
     "vulnNoDetail": "No additional details available.",
-    "vulnRowToggle": "Show vulnerability details"
+    "vulnRowToggle": "Show vulnerability details",
+    "componentRowToggle": "Show component details"
   },
   "deps": {
     "loading": "Loading dependencies…",

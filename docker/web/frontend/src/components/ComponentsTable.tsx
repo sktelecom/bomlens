@@ -238,12 +238,25 @@ export function ComponentsTable({ items, total, truncated }: Props) {
             {visible.map((c, i) => {
               const key = c.purl || `${c.name}-${i}`;
               const isOpen = openKey === key;
+              const toggle = () => setOpenKey(isOpen ? null : key);
               return (
               <Fragment key={key}>
+              {/* role="button" makes aria-expanded valid here (it is not allowed
+                  on a plain table row) and, with tabIndex + the key handler,
+                  keeps the expandable row reachable by keyboard. */}
               <tr
                 className="cursor-pointer border-b last:border-0 hover:bg-accent/50"
-                onClick={() => setOpenKey(isOpen ? null : key)}
+                role="button"
+                tabIndex={0}
                 aria-expanded={isOpen}
+                aria-label={t("result.componentRowToggle")}
+                onClick={toggle}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle();
+                  }
+                }}
               >
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">

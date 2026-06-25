@@ -169,7 +169,8 @@
     "vulnDescription": "설명",
     "vulnReferences": "참고 링크",
     "vulnNoDetail": "추가 상세 정보가 없습니다.",
-    "vulnRowToggle": "취약점 상세 보기"
+    "vulnRowToggle": "취약점 상세 보기",
+    "componentRowToggle": "컴포넌트 상세 보기"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
