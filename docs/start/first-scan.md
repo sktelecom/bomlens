@@ -12,7 +12,7 @@ BomLens runs on a Docker engine, but the desktop app and web UI set it up and pu
 
 ## Start without the command line (recommended)
 
-Download [BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/SBOM-Generator-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 3–4 GB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
+Download [BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 3–4 GB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
