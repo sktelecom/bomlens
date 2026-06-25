@@ -437,7 +437,7 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   expect(results.violations).toEqual([]);
 });
 
-test("g7 section matches baseline — light/en @visual", async ({ page }) => {
+test("conformance section matches baseline — light/en @visual", async ({ page }) => {
   await stubAiAndRun(page);
   await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
   await expect(page.getByText("4/6 present")).toBeVisible();
@@ -451,7 +451,7 @@ test("g7 section matches baseline — light/en @visual", async ({ page }) => {
   // transform has settled to translateY(0) before the screenshot.
   await waitForMainSettled(page);
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("g7-light-en.png", {
+  await expect(page.locator("main")).toHaveScreenshot("conformance-light-en.png", {
     animations: "disabled",
   });
 });
