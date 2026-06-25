@@ -409,6 +409,16 @@ def sbom_summary(prefix):
             (p.get("value") for p in props if p.get("name") == "bomlens:licenseReview"),
             "",
         )
+        refs = c.get("externalReferences") or []
+        source = next(
+            (
+                r.get("url")
+                for r in refs
+                if isinstance(r.get("url"), str)
+                and r.get("type") in ("vcs", "distribution", "website")
+            ),
+            "",
+        )
         row = {
             "name": c.get("name") or "",
             "version": c.get("version") or "",
@@ -418,6 +428,8 @@ def sbom_summary(prefix):
             "licenses": _component_licenses(c),
             "vendored": vendored,
             "matchConfidence": match,
+            "source": source,
+            "copyright": c.get("copyright") or "",
         }
 
         # Scope: direct/transitive from the dependency graph (a component may be
