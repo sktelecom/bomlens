@@ -1,3 +1,4 @@
+// @no-unit-test: static guidance data table (CycloneDX snippets + doc links); no logic to unit test.
 /**
  * Static, per-G7-element guidance for the conformance view: a small CycloneDX
  * fragment showing the correct shape, plus a link to authoritative docs. The

@@ -376,6 +376,8 @@ jobs:
         run: npm run token:lint
       - name: i18n coverage (en ≡ ko)
         run: npm run i18n:check
+      - name: Lib test gate (every src/lib module has a unit test)
+        run: npm run test:lib-gate
       - name: Unit tests (Vitest)
         run: npm run test:unit
       - name: Install Playwright browser

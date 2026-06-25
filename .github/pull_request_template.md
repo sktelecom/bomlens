@@ -47,6 +47,7 @@ Resolves #(Issue Number)
 - [ ] Documentation has been updated (if applicable)
 - [ ] Comments have been added for complex logic
 - [ ] ShellCheck warnings have been resolved (for Bash script changes)
+- [ ] New `src/lib` modules ship with a `*.test.ts` (or a justified `// @no-unit-test:` annotation)
 - [ ] No new warnings or errors occur
 
 ## Screenshots (if applicable)

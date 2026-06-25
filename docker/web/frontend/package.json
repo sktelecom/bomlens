@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "test:lib-gate": "node scripts/lib-test-gate.mjs",
     "test:ui": "playwright test --grep-invert \"@capture|@visual\"",
     "test:visual": "playwright test --grep @visual",
     "capture:ui": "playwright test --grep @capture",

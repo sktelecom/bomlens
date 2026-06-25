@@ -1,3 +1,4 @@
+// @no-unit-test: i18next bootstrap (side-effecting init + re-export); behavior covered by the Playwright i18n suite.
 import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
