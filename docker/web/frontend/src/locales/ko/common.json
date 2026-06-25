@@ -48,6 +48,7 @@
   "options": {
     "notice": "고지문",
     "noticeHint": "오픈소스 라이선스 고지문(NOTICE) 생성",
+    "aiNoticeHint": "AI 모델은 고지문이 모델과 데이터셋 라이선스를 정리하고, 사용 제한이 있는 라이선스(RAIL·비상업)를 검토 대상으로 표시합니다. 켜 두기를 권장합니다.",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "라이선스 스캔 (ScanCode)",

@@ -186,7 +186,7 @@ export function useScanForm({
     identifyVendored, setIdentifyVendored,
     scanossToken, setScanossToken,
     invalid, uploadError, uploading,
-    busy, uploadKind, textInput, isText, isAnalyze, showVendored,
+    busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showScanOptions,
     options, submit,
     capabilities,
