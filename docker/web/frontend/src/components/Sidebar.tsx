@@ -8,15 +8,15 @@ import {
   type SectionId,
   visibleGroups,
 } from "@/lib/nav";
+import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   scan?: ScanContext;
   activeSection: SectionId;
-  onSelect: (id: SectionId) => void;
+  /** The current scan's id, so section links resolve to `#/scan/<id>/<section>`. */
+  activeScanId?: string | null;
   recent?: RecentScanLink[];
-  /** Re-open a past scan from the Recent list. */
-  onSelectRecent?: (id: string) => void;
   /** Delete a past scan from the Recent list (removes its artifacts). */
   onDeleteRecent?: (id: string) => void;
   /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
@@ -45,9 +45,8 @@ const SEVERITY_DOT: Record<NonNullable<RecentScanLink["topSeverity"]>, string> =
 export function Sidebar({
   scan = EMPTY_SCAN,
   activeSection,
-  onSelect,
+  activeScanId,
   recent = [],
-  onSelectRecent,
   onDeleteRecent,
   counts = {},
   showSections = true,
@@ -108,9 +107,8 @@ export function Sidebar({
               const count = counts[section.id];
               return (
                 <li key={section.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(section.id)}
+                  <a
+                    href={activeScanId ? scanHash(activeScanId, section.id) : undefined}
                     aria-current={active ? "page" : undefined}
                     title={collapsed ? label : undefined}
                     className={cn(
@@ -141,7 +139,7 @@ export function Sidebar({
                         {count}
                       </span>
                     )}
-                  </button>
+                  </a>
                 </li>
               );
             })}
@@ -166,10 +164,9 @@ export function Sidebar({
           <ul className="flex flex-col gap-0.5">
             {recent.map((scanItem) => (
               <li key={scanItem.id} className="group/recent relative">
-                <button
-                  type="button"
+                <a
+                  href={scanHash(scanItem.id)}
                   title={collapsed ? scanItem.label : undefined}
-                  onClick={() => onSelectRecent?.(scanItem.id)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
                     "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
@@ -185,7 +182,7 @@ export function Sidebar({
                     aria-hidden
                   />
                   {!collapsed && <span className="truncate">{scanItem.label}</span>}
-                </button>
+                </a>
                 {!collapsed && onDeleteRecent && (
                   <button
                     type="button"

@@ -12,10 +12,9 @@ import {
 interface AppShellProps {
   scan?: ScanContext;
   activeSection: SectionId;
-  onSelectSection: (id: SectionId) => void;
+  /** The current scan's id, so the rail can build `#/scan/<id>/<section>` links. */
+  activeScanId?: string | null;
   recent?: RecentScanLink[];
-  /** Re-open a past scan from the Recent list. */
-  onSelectRecent?: (id: string) => void;
   /** Delete a past scan from the Recent list. */
   onDeleteRecent?: (id: string) => void;
   /** Per-section counts shown as trailing rail badges. */
@@ -24,10 +23,10 @@ interface AppShellProps {
   showSections?: boolean;
   /** Project context shown in the top bar, e.g. "my-app · 1.0.0". */
   projectLabel?: string;
-  /** Optional top-bar action (e.g. New scan button). */
-  topBarActions?: ReactNode;
-  /** Clicking the logo goes home (new scan). */
-  onHome?: () => void;
+  /** Hash for the home (New scan) screen — the logo / New scan links point here. */
+  homeHref: string;
+  /** Show the logo + New scan as links home (hidden on the idle screen itself). */
+  showHomeLink?: boolean;
   /** The active section's content fills the canvas. */
   children: ReactNode;
 }
@@ -43,15 +42,14 @@ const COLLAPSE_QUERY = "(max-width: 1024px)";
 export function AppShell({
   scan = EMPTY_SCAN,
   activeSection,
-  onSelectSection,
+  activeScanId,
   recent,
-  onSelectRecent,
   onDeleteRecent,
   counts,
   showSections,
   projectLabel,
-  topBarActions,
-  onHome,
+  homeHref,
+  showHomeLink,
   children,
 }: AppShellProps) {
   // `null` until the user toggles manually; until then we follow the viewport.
@@ -70,14 +68,17 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <TopBar projectLabel={projectLabel} actions={topBarActions} onHome={onHome} />
+      <TopBar
+        projectLabel={projectLabel}
+        homeHref={homeHref}
+        showHomeLink={showHomeLink}
+      />
       <div className="flex min-h-0 flex-1">
         <Sidebar
           scan={scan}
           activeSection={activeSection}
-          onSelect={onSelectSection}
+          activeScanId={activeScanId}
           recent={recent}
-          onSelectRecent={onSelectRecent}
           onDeleteRecent={onDeleteRecent}
           counts={counts}
           showSections={showSections}

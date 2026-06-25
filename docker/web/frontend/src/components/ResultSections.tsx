@@ -22,17 +22,18 @@ import { VulnerabilitiesTable } from "./VulnerabilitiesTable";
 export function ResultSection({
   section,
   result,
-  onNavigate,
+  scanId,
 }: {
   section: SectionId;
   result: DoneEvent;
-  onNavigate: (section: SectionId) => void;
+  /** The scan's id, so Overview can link into sections via `#/scan/<id>/…`. */
+  scanId: string | null;
 }) {
   const { t } = useTranslation();
 
   switch (section) {
     case "overview":
-      return <Overview result={result} onNavigate={onNavigate} />;
+      return <Overview result={result} scanId={scanId} />;
 
     case "components":
       return (

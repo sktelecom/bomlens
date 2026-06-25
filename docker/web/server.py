@@ -588,6 +588,7 @@ def scan_detail(prefix):
     return {
         "ok": True,
         "mode": None,
+        "id": prefix,
         "results": list_results(prefix),
         "sbom": sbom,
         "security": security_summary(prefix),
@@ -1173,6 +1174,7 @@ class Handler(BaseHTTPRequestHandler):
             done = {
                 "ok": ok,
                 "mode": mode,
+                "id": prefix,
                 "results": list_results(prefix),
                 "sbom": sbom_summary(prefix),
                 "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,

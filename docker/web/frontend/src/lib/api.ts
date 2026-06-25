@@ -109,6 +109,10 @@ export interface ConformanceSummary {
 export interface DoneEvent {
   ok: boolean;
   mode?: string;
+  /** The {project}_{version} prefix this scan's artifacts share — the scan id
+   *  used for re-opening (`loadScan`) and for the `#/scan/<id>` hash route.
+   *  Set by server.py from `output_prefix`; absent on older payloads. */
+  id?: string;
   results: ResultFile[];
   sbom: SbomSummary | null;
   security: SecuritySummary | null;

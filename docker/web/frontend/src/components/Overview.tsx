@@ -16,6 +16,7 @@ import type { DoneEvent } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
 import { isAiScan, sbomFileName } from "@/lib/results";
+import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 import { KpiCards } from "./KpiCards";
@@ -41,10 +42,11 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
  */
 export function Overview({
   result,
-  onNavigate,
+  scanId,
 }: {
   result: DoneEvent;
-  onNavigate: (section: SectionId) => void;
+  /** The scan's id; section links resolve to `#/scan/<id>/<section>`. */
+  scanId: string | null;
 }) {
   const { t } = useTranslation();
   const attention = needsAttention(result);
@@ -99,9 +101,8 @@ export function Overview({
                     : t("overview.attnReview", { count: item.count });
                 return (
                   <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onNavigate(item.target)}
+                    <a
+                      href={scanId ? scanHash(scanId, item.target) : undefined}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm",
                         "transition-colors duration-fast ease-out-soft hover:bg-muted",
@@ -111,7 +112,7 @@ export function Overview({
                       <Icon className={cn("h-4 w-4 shrink-0", TONE_ICON[item.tone])} aria-hidden />
                       <span className="text-foreground">{label}</span>
                       <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </button>
+                    </a>
                   </li>
                 );
               })}
@@ -124,7 +125,7 @@ export function Overview({
         sbom={result.sbom}
         security={result.security}
         conformance={result.conformance}
-        onNavigate={onNavigate}
+        scanId={scanId}
       />
 
       {result.security && <SeverityBar security={result.security} />}
@@ -136,7 +137,7 @@ export function Overview({
         hasDeps={hasDeps}
         ai={ai}
         hasG7={hasG7}
-        onNavigate={onNavigate}
+        scanId={scanId}
       />
     </div>
   );
@@ -153,13 +154,13 @@ function JumpCards({
   hasDeps,
   ai,
   hasG7,
-  onNavigate,
+  scanId,
 }: {
   result: DoneEvent;
   hasDeps: boolean;
   ai: boolean;
   hasG7: boolean;
-  onNavigate: (section: SectionId) => void;
+  scanId: string | null;
 }) {
   const { t } = useTranslation();
   const modelCount = (result.sbom?.componentList ?? []).filter(
@@ -179,10 +180,9 @@ function JumpCards({
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {jumps.map(({ id, icon: Icon, value }) => (
-        <button
+        <a
           key={id}
-          type="button"
-          onClick={() => onNavigate(id)}
+          href={scanId ? scanHash(scanId, id) : undefined}
           aria-label={t("overview.jumpHint", { section: t(`nav.${id}`) })}
           className={cn(
             "group rounded-lg border bg-card p-4 text-left",
@@ -198,7 +198,7 @@ function JumpCards({
             {value ?? "—"}
           </div>
           <div className="truncate text-xs text-muted-foreground">{t(`nav.${id}`)}</div>
-        </button>
+        </a>
       ))}
     </div>
   );
