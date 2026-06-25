@@ -195,7 +195,7 @@ export function useScanForm({
     includeOsv, setIncludeOsv,
     scanossToken, setScanossToken,
     invalid, uploadError, uploading,
-    busy, uploadKind, textInput, isText, isAnalyze, showVendored,
+    busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showIncludeOsv, showScanOptions,
     options, submit,
     capabilities,

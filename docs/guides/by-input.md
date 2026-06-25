@@ -1,12 +1,12 @@
 ---
-description: How BomLens produces an SBOM, an open-source notice, and a risk report for five input forms — a GitHub URL, a ZIP archive, local source, an existing SBOM, and firmware.
+description: How BomLens produces an SBOM, an open-source notice, and a risk report for six input forms — a GitHub URL, a ZIP archive, local source, an existing SBOM, firmware, and a HuggingFace AI model.
 ---
 
 # Input scenarios guide
 
 ## Overview
 
-An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of five input forms.
+An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of six input forms. (An AI model differs slightly — an ML-BOM and no security report; see Scenario 6.)
 
 **The three deliverables**
 
@@ -43,6 +43,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 | Local directory (C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | same |
 | Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same + conformance report |
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
+| AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 
 > Every command also needs `--project <name> --version <version>` (see examples below).
 >
@@ -129,6 +130,23 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 **Deliverables**: notice, SBOM, risk report (three)
 
+## Scenario 6 — AI model (HuggingFace)
+
+A team points you at a HuggingFace model instead of code. Generate an ML-BOM from the model id — no source code and no model-weight download.
+
+```bash
+$SBOM --project bert-base --version 1.0.0 \
+  --model "google-bert/bert-base-uncased" \
+  --generate-only
+```
+
+- Needs the opt-in aibom image (`ghcr.io/sktelecom/bomlens-aibom:latest`), pulled automatically. Set a different tag via `SBOM_AIBOM_IMAGE`.
+- `--model` is mutually exclusive with `--target`/`--analyze`/`--git`/`--merge`.
+- Produces a CycloneDX 1.7 **ML-BOM** (not 1.6), the notice, and the risk report, plus a G7 minimum-element conformance check. There is **no security report** — a model has no package CVEs.
+- For the model card, datasets, and G7 details, see the [AI model guide](ai-model.md).
+
+**Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, G7 conformance
+
 ## Reading the three deliverables
 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
@@ -153,6 +171,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
 | Firmware upload | upload a `.bin`, etc. (run the UI from the firmware image) |
 | Docker image | enter the image name |
+| AI model | enter a HuggingFace model id (run the UI from the aibom image) |
 
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report (plus the conformance report when relevant). The conformance result (pass/fail) is shown as a card at the top.
 

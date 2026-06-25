@@ -13,14 +13,23 @@ const SOURCE_SCAN: ScanContext = {
   isAiScan: false,
   hasDependencies: true,
   hasSourceTree: false,
-  hasG7: false,
+  hasConformance: false,
 };
 const AI_SCAN: ScanContext = {
   mode: "ANALYZE",
   isAiScan: true,
   hasDependencies: true,
   hasSourceTree: true,
-  hasG7: true,
+  hasConformance: true,
+};
+// A supplier SBOM uploaded for review (ANALYZE) with no AI model: it produces a
+// conformance report but is not an AI scan.
+const SUPPLIER_SBOM: ScanContext = {
+  mode: "ANALYZE",
+  isAiScan: false,
+  hasDependencies: true,
+  hasSourceTree: false,
+  hasConformance: true,
 };
 
 describe("visibleGroups — scan-type + data adaptation", () => {
@@ -32,18 +41,28 @@ describe("visibleGroups — scan-type + data adaptation", () => {
     expect(ids).toContain("artifacts");
   });
 
-  it("hides AI-only sections for non-AI scans", () => {
+  it("hides the models section for non-AI scans", () => {
     expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("models");
-    expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("g7");
   });
 
-  it("shows AI-only sections for AI/ANALYZE scans", () => {
+  it("shows the models section only for AI scans", () => {
     expect(visibleSectionIds(AI_SCAN)).toContain("models");
-    expect(visibleSectionIds(AI_SCAN)).toContain("g7"); // hasG7 true
   });
 
-  it("hides g7 when an AI scan has no G7 conformance checks", () => {
-    expect(visibleSectionIds({ ...AI_SCAN, hasG7: false })).not.toContain("g7");
+  it("shows conformance whenever a conformance report exists, AI or not", () => {
+    // Core supplier-SBOM fix: a non-AI SBOM with a conformance report still
+    // reaches the conformance section (it lives under Risk, not AI).
+    expect(visibleSectionIds(SUPPLIER_SBOM)).toContain("conformance");
+    expect(visibleSectionIds(AI_SCAN)).toContain("conformance");
+    const riskGroup = visibleGroups(SUPPLIER_SBOM).find((g) => g.id === "risk");
+    expect(riskGroup?.sections.map((s) => s.id)).toContain("conformance");
+  });
+
+  it("hides conformance when no conformance report exists", () => {
+    expect(visibleSectionIds(SOURCE_SCAN)).not.toContain("conformance");
+    expect(
+      visibleSectionIds({ ...AI_SCAN, hasConformance: false }),
+    ).not.toContain("conformance");
   });
 
   it("gates dependencies/sourceTree on their data being present", () => {

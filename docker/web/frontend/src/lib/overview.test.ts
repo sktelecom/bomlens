@@ -39,6 +39,42 @@ describe("needsAttention", () => {
     expect(items[0]).toMatchObject({ id: "vulns", count: 1, tone: "high" });
   });
 
+  it("flags a failed conformance and leads the list", () => {
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "fail",
+          format: "CycloneDX",
+          checks: [
+            { id: "purl", label: "PURL coverage", required: true, status: "fail", detail: "" },
+            { id: "g7-model-id", label: "Model id", required: false, status: "warn", detail: "" },
+          ],
+        },
+        security: sev({ CRITICAL: 1, TOTAL: 1 }),
+      }),
+    );
+    // Conformance leads, then the critical vuln — G7 advisory warn is not counted.
+    expect(items.map((i) => i.id)).toEqual(["conformance", "vulns"]);
+    expect(items[0]).toMatchObject({
+      id: "conformance",
+      count: 1,
+      tone: "high",
+      target: "conformance",
+    });
+  });
+
+  it("does not flag a passing conformance", () => {
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "pass",
+          checks: [{ id: "purl", label: "PURL", required: true, status: "pass", detail: "" }],
+        },
+      }),
+    );
+    expect(items).toEqual([]);
+  });
+
   it("flags vendored components for review and orders vulns first", () => {
     const items = needsAttention(
       result({

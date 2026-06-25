@@ -7,8 +7,8 @@ import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/result
 
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
+import { ConformancePanel } from "./ConformancePanel";
 import { DependenciesPanel } from "./DependenciesPanel";
-import { G7Conformance } from "./G7Conformance";
 import { Licenses } from "./Licenses";
 import { ModelsDatasets } from "./ModelsDatasets";
 import { SourceTreePanel } from "./SourceTreePanel";
@@ -81,9 +81,9 @@ export function ResultSection({
       return sbomFile ? <ModelsDatasets sbomFile={sbomFile} /> : null;
     }
 
-    case "g7":
+    case "conformance":
       return result.conformance ? (
-        <G7Conformance conformance={result.conformance} />
+        <ConformancePanel conformance={result.conformance} />
       ) : null;
 
     default:

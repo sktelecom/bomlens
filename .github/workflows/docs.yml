@@ -31,6 +31,6 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install mkdocs-material mkdocs-static-i18n
+          pip install -r docs/requirements.txt
           mkdocs build --strict
           mkdocs gh-deploy --force --no-history
