@@ -56,7 +56,7 @@ git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
 
 Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results.
 
-![BomLens web UI — a scan in progress with live logs](docs/images/web-ui-scan-en.png)
+![BomLens web UI — reviewing a finished scan: needs-attention, component and vulnerability counts, the severity distribution and the license summary](docs/images/web-ui-scan-en.png)
 
 ### CLI (advanced)
 
