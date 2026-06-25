@@ -2,7 +2,7 @@
   <img src="docs/images/logo.svg" alt="BomLens — an SBOM generator" width="300" />
 </p>
 
-> **BomLens** is a local-first SBOM generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security/license risk report for a single project in seconds — from source code, containers, binaries, firmware, or an SBOM you received. CLI or browser UI, no SaaS.
+> **BomLens** is a local-first SBOM generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security/license risk report for a single project in seconds — from source code, containers, binaries, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS.
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/sbom-tools?style=flat-square)](https://github.com/sktelecom/sbom-tools/releases)
 [![Container image](https://img.shields.io/badge/ghcr.io-bomlens-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/bomlens)
@@ -28,7 +28,7 @@ One Docker image, two jobs:
 
 Every scan also emits the risk report by default. Run it from a browser UI (or the desktop app), or from the CLI. Originally built by SK Telecom for supply-chain security, now open source.
 
-Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg, or `--identify-vendored` for sources with no package manager). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware.
+Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg, or `--identify-vendored` for sources with no package manager). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware, and a HuggingFace AI model (CycloneDX ML-BOM).
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
 
