@@ -171,12 +171,19 @@ export interface ScanHandlers {
 }
 
 export interface Capabilities {
+  /** Firmware input offerable here — tools built into this image OR reachable by
+   *  running the firmware image as a sibling container (docker socket). */
   firmware: boolean;
   /** scanoss-py present (built with SBOM_SCANOSS) — enables --identify-vendored. */
   scanoss?: boolean;
   docker: boolean;
-  /** OWASP AIBOM Generator present (bomlens-aibom image) — enables AI-model SBOMs. */
+  /** AI-model input offerable here — generator built in OR sibling-reachable. */
   aibom?: boolean;
+  /** Firmware is satisfied by a sibling container (the desktop base UI image),
+   *  so the first run pulls the (large) firmware image — show a one-time notice. */
+  firmwareSibling?: boolean;
+  /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
+  aibomSibling?: boolean;
   firmwareImage?: string;
   aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)

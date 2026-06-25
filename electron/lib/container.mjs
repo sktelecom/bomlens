@@ -15,6 +15,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const DEFAULT_IMAGE =
   process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/sbom-generator:latest";
 
+// Opt-in scan images the base UI container launches as SIBLING containers (via
+// the mounted host Docker socket) for firmware and AI-model inputs — the GPL
+// firmware tools and the heavy aibom deps can't live in the permissive-only
+// base image. Kept in sync with server.py's SBOM_FIRMWARE_IMAGE / SBOM_AIBOM_IMAGE
+// defaults; passed into the container as env so both sides agree on the refs.
+export const FIRMWARE_IMAGE =
+  process.env.SBOM_FIRMWARE_IMAGE ?? "ghcr.io/sktelecom/bomlens-firmware:latest";
+export const AIBOM_IMAGE =
+  process.env.SBOM_AIBOM_IMAGE ?? "ghcr.io/sktelecom/bomlens-aibom:latest";
+
 // 결과 저장 폴더. 두 엔진(Rancher/Docker Desktop) 모두 기본 공유하는 홈 디렉터리 아래.
 export function defaultOutputDir() {
   return path.join(os.homedir(), "sbom-output");
@@ -101,10 +111,18 @@ export function pullImage(image = DEFAULT_IMAGE, onProgress = () => {}) {
 }
 
 export class UiContainer {
-  constructor({ image = DEFAULT_IMAGE, hostPort, outputDir = defaultOutputDir() } = {}) {
+  constructor({
+    image = DEFAULT_IMAGE,
+    hostPort,
+    outputDir = defaultOutputDir(),
+    firmwareImage = FIRMWARE_IMAGE,
+    aibomImage = AIBOM_IMAGE,
+  } = {}) {
     this.image = image;
     this.hostPort = hostPort;
     this.outputDir = outputDir;
+    this.firmwareImage = firmwareImage;
+    this.aibomImage = aibomImage;
     this.id = null;
   }
 
@@ -131,6 +149,12 @@ export class UiContainer {
       "UI_PORT=8080",
       "-e",
       `SBOM_UI_HOST_DIR=${this.outputDir}`,
+      // Sibling-image refs for firmware / AI-model scans (server.py launches
+      // these via the host socket when the input type needs them).
+      "-e",
+      `SBOM_FIRMWARE_IMAGE=${this.firmwareImage}`,
+      "-e",
+      `SBOM_AIBOM_IMAGE=${this.aibomImage}`,
       this.image,
     ];
     const r = await run("docker", args);

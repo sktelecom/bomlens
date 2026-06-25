@@ -50,8 +50,8 @@ done
 
 echo "== capabilities + results contract =="
 caps=$(curl -fsS "$BASE/capabilities" 2>/dev/null)
-if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom'))" 2>/dev/null; then
-    pass "/capabilities reports firmware, docker, scanoss, aibom flags"
+if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling'))" 2>/dev/null; then
+    pass "/capabilities reports firmware, docker, scanoss, aibom (+ sibling) flags"
 else
     fail "/capabilities missing expected keys" "$caps"
 fi
@@ -59,6 +59,120 @@ if curl -fsS "$BASE/results" 2>/dev/null | python3 -c "import sys,json;assert is
     pass "/results returns a JSON array"
 else
     fail "/results is not a JSON array"
+fi
+
+echo "== sibling docker-run dispatch is allowlist-guarded =="
+# Firmware/AI scans hand the job to a dedicated image via a sibling `docker run`.
+# Every user-influenced value (image ref, MODE, MODEL_ID, project/version env)
+# must pass an allowlist/sanitizer before it reaches the command line, so a
+# crafted request can never smuggle a docker-run flag or shell metacharacter.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# Image ref allowlist: no leading '-', no whitespace, no flag smuggling.
+assert server._valid_image_ref("ghcr.io/sktelecom/bomlens-aibom:1.5.0")
+assert not server._valid_image_ref("-v/etc:/etc")
+assert not server._valid_image_ref("img with space")
+assert not server._valid_image_ref("")
+
+# Model id allowlist (HuggingFace owner/name); reject traversal/flags.
+assert server._valid_model_id("openai/clip-vit-base")
+assert server._valid_model_id("bert-base-uncased")
+assert not server._valid_model_id("../etc/passwd")
+assert not server._valid_model_id("--privileged")
+assert not server._valid_model_id("a b")
+
+# Free-text env values are stripped to a bounded, flag-safe token.
+assert server._env_flag_value("ok-name_1.0") == "ok-name_1.0"
+assert ";" not in server._env_flag_value("a;rm -rf /")
+assert "$" not in server._env_flag_value("$(whoami)")
+assert "`" not in server._env_flag_value("`id`")
+assert len(server._env_flag_value("x" * 5000)) <= 256
+
+# Host bind-mount paths are gated by an inline _HOSTPATH_RE full-match barrier:
+# absolute, no ':' (which would split the mount), no flag-leading '-', no
+# whitespace or shell metacharacters. (run_sibling_scan refuses non-matching
+# paths; see the fail-closed cases below.)
+assert server._HOSTPATH_RE.fullmatch("/host/out")
+assert server._HOSTPATH_RE.fullmatch("/host/git-abc123/repo")
+assert not server._HOSTPATH_RE.fullmatch("relative/path")
+assert not server._HOSTPATH_RE.fullmatch("/etc:/etc")
+assert not server._HOSTPATH_RE.fullmatch("/path with space")
+assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
+
+# A hostile project name reaches docker run only as a sanitized -e value, and
+# an out-of-allowlist mode is refused outright (returns -1 without launching).
+captured = {}
+def fake_stream(args, on_log):
+    captured["args"] = args
+    return 0
+server._stream_cmd = fake_stream
+server._sibling_image_present = lambda image: True
+
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"PROJECT_NAME": "a;rm -rf /", "PROJECT_VERSION": "1.0"},
+)
+assert rc == 0, rc
+args = captured["args"]
+# The PROJECT_NAME value reaches docker run only as one sanitized -e element
+# (shell metacharacters stripped); it can never split into a new flag.
+pname = [a for a in args if a.startswith("PROJECT_NAME=")][0]
+assert not any(c in pname for c in ";`$&|<>\n"), pname
+assert "MODE=AIBOM" in args and "MODEL_ID=openai/clip" in args, args
+# The image ref and host_out pass the inline full-match barriers and reach the
+# command line as charset-constrained tokens; valid inputs are interpolated
+# verbatim (the guard rejects, it does not rewrite).
+assert "ghcr.io/sktelecom/bomlens-aibom:1.5.0" in args, args
+assert "/host/out:/host-output" in args, args
+
+# A firmware host_file passes the bind-mount barrier and is mounted read-only
+# under a basename-only in-sibling path.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+)
+assert rc == 0, rc
+assert "/host/up/fw.bin:/input/fw.bin:ro" in captured["args"], captured["args"]
+
+# A bogus mode is refused before any docker run is attempted.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "EVIL", "/host/out", lambda ln: None,
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A bogus model id is refused too.
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="--privileged",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A host_out that fails the bind-mount allowlist is refused before any run.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out:/evil",
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
+# A hostile firmware host_file path is refused too.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up:ro,Z",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+PY
+then
+    pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"
+else
+    fail "sibling dispatch guard failed (see assertion above)"
 fi
 
 echo "== path traversal is blocked =="

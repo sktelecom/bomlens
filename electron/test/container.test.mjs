@@ -5,7 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  AIBOM_IMAGE,
   DEFAULT_IMAGE,
+  FIRMWARE_IMAGE,
   defaultOutputDir,
   findFreePort,
 } from "../lib/container.mjs";
@@ -24,5 +26,15 @@ test("DEFAULT_IMAGE points at the generator image by default", () => {
   // 환경변수 오버라이드가 없을 때의 기본값을 검증.
   if (!process.env.SBOM_SCANNER_IMAGE) {
     assert.equal(DEFAULT_IMAGE, "ghcr.io/sktelecom/sbom-generator:latest");
+  }
+});
+
+test("sibling image refs default to the firmware/aibom images", () => {
+  // server.py의 SBOM_FIRMWARE_IMAGE/SBOM_AIBOM_IMAGE 기본값과 일치해야 한다.
+  if (!process.env.SBOM_FIRMWARE_IMAGE) {
+    assert.equal(FIRMWARE_IMAGE, "ghcr.io/sktelecom/bomlens-firmware:latest");
+  }
+  if (!process.env.SBOM_AIBOM_IMAGE) {
+    assert.equal(AIBOM_IMAGE, "ghcr.io/sktelecom/bomlens-aibom:latest");
   }
 });

@@ -178,6 +178,27 @@ def docker_capable():
     return os.path.exists("/var/run/docker.sock")
 
 
+def docker_cli_present():
+    """A docker CLI in THIS image lets the base UI container launch a sibling
+    firmware/aibom container via the mounted host socket (same pattern as the
+    cdxgen language images in entrypoint.sh)."""
+    return shutil.which("docker") is not None
+
+
+def firmware_usable():
+    """Firmware analysis is offered when either the tools are built into THIS
+    image (run in-process) OR we can launch the firmware image as a sibling
+    container (docker CLI + host socket). The sibling path is how the desktop
+    app's permissive-only base UI image reaches the GPL-isolated firmware image."""
+    return firmware_capable() or (docker_cli_present() and docker_capable())
+
+
+def aibom_usable():
+    """AI-model SBOMs are offered when the generator is in THIS image OR we can
+    launch the aibom image as a sibling container (docker CLI + host socket)."""
+    return aibom_capable() or (docker_cli_present() and docker_capable())
+
+
 def list_results(prefix=None):
     """Generated artifacts in OUTPUT_DIR. With a prefix, only that scan's files
     ({prefix}_*) — used when re-opening a past scan."""
@@ -740,6 +761,186 @@ def host_path_of(container_path):
     return ""
 
 
+# Allowlist charsets for every value interpolated into the sibling docker-run
+# command line. Each is enforced as an inline `re.fullmatch(<const>, value)`
+# barrier in run_sibling_scan, in the same scope as the flow it gates: string
+# substitution (re.sub) does NOT break command-injection taint, but a full-match
+# guard the value must pass to reach the sink does. None of these admit a leading
+# '-', whitespace, ':' (which would split a -v mount), or a shell metacharacter.
+_REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
+_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
+_HOSTPATH_RE = re.compile(r"/[A-Za-z0-9._@/-]*")                # absolute bind-mount path
+_BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
+
+# Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
+# caller string) is interpolated into the docker-run command line, so the MODE
+# argument can only ever be one of these literals.
+_SIBLING_MODES = ("FIRMWARE", "AIBOM")
+
+
+def _valid_image_ref(ref):
+    """True for a plain image reference (registry/name[:tag][@digest]).
+
+    The image comes from server env (SBOM_FIRMWARE_IMAGE / SBOM_AIBOM_IMAGE),
+    not user input, but we still allowlist the charset so a misconfigured env
+    can't smuggle a docker-run flag (no leading '-', no whitespace/separators).
+    run_sibling_scan re-applies the same _REF_RE inline as the taint barrier."""
+    return bool(ref) and _REF_RE.fullmatch(ref) is not None
+
+
+def _valid_model_id(mid):
+    """True for a HuggingFace model id (owner/name; owner optional).
+
+    Shares _MODEL_RE with the inline barrier in run_sibling_scan, so the value
+    that reaches the command line is charset-constrained (no leading '-', no
+    whitespace, no path traversal) regardless of call site."""
+    return bool(mid) and _MODEL_RE.fullmatch(mid) is not None
+
+
+def _env_flag_value(value):
+    """Sanitize a free-text value (project name/version) for a docker-run
+    `-e KEY=<value>` argument.
+
+    It is already a single argv element (subprocess is invoked with a list and
+    shell=False, so it can never split into a new flag), but we additionally
+    strip control characters and the few shell-significant bytes so the value
+    that reaches the command line is a plain, bounded token."""
+    return re.sub(r"[^\w.+:/ @=-]", "", (value or ""))[:256]
+
+
+def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=None,
+                     extra_env=None):
+    """Run a firmware/aibom SBOM scan in a SIBLING container.
+
+    The desktop app's base UI image is permissive-only (no GPL firmware tools,
+    no heavy aibom deps), so when the user picks firmware/AI we hand the job to
+    the dedicated firmware/aibom image launched via the mounted host Docker
+    socket — the same sibling pattern entrypoint.sh uses for cdxgen language
+    images. The sibling runs the FULL run-scan pipeline (generate + normalize +
+    notice + security + sign) with MODE set, writing finished artifacts straight
+    into the shared host output dir, which is also THIS container's OUTPUT_DIR.
+    So the base container just streams the sibling's log and then summarizes the
+    artifacts exactly as it does for an in-process scan.
+
+    Mounts (host paths — the sibling is launched by the host daemon, which can
+    only bind-mount host paths):
+      host_out  -> /host-output  (shared artifacts; == our OUTPUT_DIR)
+      host_file -> /input/<name> read-only (firmware upload)  [firmware only]
+    The host socket is mounted so the firmware image can, in turn, do its own
+    work; AIBOM needs only outbound network (HuggingFace).
+
+    Returns the sibling's exit code, or -1 if docker could not be invoked.
+    Streams every line (docker pull progress + scan log) through on_log so the
+    SSE UX is identical to an in-process scan.
+    """
+    # Gate every user-influenced value with an inline full-match allowlist right
+    # before it reaches the command line, and REBIND each name to the match's
+    # group(0). The value that flows into the docker-run argv is then the freshly
+    # extracted match, not the original (taint-carrying) string — a guard that
+    # merely returns on a failed re.fullmatch but reuses the original variable
+    # does NOT break command-injection taint, whereas `m.group(0)` does. The
+    # charsets admit no leading '-', whitespace, ':' (which would split a -v
+    # mount) or shell metacharacter.
+    _m = _REF_RE.fullmatch(image) if image else None
+    if _m is None:
+        on_log("[ui] refusing to launch sibling: invalid image reference")
+        return -1
+    image = _m.group(0)
+    if mode not in _SIBLING_MODES:
+        on_log("[ui] refusing to launch sibling: unsupported mode")
+        return -1
+    # Pin MODE to the exact matched literal (drops the caller's string identity).
+    mode = _SIBLING_MODES[_SIBLING_MODES.index(mode)]
+    _m = _HOSTPATH_RE.fullmatch(host_out) if host_out else None
+    if _m is None:
+        on_log("[ui] cannot launch sibling: host output dir unknown or unsafe "
+               "(SBOM_UI_HOST_DIR unset — relaunch the UI via the desktop app or scan-sbom.sh --ui)")
+        return -1
+    host_out = _m.group(0)
+    if host_file is not None:
+        _m = _HOSTPATH_RE.fullmatch(host_file)
+        if _m is None:
+            on_log("[ui] refusing to launch sibling: unsafe host input path")
+            return -1
+        host_file = _m.group(0)
+    if model_id is not None:
+        _m = _MODEL_RE.fullmatch(model_id)
+        if _m is None:
+            on_log("[ui] refusing to launch sibling: invalid model id")
+            return -1
+        model_id = _m.group(0)
+
+    env = dict(os.environ)
+    if extra_env:
+        env.update(extra_env)
+
+    # Normalize the boolean-ish flags to exactly "true"/"false".
+    def _bool_env(key):
+        return "true" if env.get(key, "true") == "true" else "false"
+
+    args = [
+        "docker", "run", "--rm",
+        "-v", "%s:/host-output" % host_out,  # host_out passed _HOSTPATH_RE above
+        "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
+        "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
+        "-e", "PROJECT_VERSION=%s" % _env_flag_value(env.get("PROJECT_VERSION", "")),
+        "-e", "HOST_OUTPUT_DIR=/host-output",
+        "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
+        "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
+        "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
+    ]
+    if host_file is not None:
+        # Mount the upload read-only under a fixed in-sibling path. Reduce to a
+        # bare basename and take it from the allowlist match so the in-sibling
+        # path is a single charset-constrained file name (host_file itself was
+        # rebound from _HOSTPATH_RE above).
+        _bm = _BASENAME_RE.fullmatch(os.path.basename(host_file))
+        base = _bm.group(0) if _bm else "upload.bin"
+        args += ["-v", "%s:/input/%s:ro" % (host_file, base),
+                 "-e", "TARGET_FILE=/input/%s" % base]
+    if model_id is not None:
+        # model_id passed _MODEL_RE above.
+        args += ["-e", "MODEL_ID=%s" % model_id]
+    # The sibling writes into /host-output; run-scan also cds there via cwd.
+    args += ["-w", "/host-output", "--entrypoint", "/usr/local/bin/run-scan", image]
+
+    # Pull progress first so the (heavy, one-time) firmware/aibom image download
+    # shows up in the live log rather than as a silent stall.
+    if not _sibling_image_present(image):
+        on_log("[ui] pulling %s (first run is large; one-time download)..." % image)
+        _stream_cmd(["docker", "pull", image], on_log)
+
+    on_log("[ui] launching %s in a sibling container (%s)..." % (mode.lower(), image))
+    return _stream_cmd(args, on_log)
+
+
+def _sibling_image_present(image):
+    try:
+        r = subprocess.run(["docker", "image", "inspect", image],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return r.returncode == 0
+    except OSError:
+        return False
+
+
+def _stream_cmd(args, on_log):
+    """Run a command, streaming combined stdout/stderr line-by-line to on_log.
+    Returns the exit code, or -1 if the binary could not be launched."""
+    try:
+        proc = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+        )
+    except OSError as exc:
+        on_log("[ui] failed to launch: %s" % exc)
+        return -1
+    for line in proc.stdout:
+        on_log(line.rstrip("\n"))
+    proc.wait()
+    return proc.returncode
+
+
 # Single-use private-repo tokens, stashed via POST /git-cred so the secret
 # never travels in the scan-stream querystring (which could be logged/cached).
 _GIT_CREDS = {}
@@ -767,10 +968,19 @@ class Handler(BaseHTTPRequestHandler):
             self._download_all()
         elif path == "/capabilities":
             self._send(200, json.dumps({
-                "firmware": firmware_capable(),
+                # `firmware`/`aibom` are the input-gating flags the frontend reads:
+                # true when the input type is offerable here, whether the tools are
+                # built into THIS image (run in-process) or reachable by launching
+                # the firmware/aibom image as a SIBLING container (docker socket).
+                "firmware": firmware_usable(),
                 "scanoss": scanoss_capable(),
                 "docker": docker_capable(),
-                "aibom": aibom_capable(),
+                "aibom": aibom_usable(),
+                # Whether the offer is satisfied by a sibling container (the desktop
+                # app's permissive-only base UI image) — the frontend shows a
+                # one-time "pulling the image" notice for the first sibling run.
+                "firmwareSibling": not firmware_capable() and docker_cli_present() and docker_capable(),
+                "aibomSibling": not aibom_capable() and docker_cli_present() and docker_capable(),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
@@ -1033,6 +1243,9 @@ class Handler(BaseHTTPRequestHandler):
         cwd = OUTPUT_DIR
         cleanup_dir = None
         mode = None
+        # When set, run the scan in a SIBLING container (firmware/aibom image)
+        # instead of in-process run-scan. dict: {image, host_file?, model_id?}.
+        sibling = None
 
         try:
             if source == "docker-image":
@@ -1130,13 +1343,25 @@ class Handler(BaseHTTPRequestHandler):
                 up = resolve_upload(token)
                 if not up:
                     fail("uploaded firmware not found (re-upload)"); return
-                if not firmware_capable():
-                    fail("Firmware analysis requires the firmware image. Relaunch the UI with "
-                         "SBOM_SCANNER_IMAGE=%s ./scan-sbom.sh --ui" % FIRMWARE_IMAGE)
-                    return
                 mode = "FIRMWARE"
                 env["MODE"] = "FIRMWARE"
                 env["TARGET_FILE"] = up
+                if firmware_capable():
+                    # Tools are in THIS image (UI launched from the firmware image):
+                    # run in-process exactly as before.
+                    pass
+                elif docker_cli_present() and docker_capable():
+                    # Permissive-only base UI image: hand the GPL-isolated firmware
+                    # image the job as a sibling container. It needs the HOST path
+                    # of the upload (the host daemon bind-mounts host paths only).
+                    host_file = host_path_of(up)
+                    if not host_file:
+                        fail("Cannot reach the firmware image: host output dir unknown "
+                             "(relaunch the UI via the desktop app or scan-sbom.sh --ui)."); return
+                    sibling = {"image": FIRMWARE_IMAGE, "host_file": host_file}
+                else:
+                    fail("Firmware analysis requires Docker (to run the firmware image) "
+                         "or relaunching the UI from the firmware image."); return
 
             elif source == "ai-model":
                 # Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace
@@ -1146,13 +1371,17 @@ class Handler(BaseHTTPRequestHandler):
                 # owner/name (optional owner), HuggingFace charset only; no traversal.
                 if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$", target):
                     fail("Unsupported model id (expected owner/name)"); return
-                if not aibom_capable():
-                    fail("AI-model SBOM generation requires the AIBOM image. Relaunch the UI with "
-                         "SBOM_SCANNER_IMAGE=%s ./scan-sbom.sh --ui" % AIBOM_IMAGE)
-                    return
                 mode = "AIBOM"
                 env["MODE"] = "AIBOM"
                 env["MODEL_ID"] = target
+                if aibom_capable():
+                    pass  # in-process (UI launched from the aibom image)
+                elif docker_cli_present() and docker_capable():
+                    # Heavy aibom image runs as a sibling; needs only outbound net.
+                    sibling = {"image": AIBOM_IMAGE, "model_id": target}
+                else:
+                    fail("AI-model SBOM generation requires Docker (to run the AIBOM image) "
+                         "or relaunching the UI from the AIBOM image."); return
 
             else:
                 fail("unknown input type: %s" % source); return
@@ -1167,18 +1396,36 @@ class Handler(BaseHTTPRequestHandler):
 
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
-            try:
-                proc = subprocess.Popen(
-                    ["/usr/local/bin/run-scan"], env=env, cwd=cwd,
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, bufsize=1,
+            if sibling is not None:
+                # Firmware / AI on the permissive-only base image: run the
+                # dedicated image as a sibling container (host socket). It does
+                # the full pipeline and writes artifacts into the shared host
+                # output dir, which is also our OUTPUT_DIR — so the summary below
+                # reads them just like an in-process scan.
+                host_out = host_path_of(OUTPUT_DIR)
+                rc = run_sibling_scan(
+                    sibling["image"], env["MODE"], host_out,
+                    lambda ln: sse("log", json.dumps(ln)),
+                    host_file=sibling.get("host_file"),
+                    model_id=sibling.get("model_id"),
+                    extra_env=env,
                 )
-                for line in proc.stdout:
-                    sse("log", json.dumps(line.rstrip("\n")))
-                proc.wait()
-                ok = proc.returncode == 0
-            except Exception as exc:  # noqa: BLE001
-                sse("error", json.dumps("Failed to launch scan: %s" % exc))
+                ok = rc == 0
+                if rc == -1:
+                    sse("error", json.dumps("Failed to launch the %s sibling container." % mode.lower()))
+            else:
+                try:
+                    proc = subprocess.Popen(
+                        ["/usr/local/bin/run-scan"], env=env, cwd=cwd,
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, bufsize=1,
+                    )
+                    for line in proc.stdout:
+                        sse("log", json.dumps(line.rstrip("\n")))
+                    proc.wait()
+                    ok = proc.returncode == 0
+                except Exception as exc:  # noqa: BLE001
+                    sse("error", json.dumps("Failed to launch scan: %s" % exc))
 
             prefix = output_prefix(project, version)
             done = {
