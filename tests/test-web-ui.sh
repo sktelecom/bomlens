@@ -105,7 +105,7 @@ assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
 captured = {}
-def fake_stream(args, on_log):
+def fake_stream(args, on_log, on_progress=None):
     captured["args"] = args
     return 0
 server._stream_cmd = fake_stream
@@ -139,6 +139,38 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert "/host/up/fw.bin:/input/fw.bin:ro" in captured["args"], captured["args"]
 
+# Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
+# they are forwarded to the sibling as exactly two fixed -e literals. AIBOM and
+# the default (off) firmware path must NOT carry them.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+    extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
+)
+assert rc == 0, rc
+assert "CVE_BIN_TOOL_DISABLE_SOURCES=GAD" in captured["args"], captured["args"]
+assert "CVE_BIN_TOOL_MODE=online" in captured["args"], captured["args"]
+
+# Default firmware (no opt-in) forwards neither var -> offline-bundle default.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
+    lambda ln: None, host_file="/host/up/fw.bin",
+)
+assert rc == 0, rc
+assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
+
+# AIBOM never carries the OSV control vars even if present in extra_env.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
+
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
 rc = server.run_sibling_scan(
@@ -168,6 +200,17 @@ rc = server.run_sibling_scan(
     lambda ln: None, host_file="/host/up:ro,Z",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
+
+# Firmware CVE-DB progress markers become a `progress` channel call (clamped
+# 0..100); everything else stays a plain log line. A missing progress handler
+# falls back to log so older callers keep working.
+logs = []; progs = []
+server._emit_or_log("[firmware-cvedb-progress] 42%", logs.append, progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 250%", logs.append, progs.append)
+server._emit_or_log("regular build line", logs.append, progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 10%", logs.append, None)
+assert progs == [42, 100], progs
+assert logs == ["regular build line", "[firmware-cvedb-progress] 10%"], logs
 PY
 then
     pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"

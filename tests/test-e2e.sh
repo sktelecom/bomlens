@@ -200,6 +200,32 @@ if [ "$merged" = "3" ]; then
 else
     fail "firmware merge dedupes by purl (3 unique of 4)" "got $merged"
 fi
+
+# _cvedb_progress_filter: rich repaints the same line with \r and ANSI escapes;
+# the filter must split on \r, strip ANSI, and emit one monotonic, de-duplicated
+# "[firmware-cvedb-progress] NN%" marker per advance. Source the function out of
+# scan-firmware.sh (extract just its definition so the file's top-level code,
+# which expects a real rootfs, never runs) and feed it a rich-style stream.
+if [ -f "$LIB/scan-firmware.sh" ]; then
+    sed -n '/^_cvedb_progress_filter() {/,/^}/p' "$LIB/scan-firmware.sh" > "$tmp/progress_fn.sh"
+    if [ -s "$tmp/progress_fn.sh" ]; then
+        # A rich-like repaint: one CR-terminated frame per percentage, ANSI colour
+        # codes inline, an out-of-order/duplicate frame that must be suppressed, and
+        # a final newline-terminated 100%.
+        printf '\033[36mDownloading\033[0m 0%%\r\033[36mDownloading\033[0m 37%%\r37%%\r\033[1m12%%\033[0m\r\033[36mDownloading\033[0m 100%%\n' \
+            > "$tmp/progress_in.txt"
+        got_progress="$( ( . "$tmp/progress_fn.sh"; _cvedb_progress_filter < "$tmp/progress_in.txt" ) )"
+        expected_progress="$(printf '[firmware-cvedb-progress] 0%%\n[firmware-cvedb-progress] 37%%\n[firmware-cvedb-progress] 100%%')"
+        if [ "$got_progress" = "$expected_progress" ]; then
+            pass "cvedb progress filter extracts monotonic NN% from rich \\r+ANSI stream"
+        else
+            fail "cvedb progress filter extracts monotonic NN% from rich \\r+ANSI stream" \
+                "got: $(printf '%s' "$got_progress" | tr '\n' '|')"
+        fi
+    else
+        fail "cvedb progress filter: could not extract _cvedb_progress_filter from scan-firmware.sh"
+    fi
+fi
 rm -rf "$tmp"
 
 # --------------------------------------------------------
@@ -535,6 +561,49 @@ EOF
         { [ -f "$w/fwtest_1.0_NOTICE.txt" ] && [ -f "$w/fwtest_1.0_security.json" ]; } \
             && pass "firmware scan: notice + security artifacts produced" \
             || fail "firmware scan: notice + security artifacts produced"
+
+        # Offline-CVE matching: only meaningful when the firmware image ships the
+        # bundled cve-bin-tool DB at the HOME-controlled cache path. A key-less /
+        # local build leaves it empty, so probe first and SKIP (never FAIL) when
+        # absent — the assertion is real only on CI/native where the DB is baked in.
+        bundled_db="/opt/cve-bin-tool-home/.cache/cve-bin-tool/cve.db"
+        if docker run --rm --entrypoint sh "$FW_IMG" -c "[ -s '$bundled_db' ]" >/dev/null 2>&1; then
+            wc="$(mktemp -d "$WORK_ROOT/fwcve.XXXXXX")"
+            # Pack a fixture whose binaries carry a known-vulnerable component so the
+            # offline DB has something to match. cve-bin-tool keys off binary
+            # signatures, so embed the busybox version-banner string it recognises.
+            mkdir -p "$wc/rootfs/bin" "$wc/rootfs/etc"
+            printf 'BusyBox v1.30.1 (2019-01-24) multi-call binary.\n' > "$wc/rootfs/bin/busybox"
+            echo "NAME=Fixture" > "$wc/rootfs/etc/os-release"
+            if docker run --rm -v "$wc":/wc --entrypoint mksquashfs "$FW_IMG" \
+                    /wc/rootfs /wc/fw.squashfs -noappend -no-progress >/dev/null 2>&1 \
+                    && [ -f "$wc/fw.squashfs" ]; then
+                # Force offline so the assertion proves the *bundled* DB works, not a
+                # silent online fallback; no network is contacted.
+                ( cd "$wc" && SBOM_FIRMWARE_IMAGE="$FW_IMG" CVE_BIN_TOOL_MODE=offline bash "$SCAN" \
+                    --project "fwcve" --version "1.0" --target fw.squashfs --all --generate-only ) \
+                    > "$wc/_scan.log" 2>&1
+                nvuln=0
+                if [ -f "$wc/fwcve_1.0_security.json" ]; then
+                    nvuln=$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$wc/fwcve_1.0_security.json" 2>/dev/null || echo 0)
+                fi
+                # Fall back to the cve-bin-tool sidecar if scan-security.sh did not run.
+                if [ "${nvuln:-0}" -le 0 ] && [ -f "$wc/fwcve_1.0_security_cvebintool.json" ]; then
+                    nvuln=$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$wc/fwcve_1.0_security_cvebintool.json" 2>/dev/null || echo 0)
+                fi
+                if [ "${nvuln:-0}" -gt 0 ]; then
+                    pass "firmware offline CVE matching: bundled DB found $nvuln vuln(s)"
+                else
+                    fail "firmware offline CVE matching: bundled DB found vulns" \
+                        "got $nvuln (offline DB present but no CVE matched)"; show_log_if_verbose "$wc"
+                fi
+            else
+                fail "firmware offline CVE fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
+            fi
+            rm -rf "$wc"
+        else
+            skip "firmware offline CVE matching (no bundled CVE DB in firmware image; skipping offline-CVE assertion)"
+        fi
     else
         fail "firmware fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
     fi

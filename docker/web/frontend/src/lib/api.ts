@@ -161,13 +161,26 @@ export interface ScanParams {
   security: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
+  /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
+   *  is not baked into the image, so enabling this downloads it on this run
+   *  (the determinate progress bar surfaces the download). Read server-side as
+   *  the exact `includeOsv` flag. */
+  includeOsv: boolean;
   byteStable: boolean;
+}
+
+/** A determinate progress update (e.g. CVE database download). */
+export interface ScanProgress {
+  phase: string;
+  percent: number;
 }
 
 export interface ScanHandlers {
   onLog: (line: string) => void;
   onDone: (done: DoneEvent) => void;
   onError: (message?: string) => void;
+  /** Optional determinate progress (e.g. firmware CVE DB download). */
+  onProgress?: (p: ScanProgress) => void;
 }
 
 export interface Capabilities {
@@ -333,6 +346,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     security: String(params.security),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
+    includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
   });
 
@@ -345,6 +359,18 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
       handlers.onLog(JSON.parse(data));
     } catch {
       handlers.onLog(String(data));
+    }
+  });
+
+  es.addEventListener("progress", (e) => {
+    // Determinate progress (e.g. firmware CVE DB download). Best-effort: ignore
+    // anything we can't parse into a numeric percent.
+    const data = (e as MessageEvent).data;
+    try {
+      const p = JSON.parse(data) as ScanProgress;
+      if (typeof p.percent === "number") handlers.onProgress?.(p);
+    } catch {
+      /* ignore malformed progress */
     }
   });
 
