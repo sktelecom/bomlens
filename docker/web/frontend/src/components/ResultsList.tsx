@@ -176,7 +176,12 @@ export function ResultsList({ results }: { results: ResultFile[] }) {
             size: formatBytes(totalBytes),
           })}
         </div>
-        <Button asChild onClick={() => toast(t("result.downloadStarted"))}>
+        <Button
+          asChild
+          variant="outline"
+          className="text-brand hover:text-brand"
+          onClick={() => toast(t("result.downloadStarted"))}
+        >
           <a href={downloadAllUrl()} download>
             <Download className="h-4 w-4" />
             {t("result.downloadAll")}

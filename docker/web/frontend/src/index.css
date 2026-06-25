@@ -106,9 +106,10 @@
 
     --ring: 240 5% 65%;
 
-    /* Brand — slightly lifted lightness so SK Red/Orange stay vivid against the
-     * near-black canvas without glowing. */
-    --brand: 349 100% 56%;
+    /* Brand — SK Red/Orange against the near-black canvas. Kept at a lightness
+     * where white text on a solid brand fill (the New scan CTA pill) still meets
+     * WCAG AA (4.5:1); a lighter red here drops the pill to ~3.8:1. */
+    --brand: 349 100% 46%;
     --brand-foreground: 0 0% 100%;
     --brand-accent: 24 90% 60%;
 

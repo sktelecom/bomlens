@@ -19,7 +19,6 @@ import { isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
-import { KpiCards } from "./KpiCards";
 import { LicenseSummary } from "./LicenseSummary";
 import { ResultsList } from "./ResultsList";
 import { SeverityBar } from "./SeverityBar";
@@ -121,13 +120,6 @@ export function Overview({
         </Card>
       )}
 
-      <KpiCards
-        sbom={result.sbom}
-        security={result.security}
-        conformance={result.conformance}
-        scanId={scanId}
-      />
-
       {result.security && <SeverityBar security={result.security} />}
 
       <LicenseSummary components={result.sbom?.componentList ?? []} />
@@ -147,6 +139,8 @@ interface Jump {
   id: SectionId;
   icon: LucideIcon;
   value: number | null;
+  /** Optional secondary line, e.g. the dependency direct/transitive split. */
+  sub?: string;
 }
 
 function JumpCards({
@@ -166,12 +160,26 @@ function JumpCards({
   const modelCount = (result.sbom?.componentList ?? []).filter(
     (c) => c.type === "machine-learning-model",
   ).length;
+  const direct = result.sbom?.directCount ?? 0;
+  const transitive = result.sbom?.transitiveCount ?? 0;
+  const depTotal = direct + transitive;
   const jumps: Jump[] = [
     { id: "components", icon: Boxes, value: result.sbom?.components ?? 0 },
     ...(result.security
       ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
       : []),
-    ...(hasDeps ? [{ id: "dependencies" as SectionId, icon: GitBranch, value: null }] : []),
+    // Only when the SBOM has a real dependency graph (flat firmware/image SBOMs
+    // have no direct/transitive split, so the tile would be a meaningless 0).
+    ...(hasDeps && depTotal > 0
+      ? [
+          {
+            id: "dependencies" as SectionId,
+            icon: GitBranch,
+            value: depTotal,
+            sub: t("overview.depBreakdown", { direct, transitive }),
+          },
+        ]
+      : []),
     ...(ai ? [{ id: "models" as SectionId, icon: Cpu, value: modelCount }] : []),
     ...(hasG7 ? [{ id: "g7" as SectionId, icon: FileCheck2, value: null }] : []),
     { id: "artifacts", icon: Package, value: result.results.length },
@@ -179,7 +187,7 @@ function JumpCards({
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      {jumps.map(({ id, icon: Icon, value }) => (
+      {jumps.map(({ id, icon: Icon, value, sub }) => (
         <a
           key={id}
           href={scanId ? scanHash(scanId, id) : undefined}
@@ -198,6 +206,11 @@ function JumpCards({
             {value ?? "—"}
           </div>
           <div className="truncate text-xs text-muted-foreground">{t(`nav.${id}`)}</div>
+          {sub && (
+            <div className="mt-0.5 truncate text-[0.6875rem] text-muted-foreground">
+              {sub}
+            </div>
+          )}
         </a>
       ))}
     </div>

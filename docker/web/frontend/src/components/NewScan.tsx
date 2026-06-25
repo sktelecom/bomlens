@@ -52,127 +52,127 @@ const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
   { key: "catAiModel", sources: ["ai-model"] },
 ];
 
+const SECTION_LABEL =
+  "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+
 /**
- * Two-pane New scan (shell): a grouped source-tile picker and its source-
- * specific input on the left, scan settings + outputs + the generate action on
- * the right. Shares all logic with the classic ScanForm via useScanForm.
+ * Two-pane New scan: a question title, a grouped source-tile picker and the
+ * selected source's input on the left, and a sticky "Scan settings" panel
+ * (identity + outputs + the generate action) on the right. Shares all logic
+ * with the classic form via useScanForm — only the layout changes.
  */
 export function NewScan({ running, capabilities, onRun }: Props) {
   const { t } = useTranslation();
   const state = useScanForm({ running, capabilities, onRun });
 
   return (
-    <div className="space-y-4">
-      {/* Source picker spans the full width so the tiles sit on one balanced
-          row block, and the selected source's input lands directly below. */}
-      <Card className="animate-fade-in">
-        <CardContent className="space-y-4 p-4">
-          <Label>{t("newscan.source")}</Label>
+    <div className="space-y-6">
+      <div className="space-y-1.5">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+          {t("newscan.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t("newscan.subtitle")}</p>
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* Left: pick what to scan, then its source-specific input. */}
+        <div className="space-y-4">
           <div
             role="group"
             aria-label={t("newscan.source")}
-            className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
           >
             {SOURCE_GROUPS.flatMap((group) => group.sources).map((s) => {
-                    const { labelKey, icon: Icon } = SOURCE_META[s];
-                    const active = state.source === s;
-                    const fwLocked = s === "firmware-upload" && !capabilities.firmware;
-                    const aiLocked = s === "ai-model" && !capabilities.aibom;
-                    const locked = fwLocked || aiLocked;
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        aria-pressed={active}
-                        disabled={state.busy || locked}
-                        title={
-                          fwLocked
-                            ? t("source.firmwareUnavailable")
-                            : aiLocked
-                              ? t("source.aiModelUnavailable")
-                              : undefined
-                        }
-                        onClick={() => state.changeSource(s)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
-                          "transition-colors duration-fast ease-out-soft",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                          "disabled:pointer-events-none disabled:opacity-50",
-                          active
-                            ? "border-brand/40 bg-brand/10 font-medium text-foreground"
-                            : "text-foreground hover:border-brand/40 hover:bg-muted/50",
-                        )}
-                      >
-                        <Icon
-                          className={cn(
-                            "h-4 w-4 shrink-0",
-                            active ? "text-brand" : "text-muted-foreground",
-                          )}
-                          aria-hidden
-                        />
-                        <span className="truncate">{t(labelKey)}</span>
-                      </button>
-                    );
+              const { labelKey, icon: Icon } = SOURCE_META[s];
+              const active = state.source === s;
+              const fwLocked = s === "firmware-upload" && !capabilities.firmware;
+              const aiLocked = s === "ai-model" && !capabilities.aibom;
+              const locked = fwLocked || aiLocked;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={state.busy || locked}
+                  title={
+                    fwLocked
+                      ? t("source.firmwareUnavailable")
+                      : aiLocked
+                        ? t("source.aiModelUnavailable")
+                        : undefined
+                  }
+                  onClick={() => state.changeSource(s)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
+                    "transition-colors duration-fast ease-out-soft",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "disabled:pointer-events-none disabled:opacity-50",
+                    active
+                      ? "border-brand/40 bg-brand/10 font-medium text-foreground"
+                      : "text-foreground hover:border-brand/40 hover:bg-muted/50",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      active ? "text-brand" : "text-muted-foreground",
+                    )}
+                    aria-hidden
+                  />
+                  <span className="truncate">{t(labelKey)}</span>
+                </button>
+              );
             })}
           </div>
 
-          <SourceControls state={state} />
-        </CardContent>
-      </Card>
+          <Card className="animate-fade-in">
+            <CardContent className="space-y-4 p-4">
+              <SourceControls state={state} />
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Settings below the source, as one top-to-bottom card: identity first,
-          then all options side by side, then the run action — so "what to turn
-          on" reads in one place instead of split left/right. */}
-      <Card className="animate-fade-in">
-        <CardContent className="space-y-6 p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="project">{t("form.project")}</Label>
-              <Input
-                id="project"
-                value={state.project}
-                onChange={(e) => state.setProject(e.target.value)}
-                placeholder={t("form.projectPlaceholder")}
-                disabled={state.busy}
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="version">{t("form.version")}</Label>
-              <Input
-                id="version"
-                value={state.version}
-                onChange={(e) => state.setVersion(e.target.value)}
-                placeholder={t("form.versionPlaceholder")}
-                disabled={state.busy}
-              />
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              "grid gap-x-8 gap-y-5 border-t pt-5",
-              state.showScanOptions && "sm:grid-cols-2",
-            )}
-          >
+        {/* Right: sticky settings panel — identity, outputs, generate. */}
+        <Card className="animate-fade-in lg:sticky lg:top-6">
+          <CardContent className="space-y-5 p-5">
             <div className="space-y-3">
-              <Label>{t("newscan.outputs")}</Label>
-              <GenerationOptions state={state} />
-            </div>
-            {state.showScanOptions && (
-              <div className="space-y-3">
-                <Label>{t("newscan.scanOptions")}</Label>
-                <ScanOptions state={state} />
+              <p className={SECTION_LABEL}>{t("newscan.settings")}</p>
+              <div className="space-y-2">
+                <Label htmlFor="project">{t("form.project")}</Label>
+                <Input
+                  id="project"
+                  value={state.project}
+                  onChange={(e) => state.setProject(e.target.value)}
+                  placeholder={t("form.projectPlaceholder")}
+                  disabled={state.busy}
+                  autoFocus
+                />
               </div>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="version">{t("form.version")}</Label>
+                <Input
+                  id="version"
+                  value={state.version}
+                  onChange={(e) => state.setVersion(e.target.value)}
+                  placeholder={t("form.versionPlaceholder")}
+                  disabled={state.busy}
+                />
+              </div>
+            </div>
 
-          <div className="space-y-3 border-t pt-5">
-            <FormMessages state={state} />
-            <RunButton state={state} running={running} />
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-3 border-t pt-5">
+              <p className={SECTION_LABEL}>{t("newscan.outputs")}</p>
+              <GenerationOptions state={state} />
+              {state.showScanOptions && <ScanOptions state={state} />}
+            </div>
+
+            <div className="space-y-3 border-t pt-4">
+              <FormMessages state={state} />
+              <RunButton state={state} running={running} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
