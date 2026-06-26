@@ -70,6 +70,29 @@ else
     fail "scan-aibom.sh failed against the mock generator"
 fi
 
+echo "== scan-aibom.sh rejects a card-less stub (degraded offline output) =="
+# Same mock shape, but the 1.7 variant carries a model component with NO
+# modelCard — the degraded stub the generator emits when it cannot reach the
+# card (offline, or a nonexistent/private model id). The gate must hard-fail and
+# leave no artifact, not pass an empty ML-BOM off as a real supply-chain output.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"machine-learning-model","name":"stub"}]}' > "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if PATH="$WORK/bin:$PATH" bash "$LIB/scan-aibom.sh" "ghost/missing-model" "$WORK/stub.json" "1.0.0" >/dev/null 2>&1; then
+    fail "scan-aibom.sh rejects a card-less stub" "exited 0 instead of failing"
+elif [ -f "$WORK/stub.json" ]; then
+    fail "scan-aibom.sh rejects a card-less stub" "left a stub artifact behind"
+else
+    pass "scan-aibom.sh rejects a card-less stub and leaves no artifact"
+fi
+
 echo "== generate-notice.sh lists the model license =="
 bash "$LIB/generate-notice.sh" "$WORK/a.json" "$WORK/notice" "bert-base-uncased" >/dev/null 2>&1
 NOTICE="$WORK/notice_NOTICE.txt"

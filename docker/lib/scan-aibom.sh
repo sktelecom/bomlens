@@ -67,3 +67,18 @@ else
     echo "[aibom] ERROR: generator produced no valid SBOM." >&2
     exit 1
 fi
+
+# A written, well-formed file is not enough. When the generator cannot reach the
+# model card (offline, or a nonexistent/private model id) it still exits 0 and
+# emits a degraded stub with no modelCard. Treat that as a hard failure so an
+# empty ML-BOM is never trusted as a real supply-chain artifact — offline use is
+# not supported (docs/guides/ai-model.md).
+ml_with_card=$(jq '[.components[]? | select(.type=="machine-learning-model" and ((.modelCard? // {}) | length) > 0)] | length' "$OUTPUT" 2>/dev/null || echo 0)
+if [ "${ml_with_card:-0}" -lt 1 ]; then
+    echo "[aibom] ERROR: the generated ML-BOM carries no model card for $MODEL_ID." >&2
+    echo "[aibom]   The card could not be collected — this happens offline or for a" >&2
+    echo "[aibom]   nonexistent/private model id. AIBOM needs HuggingFace network access." >&2
+    rm -f "$OUTPUT"
+    exit 1
+fi
+echo "[aibom] model card present ($ml_with_card model component(s) with a card)."
