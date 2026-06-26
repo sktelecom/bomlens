@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
+    inputs:
+      firmware:
+        description: "Also build the firmware image and run the firmware e2e group in full-e2e"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,54 +19,25 @@ jobs:
   test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    # One heavy Docker job pulls the published scanner image once and runs every
-    # image-dependent harness against it: per-language scans (test-scan), the
-    # full user journey (test-e2e), and the literal documented commands
-    # (test-docs-executable). Keeping them in one job avoids re-pulling 3-4 GB.
-    env:
-      SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      # The scanner image plus per-language cdxgen images are large; reclaim the
-      # space the runner ships preloaded so multi-language scans don't hit ENOSPC.
-      - name: Free up runner disk
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
-            /opt/hostedtoolcache/CodeQL /usr/local/share/boost 2>/dev/null || true
-          df -h /
-
+      
       - name: Grant script permissions
         run: |
           chmod +x scripts/scan-sbom.sh
-          chmod +x tests/test-scan.sh tests/test-e2e.sh tests/test-docs-executable.sh
-
+          chmod +x tests/test-scan.sh
+      
       - name: Run integration tests
         run: |
           echo "Running integration tests..."
           VERBOSE=true ./tests/test-scan.sh
         continue-on-error: false
-
-      # Runs the exact commands printed in the onboarding docs so a stale flag,
-      # image tag, or command in a getting-started page fails CI. Blocking, and
-      # before the e2e harness so it is never masked by it.
-      - name: Documented commands actually run
-        run: VERBOSE=true bash tests/test-docs-executable.sh
-
-      # The comprehensive user-perspective harness (CLI contract, source/image
-      # scans, notice + security reports). Just activated from dormancy, so it
-      # runs informational for now while two pre-existing assertions are hardened
-      # (go --byte-stable reproducibility, Linux root-owned temp cleanup). Its
-      # signal is visible in the log without blocking the gates above.
-      - name: User-journey e2e (informational)
-        run: VERBOSE=true bash tests/test-e2e.sh
-        continue-on-error: true
-
+      
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -120,10 +96,10 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/test-e2e.sh tests/test-examples-e2e.sh tests/check-examples-sync.sh tests/check-docs-drift.sh tests/test-docs-walkthrough.sh examples/test-all.sh || true
           echo ""
           echo "Checking onboarding-guarantee gates..."
-          shellcheck scripts/check-doc-drift.sh scripts/check-ux-heuristics.sh scripts/check-doc-links.sh tests/test-e2e.sh tests/test-docs-executable.sh || true
+          shellcheck scripts/check-doc-links.sh scripts/check-ux-heuristics.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -184,6 +160,9 @@ jobs:
       - name: Examples / docs / test-all.sh sync check
         run: bash tests/check-examples-sync.sh
 
+      - name: Docs / tool drift check (flags, env vars, image names, download, output dir)
+        run: bash tests/check-docs-drift.sh
+
       - name: Examples manifest validation
         run: bash examples/test-all.sh
 
@@ -195,9 +174,11 @@ jobs:
   web-e2e:
     name: Web UI E2E (container scan -> done)
     runs-on: ubuntu-latest
-    # Builds a light scanner image (base + scanoss), boots the UI container, and
-    # runs real scans through the SSE stream. Runs on every PR so a broken web UI
-    # onboarding path is caught before merge, not only on main.
+    # Heavy (builds a scanner image, boots the UI container, runs real scans), so
+    # it stays off the per-PR critical path: it runs on main/develop pushes and on
+    # manual dispatch. The lightweight API contract (tests/test-web-ui.sh) still
+    # guards every PR in the postprocess job.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -220,6 +201,75 @@ jobs:
         env:
           SBOM_E2E_IMAGE: bomlens-e2e:ci
         run: bash tests/test-web-e2e.sh
+
+  full-e2e:
+    name: Full CLI E2E (comprehensive + examples)
+    runs-on: ubuntu-latest
+    # Heavy: builds the scanner image and runs the comprehensive CLI suite
+    # (tests/test-e2e.sh — analyze, source ingestion, image scan, cosign signing,
+    # byte-stable) plus the real-example scan suite (tests/test-examples-e2e.sh).
+    # These were previously orphaned (written but never run in CI). Like web-e2e
+    # they stay off the per-PR critical path: main/develop pushes and manual
+    # dispatch only. The firmware group self-skips unless dispatched with
+    # firmware=true; the SCANOSS group stays gated behind SCANOSS_E2E.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Grant script permissions
+        run: chmod +x scripts/scan-sbom.sh tests/test-e2e.sh tests/test-examples-e2e.sh
+
+      # Tag as sbom-scanner:test — the default image name both scripts expect, so
+      # they run with no extra env. base + scanoss covers analyze/source/image/
+      # cosign; cdxgen per-language images are pulled on demand for source scans.
+      - name: Build scanner image (base + scanoss)
+        run: docker build --build-arg SBOM_SCANOSS=true -t sbom-scanner:test ./docker
+
+      # Opt-in: building the GPL firmware image (unblob/cve-bin-tool) is slow, so it
+      # is only built on manual dispatch with firmware=true. test-e2e.sh skips its
+      # firmware group when this image is absent.
+      - name: Build firmware image (dispatch + firmware=true only)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.firmware == 'true'
+        run: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware:test ./docker
+
+      - name: Run comprehensive CLI e2e (test-e2e.sh)
+        run: bash tests/test-e2e.sh
+
+      # On push, scan a representative subset (npm/pip/gomod) to bound runtime;
+      # manual dispatch (ONLY empty) scans every bundled example.
+      - name: Run real-example scan e2e (test-examples-e2e.sh)
+        env:
+          ONLY: ${{ github.event_name == 'push' && 'nodejs python go' || '' }}
+        run: bash tests/test-examples-e2e.sh
+
+  docs-walkthrough:
+    name: Docs Walkthrough (getting-started commands)
+    runs-on: ubuntu-latest
+    # Runs the getting-started guide's runnable blocks verbatim against a real
+    # scanner image to prove the documented commands still work. Heavy (builds an
+    # image, runs a scan), so like web-e2e it is push/dispatch only.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Base image (syft) is enough: the first-scan walkthrough scans the bundled
+      # example as a directory (ROOTFS/syft). Tag it sbom-scanner:test, the
+      # default the harness expects.
+      - name: Build scanner image (base)
+        run: docker build -t sbom-scanner:test ./docker
+
+      - name: Run docs walkthrough
+        run: bash tests/test-docs-walkthrough.sh
 
   validate-docs:
     name: Validate Documentation
@@ -465,11 +515,6 @@ jobs:
       - name: Check input-form documentation coverage
         run: bash scripts/check-doc-coverage.sh
 
-      # Onboarding facts that live in code but repeat in the docs: CLI flags,
-      # image tag, desktop download name, Windows output folder.
-      - name: Check doc drift (flags, image, download, output dir)
-        run: bash scripts/check-doc-drift.sh
-
       # Deterministic internal-link gate for the getting-started pages.
       - name: Check onboarding internal links
         run: bash scripts/check-doc-links.sh
@@ -477,7 +522,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [test, contract, postprocess, web-e2e, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
+    needs: [test, contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
     if: always()
 
     steps:
@@ -491,6 +536,8 @@ jobs:
           echo "| No-Docker Contract (ubuntu+windows) | ${{ needs.contract.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Post-process & Sync | ${{ needs.postprocess.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web UI E2E | ${{ needs.web-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Full CLI E2E | ${{ needs.full-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docs Walkthrough | ${{ needs.docs-walkthrough.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Script Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Documentation | ${{ needs.validate-docs.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Examples | ${{ needs.validate-examples.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -511,6 +558,12 @@ jobs:
             exit 1
           elif [ "${{ needs.web-e2e.result }}" == "failure" ]; then
             echo "❌ Web UI e2e failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.full-e2e.result }}" == "failure" ]; then
+            echo "❌ Full CLI e2e failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          elif [ "${{ needs.docs-walkthrough.result }}" == "failure" ]; then
+            echo "❌ Docs walkthrough failed (a documented command broke)" >> $GITHUB_STEP_SUMMARY
             exit 1
           elif [ "${{ needs.validate-examples.result }}" == "failure" ]; then
             echo "❌ Example validation failed" >> $GITHUB_STEP_SUMMARY
