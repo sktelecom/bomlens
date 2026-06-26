@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { RecentScan } from "./api";
-import { formatRelativeTime, scanTypeLabelKey, summarizeRecent } from "./recent";
+import {
+  formatRelativeTime,
+  scanComparison,
+  scanTypeLabelKey,
+  summarizeRecent,
+} from "./recent";
 
 function scan(over: Partial<RecentScan> = {}): RecentScan {
   return {
@@ -63,6 +68,47 @@ describe("scanTypeLabelKey", () => {
     expect(scanTypeLabelKey(scan({ componentType: "data" }))).toBe(
       "recent.typeSbom",
     );
+  });
+});
+
+describe("scanComparison", () => {
+  const list: RecentScan[] = [
+    scan({ id: "cur", version: "2.0", components: 13, maxSeverity: "CRITICAL", generatedAt: 200 }),
+    scan({ id: "prev", version: "1.0", components: 10, maxSeverity: "HIGH", generatedAt: 100 }),
+    scan({ id: "other", project: "q", components: 99, generatedAt: 150 }),
+  ];
+
+  it("compares against the most recent earlier scan of the same project", () => {
+    const cmp = scanComparison(list, "cur");
+    expect(cmp?.prev.id).toBe("prev");
+    expect(cmp?.componentsDelta).toBe(3);
+    expect(cmp?.severityDir).toBe("up"); // HIGH → CRITICAL
+  });
+
+  it("reports a drop and an unchanged severity by rank", () => {
+    expect(
+      scanComparison(
+        [
+          scan({ id: "cur", components: 8, maxSeverity: "LOW", generatedAt: 200 }),
+          scan({ id: "prev", components: 10, maxSeverity: "CRITICAL", generatedAt: 100 }),
+        ],
+        "cur",
+      ),
+    ).toMatchObject({ componentsDelta: -2, severityDir: "down" });
+    expect(
+      scanComparison(
+        [
+          scan({ id: "cur", maxSeverity: "MEDIUM", generatedAt: 200 }),
+          scan({ id: "prev", maxSeverity: "MEDIUM", generatedAt: 100 }),
+        ],
+        "cur",
+      )?.severityDir,
+    ).toBe("same");
+  });
+
+  it("is null with no prior scan of the same project, or an unknown id", () => {
+    expect(scanComparison(list, "prev")).toBeNull(); // nothing older for project p
+    expect(scanComparison(list, "missing")).toBeNull();
   });
 });
 

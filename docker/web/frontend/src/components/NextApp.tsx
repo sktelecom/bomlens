@@ -315,6 +315,7 @@ export function NextApp() {
             section={activeSection}
             result={result}
             scanId={loadedIdRef.current}
+            recent={recent}
           />
 
           {/* The run log is reference material for the run you just watched.

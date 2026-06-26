@@ -12,9 +12,10 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { DoneEvent } from "@/lib/api";
+import type { DoneEvent, RecentScan } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
+import { formatRelativeTime, scanComparison } from "@/lib/recent";
 import { isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -43,19 +44,62 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
 export function Overview({
   result,
   scanId,
+  recent = [],
 }: {
   result: DoneEvent;
   /** The scan's id; section links resolve to `#/scan/<id>/<section>`. */
   scanId: string | null;
+  /** Local Recent-scans list, for the "vs previous scan" comparison line. */
+  recent?: RecentScan[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const attention = needsAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
   const ai = isAiScan(result);
   const hasConformance = Boolean(result.conformance?.checks?.length);
+  const comparison = scanId ? scanComparison(recent, scanId) : null;
 
   return (
     <div className="space-y-6">
+      {comparison && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            {t("overview.vsPrevious", {
+              label:
+                comparison.prev.version ||
+                formatRelativeTime(
+                  comparison.prev.generatedAt,
+                  Date.now(),
+                  i18n.language,
+                ),
+            })}
+          </span>
+          <span className="text-foreground">
+            {comparison.componentsDelta === 0
+              ? t("overview.compSame")
+              : t("overview.compDelta", {
+                  delta:
+                    comparison.componentsDelta > 0
+                      ? `+${comparison.componentsDelta}`
+                      : `${comparison.componentsDelta}`,
+                })}
+          </span>
+          <span
+            className={cn(
+              comparison.severityDir === "up" && "text-risk-high",
+              comparison.severityDir === "down" && "text-risk-low",
+            )}
+          >
+            {t(
+              comparison.severityDir === "up"
+                ? "overview.sevUp"
+                : comparison.severityDir === "down"
+                  ? "overview.sevDown"
+                  : "overview.sevSame",
+            )}
+          </span>
+        </div>
+      )}
       {ai && (
         <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
           <div className="text-sm font-medium text-foreground">{t("result.aiScanTitle")}</div>

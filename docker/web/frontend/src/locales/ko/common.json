@@ -283,7 +283,13 @@
     "attnReview": "검토가 필요한 컴포넌트 {{count}}개",
     "explore": "둘러보기",
     "jumpHint": "{{section}} 보기",
-    "depBreakdown": "직접 {{direct}} · 전이 {{transitive}}"
+    "depBreakdown": "직접 {{direct}} · 전이 {{transitive}}",
+    "vsPrevious": "{{label}} 대비",
+    "compDelta": "컴포넌트 {{delta}}",
+    "compSame": "컴포넌트 변동 없음",
+    "sevUp": "이전보다 심각도 높음",
+    "sevDown": "이전보다 심각도 낮음",
+    "sevSame": "심각도 변동 없음"
   },
   "models": {
     "loading": "모델 정보를 불러오는 중…",

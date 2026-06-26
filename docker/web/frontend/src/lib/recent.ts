@@ -8,7 +8,7 @@
  * distinguishable from the SBOM alone, so we expose just AI vs generic SBOM —
  * we never invent a finer type. See the plan's data-honesty constraint.
  */
-import type { RecentScan } from "./api";
+import { type RecentScan, SEVERITY_ORDER } from "./api";
 
 export interface RecentSummary {
   /** Total stored scans. */
@@ -51,6 +51,52 @@ export function scanTypeLabelKey(scan: RecentScan): string {
     default:
       return "recent.typeSbom";
   }
+}
+
+export interface ScanComparison {
+  /** The previous scan of the same project this one is compared against. */
+  prev: RecentScan;
+  /** current.components − prev.components (positive = grew). */
+  componentsDelta: number;
+  /** Whether the worst severity rose, fell, or held vs the previous scan. */
+  severityDir: "up" | "down" | "same";
+}
+
+/** Worst-severity rank, higher = more severe; null/none = 0. */
+function severityRank(s: RecentScan["maxSeverity"]): number {
+  if (!s) return 0;
+  const i = SEVERITY_ORDER.indexOf(s);
+  // SEVERITY_ORDER is most-severe-first, so invert to make higher = worse.
+  return i < 0 ? 0 : SEVERITY_ORDER.length - i;
+}
+
+/**
+ * Compare a scan to the most recent earlier scan of the same project. Local and
+ * summary-only (component count + worst severity from the Recent list) — no full
+ * SBOM is loaded, in keeping with the no-server-state, single-run identity.
+ * Returns null when the scan isn't in the list or has no prior run to compare.
+ */
+export function scanComparison(
+  recent: RecentScan[],
+  currentId: string,
+): ScanComparison | null {
+  const current = recent.find((s) => s.id === currentId);
+  if (!current) return null;
+  const prev = recent
+    .filter(
+      (s) =>
+        s.id !== currentId &&
+        s.project === current.project &&
+        s.generatedAt < current.generatedAt,
+    )
+    .sort((a, b) => b.generatedAt - a.generatedAt)[0];
+  if (!prev) return null;
+  const dr = severityRank(current.maxSeverity) - severityRank(prev.maxSeverity);
+  return {
+    prev,
+    componentsDelta: current.components - prev.components,
+    severityDir: dr > 0 ? "up" : dr < 0 ? "down" : "same",
+  };
 }
 
 /**

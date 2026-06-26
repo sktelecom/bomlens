@@ -283,7 +283,13 @@
     "attnReview": "{{count}} components flagged for review",
     "explore": "Explore",
     "jumpHint": "View {{section}}",
-    "depBreakdown": "{{direct}} direct · {{transitive}} transitive"
+    "depBreakdown": "{{direct}} direct · {{transitive}} transitive",
+    "vsPrevious": "vs {{label}}",
+    "compDelta": "{{delta}} components",
+    "compSame": "no component change",
+    "sevUp": "more severe than before",
+    "sevDown": "less severe than before",
+    "sevSame": "severity unchanged"
   },
   "models": {
     "loading": "Loading model details…",
