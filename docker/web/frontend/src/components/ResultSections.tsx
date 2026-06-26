@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/state";
-import type { DoneEvent } from "@/lib/api";
+import type { DoneEvent, RecentScan } from "@/lib/api";
 import type { SectionId } from "@/lib/nav";
 import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/results";
 
@@ -23,17 +23,20 @@ export function ResultSection({
   section,
   result,
   scanId,
+  recent,
 }: {
   section: SectionId;
   result: DoneEvent;
   /** The scan's id, so Overview can link into sections via `#/scan/<id>/…`. */
   scanId: string | null;
+  /** Local Recent-scans list, for the Overview "vs previous scan" line. */
+  recent?: RecentScan[];
 }) {
   const { t } = useTranslation();
 
   switch (section) {
     case "overview":
-      return <Overview result={result} scanId={scanId} />;
+      return <Overview result={result} scanId={scanId} recent={recent} />;
 
     case "components":
       return (
