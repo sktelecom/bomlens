@@ -422,9 +422,7 @@ else
                 echo "    [diag] go --byte-stable diff (sorted-key, first 50 lines):"
                 diff <(jq -S . "$w1/testapp_1.0_bom.json" 2>/dev/null) \
                      <(jq -S . "$w2/testapp_1.0_bom.json" 2>/dev/null) | head -50 | sed 's/^/    /'
-                # Quarantined while the diff above pins the non-deterministic field
-                # (tracked in #236). Keep as skip so the suite stays green meanwhile.
-                skip "go --byte-stable: two scans byte-identical (known non-determinism, tracked in #236)"
+                fail "go --byte-stable: two scans byte-identical"
             fi
         else
             fail "go --byte-stable: SBOMs generated" "$(tail -3 "$w1/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w1"

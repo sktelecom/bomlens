@@ -219,6 +219,13 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# A reproducible (--byte-stable) build must not resolve dependency licenses over
+# the network: registry availability (e.g. pkg.go.dev) varies between runs, so a
+# license fetched in one scan but not the next would make two otherwise-identical
+# scans differ. Pin the lookup off for byte-stable scans.
+FETCH_LICENSE="${FETCH_LICENSE:-true}"
+[ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
+
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
