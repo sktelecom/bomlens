@@ -197,10 +197,11 @@
     "collapse": "Collapse",
     "tooLarge": "The graph has {{count}} nodes (over {{cap}}); use the tree view instead.",
     "graphError": "The dependency graph could not be rendered.",
-    "graphLegend": "Red nodes are direct dependencies; arrows point from a package to what it depends on.",
     "search": "Search packages…",
-    "clickHint": "Click a node for details.",
-    "vulnLegend": "Ringed nodes have known vulnerabilities.",
+    "legendTransitive": "Transitive",
+    "legendVuln": "Vulnerable",
+    "arrowHint": "Arrows point from a package to what it depends on.",
+    "interactHint": "Hover to trace a package's links; click for details.",
     "hasVuln": "Has known vulnerabilities"
   },
   "sourceTree": {
