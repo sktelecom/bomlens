@@ -49,6 +49,8 @@ function themeColors() {
     node: hsl("--muted-foreground"),
     text: hsl("--foreground"),
     edge: hsl("--border"),
+    // Card surface — used as a translucent plate behind node labels.
+    bg: hsl("--card"),
     // Direct-dependency accent — SK red brand token (legend mark).
     direct: hsl("--brand"),
     risk: {
@@ -76,6 +78,14 @@ export function DependencyGraph({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const tooLarge = nodes.length > NODE_CAP;
+
+  // Latest query, readable from the long-lived Cytoscape event handlers without
+  // rebinding them — so hover highlighting can stand down while a search owns
+  // the dim/match classes.
+  const queryRef = useRef("");
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   const nodeById = useMemo(() => {
     const m = new Map<string, GraphNode>();
@@ -133,6 +143,12 @@ export function DependencyGraph({
                 "text-halign": "right",
                 "text-margin-x": 6,
                 "min-zoomed-font-size": 7,
+                // A translucent card-coloured plate behind each label keeps it
+                // legible where labels and edges overlap on a dense graph.
+                "text-background-color": c.bg,
+                "text-background-opacity": 0.85,
+                "text-background-padding": 2,
+                "text-background-shape": "roundrectangle",
                 width: 10,
                 height: 10,
               },
@@ -155,6 +171,22 @@ export function DependencyGraph({
               style: { "border-width": 2, "border-color": c.text },
             },
             { selector: ".dim", style: { opacity: 0.2 } },
+            // Hover trace: the focused node gets a brand ring while the edges of
+            // its neighbourhood thicken and recolour to the foreground, so the
+            // package's links read clearly against the dimmed rest.
+            {
+              selector: "node.focus",
+              style: { "border-width": 3, "border-color": c.direct },
+            },
+            {
+              selector: "edge.trace",
+              style: {
+                width: 2,
+                "line-color": c.text,
+                "target-arrow-color": c.text,
+                "z-index": 10,
+              },
+            },
             {
               selector: "edge",
               style: {
@@ -167,7 +199,7 @@ export function DependencyGraph({
               },
             },
           ],
-          layout: { name: "dagre", rankDir: "LR", nodeSep: 28, rankSep: 160, fit: true, padding: 24 },
+          layout: { name: "dagre", rankDir: "LR", nodeSep: 36, rankSep: 160, fit: true, padding: 24 },
           // Cap zoom so small graphs (a few nodes) don't blow up to fill the
           // canvas — that's what made labels huge and overlap.
           minZoom: 0.2,
@@ -193,6 +225,22 @@ export function DependencyGraph({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cy.on("tap", (evt: any) => {
           if (evt.target === cy) setSelected(null);
+        });
+        // Hover to trace a package: highlight its neighbourhood (node, its edges
+        // and adjacent packages), dim the rest. Skipped while a search query
+        // owns the dim/match classes so the two never fight.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        cy.on("mouseover", "node", (evt: any) => {
+          if (queryRef.current.trim()) return;
+          const node = evt.target;
+          const nb = node.closedNeighborhood();
+          cy.elements().difference(nb).addClass("dim");
+          nb.edges().addClass("trace");
+          node.addClass("focus");
+        });
+        cy.on("mouseout", "node", () => {
+          if (queryRef.current.trim()) return;
+          cy.elements().removeClass("dim trace focus");
         });
       } catch {
         if (!destroyed) setError(true);
@@ -253,9 +301,26 @@ export function DependencyGraph({
           className="h-8 pl-8"
         />
       </div>
-      <p className="text-xs text-muted-foreground">
-        {t("deps.graphLegend")} {t("deps.vulnLegend")} {t("deps.clickHint")}
-      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-hidden />
+          {t("deps.direct")}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden />
+          {t("deps.legendTransitive")}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-risk-high bg-muted-foreground"
+            aria-hidden
+          />
+          {t("deps.legendVuln")}
+        </span>
+        <span className="text-muted-foreground/80">
+          {t("deps.arrowHint")} {t("deps.interactHint")}
+        </span>
+      </div>
       <div
         ref={containerRef}
         className="h-[28rem] w-full rounded-md border bg-card"

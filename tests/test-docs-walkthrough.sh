@@ -31,9 +31,11 @@ cd "$ROOT" || exit 2
 SCANNER_IMG="${SBOM_SCANNER_IMAGE:-sbom-scanner:test}"
 
 # Pages whose runnable blocks we execute, and the artifact each must produce.
-# (page : expected-artifact-glob)
+# (page : expected-artifact-glob). Scans land in a per-run {Project}_{Version}/
+# subfolder by default, which is what the documented command produces and what
+# the docs show — so the artifact lives under that subfolder.
 TARGETS=(
-    "docs/start/first-scan.md:MyApp_1.0.0_bom.json"
+    "docs/start/first-scan.md:MyApp_1.0.0/MyApp_1.0.0_bom.json"
 )
 
 PASS=0; FAIL=0; SKIP=0
