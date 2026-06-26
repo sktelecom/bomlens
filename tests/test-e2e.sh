@@ -13,6 +13,12 @@
 #   VERBOSE=true         show scan logs on failure
 set -uo pipefail
 
+# Scans default to a per-run {Project}_{Version}/ subfolder. This comprehensive
+# harness asserts flat artifact paths (e.g. testapp_1.0_bom.json) in ~40 places,
+# so pin the legacy flat layout for it; the documented subfolder default is
+# covered by tests/test-docs-walkthrough.sh.
+export SBOM_OUTPUT_FLAT=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCAN="$REPO/scripts/scan-sbom.sh"
