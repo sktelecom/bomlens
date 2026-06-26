@@ -478,7 +478,7 @@ jobs:
     name: UI Visual Regression
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.49.1-jammy
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
     defaults:
       run:
         working-directory: docker/web/frontend

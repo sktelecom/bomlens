@@ -10,6 +10,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
+  // Tolerate a few pixels of cross-version antialiasing drift: each Playwright
+  // bump ships a newer chromium that renders text edges slightly differently
+  // (a sub-0.1% delta on otherwise identical pages). 100px keeps the gate
+  // meaningful for real layout changes while not failing on engine noise.
+  expect: {
+    toHaveScreenshot: { maxDiffPixels: 100 },
+  },
   use: {
     baseURL: "http://localhost:4173",
     trace: "on-first-retry",
