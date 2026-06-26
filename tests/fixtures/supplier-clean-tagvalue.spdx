@@ -1,0 +1,26 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: supplier-clean
+DocumentNamespace: https://example.com/supplier-clean
+Created: 2026-01-01T00:00:00Z
+Creator: Tool: syft-1.0.0
+
+PackageName: leftpad
+SPDXID: SPDXRef-Package-leftpad
+PackageVersion: 1.3.0
+PackageDownloadLocation: NOASSERTION
+ExternalRef: PACKAGE-MANAGER purl pkg:npm/leftpad@1.3.0
+PackageLicenseConcluded: MIT
+PackageChecksum: SHA1: da39a3ee5e6b4b0d3255bfef95601890afd80709
+
+PackageName: rightpad
+SPDXID: SPDXRef-Package-rightpad
+PackageVersion: 2.0.1
+PackageDownloadLocation: NOASSERTION
+ExternalRef: PACKAGE-MANAGER purl pkg:npm/rightpad@2.0.1
+PackageLicenseConcluded: Apache-2.0
+PackageChecksum: SHA1: 0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33
+
+Relationship: SPDXRef-DOCUMENT DEPENDS_ON SPDXRef-Package-leftpad
+Relationship: SPDXRef-Package-leftpad DEPENDS_ON SPDXRef-Package-rightpad

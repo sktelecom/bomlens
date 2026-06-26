@@ -399,6 +399,22 @@ cbt_cvss=$(jq -r '[ .Results[]?.Vulnerabilities[]? | select(.VulnerabilityID=="C
     | ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ] | map(select(.!=null)) | (max // null)) ][0]' "$WORK/sec.json")
 [ "$cbt_cvss" = "7.2" ] && pass "cve-bin-tool CVSS score readable by the report flatten" || fail "cve-bin-tool CVSS='$cbt_cvss', expected 7.2"
 
+echo "== D-4: validate-sbom.sh emits a conformance report for clean SPDX Tag-Value =="
+# grep -c exits 1 on zero matches, so the old `grep -cE … || echo 0` appended a
+# second "0" for every empty count. pkg:generic is always 0 in a clean SBOM, so
+# the count became "0\n0", which broke --argjson under set -e and aborted the
+# function — a well-formed Tag-Value input never got a conformance report.
+bash "$LIB/validate-sbom.sh" "$FIX/supplier-clean-tagvalue.spdx" "$WORK/tv" "supplier" >/dev/null 2>&1
+if [ -f "$WORK/tv_conformance.json" ] && [ -f "$WORK/tv_conformance.md" ] && [ -f "$WORK/tv_conformance.html" ]; then
+    pass "clean Tag-Value SBOM produces conformance json+md+html"
+    tv_gen=$(jq -r '.checks[] | select(.id=="no-generic") | .status' "$WORK/tv_conformance.json")
+    [ "$tv_gen" = "pass" ] && pass "no-generic check evaluates (generic count 0 no longer aborts)" || fail "no-generic status='$tv_gen', expected pass"
+    tv_res=$(jq -r '.result' "$WORK/tv_conformance.json")
+    [ "$tv_res" = "pass" ] && pass "clean Tag-Value overall result is pass" || fail "Tag-Value result='$tv_res', expected pass"
+else
+    fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
