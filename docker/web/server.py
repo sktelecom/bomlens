@@ -1382,7 +1382,14 @@ class Handler(BaseHTTPRequestHandler):
         run_id = prefix
         if g("timestamp") == "true":
             run_id = "%s_%s" % (prefix, datetime.now().strftime("%Y%m%d-%H%M%S"))
-        run_out = os.path.join(OUTPUT_DIR, run_id)
+        # Route through run_dir so the same path-injection barrier the read side
+        # uses (scan_id_ok allowlist + realpath boundary) gates makedirs. run_id
+        # already derives from the sanitized project/version, but resolving it
+        # here keeps the write path traversal-safe and analyzer-visible.
+        run_out = run_dir(run_id)
+        if run_out is None:
+            self._send(400, json.dumps({"error": "invalid run id"}))
+            return
         os.makedirs(run_out, exist_ok=True)
 
         self.send_response(200)
