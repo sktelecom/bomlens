@@ -96,6 +96,10 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ github.ref_name }}
+          # Preserve the draft state set by release.yml's create-release: without
+          # this, action-gh-release's default (draft: false) would publish the
+          # release as soon as the installers attach, bypassing the release-gate.
+          draft: true
           files: |
             electron/dist-electron/*.exe
             electron/dist-electron/*.dmg

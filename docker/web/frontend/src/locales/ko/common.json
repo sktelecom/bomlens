@@ -197,10 +197,11 @@
     "collapse": "접기",
     "tooLarge": "노드가 {{count}}개로 {{cap}}개를 넘습니다. 트리 보기를 사용하세요.",
     "graphError": "의존성 그래프를 렌더링하지 못했습니다.",
-    "graphLegend": "빨간 노드는 직접 의존성이며, 화살표는 패키지에서 그 패키지가 의존하는 대상을 가리킵니다.",
     "search": "패키지 검색…",
-    "clickHint": "노드를 클릭하면 상세가 보입니다.",
-    "vulnLegend": "고리 표시 노드는 알려진 취약점이 있습니다.",
+    "legendTransitive": "간접",
+    "legendVuln": "취약점 있음",
+    "arrowHint": "화살표는 패키지가 의존하는 대상을 가리킵니다.",
+    "interactHint": "노드에 마우스를 올리면 연결을 추적하고, 클릭하면 상세를 봅니다.",
     "hasVuln": "알려진 취약점 있음"
   },
   "sourceTree": {

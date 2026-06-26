@@ -104,12 +104,12 @@ export function NewScan({ running, capabilities, onRun }: Props) {
                   onClick={() => state.changeSource(s)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
-                    "transition-colors duration-fast ease-out-soft",
+                    "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     "disabled:pointer-events-none disabled:opacity-50",
                     active
                       ? "border-brand/40 bg-brand/10 font-medium text-foreground"
-                      : "text-foreground hover:border-brand/40 hover:bg-muted/50",
+                      : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
                   )}
                 >
                   <Icon
