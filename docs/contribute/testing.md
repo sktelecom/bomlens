@@ -1,3 +1,7 @@
+---
+description: The BomLens test structure — how to run the suites, write new tests, and debug failures.
+---
+
 # Testing guide
 
 This guide explains the test structure of BomLens, how to run and write tests, and how to debug failures.

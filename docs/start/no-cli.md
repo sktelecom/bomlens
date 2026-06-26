@@ -1,3 +1,7 @@
+---
+description: The shortest no-command-line path to turn source code into an open-source notice, all in the browser.
+---
+
 # No-CLI quick start (no command line)
 
 You do not need to have ever typed a command. This page covers the shortest path for an open-source license manager to turn source code received from a dev team into an open-source notice. It is all clicks in a browser.
