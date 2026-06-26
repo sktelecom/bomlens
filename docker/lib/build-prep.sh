@@ -101,13 +101,26 @@ set -- "$@" "$SRC"
 if command -v cdxgen >/dev/null 2>&1; then
     log "cdxgen (PATH)"
     cdxgen "$@"
+    rc=$?
 elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
     log "cdxgen (/opt/cdxgen/bin/cdxgen.js)"
     node /opt/cdxgen/bin/cdxgen.js "$@"
+    rc=$?
 elif [ -f /opt/bin/cdxgen ]; then
     log "cdxgen (/opt/bin/cdxgen)"
     /opt/bin/cdxgen "$@"
+    rc=$?
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
 fi
+
+# Hand the build tree back to the host user. This image runs as root (-u 0:0),
+# so the build steps above (npm install, cargo/go fetch, the bom write) leave
+# root-owned files in the mounted source dir. On Linux the host user then cannot
+# clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
+# arrive via `docker run -e`; best-effort, never fail the prep on this.
+if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
+    chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
+fi
+exit "${rc:-0}"

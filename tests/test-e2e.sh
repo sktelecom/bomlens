@@ -419,11 +419,10 @@ else
             if diff -q "$w1/testapp_1.0_bom.json" "$w2/testapp_1.0_bom.json" >/dev/null 2>&1; then
                 pass "go --byte-stable: two scans byte-identical"
             else
-                # Known pre-existing issue surfaced when this orphaned suite was
-                # first run in CI: go SBOMs are not yet byte-identical across runs
-                # under --byte-stable. Quarantined (tracked) so the suite stays
-                # green; remove this skip once the go path is reproducible.
-                skip "go --byte-stable: two scans byte-identical (known non-determinism, tracked in #236)"
+                echo "    [diag] go --byte-stable diff (sorted-key, first 50 lines):"
+                diff <(jq -S . "$w1/testapp_1.0_bom.json" 2>/dev/null) \
+                     <(jq -S . "$w2/testapp_1.0_bom.json" 2>/dev/null) | head -50 | sed 's/^/    /'
+                fail "go --byte-stable: two scans byte-identical"
             fi
         else
             fail "go --byte-stable: SBOMs generated" "$(tail -3 "$w1/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w1"
@@ -457,17 +456,15 @@ else
         else
             fail "zip ingestion: risk-report produced"
         fi
-        # the temp extraction dir must be cleaned up (only artifacts remain)
+        # the temp extraction dir must be cleaned up (only artifacts remain).
+        # build-prep chowns the scanned tree back to the host user so the host can
+        # remove the root-created build files; this guards that path.
         if ! ls -d "$z"/.sbom-arc.* >/dev/null 2>&1; then
             pass "zip ingestion: temp extraction dir cleaned up"
         else
-            # Known pre-existing issue surfaced when this orphaned suite was first
-            # run on Linux CI: a source scan's in-container build leaves root-owned
-            # files in the mounted temp dir that the host user cannot remove, so the
-            # extraction dir lingers. scan-sbom.sh now clears such leftovers via a
-            # throwaway container, but the path still needs confirming. Quarantined
-            # (tracked); remove this skip once cleanup is robust on Linux.
-            skip "zip ingestion: temp extraction dir cleaned up (known root-owned leftovers on Linux, tracked in #236)"
+            echo "    [diag] leftover .sbom-arc contents (ownership):"
+            ls -la "$z"/.sbom-arc.*/ 2>/dev/null | head -8 | sed 's/^/    /'
+            fail "zip ingestion: temp extraction dir cleaned up"
         fi
         rm -rf "$z"
     else
