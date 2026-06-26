@@ -145,6 +145,10 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
+          # Keep the release a draft — action-gh-release defaults draft to false,
+          # which would otherwise publish it here, before the release-gate has
+          # verified it. Only the gate's `gh release edit --draft=false` publishes.
+          draft: true
           files: |
             release-assets/bomlens-cli-linux.tar.gz
             release-assets/bomlens-cli-windows.zip
