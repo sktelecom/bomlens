@@ -210,7 +210,12 @@ spdx_json_checks() {
 # SPDX Tag-Value: coarse, presence-based grep checks (best-effort; JSON formats
 # above are exact). Per-package coverage isn't computed for Tag-Value.
 spdx_tv_checks() {
-    g() { grep -cE "$1" "$SBOM" 2>/dev/null || echo 0; }
+    # grep -c prints the count AND exits 1 when it is zero, so `grep -cE … || echo 0`
+    # appended a second "0" line for every empty match, producing "0\n0". Under
+    # set -e that broke --argjson (invalid number) and aborted the whole function,
+    # so a well-formed Tag-Value SBOM — where pkg:generic is always 0 — never got a
+    # conformance report. Capture the count and emit exactly one integer.
+    g() { local n; n=$(grep -cE "$1" "$SBOM" 2>/dev/null) || true; printf '%s' "${n:-0}"; }
     local ts tools names vers purls generic deps lics hashes
     ts=$(g '^Created:'); tools=$(g '^Creator: ?Tool:')
     names=$(g '^PackageName:'); vers=$(g '^PackageVersion:')
