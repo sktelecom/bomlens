@@ -30,10 +30,12 @@ WARN=0
 # scan-sbom.sh option parser: every `--flag)` / `--a|--b)` case label.
 CODE_FLAGS="$(grep -oE '^[[:space:]]*--[a-z|-]+\)' scripts/scan-sbom.sh \
     | grep -oE -- '--[a-z-]+' | sort -u)"
-# SBOM_* vars referenced by the CLI, the entrypoint, the lib scripts and the
-# Dockerfile build args.
+# SBOM_* vars referenced by the CLI, the entrypoint, the lib scripts, the
+# Dockerfile build args, the web UI server/launchers (SBOM_OUTPUT_DIR lives
+# there, not in the CLI) and the desktop container wrapper.
 CODE_ENV="$(grep -rhoE 'SBOM_[A-Z0-9]+(_[A-Z0-9]+)*' \
-    scripts/scan-sbom.sh docker/entrypoint.sh docker/lib/*.sh docker/Dockerfile 2>/dev/null \
+    scripts/scan-sbom.sh scripts/sbom-ui.bat docker/entrypoint.sh docker/lib/*.sh \
+    docker/Dockerfile docker/web/server.py electron/lib/container.mjs 2>/dev/null \
     | sort -u)"
 # Published image names (the registry path stops before the :tag), plus the
 # legacy aliases the docs intentionally keep pointing users at (same digest,

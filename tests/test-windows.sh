@@ -52,16 +52,29 @@ echo "docker $*" >> "$log"
 case "${1:-}" in
   version|info|pull|image|inspect|stop|rm) exit 0 ;;
   run)
-    pn=""; pv=""
+    # Drop the SBOM where the real container would: the host dir bind-mounted to
+    # /host-output (post-process / single-shot) or /out (source stage 1) — i.e.
+    # the per-run subfolder scan-sbom.sh now creates. Falls back to cwd so the
+    # legacy flat layout (SBOM_OUTPUT_FLAT) still works.
+    pn=""; pv=""; hostout=""; prev=""
     for a in "$@"; do
+      case "$prev" in
+        -v)
+          case "$a" in
+            *:/host-output) hostout="${a%:/host-output}" ;;
+            *:/out)         [ -z "$hostout" ] && hostout="${a%:/out}" ;;
+          esac ;;
+      esac
       case "$a" in
         PROJECT_NAME=*)    pn="${a#PROJECT_NAME=}" ;;
         PROJECT_VERSION=*) pv="${a#PROJECT_VERSION=}" ;;
       esac
+      prev="$a"
     done
     if [ -n "$pn" ] && [ -n "$pv" ]; then
+      dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
       printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"}},"components":[]}\n' \
-        "$pn" "$pv" > "${pn}_${pv}_bom.json"
+        "$pn" "$pv" > "$dest/${pn}_${pv}_bom.json"
     fi
     exit 0 ;;
   *) exit 0 ;;
@@ -100,7 +113,7 @@ HELP="$(bash "$SCAN" --help 2>&1)"; hrc=$?
 [ "$hrc" -eq 0 ] && pass "--help exits 0" || fail "--help exits 0" "rc=$hrc"
 for flag in --project --version --target --git --branch --firmware --analyze \
             --generate-only --notice --security --all --no-report --deep-license \
-            --byte-stable --sign --ui; do
+            --byte-stable --sign --output-dir --timestamp --ui; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -166,11 +179,13 @@ scan_in "$d" --project Pmixed --version 1.0.0 --generate-only
 { in_out "Language: mixed" && in_log "cyclonedx/cdxgen:v12"; } \
   && pass "two manifests → mixed → all-in-one image" || { fail "mixed → all-in-one"; show; }
 
-# A completed source scan must print success and leave the SBOM on the host.
+# A completed source scan must print success and leave the SBOM on the host,
+# isolated in the per-run <proj>_<ver>/ subfolder (not flat in the source tree).
 d="$(new_proj complete)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project Done --version 2.0.0 --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && [ -f "$d/Done_2.0.0_bom.json" ]; } \
-  && pass "source scan completes and writes <proj>_<ver>_bom.json" \
+{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+    && [ -f "$d/Done_2.0.0/Done_2.0.0_bom.json" ] && [ ! -f "$d/Done_2.0.0_bom.json" ]; } \
+  && pass "source scan completes and writes <proj>_<ver>/<proj>_<ver>_bom.json" \
   || { fail "source scan completes and writes SBOM" "rc=$RC"; show; }
 
 # --------------------------------------------------------
