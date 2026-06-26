@@ -20,18 +20,27 @@ import {
 // Pure URL builders
 // ---------------------------------------------------------------------------
 describe("URL builders", () => {
-  it("fileUrl encodes the artifact name", () => {
-    expect(fileUrl("app_1.0_bom.json")).toBe("/file?name=app_1.0_bom.json");
-    expect(fileUrl("a b&c.json")).toBe("/file?name=a%20b%26c.json");
+  it("fileUrl scopes by run id and encodes the artifact name", () => {
+    expect(fileUrl("run_1.0", "app_1.0_bom.json")).toBe(
+      "/file?id=run_1.0&name=app_1.0_bom.json",
+    );
+    expect(fileUrl("run_1.0", "a b&c.json")).toBe(
+      "/file?id=run_1.0&name=a%20b%26c.json",
+    );
+    // No id falls back to the flat (legacy) name-only URL.
+    expect(fileUrl(null, "app_1.0_bom.json")).toBe("/file?name=app_1.0_bom.json");
   });
 
-  it("downloadAllUrl is the zip endpoint", () => {
+  it("downloadAllUrl is the zip endpoint, scoped by id when given", () => {
     expect(downloadAllUrl()).toBe("/download-all");
+    expect(downloadAllUrl("run_1.0")).toBe("/download-all?id=run_1.0");
   });
 
   it("absoluteFileUrl prefixes the window origin", () => {
     vi.stubGlobal("window", { location: { origin: "https://host:8080" } });
-    expect(absoluteFileUrl("x.json")).toBe("https://host:8080/file?name=x.json");
+    expect(absoluteFileUrl("run_1.0", "x.json")).toBe(
+      "https://host:8080/file?id=run_1.0&name=x.json",
+    );
     vi.unstubAllGlobals();
   });
 });
