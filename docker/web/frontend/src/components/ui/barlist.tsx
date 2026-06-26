@@ -44,7 +44,7 @@ export function BarList({ items, max, ariaLabel, onSelect, selectedKey }: Props)
             <div className="absolute inset-0 bg-muted" aria-hidden />
             <div
               className={cn(
-                "absolute inset-y-0 left-0",
+                "absolute inset-y-0 left-0 origin-left animate-grow-x",
                 it.emphasis ? "bg-risk-medium/25" : "bg-muted-foreground/20",
               )}
               style={{ width: `${pct}%` }}

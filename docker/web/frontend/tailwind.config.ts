@@ -97,9 +97,15 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(4px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        // Bar charts wipe in from the left on mount (pair with origin-left).
+        "grow-x": {
+          from: { transform: "scaleX(0)" },
+          to: { transform: "scaleX(1)" },
+        },
       },
       animation: {
         "fade-in": "fade-in var(--duration-base) var(--ease-out)",
+        "grow-x": "grow-x var(--duration-slow) var(--ease-out)",
       },
     },
   },
