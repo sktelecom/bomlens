@@ -87,7 +87,7 @@ cd examples/nodejs
 
 Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.yaml`)
 
-> Note: without a lock file, dependencies are captured incompletely. Run `npm install` first, then try again.
+> Note: a lock file pins the exact installed versions. Dependencies are still captured from `package.json` without one, but committing a lock file makes the result reproducible.
 
 ---
 

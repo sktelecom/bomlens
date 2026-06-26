@@ -1,3 +1,7 @@
+---
+description: Call the BomLens scanner Docker image directly with docker run, for CI runners, Kubernetes jobs, and other environments where the script cannot live.
+---
+
 # Use the Docker image directly
 
 For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, which handles language detection, image selection, and volume mounts for you. This document explains how to call the image directly with `docker run` in environments where the script cannot live (CI runners, Kubernetes jobs, and so on).

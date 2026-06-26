@@ -1,3 +1,7 @@
+---
+description: Add support for a new programming language or package manager to BomLens, step by step.
+---
+
 # Adding a package manager
 
 This guide walks through adding support for a new programming language or package manager, step by step.

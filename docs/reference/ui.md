@@ -62,7 +62,7 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 ![Components — Scope and Risk columns with filters](../images/web-ui-components.png)
 
-**Vulnerabilities** sorts by severity then CVSS, with a CVSS column and the fixed version, and each row expands in place to show the CVSS vector, description and references. Click a band in the severity bar to filter to that severity, or search by CVE or package; the table columns are drag-resizable.
+**Vulnerabilities** sorts by severity then CVSS, with a CVSS column and the fixed version, and each row expands in place to show the CVSS vector, description and references. Click a band in the severity bar to filter to that severity, or search by CVE or package.
 
 ![Vulnerabilities — CVSS column and expandable rows](../images/web-ui-vulns.png)
 

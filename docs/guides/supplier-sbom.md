@@ -52,7 +52,7 @@ Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), th
 | Output | File | Meaning |
 |--------|------|---------|
 | Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the quality criteria are met, and what is missing |
-| SBOM (converted) | `{Project}_{Version}_bom.json` | the input normalized to CycloneDX 1.6 |
+| SBOM (converted) | `{Project}_{Version}_bom.json` | SPDX inputs converted to CycloneDX 1.6; CycloneDX inputs keep their original spec version |
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | components grouped by license |
 | Risk report | `{Project}_{Version}_risk-report.{md,html}` | conformance, vulnerabilities, and licenses combined, with response deadlines |
 

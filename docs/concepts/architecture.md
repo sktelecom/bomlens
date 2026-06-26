@@ -1,3 +1,7 @@
+---
+description: How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order.
+---
+
 # Architecture
 
 This document describes the overall system structure of BomLens and explains which tool runs at which step of the scan pipeline, and in what order.
