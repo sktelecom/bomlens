@@ -14,9 +14,12 @@ import { SourceFileTree } from "./SourceFileTree";
  * tells the view whether license data is present (false for `_files.json`).
  */
 export function SourceTreePanel({
+  scanId,
   sourceFile,
   hasLicenses,
 }: {
+  /** The scan's run_id, scoping the artifact fetch to its run folder. */
+  scanId: string | null;
   sourceFile: string;
   hasLicenses: boolean;
 }) {
@@ -28,7 +31,7 @@ export function SourceTreePanel({
   useEffect(() => {
     let active = true;
     setState("loading");
-    void loadScanCode(sourceFile)
+    void loadScanCode(scanId, sourceFile)
       .then((report) => {
         if (!active) return;
         setNodes(parseScanCode(report));
@@ -40,7 +43,7 @@ export function SourceTreePanel({
     return () => {
       active = false;
     };
-  }, [sourceFile, reloadKey]);
+  }, [scanId, sourceFile, reloadKey]);
 
   if (state === "loading") {
     return <LoadingState>{t("sourceTree.loading")}</LoadingState>;

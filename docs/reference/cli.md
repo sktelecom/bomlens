@@ -40,6 +40,8 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
+| `--output-dir <dir>` | current directory | Base directory for outputs (alias `-o`). Each scan lands in a `{Project}_{Version}/` subfolder under it, keeping the bundle together and out of the source tree |
+| `--timestamp` | false | Append `_YYYYMMDD-HHMMSS` to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged |
 | `--ui` | — | Launch the local web UI |
 | `--help` | — | Print help |
 
@@ -49,6 +51,8 @@ Environment variables adjust the behavior.
 |----------|---------|-------------|
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | Override the scanner image |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
+| `SBOM_OUTPUT_FLAT` | — | Set to `1` to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths) |
+| `SBOM_OUTPUT_DIR` | `~/sbom-output` | Output base for the desktop app and web UI (the CLI uses `--output-dir` instead). Each scan still lands in a `{Project}_{Version}/` subfolder under it |
 | `CVE_BIN_TOOL_MODE` | `auto` | Firmware CVE matching. `auto` uses the bundled CVE database if present, otherwise downloads from NVD when the network is reachable. `offline` matches only against the bundled database. `online` always updates from the network. `components-only` skips CVE matching and emits a component-only SBOM |
 | `CVE_BIN_TOOL_HOME` | `/opt/cve-bin-tool-home` | Location of the bundled cve-bin-tool CVE database. cve-bin-tool reads `$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db` (it keys the cache off `HOME`) |
 | `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD` | cve-bin-tool data sources to disable during a firmware scan. `GAD` (GitLab Advisory) is disabled by default because it crashes the bundled cve-bin-tool on fetch |
@@ -70,7 +74,16 @@ Output flags are detailed in the [reports guide](../guides/reports.md); validati
 
 ## Where outputs go
 
-Outputs are written to the directory you ran the command in (`$(pwd)`), named `{Project}_{Version}_*`. For `--git`/archive ingestion the clone/extract happens in a temp directory and only the outputs remain in the current directory (the temp directory is cleaned up on exit).
+Each scan is isolated in its own `{Project}_{Version}/` subfolder, so the files from one run stay together and the CLI never litters the source tree it scans. That subfolder is created under a base directory:
+
+- **CLI** (`scan-sbom.sh`): the base is the directory you ran the command in. Override it with `--output-dir <dir>` (alias `-o`).
+- **Desktop app and web UI**: the base is `~/sbom-output` (`C:\Users\<you>\sbom-output` on Windows). Override it with the `SBOM_OUTPUT_DIR` environment variable.
+
+For `--git` or archive ingestion the clone or extract happens in a temp directory that is cleaned up on exit, and only the output subfolder remains.
+
+A re-scan of the same project and version overwrites its subfolder by default, keeping just the latest result. Add `--timestamp` to keep each run instead: it appends `_YYYYMMDD-HHMMSS` to the folder name, for example `MyApp_1.0.0_20260626-143000/`. The flag changes the folder name only, not the SBOM file names or bytes, so it works together with `--byte-stable`.
+
+To restore the previous flat layout, where every file is written directly in the base with no per-run subfolder, set `SBOM_OUTPUT_FLAT=1`. This is meant for CI that expects the old paths.
 
 ## Pin the scanner image version
 

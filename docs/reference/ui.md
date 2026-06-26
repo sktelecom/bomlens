@@ -17,7 +17,7 @@ cd ~/sbom-output      # output folder (anywhere is fine)
 
 **Windows — double-click (no command line):** in the unzipped folder, double-click `scripts\sbom-ui.bat` and a browser opens `http://localhost:8080` shortly after. Docker just needs to be running, and `sbom-ui.bat` works on Rancher Desktop or Docker Desktop (on WSL2, run `scan-sbom.sh --ui` inside WSL).
 
-> The run location is the output folder, and it scans that folder's source only when you choose "Current folder" as the scan target. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter.
+> The run location is the output base, and it scans that folder's source only when you choose "Current folder" as the scan target. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter. Each scan is saved to its own `{Project}_{Version}/` subfolder under the base. The desktop app uses `~/sbom-output` as the base by default (`C:\Users\<you>\sbom-output` on Windows); set `SBOM_OUTPUT_DIR` to change it.
 
 ## The shell
 
@@ -92,7 +92,7 @@ The G7 AI minimum-element checks appear inside the **Conformance** section above
 
 ## Recent scans
 
-Past scans in the output folder appear in the rail's Recent list (the newest 20, with the worst severity). Click one to re-open its results, or delete one to remove its artifacts. This is local files only — no account, no database.
+Each scan's `{Project}_{Version}/` subfolder under the output base is one past scan, and they appear in the rail's Recent list (the newest 20, with the worst severity). Click one to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
 
 ## Notes
 

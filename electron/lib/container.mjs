@@ -26,8 +26,10 @@ export const AIBOM_IMAGE =
   process.env.SBOM_AIBOM_IMAGE ?? "ghcr.io/sktelecom/bomlens-aibom:latest";
 
 // 결과 저장 폴더. 두 엔진(Rancher/Docker Desktop) 모두 기본 공유하는 홈 디렉터리 아래.
+// SBOM_OUTPUT_DIR로 베이스를 바꿀 수 있다(실행별 하위 폴더는 server.py가 그 아래에 만든다).
 export function defaultOutputDir() {
-  return path.join(os.homedir(), "sbom-output");
+  const override = process.env.SBOM_OUTPUT_DIR;
+  return override && override.trim() ? override : path.join(os.homedir(), "sbom-output");
 }
 
 // 호스트의 Docker 엔진을 컨테이너에 연결하는 마운트. UI 컨테이너가 언어별 cdxgen 이미지를

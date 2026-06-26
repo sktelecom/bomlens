@@ -76,7 +76,7 @@ Docker가 설치되지 않았거나 꺼져 있으면, 앱이 스캔을 시작하
    압축을 풉니다. 압축을 푼 폴더 안에 `scripts` 폴더가 보이면 됩니다.
 3. **웹 UI 실행**. `scripts` 폴더의 `sbom-ui.bat`을 더블클릭합니다. 처음에는 검은 창에 "스캐너
    이미지를 내려받습니다(약 3~4GB)"라는 안내가 나오고, 다 받으면 브라우저에
-   `http://localhost:8080`이 열립니다. 결과는 `C:\Users\사용자이름\sbom-output` 폴더에 저장됩니다.
+   `http://localhost:8080`이 열립니다. 스캔 결과는 `C:\Users\사용자이름\sbom-output` 아래 `{Project}_{Version}\` 하위 폴더에 저장됩니다.
 
 준비가 잘 됐는지 확인하려면 압축을 푼 폴더에서 `scripts\check-setup.bat`을 더블클릭하세요.
 Docker 설치와 실행, 스캐너 이미지, 포트 상태를 한국어로 점검해 줍니다.

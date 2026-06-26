@@ -61,7 +61,7 @@ $SBOM --project team1-app --version 1.0.0 \
 
 - 특정 브랜치/태그: `--branch v1.2.3`
 - 비공개 저장소: `GIT_TOKEN=ghp_xxx $SBOM ... --git https://github.com/org/private ...` (토큰은 로그에 남지 않음)
-- 얕은 클론(`--depth 1`)으로 임시 디렉터리에 받은 뒤 분석하고, 산출물만 현재 디렉터리에 남깁니다.
+- 얕은 클론(`--depth 1`)으로 임시 디렉터리에 받은 뒤 분석하고, 산출물만 현재 디렉터리 아래 `{Project}_{Version}/` 하위 폴더에 남깁니다.
 
 **산출물**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`
 

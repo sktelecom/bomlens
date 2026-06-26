@@ -101,9 +101,13 @@ function labelOf(name: string, version: string): string {
   return version ? `${name}@${version}` : name || "(unknown)";
 }
 
-/** Fetch and parse the raw SBOM artifact. Throws on network/JSON failure. */
-export async function loadSbom(name: string): Promise<RawSbom> {
-  const res = await fetch(fileUrl(name));
+/** Fetch and parse the raw SBOM artifact (scoped to the scan's run folder).
+ *  Throws on network/JSON failure. */
+export async function loadSbom(
+  id: string | null | undefined,
+  name: string,
+): Promise<RawSbom> {
+  const res = await fetch(fileUrl(id, name));
   if (!res.ok) throw new Error(`SBOM fetch failed (${res.status})`);
   return (await res.json()) as RawSbom;
 }

@@ -19,7 +19,27 @@ test("findFreePort returns a usable TCP port", async () => {
 });
 
 test("defaultOutputDir sits under the home directory", () => {
-  assert.equal(defaultOutputDir(), path.join(os.homedir(), "sbom-output"));
+  // 환경변수 오버라이드가 없을 때의 기본값(홈/sbom-output)을 검증.
+  if (!process.env.SBOM_OUTPUT_DIR) {
+    assert.equal(defaultOutputDir(), path.join(os.homedir(), "sbom-output"));
+  }
+});
+
+test("defaultOutputDir honours SBOM_OUTPUT_DIR when set", () => {
+  // server.py와 같은 베이스를 공유하도록, 설정된 출력 디렉터리를 그대로 쓴다
+  // (실행별 하위 폴더는 server.py가 이 베이스 아래에 만든다). 공백만 있는 값은
+  // 미설정으로 보고 홈/sbom-output 기본값으로 되돌아간다.
+  const prev = process.env.SBOM_OUTPUT_DIR;
+  try {
+    const custom = path.join(os.tmpdir(), "custom-sbom-out");
+    process.env.SBOM_OUTPUT_DIR = custom;
+    assert.equal(defaultOutputDir(), custom);
+    process.env.SBOM_OUTPUT_DIR = "   ";
+    assert.equal(defaultOutputDir(), path.join(os.homedir(), "sbom-output"));
+  } finally {
+    if (prev === undefined) delete process.env.SBOM_OUTPUT_DIR;
+    else process.env.SBOM_OUTPUT_DIR = prev;
+  }
 });
 
 test("DEFAULT_IMAGE points at the generator image by default", () => {

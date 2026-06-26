@@ -60,7 +60,7 @@ If you prefer a script over the desktop app, this path works too.
 
 1. **Install a Docker engine**. Same as step 1 of Path A.
 2. **Download the tool**. On the GitHub repository page, click the green Code button, choose Download ZIP, and unzip it. You should see a `scripts` folder inside the unzipped folder.
-3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 3–4 GB)", and once done a browser opens `http://localhost:8080`. Results are saved to the `C:\Users\<your-name>\sbom-output` folder.
+3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 3–4 GB)", and once done a browser opens `http://localhost:8080`. Each scan's results are saved to a `{Project}_{Version}\` subfolder under `C:\Users\<your-name>\sbom-output`.
 
 To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in Korean.
 

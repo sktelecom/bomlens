@@ -21,6 +21,7 @@
 #   firmware-upload -> MODE=FIRMWARE (only when unblob is present in this image)
 #   ai-model      -> MODE=AIBOM on <model id> (only in the bomlens-aibom image)
 #   docker-image  -> MODE=IMAGE on <target>
+import glob
 import io
 import json
 import os
@@ -30,6 +31,7 @@ import shutil
 import subprocess
 import urllib.parse
 import zipfile
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -90,6 +92,10 @@ ARTIFACT_SUFFIXES = (
     # opt-in ScanCode deep-license scan; the frontend prefers _scancode (which
     # carries licenses) when both exist.
     "_files.json",
+    # EPSS/KEV priority sidecar (scan-security.sh) and the SCANOSS vendored-OSS
+    # SBOM (identify-vendored). Both back result views, so include them in the
+    # download bundle and the per-scan results listing.
+    "_security_epss.json", "_vendored.cdx.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -131,6 +137,63 @@ def safe_prefix_path(prefix, suffix):
     if not path.startswith(os.path.realpath(OUTPUT_DIR) + os.sep):
         return None
     return path
+
+
+def run_dir(run_id):
+    """Resolve a scan's run folder OUTPUT_DIR/<run_id> strictly inside OUTPUT_DIR.
+
+    A scan's artifacts live in a per-run subfolder (run_id = the folder name,
+    e.g. {prefix} or {prefix}_{timestamp}). The run_id must pass scan_id_ok (no
+    separators / traversal); then confirm the realpath stays inside OUTPUT_DIR
+    (blocks symlink escape). Returns the real path, or None on a bad id/escape.
+    Same path-injection barrier as safe_output_path / safe_prefix_path."""
+    if not scan_id_ok(run_id):
+        return None
+    path = os.path.realpath(os.path.join(OUTPUT_DIR, run_id))
+    if not path.startswith(os.path.realpath(OUTPUT_DIR) + os.sep):
+        return None
+    return path
+
+
+def run_file(run_id, suffix):
+    """Resolve a scan's artifact ending in `suffix`, traversal-safe.
+
+    Prefers the run subfolder: OUTPUT_DIR/<run_id>/*<suffix>. entrypoint.sh names
+    files by the {prefix} (PROJECT/VERSION), which can differ from the folder name
+    on a timestamped run, so we glob by suffix — one scan per folder means the
+    suffix is unique. Each candidate's basename is re-joined and realpath-checked
+    against the run folder boundary before it is returned (keeps the resolver
+    visible to static analysis). Falls back to the legacy flat layout
+    OUTPUT_DIR/<run_id><suffix> so pre-upgrade scans keep opening. Returns a path
+    inside OUTPUT_DIR, or None."""
+    d = run_dir(run_id)
+    if d and os.path.isdir(d):
+        droot = os.path.realpath(d)
+        for hit in sorted(glob.glob(os.path.join(d, "*" + suffix))):
+            base = os.path.basename(hit)
+            cand = os.path.realpath(os.path.join(d, base))
+            if cand.startswith(droot + os.sep) and os.path.isfile(cand):
+                return cand
+    return safe_prefix_path(run_id, suffix)
+
+
+def run_artifact_path(run_id, name):
+    """Resolve a single artifact by run id + basename, traversal-safe.
+
+    Used by /file and /download-all. The name must be a bare basename (no
+    separators). Prefers OUTPUT_DIR/<run_id>/<name>, realpath-checked against the
+    run-folder boundary; falls back to the legacy flat OUTPUT_DIR/<name> (also
+    when run_id is empty, for pre-upgrade scans). Returns None on a bad name."""
+    base = os.path.basename(name or "")
+    if not base or base != name:
+        return None
+    d = run_dir(run_id) if run_id else None
+    if d and os.path.isdir(d):
+        droot = os.path.realpath(d)
+        cand = os.path.realpath(os.path.join(d, base))
+        if cand.startswith(droot + os.sep) and os.path.isfile(cand):
+            return cand
+    return safe_output_path(base)
 
 
 # Directories the UI is allowed to scan as a ROOTFS target. Only /src is mounted
@@ -199,18 +262,36 @@ def aibom_usable():
     return aibom_capable() or (docker_cli_present() and docker_capable())
 
 
-def list_results(prefix=None):
-    """Generated artifacts in OUTPUT_DIR. With a prefix, only that scan's files
-    ({prefix}_*) — used when re-opening a past scan."""
+def list_results(run_id=None):
+    """Generated artifacts for a scan. With a run_id, the artifacts in that scan's
+    run folder OUTPUT_DIR/<run_id>/ (ARTIFACT_SUFFIXES only); when no run folder
+    exists, the legacy flat {run_id}_* files in OUTPUT_DIR (pre-upgrade scans).
+    With no run_id, the artifacts directly in OUTPUT_DIR (legacy flat layout)."""
     out = []
+    if run_id is not None:
+        d = run_dir(run_id)
+        if d and os.path.isdir(d):
+            for name in sorted(os.listdir(d)):
+                p = os.path.join(d, name)
+                if os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES):
+                    out.append({"name": name, "size": os.path.getsize(p)})
+            return out
+        # Legacy flat layout: {run_id}_* artifacts in OUTPUT_DIR root.
+        if os.path.isdir(OUTPUT_DIR):
+            for name in sorted(os.listdir(OUTPUT_DIR)):
+                p = os.path.join(OUTPUT_DIR, name)
+                if not (os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES)):
+                    continue
+                if not name.startswith(run_id + "_"):
+                    continue
+                out.append({"name": name, "size": os.path.getsize(p)})
+        return out
+    # No run_id: legacy flat listing of every artifact in OUTPUT_DIR root.
     if os.path.isdir(OUTPUT_DIR):
         for name in sorted(os.listdir(OUTPUT_DIR)):
             p = os.path.join(OUTPUT_DIR, name)
-            if not (os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES)):
-                continue
-            if prefix and not name.startswith(prefix + "_"):
-                continue
-            out.append({"name": name, "size": os.path.getsize(p)})
+            if os.path.isfile(p) and name.endswith(ARTIFACT_SUFFIXES):
+                out.append({"name": name, "size": os.path.getsize(p)})
     return out
 
 
@@ -265,10 +346,10 @@ def _cvss_best(v):
     return best_score, best_vector
 
 
-def _epss_kev_map(prefix):
+def _epss_kev_map(run_id):
     """Per-CVE EPSS probability + CISA KEV flag, written by scan-security.sh as a
     sidecar (Trivy's _security.json carries neither). Empty when absent/offline."""
-    p = safe_prefix_path(prefix, "_security_epss.json")
+    p = run_file(run_id, "_security_epss.json")
     if not p or not os.path.isfile(p):
         return {}
     try:
@@ -279,8 +360,8 @@ def _epss_kev_map(prefix):
     return data if isinstance(data, dict) else {}
 
 
-def security_summary(prefix):
-    p = safe_prefix_path(prefix, "_security.json")
+def security_summary(run_id):
+    p = run_file(run_id, "_security.json")
     if not p or not os.path.isfile(p):
         return None
     try:
@@ -288,7 +369,7 @@ def security_summary(prefix):
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
-    priority = _epss_kev_map(prefix)
+    priority = _epss_kev_map(run_id)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
     for r in (data.get("Results") or []):
@@ -335,12 +416,12 @@ def _norm_purl(purl):
     return purl.split("?", 1)[0].split("#", 1)[0].strip().lower()
 
 
-def _component_risk_index(prefix):
+def _component_risk_index(run_id):
     """Join the Trivy security report to packages: worst severity + count per
     package, keyed by normalized purl and by (name, version). Uncapped (unlike
     the detail list) so a component's Risk reflects every finding against it.
     Returns (by_purl, by_nv); both empty when there is no security report."""
-    p = safe_prefix_path(prefix, "_security.json")
+    p = run_file(run_id, "_security.json")
     by_purl, by_nv = {}, {}
     if not p or not os.path.isfile(p):
         return by_purl, by_nv
@@ -404,8 +485,8 @@ def _scope_index(data):
     return {ref: ("direct" if ref in direct else "transitive") for ref in refs}, True
 
 
-def sbom_summary(prefix):
-    p = safe_prefix_path(prefix, "_bom.json")
+def sbom_summary(run_id):
+    p = run_file(run_id, "_bom.json")
     if not p or not os.path.isfile(p):
         return None
     try:
@@ -414,7 +495,7 @@ def sbom_summary(prefix):
     except (OSError, json.JSONDecodeError):
         return None
     comps = data.get("components") or []
-    risk_by_purl, risk_by_nv = _component_risk_index(prefix)
+    risk_by_purl, risk_by_nv = _component_risk_index(run_id)
     scope_by_ref, has_deps = _scope_index(data)
     rows = []
     for c in comps[:MAX_COMPONENT_ROWS]:
@@ -512,12 +593,12 @@ def sbom_summary(prefix):
     }
 
 
-def scanoss_status(prefix):
+def scanoss_status(run_id):
     """SCANOSS vendored-ID outcome for the UI, read from the vendored SBOM's
     metadata: 'unavailable' (search failed — rate limit / no network / no token),
     'no-match' (ran clean but found nothing vendored), or 'matched'. None when
     vendored identification wasn't run (no vendored artifact)."""
-    p = safe_prefix_path(prefix, "_vendored.cdx.json")
+    p = run_file(run_id, "_vendored.cdx.json")
     if not p or not os.path.isfile(p):
         return None
     try:
@@ -533,9 +614,9 @@ def scanoss_status(prefix):
     return {"status": status, "count": len(data.get("components") or [])}
 
 
-def conformance_summary(prefix):
+def conformance_summary(run_id):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
-    p = safe_prefix_path(prefix, "_conformance.json")
+    p = run_file(run_id, "_conformance.json")
     if not p or not os.path.isfile(p):
         return None
     try:
@@ -580,23 +661,22 @@ SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN")
 
 
 def list_scans():
-    """Past scans in OUTPUT_DIR — one per {prefix}_bom.json, newest first. The
-    real project/version come from the SBOM's metadata.component. Local files
-    only; no account, no database."""
+    """Past scans in OUTPUT_DIR, newest first. Each scan is a run folder
+    OUTPUT_DIR/<run_id>/ holding one *_bom.json (the id is the folder name); the
+    legacy flat OUTPUT_DIR/{prefix}_bom.json layout is still listed too (id is the
+    prefix), so pre-upgrade scans don't disappear. The real project/version come
+    from the SBOM's metadata.component. Local files only; no account, no db."""
     scans = []
     if not os.path.isdir(OUTPUT_DIR):
         return scans
-    for name in os.listdir(OUTPUT_DIR):
-        if not name.endswith("_bom.json"):
-            continue
-        prefix = name[: -len("_bom.json")]
-        p = os.path.join(OUTPUT_DIR, name)
+
+    def add_scan(run_id, bom_path):
         try:
-            mtime = int(os.path.getmtime(p))
-            with open(p) as f:
+            mtime = int(os.path.getmtime(bom_path))
+            with open(bom_path) as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError):
-            continue
+            return
         comps = data.get("components") or []
         meta = (data.get("metadata") or {}).get("component") or {}
         # The OWASP AIBOM generator names the root metadata.component after its
@@ -606,17 +686,17 @@ def list_scans():
             (c for c in comps if c.get("type") == "machine-learning-model"), None
         )
         if model:
-            project = model.get("name") or prefix
+            project = model.get("name") or run_id
             version = model.get("version") or ""
         else:
-            project = meta.get("name") or prefix
+            project = meta.get("name") or run_id
             version = meta.get("version") or ""
         scans.append({
-            "id": prefix,
+            "id": run_id,
             "project": project,
             "version": version,
             "components": len(comps),
-            "maxSeverity": _max_severity(security_summary(prefix)),
+            "maxSeverity": _max_severity(security_summary(run_id)),
             "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
             # CycloneDX root component type — lets the Recent list label the scan
             # honestly (application/firmware/container/operating-system/data),
@@ -624,24 +704,41 @@ def list_scans():
             "componentType": meta.get("type"),
             "generatedAt": mtime,
         })
+
+    for entry in os.listdir(OUTPUT_DIR):
+        if entry.startswith("."):  # .uploads and other dotfiles are not scans
+            continue
+        full = os.path.join(OUTPUT_DIR, entry)
+        if os.path.isdir(full):
+            # New layout: a per-run subfolder; find its (unique) *_bom.json.
+            d = run_dir(entry)
+            if not d or not os.path.isdir(d):
+                continue
+            boms = sorted(glob.glob(os.path.join(d, "*_bom.json")))
+            if boms:
+                add_scan(entry, boms[0])
+        elif os.path.isfile(full) and entry.endswith("_bom.json"):
+            # Legacy flat layout: id is the {prefix}.
+            add_scan(entry[: -len("_bom.json")], full)
+
     scans.sort(key=lambda s: s["generatedAt"], reverse=True)
     return scans[:RECENT_SCANS_CAP]
 
 
-def scan_detail(prefix):
+def scan_detail(run_id):
     """A past scan as a done-event payload (its own artifacts only)."""
-    sbom = sbom_summary(prefix)
+    sbom = sbom_summary(run_id)
     if sbom is None:
         return None
     return {
         "ok": True,
         "mode": None,
-        "id": prefix,
-        "results": list_results(prefix),
+        "id": run_id,
+        "results": list_results(run_id),
         "sbom": sbom,
-        "security": security_summary(prefix),
-        "conformance": conformance_summary(prefix),
-        "scanoss": scanoss_status(prefix),
+        "security": security_summary(run_id),
+        "conformance": conformance_summary(run_id),
+        "scanoss": scanoss_status(run_id),
     }
 
 
@@ -1020,9 +1117,10 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         if path == "/results":
-            self._send(200, json.dumps(list_results()))
+            qs = urllib.parse.parse_qs(parsed.query)
+            self._send(200, json.dumps(list_results((qs.get("id") or [""])[0] or None)))
         elif path == "/download-all":
-            self._download_all()
+            self._download_all(urllib.parse.parse_qs(parsed.query))
         elif path == "/capabilities":
             self._send(200, json.dumps({
                 # `firmware`/`aibom` are the input-gating flags the frontend reads:
@@ -1066,25 +1164,37 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, json.dumps({"error": "not found"}))
 
     def _scan_delete(self, qs):
-        """Delete one past scan: remove every {id}_* artifact from OUTPUT_DIR.
-        Local-only housekeeping (no account/db); the id is a validated prefix."""
+        """Delete one past scan. New layout: remove the whole run folder
+        OUTPUT_DIR/<id>/. Legacy flat layout: remove every {id}_* artifact.
+        Local-only housekeeping (no account/db); the id is a validated run id."""
         sid = (qs.get("id") or [""])[0]
         if not scan_id_ok(sid):
             self._send(400, json.dumps({"error": "bad scan id"}))
             return
         removed = 0
-        for suf in ARTIFACT_SUFFIXES:
-            # safe_prefix_path re-resolves {sid}{suf} with realpath and confirms
-            # it stays inside OUTPUT_DIR, so the delete cannot escape even though
-            # scan_id_ok already allowlisted the id. It also makes the boundary
-            # explicit to static analysis (no taint reaches os.remove unchecked).
-            p = safe_prefix_path(sid, suf)
-            if p and os.path.isfile(p):
-                try:
-                    os.remove(p)
-                    removed += 1
-                except OSError:
-                    pass
+        d = run_dir(sid)
+        if d and os.path.isdir(d):
+            # run_dir re-resolved {sid} with realpath and confirmed it stays
+            # strictly inside OUTPUT_DIR (never OUTPUT_DIR itself), so the
+            # recursive delete cannot escape the boundary.
+            removed = sum(
+                1 for n in os.listdir(d)
+                if os.path.isfile(os.path.join(d, n)) and n.endswith(ARTIFACT_SUFFIXES)
+            )
+            shutil.rmtree(d, ignore_errors=True)
+        else:
+            for suf in ARTIFACT_SUFFIXES:
+                # safe_prefix_path re-resolves {sid}{suf} with realpath and
+                # confirms it stays inside OUTPUT_DIR, so the delete cannot escape
+                # even though scan_id_ok already allowlisted the id. It also makes
+                # the boundary explicit to static analysis.
+                p = safe_prefix_path(sid, suf)
+                if p and os.path.isfile(p):
+                    try:
+                        os.remove(p)
+                        removed += 1
+                    except OSError:
+                        pass
         self._send(200, json.dumps({"deleted": sid, "removed": removed}))
 
     def _git_cred(self):
@@ -1174,8 +1284,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, f.read(), ctype)
 
     def _serve_file(self, qs):
+        rid = (qs.get("id") or [""])[0]
         name = (qs.get("name") or [""])[0]
-        path = safe_output_path(name)
+        # run_artifact_path joins the run folder (OUTPUT_DIR/<id>/<name>) and
+        # realpath-checks the boundary, with a flat OUTPUT_DIR/<name> fallback for
+        # pre-upgrade scans (and when no id is supplied by an older frontend).
+        path = run_artifact_path(rid, name)
         if not path or not os.path.isfile(path):
             self._send(404, json.dumps({"error": "not found"}))
             return
@@ -1200,15 +1314,18 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(200, json.dumps(detail))
 
-    def _download_all(self):
-        """Bundle every generated artifact into one in-memory zip.
+    def _download_all(self, qs=None):
+        """Bundle one scan's generated artifacts into one in-memory zip.
 
         Artifacts are reports/JSON and stay small, so building the zip in a
         BytesIO and sending it with a fixed Content-Length fits the server's
-        close-terminated model (no chunked transfer). Only files already
-        whitelisted by list_results() are added — no new path is exposed.
+        close-terminated model (no chunked transfer). With ?id=<run_id> only that
+        scan's run folder is bundled; without an id (or for a pre-upgrade scan)
+        the legacy flat layout is used. Only files already whitelisted by
+        list_results() are added — no new path is exposed.
         """
-        files = list_results()
+        rid = ((qs or {}).get("id") or [""])[0]
+        files = list_results(rid or None)
         if not files:
             self._send(404, json.dumps({"error": "no artifacts to download"}))
             return
@@ -1227,7 +1344,7 @@ class Handler(BaseHTTPRequestHandler):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in files:
-                path = safe_output_path(f["name"])
+                path = run_artifact_path(rid, f["name"])
                 if path and os.path.isfile(path):
                     zf.write(path, arcname=f["name"])
         body = buf.getvalue()
@@ -1256,6 +1373,18 @@ class Handler(BaseHTTPRequestHandler):
         target = g("target").strip()
         token = g("token").strip()
 
+        # Per-run output folder OUTPUT_DIR/<run_id>/ (matches scan-sbom.sh). The
+        # default run_id is the {prefix}; with ?timestamp=true the folder name
+        # gets a _{YYYYMMDD-HHMMSS} suffix so repeat scans don't overwrite each
+        # other. Files inside stay named by the {prefix} (entrypoint.sh uses
+        # PROJECT/VERSION), so the folder name and the file prefix can differ.
+        prefix = output_prefix(project, version)
+        run_id = prefix
+        if g("timestamp") == "true":
+            run_id = "%s_%s" % (prefix, datetime.now().strftime("%Y%m%d-%H%M%S"))
+        run_out = os.path.join(OUTPUT_DIR, run_id)
+        os.makedirs(run_out, exist_ok=True)
+
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
@@ -1270,7 +1399,7 @@ class Handler(BaseHTTPRequestHandler):
 
         def fail(msg):
             sse("error", json.dumps(msg))
-            sse("done", json.dumps({"ok": False, "results": list_results(),
+            sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
                                     "sbom": None, "security": None, "conformance": None}))
 
         # Build the run-scan environment + working dir for the chosen source.
@@ -1279,7 +1408,7 @@ class Handler(BaseHTTPRequestHandler):
             "PROJECT_NAME": project,
             "PROJECT_VERSION": version,
             "UPLOAD_ENABLED": "false",
-            "HOST_OUTPUT_DIR": OUTPUT_DIR,
+            "HOST_OUTPUT_DIR": run_out,
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
             "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
             "GENERATE_REPORT": "true",  # 오픈소스위험분석보고서: default-on (mirrors CLI)
@@ -1297,7 +1426,7 @@ class Handler(BaseHTTPRequestHandler):
             tok = _GIT_CREDS.pop(scanoss_cred, None)
             if tok:
                 env["SCANOSS_API_KEY"] = tok
-        cwd = OUTPUT_DIR
+        cwd = run_out
         cleanup_dir = None
         mode = None
         # When set, run the scan in a SIBLING container (firmware/aibom image)
@@ -1466,9 +1595,9 @@ class Handler(BaseHTTPRequestHandler):
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
                 # the full pipeline and writes artifacts into the shared host
-                # output dir, which is also our OUTPUT_DIR — so the summary below
-                # reads them just like an in-process scan.
-                host_out = host_path_of(OUTPUT_DIR)
+                # output dir, which is also our run_out folder — so the summary
+                # below reads them just like an in-process scan.
+                host_out = host_path_of(run_out)
                 rc = run_sibling_scan(
                     sibling["image"], env["MODE"], host_out,
                     lambda ln: sse("log", json.dumps(ln)),
@@ -1500,21 +1629,24 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as exc:  # noqa: BLE001
                     sse("error", json.dumps("Failed to launch scan: %s" % exc))
 
-            prefix = output_prefix(project, version)
+            # Artifacts landed in run_out (the run folder named run_id); the
+            # summary helpers glob it by suffix. The done event carries id=run_id
+            # so the frontend's later /file, /download-all and /scan requests
+            # address this scan's folder.
             done = {
                 "ok": ok,
                 "mode": mode,
-                "id": prefix,
-                "results": list_results(prefix),
-                "sbom": sbom_summary(prefix),
-                "security": security_summary(prefix) if env["GENERATE_SECURITY"] == "true" else None,
-                "conformance": conformance_summary(prefix),
-                "scanoss": scanoss_status(prefix),
+                "id": run_id,
+                "results": list_results(run_id),
+                "sbom": sbom_summary(run_id),
+                "security": security_summary(run_id) if env["GENERATE_SECURITY"] == "true" else None,
+                "conformance": conformance_summary(run_id),
+                "scanoss": scanoss_status(run_id),
             }
             sse("done", json.dumps(done))
         finally:
             # Remove uploaded/cloned/extracted trees; keep generated artifacts
-            # (entrypoint copied them to OUTPUT_DIR root).
+            # (entrypoint wrote them into the run folder run_out).
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)

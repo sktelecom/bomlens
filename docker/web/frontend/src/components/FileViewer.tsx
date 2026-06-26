@@ -7,6 +7,8 @@ import { fileUrl } from "@/lib/api";
 
 interface Props {
   name: string | null;
+  /** The scan's run_id, scoping the artifact fetch to its run folder. */
+  scanId: string | null;
   onClose: () => void;
 }
 
@@ -16,7 +18,7 @@ interface Props {
  * No @radix-ui/react-dialog dependency — a focus-trapped overlay is enough for
  * this single-purpose viewer.
  */
-export function FileViewer({ name, onClose }: Props) {
+export function FileViewer({ name, scanId, onClose }: Props) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const isHtml = !!name && name.endsWith(".html");
@@ -27,7 +29,7 @@ export function FileViewer({ name, onClose }: Props) {
       return;
     }
     let active = true;
-    void fetch(fileUrl(name))
+    void fetch(fileUrl(scanId, name))
       .then((r) => r.text())
       .then((c) => {
         if (active) setText(c);
@@ -35,7 +37,7 @@ export function FileViewer({ name, onClose }: Props) {
     return () => {
       active = false;
     };
-  }, [name, isHtml]);
+  }, [name, scanId, isHtml]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -72,7 +74,7 @@ export function FileViewer({ name, onClose }: Props) {
           <span className="truncate font-mono text-sm">{name}</span>
           <div className="flex shrink-0 items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <a href={fileUrl(name)} download={name}>
+              <a href={fileUrl(scanId, name)} download={name}>
                 <Download className="h-4 w-4" />
                 {t("result.download")}
               </a>
@@ -91,7 +93,7 @@ export function FileViewer({ name, onClose }: Props) {
           {isHtml ? (
             <iframe
               title={name}
-              src={fileUrl(name)}
+              src={fileUrl(scanId, name)}
               className="h-full w-full bg-white"
             />
           ) : (
