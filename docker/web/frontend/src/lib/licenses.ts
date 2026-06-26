@@ -40,6 +40,15 @@ export function licenseGroups(components: ComponentItem[]): {
   return { groups, unlicensed };
 }
 
+// Copyleft / reciprocal licenses get a review tone so they stand out from the
+// permissive bulk (Apache/MIT/BSD). Heuristic on the SPDX id; a human judges.
+const COPYLEFT = /\b(A?GPL|LGPL|MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL)/i;
+
+/** True for copyleft/reciprocal license ids worth a closer look. */
+export function isCopyleft(license: string): boolean {
+  return COPYLEFT.test(license);
+}
+
 // Most-restrictive first.
 const REVIEW_ORDER: LicenseReview[] = ["behavioral-use", "non-commercial"];
 
