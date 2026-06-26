@@ -11,9 +11,15 @@ on:
   schedule:
     - cron: "41 6 * * 1"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Run the full release-gate check (installers + published image + documented command) against this tag, e.g. v1.5.1"
+        type: string
+        required: false
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   verify-downloads:
@@ -39,3 +45,23 @@ jobs:
             fi
           done
           [ "$fail" -eq 0 ] || { echo "one or more advertised downloads are missing or broken"; exit 1; }
+
+  # Dry-run of the release-gate check against an existing tag — same script the
+  # Release workflow runs before publishing, so the gate logic can be exercised
+  # without cutting a release. Only runs when a tag is supplied on manual dispatch.
+  verify-release-full:
+    name: Full release-gate dry-run
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Verify release entry points
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/verify-release.sh "${{ inputs.tag }}"

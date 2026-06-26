@@ -93,7 +93,11 @@ jobs:
             - [Notice, security & risk reports](https://sktelecom.github.io/sbom-tools/guides/reports/)
             - [Usage Guide](https://sktelecom.github.io/sbom-tools/reference/cli/)
             - [Examples](https://sktelecom.github.io/sbom-tools/reference/ecosystems/)
-          draft: false
+          # Created as a draft so it is not shown as the latest release until the
+          # release-gate job confirms a first-time user's entry points actually
+          # work (installers attached, published image runs the documented
+          # command). The gate flips this to published on success.
+          draft: true
           prerelease: false
   
   upload-assets:
@@ -148,9 +152,42 @@ jobs:
             release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz
             release-assets/SHA256SUMS.txt
   
+  release-gate:
+    name: Release Gate (verify entry points, then publish)
+    needs: [create-release, upload-assets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Confirm the recommended entry points work for THIS release before it is
+      # shown to users: the desktop installers are attached (built async by
+      # desktop.yml), and the documented first-scan command produces a valid SBOM
+      # on the actual published image (pushed async by docker-publish.yml). Both
+      # are polled until ready, then exercised; failure leaves the release a draft.
+      - name: Verify the release is ready for users
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/verify-release.sh "${{ needs.create-release.outputs.version }}"
+
+      # Only now make it the public, latest release.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "${{ needs.create-release.outputs.version }}" \
+            --repo "${{ github.repository }}" --draft=false --latest
+
   summary:
     name: Release Summary
-    needs: [create-release, upload-assets]
+    needs: [create-release, upload-assets, release-gate]
     runs-on: ubuntu-latest
     
     steps:
