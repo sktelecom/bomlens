@@ -129,6 +129,12 @@ app.whenReady().then(async () => {
   });
 
   await createWindow();
+  // 테스트 시드: 부팅 스모크는 첫 화면 렌더와 i18n만 확인하고 Docker/컨테이너 기동
+  // (수 GB 이미지 풀)은 건너뛴다. SBOM_SMOKE=1이면 상태 화면에 머물러 결정론적으로 끝난다.
+  if (process.env.SBOM_SMOKE === "1") {
+    status(t.ready);
+    return;
+  }
   startup().catch((err) => {
     status(t.startFailed(err.message));
   });

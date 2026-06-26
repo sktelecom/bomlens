@@ -43,6 +43,7 @@ Screen layout and per-target details are in the [web UI reference](../reference/
 
 Advanced — for automation and CI. Run from the cloned repo.
 
+<!-- ci:run -->
 ```bash
 # All deliverables for a project in the current directory
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only

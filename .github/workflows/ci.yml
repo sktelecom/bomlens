@@ -14,25 +14,42 @@ jobs:
   test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    
+    # One heavy Docker job pulls the published scanner image once and runs every
+    # image-dependent harness against it: per-language scans (test-scan), the
+    # full user journey (test-e2e), and the literal documented commands
+    # (test-docs-executable). Keeping them in one job avoids re-pulling 3-4 GB.
+    env:
+      SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      
+
       - name: Grant script permissions
         run: |
           chmod +x scripts/scan-sbom.sh
-          chmod +x tests/test-scan.sh
-      
+          chmod +x tests/test-scan.sh tests/test-e2e.sh tests/test-docs-executable.sh
+
       - name: Run integration tests
         run: |
           echo "Running integration tests..."
           VERBOSE=true ./tests/test-scan.sh
         continue-on-error: false
-      
+
+      # The comprehensive user-perspective harness (CLI contract, source/image
+      # scans, notice + security reports, byte-stable output). Reuses the image
+      # pulled above.
+      - name: User-journey e2e
+        run: VERBOSE=true bash tests/test-e2e.sh
+
+      # Runs the exact commands printed in the onboarding docs so a stale flag,
+      # image tag, or command in a getting-started page fails CI.
+      - name: Documented commands actually run
+        run: VERBOSE=true bash tests/test-docs-executable.sh
+
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -92,6 +109,9 @@ jobs:
           echo ""
           echo "Checking new test/helper scripts..."
           shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/check-examples-sync.sh examples/test-all.sh || true
+          echo ""
+          echo "Checking onboarding-guarantee gates..."
+          shellcheck scripts/check-doc-drift.sh scripts/check-ux-heuristics.sh scripts/check-doc-links.sh tests/test-e2e.sh tests/test-docs-executable.sh || true
           echo ""
           echo "✅ Shellcheck completed (warnings are informational)"
       
@@ -155,14 +175,17 @@ jobs:
       - name: Examples manifest validation
         run: bash examples/test-all.sh
 
+      # Machine-checkable proxies for a friendly first run: no silent error
+      # exits, check-setup parity across .sh/.bat, and a complete --help.
+      - name: UX heuristics
+        run: bash scripts/check-ux-heuristics.sh
+
   web-e2e:
     name: Web UI E2E (container scan -> done)
     runs-on: ubuntu-latest
-    # Heavy (builds a scanner image, boots the UI container, runs real scans), so
-    # it stays off the per-PR critical path: it runs on main/develop pushes and on
-    # manual dispatch. The lightweight API contract (tests/test-web-ui.sh) still
-    # guards every PR in the postprocess job.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # Builds a light scanner image (base + scanoss), boots the UI container, and
+    # runs real scans through the SSE stream. Runs on every PR so a broken web UI
+    # onboarding path is caught before merge, not only on main.
 
     steps:
       - name: Checkout repository
@@ -429,6 +452,15 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check input-form documentation coverage
         run: bash scripts/check-doc-coverage.sh
+
+      # Onboarding facts that live in code but repeat in the docs: CLI flags,
+      # image tag, desktop download name, Windows output folder.
+      - name: Check doc drift (flags, image, download, output dir)
+        run: bash scripts/check-doc-drift.sh
+
+      # Deterministic internal-link gate for the getting-started pages.
+      - name: Check onboarding internal links
+        run: bash scripts/check-doc-links.sh
 
   summary:
     name: CI Summary

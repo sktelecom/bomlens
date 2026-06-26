@@ -97,7 +97,8 @@ Options:
   --git <url>            Clone a git/GitHub URL (shallow) and scan as source.
                          Private repos: set GIT_TOKEN env. Mutually exclusive
                          with --target/--analyze/--firmware.
-  --branch <ref>         Branch, tag, or commit for --git (default: repo default)
+  --branch <ref>         Branch, tag, or commit for --git (alias: --ref;
+                         default: repo default)
   --firmware             Force firmware mode for --target file (opt-in image)
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
