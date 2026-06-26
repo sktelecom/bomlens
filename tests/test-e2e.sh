@@ -769,11 +769,16 @@ else
             else
                 fail "web UI /capabilities reports firmware/docker support"
             fi
-            # base image has no firmware tools -> firmware capability is false
-            if [ "$(curl -fsS "http://localhost:${port}/capabilities" | jq -r '.firmware')" = "false" ]; then
-                pass "web UI: firmware disabled on base image"
+            # The base image has no firmware tools, but with the docker socket
+            # mounted it reaches the firmware image as a sibling container, so
+            # firmware is usable via sibling dispatch (firmware_usable() in
+            # server.py). Assert that path is what is offered.
+            caps="$(curl -fsS "http://localhost:${port}/capabilities")"
+            if [ "$(printf '%s' "$caps" | jq -r '.firmware')" = "true" ] \
+               && [ "$(printf '%s' "$caps" | jq -r '.firmwareSibling')" = "true" ]; then
+                pass "web UI: firmware offered via sibling dispatch on base image"
             else
-                fail "web UI: firmware disabled on base image"
+                fail "web UI: firmware offered via sibling dispatch on base image" "$caps"
             fi
             # path traversal guard
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${port}/file?name=../../etc/passwd")
