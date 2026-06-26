@@ -221,6 +221,12 @@ function JumpCards({
 }
 
 /** The standalone Artifacts section (jump-card target). */
-export function ArtifactsSection({ result }: { result: DoneEvent }) {
-  return <ResultsList results={result.results} />;
+export function ArtifactsSection({
+  result,
+  scanId,
+}: {
+  result: DoneEvent;
+  scanId: string | null;
+}) {
+  return <ResultsList results={result.results} scanId={scanId} />;
 }

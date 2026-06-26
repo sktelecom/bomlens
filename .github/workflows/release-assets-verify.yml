@@ -1,0 +1,67 @@
+name: Release assets verify
+
+# Confirms the permanent one-click download URLs the docs advertise actually
+# resolve to a real installer. Runs after a release is published and on a weekly
+# schedule (asset hosting can change under us). Manual dispatch is available too.
+# Not a required check — a failure means a download a first-time user is told to
+# click is missing or broken.
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Run the full release-gate check (installers + published image + documented command) against this tag, e.g. v1.5.1"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  verify-downloads:
+    name: Verify desktop download URLs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest-release installers resolve
+        run: |
+          base="https://github.com/sktelecom/sbom-tools/releases/latest/download"
+          # Minimum plausible installer size (bytes); a real .exe/.dmg is tens of MB.
+          min=1000000
+          fail=0
+          for file in BomLens-Setup.exe BomLens-Setup.dmg; do
+            url="$base/$file"
+            hdr="$(curl -sIL "$url" || true)"
+            code="$(printf '%s' "$hdr" | awk '/^HTTP/ {c=$2} END {print c}')"
+            len="$(printf '%s' "$hdr" | grep -i '^content-length:' | tail -1 | tr -dc '0-9')"
+            if [ "$code" = "200" ] && [ -n "$len" ] && [ "$len" -ge "$min" ]; then
+              echo "✓ $file → HTTP $code, ${len} bytes"
+            else
+              echo "❌ $file → HTTP ${code:-none}, size ${len:-0} (expected 200 and ≥ ${min} bytes)"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || { echo "one or more advertised downloads are missing or broken"; exit 1; }
+
+  # Dry-run of the release-gate check against an existing tag — same script the
+  # Release workflow runs before publishing, so the gate logic can be exercised
+  # without cutting a release. Only runs when a tag is supplied on manual dispatch.
+  verify-release-full:
+    name: Full release-gate dry-run
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Verify release entry points
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/verify-release.sh "${{ inputs.tag }}"

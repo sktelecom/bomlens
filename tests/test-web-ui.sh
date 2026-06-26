@@ -514,6 +514,202 @@ del_gone=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=demo_1.0")
 [ "$del_gone" = "404" ] && pass "deleted scan is gone (404)" || fail "deleted scan returned $del_gone (expected 404)"
 rm -f "$OUT"/demo_1.0_*
 
+echo "== per-run subfolder layout (OUTPUT_DIR/<run_id>/) =="
+# New disk layout: each scan's artifacts live in a per-run folder named by the
+# run_id (default {prefix}, e.g. demo_1.0). Files inside stay named by the
+# {prefix}. The summary helpers (sbom_summary/security_summary/...) take the
+# run_id (folder name), glob the folder by suffix, and the /file, /download-all,
+# /scan, /scans, /scan-delete endpoints all address a scan by its run_id.
+mkdir -p "$OUT/demo_1.0"
+cat > "$OUT/demo_1.0/demo_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "metadata":{"component":{"bom-ref":"root","name":"demo","version":"1.0","type":"application"}},
+ "components":[
+   {"bom-ref":"pkg:pypi/flask@2.0","name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"},
+   {"bom-ref":"pkg:pypi/werkzeug@2.0","name":"werkzeug","version":"2.0","type":"library","purl":"pkg:pypi/werkzeug@2.0"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["pkg:pypi/flask@2.0"]},
+   {"ref":"pkg:pypi/flask@2.0","dependsOn":["pkg:pypi/werkzeug@2.0"]}
+ ]}
+JSON
+cat > "$OUT/demo_1.0/demo_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-1","Severity":"CRITICAL","PkgName":"werkzeug","InstalledVersion":"2.0","PkgIdentifier":{"PURL":"pkg:pypi/werkzeug@2.0"}}
+]}]}
+JSON
+cat > "$OUT/demo_1.0/demo_1.0_security_epss.json" <<'JSON'
+{"CVE-1":{"epss":0.91,"kev":true}}
+JSON
+# A timestamped run: the folder name (demo_1.0_20260101-120000) differs from the
+# file prefix (demo_1.0), proving the helpers resolve artifacts by suffix glob,
+# not by deriving the filename from the folder name.
+mkdir -p "$OUT/demo_1.0_20260101-120000"
+cat > "$OUT/demo_1.0_20260101-120000/demo_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"demo","version":"1.0","type":"application"}},
+ "components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+# Helpers take the run_id (folder name) and glob the folder by suffix.
+demo = {r["name"]: r for r in server.sbom_summary("demo_1.0")["componentList"]}
+assert demo["flask"]["scope"] == "direct", demo["flask"]
+assert demo["werkzeug"]["scope"] == "transitive", demo["werkzeug"]
+assert demo["werkzeug"]["maxSeverity"] == "CRITICAL", demo["werkzeug"]
+v = {x["id"]: x for x in server.security_summary("demo_1.0")["vulnerabilities"]}
+assert v["CVE-1"]["epss"] == 0.91 and v["CVE-1"]["kev"] is True, v["CVE-1"]
+# run_file resolves the artifact INSIDE the run folder.
+rf = server.run_file("demo_1.0", "_bom.json")
+assert rf and rf.endswith("/demo_1.0/demo_1.0_bom.json"), rf
+# Timestamped run: folder name != file prefix, resolved by suffix glob.
+ts = server.sbom_summary("demo_1.0_20260101-120000")
+assert ts and ts["components"] == 1, ts
+tf = server.run_file("demo_1.0_20260101-120000", "_bom.json")
+assert tf and tf.endswith("/demo_1.0_20260101-120000/demo_1.0_bom.json"), tf
+# Path-traversal barriers: a run_id with separators/.. resolves to nothing, and
+# a name that is not a bare basename is refused.
+assert server.run_dir("../etc") is None
+assert server.run_dir("a/b") is None
+assert server.run_file("../etc", "_bom.json") is None
+assert server.run_artifact_path("demo_1.0", "../x") is None
+assert server.run_artifact_path("demo_1.0", "a/b") is None
+PY
+then
+    pass "subfolder helpers resolve by run_id + suffix glob (incl. timestamped folder; traversal refused)"
+else
+    fail "subfolder layout helper resolution is wrong (see assertion above)"
+fi
+# /scans walks the subfolders and lists each by its folder name (run_id).
+scans=$(curl -fsS "$BASE/scans" 2>/dev/null)
+if echo "$scans" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+s = next(x for x in d if x['id'] == 'demo_1.0')
+assert s['project'] == 'demo' and s['version'] == '1.0', s
+assert s['maxSeverity'] == 'CRITICAL' and s['components'] == 2, s
+t = next(x for x in d if x['id'] == 'demo_1.0_20260101-120000')
+assert t['project'] == 'demo' and t['components'] == 1, t
+"; then
+    pass "/scans lists each run subfolder by its folder name (run_id)"
+else
+    fail "/scans did not list the run subfolders" "$scans"
+fi
+# /scan?id=<run_id> re-opens the scan from its folder.
+if curl -fsS "$BASE/scan?id=demo_1.0" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['ok'] is True and d['id'] == 'demo_1.0', d
+assert d['sbom']['components'] == 2 and d['security']['TOTAL'] == 1, d
+names = [r['name'] for r in d['results']]
+assert 'demo_1.0_security_epss.json' in names, names
+"; then
+    pass "/scan?id=<run_id> re-opens a subfolder scan with its artifacts"
+else
+    fail "/scan?id=<run_id> did not return the subfolder scan"
+fi
+# /file?id=<run_id>&name=<basename> serves an artifact from the run folder.
+if curl -fsS "$BASE/file?id=demo_1.0&name=demo_1.0_security.json" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['Results'][0]['Vulnerabilities'][0]['VulnerabilityID'] == 'CVE-1', d
+"; then
+    pass "/file?id=&name= serves an artifact from the run folder"
+else
+    fail "/file?id=&name= did not serve the subfolder artifact"
+fi
+# Timestamped folder: /file by folder-name id + prefix-named file.
+fc=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?id=demo_1.0_20260101-120000&name=demo_1.0_bom.json")
+[ "$fc" = "200" ] && pass "/file resolves a prefix-named file in a timestamped folder" || fail "/file timestamped folder returned $fc (expected 200)"
+# /download-all?id=<run_id> bundles only that run folder's artifacts.
+curl -fsS "$BASE/download-all?id=demo_1.0" -o "$WORK/dl.zip" 2>/dev/null
+if python3 -c "
+import zipfile
+names = set(zipfile.ZipFile('$WORK/dl.zip').namelist())
+assert {'demo_1.0_bom.json','demo_1.0_security.json','demo_1.0_security_epss.json'} <= names, names
+"; then
+    pass "/download-all?id=<run_id> zips the run folder's artifacts"
+else
+    fail "/download-all?id=<run_id> bundle is wrong"
+fi
+# /file path-traversal: a name that is not a bare basename is 404 regardless of id.
+fc_trav=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?id=demo_1.0&name=../../etc/passwd")
+[ "$fc_trav" = "404" ] && pass "/file blocks a traversal name even with a valid id (404)" || fail "/file traversal name returned $fc_trav (expected 404)"
+fc_id=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?id=../etc&name=demo_1.0_bom.json")
+[ "$fc_id" = "404" ] && pass "/file with a traversal id does not escape (404)" || fail "/file traversal id returned $fc_id (expected 404)"
+
+echo "== backward compatibility: legacy flat layout (OUTPUT_DIR/{prefix}_*) =="
+# Pre-upgrade scans wrote artifacts flat in OUTPUT_DIR (no run folder). They must
+# keep listing, re-opening, downloading, serving (with id omitted OR supplied),
+# and deleting — the helpers fall back to the flat {prefix}_* layout.
+cat > "$OUT/legacy_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"legacy","version":"1.0","type":"application"}},
+ "components":[{"name":"openssl","version":"3.0","type":"library","purl":"pkg:generic/openssl@3.0"}]}
+JSON
+cat > "$OUT/legacy_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[{"VulnerabilityID":"CVE-L","Severity":"MEDIUM","PkgName":"openssl","InstalledVersion":"3.0"}]}]}
+JSON
+if curl -fsS "$BASE/scans" 2>/dev/null | python3 -c "
+import sys, json
+s = next(x for x in json.load(sys.stdin) if x['id'] == 'legacy_1.0')
+assert s['project'] == 'legacy' and s['maxSeverity'] == 'MEDIUM' and s['components'] == 1, s
+"; then
+    pass "/scans lists a legacy flat scan by its {prefix} id"
+else
+    fail "/scans dropped the legacy flat scan"
+fi
+if curl -fsS "$BASE/scan?id=legacy_1.0" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['ok'] is True and d['sbom']['components'] == 1 and d['security']['TOTAL'] == 1, d
+"; then
+    pass "/scan?id= re-opens a legacy flat scan"
+else
+    fail "/scan?id= did not re-open the legacy flat scan"
+fi
+lc_noid=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?name=legacy_1.0_bom.json")
+[ "$lc_noid" = "200" ] && pass "/file (id omitted) serves a legacy flat artifact" || fail "/file id-omitted legacy returned $lc_noid (expected 200)"
+lc_id=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?id=legacy_1.0&name=legacy_1.0_bom.json")
+[ "$lc_id" = "200" ] && pass "/file (id supplied, no folder) falls back to the legacy flat artifact" || fail "/file id-supplied legacy returned $lc_id (expected 200)"
+curl -fsS "$BASE/download-all?id=legacy_1.0" -o "$WORK/dl-legacy.zip" 2>/dev/null
+if python3 -c "
+import zipfile
+names = set(zipfile.ZipFile('$WORK/dl-legacy.zip').namelist())
+assert 'legacy_1.0_bom.json' in names and 'legacy_1.0_security.json' in names, names
+"; then
+    pass "/download-all?id= bundles a legacy flat scan"
+else
+    fail "/download-all?id= legacy bundle is wrong"
+fi
+
+echo "== delete: subfolder removes the run folder, legacy removes flat {prefix}_* =="
+del_sub=$(curl -fsS -X POST "$BASE/scan-delete?id=demo_1.0" 2>/dev/null)
+if echo "$del_sub" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['deleted'] == 'demo_1.0' and d['removed'] >= 2, d
+"; then
+    pass "/scan-delete removes a subfolder scan's artifacts"
+else
+    fail "/scan-delete did not delete the subfolder scan" "$del_sub"
+fi
+[ ! -d "$OUT/demo_1.0" ] && pass "/scan-delete removed the whole run folder" || fail "run folder still present after delete"
+del_gone=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=demo_1.0")
+[ "$del_gone" = "404" ] && pass "deleted subfolder scan is gone (404)" || fail "deleted subfolder scan returned $del_gone (expected 404)"
+curl -fsS -X POST "$BASE/scan-delete?id=demo_1.0_20260101-120000" >/dev/null 2>&1
+del_legacy=$(curl -fsS -X POST "$BASE/scan-delete?id=legacy_1.0" 2>/dev/null)
+if echo "$del_legacy" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['deleted'] == 'legacy_1.0' and d['removed'] >= 1, d
+"; then
+    pass "/scan-delete removes a legacy flat scan's {prefix}_* artifacts"
+else
+    fail "/scan-delete did not delete the legacy flat scan" "$del_legacy"
+fi
+[ ! -f "$OUT/legacy_1.0_bom.json" ] && pass "/scan-delete left no legacy flat artifact behind" || fail "legacy flat artifacts still present after delete"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

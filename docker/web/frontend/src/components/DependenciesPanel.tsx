@@ -20,9 +20,12 @@ type View = "graph" | "tree";
  * their nodes as vulnerable.
  */
 export function DependenciesPanel({
+  scanId,
   sbomFile,
   components = [],
 }: {
+  /** The scan's run_id, scoping the artifact fetch to its run folder. */
+  scanId: string | null;
   sbomFile: string;
   components?: ComponentItem[];
 }) {
@@ -37,7 +40,7 @@ export function DependenciesPanel({
   useEffect(() => {
     let active = true;
     setState("loading");
-    void loadSbom(sbomFile)
+    void loadSbom(scanId, sbomFile)
       .then((sbom) => {
         if (!active) return;
         setGraph(parseSbomGraph(sbom, (n, v) => severityFor(vulnIndex, n, v)));
@@ -49,7 +52,7 @@ export function DependenciesPanel({
     return () => {
       active = false;
     };
-  }, [sbomFile, reloadKey, vulnIndex]);
+  }, [scanId, sbomFile, reloadKey, vulnIndex]);
 
   if (state === "loading") {
     return <LoadingState>{t("deps.loading")}</LoadingState>;

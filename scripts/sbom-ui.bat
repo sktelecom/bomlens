@@ -15,8 +15,11 @@ if "%UI_PORT%"=="" set UI_PORT=8080
 
 REM Results land in a dedicated folder under the user's home directory, which
 REM both Rancher Desktop and Docker Desktop share by default. Double-clicking
-REM this .bat would otherwise dump artifacts next to the script.
-set OUTDIR=%USERPROFILE%\sbom-output
+REM this .bat would otherwise dump artifacts next to the script. Each scan goes
+REM into a <project>_<version>/ subfolder under here (created by server.py).
+REM Override the base with SBOM_OUTPUT_DIR.
+set OUTDIR=%SBOM_OUTPUT_DIR%
+if "%OUTDIR%"=="" set OUTDIR=%USERPROFILE%\sbom-output
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
 REM --- Docker 점검 (진짜 사전 요구사항) ---

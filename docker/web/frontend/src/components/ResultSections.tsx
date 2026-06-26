@@ -58,6 +58,7 @@ export function ResultSection({
       const sbomFile = sbomFileName(result);
       return sbomFile ? (
         <DependenciesPanel
+          scanId={scanId}
           sbomFile={sbomFile}
           components={result.sbom?.componentList ?? []}
         />
@@ -70,15 +71,23 @@ export function ResultSection({
       // ScanCode output carries per-file licenses; the structure-only
       // `_files.json` fallback does not, so hint that licenses need ScanCode.
       const hasLicenses = Boolean(scancodeFileName(result));
-      return <SourceTreePanel sourceFile={sourceFile} hasLicenses={hasLicenses} />;
+      return (
+        <SourceTreePanel
+          scanId={scanId}
+          sourceFile={sourceFile}
+          hasLicenses={hasLicenses}
+        />
+      );
     }
 
     case "artifacts":
-      return <ArtifactsSection result={result} />;
+      return <ArtifactsSection result={result} scanId={scanId} />;
 
     case "models": {
       const sbomFile = sbomFileName(result);
-      return sbomFile ? <ModelsDatasets sbomFile={sbomFile} /> : null;
+      return sbomFile ? (
+        <ModelsDatasets scanId={scanId} sbomFile={sbomFile} />
+      ) : null;
     }
 
     case "conformance":

@@ -55,6 +55,10 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
+      # 부팅 스모크: 인스톨러 빌드 전에 앱이 이 OS에서 실제로 켜지고 첫 화면(en/ko)을
+      # 렌더하는지 확인한다. SBOM_SMOKE로 Docker/컨테이너 기동은 건너뛰어 결정론적이다.
+      - name: Boot smoke (app launches and renders)
+        run: npm run test:smoke
       # 1차 미서명: mac 자동 서명 탐색을 끄고, 어떤 레지스트리에도 publish 하지 않는다.
       # 태그 빌드는 버전을 태그에서 주입해 인스톨러 파일명이 릴리스와 항상 일치하게 한다.
       - name: Build installer

@@ -1,0 +1,65 @@
+name: Nightly (best-effort)
+
+# Non-blocking checks that are too slow or too flaky for the per-PR critical
+# path. This workflow is scheduled and manual only — it is never a required
+# status check, so a red run here signals a problem to investigate without
+# blocking any PR or release.
+on:
+  schedule:
+    - cron: "27 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-real-scan:
+    name: macOS real scan (Colima)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # GitHub's hosted macOS runners ship no Docker daemon, so we bring one up
+      # with Colima (Apple Silicon -> the vz backend). This is the only way to
+      # exercise the real container scan on macOS in hosted CI; it is slow and
+      # occasionally flaky, which is exactly why it lives here and not on PRs.
+      - name: Install Colima + Docker CLI
+        run: brew install colima docker
+
+      - name: Start Colima
+        run: colima start --vm-type=vz --cpu 3 --memory 6 --disk 30
+
+      - name: Verify Docker is usable
+        run: docker info
+
+      # The arm64 scanner image is published alongside amd64, so it pulls and
+      # runs natively under Colima on Apple Silicon.
+      - name: Real scan via scan-sbom.sh
+        env:
+          SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
+        run: |
+          chmod +x scripts/scan-sbom.sh
+          ( cd examples/nodejs && \
+            bash "$GITHUB_WORKSPACE/scripts/scan-sbom.sh" \
+              --project NightlyMac --version 1.0.0 --generate-only )
+
+      - name: Assert a valid SBOM was produced
+        run: |
+          f=examples/nodejs/NightlyMac_1.0.0_bom.json
+          test -f "$f" || { echo "no SBOM at $f"; exit 1; }
+          jq -e '.bomFormat == "CycloneDX" and (.components | type == "array")' "$f" >/dev/null
+          echo "components: $(jq '.components | length' "$f")"
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## macOS real scan (Colima)"
+            if [ -f examples/nodejs/NightlyMac_1.0.0_bom.json ]; then
+              echo "✅ produced a CycloneDX SBOM on macOS via Colima"
+            else
+              echo "⚠️ no SBOM produced — see the log (Colima or scan step failed)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -9,8 +9,8 @@
  *   `#/scan/<id>`              → a scan's Overview
  *   `#/scan/<id>/<section>`    → a scan's specific section
  *
- * `<id>` is the `{project}_{version}` artifact prefix (`DoneEvent.id`, what
- * `loadScan` takes). `<section>` is a SectionId. Ids are encoded so any prefix
+ * `<id>` is the scan's run_id — the run-folder name (`DoneEvent.id`, what
+ * `loadScan` takes). `<section>` is a SectionId. Ids are encoded so any run_id
  * survives a round-trip; parsing decodes and tolerates a missing leading slash.
  */
 import type { SectionId } from "./nav";

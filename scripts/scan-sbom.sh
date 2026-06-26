@@ -50,6 +50,7 @@ SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
+OUTPUT_BASE=""; TIMESTAMP="false"
 
 # ========================================================
 # Parse arguments
@@ -84,6 +85,8 @@ while [[ "$#" -gt 0 ]]; do
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
+        --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
+        --timestamp) TIMESTAMP="true" ;;
         --ui) UI_MODE="true" ;;
         --help)
             cat << EOF
@@ -97,7 +100,8 @@ Options:
   --git <url>            Clone a git/GitHub URL (shallow) and scan as source.
                          Private repos: set GIT_TOKEN env. Mutually exclusive
                          with --target/--analyze/--firmware.
-  --branch <ref>         Branch, tag, or commit for --git (default: repo default)
+  --branch <ref>         Branch, tag, or commit for --git (alias: --ref;
+                         default: repo default)
   --firmware             Force firmware mode for --target file (opt-in image)
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
@@ -128,6 +132,14 @@ Options:
                          not source). See docs/guides/identify-vendored.md
   --byte-stable          Deterministic SBOM output
   --sign                 cosign sign (requires COSIGN_KEY)
+  --output-dir <dir>     Base directory for outputs (alias: -o; default: current
+                         dir). Each scan lands in a <project>_<version>/ subfolder
+                         under it, keeping the bundle together and out of the
+                         source tree.
+  --timestamp            Append _YYYYMMDD-HHMMSS to the run subfolder so repeat
+                         scans of the same project/version are kept side by side
+                         instead of overwritten. Folder name only; SBOM bytes are
+                         unchanged (orthogonal to --byte-stable).
   --ui                   Launch local web UI
   --help                 Show this help
 
@@ -138,6 +150,8 @@ Environment:
                          signals (default: true; set false for air-gapped)
   GIT_TOKEN              Token for cloning private --git repos
   COSIGN_KEY             Signing key for --sign
+  SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
+                         (no per-run subfolder), matching the pre-isolation layout
   SBOM_SCANNER_IMAGE     Override the scanner image
   SBOM_FIRMWARE_IMAGE    Override the firmware image
   SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
@@ -174,15 +188,18 @@ docker_check() {
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
     docker_check
+    # The web UI owns per-run subfolders itself (server.py creates them under the
+    # mounted base). Honor --output-dir as that base; default to the current dir.
+    UI_BASE="${OUTPUT_BASE:-$(pwd)}"
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
     ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
         || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &
     exec docker run --rm -it -p "${UI_PORT}:8080" \
-        -v "$(pwd)":/src -v "$(pwd)":/host-output \
+        -v "$UI_BASE":/src -v "$UI_BASE":/host-output \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(pwd)" "$POSTPROCESS_IMAGE"
+        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$UI_BASE" "$POSTPROCESS_IMAGE"
 fi
 
 # ========================================================
@@ -197,13 +214,48 @@ docker_check
 SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
 SAFE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/[^a-zA-Z0-9._-]/_/g')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
-SOURCE_DIR="$(pwd)"          # host-output anchor: artifacts land where the user ran the tool
+SOURCE_DIR="$(pwd)"          # input anchor: the dir the user ran the tool in
 SCAN_INPUT_DIR="$SOURCE_DIR" # what cdxgen scans (overridden by git clone / zip extract)
+
+# Output base + per-run subfolder. Input (SOURCE_DIR/SCAN_INPUT_DIR) and output
+# (OUTPUT_HOST_DIR) are kept separate so a source scan never litters the tree it
+# scans. Each run lands in <base>/<project>_<version>[_<ts>]/ so the 8~13-file
+# bundle stays together. SBOM_OUTPUT_FLAT=1 restores the legacy flat layout.
+OUTPUT_BASE="${OUTPUT_BASE:-$(pwd)}"
+RUN_NAME="${SAFE_PROJECT}_${SAFE_VERSION}"
+[ "$TIMESTAMP" = "true" ] && RUN_NAME="${RUN_NAME}_$(date +%Y%m%d-%H%M%S)"
+if [ "$SBOM_OUTPUT_FLAT" = "1" ]; then
+    OUTPUT_HOST_DIR="$OUTPUT_BASE"
+else
+    OUTPUT_HOST_DIR="$OUTPUT_BASE/$RUN_NAME"
+fi
+mkdir -p "$OUTPUT_HOST_DIR" || { echo "[ERROR] cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
+OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 
-# Temp dirs (git clone / archive extract) are cleaned on any exit.
-cleanup() { local d; for d in "${CLEANUP_DIRS[@]}"; do [ -n "$d" ] && rm -rf -- "$d"; done; }
+# Temp dirs (git clone / archive extract) are cleaned on any exit. A container
+# build step (e.g. npm install during a source scan) can leave root-owned files
+# in the mounted temp dir on Linux, where the host user cannot rm them; fall back
+# to clearing those via a throwaway container so nothing lingers.
+cleanup() {
+    local d
+    for d in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$d" ] || continue
+        rm -rf -- "$d" 2>/dev/null
+        if [ -e "$d" ] && command -v docker >/dev/null 2>&1; then
+            docker run --rm -v "$(dirname "$d")":/cleanup alpine:latest \
+                rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
+        fi
+    done
+}
 trap cleanup EXIT INT TERM
+
+# A reproducible (--byte-stable) build must not resolve dependency licenses over
+# the network: registry availability (e.g. pkg.go.dev) varies between runs, so a
+# license fetched in one scan but not the next would make two otherwise-identical
+# scans differ. Pin the lookup off for byte-stable scans.
+FETCH_LICENSE="${FETCH_LICENSE:-true}"
+[ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
 
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
@@ -434,8 +486,8 @@ echo "=========================================="
 # ========================================================
 if [ "$MODE" = "SOURCE" ]; then
     # SCAN_INPUT_DIR = the tree we scan (current dir, or a cloned/extracted temp
-    # dir). SOURCE_DIR ($(pwd)) stays the host-output anchor so artifacts land
-    # where the user ran the tool, even for --git/zip ingestion.
+    # dir). Artifacts go to OUTPUT_HOST_DIR (the per-run subfolder), which is kept
+    # separate from the scanned tree, even for --git/zip ingestion.
     [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
     LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
     if [ "$LANG_DET" = "android" ]; then
@@ -470,6 +522,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # root (no-op); the resulting bom is chown'd back to the host user in stage 2.
     eval docker run --rm -u 0:0 \
         -v "\"$SCAN_INPUT_DIR\"":/app \
+        -v "\"$OUTPUT_HOST_DIR\"":/out \
         -v "\"$BUILD_PREP\"":/tmp/build-prep.sh:ro \
         $CACHE_MOUNTS \
         -e HOME=/tmp/sbomhome \
@@ -477,15 +530,19 @@ if [ "$MODE" = "SOURCE" ]; then
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
+        -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
         --entrypoint sh "\"$CDX_IMG\"" \
-        -c "'sh /tmp/build-prep.sh /app \"/app/$OUTPUT_FILE\" 1.6'" \
+        -c "'sh /tmp/build-prep.sh /app \"/out/$OUTPUT_FILE\" 1.6'" \
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }
 
     echo "[2/2] Post-processing..."
-    # Mount the scanned tree as /src (so POSTPROCESS finds the bom + deep-license
-    # sees the real source) and the pwd as /host-output (artifact destination).
+    # Mount the scanned tree as /src (so deep-license/vendored see the real source)
+    # and the run folder as /host-output. -w /host-output makes the bom written by
+    # stage 1 the cwd, so POSTPROCESS finds it and writes the bundle in place — the
+    # scanned tree (/src) is never written to.
     eval docker run --rm \
-        -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$SOURCE_DIR\"":/host-output \
+        -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$OUTPUT_HOST_DIR\"":/host-output \
+        -w /host-output \
         --add-host=host.docker.internal:host-gateway \
         -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
         "\"$POSTPROCESS_IMAGE\""
@@ -495,17 +552,17 @@ else
     # need their heavier opt-in images; others use the base image.
     VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
-        IMAGE)  VOL="-v \"$SOURCE_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
-        BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
-        ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
-        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$SOURCE_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
-        AIBOM)  VOL="-v \"$SOURCE_DIR\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
-        ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$SOURCE_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
+        IMAGE)  VOL="-v \"$OUTPUT_HOST_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
+        BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
+        ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
+        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
+        AIBOM)  VOL="-v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
+        ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files
             # that share a basename (three layers all named *_bom.json) don't
             # collide. MERGE_FILES carries the container-side paths.
-            VOL="-v \"$SOURCE_DIR\":/host-output"; MF_CONTAINER=""; i=0
+            VOL="-v \"$OUTPUT_HOST_DIR\":/host-output"; MF_CONTAINER=""; i=0
             for mf in "${MERGE_FILES[@]}"; do
                 FD="$(cd "$(dirname "$mf")" && pwd)"; FN="$(basename "$mf")"
                 VOL="$VOL -v \"$FD\":/merge-in-$i:ro"
@@ -524,8 +581,8 @@ fi
 # Docker Desktop file sharing, the container runs and reports success but the
 # /host-output mount is silently empty, so nothing lands here. Catch that
 # instead of printing "Analysis Complete!" over a folder with no SBOM.
-if [ "$GENERATE_ONLY" = "true" ] && [ ! -f "$SOURCE_DIR/$OUTPUT_FILE" ]; then
-    echo "[ERROR] SBOM not found on host: $SOURCE_DIR/$OUTPUT_FILE"
+if [ "$GENERATE_ONLY" = "true" ] && [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+    echo "[ERROR] SBOM not found on host: $OUTPUT_HOST_DIR/$OUTPUT_FILE"
     echo "  The container ran but no artifact reached this folder."
     echo "  Likely cause: this folder is outside Docker Desktop file sharing."
     echo "  Run from a shared path (e.g. under your home directory) and retry."
@@ -535,6 +592,7 @@ fi
 echo "=========================================="
 echo "  Analysis Complete!"
 if [ "$GENERATE_ONLY" = "true" ]; then
+    echo "  Output dir: ${OUTPUT_HOST_DIR}"
     echo "  SBOM: ${OUTPUT_FILE}"
     [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
     [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"

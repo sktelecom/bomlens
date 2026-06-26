@@ -20,6 +20,7 @@ LIB="$REPO/docker/lib"
 EXAMPLES="$REPO/examples"
 SCANNER_IMG="${SBOM_SCANNER_IMAGE:-sbom-scanner:test}"
 FW_IMG="${SBOM_FIRMWARE_IMAGE:-sbom-scanner-firmware:test}"
+AIBOM_IMG="${SBOM_AIBOM_IMAGE:-sbom-scanner-aibom:test}"
 VERBOSE="${VERBOSE:-false}"
 
 # Work under the repo (/Users/...) so Docker Desktop file sharing mounts it.
@@ -42,6 +43,8 @@ have_image=0
 if [ "$have_docker" = 1 ] && docker image inspect "$SCANNER_IMG" >/dev/null 2>&1; then have_image=1; fi
 have_fw_image=0
 if [ "$have_docker" = 1 ] && docker image inspect "$FW_IMG" >/dev/null 2>&1; then have_fw_image=1; fi
+have_aibom_image=0
+if [ "$have_docker" = 1 ] && docker image inspect "$AIBOM_IMG" >/dev/null 2>&1; then have_aibom_image=1; fi
 
 # Run a source scan in an isolated copy of a project. Echoes the work dir.
 run_source_scan() {
@@ -416,6 +419,9 @@ else
             if diff -q "$w1/testapp_1.0_bom.json" "$w2/testapp_1.0_bom.json" >/dev/null 2>&1; then
                 pass "go --byte-stable: two scans byte-identical"
             else
+                echo "    [diag] go --byte-stable diff (sorted-key, first 50 lines):"
+                diff <(jq -S . "$w1/testapp_1.0_bom.json" 2>/dev/null) \
+                     <(jq -S . "$w2/testapp_1.0_bom.json" 2>/dev/null) | head -50 | sed 's/^/    /'
                 fail "go --byte-stable: two scans byte-identical"
             fi
         else
@@ -450,10 +456,14 @@ else
         else
             fail "zip ingestion: risk-report produced"
         fi
-        # the temp extraction dir must be cleaned up (only artifacts remain)
+        # the temp extraction dir must be cleaned up (only artifacts remain).
+        # build-prep chowns the scanned tree back to the host user so the host can
+        # remove the root-created build files; this guards that path.
         if ! ls -d "$z"/.sbom-arc.* >/dev/null 2>&1; then
             pass "zip ingestion: temp extraction dir cleaned up"
         else
+            echo "    [diag] leftover .sbom-arc contents (ownership):"
+            ls -la "$z"/.sbom-arc.*/ 2>/dev/null | head -8 | sed 's/^/    /'
             fail "zip ingestion: temp extraction dir cleaned up"
         fi
         rm -rf "$z"
@@ -766,11 +776,16 @@ else
             else
                 fail "web UI /capabilities reports firmware/docker support"
             fi
-            # base image has no firmware tools -> firmware capability is false
-            if [ "$(curl -fsS "http://localhost:${port}/capabilities" | jq -r '.firmware')" = "false" ]; then
-                pass "web UI: firmware disabled on base image"
+            # The base image has no firmware tools, but with the docker socket
+            # mounted it reaches the firmware image as a sibling container, so
+            # firmware is usable via sibling dispatch (firmware_usable() in
+            # server.py). Assert that path is what is offered.
+            caps="$(curl -fsS "http://localhost:${port}/capabilities")"
+            if [ "$(printf '%s' "$caps" | jq -r '.firmware')" = "true" ] \
+               && [ "$(printf '%s' "$caps" | jq -r '.firmwareSibling')" = "true" ]; then
+                pass "web UI: firmware offered via sibling dispatch on base image"
             else
-                fail "web UI: firmware disabled on base image"
+                fail "web UI: firmware offered via sibling dispatch on base image" "$caps"
             fi
             # path traversal guard
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${port}/file?name=../../etc/passwd")
@@ -817,6 +832,106 @@ else
         fail "cosign keypair generated"
     fi
     rm -rf "$keydir"
+fi
+
+# --------------------------------------------------------
+# Group 7: MERGE mode E2E (layered SBOM combine, requires image)
+# --------------------------------------------------------
+section "Merge mode E2E"
+if [ "$have_image" != 1 ]; then
+    skip "merge mode (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/mrg.XXXXXX")"
+    # Two overlapping CycloneDX layers: {express,lodash} + {lodash,express,axios}.
+    # The union has three unique purls — the shared two must dedupe.
+    cp "$FIX/good-cyclonedx.json" "$w/layer-a.json"
+    cp "$FIX/cdxgen-node-managed.json" "$w/layer-b.json"
+    ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "mergetest" --version "1.0" --merge layer-a.json layer-b.json --generate-only ) > "$w/_scan.log" 2>&1
+    bom="$w/mergetest_1.0_bom.json"
+    if [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX"' "$bom" >/dev/null 2>&1; then
+        pass "merge: valid CycloneDX produced"
+    else
+        fail "merge: valid CycloneDX produced" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    if [ -f "$bom" ]; then
+        ntotal="$(jq '.components | length' "$bom" 2>/dev/null)"
+        nuniq="$(jq '[.components[].purl] | map(select(.)) | unique | length' "$bom" 2>/dev/null)"
+        if [ "${ntotal:-0}" = "3" ] && [ "${nuniq:-0}" = "3" ]; then
+            pass "merge: deduped overlapping layers by purl (3 unique)"
+        else
+            fail "merge: deduped overlapping layers by purl" "got total=$ntotal unique=$nuniq (expected 3/3)"
+        fi
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 8: ROOTFS mode E2E (directory target -> syft, requires image)
+# --------------------------------------------------------
+section "Rootfs mode E2E"
+if [ "$have_image" != 1 ]; then
+    skip "rootfs mode (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/rfs.XXXXXX")"
+    # A directory target routes to ROOTFS (syft on the tree). The bundled example
+    # has no lockfile, so component discovery may be empty — what matters here is
+    # that the directory path produces a valid, project-stamped SBOM.
+    ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "rootfstest" --version "1.0" --target "$EXAMPLES/nodejs" --generate-only ) > "$w/_scan.log" 2>&1
+    bom="$w/rootfstest_1.0_bom.json"
+    if [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX" and .metadata.component.name=="rootfstest"' "$bom" >/dev/null 2>&1; then
+        pass "rootfs: valid CycloneDX with project metadata"
+    else
+        fail "rootfs: valid CycloneDX with project metadata" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 9: BINARY mode E2E (file target -> syft, requires image)
+# --------------------------------------------------------
+section "Binary mode E2E"
+if [ "$have_image" != 1 ]; then
+    skip "binary mode (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/bin.XXXXXX")"
+    # A regular file target routes to BINARY (syft file). The name avoids the
+    # firmware extensions (.bin/.img/.fw/…) that would route to FIRMWARE, and a
+    # small file keeps syft fast; the point is that the file path produces a
+    # valid SBOM rather than being misrouted to firmware or an image pull.
+    printf 'placeholder artifact\n' > "$w/sample.dat"
+    ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "bintest" --version "1.0" --target sample.dat --generate-only ) > "$w/_scan.log" 2>&1
+    bom="$w/bintest_1.0_bom.json"
+    if [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX"' "$bom" >/dev/null 2>&1; then
+        pass "binary: file target produced valid CycloneDX"
+    else
+        fail "binary: file target produced valid CycloneDX" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 10: AIBOM mode E2E (AI model SBOM). Opt-in image + HuggingFace network,
+# so it is gated behind AIBOM_E2E=1 and never part of the default/CI run.
+# --------------------------------------------------------
+section "AI model SBOM (AIBOM) E2E"
+if [ "$have_aibom_image" != 1 ]; then
+    skip "aibom scan (image lacks the AIBOM generator — build --build-arg SBOM_AIBOM=true)"
+elif [ "${AIBOM_E2E:-0}" != "1" ]; then
+    skip "aibom scan (set AIBOM_E2E=1 to reach the HuggingFace API)"
+else
+    w="$(mktemp -d "$WORK_ROOT/aib.XXXXXX")"
+    ( cd "$w" && SBOM_AIBOM_IMAGE="$AIBOM_IMG" bash "$SCAN" \
+        --project "aibomtest" --version "1.0" --model "google-bert/bert-base-uncased" --generate-only ) > "$w/_scan.log" 2>&1
+    bom="$w/aibomtest_1.0_bom.json"
+    if [ -f "$bom" ] && jq -e '.specVersion=="1.7" and (.components[]? | select(.type=="machine-learning-model"))' "$bom" >/dev/null 2>&1; then
+        pass "aibom: CycloneDX 1.7 ML-BOM with a machine-learning-model component"
+    else
+        fail "aibom: CycloneDX 1.7 ML-BOM" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    rm -rf "$w"
 fi
 
 # --------------------------------------------------------

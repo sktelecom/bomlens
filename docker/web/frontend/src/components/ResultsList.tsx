@@ -36,14 +36,16 @@ function preferredView(formats: ArtifactFormat[]): string | null {
 
 function DownloadChip({
   fmt,
+  scanId,
   onDownload,
 }: {
   fmt: ArtifactFormat;
+  scanId: string | null;
   onDownload: () => void;
 }) {
   return (
     <Button variant="outline" size="sm" asChild>
-      <a href={fileUrl(fmt.name)} download={fmt.name} onClick={onDownload}>
+      <a href={fileUrl(scanId, fmt.name)} download={fmt.name} onClick={onDownload}>
         <Download className="h-3.5 w-3.5" />
         {formatLabel(fmt.ext)}
         <span className="font-normal text-muted-foreground">
@@ -56,9 +58,11 @@ function DownloadChip({
 
 function ArtifactCard({
   artifact,
+  scanId,
   onView,
 }: {
   artifact: LogicalArtifact;
+  scanId: string | null;
   onView: (name: string) => void;
 }) {
   const { t } = useTranslation();
@@ -68,7 +72,7 @@ function ArtifactCard({
 
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(absoluteFileUrl(formats[0].name));
+      await navigator.clipboard.writeText(absoluteFileUrl(scanId, formats[0].name));
       toast(t("result.copied"));
     } catch {
       /* clipboard blocked (insecure context) — silently ignore */
@@ -117,6 +121,7 @@ function ArtifactCard({
           <DownloadChip
             key={fmt.name}
             fmt={fmt}
+            scanId={scanId}
             onDownload={() => toast(t("result.downloadStarted"))}
           />
         ))}
@@ -128,6 +133,7 @@ function ArtifactCard({
               size: signature.size,
               viewable: false,
             }}
+            scanId={scanId}
             onDownload={() => toast(t("result.downloadStarted"))}
           />
         )}
@@ -152,7 +158,14 @@ function ArtifactCard({
   );
 }
 
-export function ResultsList({ results }: { results: ResultFile[] }) {
+export function ResultsList({
+  results,
+  scanId,
+}: {
+  results: ResultFile[];
+  /** The scan's run_id, scoping artifact URLs to its run folder. */
+  scanId: string | null;
+}) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<string | null>(null);
@@ -182,7 +195,7 @@ export function ResultsList({ results }: { results: ResultFile[] }) {
           className="text-brand hover:text-brand"
           onClick={() => toast(t("result.downloadStarted"))}
         >
-          <a href={downloadAllUrl()} download>
+          <a href={downloadAllUrl(scanId)} download>
             <Download className="h-4 w-4" />
             {t("result.downloadAll")}
           </a>
@@ -191,11 +204,11 @@ export function ResultsList({ results }: { results: ResultFile[] }) {
 
       <div className="space-y-3">
         {artifacts.map((a) => (
-          <ArtifactCard key={a.key} artifact={a} onView={setView} />
+          <ArtifactCard key={a.key} artifact={a} scanId={scanId} onView={setView} />
         ))}
       </div>
 
-      <FileViewer name={view} onClose={() => setView(null)} />
+      <FileViewer name={view} scanId={scanId} onClose={() => setView(null)} />
     </div>
   );
 }
