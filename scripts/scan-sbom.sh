@@ -491,6 +491,7 @@ if [ "$MODE" = "SOURCE" ]; then
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
+        -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
         --entrypoint sh "\"$CDX_IMG\"" \
         -c "'sh /tmp/build-prep.sh /app \"/app/$OUTPUT_FILE\" 1.6'" \
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }
