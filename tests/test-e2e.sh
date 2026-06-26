@@ -128,6 +128,33 @@ else
     skip "--git/--target exclusivity (docker daemon unavailable)"
 fi
 
+# --analyze + --model are mutually exclusive. The ANALYZE branch is evaluated
+# before the --model branch, so without an explicit guard the combination would
+# fall through to ANALYZE mode silently (regression: D-1.5.1 / D-3).
+if [ "$have_docker" = 1 ]; then
+    am_err="$(bash "$SCAN" --project p --version 1 --analyze /nonexistent-sbom.json --model org/m 2>&1 || true)"
+    if printf '%s' "$am_err" | grep -q "mutually exclusive"; then
+        pass "--analyze + --model rejected (mutually exclusive)"
+    else
+        fail "--analyze + --model rejected (mutually exclusive)" "$am_err"
+    fi
+else
+    skip "--analyze/--model exclusivity (docker daemon unavailable)"
+fi
+
+# SECURITY_ENRICH must reach the post-process container so the EPSS/CISA KEV
+# opt-out works from the host CLI for air-gapped runs. The variable was missing
+# from pp_env's forwarding list (regression: D-1.5.1 / D-1). Run the function in
+# isolation and assert it carries the host value through.
+pp_out="$( set +e +u
+    eval "$(sed -n '/^pp_env() {/,/^}/p' "$SCAN")"
+    SECURITY_ENRICH=false pp_env )"
+if printf '%s' "$pp_out" | grep -q -- "-e SECURITY_ENRICH=false"; then
+    pass "pp_env forwards SECURITY_ENRICH to the container"
+else
+    fail "pp_env forwards SECURITY_ENRICH to the container" "$pp_out"
+fi
+
 # --firmware with no target must fail fast with a clear message (needs docker daemon:
 # the guard runs after docker_check in the orchestrator).
 if [ "$have_docker" = 1 ]; then

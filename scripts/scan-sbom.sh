@@ -256,13 +256,16 @@ trap cleanup EXIT INT TERM
 # scans differ. Pin the lookup off for byte-stable scans.
 FETCH_LICENSE="${FETCH_LICENSE:-true}"
 [ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
+# EPSS + CISA KEV enrichment defaults on, but the host setting must reach the
+# post-process container so SECURITY_ENRICH=false works for air-gapped runs.
+SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -441,6 +444,7 @@ elif [ "$INGEST_SOURCE" = "true" ]; then
 elif [ -n "$ANALYZE_SBOM" ]; then
     # Supplier SBOM analysis takes precedence; it does not use --target.
     [ -z "$TARGET" ] || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --target."; exit 1; }
+    [ -z "$MODEL" ]  || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --model."; exit 1; }
     [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with --analyze."; exit 1; }
     [ -f "$ANALYZE_SBOM" ] || { echo "[ERROR] --analyze SBOM file not found: $ANALYZE_SBOM"; exit 1; }
     MODE="ANALYZE"
