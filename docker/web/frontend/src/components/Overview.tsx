@@ -197,7 +197,8 @@ function JumpCards({
           aria-label={t("overview.jumpHint", { section: t(`nav.${id}`) })}
           className={cn(
             "group rounded-lg border bg-card p-4 text-left",
-            "transition-colors duration-fast ease-out-soft hover:border-brand/40 hover:bg-muted/50",
+            "transition-[border-color,background-color,box-shadow] duration-fast ease-out-soft",
+            "hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           )}
         >

@@ -151,3 +151,17 @@
     @apply font-semibold tracking-tight;
   }
 }
+
+/* Honour a reduced-motion preference: collapse animations and transitions to
+   near-instant so the fade-ins, hover lifts and chart entrances never move for
+   users who ask the OS to limit motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
