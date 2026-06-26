@@ -317,9 +317,14 @@ export function NextApp() {
             scanId={loadedIdRef.current}
           />
 
-          {activeSection === "overview" && (
-            <ProgressLog logs={logs} status={status} collapsible />
-          )}
+          {/* The run log is reference material for the run you just watched.
+              A scan re-opened from history has no logs (logs is reset on load),
+              so don't show an empty disclosure — only render while running or
+              when there is something to show. */}
+          {activeSection === "overview" &&
+            (status === "running" || logs.length > 0) && (
+              <ProgressLog logs={logs} status={status} collapsible />
+            )}
         </div>
       )}
     </AppShell>
