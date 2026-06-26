@@ -49,7 +49,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
       ) : (
         <>
           <div
-            className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+            className="flex h-2.5 w-full origin-left animate-grow-x overflow-hidden rounded-full bg-muted"
             role={interactive ? "group" : "img"}
             aria-label={t("result.severityTitle")}
           >
