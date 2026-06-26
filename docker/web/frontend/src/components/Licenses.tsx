@@ -3,25 +3,28 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
-import { type LicenseReview, licenseGroups, reviewGroups } from "@/lib/licenses";
-import { cn } from "@/lib/utils";
+import {
+  isCopyleft,
+  type LicenseReview,
+  licenseGroups,
+  reviewGroups,
+} from "@/lib/licenses";
 
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
   "non-commercial": "licenses.flagNonCommercial",
 };
 
-// Copyleft / reciprocal licenses get a "review" tone so they stand out from the
-// permissive bulk (Apache/MIT/BSD). Heuristic on the SPDX id; a human judges.
-const COPYLEFT = /\b(A?GPL|LGPL|MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL)/i;
-
 /**
  * Licenses — the full license distribution, led by any components whose terms
  * need human review (AI behavioral-use / non-commercial), flagged from the
  * bomlens:licenseReview property so the badge matches the NOTICE review section.
+ * The distribution is a proportional bar chart (copyleft tinted for review);
+ * click a bar to list its components.
  */
 export function Licenses({ components }: { components: ComponentItem[] }) {
   const { t } = useTranslation();
@@ -36,6 +39,13 @@ export function Licenses({ components }: { components: ComponentItem[] }) {
   if (components.length === 0) {
     return <EmptyState icon={ScrollText}>{t("licenses.empty")}</EmptyState>;
   }
+
+  const bars: BarDatum[] = groups.map((g) => ({
+    key: g.name,
+    label: g.name,
+    value: g.count,
+    emphasis: isCopyleft(g.name),
+  }));
 
   return (
     <div className="space-y-6">
@@ -91,35 +101,18 @@ export function Licenses({ components }: { components: ComponentItem[] }) {
           </div>
           <span className="text-xs text-muted-foreground">{t("licenses.clickHint")}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {groups.map((g) => {
-            const sel = selected === g.name;
-            const copyleft = COPYLEFT.test(g.name);
-            return (
-              <button
-                key={g.name}
-                type="button"
-                aria-pressed={sel}
-                onClick={() => setSelected(sel ? null : g.name)}
-                className={cn(
-                  "rounded-full transition duration-fast ease-out-soft",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                  sel ? "ring-2 ring-foreground ring-offset-1" : "hover:opacity-80",
-                )}
-              >
-                <Badge tone={copyleft ? "medium" : undefined} variant={copyleft ? undefined : "muted"}>
-                  {g.name} <span className="tabular-nums opacity-70">{g.count}</span>
-                </Badge>
-              </button>
-            );
-          })}
-          {unlicensed > 0 && (
-            <Badge variant="muted">
-              {t("result.licenseNone")}{" "}
-              <span className="tabular-nums opacity-70">{unlicensed}</span>
-            </Badge>
-          )}
-        </div>
+        <BarList
+          items={bars}
+          ariaLabel={t("licenses.distribution")}
+          selectedKey={selected}
+          onSelect={(key) => setSelected((cur) => (cur === key ? null : key))}
+        />
+        {unlicensed > 0 && (
+          <div className="text-xs text-muted-foreground">
+            {t("result.licenseNone")}{" "}
+            <span className="tabular-nums">{unlicensed}</span>
+          </div>
+        )}
 
         {selected && (
           <div className="space-y-1.5 pt-1">

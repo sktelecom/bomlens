@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentItem } from "./api";
-import { licenseGroups, reviewCount, reviewGroups } from "./licenses";
+import { isCopyleft, licenseGroups, reviewCount, reviewGroups } from "./licenses";
 
 const c = (over: Partial<ComponentItem>): ComponentItem => ({
   name: "x", version: "1", group: "", purl: "", type: "library", licenses: [], ...over,
@@ -34,5 +34,16 @@ describe("reviewGroups", () => {
   it("is empty when nothing needs review", () => {
     expect(reviewGroups([c({ licenses: ["MIT"] })])).toEqual([]);
     expect(reviewCount(COMPONENTS)).toBe(2);
+  });
+});
+
+describe("isCopyleft", () => {
+  it("flags copyleft/reciprocal ids and leaves permissive ones alone", () => {
+    for (const id of ["GPL-3.0-only", "AGPL-3.0", "LGPL-2.1", "MPL-2.0", "EPL-2.0"]) {
+      expect(isCopyleft(id)).toBe(true);
+    }
+    for (const id of ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]) {
+      expect(isCopyleft(id)).toBe(false);
+    }
   });
 });

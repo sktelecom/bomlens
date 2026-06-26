@@ -1,61 +1,52 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
+import { BarList, type BarDatum } from "@/components/ui/barlist";
 import type { ComponentItem } from "@/lib/api";
+import { isCopyleft, licenseGroups } from "@/lib/licenses";
 
-const TOP = 15;
+const TOP = 8;
 
 /**
- * License distribution for the summary tab: how many components declare each
- * license, plus an "unlicensed" group. Reuses the SBOM component data already
- * shown in the components tab — no extra computation beyond grouping.
+ * License distribution for the Overview: how many components declare each
+ * license, shown as proportional bars so the permissive bulk vs. the long tail
+ * reads at a glance. Reuses the SBOM component data already shown in the
+ * Components section — no extra computation beyond grouping.
  */
 export function LicenseSummary({ components }: { components: ComponentItem[] }) {
   const { t } = useTranslation();
-
-  const { groups, none } = useMemo(() => {
-    const counts = new Map<string, number>();
-    let unlicensed = 0;
-    for (const c of components) {
-      if (c.licenses.length === 0) {
-        unlicensed += 1;
-        continue;
-      }
-      for (const l of c.licenses) counts.set(l, (counts.get(l) ?? 0) + 1);
-    }
-    const sorted = [...counts.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
-    );
-    return { groups: sorted, none: unlicensed };
-  }, [components]);
+  const { groups, unlicensed } = useMemo(
+    () => licenseGroups(components),
+    [components],
+  );
 
   if (components.length === 0) return null;
 
   const shown = groups.slice(0, TOP);
   const more = groups.length - shown.length;
+  // Scale every bar to the busiest license so proportions stay comparable even
+  // when the unlicensed bucket isn't the largest.
+  const max = Math.max(1, groups[0]?.count ?? 0, unlicensed);
+
+  const items: BarDatum[] = shown.map((g) => ({
+    key: g.name,
+    label: g.name,
+    value: g.count,
+    emphasis: isCopyleft(g.name),
+  }));
+  if (unlicensed > 0) {
+    items.push({ key: "__none__", label: t("result.licenseNone"), value: unlicensed });
+  }
 
   return (
     <div className="space-y-3">
       <div className="text-sm font-medium">{t("result.licenseSummaryTitle")}</div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {shown.map(([name, n]) => (
-          <Badge key={name} variant="muted">
-            {name} <span className="tabular-nums opacity-70">{n}</span>
-          </Badge>
-        ))}
-        {none > 0 && (
-          <Badge variant="muted">
-            {t("result.licenseNone")}{" "}
-            <span className="tabular-nums opacity-70">{none}</span>
-          </Badge>
-        )}
-        {more > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {t("result.licenseMore", { count: more })}
-          </span>
-        )}
-      </div>
+      <BarList items={items} max={max} ariaLabel={t("result.licenseSummaryTitle")} />
+      {more > 0 && (
+        <div className="text-xs text-muted-foreground">
+          {t("result.licenseMore", { count: more })}
+        </div>
+      )}
     </div>
   );
 }
