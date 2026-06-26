@@ -34,9 +34,13 @@ export interface FileNode {
   children: FileNode[];
 }
 
-/** Fetch and parse the raw ScanCode artifact. Throws on network/JSON failure. */
-export async function loadScanCode(name: string): Promise<ScanCodeReport> {
-  const res = await fetch(fileUrl(name));
+/** Fetch and parse the raw ScanCode artifact (scoped to the scan's run folder).
+ *  Throws on network/JSON failure. */
+export async function loadScanCode(
+  id: string | null | undefined,
+  name: string,
+): Promise<ScanCodeReport> {
+  const res = await fetch(fileUrl(id, name));
   if (!res.ok) throw new Error(`ScanCode fetch failed (${res.status})`);
   return (await res.json()) as ScanCodeReport;
 }

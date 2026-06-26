@@ -122,13 +122,15 @@ else
     echo ""; echo "Results: ${PASS} passed, ${FAIL} failed"; exit 1
 fi
 
-# Confirm the mounted server.py is the FIXED one (prefix-scoped done results).
+# Confirm the mounted server.py is the FIXED one (run-scoped done results).
 # A guard so a future refactor that drops the mount/fix doesn't silently pass.
-if docker exec "$CID" grep -q 'results.*list_results(prefix)' \
+# Post per-run-subfolder change the done event scopes results by run_id (the run
+# folder), so list_results is called with the run id rather than no argument.
+if docker exec "$CID" grep -q 'results.*list_results(run_id)' \
         /usr/local/lib/sbom-web/server.py 2>/dev/null; then
-    pass "server.py under test scopes done.results by prefix (regression #2 fix present)"
+    pass "server.py under test scopes done.results by run_id (regression #2 fix present)"
 else
-    fail "server.py under test still calls list_results() without a prefix"
+    fail "server.py under test still calls list_results() without a run id"
 fi
 
 # upload <kind> <file> -> echoes the upload token (empty on failure).

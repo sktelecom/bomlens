@@ -54,7 +54,11 @@ for proj in "${PROJECTS[@]}"; do
         --project "$proj" --version "1.0" --all --generate-only ) > "$w/_scan.log" 2>&1
     rc=$?
 
-    bom="$w/${proj}_1.0_bom.json"
+    # scan-sbom.sh writes each run into a per-run subfolder
+    # <base>/<project>_<version>/ (SBOM_OUTPUT_FLAT=1 would restore the flat
+    # layout). The base here is the work dir, so artifacts land under $w/<run>/.
+    rd="$w/${proj}_1.0"
+    bom="$rd/${proj}_1.0_bom.json"
     # Assert the BOM is CycloneDX, carries the input project name (not cdxgen's
     # source coords or a temp path), and has an array components (not null).
     if [ "$rc" -eq 0 ] && [ -f "$bom" ] && jq -e --arg p "$proj" \
@@ -71,14 +75,14 @@ for proj in "${PROJECTS[@]}"; do
         fail "$proj: valid CycloneDX SBOM" "rc=$rc; $(grep -iE 'error|fail' "$w/_scan.log" | tail -2 | tr '\n' ' ')"
     fi
 
-    if [ -f "$w/${proj}_1.0_NOTICE.txt" ] && [ -f "$w/${proj}_1.0_NOTICE.html" ]; then
+    if [ -f "$rd/${proj}_1.0_NOTICE.txt" ] && [ -f "$rd/${proj}_1.0_NOTICE.html" ]; then
         pass "$proj: notice (txt+html)"
     else
         fail "$proj: notice (txt+html)"
     fi
 
-    if [ -f "$w/${proj}_1.0_security.json" ] && [ -f "$w/${proj}_1.0_security.md" ] \
-       && jq -e '.Results' "$w/${proj}_1.0_security.json" >/dev/null 2>&1; then
+    if [ -f "$rd/${proj}_1.0_security.json" ] && [ -f "$rd/${proj}_1.0_security.md" ] \
+       && jq -e '.Results' "$rd/${proj}_1.0_security.json" >/dev/null 2>&1; then
         pass "$proj: security report (json+md, valid Trivy)"
     else
         fail "$proj: security report"

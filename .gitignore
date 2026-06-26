@@ -21,6 +21,7 @@ bom.json
 *_NOTICE.pdf
 *_security_epss.json
 *_vendored.cdx.json
+*_files.json
 *.wfp
 
 # Test Workspace

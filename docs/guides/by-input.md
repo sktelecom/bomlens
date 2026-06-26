@@ -61,7 +61,7 @@ $SBOM --project team1-app --version 1.0.0 \
 
 - Specific branch/tag: `--branch v1.2.3`
 - Private repository: `GIT_TOKEN=ghp_xxx $SBOM ... --git https://github.com/org/private ...` (the token never appears in logs)
-- A shallow clone (`--depth 1`) is fetched to a temp directory and analyzed; only the deliverables remain in the current directory.
+- A shallow clone (`--depth 1`) is fetched to a temp directory and analyzed; only the deliverables remain, in a `{Project}_{Version}/` subfolder under the current directory.
 
 **Deliverables**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`
 

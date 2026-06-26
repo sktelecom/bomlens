@@ -45,7 +45,7 @@ Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), th
   --generate-only
 ```
 
-`--analyze` turns on notice and security analysis automatically, so you do not need to add `--all`. `--generate-only` leaves only the outputs in the current directory and cleans up the temporary working copy. For the remaining options, see the [usage guide](../reference/cli.md#options-reference).
+`--analyze` turns on notice and security analysis automatically, so you do not need to add `--all`. `--generate-only` leaves only the outputs in a `{Project}_{Version}/` subfolder under the current directory and cleans up the temporary working copy. For the remaining options, see the [usage guide](../reference/cli.md#options-reference).
 
 ## The four outputs
 

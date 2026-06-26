@@ -96,31 +96,42 @@ cleanup() {
     fi
 }
 
-# Find BOM file function
+# Find BOM file function. Scans now land in a per-run subfolder
+# (<project>_<version>[_<ts>]/), so look there first, then fall back to the
+# legacy flat layout for back-compat.
 find_bom_file() {
     local project=$1
     local version=$2
-    
-    # Single underscore
+
+    # Per-run subfolder (current layout)
+    if [ -f "${project}_${version}/${project}_${version}_bom.json" ]; then
+        echo "${project}_${version}/${project}_${version}_bom.json"
+        return 0
+    fi
+
+    # Single underscore (legacy flat)
     if [ -f "${project}_${version}_bom.json" ]; then
         echo "${project}_${version}_bom.json"
         return 0
     fi
-    
+
     # Double underscore
     if [ -f "${project}__${version}__bom.json" ]; then
         echo "${project}__${version}__bom.json"
         return 0
     fi
-    
-    # Pattern matching
-    local pattern="${project}*${version}*bom.json"
-    local found=$(ls $pattern 2>/dev/null | head -n1)
+
+    # Pattern matching: subfolder bundle first, then flat
+    local found
+    found=$(ls "${project}"*"${version}"*/"${project}"*"${version}"*bom.json 2>/dev/null | head -n1)
+    if [ -z "$found" ]; then
+        found=$(ls "${project}"*"${version}"*bom.json 2>/dev/null | head -n1)
+    fi
     if [ -n "$found" ]; then
         echo "$found"
         return 0
     fi
-    
+
     return 1
 }
 
@@ -284,7 +295,7 @@ echo ""
 # ========================================================
 # Test 1: Node.js project
 # ========================================================
-print_test "Test 1/12: Node.js project (npm)"
+print_test "Test 1/15: Node.js project (npm)"
 
 mkdir -p node-project
 cd node-project || true
@@ -330,7 +341,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 2: Python project
 # ========================================================
-print_test "Test 2/12: Python project (pip)"
+print_test "Test 2/15: Python project (pip)"
 
 mkdir -p python-project
 cd python-project || true
@@ -368,7 +379,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 3: Java Maven project
 # ========================================================
-print_test "Test 3/12: Java Maven project"
+print_test "Test 3/15: Java Maven project"
 
 mkdir -p java-maven-project
 cd java-maven-project || true
@@ -418,7 +429,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 4: Ruby project
 # ========================================================
-print_test "Test 4/12: Ruby project (Bundler)"
+print_test "Test 4/15: Ruby project (Bundler)"
 
 mkdir -p ruby-project
 cd ruby-project || true
@@ -457,7 +468,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 5: PHP project
 # ========================================================
-print_test "Test 5/12: PHP project (Composer)"
+print_test "Test 5/15: PHP project (Composer)"
 
 mkdir -p php-project
 cd php-project || true
@@ -499,7 +510,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 6: Rust project
 # ========================================================
-print_test "Test 6/12: Rust project (Cargo)"
+print_test "Test 6/15: Rust project (Cargo)"
 
 mkdir -p rust-project
 cd rust-project || true
@@ -542,7 +553,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 7: Docker image analysis
 # ========================================================
-print_test "Test 7/12: Docker image analysis"
+print_test "Test 7/15: Docker image analysis"
 
 # Pull alpine image if network available
 if docker pull alpine:latest > /dev/null 2>&1; then
@@ -577,7 +588,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 8: Binary file analysis
 # ========================================================
-print_test "Test 8/12: Binary file analysis"
+print_test "Test 8/15: Binary file analysis"
 
 mkdir -p binary-test
 cd binary-test || true
@@ -607,7 +618,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 9: RootFS directory analysis
 # ========================================================
-print_test "Test 9/12: RootFS directory analysis"
+print_test "Test 9/15: RootFS directory analysis"
 
 mkdir -p rootfs-test/usr/bin
 cd rootfs-test || true
@@ -635,7 +646,7 @@ cd "$TEST_DIR" || true
 # ========================================================
 # Test 10: Example projects validation
 # ========================================================
-print_test "Test 10/12: Example project validation"
+print_test "Test 10/15: Example project validation"
 
 EXAMPLE_PASSED=0
 EXAMPLE_TOTAL=0
@@ -670,7 +681,7 @@ cd "$TEST_DIR" || true
 # Test 11: ZIP archive ingestion (auto-extract -> source scan)
 # Exercises native archive ingestion + risk-report (default-on, all modes).
 # ========================================================
-print_test "Test 11/12: ZIP archive ingestion"
+print_test "Test 11/15: ZIP archive ingestion"
 
 if ! command -v zip > /dev/null 2>&1; then
     print_error "ZIP ingestion (zip command unavailable)"
@@ -706,7 +717,7 @@ fi
 # language that builds a temp venv whose random name used to leak), and the
 # stamped SBOM must carry the input project name with an array components (B-2/B-3).
 # ========================================================
-print_test "Test 12/12: Python --byte-stable reproducibility"
+print_test "Test 12/15: Python --byte-stable reproducibility"
 
 mkdir -p bytestable-project
 cd bytestable-project || true
@@ -721,7 +732,7 @@ if run_scan_with_logs "test-bytestable-1" "ByteStable" "1.0.0" "--byte-stable"; 
 else
     bs_ok=false
 fi
-rm -f ./*_bom.json
+rm -rf ./ByteStable_1.0.0*/ ./*_bom.json
 if run_scan_with_logs "test-bytestable-2" "ByteStable" "1.0.0" "--byte-stable"; then
     if F2=$(find_bom_file "ByteStable" "1.0.0"); then cp "$F2" "$TEST_DIR/bs2.json"; else bs_ok=false; fi
 else
@@ -736,6 +747,100 @@ if [ "$bs_ok" = true ] \
 else
     print_error "Python --byte-stable (non-reproducible or metadata/components invalid)"
     show_failure_log "test-bytestable-2"
+    ((FAILED++))
+fi
+
+cd "$TEST_DIR" || true
+
+# ========================================================
+# Test 13: Source scan isolates its bundle and keeps the scanned tree clean
+# (regression for outputs being dumped flat into the user's source dir).
+# ========================================================
+print_test "Test 13/15: Source scan output isolation"
+
+mkdir -p isolation-project
+cd isolation-project || true
+cat > requirements.txt <<'EOF'
+flask==3.0.0
+EOF
+
+iso_ok=true
+if run_scan_with_logs "test-isolation" "Isolation" "1.0.0"; then
+    # Bundle must land in the per-run subfolder...
+    [ -f "Isolation_1.0.0/Isolation_1.0.0_bom.json" ] || iso_ok=false
+    # ...and nothing must leak flat into the scanned tree.
+    stray=$(ls ./*_bom.json 2>/dev/null | head -n1)
+    [ -z "$stray" ] || iso_ok=false
+else
+    iso_ok=false
+fi
+
+if [ "$iso_ok" = true ]; then
+    print_success "Source scan keeps the tree clean (bundle in Isolation_1.0.0/)"
+    ((PASSED++))
+else
+    print_error "Source scan leaked artifacts into the scanned tree"
+    show_failure_log "test-isolation"
+    ((FAILED++))
+fi
+
+cd "$TEST_DIR" || true
+
+# ========================================================
+# Test 14: --output-dir places the bundle under the given base directory.
+# ========================================================
+print_test "Test 14/15: --output-dir base directory"
+
+mkdir -p outdir-project
+cd outdir-project || true
+cat > requirements.txt <<'EOF'
+click==8.1.7
+EOF
+
+CUSTOM_OUT="$TEST_DIR/custom-output"
+od_ok=true
+if run_scan_with_logs "test-outdir" "OutDir" "1.0.0" "--output-dir $CUSTOM_OUT"; then
+    [ -f "$CUSTOM_OUT/OutDir_1.0.0/OutDir_1.0.0_bom.json" ] || od_ok=false
+else
+    od_ok=false
+fi
+
+if [ "$od_ok" = true ]; then
+    print_success "--output-dir honored ($CUSTOM_OUT/OutDir_1.0.0/)"
+    ((PASSED++))
+else
+    print_error "--output-dir not honored"
+    show_failure_log "test-outdir"
+    ((FAILED++))
+fi
+
+cd "$TEST_DIR" || true
+
+# ========================================================
+# Test 15: --timestamp keeps repeat scans side by side in dated folders.
+# ========================================================
+print_test "Test 15/15: --timestamp run folder"
+
+mkdir -p stamp-project
+cd stamp-project || true
+cat > requirements.txt <<'EOF'
+click==8.1.7
+EOF
+
+ts_ok=true
+if run_scan_with_logs "test-timestamp" "Stamped" "1.0.0" "--timestamp"; then
+    tsdir=$(ls -d ./Stamped_1.0.0_*/ 2>/dev/null | head -n1)
+    if [ -n "$tsdir" ] && [ -f "${tsdir}Stamped_1.0.0_bom.json" ]; then :; else ts_ok=false; fi
+else
+    ts_ok=false
+fi
+
+if [ "$ts_ok" = true ]; then
+    print_success "--timestamp run folder created ($tsdir)"
+    ((PASSED++))
+else
+    print_error "--timestamp did not create a timestamped folder"
+    show_failure_log "test-timestamp"
     ((FAILED++))
 fi
 

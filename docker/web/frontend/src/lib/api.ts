@@ -3,9 +3,17 @@
  * rebuild. All network access for the app flows through this module so the
  * contract lives in one place.
  *
- *   GET /results            → ResultFile[]
- *   GET /file?name=<n>      → raw file (download / inline view)
- *   GET /scan-stream?…      → SSE: `log` (string line) + `done` (DoneEvent)
+ *   GET /results?id=<run>      → ResultFile[] (scoped to one run folder)
+ *   GET /file?id=<run>&name=<n> → raw file (download / inline view)
+ *   GET /scan-stream?…         → SSE: `log` (string line) + `done` (DoneEvent)
+ *
+ * Scans are isolated per run in OUTPUT_DIR/<run_id>/. The `id` carried by the
+ * `done` event, each `/scans` entry and the `/scan` detail is the run_id (the
+ * run-folder name) — every later /file, /download-all, /scan and /scan-delete
+ * call must pass it. The run_id can differ from the artifact filename prefix
+ * (timestamped runs are `{prefix}_{YYYYMMDD-HHMMSS}`), so address artifacts by
+ * the names in `results[]` plus this `id`, never by reconstructing from
+ * project/version. Omitting `id` falls back to the legacy flat layout.
  */
 
 export interface ResultFile {
@@ -119,9 +127,11 @@ export interface ConformanceSummary {
 export interface DoneEvent {
   ok: boolean;
   mode?: string;
-  /** The {project}_{version} prefix this scan's artifacts share — the scan id
-   *  used for re-opening (`loadScan`) and for the `#/scan/<id>` hash route.
-   *  Set by server.py from `output_prefix`; absent on older payloads. */
+  /** The run_id (run-folder name) for this scan — used for re-opening
+   *  (`loadScan`), the `#/scan/<id>` hash route, and every later /file,
+   *  /download-all and /scan-delete call. Defaults to the artifact prefix;
+   *  timestamped runs are `{prefix}_{YYYYMMDD-HHMMSS}` and so differ from the
+   *  filename prefix. Absent on older payloads. */
   id?: string;
   results: ResultFile[];
   sbom: SbomSummary | null;
@@ -265,13 +275,19 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
   return (await res.json()) as { credId: string };
 }
 
-/** URL to download / view a generated artifact (server validates basename). */
-export function fileUrl(name: string): string {
-  return `/file?name=${encodeURIComponent(name)}`;
+/**
+ * URL to download / view a generated artifact. `name` is the pure basename
+ * inside the run folder; `id` is the run_id that scopes it. When `id` is absent
+ * the server falls back to the legacy flat layout (back-compat).
+ */
+export function fileUrl(id: string | null | undefined, name: string): string {
+  const idPart = id ? `id=${encodeURIComponent(id)}&` : "";
+  return `/file?${idPart}name=${encodeURIComponent(name)}`;
 }
 
 /** A past scan in the local output dir (history; no account / DB). */
 export interface RecentScan {
+  /** The run_id (run-folder name); pass to loadScan/deleteScan/fileUrl. */
   id: string;
   project: string;
   version: string;
@@ -299,7 +315,7 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
-/** Delete one past scan (removes its {id}_* artifacts on disk). */
+/** Delete one past scan by run_id (removes its run folder, or legacy {id}_*). */
 export async function deleteScan(id: string): Promise<boolean> {
   try {
     const res = await fetch(`/scan-delete?id=${encodeURIComponent(id)}`, {
@@ -311,7 +327,7 @@ export async function deleteScan(id: string): Promise<boolean> {
   }
 }
 
-/** Re-open a past scan by id; null if it is gone or invalid. */
+/** Re-open a past scan by run_id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {
     const res = await fetch(`/scan?id=${encodeURIComponent(id)}`);
@@ -323,18 +339,19 @@ export async function loadScan(id: string): Promise<DoneEvent | null> {
 }
 
 /** Absolute artifact URL (origin + path) — for the "copy link" action. */
-export function absoluteFileUrl(name: string): string {
-  return new URL(fileUrl(name), window.location.origin).toString();
+export function absoluteFileUrl(id: string | null | undefined, name: string): string {
+  return new URL(fileUrl(id, name), window.location.origin).toString();
 }
 
-/** URL that streams every generated artifact as a single zip. */
-export function downloadAllUrl(): string {
-  return "/download-all";
+/** URL that streams a run's generated artifacts as a single zip (scoped by id). */
+export function downloadAllUrl(id?: string | null): string {
+  return id ? `/download-all?id=${encodeURIComponent(id)}` : "/download-all";
 }
 
-export async function listResults(): Promise<ResultFile[]> {
+/** List a run's result files (scoped by run_id; all runs when omitted). */
+export async function listResults(id?: string | null): Promise<ResultFile[]> {
   try {
-    const res = await fetch("/results");
+    const res = await fetch(id ? `/results?id=${encodeURIComponent(id)}` : "/results");
     if (!res.ok) return [];
     return (await res.json()) as ResultFile[];
   } catch {

@@ -24,11 +24,11 @@ No commands beyond launching it: run in the browser, scan, and download results.
 
 ```bash
 git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
-./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
+./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-The folder you run from is where outputs are saved; on Windows it must be inside a Docker file-sharing path (`C:\Users\...` is shared by default). If the port is taken, prefix `UI_PORT=9090`. To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+The folder you run from is the output base, and each scan saves to a `{Project}_{Version}/` subfolder under it; on Windows that folder must be inside a Docker file-sharing path (`C:\Users\...` is shared by default). If the port is taken, prefix `UI_PORT=9090`. To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
@@ -49,7 +49,7 @@ Advanced — for automation and CI. Run from the cloned repo. The command below 
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target examples/nodejs --all --generate-only
 ```
 
-This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report named `MyApp_1.0.0_…` in the current directory.
+This produces a CycloneDX SBOM, an open-source notice, a security report, and a risk report named `MyApp_1.0.0_…`, all in a `MyApp_1.0.0/` subfolder of the current directory.
 
 ```bash
 # From a GitHub URL, without cloning first
@@ -62,7 +62,7 @@ Other inputs — ZIP archive, Docker image, binary, firmware, or an existing SBO
 
 ## Understanding the results
 
-Outputs are named `{Project}_{Version}_…`, for example `MyApp_1.0.0_bom.json`:
+Each scan lands in a `{Project}_{Version}/` subfolder, and the files inside are named `{Project}_{Version}_…`, for example `MyApp_1.0.0/MyApp_1.0.0_bom.json`:
 
 | File | What it is |
 |------|------------|
@@ -78,10 +78,10 @@ Quick checks with `jq` (on WSL2/Ubuntu `sudo apt-get install jq`; on Windows Git
 <!-- runnable -->
 ```bash
 # Component count
-jq '.components | length' MyApp_1.0.0_bom.json
+jq '.components | length' MyApp_1.0.0/MyApp_1.0.0_bom.json
 
 # Unique licenses
-jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0_bom.json
+jq '[.components[].licenses[]?.license.id] | unique' MyApp_1.0.0/MyApp_1.0.0_bom.json
 ```
 
 ## Requirements

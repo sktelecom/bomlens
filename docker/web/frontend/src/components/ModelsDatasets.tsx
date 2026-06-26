@@ -21,7 +21,14 @@ import { cn } from "@/lib/utils";
  * integrity, references, limitations), shows the four openness-disclosure axes
  * and the datasets the models reference. Only reachable for AI/ANALYZE scans.
  */
-export function ModelsDatasets({ sbomFile }: { sbomFile: string }) {
+export function ModelsDatasets({
+  scanId,
+  sbomFile,
+}: {
+  /** The scan's run_id, scoping the artifact fetch to its run folder. */
+  scanId: string | null;
+  sbomFile: string;
+}) {
   const { t } = useTranslation();
   const [data, setData] = useState<AiModelData | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -30,7 +37,7 @@ export function ModelsDatasets({ sbomFile }: { sbomFile: string }) {
   useEffect(() => {
     let active = true;
     setState("loading");
-    void loadSbom(sbomFile)
+    void loadSbom(scanId, sbomFile)
       .then((sbom) => {
         if (!active) return;
         setData(parseModelCards(sbom));
@@ -40,7 +47,7 @@ export function ModelsDatasets({ sbomFile }: { sbomFile: string }) {
     return () => {
       active = false;
     };
-  }, [sbomFile, reloadKey]);
+  }, [scanId, sbomFile, reloadKey]);
 
   if (state === "loading") return <LoadingState>{t("models.loading")}</LoadingState>;
   if (state === "error" || !data) {
