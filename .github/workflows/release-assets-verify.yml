@@ -1,0 +1,41 @@
+name: Release assets verify
+
+# Confirms the permanent one-click download URLs the docs advertise actually
+# resolve to a real installer. Runs after a release is published and on a weekly
+# schedule (asset hosting can change under us). Manual dispatch is available too.
+# Not a required check — a failure means a download a first-time user is told to
+# click is missing or broken.
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-downloads:
+    name: Verify desktop download URLs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest-release installers resolve
+        run: |
+          base="https://github.com/sktelecom/sbom-tools/releases/latest/download"
+          # Minimum plausible installer size (bytes); a real .exe/.dmg is tens of MB.
+          min=1000000
+          fail=0
+          for file in BomLens-Setup.exe BomLens-Setup.dmg; do
+            url="$base/$file"
+            hdr="$(curl -sIL "$url" || true)"
+            code="$(printf '%s' "$hdr" | awk '/^HTTP/ {c=$2} END {print c}')"
+            len="$(printf '%s' "$hdr" | grep -i '^content-length:' | tail -1 | tr -dc '0-9')"
+            if [ "$code" = "200" ] && [ -n "$len" ] && [ "$len" -ge "$min" ]; then
+              echo "✓ $file → HTTP $code, ${len} bytes"
+            else
+              echo "❌ $file → HTTP ${code:-none}, size ${len:-0} (expected 200 and ≥ ${min} bytes)"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || { echo "one or more advertised downloads are missing or broken"; exit 1; }

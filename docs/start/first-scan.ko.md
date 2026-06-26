@@ -45,11 +45,12 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ## 첫 번째 SBOM 생성 (CLI)
 
-자동화와 CI를 위한 고급 방식입니다. 클론한 저장소에서 실행합니다.
+자동화와 CI를 위한 고급 방식입니다. 클론한 저장소에서 실행합니다. 아래 명령은 번들로 포함된 Node.js 예제를 스캔합니다. 자신의 폴더를 스캔하려면 `--target`을 그 경로로 바꾸고, 현재 디렉터리를 스캔하려면 `--target`을 빼면 됩니다.
 
+<!-- runnable -->
 ```bash
-# 현재 디렉터리 프로젝트의 모든 산출물
-./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
+# 번들 예제 프로젝트의 모든 산출물
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target examples/nodejs --all --generate-only
 ```
 
 ```bash
@@ -114,6 +115,7 @@ SBOM은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON입니다.
 
 아래 예시는 `jq`를 씁니다. WSL2(우분투)는 `sudo apt-get install jq`, Windows Git Bash는 `winget install jqlang.jq`로 설치합니다. 설치가 번거롭다면 웹 UI 개요 화면에서 컴포넌트 수와 라이선스를 바로 볼 수 있습니다.
 
+<!-- runnable -->
 ```bash
 # 컴포넌트 수 확인
 jq '.components | length' MyApp_1.0.0_bom.json

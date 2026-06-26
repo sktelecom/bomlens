@@ -24,7 +24,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--version <version>` | — | **(required)** Project version |
 | `--target <target>` | current directory | What to analyze: a directory (source tree, or an OS rootfs / staging build output), a Docker image, a binary file, or a `.zip`/`.tar.gz` archive |
 | `--git <url>` | — | Shallow-clone a git/GitHub URL and analyze it as source (private repos: `GIT_TOKEN` env var) |
-| `--branch <ref>` | default branch | Branch, tag, or commit of the `--git` target |
+| `--branch <ref>` | default branch | Branch, tag, or commit of the `--git` target (alias `--ref`) |
 | `--firmware` | false | Force firmware mode on the `--target` file (opt-in firmware image) |
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
 | `--model <owner/name>` | — | Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace model via the OWASP AIBOM Generator (opt-in `bomlens-aibom` image; fetches model-card metadata over the network). Mutually exclusive with `--target`/`--analyze`/`--git`/`--merge` |
