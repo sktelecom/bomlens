@@ -766,11 +766,17 @@ else
             else
                 fail "web UI /capabilities reports firmware/docker support"
             fi
-            # base image has no firmware tools -> firmware capability is false
-            if [ "$(curl -fsS "http://localhost:${port}/capabilities" | jq -r '.firmware')" = "false" ]; then
-                pass "web UI: firmware disabled on base image"
+            # A stripped base build reports firmware:false; the published image
+            # offers firmware scanning (it dispatches the separate firmware image),
+            # so only assert this when explicitly testing a base build.
+            if [ "${SBOM_E2E_BASE_IMAGE:-0}" = "1" ]; then
+                if [ "$(curl -fsS "http://localhost:${port}/capabilities" | jq -r '.firmware')" = "false" ]; then
+                    pass "web UI: firmware disabled on base image"
+                else
+                    fail "web UI: firmware disabled on base image"
+                fi
             else
-                fail "web UI: firmware disabled on base image"
+                skip "web UI: firmware capability gating (set SBOM_E2E_BASE_IMAGE=1 for a base build)"
             fi
             # path traversal guard
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${port}/file?name=../../etc/passwd")

@@ -28,6 +28,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # The scanner image plus per-language cdxgen images are large; reclaim the
+      # space the runner ships preloaded so multi-language scans don't hit ENOSPC.
+      - name: Free up runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost 2>/dev/null || true
+          df -h /
+
       - name: Grant script permissions
         run: |
           chmod +x scripts/scan-sbom.sh

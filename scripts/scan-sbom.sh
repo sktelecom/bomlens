@@ -202,8 +202,21 @@ SOURCE_DIR="$(pwd)"          # host-output anchor: artifacts land where the user
 SCAN_INPUT_DIR="$SOURCE_DIR" # what cdxgen scans (overridden by git clone / zip extract)
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 
-# Temp dirs (git clone / archive extract) are cleaned on any exit.
-cleanup() { local d; for d in "${CLEANUP_DIRS[@]}"; do [ -n "$d" ] && rm -rf -- "$d"; done; }
+# Temp dirs (git clone / archive extract) are cleaned on any exit. A container
+# build step (e.g. npm install during a source scan) can leave root-owned files
+# in the mounted temp dir on Linux, where the host user cannot rm them; fall back
+# to clearing those via a throwaway container so nothing lingers.
+cleanup() {
+    local d
+    for d in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$d" ] || continue
+        rm -rf -- "$d" 2>/dev/null
+        if [ -e "$d" ] && command -v docker >/dev/null 2>&1; then
+            docker run --rm -v "$(dirname "$d")":/cleanup alpine:latest \
+                rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
+        fi
+    done
+}
 trap cleanup EXIT INT TERM
 
 # Common -e flags for the post-process image.
