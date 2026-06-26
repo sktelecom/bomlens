@@ -495,6 +495,13 @@ else
     fail "source-file-tree.sh output is wrong" "$(cat "$WORK/sft.json" 2>/dev/null)"
 fi
 
+# D-6 regression: the EPSS sidecar (_security_epss.json) must be deleted with the
+# rest of a flat scan's artifacts. It was absent from ARTIFACT_SUFFIXES, so
+# /scan-delete walked past it and left the file orphaned to accumulate on disk.
+cat > "$OUT/demo_1.0_security_epss.json" <<'JSON'
+{"items":[{"cve":"CVE-2020-0001","epss":0.12,"percentile":0.5}]}
+JSON
+
 # /scan-delete removes a past scan's artifacts, and fails closed on a bad id.
 # The delete builds an OUTPUT_DIR path from the id, so cover the traversal guard.
 del_bad=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/scan-delete?id=../../etc/passwd")
@@ -509,7 +516,11 @@ assert d['deleted'] == 'demo_1.0' and d['removed'] >= 1, d
 else
     fail "/scan-delete did not delete the scan" "$del_resp"
 fi
-[ ! -f "$OUT/demo_1.0_bom.json" ] && pass "/scan-delete left no artifact behind" || fail "demo_1.0 artifacts still present after delete"
+if [ ! -f "$OUT/demo_1.0_bom.json" ] && [ ! -f "$OUT/demo_1.0_security_epss.json" ]; then
+    pass "/scan-delete left no artifact behind (incl. the EPSS sidecar)"
+else
+    fail "demo_1.0 artifacts still present after delete" "$(ls "$OUT"/demo_1.0_* 2>/dev/null)"
+fi
 del_gone=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan?id=demo_1.0")
 [ "$del_gone" = "404" ] && pass "deleted scan is gone (404)" || fail "deleted scan returned $del_gone (expected 404)"
 rm -f "$OUT"/demo_1.0_*
