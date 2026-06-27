@@ -19,6 +19,8 @@ interface Props {
   items: ComponentItem[];
   total: number;
   truncated?: boolean;
+  /** Search term seeded from global search; applied to the name/license filter. */
+  initialQuery?: string;
 }
 
 type Sort = { key: ComponentSortKey; dir: SortDir };
@@ -106,9 +108,18 @@ function FilterChip({
 
 /** Searchable, sortable, filterable table of detected SBOM components, with
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
-export function ComponentsTable({ items, total, truncated }: Props) {
+export function ComponentsTable({ items, total, truncated, initialQuery }: Props) {
   const { t } = useTranslation();
-  const [filters, setFilters] = useState<ComponentFilters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<ComponentFilters>(() => ({
+    ...EMPTY_FILTERS,
+    query: initialQuery ?? "",
+  }));
+  // Re-seed the search when global search routes in a new term.
+  useEffect(() => {
+    if (initialQuery !== undefined) {
+      setFilters((f) => ({ ...f, query: initialQuery }));
+    }
+  }, [initialQuery]);
   const [sort, setSort] = useState<Sort | null>(null);
   const [limit, setLimit] = useState(RENDER_STEP);
   const [openKey, setOpenKey] = useState<string | null>(null);
