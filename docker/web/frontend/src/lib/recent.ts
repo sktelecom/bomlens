@@ -62,6 +62,40 @@ export interface ScanComparison {
   severityDir: "up" | "down" | "same";
 }
 
+export type RecentSortKey = "scan" | "generated" | "components" | "severity";
+export type RecentSortDir = "asc" | "desc";
+
+/**
+ * Sort the Recent list by a column. Pure and stable: the chosen key drives the
+ * primary order (direction-aware), with most-recent-first as the tiebreak so
+ * equal rows keep a sensible order. The default view is generated/desc.
+ */
+export function sortRecent(
+  scans: RecentScan[],
+  key: RecentSortKey,
+  dir: RecentSortDir,
+): RecentScan[] {
+  const factor = dir === "asc" ? 1 : -1;
+  const primary = (a: RecentScan, b: RecentScan): number => {
+    switch (key) {
+      case "scan":
+        return (
+          a.project.localeCompare(b.project) ||
+          (a.version || "").localeCompare(b.version || "")
+        );
+      case "components":
+        return a.components - b.components;
+      case "severity":
+        return severityRank(a.maxSeverity) - severityRank(b.maxSeverity);
+      default:
+        return a.generatedAt - b.generatedAt;
+    }
+  };
+  return [...scans].sort(
+    (a, b) => factor * primary(a, b) || b.generatedAt - a.generatedAt,
+  );
+}
+
 /** Worst-severity rank, higher = more severe; null/none = 0. */
 function severityRank(s: RecentScan["maxSeverity"]): number {
   if (!s) return 0;
