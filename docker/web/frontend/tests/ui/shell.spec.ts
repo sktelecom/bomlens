@@ -429,6 +429,15 @@ test("Overview leads with needs-attention and jumps into sections", async ({ pag
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
 
+test("section navigation moves focus to the section heading", async ({ page }) => {
+  await stubAndRun(page);
+  // Switching sections from the rail should move focus onto the new section's
+  // heading, so keyboard/screen-reader users follow the content.
+  await page.getByRole("navigation").locator('a[href$="/components"]').first().click();
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await expect(page.locator("main h1")).toBeFocused();
+});
+
 test("overview has no axe violations", async ({ page }) => {
   await stubAndRun(page);
   await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();

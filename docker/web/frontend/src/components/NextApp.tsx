@@ -93,6 +93,13 @@ export function NextApp() {
   // The id of an in-flight live scan, so its `done` can set the URL.
   const runningIdRef = useRef<string | null>(null);
 
+  // The result-section heading. On a section change we move focus here so
+  // keyboard and screen-reader users land on (and hear) the new section instead
+  // of being left on the rail link. Skip the first run so we don't grab focus
+  // on initial load.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const didMountRef = useRef(false);
+
   // The live scan's SSE stream. Held so leaving the running view (new scan,
   // opening a past scan) can close it — otherwise a backgrounded scan finishes
   // later and hijacks whatever the user is now looking at.
@@ -176,6 +183,17 @@ export function NextApp() {
     window.addEventListener("hashchange", route);
     return () => window.removeEventListener("hashchange", route);
   }, [route]);
+
+  // Move focus to the section heading when the active section changes, so a
+  // keyboard/screen-reader user follows the content instead of staying on the
+  // rail link. Skipped on first mount to avoid stealing initial focus.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    headingRef.current?.focus();
+  }, [activeSection]);
 
   // Close the live scan stream if the app unmounts.
   useEffect(() => () => streamRef.current?.close(), []);
@@ -288,10 +306,15 @@ export function NextApp() {
         <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              <h1
+                ref={headingRef}
+                tabIndex={-1}
+                className="text-3xl font-semibold tracking-tight text-foreground focus:outline-none"
+              >
                 {t(`nav.${activeSection}`)}
               </h1>
               <span
+                role="status"
                 className={
                   result.ok
                     ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
