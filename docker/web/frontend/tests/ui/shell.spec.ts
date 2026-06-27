@@ -107,9 +107,14 @@ test("New scan screen matches baseline — light/en @visual", async ({ page }) =
 });
 
 test("AI model source is gated on the AIBOM image", async ({ page }) => {
-  // Without the AIBOM image, the tile is disabled.
+  // Without the AIBOM image, the tile is locked (aria-disabled, with a visible
+  // reason) rather than plain-disabled, so its reason is still announced.
   await openNewScan(page, "light", "en");
-  await expect(page.getByRole("button", { name: "AI model" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "AI model" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  await expect(page.getByText("AI-model SBOMs need Docker", { exact: false })).toBeVisible();
 
   // With the AIBOM image, selecting it reveals the HuggingFace model id input.
   await page.route("**/capabilities", (r) =>

@@ -7,6 +7,7 @@ import {
   Folder,
   FolderTree,
   Github,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -77,50 +78,75 @@ export function NewScan({ running, capabilities, onRun }: Props) {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Left: pick what to scan, then its source-specific input. */}
         <div className="space-y-4">
-          <div
-            role="group"
-            aria-label={t("newscan.source")}
-            className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
-          >
-            {SOURCE_GROUPS.flatMap((group) => group.sources).map((s) => {
-              const { labelKey, icon: Icon } = SOURCE_META[s];
-              const active = state.source === s;
-              const fwLocked = s === "firmware-upload" && !capabilities.firmware;
-              const aiLocked = s === "ai-model" && !capabilities.aibom;
-              const locked = fwLocked || aiLocked;
+          <div role="group" aria-label={t("newscan.source")} className="space-y-4">
+            {SOURCE_GROUPS.map((group) => {
+              // Lock reason for this group (firmware/AI need the Docker sibling
+              // image). Shown as visible text so keyboard/touch users — who can't
+              // see a hover title — still learn why a tile is unavailable.
+              const lockReason =
+                group.sources.includes("firmware-upload") && !capabilities.firmware
+                  ? t("source.firmwareUnavailable")
+                  : group.sources.includes("ai-model") && !capabilities.aibom
+                    ? t("source.aiModelUnavailable")
+                    : null;
               return (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={active}
-                  disabled={state.busy || locked}
-                  title={
-                    fwLocked
-                      ? t("source.firmwareUnavailable")
-                      : aiLocked
-                        ? t("source.aiModelUnavailable")
-                        : undefined
-                  }
-                  onClick={() => state.changeSource(s)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
-                    "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    "disabled:pointer-events-none disabled:opacity-50",
-                    active
-                      ? "border-brand/40 bg-brand/10 font-medium text-foreground"
-                      : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
+                <div key={group.key} className="space-y-2">
+                  <p className={SECTION_LABEL}>{t(`newscan.${group.key}`)}</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                    {group.sources.map((s) => {
+                      const { labelKey, icon: Icon } = SOURCE_META[s];
+                      const active = state.source === s;
+                      const locked =
+                        (s === "firmware-upload" && !capabilities.firmware) ||
+                        (s === "ai-model" && !capabilities.aibom);
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          aria-disabled={locked || undefined}
+                          disabled={state.busy}
+                          onClick={() => {
+                            if (!locked) state.changeSource(s);
+                          }}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
+                            "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            "disabled:pointer-events-none disabled:opacity-50",
+                            locked
+                              ? "cursor-not-allowed border-dashed text-muted-foreground"
+                              : active
+                                ? "border-brand/40 bg-brand/10 font-medium text-foreground"
+                                : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
+                          )}
+                        >
+                          <Icon
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              locked
+                                ? "text-muted-foreground/60"
+                                : active
+                                  ? "text-brand"
+                                  : "text-muted-foreground",
+                            )}
+                            aria-hidden
+                          />
+                          <span className="truncate">{t(labelKey)}</span>
+                          {locked && (
+                            <Lock
+                              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
+                              aria-hidden
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {lockReason && (
+                    <p className="text-xs text-muted-foreground">{lockReason}</p>
                   )}
-                >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      active ? "text-brand" : "text-muted-foreground",
-                    )}
-                    aria-hidden
-                  />
-                  <span className="truncate">{t(labelKey)}</span>
-                </button>
+                </div>
               );
             })}
           </div>
