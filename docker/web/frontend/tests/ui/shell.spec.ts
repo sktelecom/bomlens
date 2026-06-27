@@ -70,6 +70,9 @@ for (const { theme, lang } of COMBOS) {
     // The idle home is now Recent scans (`#/`). With no backend the list is
     // empty, so this also covers the Recent empty state + New scan CTA.
     await openShell(page, theme, lang);
+    // Wait out the main fade-in: axe weighs opacity into contrast, so analysing
+    // mid-fade (text at opacity < 1) reports false color-contrast violations.
+    await waitForMainSettled(page);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();
@@ -87,6 +90,7 @@ for (const { theme, lang } of COMBOS) {
 
 test("New scan screen has no axe violations", async ({ page }) => {
   await openNewScan(page, "light", "en");
+  await waitForMainSettled(page); // see note above: avoid mid-fade contrast flake
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -230,7 +234,7 @@ test("Recent home deletes a scan from its row", async ({ page }) => {
   // The row's trash button deletes the scan; the list refreshes to empty.
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0);
-  await expect(page.getByText("No scans yet. Start with a New scan.")).toBeVisible();
+  await expect(page.getByText("Generate your first SBOM")).toBeVisible();
 });
 
 test("Recent home empty state offers a New scan CTA", async ({ page }) => {
@@ -240,7 +244,7 @@ test("Recent home empty state offers a New scan CTA", async ({ page }) => {
   await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
   await page.goto("/?ui=next");
 
-  await expect(page.getByText("No scans yet. Start with a New scan.")).toBeVisible();
+  await expect(page.getByText("Generate your first SBOM")).toBeVisible();
   // The CTA links to the New scan screen; following it lands there.
   const cta = page.getByRole("main").getByRole("link", { name: "New scan" });
   await expect(cta).toHaveAttribute("href", "#/new");

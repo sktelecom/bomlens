@@ -1,10 +1,17 @@
-import { Clock, FolderOpen, Plus, Trash2 } from "lucide-react";
+import {
+  FileJson,
+  FolderOpen,
+  Plus,
+  ScanLine,
+  ScrollText,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/state";
 import type { RecentScan, Severity } from "@/lib/api";
 import {
   formatRelativeTime,
@@ -82,15 +89,37 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
       </div>
 
       {scans.length === 0 ? (
+        // First-run hero: this empty Recent list is what a new user sees first,
+        // so orient them — what BomLens does, how to start, and what it produces.
         <Card>
-          <CardContent className="space-y-4 p-8">
-            <EmptyState icon={Clock}>{t("recent.empty")}</EmptyState>
-            <div className="flex justify-center">
-              <a href={newHref} className={cn(buttonVariants())}>
-                <Plus className="h-4 w-4" aria-hidden />
-                {t("shell.newScan")}
-              </a>
+          <CardContent className="flex flex-col items-center gap-5 px-6 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+              <ScanLine className="h-6 w-6" aria-hidden />
             </div>
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                {t("recent.emptyTitle")}
+              </h2>
+              <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                {t("recent.emptyBody")}
+              </p>
+            </div>
+            <a href={newHref} className={cn(buttonVariants())}>
+              <Plus className="h-4 w-4" aria-hidden />
+              {t("shell.newScan")}
+            </a>
+            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+              {[
+                { icon: FileJson, label: t("recent.emptyOutSbom") },
+                { icon: ScrollText, label: t("recent.emptyOutNotice") },
+                { icon: ShieldCheck, label: t("recent.emptyOutSecurity") },
+              ].map(({ icon: Icon, label }) => (
+                <li key={label} className="inline-flex items-center gap-1.5">
+                  <Icon className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  {label}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       ) : (
