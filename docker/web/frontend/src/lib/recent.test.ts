@@ -5,6 +5,7 @@ import {
   formatRelativeTime,
   scanComparison,
   scanTypeLabelKey,
+  sortRecent,
   summarizeRecent,
 } from "./recent";
 
@@ -109,6 +110,34 @@ describe("scanComparison", () => {
   it("is null with no prior scan of the same project, or an unknown id", () => {
     expect(scanComparison(list, "prev")).toBeNull(); // nothing older for project p
     expect(scanComparison(list, "missing")).toBeNull();
+  });
+});
+
+describe("sortRecent", () => {
+  const list: RecentScan[] = [
+    scan({ id: "a", project: "alpha", components: 5, maxSeverity: "LOW", generatedAt: 100 }),
+    scan({ id: "b", project: "charlie", components: 30, maxSeverity: "CRITICAL", generatedAt: 300 }),
+    scan({ id: "c", project: "bravo", components: 12, maxSeverity: null, generatedAt: 200 }),
+  ];
+
+  it("sorts by generated time (desc = newest first)", () => {
+    expect(sortRecent(list, "generated", "desc").map((s) => s.id)).toEqual(["b", "c", "a"]);
+    expect(sortRecent(list, "generated", "asc").map((s) => s.id)).toEqual(["a", "c", "b"]);
+  });
+
+  it("sorts by component count and by worst severity", () => {
+    expect(sortRecent(list, "components", "desc").map((s) => s.id)).toEqual(["b", "c", "a"]);
+    expect(sortRecent(list, "severity", "desc").map((s) => s.id)[0]).toBe("b"); // CRITICAL first
+  });
+
+  it("sorts by project name and doesn't mutate the input", () => {
+    const copy = [...list];
+    expect(sortRecent(list, "scan", "asc").map((s) => s.project)).toEqual([
+      "alpha",
+      "bravo",
+      "charlie",
+    ]);
+    expect(list).toEqual(copy);
   });
 });
 

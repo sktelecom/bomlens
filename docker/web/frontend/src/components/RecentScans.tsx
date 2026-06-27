@@ -1,4 +1,7 @@
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   FileJson,
   FolderOpen,
   Plus,
@@ -7,6 +10,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +19,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { RecentScan, Severity } from "@/lib/api";
 import {
   formatRelativeTime,
+  type RecentSortDir,
+  type RecentSortKey,
   scanTypeLabelKey,
+  sortRecent,
   summarizeRecent,
 } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
@@ -68,6 +75,46 @@ function SummaryCard({
 
 const TH = "px-4 py-3 text-left font-medium";
 
+interface RecentSort {
+  key: RecentSortKey;
+  dir: RecentSortDir;
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: RecentSortKey;
+  sort: RecentSort;
+  onSort: (key: RecentSortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={cn("px-4 py-3 font-medium", className)}
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {label}
+        <Icon
+          className={cn("h-3 w-3", active ? "text-foreground" : "text-muted-foreground/60")}
+          aria-hidden
+        />
+      </button>
+    </th>
+  );
+}
+
 /**
  * Recent scans — the home screen (logo / `#/` target). A light summary strip
  * over a table of past local scans. Every figure is computed from real
@@ -78,6 +125,12 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
   const { t, i18n } = useTranslation();
   const summary = summarizeRecent(scans);
   const now = Date.now();
+  const [sort, setSort] = useState<RecentSort>({ key: "generated", dir: "desc" });
+  const sorted = useMemo(() => sortRecent(scans, sort.key, sort.dir), [scans, sort]);
+  const onSort = (key: RecentSortKey) =>
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
+    );
 
   return (
     <div className="space-y-6">
@@ -139,20 +192,24 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs text-muted-foreground">
-                    <th className={TH}>{t("recent.colScan")}</th>
+                    <SortHeader label={t("recent.colScan")} sortKey="scan" sort={sort} onSort={onSort} />
                     <th className={TH}>{t("recent.colType")}</th>
-                    <th className={TH}>{t("recent.colGenerated")}</th>
-                    <th className={cn(TH, "text-right")}>
-                      {t("recent.colComponents")}
-                    </th>
-                    <th className={TH}>{t("recent.colSeverity")}</th>
+                    <SortHeader label={t("recent.colGenerated")} sortKey="generated" sort={sort} onSort={onSort} />
+                    <SortHeader
+                      label={t("recent.colComponents")}
+                      sortKey="components"
+                      sort={sort}
+                      onSort={onSort}
+                      className="text-right"
+                    />
+                    <SortHeader label={t("recent.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
                     <th className={cn(TH, "text-right")}>
                       <span className="sr-only">{t("recent.delete")}</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {scans.map((s) => (
+                  {sorted.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b transition-colors duration-fast ease-out-soft last:border-0 hover:bg-muted/40"
