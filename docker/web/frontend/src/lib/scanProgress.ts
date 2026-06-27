@@ -27,6 +27,16 @@ export function scanStageIndex(logs: string[]): number {
   return 0;
 }
 
+/**
+ * A monotonic, honest percent (0–100) from the furthest pipeline stage reached.
+ * The active stage counts as half done, so the bar advances with real progress
+ * and never claims completion before the scan's done event. Replaces the old
+ * log-volume guess; the caller snaps to 100 once the scan finishes.
+ */
+export function stageProgress(logs: string[]): number {
+  return Math.round(((scanStageIndex(logs) + 0.5) / SCAN_STAGES.length) * 100);
+}
+
 export type StageStatus = "done" | "active" | "pending";
 
 /** Per-stage status for the given logs and run state. */

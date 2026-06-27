@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { ScanProgress } from "@/lib/api";
+import { stageProgress } from "@/lib/scanProgress";
 import { cn } from "@/lib/utils";
 
 export type RunStatus = "running" | "done" | "error";
@@ -55,7 +56,7 @@ export function ProgressLog({
   const value = determinate
     ? Math.min(100, Math.max(0, progress!.percent))
     : status === "running"
-      ? Math.min(92, 8 + logs.length * 2)
+      ? stageProgress(logs)
       : 100;
 
   const body = (

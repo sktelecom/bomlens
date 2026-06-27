@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { SCAN_STAGES, scanStageIndex, stageStatuses } from "./scanProgress";
+import {
+  SCAN_STAGES,
+  scanStageIndex,
+  stageProgress,
+  stageStatuses,
+} from "./scanProgress";
 
 describe("scanStageIndex", () => {
   it("is 0 before any recognizable marker", () => {
@@ -29,5 +34,16 @@ describe("stageStatuses", () => {
 
   it("marks every stage done once finished", () => {
     expect(stageStatuses([], true)).toEqual(SCAN_STAGES.map(() => "done"));
+  });
+});
+
+describe("stageProgress", () => {
+  it("advances monotonically with the furthest stage, never reaching 100", () => {
+    const start = stageProgress([]); // generate active, no marker yet
+    const mid = stageProgress(["[1/2] cdxgen", "[notice] generated"]);
+    const late = stageProgress(["[risk] generated"]);
+    expect(start).toBeLessThan(mid);
+    expect(mid).toBeLessThan(late);
+    expect(late).toBeLessThan(100); // the done event snaps to 100, not this
   });
 });
