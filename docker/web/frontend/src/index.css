@@ -25,7 +25,7 @@
     --popover-foreground: 240 6% 10%;
 
     --muted: 240 5% 96%; /* #f4f4f5 */
-    --muted-foreground: 240 4% 46%; /* #71717a — AA on muted */
+    --muted-foreground: 240 4% 44%; /* #6c6c75 — ≥4.6:1 on both background and muted (was 46%, a 4.49 knife-edge) */
 
     --border: 240 5% 91%; /* #e5e5ea */
     --input: 240 5% 91%;
