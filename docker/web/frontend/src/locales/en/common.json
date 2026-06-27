@@ -202,6 +202,8 @@
     "legendVuln": "Vulnerable",
     "arrowHint": "Arrows point from a package to what it depends on.",
     "interactHint": "Hover to trace a package's links; click for details.",
+    "keyboardHint": "Keyboard users: switch to Tree to navigate.",
+    "graphAria": "Dependency graph (visual). Switch to Tree view to navigate by keyboard.",
     "hasVuln": "Has known vulnerabilities"
   },
   "sourceTree": {
