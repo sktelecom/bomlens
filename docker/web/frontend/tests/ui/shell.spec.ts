@@ -367,7 +367,8 @@ const SBOM = {
   ],
 };
 
-async function stubAndRun(page: Page) {
+async function stubAndRun(page: Page, theme: Theme = "light") {
+  await seedThemeLang(page, theme, "en");
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -433,15 +434,20 @@ test("overview has no axe violations", async ({ page }) => {
   expect(results.violations).toEqual([]);
 });
 
-test("overview section matches baseline — light/en @visual", async ({ page }) => {
-  await stubAndRun(page);
-  await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("overview-light-en.png", {
-    animations: "disabled",
+// Result-section visuals run in light and dark (English). Korean coverage is a
+// follow-up: it needs language-agnostic selectors (the nav links, the Tree
+// toggle and several setup waits assert on translated text).
+for (const theme of ["light", "dark"] as const) {
+  test(`overview section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAndRun(page, theme);
+    await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`overview-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 // An AI scan: the SBOM carries a machine-learning-model component, so the rail
 // exposes Models & Datasets. /file returns the matching ML-BOM (CycloneDX 1.7).
@@ -496,7 +502,8 @@ const AI_SBOM = {
   ],
 };
 
-async function stubAiAndRun(page: Page) {
+async function stubAiAndRun(page: Page, theme: Theme = "light") {
+  await seedThemeLang(page, theme, "en");
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -528,16 +535,18 @@ test("AI scan exposes Models & Datasets with the model card", async ({ page }) =
   expect(results.violations).toEqual([]);
 });
 
-test("models section matches baseline — light/en @visual", async ({ page }) => {
-  await stubAiAndRun(page);
-  await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
-  await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("models-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`models section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAiAndRun(page, theme);
+    await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
+    await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`models-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 test("AI scan exposes G7 conformance with present/advisory split", async ({ page }) => {
   await stubAiAndRun(page);
@@ -557,24 +566,26 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   expect(results.violations).toEqual([]);
 });
 
-test("conformance section matches baseline — light/en @visual", async ({ page }) => {
-  await stubAiAndRun(page);
-  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
-  await expect(page.getByText("4/6 present")).toBeVisible();
-  await expect(
-    page.getByText("G7 model openness (weight/architecture/data/training)"),
-  ).toBeVisible();
-  // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
-  // switch. With `animations: "disabled"`, Playwright freezes the transform to a
-  // non-deterministic frame, so the whole tall section is sometimes captured 4px
-  // low — a constant ~3% diff. Wait for main's own animations to finish so the
-  // transform has settled to translateY(0) before the screenshot.
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("conformance-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`conformance section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAiAndRun(page, theme);
+    await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
+    await expect(page.getByText("4/6 present")).toBeVisible();
+    await expect(
+      page.getByText("G7 model openness (weight/architecture/data/training)"),
+    ).toBeVisible();
+    // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
+    // switch. With `animations: "disabled"`, Playwright freezes the transform to a
+    // non-deterministic frame, so the whole tall section is sometimes captured 4px
+    // low — a constant ~3% diff. Wait for main's own animations to finish so the
+    // transform has settled to translateY(0) before the screenshot.
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`conformance-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 // A scan with AI-restrictive licenses, for the Licenses review section.
 const LIC_DONE = {
@@ -594,7 +605,8 @@ const LIC_DONE = {
   },
 };
 
-async function stubLicensesAndRun(page: Page) {
+async function stubLicensesAndRun(page: Page, theme: Theme = "light") {
+  await seedThemeLang(page, theme, "en");
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -625,16 +637,18 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   expect(results.violations).toEqual([]);
 });
 
-test("licenses section matches baseline — light/en @visual", async ({ page }) => {
-  await stubLicensesAndRun(page);
-  await page.getByRole("link", { name: /^Licenses/ }).first().click();
-  await expect(page.getByText("License review needed")).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("licenses-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`licenses section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubLicensesAndRun(page, theme);
+    await page.getByRole("link", { name: /^Licenses/ }).first().click();
+    await expect(page.getByText("License review needed")).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`licenses-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 test("Dependencies tree marks vulnerable packages and direct deps", async ({ page }) => {
   await stubAndRun(page);
@@ -653,17 +667,19 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   expect(results.violations).toEqual([]);
 });
 
-test("dependencies tree matches baseline — light/en @visual", async ({ page }) => {
-  await stubAndRun(page);
-  await page.getByRole("link", { name: /^Dependencies/ }).first().click();
-  await page.getByRole("button", { name: "Tree", exact: true }).click();
-  await expect(page.getByText("openssl").first()).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("dependencies-tree-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`dependencies tree matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAndRun(page, theme);
+    await page.getByRole("link", { name: /^Dependencies/ }).first().click();
+    await page.getByRole("button", { name: "Tree", exact: true }).click();
+    await expect(page.getByText("openssl").first()).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`dependencies-tree-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page }) => {
   await stubAndRun(page);
@@ -693,16 +709,18 @@ test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page
   await expect(page.getByText("CVSS:3.1/AV:N/AC:L")).toBeVisible();
 });
 
-test("vulnerabilities section matches baseline — light/en @visual", async ({ page }) => {
-  await stubAndRun(page);
-  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
-  await expect(page.getByText("9.8", { exact: true })).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("vulnerabilities-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`vulnerabilities section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAndRun(page, theme);
+    await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+    await expect(page.getByText("9.8", { exact: true })).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`vulnerabilities-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 test("Components table shows Scope/Risk and filters on the full set", async ({ page }) => {
   await stubAndRun(page);
@@ -726,16 +744,18 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
 
-test("components section matches baseline — light/en @visual", async ({ page }) => {
-  await stubAndRun(page);
-  await page.getByRole("link", { name: /^Components/ }).first().click();
-  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
-  await waitForMainSettled(page);
-  await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-  await expect(page.locator("main")).toHaveScreenshot("components-light-en.png", {
-    animations: "disabled",
+for (const theme of ["light", "dark"] as const) {
+  test(`components section matches baseline — ${theme}/en @visual`, async ({ page }) => {
+    await stubAndRun(page, theme);
+    await page.getByRole("link", { name: /^Components/ }).first().click();
+    await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+    await waitForMainSettled(page);
+    await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
+    await expect(page.locator("main")).toHaveScreenshot(`components-${theme}-en.png`, {
+      animations: "disabled",
+    });
   });
-});
+}
 
 test("results view has no axe violations", async ({ page }) => {
   await stubAndRun(page);
