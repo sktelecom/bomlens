@@ -276,7 +276,8 @@
     "stageReport": "Report",
     "failedTitle": "The scan didn't finish",
     "failedBody": "Something went wrong before the scan could complete. Check the run log below for details, then try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "cancel": "Cancel"
   },
   "overview": {
     "needsAttention": "Needs attention",

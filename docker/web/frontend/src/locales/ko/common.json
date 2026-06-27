@@ -276,7 +276,8 @@
     "stageReport": "보고서",
     "failedTitle": "스캔을 끝내지 못했습니다",
     "failedBody": "스캔이 완료되기 전에 문제가 발생했습니다. 아래 실행 로그에서 원인을 확인한 뒤 다시 시도하세요.",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "cancel": "취소"
   },
   "overview": {
     "needsAttention": "주의 필요",

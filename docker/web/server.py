@@ -1397,12 +1397,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
 
+        # Set when the client closes the stream (e.g. the UI's Cancel button), so
+        # the scan loop can stop the subprocess instead of running it to the end.
+        disconnected = [False]
+
         def sse(event, payload):
             try:
                 self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
-                pass
+                disconnected[0] = True
 
         def fail(msg):
             sse("error", json.dumps(msg))
@@ -1631,6 +1635,11 @@ class Handler(BaseHTTPRequestHandler):
                                     lambda ln: sse("log", json.dumps(ln)),
                                     lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
                                 )
+                        # Client cancelled (the SSE write broke): stop the scan
+                        # instead of running it to completion on a dead stream.
+                        if disconnected[0]:
+                            proc.terminate()
+                            break
                     proc.wait()
                     ok = proc.returncode == 0
                 except Exception as exc:  # noqa: BLE001
