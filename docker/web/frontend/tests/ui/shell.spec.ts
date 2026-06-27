@@ -309,7 +309,7 @@ test("Scan running shows the pipeline stages while scanning", async ({ page }) =
   await page.goto("/?ui=next#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /Run scan/i }).click();
+  await page.getByTestId("run-scan").click();
 
   // Running view: the headline and the pipeline stage stepper.
   await expect(page.getByText("Scanning…")).toBeVisible();
@@ -367,8 +367,8 @@ const SBOM = {
   ],
 };
 
-async function stubAndRun(page: Page, theme: Theme = "light") {
-  await seedThemeLang(page, theme, "en");
+async function stubAndRun(page: Page, theme: Theme = "light", lang: Lang = "en") {
+  await seedThemeLang(page, theme, lang);
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -382,7 +382,7 @@ async function stubAndRun(page: Page, theme: Theme = "light") {
   await page.goto("/?ui=next#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /Run scan/i }).click();
+  await page.getByTestId("run-scan").click();
 }
 
 test("scan results render in the rail sections, adapted to scan type", async ({ page }) => {
@@ -434,16 +434,17 @@ test("overview has no axe violations", async ({ page }) => {
   expect(results.violations).toEqual([]);
 });
 
-// Result-section visuals run in light and dark (English). Korean coverage is a
-// follow-up: it needs language-agnostic selectors (the nav links, the Tree
-// toggle and several setup waits assert on translated text).
-for (const theme of ["light", "dark"] as const) {
-  test(`overview section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAndRun(page, theme);
-    await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+// Result-section visuals run across light/dark × en/ko. The setup navigates and
+// waits on language-agnostic anchors — section links by href, the Tree toggle by
+// test id, and data values (package names, scores, licence ids) that don't
+// translate — so the same flow drives every locale.
+for (const { theme, lang } of COMBOS) {
+  test(`overview section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRun(page, theme, lang);
+    await expect(page.getByText("Apache-2.0").first()).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`overview-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`overview-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -502,8 +503,8 @@ const AI_SBOM = {
   ],
 };
 
-async function stubAiAndRun(page: Page, theme: Theme = "light") {
-  await seedThemeLang(page, theme, "en");
+async function stubAiAndRun(page: Page, theme: Theme = "light", lang: Lang = "en") {
+  await seedThemeLang(page, theme, lang);
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -515,7 +516,7 @@ async function stubAiAndRun(page: Page, theme: Theme = "light") {
   await page.goto("/?ui=next#/new");
   await page.fill("#project", "model");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /Run scan/i }).click();
+  await page.getByTestId("run-scan").click();
 }
 
 test("AI scan exposes Models & Datasets with the model card", async ({ page }) => {
@@ -535,14 +536,14 @@ test("AI scan exposes Models & Datasets with the model card", async ({ page }) =
   expect(results.violations).toEqual([]);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`models section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAiAndRun(page, theme);
-    await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
+for (const { theme, lang } of COMBOS) {
+  test(`models section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAiAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/models"]').first().click();
     await expect(page.getByText("bert-base-uncased").first()).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`models-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`models-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -566,14 +567,13 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   expect(results.violations).toEqual([]);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`conformance section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAiAndRun(page, theme);
-    await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
-    await expect(page.getByText("4/6 present")).toBeVisible();
-    await expect(
-      page.getByText("G7 model openness (weight/architecture/data/training)"),
-    ).toBeVisible();
+for (const { theme, lang } of COMBOS) {
+  test(`conformance section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAiAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
+    // "4/6" and the CycloneDX label are the same in every locale.
+    await expect(page.getByText("CycloneDX")).toBeVisible();
+    await expect(page.getByText(/4\s*\/\s*6/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a
     // non-deterministic frame, so the whole tall section is sometimes captured 4px
@@ -581,7 +581,7 @@ for (const theme of ["light", "dark"] as const) {
     // transform has settled to translateY(0) before the screenshot.
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`conformance-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`conformance-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -605,8 +605,8 @@ const LIC_DONE = {
   },
 };
 
-async function stubLicensesAndRun(page: Page, theme: Theme = "light") {
-  await seedThemeLang(page, theme, "en");
+async function stubLicensesAndRun(page: Page, theme: Theme = "light", lang: Lang = "en") {
+  await seedThemeLang(page, theme, lang);
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -617,7 +617,7 @@ async function stubLicensesAndRun(page: Page, theme: Theme = "light") {
   await page.goto("/?ui=next#/new");
   await page.fill("#project", "lic");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /Run scan/i }).click();
+  await page.getByTestId("run-scan").click();
 }
 
 test("Licenses section flags AI-restrictive licenses for review", async ({ page }) => {
@@ -637,14 +637,14 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   expect(results.violations).toEqual([]);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`licenses section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubLicensesAndRun(page, theme);
-    await page.getByRole("link", { name: /^Licenses/ }).first().click();
-    await expect(page.getByText("License review needed")).toBeVisible();
+for (const { theme, lang } of COMBOS) {
+  test(`licenses section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubLicensesAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/licenses"]').first().click();
+    await expect(page.getByText("some-llama-model")).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`licenses-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`licenses-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -667,15 +667,15 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   expect(results.violations).toEqual([]);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`dependencies tree matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAndRun(page, theme);
-    await page.getByRole("link", { name: /^Dependencies/ }).first().click();
-    await page.getByRole("button", { name: "Tree", exact: true }).click();
+for (const { theme, lang } of COMBOS) {
+  test(`dependencies tree matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/dependencies"]').first().click();
+    await page.getByTestId("deps-view-tree").click();
     await expect(page.getByText("openssl").first()).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`dependencies-tree-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`dependencies-tree-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -709,14 +709,14 @@ test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page
   await expect(page.getByText("CVSS:3.1/AV:N/AC:L")).toBeVisible();
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`vulnerabilities section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAndRun(page, theme);
-    await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+for (const { theme, lang } of COMBOS) {
+  test(`vulnerabilities section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/vulnerabilities"]').first().click();
     await expect(page.getByText("9.8", { exact: true })).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`vulnerabilities-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`vulnerabilities-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });
@@ -744,14 +744,14 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`components section matches baseline — ${theme}/en @visual`, async ({ page }) => {
-    await stubAndRun(page, theme);
-    await page.getByRole("link", { name: /^Components/ }).first().click();
+for (const { theme, lang } of COMBOS) {
+  test(`components section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRun(page, theme, lang);
+    await page.getByRole("navigation").locator('a[href$="/components"]').first().click();
     await expect(page.getByText("openssl", { exact: true })).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
-    await expect(page.locator("main")).toHaveScreenshot(`components-${theme}-en.png`, {
+    await expect(page.locator("main")).toHaveScreenshot(`components-${theme}-${lang}.png`, {
       animations: "disabled",
     });
   });

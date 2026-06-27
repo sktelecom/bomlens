@@ -251,7 +251,7 @@ export function RunButton({ state, running }: { state: ScanFormState; running: b
   const { t } = useTranslation();
   const { submit, busy, uploading } = state;
   return (
-    <Button className="w-full" onClick={submit} disabled={busy}>
+    <Button className="w-full" data-testid="run-scan" onClick={submit} disabled={busy}>
       {uploading ? (
         <>
           <Upload className="h-4 w-4 animate-pulse" />

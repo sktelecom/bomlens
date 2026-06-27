@@ -74,6 +74,7 @@ export function DependenciesPanel({
         <Button
           type="button"
           size="sm"
+          data-testid="deps-view-graph"
           variant={view === "graph" ? "secondary" : "ghost"}
           onClick={() => setView("graph")}
         >
@@ -83,6 +84,7 @@ export function DependenciesPanel({
         <Button
           type="button"
           size="sm"
+          data-testid="deps-view-tree"
           variant={view === "tree" ? "secondary" : "ghost"}
           onClick={() => setView("tree")}
         >
