@@ -333,6 +333,11 @@ export function NextApp() {
             onRetry={
               canRetry && retryParams ? () => run(retryParams) : undefined
             }
+            onCancel={() => {
+              closeStream(); // backend ends the process when the stream drops
+              resetToHome();
+              setHomeView("new");
+            }}
           />
         </div>
       ) : (

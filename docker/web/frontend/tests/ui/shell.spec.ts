@@ -358,6 +358,29 @@ test("a failed scan surfaces the error with recovery actions", async ({ page }) 
   ).toHaveAttribute("href", "#/new");
 });
 
+test("cancelling a running scan returns to New scan", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  // Hold the stream open so the running view (and its Cancel button) is present.
+  await page.route("**/scan-stream**", async (r) => {
+    await new Promise((res) => setTimeout(res, 5000));
+    await r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` });
+  });
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  await expect(page.getByText("Scanning…")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  // Cancel drops back to the New scan screen.
+  await expect(
+    page.getByRole("heading", { name: "What do you want to scan?" }),
+  ).toBeVisible();
+});
+
 // A finished scan with an SBOM, a ScanCode artifact and vulnerabilities — enough
 // to exercise data-gated rail sections (Dependencies, Source tree) and counts.
 const DONE = {

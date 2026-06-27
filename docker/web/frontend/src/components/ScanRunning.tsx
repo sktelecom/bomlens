@@ -5,6 +5,7 @@ import {
   Plus,
   RotateCcw,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -36,6 +37,7 @@ export function ScanRunning({
   errorMessage,
   newScanHref,
   onRetry,
+  onCancel,
 }: {
   logs: string[];
   status: Status;
@@ -47,6 +49,8 @@ export function ScanRunning({
   newScanHref?: string;
   /** Re-run the same scan; only provided when the params are safe to replay. */
   onRetry?: () => void;
+  /** Stop a running scan (closes the stream; the backend ends the process). */
+  onCancel?: () => void;
 }) {
   const { t } = useTranslation();
   const failed = status === "error";
@@ -60,6 +64,16 @@ export function ScanRunning({
         </h1>
         {projectLabel && (
           <span className="truncate text-sm text-muted-foreground">{projectLabel}</span>
+        )}
+        {!failed && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "ml-auto")}
+          >
+            <X className="h-4 w-4" aria-hidden />
+            {t("run.cancel")}
+          </button>
         )}
       </div>
 
