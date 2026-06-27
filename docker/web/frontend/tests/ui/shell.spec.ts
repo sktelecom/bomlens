@@ -500,6 +500,22 @@ test("Overview leads with needs-attention and jumps into sections", async ({ pag
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
 
+test("dependency graph is labelled and the tree view is keyboard-reachable", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("navigation").locator('a[href$="/dependencies"]').first().click();
+
+  // The canvas region carries an accessible label (it's a visual; the tree is
+  // the keyboard path).
+  await expect(page.getByRole("img", { name: /Dependency graph/ })).toBeVisible();
+
+  // The Tree toggle is a real button: focus it and activate with the keyboard.
+  const tree = page.getByTestId("deps-view-tree");
+  await tree.focus();
+  await expect(tree).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("openssl").first()).toBeVisible();
+});
+
 test("section navigation moves focus to the section heading", async ({ page }) => {
   await stubAndRun(page);
   // Switching sections from the rail should move focus onto the new section's

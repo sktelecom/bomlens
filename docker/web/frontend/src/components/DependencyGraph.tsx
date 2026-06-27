@@ -318,11 +318,13 @@ export function DependencyGraph({
           {t("deps.legendVuln")}
         </span>
         <span className="text-muted-foreground/80">
-          {t("deps.arrowHint")} {t("deps.interactHint")}
+          {t("deps.arrowHint")} {t("deps.interactHint")} {t("deps.keyboardHint")}
         </span>
       </div>
       <div
         ref={containerRef}
+        role="img"
+        aria-label={t("deps.graphAria")}
         className="h-[28rem] w-full rounded-md border bg-card"
       />
       {selected && (
