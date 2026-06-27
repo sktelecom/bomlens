@@ -32,7 +32,7 @@
     "sbomUpload": "SBOM 업로드",
     "sbomAnalyzeHint": "위험분석을 위해 고지문·보안 보고서가 자동 활성화됩니다.",
     "firmwareUpload": "펌웨어 업로드",
-    "firmwareHint": "추출 후 syft·cve-bin-tool로 구성요소를 식별합니다(.bin/.img/.squashfs 등).",
+    "firmwareHint": "추출 후 syft·cve-bin-tool로 컴포넌트를 식별합니다(.bin/.img/.squashfs 등).",
     "firmwareUnavailable": "펌웨어 분석은 Docker가 실행 중이어야 사용할 수 있습니다(펌웨어 이미지를 sibling 컨테이너로 실행합니다).",
     "siblingPullNotice": "처음 실행할 때 전용 이미지를 내려받습니다(용량이 크며 한 번만 받습니다). 이후 실행은 받아 둔 이미지를 재사용합니다.",
     "dockerImage": "Docker 이미지",
@@ -84,7 +84,7 @@
     "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
     "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"파일 단위 식별 (SCANOSS)\"을 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
     "scanossUnavailableTitle": "SCANOSS 검색이 완료되지 않았습니다",
-    "scanossUnavailableBody": "rate limit, 네트워크 문제, 또는 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 실행하면 결과가 나올 수 있습니다.",
+    "scanossUnavailableBody": "호출 한도 초과, 네트워크 문제, 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 실행하면 결과가 나올 수 있습니다.",
     "scanossNoMatchTitle": "복사된 오픈소스를 찾지 못했습니다",
     "scanossNoMatchBody": "SCANOSS 검색은 정상 완료됐지만, 소스에 직접 복사된 서드파티 오픈소스를 찾지 못했습니다. 실제로 없거나 OSSKB에 등록되지 않은 코드일 수 있습니다.",
     "vendoredBadge": "vendored",
@@ -112,7 +112,7 @@
       },
       "notice": {
         "title": "오픈소스 고지문",
-        "desc": "포함된 구성요소의 라이선스 고지와 저작권 표시입니다."
+        "desc": "포함된 컴포넌트의 라이선스 고지와 저작권 표시입니다."
       },
       "conformance": {
         "title": "적합성 보고서",
@@ -120,7 +120,7 @@
       },
       "security": {
         "title": "보안 보고서",
-        "desc": "구성요소에서 발견된 알려진 취약점(CVE)입니다."
+        "desc": "컴포넌트에서 발견된 알려진 취약점(CVE)입니다."
       },
       "license": {
         "title": "정밀 라이선스 분석",
@@ -143,8 +143,8 @@
     "tabDependencies": "의존성",
     "tabSourceTree": "소스 트리",
     "componentsEmpty": "검출된 컴포넌트가 없습니다.",
-    "componentsSearch": "이름, 라이선스, 타입 검색…",
-    "allTypes": "모든 타입",
+    "componentsSearch": "이름, 라이선스, 유형 검색…",
+    "allTypes": "모든 유형",
     "allLicenses": "모든 라이선스",
     "allSeverities": "모든 심각도",
     "licenseSummaryTitle": "라이선스",
@@ -161,7 +161,7 @@
     "scopeTransitive": "전이",
     "colName": "이름",
     "colVersion": "버전",
-    "colType": "타입",
+    "colType": "유형",
     "colScope": "범위",
     "colRisk": "위험",
     "colLicense": "라이선스",
@@ -258,7 +258,7 @@
   },
   "newscan": {
     "title": "무엇을 스캔할까요?",
-    "subtitle": "대상을 고르면 SBOM·고지문·보안 보고서를 로컬에서 한 번에 생성합니다.",
+    "subtitle": "대상을 고르면 SBOM과 고지문, 보안 보고서를 로컬에서 한 번에 생성합니다.",
     "source": "소스",
     "settings": "스캔 설정",
     "outputs": "산출물",
@@ -386,10 +386,10 @@
     "typeContainer": "컨테이너",
     "typeRootfs": "RootFS",
     "emptyTitle": "첫 SBOM을 만들어 보세요",
-    "emptyBody": "폴더나 Git 저장소, Docker 이미지, SBOM, AI 모델을 스캔하면 BomLens가 SBOM과 오픈소스 고지, 보안 리포트를 한 번에 로컬에서 만듭니다.",
+    "emptyBody": "폴더나 Git 저장소, Docker 이미지, SBOM, AI 모델을 스캔하면 BomLens가 SBOM과 고지문, 보안 보고서를 한 번에 로컬에서 만듭니다.",
     "emptyOutSbom": "SBOM (CycloneDX)",
-    "emptyOutNotice": "오픈소스 고지",
-    "emptyOutSecurity": "보안 리포트",
+    "emptyOutNotice": "오픈소스 고지문",
+    "emptyOutSecurity": "보안 보고서",
     "source": "파일을 지우면 목록에서도 사라집니다."
   },
   "validation": {
