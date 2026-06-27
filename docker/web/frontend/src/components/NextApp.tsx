@@ -17,29 +17,13 @@ import {
   type Capabilities,
   type DoneEvent,
   type RecentScan,
+  type ScanConfig,
   type ScanParams,
   type ScanProgress,
 } from "@/lib/api";
-import {
-  type RecentScanLink,
-  type SectionId,
-  visibleSectionIds,
-} from "@/lib/nav";
+import { type SectionId, visibleSectionIds } from "@/lib/nav";
 import { homeHash, newHash, parseHash, scanHash } from "@/lib/route";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
-
-/** Map a stored scan to the Sidebar's Recent link shape. */
-function toRecentLink(s: RecentScan): RecentScanLink {
-  const sev = s.maxSeverity;
-  return {
-    id: s.id,
-    label: s.version ? `${s.project} · ${s.version}` : s.project,
-    topSeverity:
-      sev === "CRITICAL" || sev === "HIGH" || sev === "MEDIUM" || sev === "LOW"
-        ? sev
-        : "NONE",
-  };
-}
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -90,6 +74,10 @@ export function NextApp() {
     docker: true,
   });
   const [recent, setRecent] = useState<RecentScan[]>([]);
+  // A finished scan's config, parked here when the user hits "Re-scan" so the
+  // New scan form can seed itself from it. The form reads it once on mount and
+  // clears it, so a subsequent plain New scan starts blank.
+  const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
   // A global-search pick: navigate to this section with the term seeded into its
   // search. Cleared by the section's own table once applied isn't needed — the
   // table only re-seeds when the term changes.
@@ -220,8 +208,6 @@ export function NextApp() {
   // Close the live scan stream if the app unmounts.
   useEffect(() => () => streamRef.current?.close(), []);
 
-  const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
-
   // Delete a past scan (its artifacts) and refresh the Recent list.
   const deleteRecent = (id: string) => {
     void deleteScan(id).then(() => {
@@ -287,6 +273,14 @@ export function NextApp() {
     });
   };
 
+  // "Re-scan": park the finished scan's config and open the New scan form so the
+  // user can adjust toggles and run it again (not an immediate re-run). The form
+  // consumes the parked config once and clears it.
+  const handleRescan = (config: ScanConfig) => {
+    setPendingRescan(config);
+    window.location.hash = newHash();
+  };
+
   // A global-search pick navigates to the section with the term seeded.
   const handleSearchPick = (section: SectionId, term: string) => {
     setSearchSeed({ section, term });
@@ -313,14 +307,15 @@ export function NextApp() {
       activeScanId={loadedIdRef.current}
       counts={counts}
       showSections={Boolean(result)}
-      recent={recentLinks}
-      onDeleteRecent={deleteRecent}
       homeHref={homeHash()}
       showHomeLink={!(isHome && homeView === "recent")}
       atRecent={isHome && homeView === "recent"}
       project={isHome ? undefined : projectInfo}
       search={
         result ? <GlobalSearch result={result} onPick={handleSearchPick} /> : undefined
+      }
+      onRescan={
+        result?.scanConfig ? () => handleRescan(result.scanConfig!) : undefined
       }
     >
       {isHome ? (
@@ -332,7 +327,13 @@ export function NextApp() {
               onDelete={deleteRecent}
             />
           ) : (
-            <NewScan running={false} capabilities={capabilities} onRun={run} />
+            <NewScan
+              running={false}
+              capabilities={capabilities}
+              onRun={run}
+              initialConfig={pendingRescan}
+              onConfigConsumed={() => setPendingRescan(null)}
+            />
           )}
         </div>
       ) : !result ? (

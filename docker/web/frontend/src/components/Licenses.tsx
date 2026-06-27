@@ -101,12 +101,14 @@ export function Licenses({ components }: { components: ComponentItem[] }) {
           </div>
           <span className="text-xs text-muted-foreground">{t("licenses.clickHint")}</span>
         </div>
-        <BarList
-          items={bars}
-          ariaLabel={t("licenses.distribution")}
-          selectedKey={selected}
-          onSelect={(key) => setSelected((cur) => (cur === key ? null : key))}
-        />
+        <div className="max-h-[26rem] overflow-auto rounded-md">
+          <BarList
+            items={bars}
+            ariaLabel={t("licenses.distribution")}
+            selectedKey={selected}
+            onSelect={(key) => setSelected((cur) => (cur === key ? null : key))}
+          />
+        </div>
         {unlicensed > 0 && (
           <div className="text-xs text-muted-foreground">
             {t("result.licenseNone")}{" "}

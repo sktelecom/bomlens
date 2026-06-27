@@ -4,7 +4,6 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import {
   EMPTY_SCAN,
-  type RecentScanLink,
   type ScanContext,
   type SectionId,
 } from "@/lib/nav";
@@ -14,9 +13,6 @@ interface AppShellProps {
   activeSection: SectionId;
   /** The current scan's id, so the rail can build `#/scan/<id>/<section>` links. */
   activeScanId?: string | null;
-  recent?: RecentScanLink[];
-  /** Delete a past scan from the Recent list. */
-  onDeleteRecent?: (id: string) => void;
   /** Per-section counts shown as trailing rail badges. */
   counts?: Partial<Record<SectionId, number>>;
   /** Hide the rail's section groups (e.g. before any scan). */
@@ -25,6 +21,9 @@ interface AppShellProps {
   project?: { name: string; version?: string };
   /** Optional top-bar content (the global search), shown when a scan is loaded. */
   search?: ReactNode;
+  /** Re-run the loaded scan (prefills the New scan form); shown in the top bar
+   *  only when the scan carries a config. */
+  onRescan?: () => void;
   /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
   /** Show the logo as a link home (hidden on the Recent home screen itself). */
@@ -47,12 +46,11 @@ export function AppShell({
   scan = EMPTY_SCAN,
   activeSection,
   activeScanId,
-  recent,
-  onDeleteRecent,
   counts,
   showSections,
   project,
   search,
+  onRescan,
   homeHref,
   showHomeLink,
   atRecent,
@@ -77,6 +75,7 @@ export function AppShell({
       <TopBar
         project={project}
         search={search}
+        onRescan={onRescan}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
       />
@@ -85,8 +84,6 @@ export function AppShell({
           scan={scan}
           activeSection={activeSection}
           activeScanId={activeScanId}
-          recent={recent}
-          onDeleteRecent={onDeleteRecent}
           counts={counts}
           showSections={showSections}
           homeHref={homeHref}

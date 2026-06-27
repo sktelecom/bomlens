@@ -1,5 +1,8 @@
+import { RotateCw } from "lucide-react";
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+
+import { Button } from "@/components/ui/button";
 
 import { LangToggle } from "./LangToggle";
 import { ThemeToggle } from "./ThemeToggle";
@@ -12,6 +15,9 @@ interface TopBarProps {
   project?: { name: string; version?: string };
   /** Optional global-search control, rendered between the project and controls. */
   search?: ReactNode;
+  /** Re-run this scan with the same target and toggles (prefills the New scan
+   *  form). Shown only when the loaded scan carries a config; absent otherwise. */
+  onRescan?: () => void;
   /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
   /** Render the logo as a link home (off on the Recent home screen itself). */
@@ -25,7 +31,7 @@ interface TopBarProps {
  * The logo is a real `<a href="#/">` link so the home screen can be opened in a
  * new tab (Cmd/Ctrl/middle click); the hash router handles same-tab navigation.
  */
-export function TopBar({ project, search, homeHref, showHomeLink }: TopBarProps) {
+export function TopBar({ project, search, onRescan, homeHref, showHomeLink }: TopBarProps) {
   const { t } = useTranslation();
   const logo = (
     <img src="/logo.svg" alt={t("appTitle")} className="h-7 w-auto shrink-0" />
@@ -64,6 +70,18 @@ export function TopBar({ project, search, homeHref, showHomeLink }: TopBarProps)
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {search}
+        {onRescan && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRescan}
+            className="gap-1.5"
+            title={t("result.rescanHint")}
+          >
+            <RotateCw className="h-4 w-4 text-brand" aria-hidden />
+            <span>{t("result.rescan")}</span>
+          </Button>
+        )}
         <LangToggle />
         <ThemeToggle />
       </div>
