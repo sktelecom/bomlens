@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.5.3] - 2026-06-27
+
+### Added
+
+- The dependency graph view was redesigned to read like a commercial graph explorer.
+- License distribution is shown as proportional bars, with the charts animating in on first render.
+- Each scan now shows how it compares to the previous run of the same project.
+
+### Changed
+
+- Interactive result cards lift on hover, with motion that honours the operating system's reduced-motion setting.
+
+### Fixed
+
+- `SECURITY_ENRICH=false` now reaches the post-process container, so the EPSS and CISA KEV opt-out works from the host CLI for air-gapped runs.
+- `--analyze`/`--sbom` combined with `--model` is now rejected instead of silently running in ANALYZE mode.
+- AI SBOM generation fails closed when the model card cannot be collected (offline, or an unknown/private model id) instead of writing an empty stub ML-BOM as a valid output.
+- Supplier SBOM analysis now produces the conformance report for well-formed SPDX Tag-Value inputs; a zero-count grep had aborted the Tag-Value checks.
+- Reopening a past scan from history no longer shows an empty run-log panel.
+- A release stays a draft until the release gate verifies it, so it is never published before its entry points are checked.
+
+### Documentation
+
+- Corrected the supplier-SBOM conversion note (SPDX is converted to CycloneDX 1.6; CycloneDX inputs keep their original spec version), removed the unimplemented drag-resizable columns claim from the UI reference, fixed the Node.js lock-file guidance, and added page descriptions to five navigation pages.
+
 ## [v1.5.2] - 2026-06-26
 
 ### Added
