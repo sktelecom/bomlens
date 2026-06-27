@@ -122,3 +122,27 @@ export function selectComponents(
   if (!sort) return rows;
   return [...rows].sort((a, b) => compareComponents(a, b, sort.key, sort.dir));
 }
+
+export interface TypeGroup {
+  /** CycloneDX component type (library/application/framework/…). */
+  type: string;
+  count: number;
+}
+
+/**
+ * Component-type distribution, busiest type first. Mirrors licenseGroups: a
+ * plain count per CycloneDX `type`, skipping components with no declared type.
+ * Low signal for single-ecosystem SBOMs (often all "library") but informative
+ * where the type split is real (e.g. Maven's library vs framework), so callers
+ * gate on `length >= 2` before showing it.
+ */
+export function typeGroups(components: ComponentItem[]): TypeGroup[] {
+  const counts = new Map<string, number>();
+  for (const c of components) {
+    if (!c.type) continue;
+    counts.set(c.type, (counts.get(c.type) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
+}

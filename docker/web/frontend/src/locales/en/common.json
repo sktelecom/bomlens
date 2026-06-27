@@ -284,6 +284,7 @@
     "explore": "Explore",
     "jumpHint": "View {{section}}",
     "depBreakdown": "{{direct}} direct · {{transitive}} transitive",
+    "typeSummaryTitle": "Component types",
     "vsPrevious": "vs {{label}}",
     "compDelta": "{{delta}} components",
     "compSame": "no component change",
