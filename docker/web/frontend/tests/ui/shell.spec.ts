@@ -329,6 +329,30 @@ test("Scan running shows the pipeline stages while scanning", async ({ page }) =
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 });
 
+test("a failed scan surfaces the error with recovery actions", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  // Connection drops with no `done` — the stranded "Scan failed" case (a launch
+  // failure or dropped stream), which lands on the Scan-running error view.
+  await page.route("**/scan-stream**", (r) => r.abort());
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // The failure is surfaced in an alert with a way out, not a bare log.
+  const alert = page.getByRole("alert");
+  await expect(alert).toBeVisible();
+  // The current-folder source carries no upload token, so retry is offered…
+  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  // …alongside an always-available New scan escape hatch.
+  await expect(
+    page.getByRole("main").getByRole("link", { name: "New scan" }),
+  ).toHaveAttribute("href", "#/new");
+});
+
 // A finished scan with an SBOM, a ScanCode artifact and vulnerabilities — enough
 // to exercise data-gated rail sections (Dependencies, Source tree) and counts.
 const DONE = {

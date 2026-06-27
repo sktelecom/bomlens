@@ -72,6 +72,9 @@ export function NextApp() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
+  // The failure message surfaced on the Scan-running screen when a scan can't
+  // run (stream/launch error), so it isn't buried in the log.
+  const [scanError, setScanError] = useState<string | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
   const [projectInfo, setProjectInfo] = useState<{
@@ -92,6 +95,9 @@ export function NextApp() {
   const loadedIdRef = useRef<string | null>(null);
   // The id of an in-flight live scan, so its `done` can set the URL.
   const runningIdRef = useRef<string | null>(null);
+  // The params of the last started scan, so a failed run can be retried — but
+  // only when they carry no single-use upload token or stashed credential.
+  const lastParamsRef = useRef<ScanParams | null>(null);
 
   // The result-section heading. On a section change we move focus here so
   // keyboard and screen-reader users land on (and hear) the new section instead
@@ -178,11 +184,19 @@ export function NextApp() {
     showScan(parsed.id, parsed.section);
   }, [status, resetToHome, showScan]);
 
+  // Run the router on mount and on real navigations (hashchange) only — never on
+  // a bare status change. Re-running it on status change would, when a scan
+  // started from #/new fails (status → error while the hash is still #/new),
+  // call resetToHome() and dump the user back to an empty form, hiding the
+  // failure. The ref keeps the listener pointed at the latest route().
+  const routeRef = useRef(route);
+  routeRef.current = route;
   useEffect(() => {
-    route();
-    window.addEventListener("hashchange", route);
-    return () => window.removeEventListener("hashchange", route);
-  }, [route]);
+    const onHash = () => routeRef.current();
+    onHash();
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   // Move focus to the section heading when the active section changes, so a
   // keyboard/screen-reader user follows the content instead of staying on the
@@ -227,8 +241,10 @@ export function NextApp() {
     closeStream(); // drop any previous stream before starting a new one
     loadedIdRef.current = null;
     runningIdRef.current = null;
+    lastParamsRef.current = params;
     setStatus("running");
     setLogs([]);
+    setScanError(null);
     setProgress(null);
     setResult(null);
     setActiveSection("overview");
@@ -254,13 +270,25 @@ export function NextApp() {
         }
       },
       onError: (message) => {
-        if (message) setLogs((prev) => [...prev, `✖ ${message}`]);
+        if (message) {
+          setLogs((prev) => [...prev, `✖ ${message}`]);
+          setScanError(message);
+        }
         setStatus((s) => (s === "running" ? "error" : s));
       },
     });
   };
 
   const isHome = status === "idle";
+  // A failed run can be retried as-is only when its params carry no single-use
+  // upload token or stashed credential (those are consumed on first use).
+  const retryParams = lastParamsRef.current;
+  const canRetry = Boolean(
+    retryParams &&
+      !retryParams.token &&
+      !retryParams.cred &&
+      !retryParams.scanossCred,
+  );
 
   return (
     <AppShell
@@ -299,6 +327,11 @@ export function NextApp() {
               (projectInfo.version
                 ? `${projectInfo.name} · ${projectInfo.version}`
                 : projectInfo.name)
+            }
+            errorMessage={scanError}
+            newScanHref={newHash()}
+            onRetry={
+              canRetry && retryParams ? () => run(retryParams) : undefined
             }
           />
         </div>
