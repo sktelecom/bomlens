@@ -310,37 +310,85 @@ jq -n \
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>SBOM Conformance — ${PROJECT}</title>
 <style>
- body{font-family:system-ui,Arial,sans-serif;max-width:1000px;margin:2rem auto;padding:0 1rem;color:#1a1a1a;}
- h1{border-bottom:2px solid #ddd;padding-bottom:.4rem;}
- .meta{color:#666;font-size:.9rem;}
- .cards{display:flex;gap:.6rem;flex-wrap:wrap;margin:1rem 0;}
- .card{padding:.6rem 1rem;border-radius:6px;color:#fff;font-weight:600;}
- .pass{background:#16a34a;} .fail{background:#dc2626;} .warn{background:#d97706;}
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
  table{border-collapse:collapse;width:100%;font-size:.85rem;}
- th,td{border:1px solid #e3e3e3;padding:.4rem .6rem;text-align:left;}
- th{background:#f3f4f6;}
- .s-pass{color:#16a34a;font-weight:700;} .s-fail{color:#dc2626;font-weight:700;} .s-warn{color:#d97706;font-weight:700;}
- ul{margin:.3rem 0 0 1rem;} li{font-family:ui-monospace,monospace;font-size:.82rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ .s-pass{color:#16a34a;font-weight:700;}
+ .s-fail{color:#dc2626;font-weight:700;}
+ .s-warn{color:#ca8a04;font-weight:700;}
+ .mono{list-style:none;padding-left:0;}
+ .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
+ ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
 </style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">Conformance</div>
+</header>
 <h1>SBOM Conformance Report</h1>
 <p class="meta">Project: $(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g') &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}</p>
 <div class="cards">
- <div class="card $( [ "$RESULT" = "pass" ] && echo pass || echo fail )">Result: $(echo "$RESULT" | tr '[:lower:]' '[:upper:]')</div>
- <div class="card fail">Mandatory failures: ${N_FAIL}</div>
- <div class="card warn">Warnings: ${N_WARN}</div>
+ <span class="pill pill-$( [ "$RESULT" = "pass" ] && echo pass || echo fail )">Result: $(echo "$RESULT" | tr '[:lower:]' '[:upper:]')</span>
+ <span class="pill pill-fail">Mandatory failures: <span class="count">${N_FAIL}</span></span>
+ <span class="pill pill-warn">Warnings: <span class="count">${N_WARN}</span></span>
 </div>
-<table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
+<div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
 HTMLHEAD
     echo "$CHECKS" | jq -r '.[] |
         "<tr><td class=\"s-\(.status)\">" + (.status|ascii_upcase|@html) + "</td>" +
         "<td>" + (.label|@html) + "</td><td>" + (if .required then "yes" else "no" end) + "</td>" +
         "<td>" + ((.detail // "")|@html) + "</td>" +
         "<td>" + (((.evidence // []) | join(", "))|@html) + "</td></tr>"'
-    echo "</table>"
+    echo "</table></div>"
     if echo "$CHECKS" | jq -e 'any(.[]; .required and .status=="fail" and (.missing|length>0))' >/dev/null; then
         echo "<h2>Missing / non-conformant items</h2>"
         echo "$CHECKS" | jq -r '.[] | select(.required and .status=="fail" and (.missing|length>0)) |
-            "<h3>" + (.label|@html) + "</h3><ul>" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
+            "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
     fi
     echo "</body></html>"
 } > "$HTML"
