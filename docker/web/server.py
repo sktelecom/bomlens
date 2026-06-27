@@ -889,6 +889,7 @@ _REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
 _HOSTPATH_RE = re.compile(r"/[A-Za-z0-9._@/-]*")                # absolute bind-mount path
 _BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
+_CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")  # docker --name
 
 # scan-firmware.sh emits `[firmware-cvedb-progress] NN%` on stdout while the
 # (large, one-time) firmware CVE database downloads. The server turns each such
@@ -947,7 +948,7 @@ def _env_flag_value(value):
 
 
 def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=None,
-                     extra_env=None, on_progress=None):
+                     extra_env=None, on_progress=None, cancel=None, container_name=None):
     """Run a firmware/aibom SBOM scan in a SIBLING container.
 
     The desktop app's base UI image is permissive-only (no GPL firmware tools,
@@ -1016,8 +1017,17 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     def _bool_env(key):
         return "true" if env.get(key, "true") == "true" else "false"
 
+    # A deterministic --name lets us stop this exact sibling on cancel. Rebind to
+    # the allowlist match so only a safe name reaches the argv (never the caller's
+    # string). An invalid/absent name just means no --name (cancel can't reach it).
+    safe_name = None
+    if container_name:
+        _nm = _CONTAINER_RE.fullmatch(container_name)
+        safe_name = _nm.group(0) if _nm else None
+
     args = [
         "docker", "run", "--rm",
+        *(["--name", safe_name] if safe_name else []),
         "-v", "%s:/host-output" % host_out,  # host_out passed _HOSTPATH_RE above
         "-v", "/var/run/docker.sock:/var/run/docker.sock",
         "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
@@ -1060,7 +1070,8 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
         _stream_cmd(["docker", "pull", image], on_log)
 
     on_log("[ui] launching %s in a sibling container (%s)..." % (mode.lower(), image))
-    return _stream_cmd(args, on_log, on_progress=on_progress)
+    return _stream_cmd(args, on_log, on_progress=on_progress, cancel=cancel,
+                       container=safe_name)
 
 
 def _sibling_image_present(image):
@@ -1072,13 +1083,17 @@ def _sibling_image_present(image):
         return False
 
 
-def _stream_cmd(args, on_log, on_progress=None):
+def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
     Returns the exit code, or -1 if the binary could not be launched.
 
     rich (used by the firmware tools) rewrites the same terminal line via '\\r',
     so a single read can carry several logical lines; split on '\\r' and route
-    each non-empty piece through _emit_or_log so progress markers are caught."""
+    each non-empty piece through _emit_or_log so progress markers are caught.
+
+    When `cancel()` turns true mid-stream (the client closed the SSE), stop the
+    named sibling container with `docker kill` and terminate the local docker-run
+    process, so a cancelled firmware/AI scan doesn't keep running detached."""
     try:
         proc = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -1091,6 +1106,15 @@ def _stream_cmd(args, on_log, on_progress=None):
         for piece in raw.rstrip("\n").split("\r"):
             if piece:
                 _emit_or_log(piece, on_log, on_progress)
+        if cancel and cancel():
+            if container:
+                try:
+                    subprocess.run(["docker", "kill", container],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except OSError:
+                    pass
+            proc.terminate()
+            break
     proc.wait()
     return proc.returncode
 
@@ -1616,6 +1640,9 @@ class Handler(BaseHTTPRequestHandler):
                     model_id=sibling.get("model_id"),
                     extra_env=env,
                     on_progress=lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
+                    # Cancel: if the client closes the stream, stop this sibling.
+                    cancel=lambda: disconnected[0],
+                    container_name="bomlens-sib-%s" % run_id,
                 )
                 ok = rc == 0
                 if rc == -1:
