@@ -256,6 +256,12 @@
   "shell": {
     "newScan": "New scan"
   },
+  "search": {
+    "placeholder": "Search components, CVEs…",
+    "none": "No matches",
+    "components": "Components",
+    "vulnerabilities": "Vulnerabilities"
+  },
   "newscan": {
     "title": "What do you want to scan?",
     "subtitle": "Pick a target and BomLens generates the SBOM, open-source notice, and security report locally in one run.",

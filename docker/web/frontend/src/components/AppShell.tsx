@@ -23,6 +23,8 @@ interface AppShellProps {
   showSections?: boolean;
   /** Project context shown in the top bar (name + optional version). */
   project?: { name: string; version?: string };
+  /** Optional top-bar content (the global search), shown when a scan is loaded. */
+  search?: ReactNode;
   /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
   /** Show the logo as a link home (hidden on the Recent home screen itself). */
@@ -50,6 +52,7 @@ export function AppShell({
   counts,
   showSections,
   project,
+  search,
   homeHref,
   showHomeLink,
   atRecent,
@@ -73,6 +76,7 @@ export function AppShell({
     <div className="flex h-screen flex-col bg-background">
       <TopBar
         project={project}
+        search={search}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
       />

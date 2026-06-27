@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
+import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
@@ -89,6 +90,13 @@ export function NextApp() {
     docker: true,
   });
   const [recent, setRecent] = useState<RecentScan[]>([]);
+  // A global-search pick: navigate to this section with the term seeded into its
+  // search. Cleared by the section's own table once applied isn't needed — the
+  // table only re-seeds when the term changes.
+  const [searchSeed, setSearchSeed] = useState<{
+    section: SectionId;
+    term: string;
+  } | null>(null);
 
   // The scan id currently held in `result` — so the hash router can tell a
   // section change (no reload) from opening a different scan (reload).
@@ -279,6 +287,14 @@ export function NextApp() {
     });
   };
 
+  // A global-search pick navigates to the section with the term seeded.
+  const handleSearchPick = (section: SectionId, term: string) => {
+    setSearchSeed({ section, term });
+    if (loadedIdRef.current) {
+      window.location.hash = scanHash(loadedIdRef.current, section);
+    }
+  };
+
   const isHome = status === "idle";
   // A failed run can be retried as-is only when its params carry no single-use
   // upload token or stashed credential (those are consumed on first use).
@@ -303,6 +319,9 @@ export function NextApp() {
       showHomeLink={!(isHome && homeView === "recent")}
       atRecent={isHome && homeView === "recent"}
       project={isHome ? undefined : projectInfo}
+      search={
+        result ? <GlobalSearch result={result} onPick={handleSearchPick} /> : undefined
+      }
     >
       {isHome ? (
         <div className="mx-auto max-w-6xl px-6 py-8">
@@ -377,6 +396,11 @@ export function NextApp() {
             result={result}
             scanId={loadedIdRef.current}
             recent={recent}
+            searchQuery={
+              searchSeed && searchSeed.section === activeSection
+                ? searchSeed.term
+                : undefined
+            }
           />
 
           {/* The run log is reference material for the run you just watched.

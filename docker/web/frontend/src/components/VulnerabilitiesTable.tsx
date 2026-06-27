@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowDown,
@@ -27,6 +27,8 @@ const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
 
 interface Props {
   security: SecuritySummary;
+  /** Search term seeded from global search (CVE / package / title). */
+  initialQuery?: string;
 }
 
 type Sort = { key: VulnSortKey; dir: SortDir };
@@ -136,12 +138,16 @@ function VulnDetail({ vuln, links }: { vuln: VulnItem; links: string[] }) {
  * CVSS score, description and reference links already present in the Trivy
  * report — no extra fetch, no side panel.
  */
-export function VulnerabilitiesTable({ security }: Props) {
+export function VulnerabilitiesTable({ security, initialQuery }: Props) {
   const { t } = useTranslation();
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
+  // Re-seed the search when global search routes in a new term.
+  useEffect(() => {
+    if (initialQuery !== undefined) setQuery(initialQuery);
+  }, [initialQuery]);
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 

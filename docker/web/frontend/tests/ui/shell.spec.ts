@@ -358,6 +358,25 @@ test("a failed scan surfaces the error with recovery actions", async ({ page }) 
   ).toHaveAttribute("href", "#/new");
 });
 
+test("global search routes to a component with the term applied", async ({ page }) => {
+  await stubAndRun(page);
+  await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
+
+  const box = page.getByPlaceholder("Search components, CVEs…");
+  await box.click();
+  await box.fill("openssl");
+  // The popover lists the matching component; pick it (the CVE row starts "CVE-").
+  await page.getByRole("listbox").getByRole("button", { name: /^openssl/ }).click();
+
+  // Lands on Components, filtered to openssl (the transitive zlib is gone).
+  await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
+});
+
 test("cancelling a running scan returns to New scan", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),

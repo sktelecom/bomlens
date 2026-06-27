@@ -24,6 +24,7 @@ export function ResultSection({
   result,
   scanId,
   recent,
+  searchQuery,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -31,6 +32,8 @@ export function ResultSection({
   scanId: string | null;
   /** Local Recent-scans list, for the Overview "vs previous scan" line. */
   recent?: RecentScan[];
+  /** Term seeded from global search into this section's table search. */
+  searchQuery?: string;
 }) {
   const { t } = useTranslation();
 
@@ -44,12 +47,13 @@ export function ResultSection({
           items={result.sbom?.componentList ?? []}
           total={result.sbom?.components ?? 0}
           truncated={result.sbom?.truncated}
+          initialQuery={searchQuery}
         />
       );
 
     case "vulnerabilities":
       return result.security ? (
-        <VulnerabilitiesTable security={result.security} />
+        <VulnerabilitiesTable security={result.security} initialQuery={searchQuery} />
       ) : (
         <EmptyState>{t("result.noSecurity")}</EmptyState>
       );
