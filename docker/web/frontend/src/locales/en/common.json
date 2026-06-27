@@ -385,7 +385,11 @@
     "typeFirmware": "Firmware",
     "typeContainer": "Container",
     "typeRootfs": "RootFS",
-    "empty": "No scans yet. Start with a New scan.",
+    "emptyTitle": "Generate your first SBOM",
+    "emptyBody": "Scan a folder, Git repo, Docker image, SBOM or AI model. BomLens builds the bill of materials, license notice and security report locally, in one run.",
+    "emptyOutSbom": "SBOM (CycloneDX)",
+    "emptyOutNotice": "Open-source notice",
+    "emptyOutSecurity": "Security report",
     "source": "Delete a file and it leaves this list too."
   },
   "validation": {

@@ -385,7 +385,11 @@
     "typeFirmware": "펌웨어",
     "typeContainer": "컨테이너",
     "typeRootfs": "RootFS",
-    "empty": "아직 스캔이 없습니다. New scan으로 시작하세요.",
+    "emptyTitle": "첫 SBOM을 만들어 보세요",
+    "emptyBody": "폴더나 Git 저장소, Docker 이미지, SBOM, AI 모델을 스캔하면 BomLens가 SBOM과 오픈소스 고지, 보안 리포트를 한 번에 로컬에서 만듭니다.",
+    "emptyOutSbom": "SBOM (CycloneDX)",
+    "emptyOutNotice": "오픈소스 고지",
+    "emptyOutSecurity": "보안 리포트",
     "source": "파일을 지우면 목록에서도 사라집니다."
   },
   "validation": {
