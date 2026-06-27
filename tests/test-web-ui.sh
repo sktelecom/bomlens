@@ -105,8 +105,9 @@ assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
 captured = {}
-def fake_stream(args, on_log, on_progress=None):
+def fake_stream(args, on_log, on_progress=None, cancel=None, container=None):
     captured["args"] = args
+    captured["container"] = container
     return 0
 server._stream_cmd = fake_stream
 server._sibling_image_present = lambda image: True
@@ -128,6 +129,24 @@ assert "MODE=AIBOM" in args and "MODEL_ID=openai/clip" in args, args
 # verbatim (the guard rejects, it does not rewrite).
 assert "ghcr.io/sktelecom/bomlens-aibom:1.5.0" in args, args
 assert "/host/out:/host-output" in args, args
+
+# Cancel support: a valid container_name reaches docker run as a `--name`
+# (so a cancelled scan can be stopped); an invalid one is dropped, not smuggled.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip", container_name="bomlens-sib-demo_1.0",
+)
+assert rc == 0 and "--name" in captured["args"], captured.get("args")
+assert "bomlens-sib-demo_1.0" in captured["args"], captured["args"]
+assert captured["container"] == "bomlens-sib-demo_1.0", captured["container"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    lambda ln: None, model_id="openai/clip", container_name="evil; rm -rf /",
+)
+assert rc == 0 and "--name" not in captured["args"], captured["args"]
+assert captured["container"] is None, captured["container"]
 
 # A firmware host_file passes the bind-mount barrier and is mounted read-only
 # under a basename-only in-sibling path.
