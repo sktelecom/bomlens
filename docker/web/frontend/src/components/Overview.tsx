@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
-import type { DoneEvent, RecentScan } from "@/lib/api";
+import type { ComponentItem, DoneEvent, RecentScan } from "@/lib/api";
+import { typeGroups } from "@/lib/components";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
@@ -169,6 +171,8 @@ export function Overview({
 
       <LicenseSummary components={result.sbom?.componentList ?? []} />
 
+      <TypeSummary components={result.sbom?.componentList ?? []} />
+
       <JumpCards
         result={result}
         hasDeps={hasDeps}
@@ -176,6 +180,28 @@ export function Overview({
         hasConformance={hasConformance}
         scanId={scanId}
       />
+    </div>
+  );
+}
+
+/**
+ * Component-type distribution. Only shown when the SBOM has more than one type
+ * (e.g. Maven's library vs framework split) — a single-ecosystem SBOM is
+ * usually all "library", where the chart would carry no signal.
+ */
+function TypeSummary({ components }: { components: ComponentItem[] }) {
+  const { t } = useTranslation();
+  const groups = typeGroups(components);
+  if (groups.length < 2) return null;
+  const items: BarDatum[] = groups.map((g) => ({
+    key: g.type,
+    label: g.type,
+    value: g.count,
+  }));
+  return (
+    <div className="space-y-3">
+      <div className="text-sm font-medium">{t("overview.typeSummaryTitle")}</div>
+      <BarList items={items} ariaLabel={t("overview.typeSummaryTitle")} />
     </div>
   );
 }

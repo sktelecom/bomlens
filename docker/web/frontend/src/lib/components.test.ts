@@ -7,6 +7,7 @@ import {
   matchesFilters,
   riskRank,
   selectComponents,
+  typeGroups,
 } from "./components";
 
 function c(over: Partial<ComponentItem>): ComponentItem {
@@ -73,5 +74,26 @@ describe("selectComponents", () => {
   it("filters then sorts on the full set", () => {
     const out = selectComponents(ALL, { ...EMPTY_FILTERS, hasVulns: true }, { key: "risk", dir: "asc" });
     expect(out.map((x) => x.name)).toEqual(["zlib", "werkzeug"]);
+  });
+});
+
+describe("typeGroups", () => {
+  it("counts components per type, busiest first, skipping untyped", () => {
+    const groups = typeGroups([
+      c({ type: "library" }),
+      c({ type: "framework" }),
+      c({ type: "library" }),
+      c({ type: "" }),
+    ]);
+    expect(groups).toEqual([
+      { type: "library", count: 2 },
+      { type: "framework", count: 1 },
+    ]);
+  });
+
+  it("returns a single group for a uniform SBOM (caller gates on length>=2)", () => {
+    expect(typeGroups([c({ type: "library" }), c({ type: "library" })])).toEqual([
+      { type: "library", count: 2 },
+    ]);
   });
 });
