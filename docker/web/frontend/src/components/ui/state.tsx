@@ -1,4 +1,4 @@
-import { Loader2, type LucideIcon } from "lucide-react";
+import { Loader2, type LucideIcon, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,13 @@ export function EmptyState({
 }) {
   return (
     <StateShell className={className}>
-      {Icon ? <Icon className="h-5 w-5 opacity-60" aria-hidden /> : null}
+      {Icon ? (
+        // The icon sits on a soft tinted plate (same language as the first-run
+        // hero) so a blank section reads as intentional, not unfinished.
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Icon className="h-6 w-6" aria-hidden />
+        </div>
+      ) : null}
       <span>{children}</span>
     </StateShell>
   );
@@ -119,6 +125,9 @@ export function ErrorState({
 }) {
   return (
     <StateShell className={className}>
+      <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+        <TriangleAlert className="h-6 w-6" aria-hidden />
+      </div>
       <span>{children}</span>
       {onRetry ? (
         <Button type="button" size="sm" variant="outline" onClick={onRetry}>
