@@ -48,13 +48,13 @@ Components never hardcode a colour — `npm run token:lint` enforces this.
 ### Visual baselines
 
 Visual snapshots are platform-dependent, so they are generated and compared in
-the pinned Playwright container (`mcr.microsoft.com/playwright:v1.49.1-jammy`),
+the pinned Playwright container (`mcr.microsoft.com/playwright:v1.61.1-jammy`),
 matching CI. The CI `visual` job seeds baselines on the first run (uploading
 them as the `visual-baselines` artifact) and runs a strict diff once the PNGs
 under `tests/ui/*-snapshots/` are committed. To seed or refresh locally:
 
 ```sh
 docker run --rm -v "$PWD:/work" -w /work \
-  mcr.microsoft.com/playwright:v1.49.1-jammy \
+  mcr.microsoft.com/playwright:v1.61.1-jammy \
   bash -lc 'npm ci && npm run test:visual -- --update-snapshots'
 ```
