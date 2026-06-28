@@ -70,13 +70,13 @@ flowchart TB
 | **syft** | `v1.18.1` | Stage 1 | 이미지·바이너리·RootFS 스캔 | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | SBOM 정규화·정렬 | 항상 |
 | **ScanCode Toolkit** | `32.3.0` | Stage 2 | 1st-party 소스 정밀 라이선스 탐지 | `--deep-license` (opt-in 빌드) |
-| **SCANOSS** | `1.25.2` | Stage 2 | 패키지 매니저 없는 C/C++ 소스의 vendored 오픈소스 식별 | `--identify-vendored` (opt-in 빌드) |
+| **SCANOSS** | `1.25.2` | Stage 2 | 패키지 매니저 없는 C/C++ 소스의 vendored 오픈소스 식별 | `--identify-vendored` |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | 오픈소스 고지문(NOTICE) 생성 | `--notice` / `--all` |
 | **Trivy** | `v0.70.0` | Stage 2 | 취약점(CVE) 보안 보고서 | `--security` / `--all` |
 | **Cosign** | `v2.4.1` | Stage 2 | SBOM detached 서명 | `--sign` |
 | **curl** | — | Stage 2 | Dependency-Track 업로드 | 기본(=`--generate-only` 아님) |
 
-> 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다. 이미지 경량화를 위해 일부 도구는 **opt-in** 빌드 인자입니다: ScanCode(`--build-arg SBOM_DEEP_LICENSE=true`)와 SCANOSS 클라이언트(`--build-arg SBOM_SCANOSS=true`, 발행 이미지엔 포함). 펌웨어 언팩·식별(unblob, cve-bin-tool)은 별도 opt-in `bomlens-firmware` 이미지에, AI 모델 SBOM 생성(OWASP AIBOM Generator)은 `bomlens-aibom`에 들어갑니다. 입력 형태별 도구 흐름은 [입력 형태별 파이프라인](pipeline-by-input.ko.md)을 참고하세요.
+> 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다. 이미지 경량화를 위해 ScanCode는 **opt-in** 빌드 인자입니다(`--build-arg SBOM_DEEP_LICENSE=true`). SCANOSS 클라이언트는 기본 포함이며, 빼려면 `--build-arg SBOM_SCANOSS=false`로 빌드합니다. 펌웨어 언팩·식별(unblob, cve-bin-tool)은 별도 opt-in `bomlens-firmware` 이미지에, AI 모델 SBOM 생성(OWASP AIBOM Generator)은 `bomlens-aibom`에 들어갑니다. 입력 형태별 도구 흐름은 [입력 형태별 파이프라인](pipeline-by-input.ko.md)을 참고하세요.
 
 ---
 

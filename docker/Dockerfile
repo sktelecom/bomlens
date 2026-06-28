@@ -47,10 +47,11 @@ ARG COSIGN_VERSION=v2.4.1
 # renovate: datasource=pypi depName=scancode-toolkit
 ARG SCANCODE_VERSION=32.3.0
 ARG SBOM_DEEP_LICENSE=false
-# Vendored-OSS identification (opt-in: --build-arg SBOM_SCANOSS=true). scanoss.py
-# is MIT, so unlike the firmware GPL tools it can live in the base image; kept
-# opt-in only to keep the default image lean and free of outbound API calls.
-ARG SBOM_SCANOSS=false
+# Vendored-OSS identification (on by default; disable with --build-arg SBOM_SCANOSS=false).
+# scanoss.py is MIT, so unlike the firmware GPL tools it can live in the base image.
+# Runtime still gates the outbound OSSKB call behind the --identify-vendored flag,
+# so shipping the client just makes the web-UI toggle available out of the box.
+ARG SBOM_SCANOSS=true
 # renovate: datasource=pypi depName=scanoss
 ARG SCANOSS_VERSION=1.25.2
 ARG TARGETARCH=amd64
@@ -139,7 +140,7 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
       echo "[build] scancode-toolkit skipped (SBOM_DEEP_LICENSE=false)"; \
     fi
 
-# scanoss.py (opt-in vendored-OSS identification: --build-arg SBOM_SCANOSS=true).
+# scanoss.py (vendored-OSS identification, on by default: --build-arg SBOM_SCANOSS=false to skip).
 # MIT-licensed client; talks to the hosted OSSKB API (or SCANOSS_API_URL). It does
 # NOT bundle the GPL-2.0 SCANOSS engine. See identify-vendored.sh and
 # THIRD_PARTY_LICENSES.md for the OSSKB terms (identification-only, no redistribution).
