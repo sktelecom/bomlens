@@ -53,10 +53,11 @@
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "License scan (ScanCode)",
     "deepLicenseHint": "Downloads each package's source and scans it for license information, instead of trusting the license the package declares (slow).",
+    "scanMethodHint": "Advanced analysis for source scanned without a package manager. If your project builds with one (Maven, npm, pip, Go modules…), the SBOM is already complete and these can stay off.",
     "identifyVendored": "File-level identification (SCANOSS)",
-    "identifyVendoredHint": "Finds third-party open source copied straight into the source tree without a package manager (mainly C/C++). Sends only file fingerprints — never the source — to the OSSKB service.",
+    "identifyVendoredHint": "Finds third-party open source copied into the source tree (mainly C/C++). Only file fingerprints — never the source — go to the OSSKB service.",
     "scanossTokenPlaceholder": "SCANOSS token (optional)",
-    "scanossTokenHint": "The free OSSKB endpoint is rate-limited and may return nothing. A token from scanoss.com makes identification reliable. Used once for this scan; never stored or logged.",
+    "scanossTokenHint": "The free OSSKB endpoint is rate-limited — fine for an occasional scan, but frequent runs may return nothing. For regular use, add a token from scanoss.com. Used once for this scan; never stored or logged.",
     "includeOsv": "Include OSV advisories",
     "includeOsvHint": "Adds OSV.dev advisories to the firmware vulnerability match. The OSV database is not bundled in the image, so it downloads from osv.dev on this run (progress is shown below)."
   },
@@ -148,6 +149,8 @@
     "allLicenses": "All licenses",
     "allSeverities": "All severities",
     "licenseSummaryTitle": "Licenses",
+    "licenseClassTitle": "License classification",
+    "licenseClassFilterHint": "Click a class to filter",
     "licenseMore": "+{{count}} more",
     "componentsCount": "{{shown}} of {{total}} components",
     "truncated": "list truncated",
@@ -235,6 +238,7 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "recent": "Recent scans",
+    "depSplitTitle": "Direct / transitive",
     "recentScans": "Recent scans",
     "recentEmpty": "No recent scans yet",
     "recentDelete": "Delete this scan",
@@ -377,7 +381,15 @@
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
     "distribution": "License distribution",
-    "clickHint": "Click a license to see its components"
+    "clickHint": "Click a license to see its components",
+    "tier": {
+      "networkCopyleft": "Network copyleft",
+      "strongCopyleft": "Strong copyleft",
+      "weakCopyleft": "Weak copyleft",
+      "reviewNeeded": "Review needed",
+      "uncategorized": "Uncategorized",
+      "permissive": "Permissive"
+    }
   },
   "recent": {
     "title": "Recent scans",

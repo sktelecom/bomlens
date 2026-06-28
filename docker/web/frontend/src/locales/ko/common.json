@@ -53,10 +53,11 @@
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "라이선스 스캔 (ScanCode)",
     "deepLicenseHint": "패키지에 선언된 라이선스 대신, 패키지의 소스 파일을 다운 받아 스캔해 라이선스 정보를 찾아냅니다 (느림).",
+    "scanMethodHint": "패키지 매니저 없이 스캔하는 소스를 위한 고급 분석입니다. 프로젝트를 패키지 매니저(Maven, npm, pip, Go modules 등)로 빌드한다면 SBOM이 이미 충분하므로 꺼 둬도 됩니다.",
     "identifyVendored": "파일 단위 식별 (SCANOSS)",
-    "identifyVendoredHint": "패키지 매니저 없이 소스에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
+    "identifyVendoredHint": "소스 트리에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
     "scanossTokenPlaceholder": "SCANOSS 토큰 (선택)",
-    "scanossTokenHint": "무료 OSSKB는 익명 호출 한도가 있어 빈 결과가 나올 수 있습니다. scanoss.com에서 발급한 토큰을 넣으면 안정적으로 식별합니다. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다.",
+    "scanossTokenHint": "무료 OSSKB는 호출 한도가 있어 가끔 쓰기엔 충분하지만 자주 돌리면 빈 결과가 나올 수 있습니다. 자주 사용한다면 scanoss.com에서 토큰을 발급해 넣으세요. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다.",
     "includeOsv": "OSV 권고 포함",
     "includeOsvHint": "펌웨어 취약점 매칭에 OSV.dev 권고를 추가합니다. OSV 데이터베이스는 이미지에 포함돼 있지 않아, 이 실행에서 osv.dev로부터 내려받습니다(진행률은 아래에 표시됩니다)."
   },
@@ -148,6 +149,8 @@
     "allLicenses": "모든 라이선스",
     "allSeverities": "모든 심각도",
     "licenseSummaryTitle": "라이선스",
+    "licenseClassTitle": "라이선스 분류",
+    "licenseClassFilterHint": "분류를 클릭하면 필터됩니다",
     "licenseMore": "외 {{count}}개",
     "componentsCount": "{{total}}개 중 {{shown}}개",
     "truncated": "목록 일부만 표시",
@@ -235,6 +238,7 @@
     "collapse": "사이드바 접기",
     "expand": "사이드바 펼치기",
     "recent": "최근 스캔",
+    "depSplitTitle": "직접 / 전이",
     "recentScans": "지난 스캔",
     "recentEmpty": "최근 스캔이 아직 없습니다",
     "recentDelete": "이 스캔 삭제",
@@ -377,7 +381,15 @@
     "flagBehavioral": "행위 기반 제한",
     "flagNonCommercial": "비상업",
     "distribution": "라이선스 분포",
-    "clickHint": "라이선스를 클릭하면 해당 컴포넌트를 봅니다"
+    "clickHint": "라이선스를 클릭하면 해당 컴포넌트를 봅니다",
+    "tier": {
+      "networkCopyleft": "네트워크 카피레프트",
+      "strongCopyleft": "강한 카피레프트",
+      "weakCopyleft": "약한 카피레프트",
+      "reviewNeeded": "검토 필요",
+      "uncategorized": "미분류",
+      "permissive": "허용적"
+    }
   },
   "recent": {
     "title": "지난 스캔",

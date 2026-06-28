@@ -189,8 +189,17 @@ export function NewScan({ running, capabilities, onRun }: Props) {
             <div className="space-y-3 border-t pt-5">
               <p className={SECTION_LABEL}>{t("newscan.outputs")}</p>
               <GenerationOptions state={state} />
-              {state.showScanOptions && <ScanOptions state={state} />}
             </div>
+
+            {/* Advanced scan options are how the scan analyzes the source, a
+                different altitude from the output artifacts above — its own
+                section, shown only when any advanced toggle applies. */}
+            {state.showScanOptions && (
+              <div className="space-y-3 border-t pt-5">
+                <p className={SECTION_LABEL}>{t("newscan.scanOptions")}</p>
+                <ScanOptions state={state} />
+              </div>
+            )}
 
             <div className="space-y-3 border-t pt-4">
               <FormMessages state={state} />

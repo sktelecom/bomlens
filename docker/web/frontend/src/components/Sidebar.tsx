@@ -1,15 +1,13 @@
-import { Clock, PanelLeftClose, PanelLeftOpen, Plus, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { buttonVariants } from "@/components/ui/button";
 import {
   EMPTY_SCAN,
-  type RecentScanLink,
   type ScanContext,
   type SectionId,
   visibleGroups,
 } from "@/lib/nav";
-import { newHash, scanHash } from "@/lib/route";
+import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -17,51 +15,33 @@ interface SidebarProps {
   activeSection: SectionId;
   /** The current scan's id, so section links resolve to `#/scan/<id>/<section>`. */
   activeScanId?: string | null;
-  recent?: RecentScanLink[];
-  /** Delete a past scan from the Recent list (removes its artifacts). */
-  onDeleteRecent?: (id: string) => void;
-  /** Per-section counts shown as a trailing badge (e.g. components, vulns). */
-  counts?: Partial<Record<SectionId, number>>;
-  /** Hide the section groups (e.g. before any scan); the Recent area stays. */
-  showSections?: boolean;
-  /** Hash for the home (Recent scans) screen — logo + Recent rail item link here. */
-  homeHref: string;
-  /** True when the Recent scans home screen is showing (rail active state). */
-  atRecent?: boolean;
+  /**
+   * Per-section counts shown as a trailing badge (e.g. components, vulns).
+   * Mostly numbers; dependencies is a `direct/transitive` string.
+   */
+  counts?: Partial<Record<SectionId, number | string>>;
   /** Icon-only rail when collapsed (narrow widths / user toggle). */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
 }
 
-const SEVERITY_DOT: Record<NonNullable<RecentScanLink["topSeverity"]>, string> = {
-  CRITICAL: "bg-risk-critical",
-  HIGH: "bg-risk-high",
-  MEDIUM: "bg-risk-medium",
-  LOW: "bg-risk-low",
-  NONE: "bg-risk-info",
-};
-
 /**
- * Left rail: grouped result sections that adapt to the scan type (AI surfaces
- * appear only for AI/ANALYZE scans), plus a Recent scans area. Tokens only;
- * the brand accent marks the active section. Collapses to an icon rail on
- * narrow widths or via the header toggle.
+ * Left rail: the current scan's grouped sections, adapting to the scan type (AI
+ * surfaces appear only for AI/ANALYZE scans). Purely intra-scan navigation —
+ * the global actions (New scan, Recent scans) live in the TopBar, so the rail
+ * stays one altitude. Tokens only; the brand accent marks the active section.
+ * Collapses to an icon rail on narrow widths or via the header toggle.
  */
 export function Sidebar({
   scan = EMPTY_SCAN,
   activeSection,
   activeScanId,
-  recent = [],
-  onDeleteRecent,
   counts = {},
-  showSections = true,
-  homeHref,
-  atRecent = false,
   collapsed = false,
   onToggleCollapsed,
 }: SidebarProps) {
   const { t } = useTranslation();
-  const groups = showSections ? visibleGroups(scan) : [];
+  const groups = visibleGroups(scan);
 
   return (
     <nav
@@ -92,49 +72,6 @@ export function Sidebar({
           )}
         </button>
       </div>
-
-      {/* New scan — primary rail action (design: sidebar top, brand pill). */}
-      <a
-        href={newHash()}
-        aria-label={t("shell.newScan")}
-        title={collapsed ? t("shell.newScan") : undefined}
-        className={cn(
-          buttonVariants({ size: collapsed ? "icon" : "lg" }),
-          "mb-2 shrink-0",
-          !collapsed && "w-full",
-        )}
-      >
-        <Plus className="h-4 w-4" aria-hidden />
-        {!collapsed && <span>{t("shell.newScan")}</span>}
-      </a>
-
-      {/* Recent scans — the home screen (logo target). */}
-      <a
-        href={homeHref}
-        aria-current={atRecent ? "page" : undefined}
-        title={collapsed ? t("nav.recentScans") : undefined}
-        className={cn(
-          "group relative mb-2 flex shrink-0 items-center gap-2.5 rounded-md px-2 py-2 text-sm",
-          "transition-colors duration-fast ease-out-soft",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-          collapsed && "justify-center",
-          atRecent
-            ? "bg-brand/10 font-semibold text-foreground"
-            : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
-        )}
-      >
-        <Clock
-          className={cn("h-4 w-4 shrink-0", atRecent && "text-brand")}
-          aria-hidden
-        />
-        {!collapsed && <span className="truncate">{t("nav.recentScans")}</span>}
-      </a>
-
-      {!showSections && !collapsed && (
-        <p className="px-2 py-3 text-xs leading-relaxed text-muted-foreground">
-          {t("nav.sectionsHint")}
-        </p>
-      )}
 
       {groups.map((group) => (
         <div key={group.id} className="mb-2">
@@ -173,7 +110,14 @@ export function Sidebar({
                     />
                     {!collapsed && <span className="truncate">{label}</span>}
                     {!collapsed && count !== undefined && (
-                      <span className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground">
+                      <span
+                        className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground"
+                        title={
+                          section.id === "dependencies"
+                            ? t("nav.depSplitTitle")
+                            : undefined
+                        }
+                      >
                         {count}
                       </span>
                     )}
@@ -184,64 +128,6 @@ export function Sidebar({
           </ul>
         </div>
       ))}
-
-      <div className="mt-auto border-t border-sidebar-border pt-2">
-        {!collapsed && (
-          <p className="flex items-center gap-1.5 px-2 pb-1 pt-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
-            <Clock className="h-3 w-3" aria-hidden />
-            {t("nav.recent")}
-          </p>
-        )}
-        {recent.length === 0 ? (
-          !collapsed && (
-            <p className="px-2 py-1 text-xs text-muted-foreground">
-              {t("nav.recentEmpty")}
-            </p>
-          )
-        ) : (
-          <ul className="flex flex-col gap-0.5">
-            {recent.map((scanItem) => (
-              <li key={scanItem.id} className="group/recent relative">
-                <a
-                  href={scanHash(scanItem.id)}
-                  title={collapsed ? scanItem.label : undefined}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
-                    "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-                    collapsed ? "justify-center" : onDeleteRecent && "pr-7",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "h-2 w-2 shrink-0 rounded-full",
-                      SEVERITY_DOT[scanItem.topSeverity ?? "NONE"],
-                    )}
-                    aria-hidden
-                  />
-                  {!collapsed && <span className="truncate">{scanItem.label}</span>}
-                </a>
-                {!collapsed && onDeleteRecent && (
-                  <button
-                    type="button"
-                    onClick={() => onDeleteRecent(scanItem.id)}
-                    aria-label={t("nav.recentDelete")}
-                    title={t("nav.recentDelete")}
-                    className={cn(
-                      "absolute right-1 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded",
-                      "text-muted-foreground opacity-0 transition-opacity duration-fast",
-                      "hover:bg-muted hover:text-foreground group-hover/recent:opacity-100",
-                      "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                    )}
-                  >
-                    <X className="h-3 w-3" aria-hidden />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </nav>
   );
 }

@@ -29,6 +29,8 @@ interface Props {
   security: SecuritySummary;
   /** Search term seeded from global search (CVE / package / title). */
   initialQuery?: string;
+  /** Severity seeded from an Overview severity-bar click (filters on open). */
+  initialSeverity?: string;
 }
 
 type Sort = { key: VulnSortKey; dir: SortDir };
@@ -138,16 +140,20 @@ function VulnDetail({ vuln, links }: { vuln: VulnItem; links: string[] }) {
  * CVSS score, description and reference links already present in the Trivy
  * report — no extra fetch, no side panel.
  */
-export function VulnerabilitiesTable({ security, initialQuery }: Props) {
+export function VulnerabilitiesTable({ security, initialQuery, initialSeverity }: Props) {
   const { t } = useTranslation();
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [severityFilter, setSeverityFilter] = useState("");
+  const [severityFilter, setSeverityFilter] = useState(initialSeverity ?? "");
   const [query, setQuery] = useState(initialQuery ?? "");
   // Re-seed the search when global search routes in a new term.
   useEffect(() => {
     if (initialQuery !== undefined) setQuery(initialQuery);
   }, [initialQuery]);
+  // Re-seed the severity filter when an Overview bar click routes one in.
+  useEffect(() => {
+    if (initialSeverity !== undefined) setSeverityFilter(initialSeverity);
+  }, [initialSeverity]);
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>({ key: "severity", dir: "desc" });
 

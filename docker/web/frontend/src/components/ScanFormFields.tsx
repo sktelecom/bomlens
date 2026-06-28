@@ -180,6 +180,11 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
   } = state;
   return (
     <div className="space-y-3">
+      {/* Set the group's altitude once: these are advanced analyses for source
+          without a package manager, so PM-built projects can leave them off. */}
+      {(showVendored || showDeepLicense) && (
+        <p className="text-xs text-muted-foreground">{t("options.scanMethodHint")}</p>
+      )}
       {showVendored && (
         <div className="space-y-2">
           <ToggleRow

@@ -117,4 +117,30 @@ describe("sectionCounts", () => {
     expect(counts.components).toBe(0);
     expect(counts.vulnerabilities).toBe(0);
   });
+
+  it("counts the dependency-graph size and distinct licenses", () => {
+    const counts = sectionCounts(
+      makeResult({
+        sbom: {
+          components: 3,
+          directCount: 1,
+          transitiveCount: 2,
+          componentList: [
+            { name: "a", version: "1", group: "", purl: "", type: "library", licenses: ["MIT"] },
+            { name: "b", version: "1", group: "", purl: "", type: "library", licenses: ["MIT", "Apache-2.0"] },
+            { name: "c", version: "1", group: "", purl: "", type: "library", licenses: [] },
+          ],
+        },
+      }),
+    );
+    expect(counts.dependencies).toBe("1/2"); // direct / transitive
+    expect(counts.licenses).toBe(2); // MIT, Apache-2.0
+  });
+
+  it("omits dependency/license badges when there's nothing to show", () => {
+    // Flat SBOM: no direct/transitive split and no detected licenses.
+    const counts = sectionCounts(makeResult({ sbom: { components: 5 } }));
+    expect(counts.dependencies).toBeUndefined();
+    expect(counts.licenses).toBeUndefined();
+  });
 });

@@ -46,14 +46,15 @@ async function seedThemeLang(page: Page, theme: Theme, lang: Lang) {
 async function openShell(page: Page, theme: Theme, lang: Lang) {
   await seedThemeLang(page, theme, lang);
   await page.goto("/?ui=next");
-  await page.getByRole("navigation").first().waitFor();
+  // The idle screens carry no section rail (it's per-scan now); the top bar is
+  // the stable anchor that mounts with the shell.
+  await page.getByRole("banner").waitFor();
 }
 
 /** Open the New scan screen (`#/new`) — the source tiles + settings pane. */
 async function openNewScan(page: Page, theme: Theme, lang: Lang) {
   await seedThemeLang(page, theme, lang);
   await page.goto("/?ui=next#/new");
-  await page.getByRole("navigation").first().waitFor();
   // The settings pane mounts the project field on the New scan screen only.
   await page.locator("#project").waitFor();
 }
@@ -121,7 +122,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true, aibom: true }) }),
   );
   await page.reload();
-  await page.getByRole("navigation").first().waitFor();
+  await page.locator("#project").waitFor();
   const tile = page.getByRole("button", { name: "AI model" });
   await expect(tile).toBeEnabled();
   await tile.click();
@@ -149,7 +150,7 @@ test("New scan groups sources and switches the source-specific input", async ({ 
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });
 
-test("Recent scans list re-opens a past scan from the rail", async ({ page }) => {
+test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
   );
@@ -164,7 +165,10 @@ test("Recent scans list re-opens a past scan from the rail", async ({ page }) =>
   );
   await page.goto("/?ui=next");
 
-  // The rail's Recent area lists the past scan; clicking it loads the result.
+  // The top bar's Recent menu lists the past scan; opening it and clicking the
+  // entry loads the result. (Recent moved from the rail to the top bar so the
+  // rail stays purely the current scan's sections.)
+  await page.getByRole("banner").getByRole("button", { name: "Recent scans" }).click();
   const recent = page.getByRole("link", { name: /demo · 1.0/ });
   await expect(recent).toBeVisible();
   await recent.click();
@@ -500,6 +504,32 @@ test("Overview leads with needs-attention and jumps into sections", async ({ pag
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
 
+test("Overview severity bar routes into filtered Vulnerabilities", async ({ page }) => {
+  await stubAndRun(page);
+  await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
+
+  // Click the High band in the Overview severity axis.
+  await page.getByRole("button", { name: "High 1" }).first().click();
+
+  // Lands on Vulnerabilities filtered to HIGH — the HIGH CVE stays, the CRITICAL one is gone.
+  await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("CVE-2024-0002")).toBeVisible();
+  await expect(page.getByText("CVE-2024-0001")).toHaveCount(0);
+});
+
+test("Overview license bar routes into filtered Licenses", async ({ page }) => {
+  await stubLicensesAndRun(page);
+  await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
+
+  // LIC_DONE is 2 review-needed + 1 permissive (MIT); click the Permissive band.
+  await page.getByRole("button", { name: "Permissive 1" }).first().click();
+
+  // Lands on Licenses filtered to permissive — the AI-restrictive review card is gone.
+  await expect(page.getByRole("link", { name: /^Licenses/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("License review needed")).toHaveCount(0);
+  await expect(page.getByText("MIT")).toBeVisible();
+});
+
 test("dependency graph is labelled and the tree view is keyboard-reachable", async ({ page }) => {
   await stubAndRun(page);
   await page.getByRole("navigation").locator('a[href$="/dependencies"]').first().click();
@@ -541,7 +571,8 @@ test("overview has no axe violations", async ({ page }) => {
 for (const { theme, lang } of COMBOS) {
   test(`overview section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);
-    await expect(page.getByText("Apache-2.0").first()).toBeVisible();
+    // The result Overview renders its h1 only once loaded (locale-agnostic anchor).
+    await expect(page.locator("main h1")).toBeVisible();
     await waitForMainSettled(page);
     await page.mouse.move(0, 0); // neutral pointer — avoid hover-state flake
     await expect(page.locator("main")).toHaveScreenshot(`overview-${theme}-${lang}.png`, {

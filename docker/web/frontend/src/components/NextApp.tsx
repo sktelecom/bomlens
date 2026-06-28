@@ -19,7 +19,9 @@ import {
   type RecentScan,
   type ScanParams,
   type ScanProgress,
+  type Severity,
 } from "@/lib/api";
+import { type LicenseRiskTier } from "@/lib/licenses";
 import {
   type RecentScanLink,
   type SectionId,
@@ -90,12 +92,14 @@ export function NextApp() {
     docker: true,
   });
   const [recent, setRecent] = useState<RecentScan[]>([]);
-  // A global-search pick: navigate to this section with the term seeded into its
-  // search. Cleared by the section's own table once applied isn't needed — the
-  // table only re-seeds when the term changes.
-  const [searchSeed, setSearchSeed] = useState<{
+  // A navigation seed: route into a section with a filter pre-applied — a
+  // global-search term, or an Overview risk-bar click (severity / license tier).
+  // The section's own control re-seeds only when the value changes.
+  const [seed, setSeed] = useState<{
     section: SectionId;
-    term: string;
+    term?: string;
+    severity?: Severity;
+    tier?: LicenseRiskTier;
   } | null>(null);
 
   // The scan id currently held in `result` — so the hash router can tell a
@@ -289,7 +293,18 @@ export function NextApp() {
 
   // A global-search pick navigates to the section with the term seeded.
   const handleSearchPick = (section: SectionId, term: string) => {
-    setSearchSeed({ section, term });
+    setSeed({ section, term });
+    if (loadedIdRef.current) {
+      window.location.hash = scanHash(loadedIdRef.current, section);
+    }
+  };
+
+  // An Overview risk-bar click routes into the section with that filter applied.
+  const handleFilterPick = (
+    section: SectionId,
+    filter: { severity?: Severity; tier?: LicenseRiskTier },
+  ) => {
+    setSeed({ section, ...filter });
     if (loadedIdRef.current) {
       window.location.hash = scanHash(loadedIdRef.current, section);
     }
@@ -317,7 +332,6 @@ export function NextApp() {
       onDeleteRecent={deleteRecent}
       homeHref={homeHash()}
       showHomeLink={!(isHome && homeView === "recent")}
-      atRecent={isHome && homeView === "recent"}
       project={isHome ? undefined : projectInfo}
       search={
         result ? <GlobalSearch result={result} onPick={handleSearchPick} /> : undefined
@@ -397,10 +411,15 @@ export function NextApp() {
             scanId={loadedIdRef.current}
             recent={recent}
             searchQuery={
-              searchSeed && searchSeed.section === activeSection
-                ? searchSeed.term
-                : undefined
+              seed && seed.section === activeSection ? seed.term : undefined
             }
+            seedSeverity={
+              seed && seed.section === activeSection ? seed.severity : undefined
+            }
+            seedTier={
+              seed && seed.section === activeSection ? seed.tier : undefined
+            }
+            onPick={handleFilterPick}
           />
 
           {/* The run log is reference material for the run you just watched.

@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/state";
-import type { DoneEvent, RecentScan } from "@/lib/api";
+import type { DoneEvent, RecentScan, Severity } from "@/lib/api";
+import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/results";
 
@@ -25,6 +26,9 @@ export function ResultSection({
   scanId,
   recent,
   searchQuery,
+  seedSeverity,
+  seedTier,
+  onPick,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -34,12 +38,23 @@ export function ResultSection({
   recent?: RecentScan[];
   /** Term seeded from global search into this section's table search. */
   searchQuery?: string;
+  /** Severity seeded into the Vulnerabilities filter (Overview bar click). */
+  seedSeverity?: string;
+  /** License tier seeded into the Licenses filter (Overview bar click). */
+  seedTier?: LicenseRiskTier | "";
+  /** Route into a section with a filter pre-applied (the Overview risk bars). */
+  onPick?: (
+    section: SectionId,
+    seed: { severity?: Severity; tier?: LicenseRiskTier },
+  ) => void;
 }) {
   const { t } = useTranslation();
 
   switch (section) {
     case "overview":
-      return <Overview result={result} scanId={scanId} recent={recent} />;
+      return (
+        <Overview result={result} scanId={scanId} recent={recent} onPick={onPick} />
+      );
 
     case "components":
       return (
@@ -53,13 +68,22 @@ export function ResultSection({
 
     case "vulnerabilities":
       return result.security ? (
-        <VulnerabilitiesTable security={result.security} initialQuery={searchQuery} />
+        <VulnerabilitiesTable
+          security={result.security}
+          initialQuery={searchQuery}
+          initialSeverity={seedSeverity}
+        />
       ) : (
         <EmptyState>{t("result.noSecurity")}</EmptyState>
       );
 
     case "licenses":
-      return <Licenses components={result.sbom?.componentList ?? []} />;
+      return (
+        <Licenses
+          components={result.sbom?.componentList ?? []}
+          initialTier={seedTier}
+        />
+      );
 
     case "dependencies": {
       const sbomFile = sbomFileName(result);
