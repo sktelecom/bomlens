@@ -13,8 +13,9 @@ import { useTranslation } from "react-i18next";
 
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
-import type { ComponentItem, DoneEvent, RecentScan } from "@/lib/api";
+import type { ComponentItem, DoneEvent, RecentScan, Severity } from "@/lib/api";
 import { typeGroups } from "@/lib/components";
+import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
@@ -22,7 +23,7 @@ import { isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
-import { LicenseSummary } from "./LicenseSummary";
+import { LicenseRiskBar } from "./LicenseRiskBar";
 import { ResultsList } from "./ResultsList";
 import { SeverityBar } from "./SeverityBar";
 
@@ -49,12 +50,22 @@ export function Overview({
   result,
   scanId,
   recent = [],
+  onPick,
 }: {
   result: DoneEvent;
   /** The scan's id; section links resolve to `#/scan/<id>/<section>`. */
   scanId: string | null;
   /** Local Recent-scans list, for the "vs previous scan" comparison line. */
   recent?: RecentScan[];
+  /**
+   * Route into a section with a filter pre-applied — clicking a severity band
+   * opens Vulnerabilities filtered to it; clicking a license class opens
+   * Licenses filtered to it. Omit for a non-interactive Overview.
+   */
+  onPick?: (
+    section: SectionId,
+    seed: { severity?: Severity; tier?: LicenseRiskTier },
+  ) => void;
 }) {
   const { t, i18n } = useTranslation();
   const attention = needsAttention(result);
@@ -118,6 +129,19 @@ export function Overview({
         </div>
       )}
 
+      {result.sbom?.sbomToolDegraded && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="text-sm font-medium">{t("result.sbomDegradedTitle")}</div>
+          <p className="mt-1 text-xs">
+            {t(
+              result.sbom.sbomToolDegraded === "disk-space"
+                ? "result.sbomDegradedDisk"
+                : "result.sbomDegradedBody",
+            )}
+          </p>
+        </div>
+      )}
+
       {result.scanoss?.status === "unavailable" && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="text-sm font-medium">{t("result.scanossUnavailableTitle")}</div>
@@ -131,6 +155,14 @@ export function Overview({
           <p className="mt-1 text-xs">{t("result.scanossNoMatchBody")}</p>
         </div>
       )}
+
+      <JumpCards
+        result={result}
+        hasDeps={hasDeps}
+        ai={ai}
+        hasConformance={hasConformance}
+        scanId={scanId}
+      />
 
       {attention.length > 0 && (
         <Card>
@@ -169,17 +201,22 @@ export function Overview({
         </Card>
       )}
 
-      {result.security && <SeverityBar security={result.security} />}
-
-      <JumpCards
-        result={result}
-        hasDeps={hasDeps}
-        ai={ai}
-        hasConformance={hasConformance}
-        scanId={scanId}
-      />
-
-      <LicenseSummary components={result.sbom?.componentList ?? []} />
+      {/* The two risk axes side by side; clicking a band routes into its
+          section with that filter applied. */}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
+        {result.security && (
+          <SeverityBar
+            security={result.security}
+            onSelect={
+              onPick ? (s) => onPick("vulnerabilities", { severity: s }) : undefined
+            }
+          />
+        )}
+        <LicenseRiskBar
+          components={result.sbom?.componentList ?? []}
+          onSelect={onPick ? (tier) => onPick("licenses", { tier }) : undefined}
+        />
+      </div>
 
       <TypeSummary components={result.sbom?.componentList ?? []} />
     </div>

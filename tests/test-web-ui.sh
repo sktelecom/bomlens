@@ -414,6 +414,29 @@ PY
     rm -f "$OUT"/lic_1.0_*
 fi
 
+echo "== sbom-tool-degraded property (sbom_summary) =="
+# When entrypoint records the syft fallback as bomlens:sbom-tool-degraded, the
+# summary must surface it (drives the Overview banner); absent -> None.
+cat > "$OUT/deg_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"deg","version":"1.0"},"properties":[{"name":"bomlens:sbom-tool-degraded","value":"disk-space"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/clean_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"clean","version":"1.0"}},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server.sbom_summary("deg_1.0")["sbomToolDegraded"] == "disk-space"
+assert server.sbom_summary("clean_1.0")["sbomToolDegraded"] is None
+PY
+then
+    pass "sbomToolDegraded surfaced from metadata (None when absent)"
+else
+    fail "sbomToolDegraded not surfaced correctly"
+fi
+rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
+
 echo "== scan-config sidecar (re-scan settings) =="
 # A scan saves how it was launched (source + non-secret toggles) as a dot-prefixed
 # sidecar in its run folder, surfaced as `scanConfig` on the done event and on a

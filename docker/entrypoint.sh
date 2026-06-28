@@ -66,6 +66,7 @@ LIBDIR="/usr/local/lib/sbom"
 generate_sbom_cdxgen() {
     local src_container="$1" src_host="$2" out="$3"
     local lang img api rc=0
+    CDXGEN_FAIL_REASON=""
     lang=$(detect_lang "$src_container")
     if [ "$lang" = "android" ]; then
         api=$(android_api "$src_container")
@@ -76,6 +77,10 @@ generate_sbom_cdxgen() {
         echo "[INFO] Language: $lang -> $img"
     fi
     local prep; prep=$(cat "$LIBDIR/build-prep.sh")
+    # Capture the sibling output for diagnosis while still streaming it live, so
+    # an out-of-disk extraction failure can be reported specifically (rather than
+    # a bare rc=125) and recorded for the UI.
+    local logf; logf=$(mktemp)
     docker run --rm -u 0:0 \
         -v "$src_host":/app \
         -e HOME=/tmp/sbomhome \
@@ -84,14 +89,45 @@ generate_sbom_cdxgen() {
         -e PROJECT_NAME="$PROJECT_NAME" \
         -e PROJECT_VERSION="$PROJECT_VERSION" \
         --entrypoint sh "$img" \
-        -c "$prep" _ /app "/app/$out" 1.6 || rc=$?
-    [ "$rc" -eq 0 ] || { echo "[WARN] cdxgen sibling container failed (rc=$rc)."; return 1; }
+        -c "$prep" _ /app "/app/$out" 1.6 2>&1 | tee "$logf"
+    rc=${PIPESTATUS[0]}
+    if [ "$rc" -ne 0 ]; then
+        if grep -qi "no space left on device" "$logf"; then
+            CDXGEN_FAIL_REASON="disk-space"
+            echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
+        else
+            CDXGEN_FAIL_REASON="cdxgen-unavailable"
+            echo "[WARN] cdxgen sibling container failed (rc=$rc)."
+        fi
+        rm -f "$logf"
+        return 1
+    fi
+    rm -f "$logf"
     if [ -f "$src_container/$out" ]; then
         mv "$src_container/$out" "./$out"
     else
+        CDXGEN_FAIL_REASON="cdxgen-unavailable"
         echo "[WARN] cdxgen produced no SBOM at $src_container/$out."; return 1
     fi
     return 0
+}
+
+# Record that the SBOM came from the shallow syft fallback (direct deps only),
+# with the reason, so the web UI can explain why the dependency graph is thin.
+# Mirrors the other bomlens:* metadata signals the server reads (survives
+# stamp/normalize like bomlens:suggest-identify-vendored does).
+mark_sbom_degraded() {
+    local file="$1" reason="$2" tmp
+    [ -f "$file" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    tmp="${file}.degraded.tmp"
+    if jq --arg r "$reason" \
+        '(.metadata.properties) = ((.metadata.properties // []) + [{name:"bomlens:sbom-tool-degraded", value:$r}])' \
+        "$file" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"
+    fi
 }
 
 echo "=========================================="
@@ -116,16 +152,45 @@ case "$SCAN_MODE" in
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
         if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
+            # Best-effort low-disk warning: cdxgen pulls/extracts a language image
+            # via the host Docker, which fails if space is tight. We only see this
+            # container's view of the disk (on Docker Desktop it shares the VM
+            # volume), so this is a hint, not a guarantee — the reliable signal is
+            # the out-of-disk detection inside generate_sbom_cdxgen.
+            avail_mb=$(df -Pk "$SRC_ROOT" 2>/dev/null | awk 'NR==2 {print int($4/1024)}')
+            if [ -n "$avail_mb" ] && [ "$avail_mb" -lt 2048 ]; then
+                echo "[WARN] Low disk space (~${avail_mb} MB) — cdxgen may fail to pull its language image; consider 'docker system prune'."
+            fi
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
             if ! generate_sbom_cdxgen "$SRC_ROOT" "$SOURCE_ROOT_HOST" "$OUTPUT_FILE"; then
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
                 syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
+                mark_sbom_degraded "$OUTPUT_FILE" "${CDXGEN_FAIL_REASON:-cdxgen-unavailable}"
             fi
         else
             echo "[1/2] syft: source dir $SRC_ROOT (manifest-only; docker.sock/CLI/host-path unavailable)"
             syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
                 || { echo "[ERROR] syft source scan failed."; exit 1; }
+            mark_sbom_degraded "$OUTPUT_FILE" "cdxgen-unavailable"
+        fi
+        # Normalize the root component type for a source scan. cdxgen sets
+        # application/library/framework, but a syft `dir:` (fallback / no-Docker)
+        # sets "file", which mislabels the scan as a generic "SBOM" in the UI. A
+        # source tree is an application-style root, so coerce non-source types
+        # here while keeping cdxgen's own choice.
+        if command -v jq >/dev/null 2>&1 && [ -f "$OUTPUT_FILE" ]; then
+            case "$(jq -r '.metadata.component.type // ""' "$OUTPUT_FILE" 2>/dev/null)" in
+                application|library|framework) ;;
+                *)
+                    if jq '.metadata.component.type = "application"' "$OUTPUT_FILE" \
+                        > "$OUTPUT_FILE.rt" 2>/dev/null; then
+                        mv "$OUTPUT_FILE.rt" "$OUTPUT_FILE"
+                    else
+                        rm -f "$OUTPUT_FILE.rt"
+                    fi
+                    ;;
+            esac
         fi
         ;;
 

@@ -54,16 +54,29 @@ export function isAiScan(result: DoneEvent): boolean {
   );
 }
 
-/** Counts shown as trailing rail badges (mirrors the classic tab counts). */
+/**
+ * Counts shown as trailing rail badges (mirrors the classic tab counts). Most
+ * are a single number; dependencies is a `direct/transitive` split, which is
+ * more telling than the total (the total just mirrors the component count).
+ */
 export function sectionCounts(
   result: DoneEvent,
-): Partial<Record<SectionId, number>> {
+): Partial<Record<SectionId, number | string>> {
+  const componentList = result.sbom?.componentList ?? [];
+  // Dependency graph as a direct/transitive split. Omit when there's no graph
+  // (flat firmware/image SBOMs) so the rail shows no misleading 0.
+  const direct = result.sbom?.directCount ?? 0;
+  const transitive = result.sbom?.transitiveCount ?? 0;
+  // Distinct license ids — the rows the Licenses distribution leads with.
+  const licenses = new Set<string>();
+  for (const c of componentList) for (const l of c.licenses) licenses.add(l);
   return {
     components: result.sbom?.components ?? 0,
+    dependencies: direct + transitive > 0 ? `${direct}/${transitive}` : undefined,
     vulnerabilities: result.security?.TOTAL ?? 0,
+    licenses: licenses.size > 0 ? licenses.size : undefined,
     artifacts: result.results.length,
-    models: (result.sbom?.componentList ?? []).filter(
-      (c) => c.type === "machine-learning-model",
-    ).length,
+    models: componentList.filter((c) => c.type === "machine-learning-model")
+      .length,
   };
 }

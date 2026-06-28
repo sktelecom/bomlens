@@ -120,11 +120,11 @@ test("a plain New scan after a re-scan starts blank (config consumed once)", asy
   await page.getByRole("button", { name: "Re-scan" }).click();
   await expect(page.locator("#project")).toHaveValue("demo");
 
-  // Go home, then open New scan again from the rail — the parked config was
+  // Go home, then open New scan again from the top bar — the parked config was
   // consumed, so the form is empty (the re-scan must not leak into a plain one).
   await page.getByRole("link", { name: "BomLens" }).click();
-  await expect(page.getByRole("heading", { name: "Recent scans" })).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: "New scan" }).click();
+  await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
+  await page.getByRole("banner").getByRole("link", { name: "New scan" }).click();
   await expect(page.locator("#project")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Current folder" })).toHaveAttribute("aria-pressed", "true");
 });

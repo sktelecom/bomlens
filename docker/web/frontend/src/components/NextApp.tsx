@@ -20,8 +20,14 @@ import {
   type ScanConfig,
   type ScanParams,
   type ScanProgress,
+  type Severity,
 } from "@/lib/api";
-import { type SectionId, visibleSectionIds } from "@/lib/nav";
+import { type LicenseRiskTier } from "@/lib/licenses";
+import {
+  type RecentScanLink,
+  type SectionId,
+  visibleSectionIds,
+} from "@/lib/nav";
 import { homeHash, newHash, parseHash, scanHash } from "@/lib/route";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 
@@ -39,6 +45,19 @@ const SCAN_KIND_KEY: Record<string, string> = {
   "operating-system": "result.kindRootfs",
   data: "result.kindAnalyze",
 };
+
+/** Map a stored scan to the top bar's Recent-menu link shape. */
+function toRecentLink(s: RecentScan): RecentScanLink {
+  const sev = s.maxSeverity;
+  return {
+    id: s.id,
+    label: s.version ? `${s.project} · ${s.version}` : s.project,
+    topSeverity:
+      sev === "CRITICAL" || sev === "HIGH" || sev === "MEDIUM" || sev === "LOW"
+        ? sev
+        : "NONE",
+  };
+}
 
 /**
  * The new shell application (behind `?ui=next`). Same scan state machine as the
@@ -78,12 +97,14 @@ export function NextApp() {
   // New scan form can seed itself from it. The form reads it once on mount and
   // clears it, so a subsequent plain New scan starts blank.
   const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
-  // A global-search pick: navigate to this section with the term seeded into its
-  // search. Cleared by the section's own table once applied isn't needed — the
-  // table only re-seeds when the term changes.
-  const [searchSeed, setSearchSeed] = useState<{
+  // A navigation seed: route into a section with a filter pre-applied — a
+  // global-search term, or an Overview risk-bar click (severity / license tier).
+  // The section's own control re-seeds only when the value changes.
+  const [seed, setSeed] = useState<{
     section: SectionId;
-    term: string;
+    term?: string;
+    severity?: Severity;
+    tier?: LicenseRiskTier;
   } | null>(null);
 
   // The scan id currently held in `result` — so the hash router can tell a
@@ -218,6 +239,7 @@ export function NextApp() {
   };
 
   const scan = useMemo(() => deriveScanContext(result), [result]);
+  const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
   const counts = useMemo(
     () => (result ? sectionCounts(result) : undefined),
     [result],
@@ -283,7 +305,18 @@ export function NextApp() {
 
   // A global-search pick navigates to the section with the term seeded.
   const handleSearchPick = (section: SectionId, term: string) => {
-    setSearchSeed({ section, term });
+    setSeed({ section, term });
+    if (loadedIdRef.current) {
+      window.location.hash = scanHash(loadedIdRef.current, section);
+    }
+  };
+
+  // An Overview risk-bar click routes into the section with that filter applied.
+  const handleFilterPick = (
+    section: SectionId,
+    filter: { severity?: Severity; tier?: LicenseRiskTier },
+  ) => {
+    setSeed({ section, ...filter });
     if (loadedIdRef.current) {
       window.location.hash = scanHash(loadedIdRef.current, section);
     }
@@ -305,11 +338,12 @@ export function NextApp() {
       scan={scan}
       activeSection={activeSection}
       activeScanId={loadedIdRef.current}
+      recent={recentLinks}
+      onDeleteRecent={deleteRecent}
       counts={counts}
       showSections={Boolean(result)}
       homeHref={homeHash()}
       showHomeLink={!(isHome && homeView === "recent")}
-      atRecent={isHome && homeView === "recent"}
       project={isHome ? undefined : projectInfo}
       search={
         result ? <GlobalSearch result={result} onPick={handleSearchPick} /> : undefined
@@ -398,10 +432,15 @@ export function NextApp() {
             scanId={loadedIdRef.current}
             recent={recent}
             searchQuery={
-              searchSeed && searchSeed.section === activeSection
-                ? searchSeed.term
-                : undefined
+              seed && seed.section === activeSection ? seed.term : undefined
             }
+            seedSeverity={
+              seed && seed.section === activeSection ? seed.severity : undefined
+            }
+            seedTier={
+              seed && seed.section === activeSection ? seed.tier : undefined
+            }
+            onPick={handleFilterPick}
           />
 
           {/* The run log is reference material for the run you just watched.

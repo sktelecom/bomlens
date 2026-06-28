@@ -1,5 +1,5 @@
 import { ScrollText, TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,11 +8,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import {
+  componentRiskTier,
   isCopyleft,
   type LicenseReview,
+  type LicenseRiskTier,
   licenseGroups,
   reviewGroups,
 } from "@/lib/licenses";
+
+import { LicenseRiskBar } from "./LicenseRiskBar";
 
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
@@ -26,19 +30,44 @@ const FLAG_LABEL: Record<LicenseReview, string> = {
  * The distribution is a proportional bar chart (copyleft tinted for review);
  * click a bar to list its components.
  */
-export function Licenses({ components }: { components: ComponentItem[] }) {
+export function Licenses({
+  components,
+  initialTier,
+}: {
+  components: ComponentItem[];
+  /** Tier seeded from an Overview classification-bar click (filters on open). */
+  initialTier?: LicenseRiskTier | "";
+}) {
   const { t } = useTranslation();
-  const review = useMemo(() => reviewGroups(components), [components]);
-  const { groups, unlicensed } = useMemo(() => licenseGroups(components), [components]);
+  // Clicking a classification tier filters the rest of the tab to that tier.
+  const [tier, setTier] = useState<LicenseRiskTier | "">(initialTier ?? "");
   const [selected, setSelected] = useState<string | null>(null);
+  // Re-seed the tier filter when an Overview bar click routes one in.
+  useEffect(() => {
+    if (initialTier !== undefined) setTier(initialTier);
+  }, [initialTier]);
+
+  const filtered = useMemo(
+    () =>
+      tier ? components.filter((c) => componentRiskTier(c) === tier) : components,
+    [tier, components],
+  );
+  const review = useMemo(() => reviewGroups(filtered), [filtered]);
+  const { groups, unlicensed } = useMemo(() => licenseGroups(filtered), [filtered]);
   const selectedComps = useMemo(
-    () => (selected ? components.filter((c) => c.licenses.includes(selected)) : []),
-    [selected, components],
+    () => (selected ? filtered.filter((c) => c.licenses.includes(selected)) : []),
+    [selected, filtered],
   );
 
   if (components.length === 0) {
     return <EmptyState icon={ScrollText}>{t("licenses.empty")}</EmptyState>;
   }
+
+  // Toggle the tier filter; clear the license drill-down when the class changes.
+  const toggleTier = (next: LicenseRiskTier) => {
+    setTier((cur) => (cur === next ? "" : next));
+    setSelected(null);
+  };
 
   const bars: BarDatum[] = groups.map((g) => ({
     key: g.name,
@@ -49,6 +78,8 @@ export function Licenses({ components }: { components: ComponentItem[] }) {
 
   return (
     <div className="space-y-6">
+      <LicenseRiskBar components={components} selected={tier} onSelect={toggleTier} />
+
       {review.length > 0 && (
         <Card className="border-amber-300/60 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-950/20">
           <CardContent className="space-y-3 p-4">

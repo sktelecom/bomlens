@@ -610,6 +610,17 @@ def sbom_summary(run_id):
         p.get("name") == "bomlens:suggest-identify-vendored" and p.get("value") == "true"
         for p in meta_props
     )
+    # sbom-tool-degraded: set by entrypoint.sh when cdxgen couldn't run and the
+    # scan fell back to syft (direct deps only) — e.g. "disk-space". Drives a
+    # result banner so the thin dependency graph has a visible reason.
+    degraded = next(
+        (
+            p.get("value")
+            for p in meta_props
+            if p.get("name") == "bomlens:sbom-tool-degraded"
+        ),
+        None,
+    )
     # Direct/transitive split across ALL components (not just the capped rows),
     # so the Overview dependency tile is accurate on large SBOMs too. Zero when
     # the SBOM has no dependency graph (flat firmware/image SBOMs).
@@ -627,6 +638,7 @@ def sbom_summary(run_id):
         "componentList": rows,
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
+        "sbomToolDegraded": degraded,
         # CycloneDX root component type — drives the honest scan-kind subtitle and
         # works on re-open too, where the scan MODE isn't stored.
         "componentType": meta_comp.get("type"),

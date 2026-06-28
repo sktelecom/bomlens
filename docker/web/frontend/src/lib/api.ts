@@ -57,6 +57,9 @@ export interface SbomSummary {
   /** Set when the scan looks like C/C++ embedded source with no package manager,
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
+  /** Set when cdxgen couldn't run and the scan fell back to syft (direct deps
+   *  only), e.g. "disk-space" | "cdxgen-unavailable". Drives a result banner. */
+  sbomToolDegraded?: string | null;
   /** CycloneDX root component type (application/firmware/container/…) — drives
    *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
   componentType?: string | null;

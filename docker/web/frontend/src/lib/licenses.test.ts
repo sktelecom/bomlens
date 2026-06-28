@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentItem } from "./api";
-import { isCopyleft, licenseGroups, reviewCount, reviewGroups } from "./licenses";
+import {
+  isCopyleft,
+  licenseGroups,
+  licenseRiskSummary,
+  licenseRiskTier,
+  reviewCount,
+  reviewGroups,
+} from "./licenses";
 
 const c = (over: Partial<ComponentItem>): ComponentItem => ({
   name: "x", version: "1", group: "", purl: "", type: "library", licenses: [], ...over,
@@ -45,5 +52,46 @@ describe("isCopyleft", () => {
     for (const id of ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]) {
       expect(isCopyleft(id)).toBe(false);
     }
+  });
+});
+
+describe("licenseRiskTier", () => {
+  it("grades by copyleft strength, AGPL/LGPL before bare GPL", () => {
+    expect(licenseRiskTier("AGPL-3.0")).toBe("network-copyleft");
+    expect(licenseRiskTier("GPL-3.0-only")).toBe("strong-copyleft");
+    expect(licenseRiskTier("LGPL-2.1")).toBe("weak-copyleft");
+    expect(licenseRiskTier("MPL-2.0")).toBe("weak-copyleft");
+    expect(licenseRiskTier("MIT")).toBe("permissive");
+    expect(licenseRiskTier("Apache-2.0")).toBe("permissive");
+  });
+
+  it("never assumes an unrecognised license is permissive", () => {
+    // The core safety property: unknown is uncategorized, not safe.
+    expect(licenseRiskTier("Foo-1.0")).toBe("uncategorized");
+    expect(licenseRiskTier("Proprietary")).toBe("uncategorized");
+    expect(licenseRiskTier("MIT OR Apache-2.0")).toBe("uncategorized");
+    expect(licenseRiskTier("")).toBe("uncategorized");
+  });
+});
+
+describe("licenseRiskSummary", () => {
+  it("counts each component once: review flag wins, no-license is uncategorized", () => {
+    const s = licenseRiskSummary(COMPONENTS);
+    expect(s["review-needed"]).toBe(2); // llama (behavioral) + nc-data
+    expect(s.permissive).toBe(2); // lib-a + lib-b (MIT)
+    expect(s.uncategorized).toBe(1); // unlic (no license)
+    expect(s.TOTAL).toBe(5);
+  });
+
+  it("takes the worst tier across a component's licenses", () => {
+    const s = licenseRiskSummary([c({ licenses: ["MIT", "GPL-3.0-only"] })]);
+    expect(s["strong-copyleft"]).toBe(1);
+    expect(s.permissive).toBe(0);
+  });
+
+  it("keeps an unknown license out of the permissive bucket", () => {
+    const s = licenseRiskSummary([c({ licenses: ["Weird-1.0"] })]);
+    expect(s.uncategorized).toBe(1);
+    expect(s.permissive).toBe(0);
   });
 });

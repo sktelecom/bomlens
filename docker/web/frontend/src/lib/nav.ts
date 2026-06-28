@@ -162,3 +162,10 @@ export function visibleSectionIds(ctx: ScanContext): SectionId[] {
   return visibleGroups(ctx).flatMap((g) => g.sections.map((s) => s.id));
 }
 
+/** A past scan as shown in the top bar's Recent menu (lightweight link shape). */
+export interface RecentScanLink {
+  id: string;
+  label: string;
+  topSeverity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
+}
+

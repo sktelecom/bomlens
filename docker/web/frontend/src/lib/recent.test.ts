@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { RecentScan } from "./api";
 import {
+  filterRecent,
   formatRelativeTime,
+  presentTypes,
   scanComparison,
+  scanType,
   scanTypeLabelKey,
   sortRecent,
   summarizeRecent,
@@ -24,18 +27,70 @@ function scan(over: Partial<RecentScan> = {}): RecentScan {
 }
 
 describe("summarizeRecent", () => {
-  it("counts total, at-risk (CRITICAL/HIGH) and AI scans", () => {
+  it("counts total, at-risk (CRITICAL/HIGH) and distinct projects", () => {
     const s = summarizeRecent([
-      scan({ maxSeverity: "CRITICAL" }),
-      scan({ maxSeverity: "HIGH" }),
-      scan({ maxSeverity: "MEDIUM" }),
-      scan({ maxSeverity: null, isAiScan: true }),
+      scan({ project: "a", maxSeverity: "CRITICAL" }),
+      scan({ project: "a", maxSeverity: "HIGH" }),
+      scan({ project: "b", maxSeverity: "MEDIUM" }),
+      scan({ project: "c", maxSeverity: null, isAiScan: true }),
     ]);
-    expect(s).toEqual({ total: 4, atRisk: 2, ai: 1 });
+    expect(s).toEqual({ total: 4, atRisk: 2, projects: 3 });
   });
 
   it("is all-zero for an empty list", () => {
-    expect(summarizeRecent([])).toEqual({ total: 0, atRisk: 0, ai: 0 });
+    expect(summarizeRecent([])).toEqual({ total: 0, atRisk: 0, projects: 0 });
+  });
+});
+
+describe("scanType / presentTypes", () => {
+  it("derives the scan kind from isAiScan then componentType", () => {
+    expect(scanType(scan({ isAiScan: true }))).toBe("ai");
+    expect(scanType(scan({ componentType: "firmware" }))).toBe("firmware");
+    expect(scanType(scan({ componentType: "container" }))).toBe("container");
+    expect(scanType(scan({ componentType: "operating-system" }))).toBe("rootfs");
+    expect(scanType(scan({ componentType: "application" }))).toBe("source");
+    expect(scanType(scan({ componentType: null }))).toBe("sbom");
+  });
+
+  it("lists distinct present types in display order", () => {
+    const types = presentTypes([
+      scan({ componentType: null }),
+      scan({ isAiScan: true }),
+      scan({ componentType: "container" }),
+      scan({ componentType: "application" }),
+    ]);
+    expect(types).toEqual(["source", "container", "ai", "sbom"]);
+  });
+});
+
+describe("filterRecent", () => {
+  const list = [
+    scan({ id: "a", project: "web-api", version: "2.0", maxSeverity: "CRITICAL", componentType: "application" }),
+    scan({ id: "b", project: "mobile", version: "1.0", maxSeverity: "LOW", componentType: "container" }),
+    scan({ id: "c", project: "ml-model", version: "1.0", maxSeverity: null, isAiScan: true }),
+  ];
+  const base = { query: "", type: "all" as const, atRisk: false };
+
+  it("returns everything with no filter", () => {
+    expect(filterRecent(list, base).map((s) => s.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("matches free text against project and version", () => {
+    expect(filterRecent(list, { ...base, query: "web" }).map((s) => s.id)).toEqual(["a"]);
+    expect(filterRecent(list, { ...base, query: "2.0" }).map((s) => s.id)).toEqual(["a"]);
+    expect(filterRecent(list, { ...base, query: "MOBILE" }).map((s) => s.id)).toEqual(["b"]);
+  });
+
+  it("filters by scan type and by at-risk", () => {
+    expect(filterRecent(list, { ...base, type: "ai" }).map((s) => s.id)).toEqual(["c"]);
+    expect(filterRecent(list, { ...base, type: "source" }).map((s) => s.id)).toEqual(["a"]);
+    expect(filterRecent(list, { ...base, type: "container" }).map((s) => s.id)).toEqual(["b"]);
+    expect(filterRecent(list, { ...base, atRisk: true }).map((s) => s.id)).toEqual(["a"]);
+  });
+
+  it("combines text, type and at-risk", () => {
+    expect(filterRecent(list, { query: "ml", type: "ai", atRisk: false }).map((s) => s.id)).toEqual(["c"]);
+    expect(filterRecent(list, { query: "mobile", type: "ai", atRisk: false })).toEqual([]);
   });
 });
 
