@@ -162,9 +162,3 @@ export function visibleSectionIds(ctx: ScanContext): SectionId[] {
   return visibleGroups(ctx).flatMap((g) => g.sections.map((s) => s.id));
 }
 
-/** A past scan entry for the Recent area (populated in a later phase). */
-export interface RecentScanLink {
-  id: string;
-  label: string;
-  topSeverity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
-}

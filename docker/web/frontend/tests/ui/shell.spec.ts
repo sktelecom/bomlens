@@ -149,30 +149,6 @@ test("New scan groups sources and switches the source-specific input", async ({ 
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });
 
-test("Recent scans list re-opens a past scan from the rail", async ({ page }) => {
-  await page.route("**/capabilities", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
-  );
-  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
-  await page.route("**/scans", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify([
-      { id: "demo_1.0", project: "demo", version: "1.0", components: 2, maxSeverity: "CRITICAL", isAiScan: false, generatedAt: 1700000000 },
-    ]) }),
-  );
-  await page.route("**/scan?id=demo_1.0", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
-  );
-  await page.goto("/?ui=next");
-
-  // The rail's Recent area lists the past scan; clicking it loads the result.
-  const recent = page.getByRole("link", { name: /demo · 1.0/ });
-  await expect(recent).toBeVisible();
-  await recent.click();
-
-  await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("2 critical or high vulnerabilities")).toBeVisible();
-});
-
 test("Recent home renders the summary strip and the scan table", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),

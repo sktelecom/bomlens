@@ -124,6 +124,26 @@ export interface ConformanceSummary {
   checks?: ConformanceCheck[];
 }
 
+/**
+ * The settings a scan was run with, echoed back so a finished scan can be
+ * re-run with the same target and toggles (the "Re-scan" action). Mirrors the
+ * server's `scanConfig` keys exactly. Credentials/tokens are deliberately not
+ * part of the contract — a re-scan re-prompts for them. Absent on older scans
+ * (history predating this field) and on payloads that never carried a config.
+ */
+export interface ScanConfig {
+  source: SourceType;
+  /** git URL / docker image (empty for current-folder and upload sources). */
+  target: string;
+  project: string;
+  version: string;
+  notice: boolean;
+  security: boolean;
+  deepLicense: boolean;
+  identifyVendored: boolean;
+  includeOsv: boolean;
+}
+
 export interface DoneEvent {
   ok: boolean;
   mode?: string;
@@ -140,6 +160,9 @@ export interface DoneEvent {
   /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
    *  status: "unavailable" (search blocked) | "no-match" | "matched". */
   scanoss?: { status: string | null; count: number } | null;
+  /** The settings this scan ran with, for the "Re-scan" action. Absent on
+   *  older payloads / history that predate the field. */
+  scanConfig?: ScanConfig;
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */

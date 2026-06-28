@@ -359,7 +359,7 @@ rm -rf "$atmp"
 
 # Self-generated risk report (no conformance artifact) — the all-modes default.
 # Without a *_conformance.json the report must drop the 포맷 검증 section and
-# retitle to 오픈소스위험분석보고서 with sections renumbered from 1.
+# retitle to 오픈소스 위험 분석 보고서 with sections renumbered from 1.
 stmp="$(mktemp -d)"
 cat > "$stmp/self_security.json" <<'EOF'
 {"Results":[{"Vulnerabilities":[
@@ -368,11 +368,11 @@ cat > "$stmp/self_security.json" <<'EOF'
 EOF
 printf 'License: MIT\nLicense: Apache-2.0\n' > "$stmp/self_NOTICE.txt"
 bash "$LIB/generate-risk-report.sh" "$stmp/self" "SelfApp" >/dev/null 2>&1
-if grep -q "오픈소스위험분석보고서" "$stmp/self_risk-report.md" \
+if grep -q "오픈소스 위험 분석 보고서" "$stmp/self_risk-report.md" \
    && ! grep -q "포맷 검증" "$stmp/self_risk-report.md"; then
-    pass "risk report (self): titled 오픈소스위험분석보고서, no 포맷 검증 section"
+    pass "risk report (self): titled 오픈소스 위험 분석 보고서, no 포맷 검증 section"
 else
-    fail "risk report (self): titled 오픈소스위험분석보고서, no 포맷 검증 section"
+    fail "risk report (self): titled 오픈소스 위험 분석 보고서, no 포맷 검증 section"
 fi
 if grep -q "## 1. 취약점" "$stmp/self_risk-report.md" \
    && grep -q "7일" "$stmp/self_risk-report.md" && grep -q "CVE-2025-0001" "$stmp/self_risk-report.md"; then
@@ -380,10 +380,10 @@ if grep -q "## 1. 취약점" "$stmp/self_risk-report.md" \
 else
     fail "risk report (self): renumbered from 1, vuln table present"
 fi
-if grep -q "<h1>오픈소스위험분석보고서</h1>" "$stmp/self_risk-report.html"; then
-    pass "risk report (self): html titled 오픈소스위험분석보고서"
+if grep -q "<h1>오픈소스 위험 분석 보고서</h1>" "$stmp/self_risk-report.html"; then
+    pass "risk report (self): html titled 오픈소스 위험 분석 보고서"
 else
-    fail "risk report (self): html titled 오픈소스위험분석보고서"
+    fail "risk report (self): html titled 오픈소스 위험 분석 보고서"
 fi
 rm -rf "$stmp"
 
@@ -419,10 +419,10 @@ else
         fi
         # Risk report is now generated in SOURCE mode too (not only ANALYZE).
         if [ -f "$w/testapp_1.0_risk-report.md" ] && [ -f "$w/testapp_1.0_risk-report.html" ] \
-           && grep -q "오픈소스위험분석보고서" "$w/testapp_1.0_risk-report.md"; then
-            pass "nodejs SOURCE: 오픈소스위험분석보고서 generated (all-modes default)"
+           && grep -q "오픈소스 위험 분석 보고서" "$w/testapp_1.0_risk-report.md"; then
+            pass "nodejs SOURCE: 오픈소스 위험 분석 보고서 generated (all-modes default)"
         else
-            fail "nodejs SOURCE: 오픈소스위험분석보고서 generated (all-modes default)"
+            fail "nodejs SOURCE: 오픈소스 위험 분석 보고서 generated (all-modes default)"
         fi
         rm -rf "$w"
     else
