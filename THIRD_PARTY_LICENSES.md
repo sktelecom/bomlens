@@ -25,6 +25,22 @@
 
 > 데이터: NVD(취약점 출처)는 public domain이며 "NIST/NVD" 출처 표시가 요구됩니다.
 
+### 웹 UI 폰트
+
+웹 UI(`--ui`)는 타이포그래피 일관성과 오프라인·데스크톱(Electron) 동작을 위해 두 글꼴을 `@fontsource`로 번들합니다. 글꼴 파일(woff2)은 빌드 시 웹 SPA에 포함되어 기본 이미지로 함께 배포되며, 외부 폰트 CDN을 호출하지 않습니다.
+
+| 글꼴 | 용도 | 라이선스 (SPDX) | Source |
+|------|------|------------------|--------|
+| Inter | 본문·UI 서체 | OFL-1.1 | https://github.com/rsms/inter |
+| JetBrains Mono | 코드·고정폭 서체 | OFL-1.1 | https://github.com/JetBrains/JetBrainsMono |
+
+SIL Open Font License 1.1은 출처(저작권) 표시를 요구하며, 두 글꼴 모두 원본을 수정 없이 그대로 번들합니다.
+
+- Inter: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+- JetBrains Mono: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+
+OFL-1.1 전문은 위 Source의 각 저장소 `OFL.txt`에서 받을 수 있습니다.
+
 ### vendored 오픈소스 식별과 OSSKB API (opt-in)
 
 `--identify-vendored`는 클라이언트 `scanoss.py`(MIT)만 번들합니다. 이 클라이언트는 기본 빌드에 포함되며, 빼려면 `docker build --build-arg SBOM_SCANOSS=false`로 빌드합니다. SBOM 매칭을 수행하는 SCANOSS Engine(GPL-2.0)은 **포함하지 않으며**, 호스팅 OSSKB API(`api.osskb.org`)를 호출합니다. 그래서 firmware 이미지의 GPL 도구와 달리 base 이미지에 둘 수 있습니다(MIT). 동봉 데이터셋 `osadl-copyleft.json`은 코드가 아닌 CC-BY-4.0 데이터로, 출처 표기만 요구됩니다.
