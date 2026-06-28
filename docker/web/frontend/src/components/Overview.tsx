@@ -127,6 +127,19 @@ export function Overview({
         </div>
       )}
 
+      {result.sbom?.sbomToolDegraded && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="text-sm font-medium">{t("result.sbomDegradedTitle")}</div>
+          <p className="mt-1 text-xs">
+            {t(
+              result.sbom.sbomToolDegraded === "disk-space"
+                ? "result.sbomDegradedDisk"
+                : "result.sbomDegradedBody",
+            )}
+          </p>
+        </div>
+      )}
+
       {result.scanoss?.status === "unavailable" && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/30 dark:text-amber-200">
           <div className="text-sm font-medium">{t("result.scanossUnavailableTitle")}</div>

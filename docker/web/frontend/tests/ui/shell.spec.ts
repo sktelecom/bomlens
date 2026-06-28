@@ -564,6 +564,30 @@ test("overview has no axe violations", async ({ page }) => {
   expect(results.violations).toEqual([]);
 });
 
+test("Overview warns when the SBOM degraded to syft (disk space)", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  const degraded = { ...DONE, sbom: { ...DONE.sbom, sbomToolDegraded: "disk-space" } };
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(degraded)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // The degraded banner explains the thin graph and how to fix it.
+  await expect(page.getByText("Direct dependencies only", { exact: false })).toBeVisible();
+  await expect(page.getByText(/docker system prune/)).toBeVisible();
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
 // Result-section visuals run across light/dark × en/ko. The setup navigates and
 // waits on language-agnostic anchors — section links by href, the Tree toggle by
 // test id, and data values (package names, scores, licence ids) that don't
