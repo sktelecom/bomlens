@@ -21,13 +21,13 @@ cd ~/sbom-output      # output folder (anywhere is fine)
 
 ## The shell
 
-The interface has a left rail, a top bar, and a content area:
+The interface has a top bar across the width, a left rail for the current scan's sections, and a content area:
 
-- **Left rail** — result sections grouped under Inventory, Risk & compliance, AI and Outputs, plus a Recent scans list at the bottom. The rail adapts to the scan: AI sections appear only for AI/ML SBOMs, and a section appears only when its data exists. The rail collapses to icons on narrow windows.
-- **Top bar** — the product mark, the current project, and the language (한국어 / EN) and light/dark toggles.
-- **Content** — the New scan form, the running view, or the active result section.
+- **Top bar** — the product mark (links home), the current project, a Re-scan button (shown on a scan that still carries its settings, so you can re-run the same target with the toggles prefilled), global search across components and CVEs, the Scan management menu (the clock icon opens a list of past scans with a delete control and a link to the full list), the New scan button, and the language (한국어 / EN) and light/dark toggles.
+- **Left rail** — the current scan's sections, grouped under Inventory, Risk & compliance, AI and Outputs. The rail adapts to the scan: AI sections appear only for AI/ML SBOMs, and a section appears only when its data exists. It collapses to icons on narrow windows. With no scan open — the home screen — there is no rail.
+- **Content** — the home (Scan management) screen, the New scan form, the running view, or the active result section.
 
-Every navigation element — the logo, New scan, the sidebar sections, the jump cards and recent scans — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
+The global actions (New scan, Scan management) live in the top bar so the rail stays purely the current scan's sections. Every navigation element — the logo, New scan, the rail sections, the jump cards and the past-scan links — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
 
 ## New scan
 
@@ -44,7 +44,7 @@ The New scan screen is two panes. On the left, pick a source — grouped into **
 | Docker image | enter the image name | IMAGE |
 | AI model | enter a HuggingFace model id (`org/model`) | AIBOM |
 
-Generation options are the open-source notice and the security (vulnerability) report. Advanced scan options — ScanCode deep license detection and SCANOSS bundled-OSS identification for C/C++ — apply to source-code scans only (current folder, GitHub URL, ZIP upload); Docker images, firmware, SBOM uploads and AI models have none. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
+Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: ScanCode deep license detection and SCANOSS file-level identification of third-party open source copied into the tree (mainly C/C++) for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
 
 ## Scan running
 
@@ -54,7 +54,7 @@ During a run the screen shows the pipeline stages — generate, normalize, notic
 
 When the scan finishes, the left rail fills with the sections for that scan.
 
-**Overview** leads with what needs attention — a failed format conformance (for an analyzed supplier SBOM), critical or high vulnerabilities, and components flagged for license review — then the at-a-glance counts, the severity distribution and the license summary, with cards that jump to each detail section. If a scan is still running, its live log appears here on the Overview, not under every section.
+**Overview** opens with the at-a-glance counts as cards that jump to each detail section, then what needs attention — a failed format conformance (for an analyzed supplier SBOM), critical or high vulnerabilities, and components flagged for license review. Below that, two risk axes sit side by side: the security severity distribution and the license classification. Click a band in either and you land in that section (Vulnerabilities or Licenses) with the filter already applied. If a scan finished with reduced analysis — for example cdxgen ran out of Docker disk space and the SBOM fell back to direct dependencies only — a banner here gives the reason and what to do. If a scan is still running, its live log appears here on the Overview, not under every section.
 
 ![Overview — needs-attention, counts, severity and jump cards](../images/app-results.png)
 
@@ -70,7 +70,7 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 ![Dependencies — direct and vulnerable packages marked](../images/web-ui-dependencies.png)
 
-**Licenses** leads with components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — then the full license distribution. Click a license to list the components that use it; copyleft and reciprocal licenses (GPL, LGPL, MPL, EPL, …) are toned for review.
+**Licenses** opens with a license classification axis that groups components by copyleft strength — network copyleft (AGPL), strong copyleft (GPL), weak copyleft (LGPL, MPL, EPL, …), permissive, review needed, and uncategorized. An unrecognised license is never assumed permissive; it falls to uncategorized so a person looks at it. Click a class to filter the rest of the section to it. Below the classification come the components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — and then the full license distribution; click a license to list the components that use it.
 
 ![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
 
@@ -90,9 +90,9 @@ For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), th
 
 The G7 AI minimum-element checks appear inside the **Conformance** section above — they are added only when the SBOM has a model component.
 
-## Recent scans
+## Scan management
 
-Each scan's `{Project}_{Version}/` subfolder under the output base is one past scan, and they appear in the rail's Recent list (the newest 20, with the worst severity). Click one to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
+The home screen — opened from the logo or the top bar's Scan management (clock) menu — lists every past scan saved on this machine. Each scan's `{Project}_{Version}/` subfolder under the output base is one entry. A search box and scan-type filter chips (only the types that exist — Source, Container, RootFS, Firmware, AI model, SBOM) narrow the list; three summary cards show the total scans, how many are at risk (click that card to filter to them), and the project count. The table sorts by scan, generated time, components or top severity. Click a row to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
 
 ## Notes
 
