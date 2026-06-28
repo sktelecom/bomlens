@@ -19,7 +19,7 @@
 | trivy-db | 취약점 DB | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM 서명 | Apache-2.0 | https://github.com/sigstore/cosign |
 | scancode-toolkit | 정밀 라이선스(opt-in) | Apache-2.0 (데이터셋 일부 CC-BY-4.0 등) | https://github.com/aboutcode-org/scancode-toolkit |
-| scanoss (scanoss.py) | vendored 오픈소스 식별(opt-in `SBOM_SCANOSS`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
+| scanoss (scanoss.py) | vendored 오픈소스 식별(기본 포함, 끄려면 `SBOM_SCANOSS=false`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI 모델 SBOM 생성(opt-in `SBOM_AIBOM`, 별도 이미지 `bomlens-aibom`; HuggingFace API 호출) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |
 | jq | SBOM 가공(헬퍼) | MIT (일부 컴포넌트 BSD/ICU/Lucent) | https://github.com/jqlang/jq |
 
@@ -27,7 +27,7 @@
 
 ### vendored 오픈소스 식별과 OSSKB API (opt-in)
 
-`--identify-vendored`(빌드: `docker build --build-arg SBOM_SCANOSS=true`)는 클라이언트 `scanoss.py`(MIT)만 번들합니다. SBOM 매칭을 수행하는 SCANOSS Engine(GPL-2.0)은 **포함하지 않으며**, 호스팅 OSSKB API(`api.osskb.org`)를 호출합니다. 그래서 firmware 이미지의 GPL 도구와 달리 base 이미지에 둘 수 있습니다(MIT). 동봉 데이터셋 `osadl-copyleft.json`은 코드가 아닌 CC-BY-4.0 데이터로, 출처 표기만 요구됩니다.
+`--identify-vendored`는 클라이언트 `scanoss.py`(MIT)만 번들합니다. 이 클라이언트는 기본 빌드에 포함되며, 빼려면 `docker build --build-arg SBOM_SCANOSS=false`로 빌드합니다. SBOM 매칭을 수행하는 SCANOSS Engine(GPL-2.0)은 **포함하지 않으며**, 호스팅 OSSKB API(`api.osskb.org`)를 호출합니다. 그래서 firmware 이미지의 GPL 도구와 달리 base 이미지에 둘 수 있습니다(MIT). 동봉 데이터셋 `osadl-copyleft.json`은 코드가 아닌 CC-BY-4.0 데이터로, 출처 표기만 요구됩니다.
 
 OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 
