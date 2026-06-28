@@ -26,6 +26,9 @@ interface AppShellProps {
   project?: { name: string; version?: string };
   /** Optional top-bar content (the global search), shown when a scan is loaded. */
   search?: ReactNode;
+  /** Re-run the loaded scan (prefills the New scan form); shown in the top bar
+   *  only when the scan carries a config. */
+  onRescan?: () => void;
   /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
   /** Show the logo as a link home (hidden on the Recent home screen itself). */
@@ -54,6 +57,7 @@ export function AppShell({
   showSections,
   project,
   search,
+  onRescan,
   homeHref,
   showHomeLink,
   children,
@@ -77,6 +81,7 @@ export function AppShell({
       <TopBar
         project={project}
         search={search}
+        onRescan={onRescan}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
         newHref={newHash()}

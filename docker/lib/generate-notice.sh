@@ -220,26 +220,67 @@ done)
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>Open Source Notice — ${PROJECT}</title>
 <style>
- body{font-family:system-ui,Arial,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a1a1a;}
- h1{border-bottom:2px solid #ddd;padding-bottom:.4rem;}
- h2{font-size:1.05rem;color:#0b5;}
- .meta{color:#666;font-size:.9rem;}
- .lic{margin:1.4rem 0;padding:1rem;border:1px solid #e3e3e3;border-radius:6px;background:#fafafa;}
- .lic h2{margin:.2rem 0;}
- .review{margin:1.2rem 0;padding:1rem;border:1px solid #f59e0b;border-radius:6px;background:#fffbeb;}
- .review h2{color:#b45309;margin:.2rem 0;}
- ul{margin:.4rem 0 0 1rem;} li{font-family:ui-monospace,monospace;font-size:.85rem;margin:.35rem 0;}
- .cr{color:#666;}
- .src{display:block;color:#555;font-size:.8rem;margin-left:1rem;}
- .src a{color:#0b5;text-decoration:none;word-break:break-all;}
- .attr{display:block;color:#666;font-size:.8rem;margin-left:1rem;}
- .attr.none{font-style:italic;color:#999;}
- .texts{margin-top:2rem;border-top:2px solid #ddd;padding-top:1rem;}
- .texts pre{background:#f6f6f6;border:1px solid #e3e3e3;border-radius:6px;padding:1rem;
-   overflow:auto;font-size:.78rem;line-height:1.4;white-space:pre-wrap;}
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .review{background:rgba(202,138,4,.1);border-left:3px solid #ca8a04;
+  border-radius:var(--radius);padding:.9rem 1.1rem;margin:1.2rem 0;}
+ .review h2{color:#ca8a04;margin:.1rem 0 .3rem;font-size:1.05rem;font-weight:600;}
+ .review .meta{margin:.2rem 0 .4rem;}
+ .review ul{list-style:none;padding:0;margin:.5rem 0 0;}
+ .review li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
+ .lic{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-card);box-shadow:var(--shadow);
+  padding:1rem 1.15rem;margin:1rem 0;}
+ .lic h2{margin:0;font-size:1.05rem;font-weight:700;color:var(--brand);}
+ .lic .count{display:block;color:var(--muted);font-size:.8rem;margin:.15rem 0 .5rem;}
+ .lic ul{list-style:none;padding:0;margin:0;}
+ .lic li{font-family:var(--mono);font-size:.82rem;padding:.45rem 0;
+  border-top:1px solid var(--border);margin:0;}
+ .lic li:first-child{border-top:none;}
+ .src{display:block;color:var(--muted);font-size:.78rem;margin-top:.25rem;}
+ .src a{color:var(--brand);text-decoration:none;word-break:break-all;}
+ .attr{display:block;color:var(--muted);font-size:.78rem;margin-top:.1rem;}
+ .attr.none{font-style:italic;opacity:.75;}
+ .texts{margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.25rem;}
+ .texts pre{background:var(--th-bg);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1rem;overflow:auto;font-size:.76rem;
+  line-height:1.45;white-space:pre-wrap;}
 </style>
 </head>
 <body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">Open Source Notice</div>
+</header>
 <h1>Third-party Open Source Notice</h1>
 <p class="meta">Project: ${PROJECT} &middot; Generated: ${GEN_AT} &middot; Components: ${TOTAL_COMP} &middot; Licenses: ${TOTAL_LIC}</p>
 HTMLHEAD
@@ -269,7 +310,7 @@ HTMLHEAD
           else "<span class=\"attr none\">Copyright: holders not captured in SBOM — see source</span>" end;
         .[] |
         "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
-        "<p>" + (.components | length | tostring) + " component(s)</p><ul>" +
+        "<p class=\"count\">" + (.components | length | tostring) + " component(s)</p><ul>" +
         (.components | map("<li>" + (.comp | @html)
             + srchtml(.src)
             + attrhtml(.)

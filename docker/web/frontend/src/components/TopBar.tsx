@@ -1,8 +1,8 @@
-import { Clock, Plus, X } from "lucide-react";
+import { Clock, Plus, RotateCw, X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,9 @@ interface TopBarProps {
   project?: { name: string; version?: string };
   /** Optional global-search control, rendered between the project and controls. */
   search?: ReactNode;
+  /** Re-run this scan with the same target and toggles (prefills the New scan
+   *  form). Shown only when the loaded scan carries a config; absent otherwise. */
+  onRescan?: () => void;
   /** Hash for the home (Recent scans) screen — the logo links here. */
   homeHref: string;
   /** Render the logo as a link home (off on the Recent home screen itself). */
@@ -50,6 +53,7 @@ const SEVERITY_DOT: Record<NonNullable<RecentScanLink["topSeverity"]>, string> =
 export function TopBar({
   project,
   search,
+  onRescan,
   homeHref,
   showHomeLink,
   newHref,
@@ -94,6 +98,18 @@ export function TopBar({
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {search}
+        {onRescan && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRescan}
+            className="gap-1.5"
+            title={t("result.rescanHint")}
+          >
+            <RotateCw className="h-4 w-4 text-brand" aria-hidden />
+            <span>{t("result.rescan")}</span>
+          </Button>
+        )}
         <a
           href={newHref}
           aria-label={t("shell.newScan")}

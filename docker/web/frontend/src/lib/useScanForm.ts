@@ -10,6 +10,7 @@ import {
   stashGitCred,
   uploadFile,
   type Capabilities,
+  type ScanConfig,
   type ScanParams,
   type SourceType,
   type UploadKind,
@@ -50,23 +51,40 @@ export function useScanForm({
   running,
   capabilities,
   onRun,
+  initialConfig,
 }: {
   running: boolean;
   capabilities: Capabilities;
   onRun: (params: ScanParams) => void;
+  /**
+   * Seed the form from a finished scan's config (the "Re-scan" flow). Read once,
+   * at mount, via the lazy state initializers, so later changes to the prop
+   * never reset the user's edits. Credentials (git/SCANOSS token) and the file
+   * are deliberately not seeded — they aren't in the config and must be
+   * re-supplied. Absent for an ordinary (blank) new scan.
+   */
+  initialConfig?: ScanConfig | null;
 }) {
-  const [project, setProject] = useState("");
-  const [version, setVersion] = useState("");
-  const [source, setSource] = useState<SourceType>("current-dir");
-  const [target, setTarget] = useState("");
+  const [project, setProject] = useState(() => initialConfig?.project ?? "");
+  const [version, setVersion] = useState(() => initialConfig?.version ?? "");
+  const [source, setSource] = useState<SourceType>(
+    () => initialConfig?.source ?? "current-dir",
+  );
+  const [target, setTarget] = useState(() => initialConfig?.target ?? "");
   const [gitToken, setGitToken] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [notice, setNotice] = useState(true);
-  const [security, setSecurity] = useState(true);
-  const [deepLicense, setDeepLicense] = useState(false);
-  const [identifyVendored, setIdentifyVendored] = useState(false);
+  const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
+  const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
+  const [deepLicense, setDeepLicense] = useState(
+    () => initialConfig?.deepLicense ?? false,
+  );
+  const [identifyVendored, setIdentifyVendored] = useState(
+    () => initialConfig?.identifyVendored ?? false,
+  );
   // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
-  const [includeOsv, setIncludeOsv] = useState(false);
+  const [includeOsv, setIncludeOsv] = useState(
+    () => initialConfig?.includeOsv ?? false,
+  );
   const [scanossToken, setScanossToken] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);

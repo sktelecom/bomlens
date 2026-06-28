@@ -102,6 +102,13 @@ ARTIFACT_SUFFIXES = (
 # listed (the user deletes via the UI or the output folder).
 RECENT_SCANS_CAP = 20
 
+# Per-run scan-configuration sidecar (the inputs + toggles a scan was launched
+# with), saved in the run folder so the UI can offer "re-scan with the same
+# settings". The dot prefix keeps it out of list_results()/downloads and out of
+# the /scans listing (list_scans skips dotfiles), and it NEVER records tokens or
+# credentials — only the non-secret source/target and the on/off feature flags.
+SCANMETA_NAME = ".scanmeta.json"
+
 
 def safe_name(s):
     """Mirror entrypoint.sh filename normalization."""
@@ -299,6 +306,41 @@ def scan_id_ok(sid):
     """A scan id is a filename prefix; allow only the safe_name charset (no
     path separators / traversal)."""
     return bool(sid) and re.fullmatch(r"[A-Za-z0-9._-]+", sid) is not None
+
+
+def write_scanmeta(run_out, config):
+    """Persist the scan-configuration sidecar inside an already-resolved run
+    folder. run_out comes from run_dir (realpath confirmed inside OUTPUT_DIR) and
+    SCANMETA_NAME is a fixed dot-prefixed basename, so the write stays inside the
+    run folder and out of list_results(). Best-effort: a write failure must not
+    abort the scan. The caller must never put secrets in `config`."""
+    try:
+        with open(os.path.join(run_out, SCANMETA_NAME), "w") as f:
+            json.dump(config, f)
+    except OSError:
+        pass
+
+
+def scanmeta(run_id):
+    """Read the scan-configuration sidecar (SCANMETA_NAME) for a past run.
+
+    Traversal-safe: run_dir re-applies the scan_id_ok allowlist + realpath
+    boundary before the fixed dot-prefixed basename is joined, so the read can
+    never escape OUTPUT_DIR. Returns the stored dict (source + non-secret feature
+    toggles the scan was launched with), or None when the sidecar is absent (a
+    pre-feature scan) or unreadable."""
+    d = run_dir(run_id)
+    if not d or not os.path.isdir(d):
+        return None
+    p = os.path.join(d, SCANMETA_NAME)
+    if not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 # Row caps so a huge SBOM/scan can't bloat the SSE 'done' payload. The counts
@@ -751,6 +793,10 @@ def scan_detail(run_id):
         "security": security_summary(run_id),
         "conformance": conformance_summary(run_id),
         "scanoss": scanoss_status(run_id),
+        # How the scan was launched (source + toggles), saved as a sidecar so the
+        # UI can offer "re-scan with the same settings". None for pre-feature
+        # scans that have no sidecar.
+        "scanConfig": scanmeta(run_id),
     }
 
 
@@ -1428,6 +1474,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         os.makedirs(run_out, exist_ok=True)
 
+        # Record how this scan was launched (source + non-secret feature toggles)
+        # so the UI can offer "re-scan with the same settings". Saved into the run
+        # folder as a dot-prefixed sidecar that stays out of the artifact listing
+        # and downloads. Tokens/credentials (token, cred, scanoss_cred, gitToken)
+        # are deliberately omitted — never persist secrets here.
+        scan_config = {
+            "source": source,
+            "target": target,
+            "project": project,
+            "version": version,
+            "notice": g("notice", "true") == "true",
+            "security": g("security", "true") == "true",
+            "deepLicense": g("deep_license") == "true",
+            "identifyVendored": g("identify_vendored") == "true",
+            "includeOsv": g("includeOsv") == "true",
+        }
+        write_scanmeta(run_out, scan_config)
+
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
@@ -1697,6 +1761,9 @@ class Handler(BaseHTTPRequestHandler):
                 "security": security_summary(run_id) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(run_id),
                 "scanoss": scanoss_status(run_id),
+                # The inputs + toggles this scan ran with (no secrets); also saved
+                # as the run-folder sidecar so a re-opened scan carries it too.
+                "scanConfig": scan_config,
             }
             sse("done", json.dumps(done))
         finally:

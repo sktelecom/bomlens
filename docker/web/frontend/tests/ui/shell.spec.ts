@@ -176,7 +176,6 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("2 critical or high vulnerabilities")).toBeVisible();
 });
-
 test("Recent home renders the summary strip and the scan table", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),

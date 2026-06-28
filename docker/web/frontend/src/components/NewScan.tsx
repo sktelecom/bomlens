@@ -10,12 +10,13 @@ import {
   Lock,
   type LucideIcon,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Capabilities, ScanParams, SourceType } from "@/lib/api";
+import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
 import { useScanForm } from "@/lib/useScanForm";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,12 @@ interface Props {
   running: boolean;
   capabilities: Capabilities;
   onRun: (params: ScanParams) => void;
+  /** Seed the form from a finished scan's config (the "Re-scan" flow). Consumed
+   *  once on mount; see `onConfigConsumed`. */
+  initialConfig?: ScanConfig | null;
+  /** Called once after `initialConfig` is read so the parent can clear the
+   *  pending config — a later plain New scan then starts blank. */
+  onConfigConsumed?: () => void;
 }
 
 const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = {
@@ -62,9 +69,26 @@ const SECTION_LABEL =
  * (identity + outputs + the generate action) on the right. Shares all logic
  * with the classic form via useScanForm — only the layout changes.
  */
-export function NewScan({ running, capabilities, onRun }: Props) {
+export function NewScan({
+  running,
+  capabilities,
+  onRun,
+  initialConfig,
+  onConfigConsumed,
+}: Props) {
   const { t } = useTranslation();
-  const state = useScanForm({ running, capabilities, onRun });
+  const state = useScanForm({ running, capabilities, onRun, initialConfig });
+
+  // The form reads `initialConfig` once (lazy state init). Tell the parent to
+  // clear the pending config right after, so navigating to a plain New scan
+  // later starts blank. Guarded so it fires only for the seeded mount.
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (initialConfig && !consumedRef.current) {
+      consumedRef.current = true;
+      onConfigConsumed?.();
+    }
+  }, [initialConfig, onConfigConsumed]);
 
   return (
     <div className="space-y-6">

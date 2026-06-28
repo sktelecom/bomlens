@@ -77,6 +77,8 @@
     "kindSbom": "SBOM",
     "succeeded": "스캔 완료",
     "failed": "스캔 실패",
+    "rescan": "재스캔",
+    "rescanHint": "같은 대상을 이 설정을 채운 채로 다시 스캔합니다",
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",

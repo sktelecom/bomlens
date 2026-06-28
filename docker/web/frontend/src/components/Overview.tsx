@@ -41,8 +41,10 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
 
 /**
  * Decision-first Overview: what needs attention first, then the at-a-glance
- * numbers and summaries, then jump cards into the detail sections — instead of
- * repeating full tables here.
+ * numbers as jump cards into the detail sections, then the license/type
+ * distribution summaries — instead of repeating full tables here. The jump
+ * cards sit above the (potentially long) distributions so they stay visible
+ * without scrolling.
  */
 export function Overview({
   result,

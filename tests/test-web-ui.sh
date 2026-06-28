@@ -437,6 +437,96 @@ else
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
 
+echo "== scan-config sidecar (re-scan settings) =="
+# A scan saves how it was launched (source + non-secret toggles) as a dot-prefixed
+# sidecar in its run folder, surfaced as `scanConfig` on the done event and on a
+# re-opened scan. The sidecar must NOT leak tokens/credentials and must NOT appear
+# in the artifact listing/downloads (dot-prefixed, not an ARTIFACT_SUFFIX).
+mkdir -p "$OUT/cfg_2.0"
+cat > "$OUT/cfg_2.0/cfg_2.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"cfg","version":"2.0","type":"application"}},
+ "components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+run_out = server.run_dir("cfg_2.0")
+assert run_out and os.path.isdir(run_out), run_out
+cfg = {
+    "source": "git-url",
+    "target": "https://example.com/acme/widget.git",
+    "project": "cfg",
+    "version": "2.0",
+    "notice": True,
+    "security": True,
+    "deepLicense": False,
+    "identifyVendored": True,
+    "includeOsv": False,
+}
+server.write_scanmeta(run_out, cfg)
+
+# The sidecar lands under the run folder with the dot-prefixed name.
+assert os.path.isfile(os.path.join(run_out, server.SCANMETA_NAME)), os.listdir(run_out)
+assert server.SCANMETA_NAME.startswith("."), server.SCANMETA_NAME
+# It is NOT an artifact suffix, so it can never enter list_results / downloads.
+assert not server.SCANMETA_NAME.endswith(server.ARTIFACT_SUFFIXES), server.SCANMETA_NAME
+
+# scanmeta() reads it back verbatim; the exact camelCase contract keys are present.
+got = server.scanmeta("cfg_2.0")
+assert got == cfg, got
+expected_keys = {"source", "target", "project", "version", "notice", "security",
+                 "deepLicense", "identifyVendored", "includeOsv"}
+assert set(got) == expected_keys, set(got)
+# No secret material is ever stored.
+assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
+                                  "SCANOSS_API_KEY")), got
+
+# The sidecar is excluded from the artifact listing and the download bundle.
+names = [r["name"] for r in server.list_results("cfg_2.0")]
+assert server.SCANMETA_NAME not in names, names
+assert "cfg_2.0_bom.json" in names, names
+
+# scan_detail carries scanConfig for a re-opened scan.
+detail = server.scan_detail("cfg_2.0")
+assert detail["scanConfig"] == cfg, detail.get("scanConfig")
+
+# A run with no sidecar (pre-feature scan) degrades gracefully to None.
+assert server.scanmeta("flat_1.0") is None  # absent -> None
+# Traversal ids are refused by the same run_dir barrier.
+assert server.scanmeta("../etc") is None
+PY
+then
+    pass "scanConfig sidecar round-trips (camelCase keys, no secrets, excluded from results)"
+else
+    fail "scan-config sidecar contract is wrong (see assertion above)"
+fi
+# /scan?id= surfaces scanConfig over the wire, and /results never lists the sidecar.
+if curl -fsS "$BASE/scan?id=cfg_2.0" 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+c = d.get('scanConfig')
+assert c is not None and c['source'] == 'git-url', c
+assert c['identifyVendored'] is True and c['deepLicense'] is False, c
+assert 'token' not in c and 'scanoss_cred' not in c, c
+"; then
+    pass "/scan?id= exposes scanConfig (no secrets)"
+else
+    fail "/scan?id= did not expose scanConfig"
+fi
+if curl -fsS "$BASE/results?id=cfg_2.0" 2>/dev/null | python3 -c "
+import sys, json
+names = [r['name'] for r in json.load(sys.stdin)]
+assert '.scanmeta.json' not in names, names
+assert 'cfg_2.0_bom.json' in names, names
+"; then
+    pass "/results omits the .scanmeta.json sidecar"
+else
+    fail "/results leaked the scan-config sidecar"
+fi
+curl -fsS -X POST "$BASE/scan-delete?id=cfg_2.0" >/dev/null 2>&1
+
 echo "== recent scans (/scans + /scan) =="
 # Reuse the demo fixtures left in OUT: list past scans, re-open one, block traversal.
 cat > "$OUT/demo_1.0_bom.json" <<'JSON'

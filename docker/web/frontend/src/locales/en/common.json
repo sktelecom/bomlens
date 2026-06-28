@@ -77,6 +77,8 @@
     "kindSbom": "SBOM",
     "succeeded": "Scan complete",
     "failed": "Scan failed",
+    "rescan": "Re-scan",
+    "rescanHint": "Scan the same target again with these settings prefilled",
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
