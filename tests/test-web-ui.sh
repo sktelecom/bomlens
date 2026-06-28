@@ -437,6 +437,39 @@ else
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
 
+echo "== direct/transitive scope with an empty root dependsOn (cdxgen quirk) =="
+# Regression: cdxgen sometimes emits the root component with an EMPTY dependsOn
+# and floats the real direct deps as nodes nothing depends on. sbom_summary must
+# still count them as direct (was 0/N before the _scope_index fallback fix).
+cat > "$OUT/dep_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "metadata":{"component":{"name":"dep","version":"1.0","type":"application","bom-ref":"root"}},
+ "components":[
+   {"name":"app","version":"1","type":"library","purl":"pkg:maven/x/app@1","bom-ref":"pkg:maven/x/app@1"},
+   {"name":"lib","version":"1","type":"library","purl":"pkg:maven/x/lib@1","bom-ref":"pkg:maven/x/lib@1"}],
+ "dependencies":[
+   {"ref":"root","dependsOn":[]},
+   {"ref":"pkg:maven/x/app@1","dependsOn":["pkg:maven/x/lib@1"]},
+   {"ref":"pkg:maven/x/lib@1","dependsOn":[]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("dep_1.0")
+assert s["directCount"] == 1, s            # app: nothing depends on it -> direct
+assert s["transitiveCount"] == 1, s        # lib: pulled in by app -> transitive
+rows = {r["name"]: r for r in s["componentList"]}
+assert rows["app"]["scope"] == "direct", rows["app"]
+assert rows["lib"]["scope"] == "transitive", rows["lib"]
+PY
+then
+    pass "empty-root dependsOn falls back to orphan roots (direct counted, not 0)"
+else
+    fail "direct/transitive scope wrong for an empty-root graph"
+fi
+rm -f "$OUT"/dep_1.0_*
+
 echo "== scan-config sidecar (re-scan settings) =="
 # A scan saves how it was launched (source + non-secret toggles) as a dot-prefixed
 # sidecar in its run folder, surfaced as `scanConfig` on the done event and on a
