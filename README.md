@@ -38,7 +38,7 @@ Everything runs on a Docker engine (20.10+). On Windows, free [Rancher Desktop](
 
 ### Desktop app — no command line (recommended)
 
-Download the installer and double-click it — [BomLens-Setup.exe](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now: on Windows, if SmartScreen warns, click **More info**, then **Run anyway**; on macOS, right-click the app and choose **Open**. Build details are in [`electron/`](electron/README.md).
+Download the installer and double-click it — [BomLens-Setup.exe](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now: on Windows, if SmartScreen warns, click **More info**, then **Run anyway**; on macOS, if it says the app is damaged, see [If macOS says the app is damaged](docs/start/no-cli.md#if-macos-says-the-app-is-damaged) to clear the quarantine flag. Build details are in [`electron/`](electron/README.md).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup-en.png)
 
