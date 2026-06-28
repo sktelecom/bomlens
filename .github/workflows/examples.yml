@@ -2,7 +2,7 @@ name: Examples Testing
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'examples/**'
       - 'scripts/**'

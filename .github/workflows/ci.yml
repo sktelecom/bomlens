@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       firmware:
@@ -175,7 +175,7 @@ jobs:
     name: Web UI E2E (container scan -> done)
     runs-on: ubuntu-latest
     # Heavy (builds a scanner image, boots the UI container, runs real scans), so
-    # it stays off the per-PR critical path: it runs on main/develop pushes and on
+    # it stays off the per-PR critical path: it runs on main pushes and on
     # manual dispatch. The lightweight API contract (tests/test-web-ui.sh) still
     # guards every PR in the postprocess job.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -209,7 +209,7 @@ jobs:
     # (tests/test-e2e.sh — analyze, source ingestion, image scan, cosign signing,
     # byte-stable) plus the real-example scan suite (tests/test-examples-e2e.sh).
     # These were previously orphaned (written but never run in CI). Like web-e2e
-    # they stay off the per-PR critical path: main/develop pushes and manual
+    # they stay off the per-PR critical path: main pushes and manual
     # dispatch only. The firmware group self-skips unless dispatched with
     # firmware=true; the SCANOSS group stays gated behind SCANOSS_E2E.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
