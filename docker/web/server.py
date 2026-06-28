@@ -515,7 +515,13 @@ def _scope_index(data):
 
     meta_comp = (data.get("metadata") or {}).get("component") or {}
     meta_ref = meta_comp.get("bom-ref") or meta_comp.get("purl")
-    if meta_ref and meta_ref in adjacency:
+    # The root's direct deps are the metadata component's dependsOn. cdxgen
+    # sometimes emits the root entry with an EMPTY dependsOn and floats the real
+    # direct deps as nodes nothing depends on — so require a non-empty list
+    # before trusting it, otherwise fall back to those orphan roots (matches the
+    # client's tree). `adjacency.get` is empty/falsey for both the missing and
+    # the empty-dependsOn case.
+    if meta_ref and adjacency.get(meta_ref):
         roots = adjacency[meta_ref]
     else:
         roots = [r for r in adjacency if r not in depended_on]
