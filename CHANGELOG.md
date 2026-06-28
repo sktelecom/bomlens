@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.5.4] - 2026-06-28
+
+### Added
+
+- The result Overview leads with the section jump cards and shows Security and License classification side by side; clicking a band opens that section pre-filtered.
+- Licenses are graded by copyleft strength (network / strong / weak / permissive), with separate review-needed and uncategorized classes; an unrecognised license is never assumed permissive.
+- The home screen is now Scan management: search past scans, filter by scan type, and see total / at-risk / project counts, with the at-risk card doubling as a filter.
+- Global search across components and CVEs from the top bar.
+- Re-scan: re-run a finished scan with the same target and options from the top bar.
+- The SCANOSS client ships in the base image, so vendored open-source identification works out of the box (still opt-in at scan time).
+- Running firmware and AI scans can be cancelled.
+
+### Changed
+
+- New scan and Recent moved into the top bar, so the left rail is purely the current scan's sections.
+- New scan's advanced analysis toggles moved into their own Advanced scan options section, with clearer copy and SCANOSS free-tier guidance.
+- Generated HTML reports were restyled to match the web UI.
+- The scan progress bar follows the real pipeline stages, and the Scan management table columns are sortable.
+- The dependency rail badge shows the direct/transitive split.
+
+### Fixed
+
+- A source scan that falls back to syft is labelled "Source" instead of "SBOM", and now says so when the fallback was caused by Docker running out of disk.
+- Fonts are self-hosted so the desktop content-security policy keeps the intended typography.
+
 ## [v1.5.3] - 2026-06-27
 
 ### Added
