@@ -7,21 +7,27 @@ import {
   Plus,
   ScanLine,
   ScrollText,
+  Search,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import type { RecentScan, Severity } from "@/lib/api";
 import {
+  filterRecent,
   formatRelativeTime,
+  presentTypes,
   type RecentSortDir,
   type RecentSortKey,
+  type ScanType,
   scanTypeLabelKey,
+  scanTypeLabelKeyFor,
   sortRecent,
   summarizeRecent,
 } from "@/lib/recent";
@@ -51,29 +57,78 @@ function SummaryCard({
   label,
   value,
   accent,
+  onClick,
+  active,
 }: {
   label: string;
   value: number;
   accent?: boolean;
+  /** When set, the card becomes a toggle that filters the list. */
+  onClick?: () => void;
+  active?: boolean;
 }) {
+  const body = (
+    <CardContent className="flex flex-col gap-1.5 p-5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "text-3xl font-semibold tabular-nums",
+          accent && "text-brand-accent",
+        )}
+      >
+        {value}
+      </span>
+    </CardContent>
+  );
+  if (!onClick) return <Card>{body}</Card>;
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-1.5 p-5">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span
-          className={cn(
-            "text-3xl font-semibold tabular-nums",
-            accent && "text-brand-accent",
-          )}
-        >
-          {value}
-        </span>
-      </CardContent>
+    <Card
+      className={cn(
+        "transition-colors duration-fast ease-out-soft",
+        active ? "border-brand bg-brand/5" : "hover:bg-muted/40",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className="w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {body}
+      </button>
     </Card>
   );
 }
 
 const TH = "px-4 py-3 text-left font-medium";
+
+/** A pill toggle for the Scan management filters (AI only / at-risk only). */
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-9 items-center rounded-full border px-3.5 text-sm transition-colors duration-fast ease-out-soft",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        active
+          ? "border-brand bg-brand/10 font-medium text-foreground"
+          : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 interface RecentSort {
   key: RecentSortKey;
@@ -126,7 +181,16 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
   const summary = summarizeRecent(scans);
   const now = Date.now();
   const [sort, setSort] = useState<RecentSort>({ key: "generated", dir: "desc" });
-  const sorted = useMemo(() => sortRecent(scans, sort.key, sort.dir), [scans, sort]);
+  const [query, setQuery] = useState("");
+  const [type, setType] = useState<ScanType | "all">("all");
+  const [atRisk, setAtRisk] = useState(false);
+  const types = useMemo(() => presentTypes(scans), [scans]);
+  const filtering = query.trim() !== "" || type !== "all" || atRisk;
+  const sorted = useMemo(
+    () =>
+      sortRecent(filterRecent(scans, { query, type, atRisk }), sort.key, sort.dir),
+    [scans, query, type, atRisk, sort],
+  );
   const onSort = (key: RecentSortKey) =>
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
@@ -183,8 +247,46 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               label={t("recent.atRisk")}
               value={summary.atRisk}
               accent={summary.atRisk > 0}
+              active={atRisk}
+              onClick={
+                summary.atRisk > 0 ? () => setAtRisk((v) => !v) : undefined
+              }
             />
-            <SummaryCard label={t("recent.ai")} value={summary.ai} />
+            <SummaryCard label={t("recent.projects")} value={summary.projects} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("recent.searchPlaceholder")}
+                aria-label={t("recent.searchPlaceholder")}
+                className="h-9 w-56 pl-8"
+              />
+            </div>
+            {/* Type chips only when there's more than one type to choose between.
+                Risk filtering lives on the "At risk" summary card above. */}
+            {types.length > 1 &&
+              types.map((ty) => (
+                <FilterChip
+                  key={ty}
+                  active={type === ty}
+                  onClick={() => setType((cur) => (cur === ty ? "all" : ty))}
+                >
+                  {t(scanTypeLabelKeyFor(ty))}
+                </FilterChip>
+              ))}
+            {filtering && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {t("recent.shown", { shown: sorted.length, total: scans.length })}
+              </span>
+            )}
           </div>
 
           <Card>
@@ -209,7 +311,17 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((s) => (
+                  {sorted.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-4 py-8 text-center text-sm text-muted-foreground"
+                      >
+                        {t("recent.noMatch")}
+                      </td>
+                    </tr>
+                  ) : (
+                    sorted.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b transition-colors duration-fast ease-out-soft last:border-0 hover:bg-muted/40"
@@ -266,7 +378,8 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </CardContent>

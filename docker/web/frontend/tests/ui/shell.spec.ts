@@ -168,7 +168,7 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   // The top bar's Recent menu lists the past scan; opening it and clicking the
   // entry loads the result. (Recent moved from the rail to the top bar so the
   // rail stays purely the current scan's sections.)
-  await page.getByRole("banner").getByRole("button", { name: "Recent scans" }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Scan management" }).click();
   const recent = page.getByRole("link", { name: /demo · 1.0/ });
   await expect(recent).toBeVisible();
   await recent.click();
@@ -190,10 +190,10 @@ test("Recent home renders the summary strip and the scan table", async ({ page }
   await page.goto("/?ui=next");
 
   // The home screen leads with the Recent heading and the three summary cards.
-  await expect(page.getByRole("heading", { name: "Recent scans" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
   await expect(page.getByText("Total scans")).toBeVisible();
   await expect(page.getByText("At risk")).toBeVisible();
-  await expect(page.getByText("AI scans")).toBeVisible();
+  await expect(page.getByText("Projects")).toBeVisible();
 
   // Both stored scans appear as table rows (scoped to the `@version` table link,
   // distinct from the sidebar rail's `· version` link).
@@ -305,7 +305,7 @@ test("an unknown scan id falls back to the Recent scans home screen", async ({ p
 
   // Falls back to the idle Recent scans home screen and the hash resets to home.
   // The list is empty here, but the heading is shown either way.
-  await expect(page.getByRole("heading", { name: "Recent scans" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#/");
 });
 

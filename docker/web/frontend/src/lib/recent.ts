@@ -15,42 +15,111 @@ export interface RecentSummary {
   total: number;
   /** Scans whose top severity is CRITICAL or HIGH. */
   atRisk: number;
-  /** Scans that are AI-model SBOMs. */
-  ai: number;
+  /** Distinct projects across the stored scans (coverage breadth). */
+  projects: number;
+}
+
+/** True when a scan's worst severity is CRITICAL or HIGH (the "at risk" set). */
+export function isAtRisk(scan: RecentScan): boolean {
+  return scan.maxSeverity === "CRITICAL" || scan.maxSeverity === "HIGH";
 }
 
 /** Aggregate the Recent list into the summary-strip counts (real data only). */
 export function summarizeRecent(scans: RecentScan[]): RecentSummary {
   return {
     total: scans.length,
-    atRisk: scans.filter(
-      (s) => s.maxSeverity === "CRITICAL" || s.maxSeverity === "HIGH",
-    ).length,
-    ai: scans.filter((s) => s.isAiScan).length,
+    atRisk: scans.filter(isAtRisk).length,
+    projects: new Set(scans.map((s) => s.project)).size,
   };
 }
 
+export interface RecentFilter {
+  /** Free text matched against project + version (case-insensitive). */
+  query: string;
+  /** Keep only this scan type, or "all" for no type filter. */
+  type: ScanType | "all";
+  /** Keep only scans whose top severity is CRITICAL or HIGH. */
+  atRisk: boolean;
+}
+
 /**
- * i18n key for a scan's Type badge. AI scans (ML-model component) win; otherwise
- * we map the CycloneDX root component.type the SBOM declared — an honest signal,
- * not an invented one. Unknown/absent types fall back to a generic "SBOM".
+ * Filter the Scan management list by free text (project/version), scan type, and
+ * the at-risk toggle. Pure, so it's unit-tested alongside sort/summarize.
  */
-export function scanTypeLabelKey(scan: RecentScan): string {
-  if (scan.isAiScan) return "recent.typeAi";
+export function filterRecent(
+  scans: RecentScan[],
+  { query, type, atRisk }: RecentFilter,
+): RecentScan[] {
+  const q = query.trim().toLowerCase();
+  return scans.filter((s) => {
+    if (q && !`${s.project} ${s.version ?? ""}`.toLowerCase().includes(q)) {
+      return false;
+    }
+    if (type !== "all" && scanType(s) !== type) return false;
+    if (atRisk && !isAtRisk(s)) return false;
+    return true;
+  });
+}
+
+/**
+ * A scan's kind, derived only from honest SBOM signals: `isAiScan` (an
+ * ML-model component) wins, otherwise the CycloneDX root component.type the SBOM
+ * declared. Unknown/absent types fall back to a generic "sbom" — we never invent
+ * a finer type than the data supports.
+ */
+export type ScanType = "ai" | "source" | "firmware" | "container" | "rootfs" | "sbom";
+
+export function scanType(scan: RecentScan): ScanType {
+  if (scan.isAiScan) return "ai";
   switch (scan.componentType) {
     case "firmware":
-      return "recent.typeFirmware";
+      return "firmware";
     case "container":
-      return "recent.typeContainer";
+      return "container";
     case "operating-system":
-      return "recent.typeRootfs";
+      return "rootfs";
     case "application":
     case "library":
     case "framework":
-      return "recent.typeSource";
+      return "source";
     default:
-      return "recent.typeSbom";
+      return "sbom";
   }
+}
+
+const TYPE_LABEL: Record<ScanType, string> = {
+  ai: "recent.typeAi",
+  source: "recent.typeSource",
+  firmware: "recent.typeFirmware",
+  container: "recent.typeContainer",
+  rootfs: "recent.typeRootfs",
+  sbom: "recent.typeSbom",
+};
+
+/** i18n key for a scan's Type badge — the single source the filter chips reuse. */
+export function scanTypeLabelKey(scan: RecentScan): string {
+  return TYPE_LABEL[scanType(scan)];
+}
+
+/** i18n key for a scan-type id (for the filter chips). */
+export function scanTypeLabelKeyFor(type: ScanType): string {
+  return TYPE_LABEL[type];
+}
+
+// Display order for the type filter; only types actually present are shown.
+const TYPE_ORDER: ScanType[] = [
+  "source",
+  "container",
+  "rootfs",
+  "firmware",
+  "ai",
+  "sbom",
+];
+
+/** The distinct scan types present in the list, in display order. */
+export function presentTypes(scans: RecentScan[]): ScanType[] {
+  const set = new Set(scans.map(scanType));
+  return TYPE_ORDER.filter((t) => set.has(t));
 }
 
 export interface ScanComparison {
