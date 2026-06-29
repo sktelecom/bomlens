@@ -41,9 +41,11 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
   --identify-vendored --all --generate-only
 ```
 
-In the web UI, open **Advanced** and turn on **Identify bundled open source**. The option appears only for a source scan when the image supports it.
+In the web UI or desktop app, open **Advanced** and turn on **File-level identification (SCANOSS)** — the on-screen label differs from this guide's title, but it is the same feature. The option appears only for a source scan (current directory, git URL, or ZIP upload) when the image supports it.
 
-![The Advanced section with the Identify bundled open source toggle](../images/web-ui-identify-vendored-en.png)
+If you are on Windows and new to the command line, follow the desktop-app steps in [Quick start without the CLI](../start/no-cli.md) first.
+
+![The Advanced section with the File-level identification (SCANOSS) toggle](../images/web-ui-identify-vendored-en.png)
 
 ## What you get
 
@@ -57,13 +59,17 @@ Only full-file matches become components. Partial (snippet) matches are noisy an
 
 ## Endpoint and limits
 
-The default endpoint is the free OSSKB API, which is rate-limited and intended for identification only. For high-volume or air-gapped use, point at a SCANOSS commercial or self-hosted endpoint:
+The default endpoint is the free OSSKB API, which is rate-limited and intended for identification only. From the CLI, you can point at a SCANOSS commercial or self-hosted endpoint with environment variables for high-volume or air-gapped use:
 
 ```bash
 SCANOSS_API_URL=https://your-scanoss-endpoint \
 SCANOSS_API_KEY=your-key \
 scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendored --all --generate-only
 ```
+
+In the web UI and desktop app, you can supply only the token from the screen. If you hit the free OSSKB rate limit, turn on **File-level identification (SCANOSS)** and paste a token from scanoss.com into the field that appears below the toggle, then run again. The token is used once for that scan and is never stored or logged.
+
+The endpoint URL (`SCANOSS_API_URL`) and the reporting threshold (`SCANOSS_MIN_FILES`) are set through CLI or container environment variables only; neither the web UI nor the desktop app exposes a field for them. In particular, the desktop app does not forward `SCANOSS_API_URL` into the container, so a commercial or self-hosted endpoint cannot be used from the desktop app today. If you need one, run from the CLI or `sbom-ui.bat` with the variable set.
 
 Version precision is approximate. A file match reports the release where that file content first appeared, so different files of the same library can resolve to slightly different versions and a copied-in library may be reported a point release off. Treat the version (and any CVEs derived from it) as a starting point for review, not a final verdict.
 

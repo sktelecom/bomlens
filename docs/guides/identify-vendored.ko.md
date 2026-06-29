@@ -41,9 +41,11 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
   --identify-vendored --all --generate-only
 ```
 
-웹 UI에서는 **고급**을 펼쳐 **내장 오픈소스 식별**을 켭니다. 이 옵션은 소스 스캔이면서 이미지가 지원할 때만 보입니다.
+웹 UI·데스크톱 앱에서는 **고급**을 펼쳐 **파일 단위 식별 (SCANOSS)** 토글을 켭니다. 화면 라벨은 "파일 단위 식별 (SCANOSS)"이지만 이 문서에서 말하는 내장 오픈소스 식별과 같은 기능입니다. 이 옵션은 소스 스캔(현재 디렉터리·git URL·ZIP 업로드)이면서 이미지가 지원할 때만 보입니다.
 
-![고급 섹션의 내장 오픈소스 식별 토글](../images/web-ui-identify-vendored-en.png)
+명령어가 낯선 Windows 사용자는 [비개발자 빠른 시작](../start/no-cli.ko.md)의 데스크톱 앱 안내를 먼저 따라 하세요.
+
+![고급 섹션의 파일 단위 식별 (SCANOSS) 토글](../images/web-ui-identify-vendored-en.png)
 
 ## 결과
 
@@ -57,13 +59,17 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src \
 
 ## 엔드포인트와 제한
 
-기본 엔드포인트는 무료 OSSKB API로, 요청 빈도 제한이 있고 식별 전용입니다. 대량 사용이나 에어갭 환경에서는 SCANOSS 상용·자체 호스팅 엔드포인트를 지정하세요.
+기본 엔드포인트는 무료 OSSKB API로, 요청 빈도 제한이 있고 식별 전용입니다. CLI에서는 대량 사용이나 에어갭 환경을 위해 SCANOSS 상용·자체 호스팅 엔드포인트를 환경변수로 지정할 수 있습니다.
 
 ```bash
 SCANOSS_API_URL=https://your-scanoss-endpoint \
 SCANOSS_API_KEY=your-key \
 scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendored --all --generate-only
 ```
+
+웹 UI·데스크톱 앱에서는 토큰만 화면에서 넣을 수 있습니다. 무료 OSSKB 호출 한도에 걸리면 **파일 단위 식별 (SCANOSS)** 토글을 켤 때 아래에 나타나는 토큰칸에 scanoss.com에서 발급한 토큰을 넣고 다시 실행하세요. 토큰은 그 스캔에만 한 번 쓰이고 저장하거나 로그에 남지 않습니다.
+
+엔드포인트 주소(`SCANOSS_API_URL`)와 보고 임계값(`SCANOSS_MIN_FILES`)은 CLI와 컨테이너 환경변수로만 설정하며, 웹 UI·데스크톱 앱에는 입력 화면이 없습니다. 특히 데스크톱 앱은 `SCANOSS_API_URL`을 컨테이너로 전달하지 않으므로, 현재 데스크톱 앱 화면에서는 상용·자체 호스팅 엔드포인트를 쓸 수 없습니다. 이 엔드포인트가 필요하면 CLI나 `sbom-ui.bat`로 실행하면서 환경변수를 지정하세요.
 
 버전은 근사값입니다. 파일 매치는 그 파일 내용이 처음 등장한 릴리스를 버전으로 보고하므로, 같은 라이브러리라도 파일마다 버전이 조금씩 다르게 나오거나 실제보다 한 단계 어긋난 릴리스로 보고될 수 있습니다. 버전(과 그로부터 도출된 CVE)은 최종 판정이 아니라 검토의 출발점으로 삼으세요.
 
