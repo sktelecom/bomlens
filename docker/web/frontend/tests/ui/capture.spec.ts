@@ -321,10 +321,14 @@ test("@capture advanced toggle", async ({ page }) => {
   await page.locator("#project").waitFor();
   await killAnim(page);
   // The vendored-ID toggle sits inline under "Advanced scan options" for a
-  // source scan — capture the settings card that holds the scan-options column.
+  // source scan — capture that whole section (heading + toggle) so the guide
+  // shows users where to find it, not just the bare switch.
   const toggle = page.getByText("File-level identification (SCANOSS)");
   await toggle.waitFor({ state: "visible" });
-  await page.locator(".rounded-2xl, [class*='rounded-']").last().screenshot({
+  const section = toggle.locator(
+    "xpath=ancestor::div[contains(@class,'border-t')][1]",
+  );
+  await section.screenshot({
     path: `${IMAGES}/web-ui-identify-vendored-en.png`,
   });
 });
