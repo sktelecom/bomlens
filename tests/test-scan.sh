@@ -150,6 +150,23 @@ assert_bom_sane() {
         "$file" >/dev/null 2>&1
 }
 
+# Assert the root component declares its direct dependencies: the dependency
+# graph entry whose ref is metadata.component's bom-ref must exist with a
+# non-empty dependsOn. Guards the JVM regression where build-prep passed
+# --project-name/--project-version to cdxgen, which re-rooted Maven/Gradle SBOMs
+# to a generic pkg:application/<name> ref disconnected from the resolved graph —
+# the new root carried an empty dependsOn, so every direct dependency was
+# orphaned and consumers reading the graph saw them all as transitive.
+assert_root_has_direct_deps() {
+    local file=$1
+    [ -f "$file" ] || return 1
+    jq -e '
+        (.metadata.component."bom-ref" // "") as $r
+        | $r != ""
+          and ([ .dependencies[]? | select(.ref == $r) | .dependsOn[]? ] | length > 0)
+    ' "$file" >/dev/null 2>&1
+}
+
 # Run scan with logging function
 run_scan_with_logs() {
     local test_name=$1
@@ -405,13 +422,17 @@ EOF
 if run_scan_with_logs "test-java-maven" "TestJavaMaven" "1.0.0"; then
     if FOUND=$(find_bom_file "TestJavaMaven" "1.0.0"); then
         COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-        if [ "$COMP_COUNT" -gt 0 ]; then
-            print_success "Java Maven project ($COMP_COUNT components)"
-            ((PASSED++))
-        else
+        if [ "$COMP_COUNT" -le 0 ]; then
             print_error "Java Maven project (SBOM is empty)"
             show_failure_log "test-java-maven"
             ((FAILED++))
+        elif ! assert_root_has_direct_deps "$FOUND"; then
+            print_error "Java Maven project (root metadata.component has no direct dependsOn — direct deps orphaned)"
+            show_failure_log "test-java-maven"
+            ((FAILED++))
+        else
+            print_success "Java Maven project ($COMP_COUNT components, root declares direct deps)"
+            ((PASSED++))
         fi
     else
         print_error "Java Maven project (SBOM file not generated)"
