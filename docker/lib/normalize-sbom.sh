@@ -36,6 +36,36 @@ NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
+# Python range-lower-bound de-duplication. For a requirements.txt range dep like
+# `flask>=2.0`, cdxgen (after build-prep runs `pip install`) emits TWO components:
+# the manifest range LOWER BOUND (Flask@2.0, evidence technique=manifest-analysis,
+# carrying a cdx:pypi:versionSpecifiers property) AND the actually-installed version
+# (Flask@3.1.3, technique=instrumentation, no specifier). The lower bound is a
+# CONSTRAINT, not an installed artifact: it is orphaned from the dependency graph
+# yet still gets CVE-matched, so the same package appears at two versions and the
+# old lower bound draws phantom vulnerabilities. Drop the lower bound when an
+# installed sibling (same name, no specifier) exists. Scoped to pkg:pypi so
+# ecosystems where multiple versions of one package legitimately coexist
+# (npm/maven diamond deps) are untouched; the $used graph guard keeps any component
+# that is actually referenced. Also strips the dropped refs from the dependency graph.
+PYRANGE_DEDUP='
+  ( [ .components[]?
+      | select(((.purl // "") | startswith("pkg:pypi/"))
+               and (((.properties // []) | any(.name=="cdx:pypi:versionSpecifiers")) | not))
+      | (.name // "" | ascii_downcase) ] | unique ) as $installed
+  | ( [ .dependencies[]? | (.ref, (.dependsOn[]?)) ] | unique ) as $used
+  | ( [ .components[]?
+        | select(((.purl // "") | startswith("pkg:pypi/"))
+                 and ((.properties // []) | any(.name=="cdx:pypi:versionSpecifiers"))
+                 and ((.name // "" | ascii_downcase) as $nm | ($installed | index($nm)) != null)
+                 and ((.["bom-ref"] // .purl // "") as $r | ($used | index($r)) == null))
+        | (.["bom-ref"] // .purl) ] | unique ) as $drop
+  | .components |= map(select((.["bom-ref"] // .purl // "") as $r | ($drop | index($r)) == null))
+  | (if (.dependencies|type)=="array" then
+        .dependencies |= ( map(select((.ref // "") as $r | ($drop | index($r)) == null))
+                           | map(.dependsOn |= (if type=="array" then map(select(. as $d | ($drop|index($d))==null)) else . end)) )
+     else . end)'
+
 # cdxgen can emit spec-invalid swift PURLs: pkg:swift REQUIRES a namespace
 # (e.g. pkg:swift/github.com/apple/swift-log@1.0.0), but the root component and
 # first-party modules come out as pkg:swift/<name>@<ver> with no namespace. A
@@ -126,6 +156,7 @@ if [ "$MODE" = "--stable" ]; then
         ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
+        | ${PYRANGE_DEDUP}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
         | ${LICENSE_FIX}
@@ -141,7 +172,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
