@@ -78,6 +78,11 @@ ARG UBI_READER_VERSION=0.8.13
 ARG SBOM_AIBOM=false
 # renovate: datasource=github-tags depName=GenAI-Security-Project/aibom-generator
 ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
+# cdxgen (Node) is installed alongside the AIBOM generator so enrich-aibom.sh can
+# harvest model pedigree / performance metrics that the OWASP tool omits. Opt-in
+# with the aibom image only; enrich-aibom.sh degrades gracefully when it is absent.
+# renovate: datasource=npm depName=@cyclonedx/cdxgen
+ARG CDXGEN_VERSION=12.7.0
 
 # NOTICE PDF rendering (opt-in: --build-arg SBOM_PDF=true). weasyprint renders the
 # generated _NOTICE.html to _NOTICE.pdf. It is Python-based (consistent with onot)
@@ -261,7 +266,11 @@ RUN if [ "$SBOM_AIBOM" = "true" ]; then \
       git clone --quiet https://github.com/GenAI-Security-Project/aibom-generator /opt/aibom-generator \
       && git -C /opt/aibom-generator checkout --quiet "${AIBOM_GENERATOR_REF}" \
       && pip3 install --no-cache-dir -r /opt/aibom-generator/requirements.txt \
-      && ( cd /opt/aibom-generator && python3 -m src.cli --help >/dev/null ); \
+      && ( cd /opt/aibom-generator && python3 -m src.cli --help >/dev/null ) \
+      && apt-get update && apt-get install -y --no-install-recommends nodejs npm \
+      && npm install -g "@cyclonedx/cdxgen@${CDXGEN_VERSION}" \
+      && rm -rf /var/lib/apt/lists/* \
+      && cdxgen --version >/dev/null; \
     else \
       echo "[build] aibom generator skipped (SBOM_AIBOM=false)"; \
     fi

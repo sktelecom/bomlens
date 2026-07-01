@@ -20,6 +20,15 @@
 # the merged BOM keeps transitive-dependency information — required by the SKT
 # conformance check. bom-refs rarely collide across ecosystems; identical refs
 # have their dependsOn lists unioned.
+#
+# Root preservation (AI path): by default the output is a fresh CycloneDX 1.6
+# document with a new root component. When MERGE_ROOT_FROM points at one of the
+# input files, the output instead keeps THAT input's specVersion and
+# metadata.component (root) — so an ML-BOM (1.7, carrying a machine-learning-model
+# root with a modelCard) can absorb an application's software components without
+# being downgraded to 1.6 or losing its modelCard. Only the component/dependency
+# sets are merged; the preserved root's own components are included via the normal
+# input flattening below (pass the ML-BOM as an input too).
 set -e
 
 OUTPUT="$1"
@@ -41,6 +50,24 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Optional base SBOM whose specVersion + root metadata.component are preserved
+# (AI path: keep the ML-BOM's 1.7 spec and modelCard). Ignored if unset, missing,
+# or not valid JSON — the merge then falls back to a fresh 1.6 root.
+MERGE_ROOT_FROM="${MERGE_ROOT_FROM:-}"
+PRESERVE_SPEC=""
+PRESERVE_META=""
+if [ -n "$MERGE_ROOT_FROM" ] && [ -s "$MERGE_ROOT_FROM" ] && jq empty "$MERGE_ROOT_FROM" >/dev/null 2>&1; then
+    PRESERVE_SPEC=$(jq -r '.specVersion // empty' "$MERGE_ROOT_FROM" 2>/dev/null)
+    PRESERVE_META=$(jq -c '.metadata.component // empty' "$MERGE_ROOT_FROM" 2>/dev/null)
+    if [ -n "$PRESERVE_SPEC" ] && [ -n "$PRESERVE_META" ]; then
+        echo "[merge] preserving root from $MERGE_ROOT_FROM (specVersion=$PRESERVE_SPEC, modelCard kept)"
+    else
+        PRESERVE_SPEC=""
+        PRESERVE_META=""
+        echo "[merge] WARN: MERGE_ROOT_FROM has no specVersion/metadata.component; using fresh 1.6 root." >&2
+    fi
+fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -103,20 +130,26 @@ jq -s '
 NEDGES=$(jq '[.[].dependsOn[]?] | length' "$WORK/deps.json")
 
 # --slurpfile reads the merged components/dependencies from files (ARG_MAX safe).
+# When a base root is preserved, keep its specVersion and metadata.component
+# (root, incl. any modelCard); otherwise emit a fresh CycloneDX 1.6 root. The
+# preserved root's own component is not re-added as a plain component — it stays
+# the metadata.component — so the merged component set is deduped as usual.
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
     --slurpfile deps "$WORK/deps.json" \
     --arg name "$NAME" \
     --arg version "$VERSION" \
-    --arg ts "$GEN_AT" '
+    --arg ts "$GEN_AT" \
+    --arg spec "${PRESERVE_SPEC:-1.6}" \
+    --argjson meta "${PRESERVE_META:-null}" '
 {
   bomFormat: "CycloneDX",
-  specVersion: "1.6",
+  specVersion: $spec,
   version: 1,
   metadata: {
     timestamp: $ts,
     tools: { components: [ { type: "application", name: "bomlens-merge" } ] },
-    component: { type: "application", name: $name, version: $version }
+    component: ($meta // { type: "application", name: $name, version: $version })
   },
   components: $comps[0],
   dependencies: $deps[0]

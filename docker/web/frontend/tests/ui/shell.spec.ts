@@ -618,12 +618,15 @@ const AI_DONE = {
     checks: [
       { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
       { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "0%" },
-      { id: "g7-model-id", label: "G7 model identifier (PURL/CPE)", required: false, status: "pass", detail: "1/1 model component(s)" },
-      { id: "g7-model-license", label: "G7 model license", required: false, status: "pass", detail: "1/1 model component(s)" },
-      { id: "g7-model-card", label: "G7 model card (architecture/training parameters)", required: false, status: "pass", detail: "1/1 model component(s)" },
-      { id: "g7-model-hash", label: "G7 model integrity (hashes)", required: false, status: "warn", detail: "0/1 model component(s)" },
-      { id: "g7-datasets", label: "G7 dataset provenance (datasets referenced)", required: false, status: "pass", detail: "2 dataset reference(s)" },
-      { id: "g7-openness", label: "G7 model openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM" },
+      { id: "g7-meta-author", label: "SBOM author", required: false, status: "pass", detail: "author present", cluster: "metadata", source: "auto" },
+      { id: "g7-meta-timestamp", label: "SBOM timestamp", required: false, status: "pass", detail: "1 found", cluster: "metadata", source: "auto" },
+      { id: "g7-slp-data-flow", label: "System data flow", required: false, status: "warn", detail: "no automated source", cluster: "slp", source: "na" },
+      { id: "g7-model-id", label: "Model identifier", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["pkg:huggingface/google-bert/bert-base-uncased@86b5e093"] },
+      { id: "g7-model-license", label: "Model license", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["Apache-2.0"] },
+      { id: "g7-model-card", label: "Model properties (model card)", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto" },
+      { id: "g7-model-hash-value", label: "Model hash value", required: false, status: "warn", detail: "0/1 model component(s)", cluster: "models", source: "auto" },
+      { id: "g7-model-openness", label: "Model license — openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM", cluster: "models", source: "inferred" },
+      { id: "g7-ds-name", label: "Dataset name", required: false, status: "pass", detail: "2 dataset reference(s)", cluster: "dp", source: "auto" },
     ],
   },
   sbom: {
@@ -708,12 +711,18 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
 
-  // Headline tally comes straight from the check statuses: 4 of 6 present.
-  await expect(page.getByText("4/6 present")).toBeVisible();
+  // Headline tally comes straight from the check statuses: 6 of 8 auto-covered,
+  // 2 advisory and 1 needing human review (the source:"na" element).
+  await expect(page.getByText("6/8 present")).toBeVisible();
   await expect(page.getByText(/2 advisory/)).toBeVisible();
+  await expect(page.getByText(/1 need review/)).toBeVisible();
+  // G7 checks are grouped into their clusters (headers rendered).
+  await expect(page.getByText("Models", { exact: true })).toBeVisible();
+  // The na element carries a "Review needed" provenance badge.
+  await expect(page.getByText("Review needed").first()).toBeVisible();
   // Base checks are split out under their own heading.
   await expect(page.getByText("Format conformance")).toBeVisible();
-  await expect(page.getByText("G7 model openness (weight/architecture/data/training)")).toBeVisible();
+  await expect(page.getByText("Model license — openness (weight/architecture/data/training)")).toBeVisible();
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -725,9 +734,9 @@ for (const { theme, lang } of COMBOS) {
   test(`conformance section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAiAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-    // "4/6" and the CycloneDX label are the same in every locale.
+    // "6/8" and the CycloneDX label are the same in every locale.
     await expect(page.getByText("CycloneDX")).toBeVisible();
-    await expect(page.getByText(/4\s*\/\s*6/)).toBeVisible();
+    await expect(page.getByText(/6\s*\/\s*8/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a
     // non-deterministic frame, so the whole tall section is sometimes captured 4px

@@ -18,9 +18,10 @@
 #   mandatory : timestamp, tool info, top component, name+version coverage,
 #               PURL coverage (>= threshold), no pkg:generic, transitive edges
 #   recommended (warn only): license coverage, hash coverage
-#   AI SBOMs (machine-learning-model present): G7 minimum-element checks are
-#               appended (model id/license/card/integrity, datasets, openness),
-#               all recommended — see docs/internal/ai-sbom-readiness.md.
+#   AI SBOMs (machine-learning-model present): the full G7 minimum-element
+#               checklist is appended (7 clusters / 50 elements, data-driven from
+#               docker/lib/g7-registry.json), all recommended, each tagged with a
+#               data source — see docs/internal/ai-sbom-readiness.md.
 set -e
 
 SBOM="$1"
@@ -116,46 +117,55 @@ cdx_checks() {
 }
 
 # G7 AI SBOM minimum-element checks (appended for CycloneDX SBOMs that carry a
-# machine-learning-model component). Maps the model/dataset/metadata clusters of
-# the G7 "minimum elements for AI SBOMs" to fields present in a CycloneDX 1.7
-# ML-BOM. All are recommended (required:false) — G7 is a non-binding guideline,
-# and several fields (integrity hashes, the openness 4-axis) depend on what the
-# model publisher declared, so the report surfaces coverage and a human judges.
-# System-level / infrastructure / KPI clusters are not checkable from a
-# single-model AI SBOM and are intentionally omitted.
+# machine-learning-model component). Data-driven: the 7 clusters / 50 elements of
+# the G7 "SBOM for AI — Minimum Elements" live in docker/lib/g7-registry.json,
+# each mapped to a CycloneDX presence expression (cdxPath) and a data-source tag
+# (auto/inferred/declared/na). All checks are recommended (required:false) — G7 is
+# non-binding. Elements with no automated source (cdxPath null, source "na" —
+# system data flows, security controls, KPI benchmarks, dataset sensitivity) are
+# surfaced as "requires human review" rather than silently omitted, so the report
+# shows the full 50-element picture and which slice the tool actually covers.
+#
+# Evaluation builds ONE jq program from the registry (element expressions inlined
+# as code, static fields JSON-encoded as literals) and runs it in a single pass —
+# no per-element subprocess, and backslashes in expressions survive since they are
+# never round-tripped through the shell as data.
 g7_ai_checks() {
-    jq -c --argjson cap "$MISSING_CAP" '
-    def cov($missing; $tot; $label; $id; $ev):
-      {id:$id, label:$label, required:false,
-       status:(if $tot==0 then "warn" elif ($missing|length)==0 then "pass" else "warn" end),
-       detail:"\($tot - ($missing|length))/\($tot) model component(s)",
-       missing:($missing[0:$cap]), evidence:(($ev | unique)[0:$cap])};
-    ([.components[]? | select(.type=="machine-learning-model")]) as $m
-    | ($m|length) as $mtot
-    | ([$m[] | select(((.purl//"")=="") and ((.cpe//"")=="")) | (.name // "(unnamed)")]) as $no_id
-    | ([$m[] | select(((.hashes//[])|length)==0) | (.name // "(unnamed)")]) as $no_hash
-    | ([$m[] | select(((.licenses//[])|length)==0) | (.name // "(unnamed)")]) as $no_lic
-    | ([$m[] | select((.modelCard.modelParameters//null)==null) | (.name // "(unnamed)")]) as $no_mc
-    | ([$m[] | (.purl // .cpe) | select(. != null and . != "")]) as $ev_id
-    | ([$m[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != "")]) as $ev_lic
-    | ([$m[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // "documented")]) as $ev_mc
-    | ([$m[] | .hashes[]? | .alg | select(. != null)]) as $ev_hash
-    | (([.. | objects | select(has("datasets")) | .datasets[]?] + [.components[]? | select(.type=="data")])) as $ds
-    | ([$ds[] | (.name // .ref // (.componentData.name) // "dataset") | select(. != null and . != "")]) as $ev_ds
-    | ([.. | strings | select(test("open[ _-]?(weight|architecture|data|training)";"i"))]) as $ev_open
-    | [
-        cov($no_id;   $mtot; "G7 model identifier (PURL/CPE)"; "g7-model-id"; $ev_id),
-        cov($no_lic;  $mtot; "G7 model license"; "g7-model-license"; $ev_lic),
-        cov($no_mc;   $mtot; "G7 model card (architecture/training parameters)"; "g7-model-card"; $ev_mc),
-        cov($no_hash; $mtot; "G7 model integrity (hashes)"; "g7-model-hash"; $ev_hash),
-        {id:"g7-datasets", label:"G7 dataset provenance (datasets referenced)", required:false,
-         status:(if ($ds|length)>0 then "pass" else "warn" end), detail:"\($ds|length) dataset reference(s)",
-         missing:[], evidence:(($ev_ds | unique)[0:$cap])},
-        {id:"g7-openness", label:"G7 model openness (weight/architecture/data/training)", required:false,
-         status:(if ($ev_open|length)>0 then "pass" else "warn" end),
-         detail:(if ($ev_open|length)>0 then "declared" else "not declared in the SBOM" end),
-         missing:[], evidence:(($ev_open | unique)[0:$cap])}
-      ]' "$SBOM"
+    local reg="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+    if [ ! -f "$reg" ]; then
+        echo "[validate] WARN: G7 registry not found at $reg; skipping G7 checks." >&2
+        echo "[]"
+        return
+    fi
+    # Generate a jq array-of-objects program. Each element becomes an object with
+    # _present (the cdxPath boolean, null for source:na) and _ev (evidence array).
+    local prog
+    prog=$(jq -r '
+        "[" + ([ .clusters[] as $c | $c.elements[] |
+            "{id:" + (.id|@json)
+            + ",label:" + (.label|@json)
+            + ",required:false"
+            + ",cluster:" + ($c.id|@json)
+            + ",source:" + (.source|@json)
+            + ",role:" + ((.role // "")|@json)
+            + ",missing:[]"
+            + ",_present:(" + (if (.source=="na" or (.cdxPath==null)) then "null" else "(try (" + .cdxPath + ") catch false)" end) + ")"
+            + ",_ev:(" + (if (.evidencePath==null) then "[]" else "(try (" + .evidencePath + ") catch [])" end) + ")"
+            + "}"
+        ] | join(",")) + "]"
+    ' "$reg") || { echo "[]"; return; }
+
+    # Evaluate against the SBOM, then fold _present/_ev into the check schema.
+    jq -c "$prog" "$SBOM" 2>/dev/null | jq -c --argjson cap "$MISSING_CAP" '
+        map(
+            (if ._present==true then {status:"pass", detail:"present"}
+             elif ._present==false then {status:"warn", detail:"not present in the SBOM"}
+             else {status:"warn", detail:"requires human review (no automated source)"} end) as $s
+            | {id, label, required, status:$s.status, detail:$s.detail, missing,
+               evidence: ((._ev // []) | unique | .[0:$cap]),
+               cluster, source, role}
+        )
+    ' 2>/dev/null || echo "[]"
 }
 
 spdx_json_checks() {

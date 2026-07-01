@@ -102,33 +102,86 @@ else
     fail "NOTICE missing or has no Apache-2.0 entry"
 fi
 
-echo "== validate-sbom.sh adds G7 minimum-element checks for an AI SBOM =="
+echo "== validate-sbom.sh adds registry-driven G7 minimum-element checks =="
 bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf" "bert-base-uncased" >/dev/null 2>&1
 CONF="$WORK/conf_conformance.json"
 if [ -f "$CONF" ]; then
+    # The registry maps the full G7 set (7 clusters, 50 elements + an openness
+    # facet), so expect the whole checklist, not just the six model checks.
     g7n=$(jq '[.checks[] | select(.id|startswith("g7-"))] | length' "$CONF")
-    [ "$g7n" -ge 5 ] && pass "G7 checks present ($g7n)" || fail "expected >=5 G7 checks, got $g7n"
+    [ "$g7n" -ge 40 ] && pass "full G7 checklist present ($g7n checks)" || fail "expected >=40 G7 checks, got $g7n"
+    # Every G7 check carries a cluster and a data source (the new schema fields).
+    clusters=$(jq -r '[.checks[] | select(.id|startswith("g7-")) | .cluster] | unique | length' "$CONF")
+    [ "$clusters" -ge 7 ] && pass "G7 checks span the 7 clusters ($clusters)" || fail "expected 7 clusters, got $clusters"
+    srcset=$(jq -r '[.checks[] | select(.id|startswith("g7-")) | .source] | unique | sort | join(",")' "$CONF")
+    echo "$srcset" | grep -q "auto" && echo "$srcset" | grep -q "na" && pass "G7 checks tag data source (auto..na: $srcset)" || fail "G7 source tags missing (got '$srcset')"
+
     licst=$(jq -r '.checks[] | select(.id=="g7-model-license") | .status' "$CONF")
     [ "$licst" = "pass" ] && pass "g7-model-license passes (Apache-2.0 present)" || fail "g7-model-license='$licst', expected pass"
     # Passing checks carry the actual SBOM values as evidence ("met with these").
     licev=$(jq -r '.checks[] | select(.id=="g7-model-license") | (.evidence // []) | join(",")' "$CONF")
     echo "$licev" | grep -q "Apache-2.0" && pass "g7-model-license evidence shows Apache-2.0" || fail "g7-model-license evidence='$licev', expected Apache-2.0"
+    liccl=$(jq -r '.checks[] | select(.id=="g7-model-license") | .cluster' "$CONF")
+    [ "$liccl" = "models" ] && pass "g7-model-license grouped under the models cluster" || fail "g7-model-license cluster='$liccl', expected models"
     idev=$(jq -r '.checks[] | select(.id=="g7-model-id") | (.evidence // []) | length' "$CONF")
     [ "$idev" -ge 1 ] && pass "g7-model-id carries evidence (the PURL/CPE)" || fail "g7-model-id evidence is empty"
-    # A warn-status element has nothing to show, so its evidence stays empty.
-    hashev=$(jq -r '.checks[] | select(.id=="g7-model-hash") | (.evidence // []) | length' "$CONF")
-    [ "$hashev" -eq 0 ] && pass "g7-model-hash (warn) carries no evidence" || fail "g7-model-hash evidence should be empty"
-    # The known engine gaps (no hashes, no openness axis) must surface as warnings.
-    hashst=$(jq -r '.checks[] | select(.id=="g7-model-hash") | .status' "$CONF")
-    [ "$hashst" = "warn" ] && pass "g7-model-hash warns (integrity gap surfaced)" || fail "g7-model-hash='$hashst', expected warn"
-    openst=$(jq -r '.checks[] | select(.id=="g7-openness") | .status' "$CONF")
-    [ "$openst" = "warn" ] && pass "g7-openness warns (4-axis not declared)" || fail "g7-openness='$openst', expected warn"
+
+    # Before enrichment the fixture has no hashes / no openness props, so these
+    # auto/inferred model checks warn (integrity + openness gaps, surfaced honestly).
+    hashst=$(jq -r '.checks[] | select(.id=="g7-model-hash-value") | .status' "$CONF")
+    [ "$hashst" = "warn" ] && pass "g7-model-hash-value warns pre-enrich (integrity gap)" || fail "g7-model-hash-value='$hashst', expected warn"
+    openst=$(jq -r '.checks[] | select(.id=="g7-model-openness") | .status' "$CONF")
+    [ "$openst" = "warn" ] && pass "g7-model-openness warns pre-enrich (not assessed)" || fail "g7-model-openness='$openst', expected warn"
+
+    # Clusters with no automated source (system data flow, KPI, …) are surfaced as
+    # review items (source=na, warn), never silently dropped or faked as pass.
+    naflow=$(jq -r '.checks[] | select(.id=="g7-slp-data-flow") | "\(.source)/\(.status)"' "$CONF")
+    [ "$naflow" = "na/warn" ] && pass "g7-slp-data-flow marked review (na/warn)" || fail "g7-slp-data-flow='$naflow', expected na/warn"
+
     # G7 checks are advisory: they must not flip the overall result to fail.
     res=$(jq -r '.result' "$CONF")
     [ "$res" != "fail" ] && pass "advisory G7 warnings do not fail the overall result" || fail "overall result is fail; G7 should be warn-only"
 else
     fail "validate-sbom.sh did not produce a conformance report"
 fi
+
+echo "== enrichment flips the model integrity + openness checks to pass =="
+# enrich-aibom.sh injects LFS SHA-256 hashes and openness:* properties from the
+# HuggingFace API; that path needs the network, so here we simulate its output
+# (inject a hash + openness props) and confirm the G7 evaluator then passes them.
+jq '(.components[] | select(.type=="machine-learning-model")) |= (
+      .hashes = [{"alg":"SHA-256","content":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}]
+      | .properties = ((.properties // []) + [
+          {"name":"openness:weights","value":"open-weight"},
+          {"name":"openness:training-data","value":"open-data"}
+        ]))' "$FIX/aibom-owasp-1_7.json" > "$WORK/enriched.json"
+bash "$LIB/validate-sbom.sh" "$WORK/enriched.json" "$WORK/conf2" "bert-base-uncased" >/dev/null 2>&1
+CONF2="$WORK/conf2_conformance.json"
+hv=$(jq -r '.checks[] | select(.id=="g7-model-hash-value") | .status' "$CONF2")
+ha=$(jq -r '.checks[] | select(.id=="g7-model-hash-alg") | .status' "$CONF2")
+op=$(jq -r '.checks[] | select(.id=="g7-model-openness") | .status' "$CONF2")
+{ [ "$hv" = "pass" ] && [ "$ha" = "pass" ]; } && pass "model integrity checks pass after enrichment" || fail "hash-value='$hv' hash-alg='$ha', expected pass"
+[ "$op" = "pass" ] && pass "model openness check passes after enrichment" || fail "g7-model-openness='$op', expected pass"
+
+echo "== 2-layer merge keeps the ML-BOM root (1.7 + modelCard) and fills infrastructure =="
+# A tiny application layer (one library + a dep edge) merged onto the model SBOM.
+cat > "$WORK/app.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"application","name":"serving-app","version":"1.0"}},
+ "components":[{"type":"library","name":"flask","version":"3.0.0","purl":"pkg:pypi/flask@3.0.0","bom-ref":"flask"}],
+ "dependencies":[{"ref":"serving-app","dependsOn":["flask"]}]}
+JSON
+MERGE_ROOT_FROM="$FIX/aibom-owasp-1_7.json" bash "$LIB/merge-sbom.sh" \
+    "$WORK/merged.json" "combo" "1.0" "$FIX/aibom-owasp-1_7.json" "$WORK/app.json" >/dev/null 2>&1
+mspec=$(jq -r '.specVersion' "$WORK/merged.json")
+[ "$mspec" = "1.7" ] && pass "MERGE_ROOT_FROM preserves the ML-BOM specVersion 1.7 (not downgraded to 1.6)" || fail "merged specVersion='$mspec', expected 1.7"
+mcard=$(jq '[.components[] | select(.type=="machine-learning-model" and (.modelCard!=null))] | length' "$WORK/merged.json")
+[ "$mcard" -ge 1 ] && pass "model component + modelCard survive the merge" || fail "modelCard lost in merge"
+mflask=$(jq '[.components[] | select(.name=="flask")] | length' "$WORK/merged.json")
+[ "$mflask" -ge 1 ] && pass "application software component merged in (infrastructure layer)" || fail "flask not merged"
+bash "$LIB/validate-sbom.sh" "$WORK/merged.json" "$WORK/mconf" "combo" >/dev/null 2>&1
+infra=$(jq -r '.checks[] | select(.id=="g7-infra-software") | .status' "$WORK/mconf_conformance.json")
+[ "$infra" = "pass" ] && pass "g7-infra-software flips to pass on the merged BOM" || fail "g7-infra-software='$infra', expected pass"
 
 echo "== generate-notice.sh flags AI restrictive licenses for review =="
 bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
