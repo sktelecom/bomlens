@@ -52,7 +52,7 @@
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
     "deepLicense": "License scan (ScanCode)",
-    "deepLicenseHint": "Downloads each package's source and scans it for license information, instead of trusting the license the package declares (slow).",
+    "deepLicenseHint": "Scans your own source files for per-file license text and headers, in addition to the licenses each package declares (slow).",
     "scanMethodHint": "Advanced analysis for source scanned without a package manager. If your project builds with one (Maven, npm, pip, Go modules…), the SBOM is already complete and these can stay off.",
     "identifyVendored": "File-level identification (SCANOSS)",
     "identifyVendoredHint": "Finds third-party open source copied into the source tree (mainly C/C++). Only file fingerprints — never the source — go to the OSSKB service.",
