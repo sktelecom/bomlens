@@ -86,15 +86,16 @@ if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
 fi
 
 # --- build the cdxgen argument list (shared across the per-image binary paths) ---
-# Pass the caller's project name/version up front so the root component carries a
-# unique identity instead of cdxgen's scan-path default (src@latest), which collides
-# in Black Duck. PROJECT_NAME/PROJECT_VERSION arrive via `docker run -e`. Build the
-# list with `set --` (not ${VAR:+...}) so a name with spaces stays one argument.
-# stamp-metadata.sh still overwrites this post-hoc as the final guarantee (it also
-# covers the syft fallback path), so an unknown flag here cannot break the SBOM.
+# Do NOT pass --project-name/--project-version. For npm cdxgen keeps the root purl
+# (pkg:npm/<name>@<ver>) and rewires the dependency graph onto it, but for Maven and
+# Gradle the override re-roots metadata.component to a generic pkg:application/<name>
+# ref while the resolved-GAV root edges stay on the old pkg:maven/... ref. The new
+# application root then carries an empty dependsOn, so every direct dependency is
+# orphaned from the root and consumers reading the graph see them all as transitive.
+# We don't need the flags for identity anyway: stamp-metadata.sh overwrites the root
+# name/version post-hoc (and covers the syft fallback path), so dropping them lets
+# cdxgen keep its ecosystem-correct, fully-linked root graph.
 set -- -r --spec-version "$SPEC" -o "$OUT"
-[ -n "$PROJECT_NAME" ]    && set -- "$@" --project-name "$PROJECT_NAME"
-[ -n "$PROJECT_VERSION" ] && set -- "$@" --project-version "$PROJECT_VERSION"
 set -- "$@" "$SRC"
 
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
