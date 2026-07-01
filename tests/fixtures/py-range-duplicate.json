@@ -1,0 +1,47 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "metadata": {
+    "component": { "type": "application", "name": "app", "purl": "pkg:pypi/app@latest", "bom-ref": "pkg:pypi/app@latest" }
+  },
+  "components": [
+    {
+      "type": "framework", "name": "Flask", "version": "2.0", "bom-ref": "pkg:pypi/flask@2.0", "purl": "pkg:pypi/flask@2.0",
+      "evidence": { "identity": [ { "field": "purl", "confidence": 0.5, "methods": [ { "technique": "manifest-analysis", "confidence": 0.5, "value": "requirements.txt" } ] } ] },
+      "properties": [
+        { "name": "SrcFile", "value": "requirements.txt" },
+        { "name": "cdx:pypi:versionSpecifiers", "value": ">=2.0" }
+      ]
+    },
+    {
+      "type": "framework", "name": "Flask", "version": "3.1.3", "bom-ref": "pkg:pypi/flask@3.1.3", "purl": "pkg:pypi/flask@3.1.3",
+      "evidence": { "identity": [ { "field": "purl", "confidence": 1, "methods": [ { "technique": "instrumentation", "confidence": 1, "value": "cdxgen-venv-w2ecGS" } ] } ] },
+      "properties": [ { "name": "SrcFile", "value": "requirements.txt" } ]
+    },
+    {
+      "type": "library", "name": "requests", "version": "2.25", "bom-ref": "pkg:pypi/requests@2.25", "purl": "pkg:pypi/requests@2.25",
+      "properties": [
+        { "name": "SrcFile", "value": "requirements.txt" },
+        { "name": "cdx:pypi:versionSpecifiers", "value": ">=2.25" }
+      ]
+    },
+    {
+      "type": "library", "name": "requests", "version": "2.34.2", "bom-ref": "pkg:pypi/requests@2.34.2", "purl": "pkg:pypi/requests@2.34.2",
+      "properties": [ { "name": "SrcFile", "value": "requirements.txt" } ]
+    },
+    {
+      "type": "library", "name": "urllib3", "version": "2.7.0", "bom-ref": "pkg:pypi/urllib3@2.7.0", "purl": "pkg:pypi/urllib3@2.7.0",
+      "properties": [ { "name": "SrcFile", "value": "requirements.txt" } ]
+    },
+    {
+      "type": "library", "name": "left-pad", "version": "1.3.0", "bom-ref": "pkg:npm/left-pad@1.3.0", "purl": "pkg:npm/left-pad@1.3.0",
+      "properties": [ { "name": "cdx:pypi:versionSpecifiers", "value": ">=1.0" } ]
+    }
+  ],
+  "dependencies": [
+    { "ref": "pkg:pypi/app@latest", "dependsOn": [ "pkg:pypi/flask@3.1.3", "pkg:pypi/requests@2.34.2", "pkg:pypi/urllib3@2.7.0" ] },
+    { "ref": "pkg:pypi/flask@3.1.3", "dependsOn": [] },
+    { "ref": "pkg:pypi/requests@2.34.2", "dependsOn": [ "pkg:pypi/urllib3@2.7.0" ] },
+    { "ref": "pkg:pypi/urllib3@2.7.0", "dependsOn": [] }
+  ]
+}

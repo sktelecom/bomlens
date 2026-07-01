@@ -415,6 +415,29 @@ else
     fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
 fi
 
+echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
+# Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
+# `pip install`) emits BOTH the requirements.txt range lower bound (flask@2.0,
+# carrying cdx:pypi:versionSpecifiers) and the installed version (flask@3.1.3).
+# The lower bound is a constraint, not an installed artifact — it must be dropped so
+# it stops producing a duplicate component and phantom CVEs. urllib3 (installed only,
+# no range sibling) must survive; left-pad (npm, has a specifier but is NOT pypi)
+# must survive — the fix is pypi-scoped.
+cp "$FIX/py-range-duplicate.json" "$WORK/pr.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/pr.json" >/dev/null 2>&1
+present() { jq -e --arg p "$1" '[.components[].purl] | index($p) != null' "$WORK/pr.json" >/dev/null 2>&1; }
+if ! present "pkg:pypi/flask@2.0"; then pass "flask range lower bound (2.0) dropped"; else fail "flask@2.0 still present"; fi
+if present "pkg:pypi/flask@3.1.3"; then pass "flask installed version (3.1.3) kept"; else fail "flask@3.1.3 was dropped"; fi
+if ! present "pkg:pypi/requests@2.25"; then pass "requests range lower bound (2.25) dropped"; else fail "requests@2.25 still present"; fi
+if present "pkg:pypi/urllib3@2.7.0"; then pass "urllib3 (installed only, no range sibling) kept"; else fail "urllib3@2.7.0 was over-dropped"; fi
+if present "pkg:npm/left-pad@1.3.0"; then pass "npm component with a specifier is untouched (pypi-scoped)"; else fail "left-pad dropped — fix is not pypi-scoped"; fi
+pr_count=$(jq '.components | length' "$WORK/pr.json")
+[ "$pr_count" = "4" ] && pass "component count 6 -> 4 (two phantom range bounds removed)" || fail "component count=$pr_count, expected 4"
+pr_specs=$(jq '[.components[] | select((.purl|startswith("pkg:pypi/")) and ((.properties//[])[]?|select(.name=="cdx:pypi:versionSpecifiers")))] | length' "$WORK/pr.json")
+[ "$pr_specs" = "0" ] && pass "no pypi component retains a versionSpecifiers range bound" || fail "$pr_specs pypi range bound(s) remain"
+pr_dangling=$(jq '[.dependencies[]? | (.ref, (.dependsOn[]?)) | select(test("pkg:pypi/(flask@2.0|requests@2.25)$"))] | length' "$WORK/pr.json")
+[ "$pr_dangling" = "0" ] && pass "dependency graph has no dangling refs to dropped components" || fail "$pr_dangling dangling dependency ref(s) remain"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
