@@ -59,6 +59,7 @@ jobs:
             -e PROJECT_VERSION=1.0 \
             -e HOST_OUTPUT_DIR=/host-output \
             -e ENRICH_CDXGEN=false \
+            -e UPLOAD_ENABLED=false \
             bomlens-aibom:e2e
           echo "=== artifacts ==="
           ls -la out
