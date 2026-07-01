@@ -92,7 +92,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 **C/C++ 안내**
 
 - 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.md)를 참고하세요.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 고급 스캔 옵션의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 위험분석보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 위험분석보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
@@ -172,6 +172,13 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | 펌웨어 업로드 | `.bin` 등 업로드(펌웨어 이미지에서 UI 실행 필요) |
 | Docker 이미지 | 이미지명 입력 |
 | AI 모델 | HuggingFace 모델 id 입력(aibom 이미지에서 UI 실행 필요) |
+
+소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **고급 스캔 옵션** 섹션에서 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글을 제공합니다.
+
+- **라이선스 스캔 (ScanCode)** — CLI `--deep-license`에 대응합니다. 내 소스 파일을 훑어 파일 단위 라이선스 텍스트·헤더(1st-party)를 탐지합니다. 선언된 의존성을 내려받거나 스캔하지는 않습니다.
+- **파일 단위 식별 (SCANOSS)** — 소스 트리에 통째로 복사된 제3자 오픈소스(주로 C/C++)를 찾습니다. [내장 오픈소스 식별](identify-vendored.md)을 참고하세요.
+
+둘 다 느리고 기본은 꺼져 있으니 필요할 때만 켜세요. ScanCode는 `--build-arg SBOM_DEEP_LICENSE=true`로 빌드한 이미지에서만 쓸 수 있습니다. 토글 전체 목록과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.md)를 참고하세요.
 
 실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서(필요하면 적합성 보고서까지)를 화면에서 보거나 내려받을 수 있습니다. 적합성 결과(적합/부적합)는 상단 카드로 표시됩니다.
 

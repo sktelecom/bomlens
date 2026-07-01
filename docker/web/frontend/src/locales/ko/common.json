@@ -52,7 +52,7 @@
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
     "deepLicense": "라이선스 스캔 (ScanCode)",
-    "deepLicenseHint": "패키지에 선언된 라이선스 대신, 패키지의 소스 파일을 다운 받아 스캔해 라이선스 정보를 찾아냅니다 (느림).",
+    "deepLicenseHint": "패키지가 선언한 라이선스에 더해, 내 소스 파일을 직접 스캔해 파일 단위 라이선스 텍스트와 헤더를 찾아냅니다 (느림).",
     "scanMethodHint": "패키지 매니저 없이 스캔하는 소스를 위한 고급 분석입니다. 프로젝트를 패키지 매니저(Maven, npm, pip, Go modules 등)로 빌드한다면 SBOM이 이미 충분하므로 꺼 둬도 됩니다.",
     "identifyVendored": "파일 단위 식별 (SCANOSS)",
     "identifyVendoredHint": "소스 트리에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",

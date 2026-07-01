@@ -92,7 +92,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 **C/C++ notes**
 
 - With a package manager (Conan `conanfile.txt` / vcpkg `vcpkg.json`), dependencies resolve and appear in the SBOM.
-- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow — OS rootfs, application, and static-link dependencies as separate layers — see the [server SBOM guide](server-delivery.md).
+- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow — OS rootfs, application, and static-link dependencies as separate layers — see the [server SBOM guide](server-delivery.md). In the web UI, `--deep-license` is the **License scan (ScanCode)** toggle under Advanced scan options; it scans your own source files (`/src`), not the declared dependencies, and is slow, so turn it on only when you need per-file license detection.
 - When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
@@ -172,6 +172,13 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Firmware upload | upload a `.bin`, etc. (run the UI from the firmware image) |
 | Docker image | enter the image name |
 | AI model | enter a HuggingFace model id (run the UI from the aibom image) |
+
+For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced scan options** section offers toggles that change how the source is analyzed rather than which files are produced:
+
+- **License scan (ScanCode)** — the UI equivalent of `--deep-license`. Scans your own source files for per-file license text and headers (1st-party). It does not download or scan the declared dependencies.
+- **File-level identification (SCANOSS)** — finds third-party open source copied straight into the tree (mainly C/C++). See [Identify bundled open source](identify-vendored.md).
+
+Both are slow and off by default, so enable them only when needed. ScanCode is available only in an image built with `--build-arg SBOM_DEEP_LICENSE=true`. For the full list of toggles and per-target availability, see the [Web UI reference](../reference/ui.md).
 
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report (plus the conformance report when relevant). The conformance result (pass/fail) is shown as a card at the top.
 

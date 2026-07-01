@@ -44,7 +44,7 @@ The New scan screen is two panes. On the left, pick a source — grouped into **
 | Docker image | enter the image name | IMAGE |
 | AI model | enter a HuggingFace model id (`org/model`) | AIBOM |
 
-Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: ScanCode deep license detection and SCANOSS file-level identification of third-party open source copied into the tree (mainly C/C++) for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
+Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: **License scan (ScanCode)**, which scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies), and **File-level identification (SCANOSS)**, which finds third-party open source copied into the tree (mainly C/C++), both for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
 
 ## Scan running
 
@@ -78,7 +78,7 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 ![Conformance — format verdict with the G7 advisory sub-block](../images/web-ui-g7.png)
 
-**Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when ScanCode results are available — that is, from a source scan run with deep license detection — showing the source files with the license detected per file.
+**Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when ScanCode results are available — that is, from a source scan run with **License scan (ScanCode)** on — showing the source files with the license detected per file.
 
 ### AI surfaces
 
