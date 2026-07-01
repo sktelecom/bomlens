@@ -1,0 +1,94 @@
+# End-to-end check of the AI SBOM path against a REAL HuggingFace model, in the
+# opt-in bomlens-aibom image. It proves the parts the no-Docker tests can only
+# simulate: the OWASP AIBOM Generator reads a real model card, and enrich-aibom.sh
+# fills model integrity hashes (from the HuggingFace LFS SHA-256s) and derives the
+# openness axes over the network. Kept out of PR CI (builds the aibom image and
+# reaches HuggingFace) — run weekly or on demand.
+name: AIBOM E2E (real HuggingFace model)
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "HuggingFace model id to scan"
+        type: string
+        default: google-bert/bert-base-uncased
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  aibom-e2e:
+    name: Build aibom image and scan a real model
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build the aibom image (amd64, loaded locally)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64
+          load: true
+          build-args: |
+            SBOM_AIBOM=true
+          tags: bomlens-aibom:e2e
+          cache-from: type=gha,scope=aibom
+          cache-to: type=gha,mode=max,scope=aibom
+
+      - name: Scan the model (MODE=AIBOM) and enrich over the network
+        env:
+          MODEL: ${{ github.event.inputs.model || 'google-bert/bert-base-uncased' }}
+        run: |
+          mkdir -p out
+          # cdxgen harvest is disabled here so the assertions isolate the
+          # HuggingFace hash/openness path (cdxgen has its own e2e in docker-publish).
+          docker run --rm \
+            -v "$PWD/out":/host-output \
+            -e MODE=AIBOM \
+            -e MODEL_ID="$MODEL" \
+            -e PROJECT_NAME=aibom-e2e \
+            -e PROJECT_VERSION=1.0 \
+            -e HOST_OUTPUT_DIR=/host-output \
+            -e ENRICH_CDXGEN=false \
+            -e UPLOAD_ENABLED=false \
+            -e GENERATE_REPORT=true \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
+            bomlens-aibom:e2e
+          echo "=== artifacts ==="
+          ls -la out
+
+      - name: Assert enrich filled hashes + openness and G7 checks pass
+        run: |
+          BOM=out/aibom-e2e_1.0_bom.json
+          CONF=out/aibom-e2e_1.0_conformance.json
+          test -f "$BOM"  || { echo "no SBOM produced"; exit 1; }
+          test -f "$CONF" || { echo "no conformance report produced"; exit 1; }
+
+          echo "=== model component: hashes + openness ==="
+          nhash=$(jq '[.components[]? | select(.type=="machine-learning-model") | .hashes[]? | select(.alg=="SHA-256")] | length' "$BOM")
+          nopen=$(jq '[.components[]? | select(.type=="machine-learning-model") | .properties[]? | select((.name//"")|startswith("openness:"))] | length' "$BOM")
+          echo "SHA-256 hashes: $nhash   openness props: $nopen"
+          [ "$nhash" -ge 1 ] || { echo "FAIL: enrich added no SHA-256 hash from the HuggingFace LFS metadata"; exit 1; }
+          [ "$nopen" -ge 1 ] || { echo "FAIL: enrich derived no openness properties"; exit 1; }
+
+          echo "=== G7 conformance: the enriched checks pass ==="
+          for id in g7-model-hash-value g7-model-hash-alg g7-model-openness; do
+            st=$(jq -r --arg id "$id" '.checks[] | select(.id==$id) | .status' "$CONF")
+            echo "$id: $st"
+            [ "$st" = "pass" ] || { echo "FAIL: $id did not pass after enrichment"; exit 1; }
+          done
+
+          echo "=== the full G7 checklist (7 clusters) is present ==="
+          g7=$(jq '[.checks[] | select(.id|startswith("g7-"))] | length' "$CONF")
+          cl=$(jq '[.checks[] | select(.id|startswith("g7-")) | .cluster] | unique | length' "$CONF")
+          echo "g7 checks: $g7   clusters: $cl"
+          [ "$g7" -ge 40 ] && [ "$cl" -ge 7 ] || { echo "FAIL: G7 checklist incomplete"; exit 1; }
+          echo "OK: real-model AIBOM enrichment verified end to end."
