@@ -699,6 +699,12 @@ def conformance_summary(run_id):
             "detail": str(c.get("detail") or ""),
             "missing": [str(m) for m in (c.get("missing") or [])][:MAX_CONFORMANCE_MISSING],
             "evidence": [str(e) for e in (c.get("evidence") or [])][:MAX_CONFORMANCE_MISSING],
+            # G7 checks carry a cluster (metadata/slp/models/dp/infrastructure/sp/
+            # kpi) and a data source (auto/inferred/declared/na); base format checks
+            # leave these empty. Passed through so the UI can group by cluster and
+            # badge how each element was satisfied. Dropped here => dropped from UI.
+            "cluster": str(c.get("cluster") or ""),
+            "source": str(c.get("source") or ""),
         })
     return {
         "result": data.get("result", "unknown"),

@@ -118,6 +118,15 @@ export interface ConformanceCheck {
   /** Actual SBOM values that satisfy this check (e.g. the PURL, license id,
    *  hash algorithm). Shown as the "met with" evidence on passing G7 checks. */
   evidence?: string[];
+  /** G7 cluster this element belongs to (metadata | slp | models | dp |
+   *  infrastructure | sp | kpi). Empty/absent for base format checks. Drives the
+   *  per-cluster grouping in the conformance panel. */
+  cluster?: string;
+  /** Where a satisfied value comes from: "auto" (tool read it directly),
+   *  "inferred" (derived from signals), "declared" (present only if a human /
+   *  manifest supplied it), "na" (no automated source — human review needed).
+   *  Empty/absent for base format checks. */
+  source?: string;
 }
 
 export interface ConformanceSummary {

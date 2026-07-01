@@ -341,6 +341,7 @@
     "subtitle": "G7 minimum elements for AI",
     "present": "{{present}}/{{total}} present",
     "advisory": "{{count}} advisory",
+    "review": "{{count}} need review",
     "allAdvisory": "All G7 elements are advisory (a non-binding guideline).",
     "formatTitle": "Format conformance",
     "basePassed": "{{passed}}/{{total}} passed",
@@ -352,30 +353,225 @@
     "evidence": "Met with:",
     "example": "Example:",
     "learnMore": "Learn more",
+    "cluster": {
+      "metadata": "Metadata",
+      "slp": "System-level properties",
+      "models": "Models",
+      "dp": "Dataset properties",
+      "infrastructure": "Infrastructure",
+      "sp": "Security properties",
+      "kpi": "Key performance indicators"
+    },
+    "source": {
+      "auto": "Auto",
+      "inferred": "Inferred",
+      "declared": "Declared",
+      "na": "Review needed"
+    },
     "help": {
+      "g7-meta-author": {
+        "what": "Who created the SBOM (author, supplier or manufacturer).",
+        "fix": "Set metadata.authors, metadata.supplier or metadata.manufacturer."
+      },
+      "g7-meta-version": {
+        "what": "The version of this SBOM document.",
+        "fix": "Set the top-level version field."
+      },
+      "g7-meta-format-name": {
+        "what": "The SBOM data format name (e.g. CycloneDX).",
+        "fix": "Set the bomFormat field."
+      },
+      "g7-meta-format-version": {
+        "what": "The SBOM format spec version (e.g. 1.7).",
+        "fix": "Set the specVersion field."
+      },
+      "g7-meta-signature": {
+        "what": "A cryptographic signature from the SBOM author.",
+        "fix": "Sign the SBOM and add the signature block."
+      },
+      "g7-meta-tool-name": {
+        "what": "The tool that generated the SBOM.",
+        "fix": "Record the generating tool under metadata.tools."
+      },
+      "g7-meta-tool-version": {
+        "what": "The version of the generating tool.",
+        "fix": "Record the tool version under metadata.tools."
+      },
+      "g7-meta-gen-context": {
+        "what": "The context the SBOM was generated in (build or analysis).",
+        "fix": "Add a bomlens:generationContext property."
+      },
+      "g7-meta-timestamp": {
+        "what": "When the SBOM was created.",
+        "fix": "Set metadata.timestamp."
+      },
+      "g7-meta-dependency": {
+        "what": "Dependency relationships between components.",
+        "fix": "Populate the dependencies graph."
+      },
+      "g7-slp-name": {
+        "what": "The name of the overall system.",
+        "fix": "Set metadata.component.name on the (non-model) root component."
+      },
+      "g7-slp-components": {
+        "what": "The components that make up the system.",
+        "fix": "List the system's components in the SBOM."
+      },
+      "g7-slp-producer": {
+        "what": "Who produced the system.",
+        "fix": "Set metadata.component.publisher or metadata.supplier."
+      },
+      "g7-slp-version": {
+        "what": "The system version.",
+        "fix": "Set metadata.component.version."
+      },
+      "g7-slp-timestamp": {
+        "what": "When the system was built.",
+        "fix": "Set metadata.timestamp."
+      },
+      "g7-slp-data-flow": {
+        "what": "How data flows through the system.",
+        "fix": "Document the system data flow — no automated source, human review needed."
+      },
+      "g7-slp-data-usage": {
+        "what": "How the system uses data.",
+        "fix": "Document the system's data usage — no automated source, human review needed."
+      },
+      "g7-slp-io": {
+        "what": "The system's input and output properties.",
+        "fix": "Document the system inputs and outputs — no automated source, human review needed."
+      },
+      "g7-slp-app-area": {
+        "what": "The intended application area of the system.",
+        "fix": "Document the intended application area — no automated source, human review needed."
+      },
+      "g7-model-name": {
+        "what": "The model's name.",
+        "fix": "Set name on the machine-learning-model component."
+      },
       "g7-model-id": {
         "what": "Identifies the model with a standard identifier such as PURL/CPE.",
         "fix": "Add a purl or cpe to the model component in the SBOM."
+      },
+      "g7-model-version": {
+        "what": "The model version.",
+        "fix": "Set version on the model component."
+      },
+      "g7-model-timestamp": {
+        "what": "When the model was created.",
+        "fix": "Add a created/timestamp property to the model component."
+      },
+      "g7-model-producer": {
+        "what": "Who produced the model.",
+        "fix": "Set publisher, supplier or manufacturer on the model component."
+      },
+      "g7-model-description": {
+        "what": "A description of the model.",
+        "fix": "Set description on the model component."
+      },
+      "g7-model-hash-value": {
+        "what": "Integrity hashes for the model weight files.",
+        "fix": "Add the model file hashes (e.g. SHA-256) to the component's hashes."
+      },
+      "g7-model-hash-alg": {
+        "what": "The hash algorithm used for the model files.",
+        "fix": "Set alg (e.g. SHA-256) on each entry in the component's hashes."
+      },
+      "g7-model-card": {
+        "what": "Model-card info such as architecture and training parameters.",
+        "fix": "Populate modelCard.modelParameters (architecture, hyperparameters)."
+      },
+      "g7-model-io": {
+        "what": "The model's input and output properties.",
+        "fix": "Set modelCard.modelParameters.inputs and outputs."
+      },
+      "g7-model-training": {
+        "what": "Training properties such as datasets and architecture.",
+        "fix": "Set datasets/modelArchitecture under modelCard.modelParameters."
       },
       "g7-model-license": {
         "what": "The license that applies to the model.",
         "fix": "State a license on the model card, or fill the licenses field on the SBOM component."
       },
-      "g7-model-card": {
-        "what": "Model-card info such as architecture and training parameters.",
-        "fix": "Document architecture and hyperparameters in the HuggingFace model card (README)."
-      },
-      "g7-model-hash": {
-        "what": "Integrity hashes for the model weight files.",
-        "fix": "Add the model file hashes (e.g. SHA-256) to the component's hashes in the SBOM."
-      },
-      "g7-datasets": {
-        "what": "Provenance of the datasets used for training.",
-        "fix": "Reference the training datasets as data components in the SBOM."
-      },
-      "g7-openness": {
+      "g7-model-openness": {
         "what": "How open the weights, architecture, data and training are.",
-        "fix": "Declare the model's openness (public weights/data/training code) in the SBOM or model card."
+        "fix": "Declare the model's openness (public weights/data/training code) via openness:* properties."
+      },
+      "g7-model-extref": {
+        "what": "External references for the model (distribution, docs).",
+        "fix": "Add externalReferences to the model component."
+      },
+      "g7-ds-name": {
+        "what": "The name of each training dataset.",
+        "fix": "Add data components (or model-card datasets) with a name."
+      },
+      "g7-ds-description": {
+        "what": "A description of the dataset.",
+        "fix": "Set description on the data component."
+      },
+      "g7-ds-content": {
+        "what": "The dataset's content.",
+        "fix": "Document the dataset content — no automated source, human review needed."
+      },
+      "g7-ds-identifier": {
+        "what": "A stable identifier for the dataset.",
+        "fix": "Set bom-ref or purl on the data component."
+      },
+      "g7-ds-hash": {
+        "what": "Integrity hashes for the dataset.",
+        "fix": "Add dataset file hashes — no automated source, human review needed."
+      },
+      "g7-ds-provenance": {
+        "what": "Where the dataset came from.",
+        "fix": "Set componentData.governance or a provenance/source property."
+      },
+      "g7-ds-statistics": {
+        "what": "Statistical properties of the dataset.",
+        "fix": "Document dataset statistics — no automated source, human review needed."
+      },
+      "g7-ds-sensitivity": {
+        "what": "Sensitive content in the dataset (PII or copyright).",
+        "fix": "Document dataset sensitivity — no automated source, human review needed."
+      },
+      "g7-ds-dependency": {
+        "what": "Dependency relationships for the dataset.",
+        "fix": "Document dataset dependencies — no automated source, human review needed."
+      },
+      "g7-ds-license": {
+        "what": "The license of the dataset.",
+        "fix": "Add licenses to the data component."
+      },
+      "g7-infra-software": {
+        "what": "The software dependencies of the infrastructure.",
+        "fix": "Include the library/application/framework components in the SBOM."
+      },
+      "g7-infra-hardware": {
+        "what": "The hardware the system runs on (HBOM link).",
+        "fix": "Add device/hardware components or a hardware BOM reference."
+      },
+      "g7-sec-controls": {
+        "what": "The security controls applied to the system.",
+        "fix": "Document the security controls — no automated source, human review needed."
+      },
+      "g7-sec-compliance": {
+        "what": "The security compliance the system meets.",
+        "fix": "Document security compliance — no automated source, human review needed."
+      },
+      "g7-sec-policy": {
+        "what": "The cybersecurity policy information.",
+        "fix": "Document the cybersecurity policy — no automated source, human review needed."
+      },
+      "g7-sec-vulns": {
+        "what": "Known vulnerabilities referenced for the system.",
+        "fix": "Add a vulnerabilities section (VEX or advisories) to the SBOM."
+      },
+      "g7-kpi-security": {
+        "what": "Security metrics for the system.",
+        "fix": "Document security metrics — no automated source, human review needed."
+      },
+      "g7-kpi-operational": {
+        "what": "Operational performance KPIs of the model.",
+        "fix": "Set modelCard.quantitativeAnalysis.performanceMetrics."
       }
     }
   },

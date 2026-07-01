@@ -1,0 +1,99 @@
+{
+  "spec": "G7 Software Bill of Materials for AI — Minimum Elements (BSI/ACN et al., 2026-05)",
+  "note": "Declarative map of the 50 G7 minimum elements (7 clusters) to CycloneDX 1.7 ML-BOM presence checks. Read by validate-sbom.sh's registry evaluator. Each element carries a self-contained jq boolean expression (cdxPath) evaluated against the whole SBOM root; when cdxPath is null the element has no automated source and is surfaced as 'requires human review'. 'source' records where a satisfied value comes from: auto (read directly), inferred (derived from signals), declared (present only if a human/manifest supplied it), na (no automated source). 'role' is informational — the party the G7 text names as the provider — NOT a required/optional gate (the G7 document defines no per-role required matrix). Openness (open weight/architecture/data/training) is not a separate G7 element; the spec lists it as an example facet of 'Model license', so g7-model-openness is grouped under models and tied to the license element.",
+  "clusters": [
+    {
+      "id": "metadata",
+      "title": "Metadata",
+      "elements": [
+        { "id": "g7-meta-author",        "label": "SBOM author",                "role": "sbom-author", "source": "auto",     "cdxPath": "((.metadata.authors // []) | length > 0) or ((.metadata.supplier // null) != null) or ((.metadata.manufacturer // null) != null)" },
+        { "id": "g7-meta-version",        "label": "SBOM version",               "role": "sbom-author", "source": "auto",     "cdxPath": "(.version // null) != null" },
+        { "id": "g7-meta-format-name",    "label": "SBOM data format name",      "role": "sbom-author", "source": "auto",     "cdxPath": "(.bomFormat // \"\") != \"\"" },
+        { "id": "g7-meta-format-version", "label": "SBOM data format version",   "role": "sbom-author", "source": "auto",     "cdxPath": "(.specVersion // \"\") != \"\"" },
+        { "id": "g7-meta-signature",      "label": "SBOM author signature",      "role": "sbom-author", "source": "declared", "cdxPath": "(.signature // null) != null" },
+        { "id": "g7-meta-tool-name",      "label": "SBOM tool name",             "role": "sbom-author", "source": "auto",     "cdxPath": "[ (.metadata.tools.components // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.name // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-meta-tool-version",   "label": "SBOM tool version",          "role": "sbom-author", "source": "auto",     "cdxPath": "[ (.metadata.tools.components // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.version // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-meta-gen-context",    "label": "SBOM generation context",    "role": "sbom-author", "source": "inferred", "cdxPath": "[ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0" },
+        { "id": "g7-meta-timestamp",      "label": "SBOM timestamp",             "role": "sbom-author", "source": "auto",     "cdxPath": "(.metadata.timestamp // \"\") != \"\"" },
+        { "id": "g7-meta-dependency",     "label": "SBOM dependency relationship","role": "sbom-author","source": "auto",     "cdxPath": "((.dependencies // []) | length) > 0" }
+      ]
+    },
+    {
+      "id": "slp",
+      "title": "System Level Properties",
+      "elements": [
+        { "id": "g7-slp-name",       "label": "System name",              "role": "system-producer", "source": "declared", "cdxPath": "((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))" },
+        { "id": "g7-slp-components", "label": "System components",        "role": "system-producer", "source": "inferred", "cdxPath": "((.components // []) | length) > 1" },
+        { "id": "g7-slp-producer",   "label": "System producer",         "role": "system-producer", "source": "declared", "cdxPath": "((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)" },
+        { "id": "g7-slp-version",    "label": "System version",          "role": "system-producer", "source": "inferred", "cdxPath": "((.metadata.component.version // \"\") != \"\")" },
+        { "id": "g7-slp-timestamp",  "label": "System timestamp",        "role": "system-producer", "source": "inferred", "cdxPath": "(.metadata.timestamp // \"\") != \"\"" },
+        { "id": "g7-slp-data-flow",  "label": "System data flow",        "role": "system-producer", "source": "na",       "cdxPath": null },
+        { "id": "g7-slp-data-usage", "label": "System data usage",       "role": "system-producer", "source": "na",       "cdxPath": null },
+        { "id": "g7-slp-io",         "label": "System input/output properties", "role": "system-producer", "source": "na", "cdxPath": null },
+        { "id": "g7-slp-app-area",   "label": "Intended application area","role": "system-producer", "source": "na",       "cdxPath": null }
+      ]
+    },
+    {
+      "id": "models",
+      "title": "Models",
+      "elements": [
+        { "id": "g7-model-name",       "label": "Model name",              "role": "model-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select((.name // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-model-id",         "label": "Model identifier",        "role": "sbom-author",    "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.purl // \"\") != \"\") or ((.cpe // \"\") != \"\")) ] | length > 0", "evidencePath": "[ .components[]? | select(.type==\"machine-learning-model\") | (.purl // .cpe) | select(. != null and . != \"\") ] | unique" },
+        { "id": "g7-model-version",    "label": "Model version",           "role": "model-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select((.version // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-model-timestamp",  "label": "Model timestamp",         "role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | (.properties // [])[]? | select((.name // \"\") | test(\"timestamp|created\";\"i\")) ] | length > 0" },
+        { "id": "g7-model-producer",   "label": "Model producer",          "role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.publisher // \"\") != \"\") or ((.supplier // null) != null) or ((.manufacturer // null) != null)) ] | length > 0" },
+        { "id": "g7-model-description","label": "Model description",        "role": "model-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select((.description // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-model-hash-value", "label": "Model hash value",        "role": "sbom-author",    "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.hashes // []) | length) > 0) ] | length > 0" },
+        { "id": "g7-model-hash-alg",   "label": "Model hash algorithm",    "role": "sbom-author",    "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | .hashes[]? | select((.alg // \"\") != \"\") ] | length > 0", "evidencePath": "[ .components[]? | select(.type==\"machine-learning-model\") | .hashes[]? | .alg | select(. != null and . != \"\") ] | unique" },
+        { "id": "g7-model-card",       "label": "Model properties (model card)", "role": "model-producer", "source": "auto", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select((.modelCard.modelParameters // null) != null) ] | length > 0" },
+        { "id": "g7-model-io",         "label": "Model input-output properties", "role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.modelCard.modelParameters.inputs // null) != null) or ((.modelCard.modelParameters.outputs // null) != null)) ] | length > 0" },
+        { "id": "g7-model-training",   "label": "Model training properties","role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | (.modelCard.modelParameters // {}) | select(has(\"datasets\") or has(\"modelArchitecture\") or has(\"architectureFamily\")) ] | length > 0" },
+        { "id": "g7-model-license",    "label": "Model license",           "role": "model-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.licenses // []) | length) > 0) ] | length > 0", "evidencePath": "[ .components[]? | select(.type==\"machine-learning-model\") | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique" },
+        { "id": "g7-model-openness",   "label": "Model license — openness (weight/architecture/data/training)", "role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) ] | length > 0", "evidencePath": "[ .components[]? | select(.type==\"machine-learning-model\") | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) | \"\\(.name)=\\(.value)\" ] | unique" },
+        { "id": "g7-model-extref",     "label": "Model external references","role": "model-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.externalReferences // []) | length) > 0) ] | length > 0" }
+      ]
+    },
+    {
+      "id": "dp",
+      "title": "Datasets Properties",
+      "elements": [
+        { "id": "g7-ds-name",        "label": "Dataset name",                  "role": "dataset-creator", "source": "auto",     "cdxPath": "(([ .components[]? | select(.type==\"data\") ]) + ([ .. | objects | select(has(\"datasets\")) | .datasets[]? ])) | map(if type==\"string\" then . elif type==\"object\" then (.name // .componentData.name // \"\") else \"\" end) | map(select(. != \"\")) | length > 0" },
+        { "id": "g7-ds-description", "label": "Dataset description",           "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select((.description // \"\") != \"\") ] | length > 0" },
+        { "id": "g7-ds-content",     "label": "Dataset content",               "role": "dataset-creator", "source": "na",       "cdxPath": null },
+        { "id": "g7-ds-identifier",  "label": "Dataset identifier",            "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.[\"bom-ref\"] // \"\") != \"\") or ((.purl // \"\") != \"\")) ] | length > 0" },
+        { "id": "g7-ds-hash",        "label": "Dataset hash",                  "role": "dataset-creator", "source": "na",       "cdxPath": null },
+        { "id": "g7-ds-provenance",  "label": "Dataset provenance",            "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.componentData.governance // null) != null) or ((.properties // []) | map(.name // \"\") | any(test(\"provenance|source\";\"i\")))) ] | length > 0" },
+        { "id": "g7-ds-statistics",  "label": "Dataset statistical properties","role": "dataset-creator", "source": "na",       "cdxPath": null },
+        { "id": "g7-ds-sensitivity", "label": "Dataset sensitivity (PII/copyright)", "role": "dataset-creator", "source": "na", "cdxPath": null },
+        { "id": "g7-ds-dependency",  "label": "Dataset dependency relationship","role": "dataset-creator", "source": "na",       "cdxPath": null },
+        { "id": "g7-ds-license",     "label": "Dataset license",               "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.licenses // []) | length) > 0) ] | length > 0" }
+      ]
+    },
+    {
+      "id": "infrastructure",
+      "title": "Infrastructure",
+      "elements": [
+        { "id": "g7-infra-software", "label": "Infrastructure software (dependencies)", "role": "system-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"library\" or .type==\"application\" or .type==\"framework\") ] | length > 0" },
+        { "id": "g7-infra-hardware", "label": "Infrastructure hardware (HBOM link)",    "role": "system-producer", "source": "declared", "cdxPath": "(([ .components[]? | select(.type==\"device\" or .type==\"hardware\") ] | length) > 0) or (([ .externalReferences[]? | select((.type // \"\") | test(\"bom|hardware\";\"i\")) ] | length) > 0)" }
+      ]
+    },
+    {
+      "id": "sp",
+      "title": "Security Properties",
+      "elements": [
+        { "id": "g7-sec-controls",   "label": "Security controls",              "role": "producer",    "source": "na",   "cdxPath": null },
+        { "id": "g7-sec-compliance", "label": "Security compliance",            "role": "producer",    "source": "na",   "cdxPath": null },
+        { "id": "g7-sec-policy",     "label": "Cybersecurity policy information","role": "producer",    "source": "na",   "cdxPath": null },
+        { "id": "g7-sec-vulns",      "label": "Vulnerability referencing",      "role": "sbom-author", "source": "auto", "cdxPath": "((.vulnerabilities // []) | length) > 0" }
+      ]
+    },
+    {
+      "id": "kpi",
+      "title": "Key Performance Indicators",
+      "elements": [
+        { "id": "g7-kpi-security",    "label": "Security metrics",            "role": "producer",       "source": "na",       "cdxPath": null },
+        { "id": "g7-kpi-operational", "label": "Operational performance KPIs","role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.modelCard.quantitativeAnalysis.performanceMetrics // .modelCard.modelParameters.performanceMetrics // null) != null)) ] | length > 0" }
+      ]
+    }
+  ]
+}

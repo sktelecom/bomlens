@@ -372,17 +372,24 @@ checks = c.get("checks") or []
 assert len(checks) > 0, "checks not exposed"
 g7 = [x for x in checks if x["id"].startswith("g7-")]
 base = [x for x in checks if not x["id"].startswith("g7-")]
-assert len(g7) == 6, ("expected 6 G7 checks", len(g7))
+# Registry-driven: the full G7 checklist (7 clusters), not just the 6 model checks.
+assert len(g7) >= 40, ("expected the full G7 checklist", len(g7))
 assert len(base) >= 1, "no base checks"
 assert all(x["required"] is False for x in g7), "G7 checks must be advisory"
-assert all(set(x) >= {"id", "label", "required", "status", "detail", "evidence"} for x in checks)
+# The cluster + source fields must survive server normalization (else the UI can't
+# group by cluster or badge the data source).
+assert all(set(x) >= {"id", "label", "required", "status", "detail", "evidence",
+                      "cluster", "source"} for x in checks)
+assert len({x["cluster"] for x in g7}) >= 7, "G7 checks should span the 7 clusters"
+assert {x["source"] for x in g7} >= {"auto", "na"}, "G7 source tags not passed through"
 # Passing G7 elements carry their satisfying SBOM values as evidence.
 lic = next(x for x in g7 if x["id"] == "g7-model-license")
 assert lic["status"] == "pass" and any("Apache-2.0" in e for e in lic["evidence"]), (
     "g7-model-license evidence missing", lic)
+assert lic["cluster"] == "models", ("g7-model-license cluster", lic)
 PY
     then
-        pass "conformance_summary exposes checks with the 6 G7 elements"
+        pass "conformance_summary exposes the full G7 checklist with cluster/source"
     else
         fail "conformance checks exposure / G7 split is wrong"
     fi

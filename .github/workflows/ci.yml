@@ -15,6 +15,10 @@ on:
         description: "Also build the deep-license (scancode) image; its build gate runs a real license scan"
         type: boolean
         default: false
+      reseed_visual:
+        description: "Regenerate ALL UI visual baselines in the pinned container and upload them as an artifact (commit the ones that changed)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -88,13 +92,13 @@ jobs:
           shellcheck docker/entrypoint.sh || true
           echo ""
           echo "Checking docker/lib/scan-firmware.sh..."
-          shellcheck docker/lib/scan-firmware.sh docker/lib/scan-aibom.sh || true
+          shellcheck docker/lib/scan-firmware.sh docker/lib/scan-aibom.sh docker/lib/enrich-aibom.sh || true
           echo ""
           echo "Checking docker/lib analyze scripts..."
           shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
           echo ""
           echo "Checking docker/lib post-process scripts..."
-          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/identify-vendored.sh docker/lib/suggest-vendored.sh docker/lib/reconcile-vendored.sh || true
+          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/identify-vendored.sh docker/lib/suggest-vendored.sh docker/lib/reconcile-vendored.sh docker/lib/merge-sbom.sh || true
           echo ""
           echo "Checking tests/test-scan.sh..."
           shellcheck tests/test-scan.sh || true
@@ -485,7 +489,11 @@ jobs:
   # Visual regression runs in the pinned Playwright container so screenshots are
   # pixel-deterministic and match the committed baselines. First run on a branch
   # without baselines seeds them and uploads an artifact (non-failing); commit
-  # those PNGs to turn this into a strict drift gate.
+  # those PNGs to turn this into a strict drift gate. When a UI change invalidates
+  # only SOME baselines (e.g. a redesigned panel), a partial delete would make the
+  # strict run fail on the missing ones — so re-run this workflow with
+  # reseed_visual=true to regenerate ALL baselines in the same pinned container and
+  # upload them, then commit the ones that actually changed.
   visual:
     name: UI Visual Regression
     runs-on: ubuntu-latest
@@ -502,7 +510,11 @@ jobs:
       - name: Visual regression
         id: visual
         run: |
-          if ls tests/ui/*-snapshots/*.png >/dev/null 2>&1; then
+          if [ "${{ github.event.inputs.reseed_visual }}" = "true" ]; then
+            echo "::notice::reseed_visual=true — regenerating ALL baselines. Download the artifact and commit the PNGs that changed."
+            npm run test:visual -- --update-snapshots
+            echo "seeded=true" >> "$GITHUB_OUTPUT"
+          elif ls tests/ui/*-snapshots/*.png >/dev/null 2>&1; then
             echo "Baselines found — running strict visual diff."
             npm run test:visual
           else

@@ -252,6 +252,12 @@ EOF
         if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode."; exit 1; fi
         echo "[1/2] aibom: generate AI SBOM for $MODEL_ID"
         bash "$LIBDIR/scan-aibom.sh" "$MODEL_ID" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        # Enrich the generated ML-BOM before normalize/validate: LFS SHA-256
+        # hashes and openness signals from the HuggingFace API, plus model
+        # pedigree/performance metrics harvested from cdxgen -t ai when present.
+        # Best-effort — a missing network or tool just leaves those fields unfilled,
+        # and the G7 conformance step then reports them honestly as not present.
+        bash "$LIBDIR/enrich-aibom.sh" "$OUTPUT_FILE" "$MODEL_ID" || true
         ;;
 
     MERGE)

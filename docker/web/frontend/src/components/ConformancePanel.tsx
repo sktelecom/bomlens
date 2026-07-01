@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ConformanceCheck, ConformanceSummary } from "@/lib/api";
-import { baseTally, g7Tally, splitChecks } from "@/lib/conformance";
+import { baseTally, g7Tally, groupG7ByCluster, splitChecks } from "@/lib/conformance";
 import { G7_GUIDANCE } from "@/lib/g7Guidance";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,27 @@ const STATUS = {
 
 function statusOf(s: ConformanceCheck["status"]) {
   return STATUS[s] ?? STATUS.warn;
+}
+
+// Provenance badge: where a satisfied value comes from. Reuses existing badge
+// tones (no invented colours); the word carries the meaning, colour only backs
+// it. "na" (no automated source) takes the review-needed tone.
+function SourceBadge({ source }: { source?: string }) {
+  const { t } = useTranslation();
+  if (!source) return null;
+  const label = t(`g7.source.${source}`, { defaultValue: "" });
+  if (!label) return null;
+  switch (source) {
+    case "auto":
+      return <Badge tone="low">{label}</Badge>;
+    case "inferred":
+      return <Badge tone="info">{label}</Badge>;
+    case "na":
+      return <Badge tone="medium">{label}</Badge>;
+    case "declared":
+    default:
+      return <Badge variant="muted">{label}</Badge>;
+  }
 }
 
 function CheckRow({ check }: { check: ConformanceCheck }) {
@@ -43,6 +64,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           {check.required ? (
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
+          {isG7 ? <SourceBadge source={check.source} /> : null}
           <span className="sr-only">{t(key)}</span>
         </div>
         {check.detail ? (
@@ -107,6 +129,7 @@ export function ConformancePanel({ conformance }: { conformance: ConformanceSumm
 
   const { base, g7 } = splitChecks(checks);
   const g7t = g7Tally(g7);
+  const g7groups = groupG7ByCluster(g7);
   const baseT = baseTally(base);
   const pass = conformance.result === "pass";
 
@@ -123,24 +146,38 @@ export function ConformancePanel({ conformance }: { conformance: ConformanceSumm
 
       {g7.length > 0 && (
         <Card>
-          <CardContent className="space-y-3 p-4">
+          <CardContent className="space-y-4 p-4">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
               <div className="text-2xl font-semibold tabular-nums text-foreground">
-                {t("g7.present", { present: g7t.present, total: g7t.total })}
+                {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
               </div>
               {g7t.advisory > 0 && (
                 <span className="text-xs text-muted-foreground">
                   · {t("g7.advisory", { count: g7t.advisory })}
                 </span>
               )}
+              {g7t.review > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  · {t("g7.review", { count: g7t.review })}
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
-            <ul className="divide-y rounded-md border">
-              {g7.map((c) => (
-                <CheckRow key={c.id} check={c} />
+            <div className="space-y-4">
+              {g7groups.map((group) => (
+                <div key={group.cluster} className="space-y-2">
+                  <div className="text-xs font-semibold text-foreground">
+                    {t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                  </div>
+                  <ul className="divide-y rounded-md border">
+                    {group.checks.map((c) => (
+                      <CheckRow key={c.id} check={c} />
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </CardContent>
         </Card>
       )}

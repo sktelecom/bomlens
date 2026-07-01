@@ -341,6 +341,7 @@
     "subtitle": "AI G7 최소 요소",
     "present": "{{present}}/{{total}} 충족",
     "advisory": "권고 {{count}}건",
+    "review": "검토 필요 {{count}}건",
     "allAdvisory": "G7 요소는 모두 권고이며 비구속 지침입니다.",
     "formatTitle": "형식 적합성",
     "basePassed": "{{passed}}/{{total}} 통과",
@@ -352,30 +353,225 @@
     "evidence": "충족 근거:",
     "example": "예시:",
     "learnMore": "더 알아보기",
+    "cluster": {
+      "metadata": "메타데이터",
+      "slp": "시스템 속성",
+      "models": "모델",
+      "dp": "데이터셋 속성",
+      "infrastructure": "인프라",
+      "sp": "보안 속성",
+      "kpi": "핵심 성과 지표"
+    },
+    "source": {
+      "auto": "자동 확인",
+      "inferred": "신호 추정",
+      "declared": "선언 필요",
+      "na": "검토 필요"
+    },
     "help": {
+      "g7-meta-author": {
+        "what": "SBOM을 만든 주체(작성자, 공급사 또는 제조사)입니다.",
+        "fix": "metadata.authors, metadata.supplier 또는 metadata.manufacturer를 설정하세요."
+      },
+      "g7-meta-version": {
+        "what": "이 SBOM 문서의 버전입니다.",
+        "fix": "최상위 version 필드를 설정하세요."
+      },
+      "g7-meta-format-name": {
+        "what": "SBOM 데이터 형식 이름입니다(예: CycloneDX).",
+        "fix": "bomFormat 필드를 설정하세요."
+      },
+      "g7-meta-format-version": {
+        "what": "SBOM 형식 규격 버전입니다(예: 1.7).",
+        "fix": "specVersion 필드를 설정하세요."
+      },
+      "g7-meta-signature": {
+        "what": "SBOM 작성자의 전자 서명입니다.",
+        "fix": "SBOM에 서명하고 signature 블록을 추가하세요."
+      },
+      "g7-meta-tool-name": {
+        "what": "SBOM을 생성한 도구입니다.",
+        "fix": "metadata.tools에 생성 도구를 기록하세요."
+      },
+      "g7-meta-tool-version": {
+        "what": "생성 도구의 버전입니다.",
+        "fix": "metadata.tools에 도구 버전을 기록하세요."
+      },
+      "g7-meta-gen-context": {
+        "what": "SBOM이 생성된 맥락입니다(빌드 또는 분석).",
+        "fix": "bomlens:generationContext 속성을 추가하세요."
+      },
+      "g7-meta-timestamp": {
+        "what": "SBOM이 생성된 시점입니다.",
+        "fix": "metadata.timestamp를 설정하세요."
+      },
+      "g7-meta-dependency": {
+        "what": "컴포넌트 사이의 의존 관계입니다.",
+        "fix": "dependencies 그래프를 채우세요."
+      },
+      "g7-slp-name": {
+        "what": "전체 시스템의 이름입니다.",
+        "fix": "모델이 아닌 루트 컴포넌트의 metadata.component.name을 설정하세요."
+      },
+      "g7-slp-components": {
+        "what": "시스템을 구성하는 컴포넌트입니다.",
+        "fix": "시스템 구성 컴포넌트를 SBOM에 나열하세요."
+      },
+      "g7-slp-producer": {
+        "what": "시스템을 만든 주체입니다.",
+        "fix": "metadata.component.publisher 또는 metadata.supplier를 설정하세요."
+      },
+      "g7-slp-version": {
+        "what": "시스템 버전입니다.",
+        "fix": "metadata.component.version을 설정하세요."
+      },
+      "g7-slp-timestamp": {
+        "what": "시스템이 빌드된 시점입니다.",
+        "fix": "metadata.timestamp를 설정하세요."
+      },
+      "g7-slp-data-flow": {
+        "what": "시스템 내 데이터 흐름입니다.",
+        "fix": "시스템 데이터 흐름을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-slp-data-usage": {
+        "what": "시스템의 데이터 사용 방식입니다.",
+        "fix": "시스템의 데이터 사용을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-slp-io": {
+        "what": "시스템의 입력·출력 특성입니다.",
+        "fix": "시스템 입출력을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-slp-app-area": {
+        "what": "시스템이 의도한 적용 분야입니다.",
+        "fix": "의도한 적용 분야를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-model-name": {
+        "what": "모델의 이름입니다.",
+        "fix": "machine-learning-model 컴포넌트의 name을 설정하세요."
+      },
       "g7-model-id": {
         "what": "모델을 PURL/CPE 같은 표준 식별자로 식별합니다.",
         "fix": "SBOM의 모델 컴포넌트에 purl 또는 cpe를 추가하세요."
+      },
+      "g7-model-version": {
+        "what": "모델 버전입니다.",
+        "fix": "모델 컴포넌트의 version을 설정하세요."
+      },
+      "g7-model-timestamp": {
+        "what": "모델이 생성된 시점입니다.",
+        "fix": "모델 컴포넌트에 created/timestamp 속성을 추가하세요."
+      },
+      "g7-model-producer": {
+        "what": "모델을 만든 주체입니다.",
+        "fix": "모델 컴포넌트에 publisher, supplier 또는 manufacturer를 설정하세요."
+      },
+      "g7-model-description": {
+        "what": "모델에 대한 설명입니다.",
+        "fix": "모델 컴포넌트의 description을 설정하세요."
+      },
+      "g7-model-hash-value": {
+        "what": "모델 가중치 파일의 무결성 해시입니다.",
+        "fix": "모델 파일 해시(SHA-256 등)를 컴포넌트의 hashes에 추가하세요."
+      },
+      "g7-model-hash-alg": {
+        "what": "모델 파일에 사용한 해시 알고리즘입니다.",
+        "fix": "컴포넌트 hashes의 각 항목에 alg(예: SHA-256)를 설정하세요."
+      },
+      "g7-model-card": {
+        "what": "아키텍처와 학습 파라미터 등 모델 카드 정보입니다.",
+        "fix": "modelCard.modelParameters(아키텍처, 하이퍼파라미터)를 채우세요."
+      },
+      "g7-model-io": {
+        "what": "모델의 입력·출력 특성입니다.",
+        "fix": "modelCard.modelParameters의 inputs와 outputs를 설정하세요."
+      },
+      "g7-model-training": {
+        "what": "데이터셋과 아키텍처 등 학습 관련 특성입니다.",
+        "fix": "modelCard.modelParameters의 datasets/modelArchitecture를 설정하세요."
       },
       "g7-model-license": {
         "what": "모델에 적용되는 라이선스 정보입니다.",
         "fix": "모델 카드에 라이선스를 명시하거나 SBOM 컴포넌트의 licenses 필드를 채우세요."
       },
-      "g7-model-card": {
-        "what": "아키텍처와 학습 파라미터 등 모델 카드 정보입니다.",
-        "fix": "HuggingFace 모델 카드(README)에 아키텍처와 하이퍼파라미터를 기재하세요."
-      },
-      "g7-model-hash": {
-        "what": "모델 가중치 파일의 무결성을 확인하는 해시입니다.",
-        "fix": "모델 파일의 해시(SHA-256 등)를 SBOM 컴포넌트의 hashes에 추가하세요."
-      },
-      "g7-datasets": {
-        "what": "학습에 사용된 데이터셋의 출처입니다.",
-        "fix": "학습 데이터셋을 SBOM에 data 컴포넌트로 참조하세요."
-      },
-      "g7-openness": {
+      "g7-model-openness": {
         "what": "가중치와 아키텍처, 데이터, 학습 과정의 공개 수준입니다.",
-        "fix": "모델의 개방성(공개 가중치·데이터·학습 코드 여부)을 SBOM이나 모델 카드에 선언하세요."
+        "fix": "모델의 개방성(공개 가중치·데이터·학습 코드)을 openness:* 속성으로 선언하세요."
+      },
+      "g7-model-extref": {
+        "what": "모델의 외부 참조(배포처, 문서)입니다.",
+        "fix": "모델 컴포넌트에 externalReferences를 추가하세요."
+      },
+      "g7-ds-name": {
+        "what": "각 학습 데이터셋의 이름입니다.",
+        "fix": "이름이 있는 data 컴포넌트(또는 모델 카드 datasets)를 추가하세요."
+      },
+      "g7-ds-description": {
+        "what": "데이터셋에 대한 설명입니다.",
+        "fix": "data 컴포넌트의 description을 설정하세요."
+      },
+      "g7-ds-content": {
+        "what": "데이터셋의 내용입니다.",
+        "fix": "데이터셋 내용을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-ds-identifier": {
+        "what": "데이터셋의 고정 식별자입니다.",
+        "fix": "data 컴포넌트의 bom-ref 또는 purl을 설정하세요."
+      },
+      "g7-ds-hash": {
+        "what": "데이터셋의 무결성 해시입니다.",
+        "fix": "데이터셋 파일 해시를 추가하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-ds-provenance": {
+        "what": "데이터셋의 출처입니다.",
+        "fix": "componentData.governance 또는 provenance/source 속성을 설정하세요."
+      },
+      "g7-ds-statistics": {
+        "what": "데이터셋의 통계적 특성입니다.",
+        "fix": "데이터셋 통계를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-ds-sensitivity": {
+        "what": "데이터셋의 민감 정보(개인정보 또는 저작권)입니다.",
+        "fix": "데이터셋 민감도를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-ds-dependency": {
+        "what": "데이터셋의 의존 관계입니다.",
+        "fix": "데이터셋 의존 관계를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-ds-license": {
+        "what": "데이터셋의 라이선스입니다.",
+        "fix": "data 컴포넌트에 licenses를 추가하세요."
+      },
+      "g7-infra-software": {
+        "what": "인프라의 소프트웨어 의존성입니다.",
+        "fix": "library/application/framework 컴포넌트를 SBOM에 포함하세요."
+      },
+      "g7-infra-hardware": {
+        "what": "시스템이 동작하는 하드웨어입니다(HBOM 연결).",
+        "fix": "device/hardware 컴포넌트나 하드웨어 BOM 참조를 추가하세요."
+      },
+      "g7-sec-controls": {
+        "what": "시스템에 적용한 보안 통제입니다.",
+        "fix": "보안 통제를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-sec-compliance": {
+        "what": "시스템이 충족하는 보안 규정 준수입니다.",
+        "fix": "보안 규정 준수를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-sec-policy": {
+        "what": "사이버 보안 정책 정보입니다.",
+        "fix": "사이버 보안 정책을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-sec-vulns": {
+        "what": "시스템에 대해 참조된 알려진 취약점입니다.",
+        "fix": "SBOM에 vulnerabilities 섹션(VEX 또는 권고)을 추가하세요."
+      },
+      "g7-kpi-security": {
+        "what": "시스템의 보안 지표입니다.",
+        "fix": "보안 지표를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+      },
+      "g7-kpi-operational": {
+        "what": "모델의 운영 성능 지표입니다.",
+        "fix": "modelCard.quantitativeAnalysis.performanceMetrics를 설정하세요."
       }
     }
   },
