@@ -61,6 +61,8 @@ jobs:
             -e ENRICH_CDXGEN=false \
             -e UPLOAD_ENABLED=false \
             -e GENERATE_REPORT=true \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
             bomlens-aibom:e2e
           echo "=== artifacts ==="
           ls -la out
