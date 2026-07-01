@@ -7,8 +7,6 @@
 name: AIBOM E2E (real HuggingFace model)
 
 on:
-  push:
-    branches: [ ci/aibom-e2e ]   # TEMP: pre-merge verification; removed before merge
   workflow_dispatch:
     inputs:
       model:
