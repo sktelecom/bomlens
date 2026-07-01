@@ -133,9 +133,42 @@ RUN case "$(uname -m)" in \
     && rm /tmp/docker.tgz \
     && docker --version
 
-# scancode-toolkit (opt-in deep license: --build-arg SBOM_DEEP_LICENSE=true)
+# scancode-toolkit (opt-in deep license: --build-arg SBOM_DEEP_LICENSE=true).
+# scancode has three native dependencies that a plain `pip install` does NOT satisfy
+# on the slim base, so all three are handled here:
+#   1. PyICU (transitive) is a C extension compiled against ICU headers, so the build
+#      needs build-essential + libicu-dev + pkg-config + python3-dev. Those dev
+#      packages are purged afterward; the runtime libicu is re-marked manual so
+#      autoremove keeps it for the compiled PyICU to load.
+#   2. extractcode loads libarchive via ctypes at import time. Its loader calls
+#      find_library("libarchive"), which ALWAYS returns None on Linux (ctypes wants
+#      the name WITHOUT the lib prefix), then loads the main program and dies with
+#      "undefined symbol: archive_read_new". We install the system libarchive13 and
+#      point EXTRACTCODE_LIBARCHIVE_PATH straight at it (the loader's first choice),
+#      sidestepping the broken find_library path. The pip extractcode-libarchive
+#      plugin is a no-arch stub here (ships no .so), so it does not help.
+#   3. typecode loads libmagic the same way; TYPECODE_LIBMAGIC_PATH / _DB_PATH pin
+#      the system libmagic1 and its compiled magic database.
+# A real license scan runs as a build gate so any missing native dep fails the build
+# instead of silently shipping a scancode that dies on the first scan.
+ENV EXTRACTCODE_LIBARCHIVE_PATH=/usr/local/lib/libarchive.so \
+    TYPECODE_LIBMAGIC_PATH=/usr/local/lib/libmagic.so \
+    TYPECODE_LIBMAGIC_DB_PATH=/usr/share/misc/magic.mgc
 RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
-      pip3 install --no-cache-dir "scancode-toolkit==${SCANCODE_VERSION}"; \
+      apt-get update && apt-get install -y --no-install-recommends \
+        build-essential libicu-dev pkg-config python3-dev \
+        libarchive13 libmagic1 \
+      && pip3 install --no-cache-dir "scancode-toolkit==${SCANCODE_VERSION}" \
+      && ln -sf "$(find /usr/lib -name 'libarchive.so.13' | head -1)" /usr/local/lib/libarchive.so \
+      && ln -sf "$(find /usr/lib -name 'libmagic.so.1' | head -1)" /usr/local/lib/libmagic.so \
+      && mkdir -p /tmp/sc-probe \
+      && printf 'Permission is hereby granted, free of charge (MIT License).\n' > /tmp/sc-probe/LICENSE \
+      && scancode --license --json-pp /tmp/sc-probe.json /tmp/sc-probe \
+      && rm -rf /tmp/sc-probe /tmp/sc-probe.json \
+      && apt-mark manual $(dpkg-query -W -f='${Package}\n' 'libicu[0-9]*') \
+      && apt-get purge -y build-essential libicu-dev pkg-config python3-dev \
+      && apt-get autoremove -y \
+      && rm -rf /var/lib/apt/lists/*; \
     else \
       echo "[build] scancode-toolkit skipped (SBOM_DEEP_LICENSE=false)"; \
     fi

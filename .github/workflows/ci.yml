@@ -11,6 +11,10 @@ on:
         description: "Also build the firmware image and run the firmware e2e group in full-e2e"
         type: boolean
         default: false
+      deep_license:
+        description: "Also build the deep-license (scancode) image; its build gate runs a real license scan"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -236,6 +240,14 @@ jobs:
       - name: Build firmware image (dispatch + firmware=true only)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.firmware == 'true'
         run: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware:test ./docker
+
+      # Opt-in: the deep-license (scancode) image compiles PyICU and pulls native
+      # libarchive/libmagic, so it is slow and only built on manual dispatch with
+      # deep_license=true. Its Dockerfile build gate runs a real license scan, so a
+      # regression in those native deps fails the build here rather than at runtime.
+      - name: Build deep-license image (dispatch + deep_license=true only)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deep_license == 'true'
+        run: docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner-deep-license:test ./docker
 
       - name: Run comprehensive CLI e2e (test-e2e.sh)
         run: bash tests/test-e2e.sh
