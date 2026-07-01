@@ -68,7 +68,7 @@ ARG UNBLOB_VERSION=26.3.30
 # renovate: datasource=pypi depName=cve-bin-tool
 ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
-ARG UBI_READER_VERSION=0.8.13
+ARG UBI_READER_VERSION=0.8.14
 
 # AI SBOM generation (opt-in image `bomlens-aibom`). owasp-aibom-generator is
 # Apache-2.0 and fetches HuggingFace model-card metadata over the network at scan
