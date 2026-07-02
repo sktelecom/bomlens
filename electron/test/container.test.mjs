@@ -42,10 +42,10 @@ test("defaultOutputDir honours SBOM_OUTPUT_DIR when set", () => {
   }
 });
 
-test("DEFAULT_IMAGE points at the generator image by default", () => {
+test("DEFAULT_IMAGE points at the bomlens image by default", () => {
   // 환경변수 오버라이드가 없을 때의 기본값을 검증.
   if (!process.env.SBOM_SCANNER_IMAGE) {
-    assert.equal(DEFAULT_IMAGE, "ghcr.io/sktelecom/sbom-generator:latest");
+    assert.equal(DEFAULT_IMAGE, "ghcr.io/sktelecom/bomlens:latest");
   }
 });
 

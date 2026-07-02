@@ -1,4 +1,4 @@
-// SBOM Generator UI 컨테이너 수명주기 관리(순수 Node — electron 비의존, 단위 테스트 가능).
+// BomLens UI 컨테이너 수명주기 관리(순수 Node — electron 비의존, 단위 테스트 가능).
 //
 // onot의 lib/sidecar.mjs가 PyInstaller 바이너리를 spawn하는 자리에서, 우리는 Docker로
 // `MODE=UI` 컨테이너를 띄운다. 우리 웹 UI 백엔드(docker/web/server.py)와 React SPA는 이미
@@ -13,7 +13,7 @@ import path from "node:path";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const DEFAULT_IMAGE =
-  process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/sbom-generator:latest";
+  process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/bomlens:latest";
 
 // Opt-in scan images the base UI container launches as SIBLING containers (via
 // the mounted host Docker socket) for firmware and AI-model inputs — the GPL
