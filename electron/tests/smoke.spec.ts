@@ -14,6 +14,27 @@ const SUBTITLE: Record<"en" | "ko", string> = {
   ko: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
 };
 
+// Seeds the docker-missing screen (SBOM_SMOKE_SCREEN) and checks the rebranded
+// title plus the "Check again" retry button, without touching Docker at all.
+test("docker-missing screen renders the BomLens title and check-again button", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: {
+      ...process.env,
+      SBOM_SMOKE: "1",
+      SBOM_SMOKE_SCREEN: "docker-missing",
+      SBOM_LANG: "ko",
+    },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win).toHaveTitle(/BomLens/);
+    await expect(win.locator("#check-again")).toHaveText("다시 확인");
+  } finally {
+    await app.close();
+  }
+});
+
 for (const lang of ["en", "ko"] as const) {
   test(`desktop app boots and renders the start screen (${lang})`, async () => {
     const app = await electron.launch({

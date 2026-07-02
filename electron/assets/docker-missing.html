@@ -52,6 +52,28 @@
         font-size: 13px;
         color: #9a9aa2;
       }
+      #check-again {
+        margin-top: 12px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #ffffff;
+        background: #ea002c;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #check-again:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #feedback {
+        min-height: 1.4em;
+        margin: 10px 0 0;
+        font-size: 13px;
+        color: #f0a5b4;
+        visibility: hidden;
+      }
     </style>
   </head>
   <body>
@@ -61,6 +83,8 @@
       <p id="intro"></p>
       <ul id="options"></ul>
       <p class="hint" id="hint"></p>
+      <button id="check-again" type="button"></button>
+      <p id="feedback" role="status"></p>
     </main>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
@@ -87,6 +111,8 @@
             linux: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Linux에서는 Docker Engine을 설치하면 됩니다:",
           },
           hint: "설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
+          checkAgain: "다시 확인",
+          stillMissing: "아직 Docker를 찾을 수 없어요. 엔진이 켜졌는지 확인해 주세요.",
         },
         en: {
           title: "Docker is required",
@@ -102,6 +128,8 @@
             linux: "BomLens runs the scanner as a Docker container. On Linux, install Docker Engine:",
           },
           hint: "Install it, start the engine, then relaunch this app.",
+          checkAgain: "Check again",
+          stillMissing: "Still can't find Docker. Make sure the engine is running.",
         },
       };
 
@@ -203,6 +231,29 @@
         li.appendChild(document.createTextNode(` — ${opt.desc[lang]}`));
         list.appendChild(li);
       }
+
+      // "다시 확인": main이 Docker를 재점검한다. 성공하면 main이 상태 화면으로 전환하고,
+      // 여전히 없으면(ok:false) 피드백 한 줄을 몇 초 보여준다.
+      const checkAgain = document.getElementById("check-again");
+      const feedback = document.getElementById("feedback");
+      checkAgain.textContent = s.checkAgain;
+      let feedbackTimer = null;
+      checkAgain.addEventListener("click", async () => {
+        checkAgain.disabled = true;
+        const result =
+          window.sbomDesktop && window.sbomDesktop.retryStartup
+            ? await window.sbomDesktop.retryStartup()
+            : { ok: false };
+        if (!result || !result.ok) {
+          checkAgain.disabled = false;
+          feedback.textContent = s.stillMissing;
+          feedback.style.visibility = "visible";
+          clearTimeout(feedbackTimer);
+          feedbackTimer = setTimeout(() => {
+            feedback.style.visibility = "hidden";
+          }, 4000);
+        }
+      });
     </script>
   </body>
 </html>

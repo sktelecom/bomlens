@@ -3,7 +3,7 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, dialog, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -14,7 +14,7 @@ import {
   pullImage,
   UiContainer,
 } from "./lib/container.mjs";
-import { BOOT } from "./lib/boot.mjs";
+import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
@@ -78,6 +78,8 @@ async function createWindow() {
 }
 
 async function startup() {
+  // 중복 진입 가드: 이미 부팅이 진행 중이면 아무것도 하지 않는다(재시도 경합 대비).
+  if (isBusy(bootState)) return;
   setBootState(BOOT.CHECKING);
   status(t.dockerChecking);
   const docker = await dockerStatus();
@@ -165,6 +167,37 @@ if (!app.requestSingleInstanceLock()) {
 
 // 앱 수명주기 등록. 단일 인스턴스 락을 잡은 경우에만 호출된다.
 function registerApp() {
+  // 시작 화면의 "다시 시도" 요청. 3중 가드를 통과해야 실제로 재시도한다.
+  // 1) file:// 시작 화면에서 온 요청만 — loadURL 이후에는 컨테이너 SPA에도 같은
+  //    preload가 주입되므로, 원격 콘텐츠가 이 채널을 부르는 경로를 막는다.
+  // 2) 실패 종착 상태에서만 — 진행 중이거나 정상이면 무시.
+  // 3) 종료 절차가 시작됐으면 무시.
+  ipcMain.handle("startup:retry", async (event) => {
+    if (!event.senderFrame?.url?.startsWith("file://")) return { ok: false };
+    if (!canRetry(bootState)) return { ok: false };
+    if (shutdownPromise) return { ok: false };
+
+    if (bootState === BOOT.FAILED_DOCKER) {
+      // Docker 안내 화면에서의 재확인: 여전히 불가면 화면 전환 없이 사유만 돌려준다.
+      const docker = await dockerStatus();
+      if (!docker.installed || !docker.running) {
+        return { ok: false, reason: !docker.installed ? "not-installed" : "not-running" };
+      }
+      // Docker가 살아났다: 상태 화면으로 돌아가 부팅을 재개한다(응답은 즉시 반환).
+      await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
+        query: { lang },
+      });
+      startup().catch((err) => status(t.startFailed(err.message)));
+      return { ok: true };
+    }
+
+    // failed-pull / failed-start / failed-died: 남은 컨테이너를 방어적으로 정리하고 재시도.
+    await container?.stop();
+    container = null;
+    startup().catch((err) => status(t.startFailed(err.message)));
+    return { ok: true };
+  });
+
   app.whenReady().then(async () => {
     // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
     lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
@@ -186,6 +219,14 @@ function registerApp() {
     // 테스트 시드: 부팅 스모크는 첫 화면 렌더와 i18n만 확인하고 Docker/컨테이너 기동
     // (수 GB 이미지 풀)은 건너뛴다. SBOM_SMOKE=1이면 상태 화면에 머물러 결정론적으로 끝난다.
     if (process.env.SBOM_SMOKE === "1") {
+      // 화면 시드: SBOM_SMOKE_SCREEN=docker-missing이면 Docker 안내 화면을 직접 띄워
+      // 재확인 버튼과 OS별 안내 렌더를 스모크로 검증할 수 있게 한다.
+      if (process.env.SBOM_SMOKE_SCREEN === "docker-missing") {
+        await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
+          query: { reason: "not-installed", lang, platform: process.platform },
+        });
+        return;
+      }
       status(t.ready);
       return;
     }
