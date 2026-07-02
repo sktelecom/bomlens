@@ -939,7 +939,7 @@ SRV2_PID=""
 cleanup2() { [ -n "$SRV2_PID" ] && kill "$SRV2_PID" 2>/dev/null; }
 trap 'cleanup2; cleanup' EXIT
 SBOM_OUTPUT_DIR="$OUT2" UI_PORT="$PORT2" SBOM_UI_HOST_DIR="$WORK" \
-    SBOM_RUN_SCAN="$WORK/bin/run-scan" \
+    SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
     STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
     python3 "$SERVER" > "$WORK/server2.log" 2>&1 &
 SRV2_PID=$!

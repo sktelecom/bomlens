@@ -250,7 +250,11 @@ def aibom_capable():
 
 
 def docker_capable():
-    return os.path.exists("/var/run/docker.sock")
+    # Socket path is env-overridable for the No-Docker contract tests only
+    # (tests/test-web-ui.sh points it at a nonexistent path to exercise the
+    # "socket not mounted" error branch even on hosts that DO have Docker).
+    # Inside the image the mount path is fixed; server-env only.
+    return os.path.exists(os.environ.get("SBOM_DOCKER_SOCK", "/var/run/docker.sock"))
 
 
 def docker_cli_present():
