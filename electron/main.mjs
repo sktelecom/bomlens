@@ -127,54 +127,71 @@ function shutdown() {
   return shutdownPromise;
 }
 
-app.whenReady().then(async () => {
-  // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
-  lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
-  t = mainMessages(lang);
-  app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
-  // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-src 'self'",
-        ],
-      },
+// 단일 인스턴스 강제: 두 번째 실행은 즉시 종료한다. 두 인스턴스가 각자 컨테이너를
+// 띄우면 출력 폴더를 놓고 경합하므로, 락을 못 잡으면 아무 로직도 등록하지 않는다.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  // 사용자가 앱을 또 실행하면 기존 창을 앞으로 가져온다.
+  app.on("second-instance", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  });
+  registerApp();
+}
+
+// 앱 수명주기 등록. 단일 인스턴스 락을 잡은 경우에만 호출된다.
+function registerApp() {
+  app.whenReady().then(async () => {
+    // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
+    lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
+    t = mainMessages(lang);
+    app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
+    // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-src 'self'",
+          ],
+        },
+      });
     });
+
+    await createWindow();
+    // 테스트 시드: 부팅 스모크는 첫 화면 렌더와 i18n만 확인하고 Docker/컨테이너 기동
+    // (수 GB 이미지 풀)은 건너뛴다. SBOM_SMOKE=1이면 상태 화면에 머물러 결정론적으로 끝난다.
+    if (process.env.SBOM_SMOKE === "1") {
+      status(t.ready);
+      return;
+    }
+    // 업데이트 확인은 부팅과 병렬로 시작하되(비차단), 표시는 부팅 종착 이후에 한다.
+    // 개발 실행에서는 꺼져 있고 SBOM_FORCE_UPDATE_CHECK=1로만 켠다(수동 검증용).
+    const updatePromise =
+      app.isPackaged || process.env.SBOM_FORCE_UPDATE_CHECK === "1"
+        ? checkForUpdate({ currentVersion: app.getVersion() }).catch(() => null)
+        : Promise.resolve(null);
+    startup()
+      .catch((err) => {
+        status(t.startFailed(err.message));
+      })
+      .finally(async () => {
+        const info = await updatePromise;
+        if (info) await showUpdateDialog(info);
+      });
   });
 
-  await createWindow();
-  // 테스트 시드: 부팅 스모크는 첫 화면 렌더와 i18n만 확인하고 Docker/컨테이너 기동
-  // (수 GB 이미지 풀)은 건너뛴다. SBOM_SMOKE=1이면 상태 화면에 머물러 결정론적으로 끝난다.
-  if (process.env.SBOM_SMOKE === "1") {
-    status(t.ready);
-    return;
-  }
-  // 업데이트 확인은 부팅과 병렬로 시작하되(비차단), 표시는 부팅 종착 이후에 한다.
-  // 개발 실행에서는 꺼져 있고 SBOM_FORCE_UPDATE_CHECK=1로만 켠다(수동 검증용).
-  const updatePromise =
-    app.isPackaged || process.env.SBOM_FORCE_UPDATE_CHECK === "1"
-      ? checkForUpdate({ currentVersion: app.getVersion() }).catch(() => null)
-      : Promise.resolve(null);
-  startup()
-    .catch((err) => {
-      status(t.startFailed(err.message));
-    })
-    .finally(async () => {
-      const info = await updatePromise;
-      if (info) await showUpdateDialog(info);
-    });
-});
+  app.on("window-all-closed", () => {
+    shutdown().finally(() => app.quit());
+  });
 
-app.on("window-all-closed", () => {
-  shutdown().finally(() => app.quit());
-});
-
-let quitting = false;
-app.on("before-quit", (event) => {
-  if (quitting) return;
-  event.preventDefault();
-  quitting = true;
-  shutdown().finally(() => app.quit());
-});
+  let quitting = false;
+  app.on("before-quit", (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    quitting = true;
+    shutdown().finally(() => app.quit());
+  });
+}

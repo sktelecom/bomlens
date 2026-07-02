@@ -36,6 +36,8 @@ npm start
 ```
 
 Docker 엔진이 실행 중이어야 한다. 이미지를 미리 받아 두면 첫 기동이 빠르다.
+앱은 단일 인스턴스만 허용하므로, 앱을 켜 둔 채 스모크 테스트(`npm run test:smoke`)를
+돌리면 락 때문에 실패한다. 먼저 앱을 닫고 실행한다.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
