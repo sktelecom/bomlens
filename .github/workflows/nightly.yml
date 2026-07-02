@@ -47,7 +47,8 @@ jobs:
 
       - name: Assert a valid SBOM was produced
         run: |
-          f=examples/nodejs/NightlyMac_1.0.0_bom.json
+          # scan-sbom.sh writes each run into a <project>_<version>/ subfolder.
+          f=examples/nodejs/NightlyMac_1.0.0/NightlyMac_1.0.0_bom.json
           test -f "$f" || { echo "no SBOM at $f"; exit 1; }
           jq -e '.bomFormat == "CycloneDX" and (.components | type == "array")' "$f" >/dev/null
           echo "components: $(jq '.components | length' "$f")"
@@ -57,7 +58,7 @@ jobs:
         run: |
           {
             echo "## macOS real scan (Colima)"
-            if [ -f examples/nodejs/NightlyMac_1.0.0_bom.json ]; then
+            if [ -f examples/nodejs/NightlyMac_1.0.0/NightlyMac_1.0.0_bom.json ]; then
               echo "✅ produced a CycloneDX SBOM on macOS via Colima"
             else
               echo "⚠️ no SBOM produced — see the log (Colima or scan step failed)"

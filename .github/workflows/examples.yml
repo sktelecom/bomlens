@@ -67,8 +67,9 @@ jobs:
             --version "1.0.0" \
             --generate-only
           
-          # Find generated SBOM
-          SBOM_FILE=$(ls *_bom.json 2>/dev/null | head -1)
+          # Find generated SBOM. scan-sbom.sh writes each run into a
+          # <project>_<version>/ subfolder, so look one level deep too.
+          SBOM_FILE=$(find . -maxdepth 2 -name '*_bom.json' 2>/dev/null | head -1)
           
           if [ -z "$SBOM_FILE" ]; then
             echo "❌ SBOM file not generated"
@@ -118,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sbom-${{ matrix.example }}
-          path: examples/${{ matrix.example }}/*_bom.json
+          path: examples/${{ matrix.example }}/**/*_bom.json
           retention-days: 7
           if-no-files-found: warn
   
