@@ -3,7 +3,8 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +19,7 @@ import {
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
+import { parseWindowState, sanitizeBounds } from "./lib/winstate.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
@@ -63,10 +65,43 @@ function hardenWebContents(contents) {
   });
 }
 
+// 창 위치/크기 기억: userData/window-state.json에 저장하고 다음 실행에서 복원한다.
+// 파일 손상이나 모니터 구성 변화로 화면 밖이면 기본 크기로 뜬다(lib/winstate.mjs).
+const WINDOW_DEFAULTS = { width: 1200, height: 860 };
+
+function windowStatePath() {
+  return path.join(app.getPath("userData"), "window-state.json");
+}
+
+function restoreWindowState() {
+  let saved = null;
+  try {
+    saved = parseWindowState(fs.readFileSync(windowStatePath(), "utf8"));
+  } catch {
+    // 파일 없음/읽기 실패: 첫 실행처럼 기본값으로 뜬다.
+  }
+  const workAreas = screen.getAllDisplays().map((display) => display.workArea);
+  return {
+    bounds: sanitizeBounds(saved, workAreas, WINDOW_DEFAULTS),
+    maximized: saved?.maximized === true,
+  };
+}
+
+function saveWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  // getNormalBounds(): 최대화 상태여도 복원 시 쓸 일반 상태의 영역을 준다.
+  const state = { ...mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() };
+  try {
+    fs.writeFileSync(windowStatePath(), JSON.stringify(state));
+  } catch {
+    // 저장 실패는 무시한다(다음 실행이 기본값으로 뜰 뿐이다).
+  }
+}
+
 async function createWindow() {
+  const { bounds, maximized } = restoreWindowState();
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 860,
+    ...bounds,
     backgroundColor: "#0a0a0c",
     title: "BomLens",
     // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
@@ -79,6 +114,8 @@ async function createWindow() {
       sandbox: false, // ESM preload 사용
     },
   });
+  if (maximized) mainWindow.maximize();
+  mainWindow.on("close", saveWindowState);
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
     query: { lang, v: app.getVersion() },
   });
