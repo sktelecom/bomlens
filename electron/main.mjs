@@ -55,7 +55,7 @@ async function createWindow() {
     width: 1200,
     height: 860,
     backgroundColor: "#0a0a0c",
-    title: "SBOM Generator",
+    title: "BomLens",
     webPreferences: {
       preload: path.join(here, "preload.mjs"),
       contextIsolation: true,
@@ -74,8 +74,9 @@ async function startup() {
   if (!docker.installed || !docker.running) {
     appOrigin = "file://";
     const reason = !docker.installed ? "not-installed" : "not-running";
+    // platform은 OS별 설치 안내(옵션 목록) 분기용. 렌더러는 process에 접근할 수 없다.
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-      query: { reason, lang },
+      query: { reason, lang, platform: process.platform },
     });
     return;
   }

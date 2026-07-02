@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Docker required — SBOM Generator</title>
+    <title>Docker required — BomLens</title>
     <style>
       :root {
         color-scheme: dark;
@@ -39,6 +39,14 @@
       a {
         color: #6ea8fe;
       }
+      code {
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        background: #1c1c21;
+        border: 1px solid #26262b;
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
       .hint {
         margin-top: 20px;
         font-size: 13px;
@@ -51,21 +59,17 @@
       <h1 id="title"></h1>
       <p id="lead"></p>
       <p id="intro"></p>
-      <ul>
-        <li><a href="https://rancherdesktop.io/">Rancher Desktop</a> — <span id="opt-rancher"></span></li>
-        <li><a href="https://docs.docker.com/engine/install/">WSL2 + docker-ce</a> — <span id="opt-wsl"></span></li>
-        <li>
-          <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> —
-          <span id="opt-desktop"></span>
-        </li>
-      </ul>
+      <ul id="options"></ul>
       <p class="hint" id="hint"></p>
     </main>
     <script>
-      // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
+      // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
       const params = new URLSearchParams(location.search);
       const lang = params.get("lang") === "ko" ? "ko" : "en";
       const reason = params.get("reason");
+      // 알 수 없는 platform은 win32 안내로 폴백한다(주 배포 대상이 Windows).
+      const rawPlatform = params.get("platform");
+      const platform = ["win32", "darwin", "linux"].includes(rawPlatform) ? rawPlatform : "win32";
       document.documentElement.lang = lang;
 
       const STR = {
@@ -74,11 +78,14 @@
           titleNotRunning: "Docker 엔진을 켜 주세요",
           leadNotRunning:
             "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. Rancher Desktop 또는 Docker Desktop을 켜고 아이콘이 안정될 때까지 기다린 뒤 이 앱을 다시 실행하세요.",
+          leadNotRunningLinux:
+            "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. sudo systemctl start docker로 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
           leadNotInstalled: "Docker가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다.",
-          intro: "SBOM Generator는 스캐너를 Docker 컨테이너로 실행합니다. Windows에서 쓸 수 있는 무료 옵션:",
-          optRancher: "GUI, 이 앱과 바로 동작(권장)",
-          optWsl: "완전 무료",
-          optDesktop: "규모가 큰 조직은 유료 라이선스 필요",
+          intro: {
+            win32: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Windows에서 쓸 수 있는 무료 옵션:",
+            darwin: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. macOS에서 쓸 수 있는 옵션:",
+            linux: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Linux에서는 Docker Engine을 설치하면 됩니다:",
+          },
           hint: "설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
         },
         en: {
@@ -86,25 +93,116 @@
           titleNotRunning: "Please start the Docker engine",
           leadNotRunning:
             "Docker is installed but the engine isn't running. Start Rancher Desktop or Docker Desktop, wait until the icon settles, then relaunch this app.",
+          leadNotRunningLinux:
+            "Docker is installed but the engine isn't running. Start it with sudo systemctl start docker, then relaunch this app.",
           leadNotInstalled: "Docker isn't installed or can't be found on your PATH.",
-          intro: "SBOM Generator runs the scanner as a Docker container. Free options on Windows:",
-          optRancher: "GUI, works with this app out of the box (recommended)",
-          optWsl: "completely free",
-          optDesktop: "larger organizations need a paid license",
+          intro: {
+            win32: "BomLens runs the scanner as a Docker container. Free options on Windows:",
+            darwin: "BomLens runs the scanner as a Docker container. Options on macOS:",
+            linux: "BomLens runs the scanner as a Docker container. On Linux, install Docker Engine:",
+          },
           hint: "Install it, start the engine, then relaunch this app.",
         },
       };
+
+      // OS별 설치 옵션. name/url/cmd는 언어와 무관하게 고정하고 설명만 번역한다.
+      const OPTIONS = {
+        win32: [
+          {
+            url: "https://rancherdesktop.io/",
+            name: "Rancher Desktop",
+            desc: {
+              ko: "GUI, 이 앱과 바로 동작(권장)",
+              en: "GUI, works with this app out of the box (recommended)",
+            },
+          },
+          {
+            url: "https://docs.docker.com/engine/install/",
+            name: "WSL2 + docker-ce",
+            desc: { ko: "완전 무료", en: "completely free" },
+          },
+          {
+            url: "https://www.docker.com/products/docker-desktop/",
+            name: "Docker Desktop",
+            desc: {
+              ko: "규모가 큰 조직은 유료 라이선스 필요",
+              en: "larger organizations need a paid license",
+            },
+          },
+        ],
+        darwin: [
+          {
+            url: "https://www.docker.com/products/docker-desktop/",
+            name: "Docker Desktop",
+            desc: {
+              ko: "가장 간단한 설치, 규모가 큰 조직은 유료 라이선스 필요",
+              en: "the simplest setup; larger organizations need a paid license",
+            },
+          },
+          {
+            url: "https://github.com/abiosoft/colima",
+            name: "Colima",
+            desc: {
+              ko: "완전 무료 — brew install colima docker 후 colima start",
+              en: "completely free — brew install colima docker, then colima start",
+            },
+          },
+        ],
+        linux: [
+          {
+            url: "https://docs.docker.com/engine/install/",
+            name: "Docker Engine",
+            desc: {
+              ko: "배포판별 설치 안내(docs.docker.com/engine/install)",
+              en: "per-distribution install guide (docs.docker.com/engine/install)",
+            },
+          },
+          {
+            name: "sudo systemctl start docker",
+            code: true,
+            desc: { ko: "설치 후 엔진 시작", en: "start the engine after installing" },
+          },
+          {
+            name: "sudo usermod -aG docker $USER",
+            code: true,
+            desc: {
+              ko: "다시 로그인하면 sudo 없이 쓸 수 있어요",
+              en: "log out and back in to use Docker without sudo",
+            },
+          },
+        ],
+      };
+
       const s = STR[lang];
 
       document.getElementById("title").textContent =
         reason === "not-running" ? s.titleNotRunning : s.title;
       document.getElementById("lead").textContent =
-        reason === "not-running" ? s.leadNotRunning : s.leadNotInstalled;
-      document.getElementById("intro").textContent = s.intro;
-      document.getElementById("opt-rancher").textContent = s.optRancher;
-      document.getElementById("opt-wsl").textContent = s.optWsl;
-      document.getElementById("opt-desktop").textContent = s.optDesktop;
+        reason === "not-running"
+          ? platform === "linux"
+            ? s.leadNotRunningLinux
+            : s.leadNotRunning
+          : s.leadNotInstalled;
+      document.getElementById("intro").textContent = s.intro[platform];
       document.getElementById("hint").textContent = s.hint;
+
+      // 옵션 목록 렌더: 링크가 있으면 <a>, 명령어면 <code>, 설명은 " — "로 잇는다.
+      const list = document.getElementById("options");
+      for (const opt of OPTIONS[platform]) {
+        const li = document.createElement("li");
+        let label;
+        if (opt.url) {
+          label = document.createElement("a");
+          label.href = opt.url;
+          label.textContent = opt.name;
+        } else {
+          label = document.createElement(opt.code ? "code" : "span");
+          label.textContent = opt.name;
+        }
+        li.appendChild(label);
+        li.appendChild(document.createTextNode(` — ${opt.desc[lang]}`));
+        list.appendChild(li);
+      }
     </script>
   </body>
 </html>
