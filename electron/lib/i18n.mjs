@@ -26,6 +26,11 @@ const MAIN = {
     startingUi: "UI 컨테이너를 시작하는 중...",
     ready: "준비 완료. UI를 엽니다.",
     startFailed: (msg) => `시작에 실패했습니다: ${msg}`,
+    updateTitle: "업데이트 알림",
+    updateMessage: (current, latest) =>
+      `새 버전(v${latest})이 나왔습니다. 현재 버전은 v${current}입니다.`,
+    updateDownload: "다운로드 페이지 열기",
+    updateLater: "나중에",
   },
   en: {
     dockerChecking: "Checking Docker status...",
@@ -36,6 +41,11 @@ const MAIN = {
     startingUi: "Starting the UI container...",
     ready: "Ready. Opening the UI.",
     startFailed: (msg) => `Startup failed: ${msg}`,
+    updateTitle: "Update available",
+    updateMessage: (current, latest) =>
+      `A new version (v${latest}) is available. You are on v${current}.`,
+    updateDownload: "Open download page",
+    updateLater: "Later",
   },
 };
 

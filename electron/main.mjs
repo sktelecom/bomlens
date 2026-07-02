@@ -3,7 +3,7 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, session, shell } from "electron";
+import { app, BrowserWindow, dialog, session, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -15,6 +15,7 @@ import {
   UiContainer,
 } from "./lib/container.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
+import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -100,6 +101,21 @@ async function startup() {
   await mainWindow.loadURL(appOrigin);
 }
 
+// 새 릴리스 알림: 부팅이 어느 종착지(UI 로드, Docker 안내, 실패)에 도달한 뒤에 띄워
+// 이미지 풀 진행 중에 대화상자가 끼어들지 않게 한다. 실패는 전부 조용히 무시된다.
+async function showUpdateDialog(info) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    title: t.updateTitle,
+    message: t.updateMessage(info.current, info.latest),
+    buttons: [t.updateDownload, t.updateLater],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) shell.openExternal(RELEASES_PAGE);
+}
+
 // 컨테이너 정리: 멱등 promise로 단일화해 종료 경합에도 정확히 1회 수행.
 let shutdownPromise = null;
 function shutdown() {
@@ -135,9 +151,20 @@ app.whenReady().then(async () => {
     status(t.ready);
     return;
   }
-  startup().catch((err) => {
-    status(t.startFailed(err.message));
-  });
+  // 업데이트 확인은 부팅과 병렬로 시작하되(비차단), 표시는 부팅 종착 이후에 한다.
+  // 개발 실행에서는 꺼져 있고 SBOM_FORCE_UPDATE_CHECK=1로만 켠다(수동 검증용).
+  const updatePromise =
+    app.isPackaged || process.env.SBOM_FORCE_UPDATE_CHECK === "1"
+      ? checkForUpdate({ currentVersion: app.getVersion() }).catch(() => null)
+      : Promise.resolve(null);
+  startup()
+    .catch((err) => {
+      status(t.startFailed(err.message));
+    })
+    .finally(async () => {
+      const info = await updatePromise;
+      if (info) await showUpdateDialog(info);
+    });
 });
 
 app.on("window-all-closed", () => {
