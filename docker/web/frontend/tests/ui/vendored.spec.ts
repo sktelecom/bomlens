@@ -52,7 +52,7 @@ test("Vendored toggle is offered under scan options when scanoss is available", 
   // The redesigned New scan shows the vendored-ID toggle inline under the
   // "Advanced scan options" column for a source scan (the default current-dir),
   // off by default but visible — no separate disclosure to expand.
-  const toggle = page.getByText("File-level identification (SCANOSS)");
+  const toggle = page.getByText("Detect copied-in open source");
   await expect(toggle).toBeVisible();
   await expect(page.locator("#scanossToken")).toHaveCount(0);
 });
@@ -62,7 +62,7 @@ test("Vendored toggle hidden when scanoss is NOT available", async ({ page }) =>
   await page.goto("/#/new");
   // Wait for the New scan screen to mount before asserting the toggle's absence.
   await page.locator("#project").waitFor();
-  await expect(page.getByText("File-level identification (SCANOSS)")).toHaveCount(0);
+  await expect(page.getByText("Detect copied-in open source")).toHaveCount(0);
 });
 
 test("result banner appears for the C/C++ suggestion", async ({ page }) => {

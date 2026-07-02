@@ -323,7 +323,7 @@ test("@capture advanced toggle", async ({ page }) => {
   // The vendored-ID toggle sits inline under "Advanced scan options" for a
   // source scan — capture that whole section (heading + toggle) so the guide
   // shows users where to find it, not just the bare switch.
-  const toggle = page.getByText("File-level identification (SCANOSS)");
+  const toggle = page.getByText("Detect copied-in open source");
   await toggle.waitFor({ state: "visible" });
   const section = toggle.locator(
     "xpath=ancestor::div[contains(@class,'border-t')][1]",
