@@ -1,4 +1,5 @@
 import { test, expect, _electron as electron } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,3 +73,71 @@ for (const lang of ["en", "ko"] as const) {
     }
   });
 }
+
+// The status screen's footer must show the app's real version (main.mjs passes
+// ?v=app.getVersion()). A broken query wiring renders an empty footer, which no
+// other test would notice.
+test("status screen displays the app version", async () => {
+  const version = JSON.parse(
+    fs.readFileSync(path.join(appRoot, "package.json"), "utf8"),
+  ).version as string;
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_LANG: "en" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("#version")).toHaveText(`BomLens v${version}`);
+  } finally {
+    await app.close();
+  }
+});
+
+// Light/dark contract: the status screen's CSS must follow prefers-color-scheme
+// with exactly the colors main.mjs paints the window background with (#f5f5f7
+// light / #0a0a0c dark) — if either side drifts, the app flashes the wrong
+// color on first paint. The scheme is emulated at the page level: overriding
+// nativeTheme.themeSource in the main process does not reach a file:// page's
+// media query in this Electron version, and the app itself never overrides it.
+test("status screen styles both color schemes with the first-paint colors", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_LANG: "en" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await win.emulateMedia({ colorScheme: "light" });
+    await expect
+      .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(245, 245, 247)");
+    await win.emulateMedia({ colorScheme: "dark" });
+    await expect
+      .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(10, 10, 12)");
+  } finally {
+    await app.close();
+  }
+});
+
+// The startup log file must actually be written on boot (userData/startup.log,
+// fresh per run) — it is what users attach to problem reports after the status
+// screen is long gone. log.mjs is unit-tested, but nothing proved the file
+// exists on a real boot until now.
+test("startup log file is written and flushed on quit", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_LANG: "en" },
+  });
+  let logPath = "";
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("#subtitle")).toBeVisible();
+    const userData = await app.evaluate(({ app: a }) => a.getPath("userData"));
+    logPath = path.join(userData, "startup.log");
+  } finally {
+    await app.close();
+  }
+  // After quit the stream is closed, so the smoke-mode ready line is flushed.
+  expect(fs.existsSync(logPath)).toBe(true);
+  expect(fs.readFileSync(logPath, "utf8")).toContain("Ready. Opening the UI.");
+});

@@ -1,0 +1,74 @@
+#!/bin/sh
+# Fake `docker` CLI for the desktop boot-recovery test (POSIX sh; prepended to
+# PATH by boot-recovery.spec.ts). It answers exactly the calls
+# electron/lib/container.mjs makes, and "docker run" starts the REAL web server
+# (docker/web/server.py) standalone on the requested host port — so the test
+# exercises the app's genuine boot path (docker check -> orphan cleanup ->
+# image check -> container start -> /capabilities health poll -> UI load)
+# without a Docker daemon or a multi-GB image.
+#
+# Env (set by the spec):
+#   FAKE_DOCKER_STATE    file containing "up" or "down" (daemon availability)
+#   FAKE_DOCKER_RUN_DIR  scratch dir for the spawned server's pid/log
+#   FAKE_SERVER          absolute path to docker/web/server.py
+#   FAKE_OUTPUT_DIR      SBOM_OUTPUT_DIR for the spawned server
+set -eu
+
+state="down"
+[ -f "${FAKE_DOCKER_STATE:-}" ] && state="$(cat "$FAKE_DOCKER_STATE")"
+piddir="${FAKE_DOCKER_RUN_DIR:-/tmp}"
+
+case "${1:-}" in
+    version|info)
+        [ "$state" = "up" ] || exit 1
+        echo "fake-docker $1 ok"
+        ;;
+    ps)
+        # cleanupOrphans: no orphans.
+        exit 0
+        ;;
+    image)
+        # imagePresent: the scanner image is always "already pulled".
+        exit 0
+        ;;
+    run)
+        # UiContainer.start: parse `-p <host>:8080`, boot the real server.py on
+        # that port, then print a container id like a detached docker run.
+        shift
+        hostport=""
+        prev=""
+        for a in "$@"; do
+            case "$prev" in -p) hostport="${a%%:*}" ;; esac
+            prev="$a"
+        done
+        [ -n "$hostport" ] || { echo "fake-docker: no -p mapping" >&2; exit 125; }
+        UI_PORT="$hostport" SBOM_OUTPUT_DIR="${FAKE_OUTPUT_DIR:-$piddir}" \
+            SBOM_UI_HOST_DIR="${FAKE_OUTPUT_DIR:-$piddir}" \
+            python3 "$FAKE_SERVER" > "$piddir/server.log" 2>&1 &
+        echo "$!" > "$piddir/server.pid"
+        echo "fakeuicontainer0000000000000000000000000000000000000000000000000000"
+        ;;
+    inspect)
+        # container alive check: `docker inspect -f {{.State.Running}} <id>`
+        pid="$(cat "$piddir/server.pid" 2>/dev/null || echo)"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            echo "true"
+        else
+            echo "false"
+        fi
+        ;;
+    stop)
+        pid="$(cat "$piddir/server.pid" 2>/dev/null || echo)"
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+        rm -f "$piddir/server.pid"
+        ;;
+    pull)
+        # Should never be reached (image inspect says present); fail loudly.
+        echo "fake-docker: unexpected pull" >&2
+        exit 1
+        ;;
+    *)
+        echo "fake-docker: unhandled subcommand: ${1:-}" >&2
+        exit 125
+        ;;
+esac

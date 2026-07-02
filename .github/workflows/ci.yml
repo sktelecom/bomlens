@@ -142,6 +142,34 @@ jobs:
         shell: bash
         run: bash tests/test-windows.sh
 
+  desktop-linux:
+    name: Desktop boot tests (linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Unit tests (boot/container/health/i18n/log/update/winstate)
+        run: node --test test/*.test.mjs
+
+      # Runs on EVERY PR (not just electron/**): the boot-recovery spec's fake
+      # docker boots the real docker/web/server.py through the app's genuine
+      # startup path, so a server.py change that breaks the desktop boot
+      # contract is caught here — desktop.yml's path filter would miss it.
+      # Smoke + recovery are deterministic (no daemon, no image pull).
+      - name: Boot smoke + recovery e2e (xvfb)
+        run: xvfb-run --auto-servernum npm run test:smoke
+
   postprocess:
     name: Post-process Unit and Sync Tests
     runs-on: ubuntu-latest
