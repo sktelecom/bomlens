@@ -163,6 +163,61 @@ op=$(jq -r '.checks[] | select(.id=="g7-model-openness") | .status' "$CONF2")
 { [ "$hv" = "pass" ] && [ "$ha" = "pass" ]; } && pass "model integrity checks pass after enrichment" || fail "hash-value='$hv' hash-alg='$ha', expected pass"
 [ "$op" = "pass" ] && pass "model openness check passes after enrichment" || fail "g7-model-openness='$op', expected pass"
 
+echo "== per-model coverage: one non-compliant model in a multi-model SBOM is named =="
+# ANY-model presence would hide the unlicensed second model; the registry's
+# missingPath semantics must warn and list it (old cov() behavior).
+jq '.components += [{"type":"machine-learning-model","name":"m2","version":"1"}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/multi.json"
+bash "$LIB/validate-sbom.sh" "$WORK/multi.json" "$WORK/conf3" "multi" >/dev/null 2>&1
+mm=$(jq -r '.checks[] | select(.id=="g7-model-license") | "\(.status)|\(.detail)|\(.missing|join(","))"' "$WORK/conf3_conformance.json")
+case "$mm" in
+    "warn|1/2 model component(s)|m2") pass "multi-model license gap warns with the offender named" ;;
+    *) fail "g7-model-license on 2 models = '$mm', expected warn|1/2 model component(s)|m2" ;;
+esac
+
+echo "== a broken registry fails loudly, not silently =="
+# A jq syntax error in one cdxPath must not silently drop the G7 section: the
+# evaluator warns on stderr and the base checks + overall result survive.
+sed 's/length > 0/length >(BROKEN/' "$LIB/g7-registry.json" > "$WORK/broken-reg.json"
+BRLOG=$(G7_REGISTRY="$WORK/broken-reg.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf4" "broken" 2>&1)
+grep -q "G7 registry evaluation failed" <<<"$BRLOG" && pass "broken registry warns on stderr" || fail "no loud warning for a broken registry"
+bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) base=\([.checks[]|select(.id|startswith("g7-")|not)]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
+[ "$bshape" = "g7=0 base=9 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
+
+echo "== legacy CycloneDX tools array does not false-negative the tool checks =="
+# metadata.tools as a bare array (pre-1.5 shape) used to hard-error inside the
+# expression and read as "not present" while the base tools check passed.
+jq '.metadata.tools = [{"name":"syft","version":"1.0"}]' "$FIX/aibom-owasp-1_7.json" > "$WORK/legacy.json"
+bash "$LIB/validate-sbom.sh" "$WORK/legacy.json" "$WORK/conf5" "legacy" >/dev/null 2>&1
+tl=$(jq -r '[.checks[] | select(.id=="g7-meta-tool-name" or .id=="g7-meta-tool-version") | .status] | unique | join(",")' "$WORK/conf5_conformance.json")
+[ "$tl" = "pass" ] && pass "legacy tools array satisfies tool name/version" || fail "tool checks on legacy array = '$tl', expected pass"
+
+echo "== prose openness declarations still count (supplier SBOM without openness:* props) =="
+jq '(.components[]|select(.type=="machine-learning-model")).description = "Open-weight model trained on open data." | del(.components[].properties)' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/prose.json"
+bash "$LIB/validate-sbom.sh" "$WORK/prose.json" "$WORK/conf6" "prose" >/dev/null 2>&1
+po=$(jq -r '.checks[] | select(.id=="g7-model-openness") | .status' "$WORK/conf6_conformance.json")
+[ "$po" = "pass" ] && pass "prose openness declaration passes (no property convention required)" || fail "g7-model-openness on prose = '$po', expected pass"
+
+echo "== ref-only dataset references count as dataset names =="
+jq '(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets = [{"ref":"dataset-a"},{"ref":"dataset-b"}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/refds.json"
+bash "$LIB/validate-sbom.sh" "$WORK/refds.json" "$WORK/conf7" "refds" >/dev/null 2>&1
+ds=$(jq -r '.checks[] | select(.id=="g7-ds-name") | "\(.status)|\(.evidence|join(","))"' "$WORK/conf7_conformance.json")
+case "$ds" in
+    pass*dataset-a*) pass "ref-only dataset references pass with the refs as evidence" ;;
+    *) fail "g7-ds-name on ref-only datasets = '$ds', expected pass with dataset-a evidence" ;;
+esac
+
+echo "== human reports separate review items from warnings =="
+# na (no automated source) elements must not inflate the warning count; the MD
+# headline carries a distinct "needs review" figure.
+grep -q "needs review:" "$WORK/conf_conformance.md" && pass "MD headline carries a needs-review count" || fail "MD headline lacks needs review"
+nw=$(jq '[.checks[] | select(.status=="warn" and .source!="na")] | length' "$CONF")
+hw=$(grep -o 'warnings: [0-9]*' "$WORK/conf_conformance.md" | grep -o '[0-9]*')
+[ "$hw" = "$nw" ] && pass "MD warning count excludes review items ($hw)" || fail "MD warnings=$hw, expected $nw (na excluded)"
+grep -q "Needs review:" "$WORK/conf_conformance.html" && pass "HTML report carries a needs-review pill" || fail "HTML lacks the needs-review pill"
+
 echo "== 2-layer merge keeps the ML-BOM root (1.7 + modelCard) and fills infrastructure =="
 # A tiny application layer (one library + a dep edge) merged onto the model SBOM.
 cat > "$WORK/app.json" <<'JSON'
@@ -175,6 +230,10 @@ MERGE_ROOT_FROM="$FIX/aibom-owasp-1_7.json" bash "$LIB/merge-sbom.sh" \
     "$WORK/merged.json" "combo" "1.0" "$FIX/aibom-owasp-1_7.json" "$WORK/app.json" >/dev/null 2>&1
 mspec=$(jq -r '.specVersion' "$WORK/merged.json")
 [ "$mspec" = "1.7" ] && pass "MERGE_ROOT_FROM preserves the ML-BOM specVersion 1.7 (not downgraded to 1.6)" || fail "merged specVersion='$mspec', expected 1.7"
+# The preserved root must carry the CALLER's identity, not the generator's
+# ephemeral job id (the OWASP root is named "job-<timestamp>").
+mroot=$(jq -r '"\(.metadata.component.name)@\(.metadata.component.version)"' "$WORK/merged.json")
+[ "$mroot" = "combo@1.0" ] && pass "preserved root renamed to the caller's project/version" || fail "merged root='$mroot', expected combo@1.0"
 mcard=$(jq '[.components[] | select(.type=="machine-learning-model" and (.modelCard!=null))] | length' "$WORK/merged.json")
 [ "$mcard" -ge 1 ] && pass "model component + modelCard survive the merge" || fail "modelCard lost in merge"
 mflask=$(jq '[.components[] | select(.name=="flask")] | length' "$WORK/merged.json")

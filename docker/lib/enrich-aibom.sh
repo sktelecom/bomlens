@@ -31,6 +31,7 @@ MODEL_ID="$2"
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[enrich] SBOM file not found: $SBOM" >&2
+    echo "[enrich]   Run the AIBOM generation step first (scan-aibom.sh) so there is an SBOM to enrich." >&2
     exit 1
 fi
 if [ -z "$MODEL_ID" ]; then
@@ -147,7 +148,11 @@ if hf_info is not None:
           f"(weights={openness['openness:weights']}).", file=sys.stderr)
 
 # ---- cdxgen -t ai: pedigree / performance metrics ---------------------------
-if cdxgen_bin:
+# Gated on the HuggingFace fetch having succeeded: cdxgen hits the same API over
+# the same network, so when hf_info is None (offline, gated model, or the hub
+# unreachable) the harvest can only fail too — skipping it avoids stalling an
+# offline AIBOM scan for up to the 300 s subprocess timeout on a dead network.
+if cdxgen_bin and hf_info is not None:
     try:
         with tempfile.TemporaryDirectory() as td:
             out = os.path.join(td, "cdxgen-ai.json")
@@ -182,6 +187,8 @@ if cdxgen_bin:
             print("[enrich] cdxgen produced no model component; nothing to merge.", file=sys.stderr)
     except Exception as e:
         print(f"[enrich] cdxgen harvest skipped: {e}", file=sys.stderr)
+elif cdxgen_bin:
+    print("[enrich] cdxgen harvest skipped (HuggingFace unreachable, so it would fail too).", file=sys.stderr)
 else:
     print("[enrich] cdxgen harvest disabled or not present; skipping pedigree/metrics.", file=sys.stderr)
 

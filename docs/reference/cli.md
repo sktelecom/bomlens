@@ -29,6 +29,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--analyze <sbom>` | — | Validate and analyze a supplier SBOM (alias `--sbom`). CycloneDX/SPDX. Mutually exclusive with `--target` |
 | `--model <owner/name>` | — | Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace model via the OWASP AIBOM Generator (opt-in `bomlens-aibom` image; fetches model-card metadata over the network). Mutually exclusive with `--target`/`--analyze`/`--git`/`--merge` |
 | `--merge <a.json> <b.json> …` | — | Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with `--project`/`--version`. Optional — for a server SBOM when an external system needs a single product BOM; otherwise keep the layers separate (see the [server SBOM guide](../guides/server-delivery.md)). Mutually exclusive with `--target`/`--analyze`/`--git` |
+| `--merge-root <file>` | — | With `--merge`: keep this input's `specVersion` and root component (for example an ML-BOM's CycloneDX 1.7 root with its model card) instead of writing a fresh 1.6 root. Must be one of the `--merge` files; the preserved root is renamed to `--project`/`--version` |
 | `--generate-only` | false | Save locally only, without uploading |
 | `--upload-target <target>` | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest) |
 | `--trusca <project_id>` | — | Upload to TRUSCA (= `--upload-target trusca` + project id). Needs `API_URL` and a Bearer `API_KEY` |

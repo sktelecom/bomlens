@@ -73,6 +73,21 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
         {what ? (
           <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{what}</div>
         ) : null}
+        {notMet && (check.missing?.length ?? 0) > 0 ? (
+          // Which items lack the element (e.g. the model components without a
+          // license) — the count in detail says how many, this names them.
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <span className="font-medium">{t("g7.missing")}</span>
+            {(check.missing ?? []).map((m, i) => (
+              <code
+                key={`${m}-${i}`}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+              >
+                {m}
+              </code>
+            ))}
+          </div>
+        ) : null}
         {evidence.length > 0 ? (
           <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             <span className="font-medium">{t("g7.evidence")}</span>
