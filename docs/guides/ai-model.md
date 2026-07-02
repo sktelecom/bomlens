@@ -56,7 +56,7 @@ In the web UI, an AI/ML SBOM adds two sections to the left rail.
 
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
-**Conformance** — for an AI-model SBOM this section adds the G7 minimum-element checks (all advisory) with an "N of 6 present" headline, alongside the base format-conformance checks. Each element shows what it is and how to satisfy it.
+**Conformance** — for an AI-model SBOM this section adds the G7 minimum-element checks (all advisory), grouped by the seven G7 clusters (metadata, system, models, datasets, infrastructure, security, KPI), alongside the base format-conformance checks. Each check is tagged by how it was satisfied — read directly from the SBOM, inferred from signals, or requiring human review when no automated source exists — so the headline separates what the tool covered automatically from what a person must still supply. Each element shows what it is and how to satisfy it.
 
 ![Conformance — the G7 advisory sub-block for an AI SBOM](../images/web-ui-g7.png)
 
