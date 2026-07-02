@@ -106,6 +106,64 @@ VENDORED_CPE_FIX='(.components) |= (if type=="array" then map(
   else . end
 ) else . end)'
 
+# Make OS packages (deb/apk/rpm) matchable by the Trivy security scan. Distro
+# advisories (Debian security tracker, Alpine secdb, RPM OVAL) are keyed by the
+# SOURCE package name (libssl3 -> openssl), but Trivy only reads the source name
+# from its own aquasecurity:trivy:SrcName property — it ignores the `upstream`
+# purl qualifier syft emits, and it has no name fallback. On any third-party
+# CycloneDX SBOM the OS result therefore comes out with the distro and packages
+# fully recognized yet ZERO vulnerabilities, silently (verified against Trivy
+# 0.70 and 0.72: distroless debian-12 image scan finds 42 CVEs, the same
+# packages via syft SBOM find 0; adding SrcName restores all 42). Synthesize
+# the Src* properties from the purl: source name from the `upstream` qualifier
+# (percent-decoded; falls back to the package name — dpkg/apk omit the source
+# field when it equals the binary name), source version from upstream's
+# embedded `@version` when present, else the component version. deb splits
+# [epoch:]version[-release] like dpkg; apk keeps the version whole; rpm parses
+# the source-RPM filename (name-version-release.src.rpm). Components that
+# already carry SrcName (Trivy-generated SBOMs via ANALYZE) are left untouched.
+OS_SRC_FIX='
+def hexnib: if . >= 97 then . - 87 else . - 48 end;
+def pdecode: gsub("%(?<h>[0-9A-Fa-f]{2})"; (.h | ascii_downcase | explode | map(hexnib) | [.[0] * 16 + .[1]] | implode));
+def vr_split: . as $v | ($v | rindex("-")) as $i
+  | if $i == null then {v: $v, r: ""} else {v: $v[0:$i], r: $v[($i + 1):($v | length)]} end;
+def epoch_split: if test("^[0-9]+:") then capture("^(?<e>[0-9]+):(?<rest>.*)$") else {e: null, rest: .} end;
+def src_props($sn; $sv; $sr; $se):
+  [{name: "aquasecurity:trivy:SrcName", value: $sn},
+   {name: "aquasecurity:trivy:SrcVersion", value: $sv}]
+  + (if ($sr // "") != "" then [{name: "aquasecurity:trivy:SrcRelease", value: $sr}] else [] end)
+  + (if $se != null then [{name: "aquasecurity:trivy:SrcEpoch", value: $se}] else [] end);
+(.components) |= (if type=="array" then map(
+  (.purl // "") as $p
+  | (($p | capture("^pkg:(?<t>deb|apk|rpm)/") | .t) // null) as $ptype
+  | if ($ptype != null) and ((.name // "") != "") and ((.version // "") != "")
+       and (((.properties // []) | any(.name == "aquasecurity:trivy:SrcName")) | not)
+    then
+      (($p | capture("[?&]upstream=(?<u>[^&#]+)") | .u | pdecode) // null) as $up
+      | (($p | capture("[?&]epoch=(?<e>[0-9]+)") | .e) // null) as $qe
+      | (if $ptype == "apk" then
+           .properties = ((.properties // [])
+             + src_props((if $up then ($up | split("@")[0]) else .name end); .version; ""; null))
+         elif $ptype == "rpm" and ($up != null)
+              and (($up | endswith(".src.rpm")) or ($up | endswith(".nosrc.rpm"))) then
+           ($up | if endswith(".nosrc.rpm") then .[0:(length - 10)] else .[0:(length - 8)] end) as $srpm
+           | ($srpm | vr_split) as $nv_r
+           | ($nv_r.v | vr_split) as $n_v
+           | if $nv_r.r != "" and $n_v.r != "" and $n_v.v != "" then
+               .properties = ((.properties // []) + src_props($n_v.v; $n_v.r; $nv_r.r; $qe))
+             else
+               ((.version | epoch_split) as $es | ($es.rest | vr_split) as $vr
+                | .properties = ((.properties // []) + src_props(.name; $vr.v; $vr.r; ($qe // $es.e))))
+             end
+         else
+           (if $up then ($up | split("@")) else [.name] end) as $us
+           | (($us[1] // .version) | epoch_split) as $es
+           | ($es.rest | vr_split) as $vr
+           | .properties = ((.properties // []) + src_props($us[0]; $vr.v; $vr.r; ($qe // $es.e)))
+         end)
+    else . end
+) else . end)'
+
 # Always: normalize component license aliases to SPDX ids. cdxgen records some
 # licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3
 # web UI surfaces (license filter, distribution card, dependency tree) read these
@@ -159,6 +217,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${PYRANGE_DEDUP}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
+        | ${OS_SRC_FIX}
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
         | ${SORT_FILTER}
@@ -172,7 +231,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
