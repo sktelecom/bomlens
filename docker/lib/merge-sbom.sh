@@ -51,26 +51,35 @@ fi
 
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
 # Optional base SBOM whose specVersion + root metadata.component are preserved
 # (AI path: keep the ML-BOM's 1.7 spec and modelCard). Ignored if unset, missing,
-# or not valid JSON — the merge then falls back to a fresh 1.6 root.
+# or not valid JSON — the merge then falls back to a fresh 1.6 root. The preserved
+# root's name/version are OVERRIDDEN with the caller's NAME/VERSION: generators
+# name their root after ephemeral job ids (the OWASP AIBOM Generator emits
+# "job-<timestamp>"), and the caller-supplied identity is the contract every merge
+# mode guarantees. The root object goes through a FILE + --slurpfile, not --argjson
+# argv (same ARG_MAX rule as the components below — a root modelCard can exceed
+# Linux's 128 KiB per-argument limit and abort the merge under set -e).
 MERGE_ROOT_FROM="${MERGE_ROOT_FROM:-}"
 PRESERVE_SPEC=""
-PRESERVE_META=""
+ROOT_META_FILE="$WORK/root-meta.json"
+echo "null" > "$ROOT_META_FILE"
 if [ -n "$MERGE_ROOT_FROM" ] && [ -s "$MERGE_ROOT_FROM" ] && jq empty "$MERGE_ROOT_FROM" >/dev/null 2>&1; then
     PRESERVE_SPEC=$(jq -r '.specVersion // empty' "$MERGE_ROOT_FROM" 2>/dev/null)
-    PRESERVE_META=$(jq -c '.metadata.component // empty' "$MERGE_ROOT_FROM" 2>/dev/null)
-    if [ -n "$PRESERVE_SPEC" ] && [ -n "$PRESERVE_META" ]; then
-        echo "[merge] preserving root from $MERGE_ROOT_FROM (specVersion=$PRESERVE_SPEC, modelCard kept)"
+    jq -c --arg name "$NAME" --arg version "$VERSION" \
+        '.metadata.component // null | if . == null then null else . + {name: $name, version: $version} end' \
+        "$MERGE_ROOT_FROM" > "$ROOT_META_FILE" 2>/dev/null || echo "null" > "$ROOT_META_FILE"
+    if [ -n "$PRESERVE_SPEC" ] && [ "$(cat "$ROOT_META_FILE")" != "null" ]; then
+        echo "[merge] preserving root from $MERGE_ROOT_FROM (specVersion=$PRESERVE_SPEC, modelCard kept, named $NAME@$VERSION)"
     else
         PRESERVE_SPEC=""
-        PRESERVE_META=""
+        echo "null" > "$ROOT_META_FILE"
         echo "[merge] WARN: MERGE_ROOT_FROM has no specVersion/metadata.component; using fresh 1.6 root." >&2
     fi
 fi
-
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
 
 # Collect each input's components into a temp file, tagging each with its source
 # layer. Drop components without a real name (syft's empty "os:unknown" noise). A
@@ -129,19 +138,21 @@ jq -s '
 
 NEDGES=$(jq '[.[].dependsOn[]?] | length' "$WORK/deps.json")
 
-# --slurpfile reads the merged components/dependencies from files (ARG_MAX safe).
-# When a base root is preserved, keep its specVersion and metadata.component
-# (root, incl. any modelCard); otherwise emit a fresh CycloneDX 1.6 root. The
-# preserved root's own component is not re-added as a plain component — it stays
-# the metadata.component — so the merged component set is deduped as usual.
+# --slurpfile reads the merged components/dependencies AND the preserved root from
+# files (ARG_MAX safe — see the comment at the collection loop). When a base root
+# is preserved, keep its specVersion and metadata.component (incl. any modelCard,
+# renamed to the caller's NAME/VERSION above); otherwise emit a fresh CycloneDX
+# 1.6 root. The preserved root's own component is not re-added as a plain
+# component — it stays the metadata.component — so the merged component set is
+# deduped as usual.
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
     --slurpfile deps "$WORK/deps.json" \
+    --slurpfile meta "$ROOT_META_FILE" \
     --arg name "$NAME" \
     --arg version "$VERSION" \
     --arg ts "$GEN_AT" \
-    --arg spec "${PRESERVE_SPEC:-1.6}" \
-    --argjson meta "${PRESERVE_META:-null}" '
+    --arg spec "${PRESERVE_SPEC:-1.6}" '
 {
   bomFormat: "CycloneDX",
   specVersion: $spec,
@@ -149,7 +160,7 @@ jq -n \
   metadata: {
     timestamp: $ts,
     tools: { components: [ { type: "application", name: "bomlens-merge" } ] },
-    component: ($meta // { type: "application", name: $name, version: $version })
+    component: ($meta[0] // { type: "application", name: $name, version: $version })
   },
   components: $comps[0],
   dependencies: $deps[0]

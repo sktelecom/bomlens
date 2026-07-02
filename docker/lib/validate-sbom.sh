@@ -129,7 +129,20 @@ cdx_checks() {
 # Evaluation builds ONE jq program from the registry (element expressions inlined
 # as code, static fields JSON-encoded as literals) and runs it in a single pass —
 # no per-element subprocess, and backslashes in expressions survive since they are
-# never round-tripped through the shell as data.
+# never round-tripped through the shell as data. The program binds $models once so
+# per-model expressions do not re-traverse the component array, and the fold is
+# part of the same program: a registry syntax error fails THAT single jq call, so
+# the loud-warn + "[]" fallback actually fires (a two-stage pipe would return the
+# LAST jq's exit status and swallow a compile failure into silence).
+#
+# Two element shapes:
+#   cdxPath     — boolean presence over the whole SBOM (pass / not present).
+#   missingPath — per-model coverage: a jq expression (may use $models) returning
+#                 the names of model components MISSING the element. Keeps the
+#                 old cov() semantics: pass only when EVERY model has it, warn with
+#                 the offender list and an "N/M model component(s)" detail otherwise
+#                 (an any-model check would hide non-compliant models in a
+#                 multi-model supplier SBOM).
 g7_ai_checks() {
     local reg="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
     if [ ! -f "$reg" ]; then
@@ -137,35 +150,48 @@ g7_ai_checks() {
         echo "[]"
         return
     fi
-    # Generate a jq array-of-objects program. Each element becomes an object with
-    # _present (the cdxPath boolean, null for source:na) and _ev (evidence array).
     local prog
     prog=$(jq -r '
-        "[" + ([ .clusters[] as $c | $c.elements[] |
+        "([.components[]? | select(.type==\"machine-learning-model\")]) as $models | ["
+        + ([ .clusters[] as $c | $c.elements[] |
             "{id:" + (.id|@json)
             + ",label:" + (.label|@json)
             + ",required:false"
             + ",cluster:" + ($c.id|@json)
             + ",source:" + (.source|@json)
             + ",role:" + ((.role // "")|@json)
-            + ",missing:[]"
             + ",_present:(" + (if (.source=="na" or (.cdxPath==null)) then "null" else "(try (" + .cdxPath + ") catch false)" end) + ")"
+            + ",_missing:(" + (if (.missingPath==null) then "null" else "(try (" + .missingPath + ") catch null)" end) + ")"
+            + ",_mtot:($models|length)"
             + ",_ev:(" + (if (.evidencePath==null) then "[]" else "(try (" + .evidencePath + ") catch [])" end) + ")"
             + "}"
         ] | join(",")) + "]"
     ' "$reg") || { echo "[]"; return; }
 
-    # Evaluate against the SBOM, then fold _present/_ev into the check schema.
-    jq -c "$prog" "$SBOM" 2>/dev/null | jq -c --argjson cap "$MISSING_CAP" '
-        map(
-            (if ._present==true then {status:"pass", detail:"present"}
-             elif ._present==false then {status:"warn", detail:"not present in the SBOM"}
-             else {status:"warn", detail:"requires human review (no automated source)"} end) as $s
-            | {id, label, required, status:$s.status, detail:$s.detail, missing,
+    # Fold appended to the same program (single jq run — see header comment).
+    local fold='
+        | map(
+            (if .source=="na" then {status:"warn", detail:"requires human review (no automated source)", missing:[]}
+             elif ._missing != null then
+               (._mtot) as $t | (._missing|length) as $m |
+               (if $t==0 then {status:"warn", detail:"no machine-learning-model components", missing:[]}
+                elif $m==0 then {status:"pass", detail:"\($t)/\($t) model component(s)", missing:[]}
+                else {status:"warn", detail:"\($t - $m)/\($t) model component(s)", missing:(._missing[0:$cap])} end)
+             elif ._present==true then {status:"pass", detail:"present", missing:[]}
+             elif ._present==false then {status:"warn", detail:"not present in the SBOM", missing:[]}
+             else {status:"warn", detail:"requires human review (no automated source)", missing:[]} end) as $s
+            | {id, label, required, status:$s.status, detail:$s.detail, missing:$s.missing,
                evidence: ((._ev // []) | unique | .[0:$cap]),
                cluster, source, role}
-        )
-    ' 2>/dev/null || echo "[]"
+        )'
+    local out
+    if ! out=$(jq -c --argjson cap "$MISSING_CAP" "${prog}${fold}" "$SBOM" 2>&1); then
+        echo "[validate] WARN: G7 registry evaluation failed; G7 checks skipped this run." >&2
+        echo "[validate]   $out" >&2
+        echo "[]"
+        return
+    fi
+    echo "$out"
 }
 
 spdx_json_checks() {
@@ -271,10 +297,14 @@ case "$FORMAT" in
 esac
 [ -n "$CHECKS" ] || CHECKS='[{"id":"parse","label":"Parseable SBOM","required":true,"status":"fail","detail":"could not evaluate","missing":[]}]'
 
-# Overall result: fail if any mandatory check failed.
+# Overall result: fail if any mandatory check failed. G7 elements with no
+# automated source (source "na") are counted separately as review items — a
+# well-formed AIBOM should not read as "30 warnings" just because a dozen G7
+# elements are checkable only by a human.
 RESULT=$(echo "$CHECKS" | jq -r 'if any(.[]; .required and .status=="fail") then "fail" else "pass" end')
 N_FAIL=$(echo "$CHECKS" | jq '[.[] | select(.required and .status=="fail")] | length')
-N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn")] | length')
+N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn" and ((.source // "") != "na"))] | length')
+N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na")] | length')
 
 # --------------------------------------------------------
 # JSON report
@@ -293,18 +323,20 @@ jq -n \
     echo ""
     echo "- Generated: ${GEN_AT}"
     echo "- Format: ${FORMAT}"
-    echo "- Result: **$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN})"
+    echo "- Result: **$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
     echo ""
     echo "| Status | Requirement | Required | Detail | Evidence |"
     echo "|--------|-------------|:--------:|--------|----------|"
     echo "$CHECKS" | jq -r '.[] |
-        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" else "⚠️" end) | \(.label) | \(if .required then "yes" else "no" end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | \(if .required then "yes" else "no" end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
     echo ""
-    # Missing-item detail for failed mandatory checks.
-    if echo "$CHECKS" | jq -e 'any(.[]; .required and .status=="fail" and (.missing|length>0))' >/dev/null; then
+    # Missing-item detail for every non-passing check that names offenders —
+    # mandatory failures AND advisory G7 warns (a reviewer needs to know WHICH
+    # model components lack the license/hash, not just the count).
+    if echo "$CHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "## Missing / non-conformant items"
         echo ""
-        echo "$CHECKS" | jq -r '.[] | select(.required and .status=="fail" and (.missing|length>0)) |
+        echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
     fi
 } > "$MD"
@@ -386,22 +418,23 @@ jq -n \
  <span class="pill pill-$( [ "$RESULT" = "pass" ] && echo pass || echo fail )">Result: $(echo "$RESULT" | tr '[:lower:]' '[:upper:]')</span>
  <span class="pill pill-fail">Mandatory failures: <span class="count">${N_FAIL}</span></span>
  <span class="pill pill-warn">Warnings: <span class="count">${N_WARN}</span></span>
+ <span class="pill">Needs review: <span class="count">${N_REVIEW}</span></span>
 </div>
 <div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
 HTMLHEAD
     echo "$CHECKS" | jq -r '.[] |
-        "<tr><td class=\"s-\(.status)\">" + (.status|ascii_upcase|@html) + "</td>" +
+        "<tr><td class=\"s-\(.status)\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
         "<td>" + (.label|@html) + "</td><td>" + (if .required then "yes" else "no" end) + "</td>" +
         "<td>" + ((.detail // "")|@html) + "</td>" +
         "<td>" + (((.evidence // []) | join(", "))|@html) + "</td></tr>"'
     echo "</table></div>"
-    if echo "$CHECKS" | jq -e 'any(.[]; .required and .status=="fail" and (.missing|length>0))' >/dev/null; then
+    if echo "$CHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "<h2>Missing / non-conformant items</h2>"
-        echo "$CHECKS" | jq -r '.[] | select(.required and .status=="fail" and (.missing|length>0)) |
+        echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
     fi
     echo "</body></html>"
 } > "$HTML"
 
-echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN): $JSON, $MD, $HTML"
+echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN, review=$N_REVIEW): $JSON, $MD, $HTML"
 exit 0

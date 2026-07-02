@@ -351,6 +351,7 @@
     "sWarn": "권고",
     "howToFix": "보완 방법:",
     "evidence": "충족 근거:",
+    "missing": "누락 항목:",
     "example": "예시:",
     "learnMore": "더 알아보기",
     "cluster": {

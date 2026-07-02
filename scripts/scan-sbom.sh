@@ -50,6 +50,7 @@ SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
+MERGE_ROOT=""
 OUTPUT_BASE=""; TIMESTAMP="false"
 
 # ========================================================
@@ -71,6 +72,7 @@ while [[ "$#" -gt 0 ]]; do
                 MERGE_FILES+=("$1"); shift
             done
             continue ;;   # we already consumed our args; skip the trailing shift
+        --merge-root) MERGE_ROOT="$2"; shift ;;
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
         --no-report) NO_REPORT="true" ;;
@@ -114,6 +116,10 @@ Options:
                          stamp the root component with --project/--version. For
                          layered server delivery (OS rootfs + app + static-link).
                          Mutually exclusive with --target/--analyze/--git.
+  --merge-root <file>    With --merge: keep THIS input's specVersion and root
+                         component (e.g. an ML-BOM's 1.7 + modelCard) instead of
+                         writing a fresh 1.6 root. Must be one of the --merge
+                         files; the root is renamed to --project/--version.
   --generate-only        Save locally without uploading
   --trusca <project_id>  Upload the SBOM to TRUSCA's native ingest endpoint
                          (shorthand for --upload-target trusca with the id).
@@ -264,8 +270,8 @@ SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -433,10 +439,20 @@ if [ "${#MERGE_FILES[@]}" -gt 0 ]; then
     [ -z "$MODEL" ]       || { echo "[ERROR] --merge is mutually exclusive with --model."; exit 1; }
     [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --merge cannot be combined with --firmware."; exit 1; }
     [ "${#MERGE_FILES[@]}" -ge 2 ] || { echo "[ERROR] --merge needs at least 2 SBOM files."; exit 1; }
+    if [ -n "$MERGE_ROOT" ]; then
+        MR_OK=false
+        MR_RESOLVED="$(cd "$(dirname "$MERGE_ROOT")" 2>/dev/null && pwd)/$(basename "$MERGE_ROOT")"
+        for mf in "${MERGE_FILES[@]}"; do
+            [ "$(cd "$(dirname "$mf")" && pwd)/$(basename "$mf")" = "$MR_RESOLVED" ] && MR_OK=true
+        done
+        [ "$MR_OK" = "true" ] || { echo "[ERROR] --merge-root must be one of the --merge input files."; exit 1; }
+    fi
     for mf in "${MERGE_FILES[@]}"; do
         is_sbom_file "$mf" || { echo "[ERROR] not a CycloneDX SBOM (or unsafe path): $mf"; exit 1; }
     done
     MODE="MERGE"
+elif [ -n "$MERGE_ROOT" ]; then
+    echo "[ERROR] --merge-root only applies with --merge."; exit 1
 elif [ "$INGEST_SOURCE" = "true" ]; then
     # A git clone / extracted archive is always scanned as SOURCE (the temp dir
     # would otherwise be detected as ROOTFS below).
@@ -567,13 +583,18 @@ else
             # that share a basename (three layers all named *_bom.json) don't
             # collide. MERGE_FILES carries the container-side paths.
             VOL="-v \"$OUTPUT_HOST_DIR\":/host-output"; MF_CONTAINER=""; i=0
+            ROOT_ENV=""
+            MR_RESOLVED=""
+            [ -n "$MERGE_ROOT" ] && MR_RESOLVED="$(cd "$(dirname "$MERGE_ROOT")" && pwd)/$(basename "$MERGE_ROOT")"
             for mf in "${MERGE_FILES[@]}"; do
                 FD="$(cd "$(dirname "$mf")" && pwd)"; FN="$(basename "$mf")"
                 VOL="$VOL -v \"$FD\":/merge-in-$i:ro"
                 MF_CONTAINER="$MF_CONTAINER /merge-in-$i/$FN"
+                # --merge-root: point merge-sbom.sh at this input's container path.
+                [ -n "$MR_RESOLVED" ] && [ "$FD/$FN" = "$MR_RESOLVED" ] && ROOT_ENV=" -e MERGE_ROOT_FROM=\"/merge-in-$i/$FN\""
                 i=$((i + 1))
             done
-            ENVV="-e MERGE_FILES=\"${MF_CONTAINER# }\"" ;;
+            ENVV="-e MERGE_FILES=\"${MF_CONTAINER# }\"$ROOT_ENV" ;;
     esac
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
