@@ -19,6 +19,10 @@ on:
         description: "Regenerate ALL UI visual baselines in the pinned container and upload them as an artifact (commit the ones that changed)"
         type: boolean
         default: false
+      reseed_guide_shots:
+        description: "Regenerate the docs/images guide screenshots (npm run capture:ui) in the pinned container and upload them (commit the ones that changed)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -528,6 +532,33 @@ jobs:
         with:
           name: visual-baselines
           path: docker/web/frontend/tests/ui/**/*-snapshots/**
+
+  # Guide screenshots (docs/images/web-ui-*.png) are captured by npm run capture:ui
+  # in the same pinned container so they render like the visual baselines. They are
+  # not a gate — this job only runs on demand (reseed_guide_shots=true), regenerates
+  # them, and uploads them as an artifact to download and commit. Run it whenever a
+  # UI change makes the guide screenshots stale.
+  guide-shots:
+    name: Regenerate guide screenshots
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.reseed_guide_shots == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+    defaults:
+      run:
+        working-directory: docker/web/frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install dependencies
+        run: npm ci
+      - name: Capture guide screenshots
+        run: npm run capture:ui
+      - name: Upload regenerated guide screenshots
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: guide-screenshots
+          path: docs/images/**
 
   doc-coverage:
     name: Doc Coverage
