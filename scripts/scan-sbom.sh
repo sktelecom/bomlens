@@ -167,7 +167,7 @@ Environment:
   TRUSCA_RELEASE         Ingest release label (default: --version value)
 
 Architecture: source SBOM generation uses cdxgen's per-language images
-(on-demand); this tool orchestrates + post-processes. See docs/direction-study.md.
+(on-demand); this tool orchestrates + post-processes.
 EOF
             exit 0 ;;
         *) echo "[ERROR] Unknown option: $1"; exit 1 ;;

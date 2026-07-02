@@ -46,7 +46,7 @@ flowchart TB
 
 ## 왜 2단계인가
 
-기존에는 모든 언어 런타임 + 분석 도구를 하나의 거대한 이미지에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다(근거는 메인테이너용 [방향성 조사 보고서](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) §1, §5).
+기존에는 모든 언어 런타임 + 분석 도구를 하나의 거대한 이미지에 담았습니다. 재설계된 파이프라인은 책임을 둘로 나눕니다.
 
 | | Stage 1 이미지 | Stage 2 이미지 (`bomlens`) |
 |---|---|---|
@@ -55,7 +55,7 @@ flowchart TB
 | **획득** | 프로젝트 언어 감지 후 **on-demand pull** | 한 번 pull해서 재사용 |
 | **이점** | 언어별 최신 toolchain을 cdxgen이 직접 관리 | 이미지가 작고, 도구 버전 고정으로 재현성 확보 |
 
-> 주류 5개 언어(java, python, node, dotnet, php)는 cdxgen 공식 이미지로 검출이 동일하고, go와 ruby, rust에서 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen)와 [방향성 조사 보고서](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) §1을 참조하세요.
+> 주류 5개 언어(java, python, node, dotnet, php)는 cdxgen 공식 이미지로 검출이 동일하고, go와 ruby, rust에서 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen)를 참조하세요.
 
 ---
 

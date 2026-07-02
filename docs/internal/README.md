@@ -4,17 +4,13 @@
 
 아키텍처 문서는 사용자 문서 사이트로 옮겼습니다. [docs/architecture.md](../concepts/architecture.ko.md)를 보세요.
 
+전략과 방향, 우선순위를 다루는 문서는 이 폴더가 아니라 별도 비공개 저장소에서 관리합니다. 이 폴더에는 기술 설계와 기여자 실무 문서만 둡니다.
+
 | 문서 | 내용 |
 |------|------|
-| [방향성 조사 보고서](direction-study.md) | Docker 이미지의 가치(cdxgen 대비 측정)와 설계 방향 |
-| [데스크톱 앱 검토 보고서](desktop-app-study.md) | Windows 데스크톱 앱(Electron) 도입 검토 |
 | [공급사 제출 SBOM 검증·분석](supplier-sbom-analysis.md) | ANALYZE 모드 검증·변환·위험 보고 설계 |
 | [검출 모드](detection-modes.md) | SOURCE 스캔에 경량·정적 검출 모드를 옵트인으로 더하는 설계(미구현 제안) |
 | [펌웨어 분석](firmware-analysis.md) | FIRMWARE 모드 언팩·바이너리 식별 설계와 도구 선정 |
-| [AI SBOM 대응 준비](ai-sbom-readiness.md) | AI SBOM 규제·가이드 분석, 갭 분석, 포맷(AI 경로 CDX 1.7)·도구 평가와 우선 역량 로드맵 |
-| [개선 로드맵](improvement-roadmap.md) | 스캔 결과에서 드러난 미비점과 우선순위 |
-| [문서 사용성 검토 보고서](docs-usability-review.md) | 신규 사용자 관점의 README와 가이드 검토, 우선순위 개선안 |
-| [외부 등록 채널](seo-external-listings.md) | 검색·AI 노출용 큐레이션 목록과 레지스트리 제출 자료 |
 | [배포 절차](release-guide.md) | 태그 기반 릴리스 체크리스트와 실행 절차 |
 | [도구 버전 업그레이드 안전장치](dependency-upgrade-policy.md) | 외부 도구 신규 버전 도입을 지키는 4계층(감지·스냅샷·정본·호환성 점검) |
 

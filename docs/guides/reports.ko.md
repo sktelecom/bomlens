@@ -179,5 +179,3 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 | UI에서 `Docker is not running` | Docker 엔진(Rancher Desktop/Docker Desktop 등)을 시작한 뒤 다시 실행하세요. |
 | 고지문에 `NOASSERTION`이 많음 | 의존성에 라이선스 메타데이터가 없는 경우입니다. `--deep-license`로 보완하거나 수동 확인하세요. |
 | 포트 충돌(`--ui`) | `UI_PORT`로 다른 포트를 지정하세요. |
-
-자세한 설계 배경은 [방향성 조사 보고서](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md)를 참고하세요.

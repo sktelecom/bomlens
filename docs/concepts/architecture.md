@@ -50,7 +50,7 @@ The single entry point for orchestration is `scripts/scan-sbom.sh` (`scan-sbom.b
 
 ## Why two stages
 
-Previously, every language runtime plus every analysis tool lived in a single huge image. The redesigned pipeline splits the responsibilities in two (see the maintainer-facing [direction study report](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) (Korean) §1 and §5 for the rationale).
+Previously, every language runtime plus every analysis tool lived in a single huge image. The redesigned pipeline splits the responsibilities in two.
 
 | | Stage 1 image | Stage 2 image (`bomlens`) |
 |---|---|---|
@@ -59,7 +59,7 @@ Previously, every language runtime plus every analysis tool lived in a single hu
 | **Acquisition** | Pulled **on demand** after detecting the project language | Pulled once and reused |
 | **Benefit** | cdxgen maintains up-to-date per-language toolchains | Small image; pinned tool versions ensure reproducibility |
 
-> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is decisively better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen) and the [direction study report](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) (Korean) §1.
+> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is decisively better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen).
 
 ---
 
