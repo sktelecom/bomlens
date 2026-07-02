@@ -2,7 +2,7 @@
 # BomLens — post-processing image (2-stage architecture)
 # Image: ghcr.io/sktelecom/sbom-scanner
 #
-# In the redesigned pipeline (see docs/direction-study.md), SBOM GENERATION for
+# In the redesigned pipeline, SBOM GENERATION for
 # source code is delegated to cdxgen's official per-language images (pulled
 # on-demand by scripts/scan-sbom.sh). THIS image is the lightweight
 # post-processor + syft scanner; it carries NO language toolchains.
@@ -257,8 +257,8 @@ RUN --mount=type=secret,id=nvd_api_key \
     fi
 
 # OWASP AIBOM Generator (opt-in: --build-arg SBOM_AIBOM=true). Generates an AI
-# SBOM (CycloneDX 1.7) for a HuggingFace model id; see scan-aibom.sh and
-# docs/internal/ai-sbom-readiness.md. Apache-2.0, pinned to a commit (no PyPI
+# SBOM (CycloneDX 1.7) for a HuggingFace model id; see scan-aibom.sh.
+# Apache-2.0, pinned to a commit (no PyPI
 # release yet). Cloned into /opt/aibom-generator and run as `python -m src.cli`
 # from there: a bare `pip install` drops the tool's data files (model-field
 # registry, SPDX schema), so we keep the repo layout. git is in the base layer.

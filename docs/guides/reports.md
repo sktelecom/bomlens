@@ -179,5 +179,3 @@ The private key is mounted read-only into the container. Additional output: `MyA
 | `Docker is not running` in the UI | start the Docker engine (Rancher Desktop/Docker Desktop, etc.) and run it again. |
 | Many `NOASSERTION` in the notice | the dependencies have no license metadata. Supplement with `--deep-license` or check manually. |
 | Port conflict (`--ui`) | specify a different port with `UI_PORT`. |
-
-For the detailed design background, see the [direction study](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/direction-study.md) (Korean).

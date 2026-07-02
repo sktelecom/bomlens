@@ -11,8 +11,7 @@
 # a normal software scan's NOTICE is unchanged.
 #
 # Returns "" for anything not in scope. The tool only SURFACES the class; whether
-# a given restriction applies to a use is a human/legal judgement (see
-# docs/internal/ai-sbom-readiness.md §8).
+# a given restriction applies to a use is a human/legal judgement.
 def license_flag($s):
   (($s // "") | ascii_downcase | gsub("[ ._/-]+"; " ")) as $n |
   if   ($n | test("openrail|\\brail\\b|responsible ai|community license|\\bllama|\\bgemma\\b|falcon llm")) then "behavioral-use"

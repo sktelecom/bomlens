@@ -1,6 +1,6 @@
 # 펌웨어 분석 (Firmware Analysis)
 
-> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) | [방향성 조사 보고서](direction-study.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [번들 도구 라이선스](../../THIRD_PARTY_LICENSES.md)
+> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [번들 도구 라이선스](../../THIRD_PARTY_LICENSES.md)
 >
 > 성격: 메인테이너용 설계·의사결정 문서입니다. Phase 1+2는 구현·머지를 마쳤으며(§5), §1의 "현재"는 펌웨어 도구가 없는 기본 이미지를 기준으로 한 한계를 뜻합니다. opt-in `sbom-scanner-firmware` 이미지(`--firmware`)가 이를 해소합니다. Phase 3(함수 핑거프린팅)만 선택적 향후 과제로 남습니다.
 

@@ -21,7 +21,7 @@
 #   AI SBOMs (machine-learning-model present): the full G7 minimum-element
 #               checklist is appended (7 clusters / 50 elements, data-driven from
 #               docker/lib/g7-registry.json), all recommended, each tagged with a
-#               data source — see docs/internal/ai-sbom-readiness.md.
+#               data source.
 set -e
 
 SBOM="$1"

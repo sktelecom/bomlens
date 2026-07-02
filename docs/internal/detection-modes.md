@@ -1,6 +1,6 @@
 # 검출 모드 (Detection Modes)
 
-> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) · [입력별 파이프라인](../concepts/pipeline-by-input.ko.md) · [방향성 조사 보고서](direction-study.md) · [개선 로드맵](improvement-roadmap.md)
+> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) · [입력별 파이프라인](../concepts/pipeline-by-input.ko.md)
 >
 > 성격: 설계·의사결정 문서 (메인테이너용). **미구현 — 제안 단계**입니다. SOURCE 스캔이 무조건 빌드+Docker로만 동작하는 현행에, 빌드를 생략하는 경량·정적 검출 모드를 옵트인으로 더하는 설계입니다. 출처는 OpenChain Korea Work Group SCA 벤치마크 팀의 검출 모드 제안 보고서입니다. 정적 백엔드 최종 선택은 벤치마크 후로 남겨 둡니다.
 

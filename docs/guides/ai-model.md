@@ -6,8 +6,6 @@ description: Generate a CycloneDX ML-BOM for a HuggingFace AI model with BomLens
 
 How to generate a CycloneDX ML-BOM (machine-learning bill of materials) for a HuggingFace model and read the result. You give a model id; BomLens fetches the model-card metadata over the network — no source code and no model-weight download.
 
-For the design background and regulatory context (EU AI Act, G7), see the maintainer doc [AI SBOM readiness](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/ai-sbom-readiness.md) (Korean).
-
 ## How it works
 
 An AI model's "bill of materials" is its model card: identifier, architecture, task, license, supplier, datasets, and the integrity of its files. BomLens uses the [OWASP AIBOM Generator](https://github.com/GenAI-Security-Project/aibom-generator) to read a HuggingFace model card and build a **CycloneDX 1.7 ML-BOM** centered on the model and the datasets it references. It then adds a **G7 minimum-element conformance** check (advisory). Because a model has no package dependencies, there is no security (CVE) report.
