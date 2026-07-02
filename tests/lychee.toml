@@ -1,0 +1,29 @@
+# lychee configuration for the nightly external-link check (nightly.yml).
+# Internal relative links are verified on every PR by scripts/check-doc-links.sh;
+# this lane covers only what can rot on its own schedule: external URLs.
+
+max_retries = 3
+timeout = 20
+max_concurrency = 8
+# Some sites answer bots with 403/429 while working fine in a browser; a link
+# that resolves at the transport level is not "broken" for our purposes.
+accept = [200, 201, 202, 203, 204, 206, 301, 302, 303, 304, 307, 308, 403, 429]
+cache = true
+max_cache_age = "1d"
+# A GitHub token is passed via GITHUB_TOKEN in CI for github.com rate limits.
+
+exclude = [
+  # Local servers the guides tell the reader to open after launching the UI.
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  # Documentation placeholders, not real destinations.
+  "^https?://example\\.com",
+  "^https?://github\\.com/org/",
+  # Registry paths are verified by pulling, not by HTTP GET.
+  "^https?://ghcr\\.io",
+  # Internal servers reachable only on the corporate network.
+  "sktelecom\\.net",
+]
+
+# Private/internal notes are not user-followed docs.
+exclude_path = ["docs/internal"]
