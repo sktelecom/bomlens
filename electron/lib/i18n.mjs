@@ -27,6 +27,7 @@ const MAIN = {
     startingUi: "UI 컨테이너를 시작하는 중...",
     ready: "준비 완료. UI를 엽니다.",
     startFailed: (msg) => `시작에 실패했습니다: ${msg}`,
+    containerDied: "UI 컨테이너가 종료되었습니다. 다시 시도를 눌러 재시작하세요.",
     updateTitle: "업데이트 알림",
     updateMessage: (current, latest) =>
       `새 버전(v${latest})이 나왔습니다. 현재 버전은 v${current}입니다.`,
@@ -46,6 +47,7 @@ const MAIN = {
     startingUi: "Starting the UI container...",
     ready: "Ready. Opening the UI.",
     startFailed: (msg) => `Startup failed: ${msg}`,
+    containerDied: "The UI container stopped. Press Try again to restart it.",
     updateTitle: "Update available",
     updateMessage: (current, latest) =>
       `A new version (v${latest}) is available. You are on v${current}.`,

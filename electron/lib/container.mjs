@@ -69,7 +69,8 @@ export function findFreePort() {
 }
 
 // /capabilities는 200 + JSON을 반환하는 가벼운 엔드포인트라 readiness 신호로 적합하다.
-function ping(port) {
+// 기동 대기(UiContainer.start)와 로드 이후의 헬스 모니터(main.mjs)가 함께 쓴다.
+export function ping(port) {
   return new Promise((resolve) => {
     const req = http.get(
       { host: "127.0.0.1", port, path: "/capabilities", timeout: 1500 },

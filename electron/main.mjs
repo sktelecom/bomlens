@@ -12,16 +12,19 @@ import {
   dockerStatus,
   findFreePort,
   imagePresent,
+  ping,
   pullImage,
   UiContainer,
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
+import { createHealthMonitor } from "./lib/health.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 let container = null;
+let healthMonitor = null;
 let mainWindow = null;
 let appOrigin = "file://";
 // 시작 화면 언어: app.getLocale()로 결정(앱 준비 이후에 확정). 그 전 안전한 기본은 영어.
@@ -123,11 +126,39 @@ async function startup() {
     status(t.ready);
     await mainWindow.loadURL(appOrigin);
     setBootState(BOOT.READY);
+    // UI 로드 이후의 컨테이너 사망 감지: ping 실패 + 컨테이너 종료가 확인되면
+    // 상태 화면으로 되돌린다(handleContainerDown). 바쁜 서버(ping만 실패)는 오탐하지 않는다.
+    healthMonitor?.stop();
+    healthMonitor = createHealthMonitor({
+      pingFn: () => ping(port),
+      aliveFn: () => (container ? container.alive() : Promise.resolve(false)),
+      onDown: () => {
+        handleContainerDown().catch(() => {});
+      },
+    });
+    healthMonitor.start();
   } catch (err) {
     // 기동 실패는 상태만 전이하고 기존처럼 호출자(startFailed 로그)로 던진다.
     setBootState(BOOT.FAILED_START, err.message);
     throw err;
   }
+}
+
+// UI 로드 후 컨테이너가 죽었을 때: 모니터를 멈추고 잔여물을 방어적으로 정리한 뒤
+// 상태 화면으로 돌아가 failed-died로 전이한다(재시도 버튼이 뜬다).
+async function handleContainerDown() {
+  healthMonitor?.stop();
+  healthMonitor = null;
+  const current = container;
+  container = null;
+  appOrigin = "file://";
+  await current?.stop();
+  if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
+  await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
+    query: { lang },
+  });
+  setBootState(BOOT.FAILED_DIED);
+  status(t.containerDied);
 }
 
 // 새 릴리스 알림: 부팅이 어느 종착지(UI 로드, Docker 안내, 실패)에 도달한 뒤에 띄워
@@ -149,6 +180,8 @@ async function showUpdateDialog(info) {
 let shutdownPromise = null;
 function shutdown() {
   if (!shutdownPromise) {
+    healthMonitor?.stop();
+    healthMonitor = null;
     const current = container;
     container = null;
     shutdownPromise = Promise.resolve(current?.stop());
@@ -196,7 +229,10 @@ function registerApp() {
       return { ok: true };
     }
 
-    // failed-pull / failed-start / failed-died: 남은 컨테이너를 방어적으로 정리하고 재시도.
+    // failed-pull / failed-start / failed-died: 모니터를 멈추고 남은 컨테이너를
+    // 방어적으로 정리한 뒤 재시도.
+    healthMonitor?.stop();
+    healthMonitor = null;
     await container?.stop();
     container = null;
     startup().catch((err) => status(t.startFailed(err.message)));
