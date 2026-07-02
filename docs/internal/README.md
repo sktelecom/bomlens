@@ -6,7 +6,6 @@
 
 | 문서 | 내용 |
 |------|------|
-| [정체성과 방향](identity-and-direction.md) | BomLens가 무엇이고 무엇이 아닌지, 2026년 하반기 실행 방향과 우선순위 |
 | [방향성 조사 보고서](direction-study.md) | Docker 이미지의 가치(cdxgen 대비 측정)와 설계 방향 |
 | [데스크톱 앱 검토 보고서](desktop-app-study.md) | Windows 데스크톱 앱(Electron) 도입 검토 |
 | [공급사 제출 SBOM 검증·분석](supplier-sbom-analysis.md) | ANALYZE 모드 검증·변환·위험 보고 설계 |
