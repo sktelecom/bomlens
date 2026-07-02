@@ -438,6 +438,42 @@ pr_specs=$(jq '[.components[] | select((.purl|startswith("pkg:pypi/")) and ((.pr
 pr_dangling=$(jq '[.dependencies[]? | (.ref, (.dependsOn[]?)) | select(test("pkg:pypi/(flask@2.0|requests@2.25)$"))] | length' "$WORK/pr.json")
 [ "$pr_dangling" = "0" ] && pass "dependency graph has no dangling refs to dropped components" || fail "$pr_dangling dangling dependency ref(s) remain"
 
+echo "== os-src: deb/apk/rpm components get aquasecurity:trivy:Src* for Trivy CVE matching =="
+# Regression for the SCA-benchmark os-vuln-zero report: Trivy matches distro
+# advisories by SOURCE package name, which it only reads from its own
+# aquasecurity:trivy:SrcName property — the `upstream` purl qualifier syft emits
+# is ignored, so a syft-generated container SBOM scanned with `trivy sbom` got
+# the distro and packages recognized but ZERO OS vulnerabilities, silently.
+# normalize-sbom.sh must synthesize Src* from the purl.
+cp "$FIX/os-pkgs-src.json" "$WORK/os.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/os.json" >/dev/null 2>&1
+srcprop() { jq -r --arg n "$1" --arg p "aquasecurity:trivy:$2" \
+    '[.components[] | select(.name==$n) | (.properties // [])[] | select(.name==$p) | .value] | first // "ABSENT"' "$WORK/os.json"; }
+[ "$(srcprop libssl3 SrcName)" = "openssl" ] && pass "deb: SrcName from upstream qualifier (libssl3 -> openssl)" || fail "libssl3 SrcName='$(srcprop libssl3 SrcName)', expected openssl"
+[ "$(srcprop libssl3 SrcVersion)" = "3.0.17" ] && pass "deb: SrcVersion split from version" || fail "libssl3 SrcVersion='$(srcprop libssl3 SrcVersion)', expected 3.0.17"
+[ "$(srcprop libssl3 SrcRelease)" = "1~deb12u3" ] && pass "deb: SrcRelease split from version" || fail "libssl3 SrcRelease='$(srcprop libssl3 SrcRelease)', expected 1~deb12u3"
+[ "$(srcprop base-files SrcName)" = "base-files" ] && pass "deb: SrcName falls back to package name (no upstream)" || fail "base-files SrcName='$(srcprop base-files SrcName)'"
+[ "$(srcprop base-files SrcVersion)" = "12.4+deb12u12" ] && pass "deb: native version kept whole (no revision)" || fail "base-files SrcVersion='$(srcprop base-files SrcVersion)'"
+[ "$(srcprop base-files SrcRelease)" = "ABSENT" ] && pass "deb: no SrcRelease for a native package" || fail "base-files SrcRelease='$(srcprop base-files SrcRelease)', expected absent"
+[ "$(srcprop dash SrcEpoch)" = "1" ] && pass "deb: epoch split out of the version (1:0.5.12-2)" || fail "dash SrcEpoch='$(srcprop dash SrcEpoch)', expected 1"
+[ "$(srcprop dash SrcVersion)" = "0.5.12" ] && pass "deb: epoch-stripped SrcVersion" || fail "dash SrcVersion='$(srcprop dash SrcVersion)', expected 0.5.12"
+[ "$(srcprop libgtk2.0-0 SrcName)" = "gtk+2.0" ] && pass "deb: percent-encoded upstream decoded (gtk%2B2.0 -> gtk+2.0)" || fail "libgtk2.0-0 SrcName='$(srcprop libgtk2.0-0 SrcName)', expected gtk+2.0"
+[ "$(srcprop libgtk2.0-0 SrcVersion)" = "2.24.33" ] && pass "deb: source version taken from upstream@version" || fail "libgtk2.0-0 SrcVersion='$(srcprop libgtk2.0-0 SrcVersion)', expected 2.24.33"
+[ "$(srcprop libcrypto3 SrcName)" = "openssl" ] && pass "apk: SrcName from upstream (libcrypto3 -> openssl)" || fail "libcrypto3 SrcName='$(srcprop libcrypto3 SrcName)'"
+[ "$(srcprop libcrypto3 SrcVersion)" = "3.0.8-r3" ] && pass "apk: version kept whole (no release split)" || fail "libcrypto3 SrcVersion='$(srcprop libcrypto3 SrcVersion)', expected 3.0.8-r3"
+[ "$(srcprop openssl-libs SrcName)" = "openssl" ] && pass "rpm: SrcName parsed from source-RPM filename" || fail "openssl-libs SrcName='$(srcprop openssl-libs SrcName)', expected openssl"
+[ "$(srcprop openssl-libs SrcVersion)" = "3.0.1" ] && pass "rpm: SrcVersion parsed from source-RPM filename" || fail "openssl-libs SrcVersion='$(srcprop openssl-libs SrcVersion)', expected 3.0.1"
+[ "$(srcprop openssl-libs SrcRelease)" = "43.el9_0" ] && pass "rpm: SrcRelease parsed from source-RPM filename" || fail "openssl-libs SrcRelease='$(srcprop openssl-libs SrcRelease)', expected 43.el9_0"
+[ "$(srcprop openssl-libs SrcEpoch)" = "1" ] && pass "rpm: SrcEpoch from the epoch qualifier" || fail "openssl-libs SrcEpoch='$(srcprop openssl-libs SrcEpoch)', expected 1"
+[ "$(srcprop pre-enriched SrcName)" = "custom-src" ] && pass "existing SrcName left untouched (Trivy-generated SBOMs)" || fail "pre-enriched SrcName='$(srcprop pre-enriched SrcName)', expected custom-src"
+pre_n=$(jq '[.components[] | select(.name=="pre-enriched") | (.properties // [])[] | select(.name=="aquasecurity:trivy:SrcName")] | length' "$WORK/os.json")
+[ "$pre_n" = "1" ] && pass "no duplicate SrcName added to a pre-enriched component" || fail "pre-enriched has $pre_n SrcName properties, expected 1"
+npm_n=$(jq '[.components[] | select(.name=="lodash") | (.properties // [])[] | select(.name | startswith("aquasecurity:trivy:"))] | length' "$WORK/os.json")
+[ "$npm_n" = "0" ] && pass "non-OS purl (npm) untouched" || fail "lodash got $npm_n trivy propert(ies), expected 0"
+bash "$LIB/normalize-sbom.sh" "$WORK/os.json" >/dev/null 2>&1
+total_src=$(jq '[.components[].properties[]? | select(.name=="aquasecurity:trivy:SrcName")] | length' "$WORK/os.json")
+[ "$total_src" = "7" ] && pass "idempotent: second normalize adds no duplicate properties" || fail "SrcName count after 2nd run = $total_src, expected 7"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
