@@ -32,16 +32,33 @@ jobs:
           # Minimum plausible installer size (bytes); a real .exe/.dmg is tens of MB.
           min=1000000
           fail=0
+          # Published checksums (releases since the gate started appending
+          # installer lines). Older releases lack these lines — fall back to
+          # the size check so the weekly schedule stays green across the
+          # transition.
+          curl -sL -o SHA256SUMS.txt "$base/SHA256SUMS.txt" || true
           for file in BomLens-Setup.exe BomLens-Setup.dmg; do
             url="$base/$file"
-            hdr="$(curl -sIL "$url" || true)"
-            code="$(printf '%s' "$hdr" | awk '/^HTTP/ {c=$2} END {print c}')"
-            len="$(printf '%s' "$hdr" | grep -i '^content-length:' | tail -1 | tr -dc '0-9')"
-            if [ "$code" = "200" ] && [ -n "$len" ] && [ "$len" -ge "$min" ]; then
-              echo "✓ $file → HTTP $code, ${len} bytes"
-            else
-              echo "❌ $file → HTTP ${code:-none}, size ${len:-0} (expected 200 and ≥ ${min} bytes)"
+            if ! curl -sL -o "$file" "$url"; then
+              echo "❌ $file → download failed"
               fail=1
+              continue
+            fi
+            len="$(stat -c %s "$file" 2>/dev/null || echo 0)"
+            if [ "$len" -lt "$min" ]; then
+              echo "❌ $file → size ${len} (expected ≥ ${min} bytes)"
+              fail=1
+              continue
+            fi
+            if grep -q "  $file\$" SHA256SUMS.txt 2>/dev/null; then
+              if grep "  $file\$" SHA256SUMS.txt | sha256sum --check --quiet -; then
+                echo "✓ $file → ${len} bytes, checksum matches SHA256SUMS.txt"
+              else
+                echo "❌ $file → checksum does NOT match SHA256SUMS.txt"
+                fail=1
+              fi
+            else
+              echo "✓ $file → ${len} bytes (no checksum published for this release)"
             fi
           done
           [ "$fail" -eq 0 ] || { echo "one or more advertised downloads are missing or broken"; exit 1; }
