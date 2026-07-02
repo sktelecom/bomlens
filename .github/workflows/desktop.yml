@@ -66,6 +66,14 @@ jobs:
       - name: Build installer
         shell: bash
         run: |
+          # Unconfigured secrets arrive as EMPTY env vars, and electron-builder
+          # treats an empty CSC_LINK as "certificate provided", then fails trying
+          # to import it ("not a file"). PR builds never hit this because signing
+          # is skipped on pull requests entirely — only push/dispatch builds do.
+          # Unset the empty ones so unsigned builds stay unsigned.
+          [ -n "${CSC_LINK:-}" ] || unset CSC_LINK CSC_KEY_PASSWORD
+          [ -n "${WIN_CSC_LINK:-}" ] || unset WIN_CSC_LINK WIN_CSC_KEY_PASSWORD
+          [ -n "${APPLE_ID:-}" ] || unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
           args=(${{ matrix.args }} --publish never)
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             args+=("-c.extraMetadata.version=${GITHUB_REF#refs/tags/v}")
