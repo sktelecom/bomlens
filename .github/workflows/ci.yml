@@ -183,113 +183,72 @@ jobs:
       - name: UX heuristics
         run: bash scripts/check-ux-heuristics.sh
 
-  web-e2e:
-    name: Web UI E2E (container scan -> done)
+  # PR-only path detection for the path-filtered heavy jobs below. Plain git
+  # diff against the PR base (no third-party action): base.sha is the base at
+  # sync time and HEAD is the virtual merge commit of base + head, so
+  # `git diff base HEAD` is exactly the PR's change set.
+  changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
-    # Heavy (builds a scanner image, boots the UI container, runs real scans), so
-    # it stays off the per-PR critical path: it runs on main pushes and on
-    # manual dispatch. The lightweight API contract (tests/test-web-ui.sh) still
-    # guards every PR in the postprocess job.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-
+    if: github.event_name == 'pull_request'
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      # Base image + SCANOSS only: gives us server.py, run-scan, syft and
-      # scanoss-py — enough for the sbom-upload (ANALYZE), docker-image (IMAGE),
-      # current-dir (SOURCE/syft) cases and the dot-path SCANOSS regression. The
-      # 15GB cdxgen language image and firmware/aibom flavors are deliberately
-      # excluded to keep the build light; those scan paths fall back to syft.
-      - name: Build scanner image (base + scanoss)
-        run: |
-          docker build --build-arg SBOM_SCANOSS=true \
-            -t bomlens-e2e:ci ./docker
-
-      - name: Run web UI e2e (SSE scan-stream -> done)
+      - name: Classify changed paths
+        id: filter
         env:
-          SBOM_E2E_IMAGE: bomlens-e2e:ci
-        run: bash tests/test-web-e2e.sh
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          changed="$(git diff --name-only "$BASE_SHA" HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The three heavy suites live in the reusable heavy-e2e.yml (shared with the
+  # nightly full run, so the step definitions cannot drift). Gating:
+  #   - web-e2e: main pushes, dispatch, AND pull requests that touch the web
+  #     stack (docker/web/**, image entry, its own harness) — the layer where a
+  #     PR regression is most user-visible and the always-on contract suite
+  #     cannot see container wiring.
+  #   - full-e2e / docs-walkthrough: main pushes and dispatch only (scanner PRs
+  #     already run the real-Docker integration suite); the nightly run bounds
+  #     drift on quiet days to 24h.
+  web-e2e:
+    name: Web UI E2E
+    needs: [changes]
+    if: >-
+      !cancelled() && (
+        github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' && needs.changes.outputs.web == 'true'))
+    uses: ./.github/workflows/heavy-e2e.yml
+    with:
+      suites: web-e2e
 
   full-e2e:
-    name: Full CLI E2E (comprehensive + examples)
-    runs-on: ubuntu-latest
-    # Heavy: builds the scanner image and runs the comprehensive CLI suite
-    # (tests/test-e2e.sh — analyze, source ingestion, image scan, cosign signing,
-    # byte-stable) plus the real-example scan suite (tests/test-examples-e2e.sh).
-    # These were previously orphaned (written but never run in CI). Like web-e2e
-    # they stay off the per-PR critical path: main pushes and manual
-    # dispatch only. The firmware group self-skips unless dispatched with
-    # firmware=true; the SCANOSS group stays gated behind SCANOSS_E2E.
+    name: Full CLI E2E
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Grant script permissions
-        run: chmod +x scripts/scan-sbom.sh tests/test-e2e.sh tests/test-examples-e2e.sh
-
-      # Tag as sbom-scanner:test — the default image name both scripts expect, so
-      # they run with no extra env. base + scanoss covers analyze/source/image/
-      # cosign; cdxgen per-language images are pulled on demand for source scans.
-      - name: Build scanner image (base + scanoss)
-        run: docker build --build-arg SBOM_SCANOSS=true -t sbom-scanner:test ./docker
-
-      # Opt-in: building the GPL firmware image (unblob/cve-bin-tool) is slow, so it
-      # is only built on manual dispatch with firmware=true. test-e2e.sh skips its
-      # firmware group when this image is absent.
-      - name: Build firmware image (dispatch + firmware=true only)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.firmware == 'true'
-        run: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware:test ./docker
-
-      # Opt-in: the deep-license (scancode) image compiles PyICU and pulls native
-      # libarchive/libmagic, so it is slow and only built on manual dispatch with
-      # deep_license=true. Its Dockerfile build gate runs a real license scan, so a
-      # regression in those native deps fails the build here rather than at runtime.
-      - name: Build deep-license image (dispatch + deep_license=true only)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deep_license == 'true'
-        run: docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner-deep-license:test ./docker
-
-      - name: Run comprehensive CLI e2e (test-e2e.sh)
-        run: bash tests/test-e2e.sh
-
+    uses: ./.github/workflows/heavy-e2e.yml
+    with:
+      suites: full-e2e
+      firmware: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.firmware == 'true' }}
+      deep_license: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deep_license == 'true' }}
       # On push, scan a representative subset (npm/pip/gomod) to bound runtime;
       # manual dispatch (ONLY empty) scans every bundled example.
-      - name: Run real-example scan e2e (test-examples-e2e.sh)
-        env:
-          ONLY: ${{ github.event_name == 'push' && 'nodejs python go' || '' }}
-        run: bash tests/test-examples-e2e.sh
+      examples_only: ${{ github.event_name == 'push' && 'nodejs python go' || '' }}
 
   docs-walkthrough:
-    name: Docs Walkthrough (getting-started commands)
-    runs-on: ubuntu-latest
-    # Runs the getting-started guide's runnable blocks verbatim against a real
-    # scanner image to prove the documented commands still work. Heavy (builds an
-    # image, runs a scan), so like web-e2e it is push/dispatch only.
+    name: Docs Walkthrough
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      # Base image (syft) is enough: the first-scan walkthrough scans the bundled
-      # example as a directory (ROOTFS/syft). Tag it sbom-scanner:test, the
-      # default the harness expects.
-      - name: Build scanner image (base)
-        run: docker build -t sbom-scanner:test ./docker
-
-      - name: Run docs walkthrough
-        run: bash tests/test-docs-walkthrough.sh
+    uses: ./.github/workflows/heavy-e2e.yml
+    with:
+      suites: docs-walkthrough
 
   validate-docs:
     name: Validate Documentation

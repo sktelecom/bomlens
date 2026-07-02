@@ -13,6 +13,17 @@ permissions:
   contents: read
 
 jobs:
+  # Full heavy-suite run (web UI E2E, comprehensive CLI E2E over ALL bundled
+  # examples, docs walkthrough) via the same reusable workflow ci.yml uses on
+  # main pushes. On quiet days (no push to main) this bounds drift in the
+  # user-facing scan paths to 24 hours instead of "until the next merge".
+  heavy-e2e:
+    name: Heavy E2E (full)
+    uses: ./.github/workflows/heavy-e2e.yml
+    with:
+      suites: web-e2e full-e2e docs-walkthrough
+      examples_only: ""
+
   macos-real-scan:
     name: macOS real scan (Colima)
     runs-on: macos-latest
@@ -64,3 +75,36 @@ jobs:
               echo "⚠️ no SBOM produced — see the log (Colima or scan step failed)"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Nightly is never a required check, so a red run is invisible unless someone
+  # opens the Actions tab. Surface failures as a single rolling issue instead:
+  # first failure opens it, repeats comment on it, and it is closed by hand once
+  # the cause is fixed.
+  report-failure:
+    name: Open issue on failure
+    runs-on: ubuntu-latest
+    needs: [heavy-e2e, macos-real-scan]
+    if: failure()
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the nightly-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAVY: ${{ needs.heavy-e2e.result }}
+          MACOS: ${{ needs.macos-real-scan.result }}
+        run: |
+          title="Nightly checks are failing"
+          body="Nightly run failed: ${RUN_URL}
+          - Heavy E2E: ${HEAVY}
+          - macOS real scan: ${MACOS}"
+          num=$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
+                --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$REPO" --body "$body"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
