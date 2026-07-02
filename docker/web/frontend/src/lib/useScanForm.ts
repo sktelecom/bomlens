@@ -41,6 +41,18 @@ export const TEXT_INPUT: Partial<
   "ai-model": { label: "source.aiModel", placeholder: "source.aiModelPlaceholder", hint: "source.aiModelHint" },
 };
 
+/** Per-field validation errors; values are i18n keys for the inline message.
+ *  Keys double as the input element ids, so the first invalid field can be
+ *  focused directly on a failed submit. */
+export interface FieldErrors {
+  project?: string;
+  version?: string;
+  target?: string;
+  file?: string;
+}
+
+const FIELD_ORDER: Array<keyof FieldErrors> = ["project", "version", "target", "file"];
+
 export interface OptionToggle {
   key: string;
   value: boolean;
@@ -76,9 +88,9 @@ export function useScanForm({
   const [source, setSource] = useState<SourceType>(
     () => initialConfig?.source ?? "current-dir",
   );
-  const [target, setTarget] = useState(() => initialConfig?.target ?? "");
+  const [target, setTargetRaw] = useState(() => initialConfig?.target ?? "");
   const [gitToken, setGitToken] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
   const [deepLicense, setDeepLicense] = useState(
@@ -92,9 +104,18 @@ export function useScanForm({
     () => initialConfig?.includeOsv ?? false,
   );
   const [scanossToken, setScanossToken] = useState("");
-  const [invalid, setInvalid] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  /** Typing into a field resolves its inline error immediately. */
+  const clearError = (k: keyof FieldErrors) =>
+    setErrors((prev) => {
+      if (!(k in prev)) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
 
   const uploadKind = UPLOAD_KIND[source];
   const textInput = TEXT_INPUT[source];
@@ -122,11 +143,21 @@ export function useScanForm({
    *  so the autofill never fights someone who deliberately blanked it. */
   const setProject = (v: string) => {
     setProjectDirty(true);
+    clearError("project");
     setProjectRaw(v);
   };
   const setVersion = (v: string) => {
     setVersionDirty(true);
+    clearError("version");
     setVersionRaw(v);
+  };
+  const setTarget = (v: string) => {
+    clearError("target");
+    setTargetRaw(v);
+  };
+  const setFile = (f: File | null) => {
+    clearError("file");
+    setFileRaw(f);
   };
 
   // Prefill project/version from the scan source while the user hasn't touched
@@ -163,19 +194,29 @@ export function useScanForm({
   /** Switching source resets the dependent inputs. */
   const changeSource = (s: SourceType) => {
     setSource(s);
-    setFile(null);
-    setTarget("");
+    setFileRaw(null);
+    setTargetRaw("");
     setGitToken("");
     setUploadError(null);
-    setInvalid(false);
+    setErrors({});
   };
 
   const submit = async () => {
     setUploadError(null);
-    if (!project.trim() || !version.trim()) return setInvalid(true);
-    if (isText && !target.trim()) return setInvalid(true);
-    if (uploadKind && !file) return setInvalid(true);
-    setInvalid(false);
+    const errs: FieldErrors = {};
+    if (!project.trim()) errs.project = "validation.project";
+    if (!version.trim()) errs.version = "validation.version";
+    if (isText && !target.trim()) errs.target = "validation.target";
+    if (uploadKind && !file) errs.file = "validation.file";
+    setErrors(errs);
+    const firstInvalid = FIELD_ORDER.find((k) => errs[k]);
+    if (firstInvalid) {
+      // Land keyboard/screen-reader users on the first field that needs fixing
+      // (field keys double as the input ids). The Run button itself stays
+      // enabled — disabling it would hide *why* the scan can't start.
+      document.getElementById(firstInvalid)?.focus();
+      return;
+    }
 
     let token: string | undefined;
     let cred: string | undefined;
@@ -260,7 +301,7 @@ export function useScanForm({
     identifyVendored, setIdentifyVendored,
     includeOsv, setIncludeOsv,
     scanossToken, setScanossToken,
-    invalid, uploadError, uploading,
+    errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showIncludeOsv, showScanOptions,
     options, submit,

@@ -622,6 +622,9 @@
   },
   "validation": {
     "required": "Enter a project name and version (and any required input).",
-    "file": "Choose a file to analyze."
+    "file": "Choose a file to analyze.",
+    "project": "Enter a project name.",
+    "version": "Enter a version.",
+    "target": "Enter the scan target."
   }
 }
