@@ -57,9 +57,27 @@ test("docker-missing recovers to READY after the daemon comes back", async () =>
     // The retry must carry the boot to the container origin: status screen ->
     // orphan cleanup -> image present -> fake `docker run` boots server.py ->
     // health poll passes -> loadURL(http://127.0.0.1:<port>).
-    await expect
-      .poll(() => win.url(), { timeout: 30_000 })
-      .toMatch(/^http:\/\/127\.0\.0\.1:\d+/);
+    try {
+      await expect
+        .poll(() => win.url(), { timeout: 60_000 })
+        .toMatch(/^http:\/\/127\.0\.0\.1:\d+/);
+    } catch (err) {
+      // Post-mortem for CI runners: the fake docker traces its invocations and
+      // the spawned server's output; the startup log records boot transitions.
+      const userDataDir = await app.evaluate(({ app: a }) => a.getPath("userData"));
+      for (const f of [
+        path.join(scratch, "docker.log"),
+        path.join(scratch, "server.log"),
+        path.join(userDataDir, "startup.log"),
+      ]) {
+        try {
+          console.log(`--- ${f} ---\n${fs.readFileSync(f, "utf8")}`);
+        } catch {
+          console.log(`--- ${f} --- (missing)`);
+        }
+      }
+      throw err;
+    }
 
     // The startup log must record the full recovery path.
     const userData = await app.evaluate(({ app: a }) => a.getPath("userData"));

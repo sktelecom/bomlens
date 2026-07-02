@@ -17,6 +17,8 @@ set -eu
 state="down"
 [ -f "${FAKE_DOCKER_STATE:-}" ] && state="$(cat "$FAKE_DOCKER_STATE")"
 piddir="${FAKE_DOCKER_RUN_DIR:-/tmp}"
+# Trace every invocation for post-mortem when the spec fails on a CI runner.
+echo "state=$state argv: $*" >> "$piddir/docker.log" 2>/dev/null || true
 
 case "${1:-}" in
     version|info)
@@ -42,10 +44,12 @@ case "${1:-}" in
             prev="$a"
         done
         [ -n "$hostport" ] || { echo "fake-docker: no -p mapping" >&2; exit 125; }
+        command -v python3 >> "$piddir/docker.log" 2>&1 || echo "no python3 on PATH" >> "$piddir/docker.log"
         UI_PORT="$hostport" SBOM_OUTPUT_DIR="${FAKE_OUTPUT_DIR:-$piddir}" \
             SBOM_UI_HOST_DIR="${FAKE_OUTPUT_DIR:-$piddir}" \
             python3 "$FAKE_SERVER" > "$piddir/server.log" 2>&1 &
         echo "$!" > "$piddir/server.pid"
+        echo "spawned server pid=$(cat "$piddir/server.pid") port=$hostport" >> "$piddir/docker.log"
         echo "fakeuicontainer0000000000000000000000000000000000000000000000000000"
         ;;
     inspect)
