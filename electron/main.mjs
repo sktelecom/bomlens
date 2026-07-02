@@ -14,6 +14,7 @@ import {
   pullImage,
   UiContainer,
 } from "./lib/container.mjs";
+import { BOOT } from "./lib/boot.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
@@ -34,6 +35,14 @@ function send(channel, payload) {
 
 function status(line) {
   send("status", line);
+}
+
+// 부팅 상태 전이: 전역 상태를 갱신하고 렌더러(상태 화면)에 브로드캐스트한다.
+// reason은 실패 상태의 부가 정보(예: docker-missing의 not-installed/not-running).
+let bootState = BOOT.IDLE;
+function setBootState(state, reason = null) {
+  bootState = state;
+  send("startup-state", { state, reason });
 }
 
 // 보안: 신규 창 차단, 외부 출처 네비게이션은 시스템 브라우저로.
@@ -69,11 +78,13 @@ async function createWindow() {
 }
 
 async function startup() {
+  setBootState(BOOT.CHECKING);
   status(t.dockerChecking);
   const docker = await dockerStatus();
   if (!docker.installed || !docker.running) {
     appOrigin = "file://";
     const reason = !docker.installed ? "not-installed" : "not-running";
+    setBootState(BOOT.FAILED_DOCKER, reason);
     // platform은 OS별 설치 안내(옵션 목록) 분기용. 렌더러는 process에 접근할 수 없다.
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
       query: { reason, lang, platform: process.platform },
@@ -82,24 +93,34 @@ async function startup() {
   }
 
   if (!(await imagePresent(DEFAULT_IMAGE))) {
+    setBootState(BOOT.PULLING);
     status(t.firstPull);
     status(t.image(DEFAULT_IMAGE));
     status(t.network);
     const ok = await pullImage(DEFAULT_IMAGE, (line) => status(line));
     if (!ok) {
       status(t.pullFailed);
+      setBootState(BOOT.FAILED_PULL);
       return;
     }
   }
 
+  setBootState(BOOT.STARTING);
   status(t.startingUi);
-  const port = await findFreePort();
-  container = new UiContainer({ image: DEFAULT_IMAGE, hostPort: port });
-  await container.start({ timeoutMs: 90000 });
+  try {
+    const port = await findFreePort();
+    container = new UiContainer({ image: DEFAULT_IMAGE, hostPort: port });
+    await container.start({ timeoutMs: 90000 });
 
-  appOrigin = `http://127.0.0.1:${port}`;
-  status(t.ready);
-  await mainWindow.loadURL(appOrigin);
+    appOrigin = `http://127.0.0.1:${port}`;
+    status(t.ready);
+    await mainWindow.loadURL(appOrigin);
+    setBootState(BOOT.READY);
+  } catch (err) {
+    // 기동 실패는 상태만 전이하고 기존처럼 호출자(startFailed 로그)로 던진다.
+    setBootState(BOOT.FAILED_START, err.message);
+    throw err;
+  }
 }
 
 // 새 릴리스 알림: 부팅이 어느 종착지(UI 로드, Docker 안내, 실패)에 도달한 뒤에 띄워
