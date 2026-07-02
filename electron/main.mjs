@@ -19,6 +19,7 @@ import {
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
+import { createStartupLogger } from "./lib/log.mjs";
 import { parseWindowState, sanitizeBounds } from "./lib/winstate.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
@@ -28,6 +29,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 let container = null;
 let healthMonitor = null;
 let mainWindow = null;
+// 부팅 로그: 상태 화면과 같은 내용을 userData/startup.log에 남긴다(whenReady에서 생성).
+let startupLogger = null;
 let appOrigin = "file://";
 // 시작 화면 언어: app.getLocale()로 결정(앱 준비 이후에 확정). 그 전 안전한 기본은 영어.
 let lang = "en";
@@ -39,8 +42,10 @@ function send(channel, payload) {
   }
 }
 
+// 진행 메시지: 상태 화면(렌더러)과 시작 로그 파일에 이중으로 기록한다.
 function status(line) {
   send("status", line);
+  startupLogger?.line(line);
 }
 
 // 부팅 상태 전이: 전역 상태를 갱신하고 렌더러(상태 화면)에 브로드캐스트한다.
@@ -48,6 +53,8 @@ function status(line) {
 let bootState = BOOT.IDLE;
 function setBootState(state, reason = null) {
   bootState = state;
+  // 상태 전이도 시작 로그에 남긴다. 진행 메시지 사이의 전이 시점이 문제 진단에 유용하다.
+  startupLogger?.line(reason ? `boot state: ${state} (${reason})` : `boot state: ${state}`);
   send("startup-state", { state, reason });
 }
 
@@ -283,6 +290,8 @@ function registerApp() {
     // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
     lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
     t = mainMessages(lang);
+    // 시작 로그 파일: 실행마다 새로 쓴다. UI 전환 후 사라진 진행 내역을 문제 보고에 쓴다.
+    startupLogger = createStartupLogger(path.join(app.getPath("userData"), "startup.log"));
     // macOS About 패널에 앱 이름과 버전을 표기한다(다른 OS에서는 효과가 없고 무해).
     app.setAboutPanelOptions({ applicationName: "BomLens", applicationVersion: app.getVersion() });
     app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
@@ -331,6 +340,12 @@ function registerApp() {
 
   app.on("window-all-closed", () => {
     shutdown().finally(() => app.quit());
+  });
+
+  // 종료 직전 로그 스트림을 닫아 버퍼를 파일로 밀어낸다. 실패는 무시된다.
+  app.on("quit", () => {
+    startupLogger?.close();
+    startupLogger = null;
   });
 
   let quitting = false;
