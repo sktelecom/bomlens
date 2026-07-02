@@ -48,6 +48,11 @@ FIRMWARE_IMAGE = os.environ.get(
 AIBOM_IMAGE = os.environ.get(
     "SBOM_AIBOM_IMAGE", "ghcr.io/sktelecom/bomlens-aibom:latest"
 )
+# In-process scan runner. Inside the image this is always the baked-in
+# /usr/local/bin/run-scan; the No-Docker contract tests (tests/test-web-ui.sh)
+# substitute a stub scanner here so the /scan-stream SSE protocol is testable
+# without Docker. Server-env only — never derived from request input.
+RUN_SCAN = os.environ.get("SBOM_RUN_SCAN", "/usr/local/bin/run-scan")
 
 # Per-kind upload size caps (bytes).
 MAX_BYTES = {
@@ -1738,7 +1743,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 try:
                     proc = subprocess.Popen(
-                        ["/usr/local/bin/run-scan"], env=env, cwd=cwd,
+                        [RUN_SCAN], env=env, cwd=cwd,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )
