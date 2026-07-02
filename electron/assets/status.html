@@ -4,14 +4,35 @@
     <meta charset="utf-8" />
     <title>BomLens</title>
     <style>
+      /* 색은 커스텀 프로퍼티로 모으고, OS가 라이트 모드면 아래 미디어 쿼리가 덮어쓴다. */
       :root {
-        color-scheme: dark;
+        color-scheme: light dark;
+        --bg: #0a0a0c;
+        --fg: #e7e7ea;
+        --muted: #9a9aa2;
+        --dim: #6f6f77;
+        --panel: #131316;
+        --border: #26262b;
+        --line: #c7c7cd;
+        --line-latest: #ffffff;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f5f5f7;
+          --fg: #1c1c21;
+          --muted: #6b6b74;
+          --dim: #8a8a92;
+          --panel: #ffffff;
+          --border: #d9d9de;
+          --line: #3c3c44;
+          --line-latest: #000000;
+        }
       }
       body {
         margin: 0;
         font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
-        background: #0a0a0c;
-        color: #e7e7ea;
+        background: var(--bg);
+        color: var(--fg);
         height: 100vh;
         display: flex;
         flex-direction: column;
@@ -27,14 +48,14 @@
       header p {
         margin: 6px 0 0;
         font-size: 13px;
-        color: #9a9aa2;
+        color: var(--muted);
       }
       #log {
         flex: 1;
         margin: 8px 32px 28px;
         padding: 16px;
-        background: #131316;
-        border: 1px solid #26262b;
+        background: var(--panel);
+        border: 1px solid var(--border);
         border-radius: 8px;
         overflow-y: auto;
         font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -44,10 +65,10 @@
         word-break: break-all;
       }
       .line {
-        color: #c7c7cd;
+        color: var(--line);
       }
       .line.latest {
-        color: #ffffff;
+        color: var(--line-latest);
       }
       #retry {
         display: none;
@@ -66,20 +87,69 @@
         opacity: 0.5;
         cursor: default;
       }
+      #version {
+        margin: 0;
+        padding: 0 32px 14px;
+        font-size: 11.5px;
+        color: var(--dim);
+      }
+      #lang-toggle {
+        position: fixed;
+        top: 20px;
+        right: 24px;
+        font-size: 12px;
+        color: var(--dim);
+        user-select: none;
+      }
+      #lang-toggle button {
+        padding: 2px 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      #lang-toggle button:disabled {
+        color: var(--fg);
+        cursor: default;
+      }
     </style>
   </head>
   <body>
+    <nav id="lang-toggle" aria-label="Language">
+      <button type="button" data-lang="ko">KO</button>|<button type="button" data-lang="en">EN</button>
+    </nav>
     <header>
       <img src="logo.svg" alt="BomLens — SBOM Generator" style="height: 40px; width: auto; display: block" />
       <p id="subtitle"></p>
     </header>
     <div id="log" aria-live="polite"></div>
     <button id="retry" type="button"></button>
+    <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
-      const lang =
-        new URLSearchParams(location.search).get("lang") === "ko" ? "ko" : "en";
+      const params = new URLSearchParams(location.search);
+      const lang = params.get("lang") === "ko" ? "ko" : "en";
       document.documentElement.lang = lang;
+
+      // 앱 버전은 main.mjs가 ?v= 쿼리로 넘긴다. 파일을 직접 열어 쿼리가 없으면 표시하지 않는다.
+      const version = params.get("v");
+      if (version) document.getElementById("version").textContent = `BomLens v${version}`;
+
+      // 언어 토글: lang 쿼리만 바꾸고 나머지 쿼리(v 등)는 보존한 채 같은 화면을 다시 연다.
+      // 현재 언어 버튼은 비활성으로 표시한다.
+      for (const button of document.querySelectorAll("#lang-toggle button")) {
+        if (button.dataset.lang === lang) {
+          button.disabled = true;
+        } else {
+          button.addEventListener("click", () => {
+            const next = new URLSearchParams(location.search);
+            next.set("lang", button.dataset.lang);
+            location.replace(`${location.pathname}?${next}`);
+          });
+        }
+      }
       const STR = {
         ko: {
           subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",

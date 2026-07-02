@@ -3,7 +3,8 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, session, shell } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +19,8 @@ import {
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
+import { createStartupLogger } from "./lib/log.mjs";
+import { parseWindowState, sanitizeBounds } from "./lib/winstate.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
 import { checkForUpdate, RELEASES_PAGE } from "./lib/update.mjs";
 
@@ -26,6 +29,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 let container = null;
 let healthMonitor = null;
 let mainWindow = null;
+// 부팅 로그: 상태 화면과 같은 내용을 userData/startup.log에 남긴다(whenReady에서 생성).
+let startupLogger = null;
 let appOrigin = "file://";
 // 시작 화면 언어: app.getLocale()로 결정(앱 준비 이후에 확정). 그 전 안전한 기본은 영어.
 let lang = "en";
@@ -37,8 +42,10 @@ function send(channel, payload) {
   }
 }
 
+// 진행 메시지: 상태 화면(렌더러)과 시작 로그 파일에 이중으로 기록한다.
 function status(line) {
   send("status", line);
+  startupLogger?.line(line);
 }
 
 // 부팅 상태 전이: 전역 상태를 갱신하고 렌더러(상태 화면)에 브로드캐스트한다.
@@ -46,6 +53,8 @@ function status(line) {
 let bootState = BOOT.IDLE;
 function setBootState(state, reason = null) {
   bootState = state;
+  // 상태 전이도 시작 로그에 남긴다. 진행 메시지 사이의 전이 시점이 문제 진단에 유용하다.
+  startupLogger?.line(reason ? `boot state: ${state} (${reason})` : `boot state: ${state}`);
   send("startup-state", { state, reason });
 }
 
@@ -63,12 +72,50 @@ function hardenWebContents(contents) {
   });
 }
 
+// 창 위치/크기 기억: userData/window-state.json에 저장하고 다음 실행에서 복원한다.
+// 파일 손상이나 모니터 구성 변화로 화면 밖이면 기본 크기로 뜬다(lib/winstate.mjs).
+const WINDOW_DEFAULTS = { width: 1200, height: 860 };
+
+function windowStatePath() {
+  return path.join(app.getPath("userData"), "window-state.json");
+}
+
+function restoreWindowState() {
+  let saved = null;
+  try {
+    saved = parseWindowState(fs.readFileSync(windowStatePath(), "utf8"));
+  } catch {
+    // 파일 없음/읽기 실패: 첫 실행처럼 기본값으로 뜬다.
+  }
+  const workAreas = screen.getAllDisplays().map((display) => display.workArea);
+  return {
+    bounds: sanitizeBounds(saved, workAreas, WINDOW_DEFAULTS),
+    maximized: saved?.maximized === true,
+  };
+}
+
+function saveWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  // getNormalBounds(): 최대화 상태여도 복원 시 쓸 일반 상태의 영역을 준다.
+  const state = { ...mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() };
+  try {
+    fs.writeFileSync(windowStatePath(), JSON.stringify(state));
+  } catch {
+    // 저장 실패는 무시한다(다음 실행이 기본값으로 뜰 뿐이다).
+  }
+}
+
 async function createWindow() {
+  const { bounds, maximized } = restoreWindowState();
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 860,
-    backgroundColor: "#0a0a0c",
+    ...bounds,
+    // 첫 페인트 배경을 OS 테마에 맞춰 흰/검 플래시를 막는다. 시작 화면의 CSS
+    // (prefers-color-scheme)와 같은 색이어야 한다.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0a0a0c" : "#f5f5f7",
     title: "BomLens",
+    // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
+    // Menu.setApplicationMenu(null)은 단축키까지 없애므로 쓰지 않는다.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(here, "preload.mjs"),
       contextIsolation: true,
@@ -76,8 +123,10 @@ async function createWindow() {
       sandbox: false, // ESM preload 사용
     },
   });
+  if (maximized) mainWindow.maximize();
+  mainWindow.on("close", saveWindowState);
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang },
+    query: { lang, v: app.getVersion() },
   });
 }
 
@@ -93,7 +142,7 @@ async function startup() {
     setBootState(BOOT.FAILED_DOCKER, reason);
     // platform은 OS별 설치 안내(옵션 목록) 분기용. 렌더러는 process에 접근할 수 없다.
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-      query: { reason, lang, platform: process.platform },
+      query: { reason, lang, platform: process.platform, v: app.getVersion() },
     });
     return;
   }
@@ -155,7 +204,7 @@ async function handleContainerDown() {
   await current?.stop();
   if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang },
+    query: { lang, v: app.getVersion() },
   });
   setBootState(BOOT.FAILED_DIED);
   status(t.containerDied);
@@ -223,7 +272,7 @@ function registerApp() {
       }
       // Docker가 살아났다: 상태 화면으로 돌아가 부팅을 재개한다(응답은 즉시 반환).
       await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-        query: { lang },
+        query: { lang, v: app.getVersion() },
       });
       startup().catch((err) => status(t.startFailed(err.message)));
       return { ok: true };
@@ -243,6 +292,10 @@ function registerApp() {
     // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
     lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
     t = mainMessages(lang);
+    // 시작 로그 파일: 실행마다 새로 쓴다. UI 전환 후 사라진 진행 내역을 문제 보고에 쓴다.
+    startupLogger = createStartupLogger(path.join(app.getPath("userData"), "startup.log"));
+    // macOS About 패널에 앱 이름과 버전을 표기한다(다른 OS에서는 효과가 없고 무해).
+    app.setAboutPanelOptions({ applicationName: "BomLens", applicationVersion: app.getVersion() });
     app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
     // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -264,7 +317,7 @@ function registerApp() {
       // 재확인 버튼과 OS별 안내 렌더를 스모크로 검증할 수 있게 한다.
       if (process.env.SBOM_SMOKE_SCREEN === "docker-missing") {
         await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-          query: { reason: "not-installed", lang, platform: process.platform },
+          query: { reason: "not-installed", lang, platform: process.platform, v: app.getVersion() },
         });
         return;
       }
@@ -289,6 +342,12 @@ function registerApp() {
 
   app.on("window-all-closed", () => {
     shutdown().finally(() => app.quit());
+  });
+
+  // 종료 직전 로그 스트림을 닫아 버퍼를 파일로 밀어낸다. 실패는 무시된다.
+  app.on("quit", () => {
+    startupLogger?.close();
+    startupLogger = null;
   });
 
   let quitting = false;

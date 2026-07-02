@@ -35,6 +35,26 @@ test("docker-missing screen renders the BomLens title and check-again button", a
   }
 });
 
+// The status screen's top-right language toggle swaps only the lang query and
+// reloads the same screen, so the copy switches without touching main-process state.
+test("language toggle on the status screen switches the copy", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_LANG: "en" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("#subtitle")).toHaveText(SUBTITLE.en);
+    // The current language's button is disabled; the other one switches.
+    await expect(win.locator('#lang-toggle button[data-lang="en"]')).toBeDisabled();
+    await win.locator('#lang-toggle button[data-lang="ko"]').click();
+    await expect(win.locator("#subtitle")).toHaveText(SUBTITLE.ko);
+    await expect(win.locator('#lang-toggle button[data-lang="ko"]')).toBeDisabled();
+  } finally {
+    await app.close();
+  }
+});
+
 for (const lang of ["en", "ko"] as const) {
   test(`desktop app boots and renders the start screen (${lang})`, async () => {
     const app = await electron.launch({

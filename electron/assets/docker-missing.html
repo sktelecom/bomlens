@@ -4,14 +4,37 @@
     <meta charset="utf-8" />
     <title>Docker required — BomLens</title>
     <style>
+      /* 색은 커스텀 프로퍼티로 모으고, OS가 라이트 모드면 아래 미디어 쿼리가 덮어쓴다. */
       :root {
-        color-scheme: dark;
+        color-scheme: light dark;
+        --bg: #0a0a0c;
+        --fg: #e7e7ea;
+        --text: #c7c7cd;
+        --muted: #9a9aa2;
+        --dim: #6f6f77;
+        --link: #6ea8fe;
+        --code-bg: #1c1c21;
+        --border: #26262b;
+        --feedback: #f0a5b4;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f5f5f7;
+          --fg: #1c1c21;
+          --text: #3c3c44;
+          --muted: #6b6b74;
+          --dim: #8a8a92;
+          --link: #1d4ed8;
+          --code-bg: #ececf0;
+          --border: #d9d9de;
+          --feedback: #b3103a;
+        }
       }
       body {
         margin: 0;
         font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
-        background: #0a0a0c;
-        color: #e7e7ea;
+        background: var(--bg);
+        color: var(--fg);
         min-height: 100vh;
         display: flex;
         align-items: center;
@@ -28,29 +51,29 @@
       p {
         font-size: 14px;
         line-height: 1.7;
-        color: #c7c7cd;
+        color: var(--text);
       }
       ul {
         font-size: 14px;
         line-height: 1.8;
-        color: #c7c7cd;
+        color: var(--text);
         padding-left: 18px;
       }
       a {
-        color: #6ea8fe;
+        color: var(--link);
       }
       code {
         font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
         font-size: 12.5px;
-        background: #1c1c21;
-        border: 1px solid #26262b;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
         border-radius: 4px;
         padding: 1px 5px;
       }
       .hint {
         margin-top: 20px;
         font-size: 13px;
-        color: #9a9aa2;
+        color: var(--muted);
       }
       #check-again {
         margin-top: 12px;
@@ -71,12 +94,46 @@
         min-height: 1.4em;
         margin: 10px 0 0;
         font-size: 13px;
-        color: #f0a5b4;
+        color: var(--feedback);
         visibility: hidden;
+      }
+      #version {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+        padding: 0 32px 14px;
+        font-size: 11.5px;
+        color: var(--dim);
+      }
+      #lang-toggle {
+        position: fixed;
+        top: 20px;
+        right: 24px;
+        font-size: 12px;
+        color: var(--dim);
+        user-select: none;
+      }
+      #lang-toggle button {
+        padding: 2px 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      #lang-toggle button:disabled {
+        color: var(--fg);
+        cursor: default;
       }
     </style>
   </head>
   <body>
+    <nav id="lang-toggle" aria-label="Language">
+      <button type="button" data-lang="ko">KO</button>|<button type="button" data-lang="en">EN</button>
+    </nav>
     <main>
       <h1 id="title"></h1>
       <p id="lead"></p>
@@ -86,6 +143,7 @@
       <button id="check-again" type="button"></button>
       <p id="feedback" role="status"></p>
     </main>
+    <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
       const params = new URLSearchParams(location.search);
@@ -95,6 +153,24 @@
       const rawPlatform = params.get("platform");
       const platform = ["win32", "darwin", "linux"].includes(rawPlatform) ? rawPlatform : "win32";
       document.documentElement.lang = lang;
+
+      // 앱 버전은 main.mjs가 ?v= 쿼리로 넘긴다. 파일을 직접 열어 쿼리가 없으면 표시하지 않는다.
+      const version = params.get("v");
+      if (version) document.getElementById("version").textContent = `BomLens v${version}`;
+
+      // 언어 토글: lang 쿼리만 바꾸고 나머지 쿼리(reason, platform, v)는 보존한 채
+      // 같은 화면을 다시 연다. 현재 언어 버튼은 비활성으로 표시한다.
+      for (const button of document.querySelectorAll("#lang-toggle button")) {
+        if (button.dataset.lang === lang) {
+          button.disabled = true;
+        } else {
+          button.addEventListener("click", () => {
+            const next = new URLSearchParams(location.search);
+            next.set("lang", button.dataset.lang);
+            location.replace(`${location.pathname}?${next}`);
+          });
+        }
+      }
 
       const STR = {
         ko: {
