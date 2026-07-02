@@ -69,6 +69,9 @@ async function createWindow() {
     height: 860,
     backgroundColor: "#0a0a0c",
     title: "BomLens",
+    // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
+    // Menu.setApplicationMenu(null)은 단축키까지 없애므로 쓰지 않는다.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(here, "preload.mjs"),
       contextIsolation: true,
@@ -77,7 +80,7 @@ async function createWindow() {
     },
   });
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang },
+    query: { lang, v: app.getVersion() },
   });
 }
 
@@ -93,7 +96,7 @@ async function startup() {
     setBootState(BOOT.FAILED_DOCKER, reason);
     // platform은 OS별 설치 안내(옵션 목록) 분기용. 렌더러는 process에 접근할 수 없다.
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-      query: { reason, lang, platform: process.platform },
+      query: { reason, lang, platform: process.platform, v: app.getVersion() },
     });
     return;
   }
@@ -155,7 +158,7 @@ async function handleContainerDown() {
   await current?.stop();
   if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang },
+    query: { lang, v: app.getVersion() },
   });
   setBootState(BOOT.FAILED_DIED);
   status(t.containerDied);
@@ -223,7 +226,7 @@ function registerApp() {
       }
       // Docker가 살아났다: 상태 화면으로 돌아가 부팅을 재개한다(응답은 즉시 반환).
       await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-        query: { lang },
+        query: { lang, v: app.getVersion() },
       });
       startup().catch((err) => status(t.startFailed(err.message)));
       return { ok: true };
@@ -243,6 +246,8 @@ function registerApp() {
     // 시작 화면 언어 확정: SBOM_LANG 환경변수 우선, 없으면 시스템 로캘(한국어면 ko, 아니면 en).
     lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
     t = mainMessages(lang);
+    // macOS About 패널에 앱 이름과 버전을 표기한다(다른 OS에서는 효과가 없고 무해).
+    app.setAboutPanelOptions({ applicationName: "BomLens", applicationVersion: app.getVersion() });
     app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
     // 보안: 로컬 컨테이너 출처로만 연결을 한정하는 CSP.
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -264,7 +269,7 @@ function registerApp() {
       // 재확인 버튼과 OS별 안내 렌더를 스모크로 검증할 수 있게 한다.
       if (process.env.SBOM_SMOKE_SCREEN === "docker-missing") {
         await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
-          query: { reason: "not-installed", lang, platform: process.platform },
+          query: { reason: "not-installed", lang, platform: process.platform, v: app.getVersion() },
         });
         return;
       }

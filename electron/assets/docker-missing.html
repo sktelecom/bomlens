@@ -74,6 +74,16 @@
         color: #f0a5b4;
         visibility: hidden;
       }
+      #version {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+        padding: 0 32px 14px;
+        font-size: 11.5px;
+        color: #6f6f77;
+      }
     </style>
   </head>
   <body>
@@ -86,6 +96,7 @@
       <button id="check-again" type="button"></button>
       <p id="feedback" role="status"></p>
     </main>
+    <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
       const params = new URLSearchParams(location.search);
@@ -95,6 +106,10 @@
       const rawPlatform = params.get("platform");
       const platform = ["win32", "darwin", "linux"].includes(rawPlatform) ? rawPlatform : "win32";
       document.documentElement.lang = lang;
+
+      // 앱 버전은 main.mjs가 ?v= 쿼리로 넘긴다. 파일을 직접 열어 쿼리가 없으면 표시하지 않는다.
+      const version = params.get("v");
+      if (version) document.getElementById("version").textContent = `BomLens v${version}`;
 
       const STR = {
         ko: {

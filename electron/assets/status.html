@@ -66,6 +66,12 @@
         opacity: 0.5;
         cursor: default;
       }
+      #version {
+        margin: 0;
+        padding: 0 32px 14px;
+        font-size: 11.5px;
+        color: #6f6f77;
+      }
     </style>
   </head>
   <body>
@@ -75,11 +81,16 @@
     </header>
     <div id="log" aria-live="polite"></div>
     <button id="retry" type="button"></button>
+    <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
-      const lang =
-        new URLSearchParams(location.search).get("lang") === "ko" ? "ko" : "en";
+      const params = new URLSearchParams(location.search);
+      const lang = params.get("lang") === "ko" ? "ko" : "en";
       document.documentElement.lang = lang;
+
+      // 앱 버전은 main.mjs가 ?v= 쿼리로 넘긴다. 파일을 직접 열어 쿼리가 없으면 표시하지 않는다.
+      const version = params.get("v");
+      if (version) document.getElementById("version").textContent = `BomLens v${version}`;
       const STR = {
         ko: {
           subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
