@@ -59,7 +59,7 @@ jobs:
       # 렌더하는지 확인한다. SBOM_SMOKE로 Docker/컨테이너 기동은 건너뛰어 결정론적이다.
       - name: Boot smoke (app launches and renders)
         run: npm run test:smoke
-      # 1차 미서명: mac 자동 서명 탐색을 끄고, 어떤 레지스트리에도 publish 하지 않는다.
+      # 서명은 시크릿이 있을 때만 켜진다(없으면 미서명). 어떤 레지스트리에도 publish 하지 않는다.
       # 태그 빌드는 버전을 태그에서 주입해 인스톨러 파일명이 릴리스와 항상 일치하게 한다.
       - name: Build installer
         shell: bash
@@ -71,12 +71,21 @@ jobs:
           npx --no-install electron-builder "${args[@]}"
         env:
           # Code signing is inert until these repo secrets are configured; without
-          # them the build stays unsigned (current behavior). When CSC_LINK is set,
-          # electron-builder signs the Windows installer. macOS Developer ID signing
-          # and notarization additionally require removing `identity: null` from
-          # electron-builder.yml and the APPLE_* secrets below — see electron/README.md.
+          # them the build stays unsigned (current behavior). Keep the Windows and
+          # macOS certificates in SEPARATE secrets: the generic CSC_LINK is also read
+          # by the macOS build, so a Windows .pfx placed there would be imported as
+          # an Apple certificate on the macos runner. See electron/README.md.
+          # Windows Authenticode certificate (.pfx) — signs the NSIS installer.
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # macOS Developer ID Application certificate (.p12).
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # macOS notarization — all-or-none: setting only part of the APPLE_*
+          # trio makes electron-builder fail the build with a configuration error.
+          # When absent, notarization is skipped with a warning (signing itself is
+          # only attempted when a certificate is present, so unsigned builds never
+          # reach the notarization step).
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

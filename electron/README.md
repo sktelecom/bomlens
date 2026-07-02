@@ -61,26 +61,67 @@ npm run dist:win      # Windows NSIS
 
 ## 코드 서명
 
-미서명 인스톨러는 Windows SmartScreen과 macOS Gatekeeper 경고를 띄운다. 서명하려면 코드
-서명 인증서가 필요하다. 인증서는 유료이고 조직 신원 확인이 필요해 별도로 발급받아야 한다.
+미서명 인스톨러는 Windows SmartScreen과 macOS Gatekeeper 경고를 띄운다. CI 워크플로우는
+아래 저장소 시크릿이 설정되면 자동으로 서명하고 공증하도록 배선돼 있다. 시크릿이 없으면
+지금처럼 미서명으로 빌드된다. 별도의 설정 파일 수정은 필요 없다.
 
-CI 워크플로우는 아래 저장소 시크릿이 설정되면 자동으로 서명하도록 배선돼 있다(시크릿이
-없으면 지금처럼 미서명으로 빌드된다).
+Windows와 macOS 인증서는 반드시 서로 다른 시크릿에 넣는다. 범용 `CSC_LINK`는 macOS
+빌드도 읽기 때문에, Windows용 `.pfx`를 거기 넣으면 macos 러너가 Apple 인증서로 임포트를
+시도해 빌드가 실패한다.
 
 | 시크릿 | 용도 |
 |--------|------|
-| `CSC_LINK` | 코드 서명 인증서(base64 인코딩한 `.pfx`/`.p12`, 또는 경로) |
-| `CSC_KEY_PASSWORD` | 인증서 비밀번호 |
-| `APPLE_ID` | (macOS 공증) Apple ID |
-| `APPLE_APP_SPECIFIC_PASSWORD` | (macOS 공증) 앱 암호 |
-| `APPLE_TEAM_ID` | (macOS 공증) 팀 ID |
+| `WIN_CSC_LINK` | Windows Authenticode 인증서(base64 인코딩한 `.pfx`) |
+| `WIN_CSC_KEY_PASSWORD` | Windows 인증서 비밀번호 |
+| `CSC_LINK` | macOS Developer ID Application 인증서(base64 인코딩한 `.p12`) |
+| `CSC_KEY_PASSWORD` | macOS 인증서 비밀번호 |
+| `APPLE_ID` | macOS 공증에 쓸 Apple ID |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 위 Apple ID의 앱 암호(appleid.apple.com에서 발급) |
+| `APPLE_TEAM_ID` | Apple Developer 팀 ID(멤버십 페이지) |
 
-설정 방법:
+`APPLE_*` 3종은 전부 넣거나 전부 뺀다. 일부만 설정하면 electron-builder가 설정 오류로
+빌드를 실패시킨다. 3종이 모두 없으면 공증만 건너뛰고 서명은 진행된다(공증 자체는 서명이
+성공한 빌드에서만 시도된다). 시크릿은 저장소 Settings의 Secrets and variables에서 추가한다.
 
-1. Windows: Authenticode 인증서(`.pfx`)를 base64로 인코딩해 `CSC_LINK`에, 비밀번호를
-   `CSC_KEY_PASSWORD`에 넣는다. 이것만으로 NSIS 인스톨러가 서명된다.
-2. macOS: Developer ID 인증서를 같은 방식으로 `CSC_LINK`/`CSC_KEY_PASSWORD`에 넣고,
-   `electron-builder.yml`의 `mac.identity: null`을 제거한 뒤 `APPLE_*` 시크릿으로 공증을
-   설정한다.
+### 인증서 발급 절차 (사람이 진행)
 
-시크릿은 저장소 Settings의 Secrets and variables에서 추가한다.
+macOS부터. Apple Developer Program 가입이 필요하다(연 99달러).
+
+1. 가입 주체를 정한다. 조직 가입(SK Telecom)은 D-U-N-S 번호와 법인 검증이 필요해 수일에서
+   수주가 걸리지만 Gatekeeper에 회사 이름이 표기된다. 개인 가입은 빠르지만 개인 이름이
+   표기되어 조직 배포에 어울리지 않는다. 조직 가입을 권장한다.
+2. Account Holder 권한으로 Developer ID Application 인증서를 발급하고 키체인에서 `.p12`로
+   내보낸 뒤 base64로 인코딩해 `CSC_LINK`에, 비밀번호를 `CSC_KEY_PASSWORD`에 넣는다.
+3. appleid.apple.com에서 앱 암호를 발급해(2단계 인증 필요) `APPLE_ID`,
+   `APPLE_APP_SPECIFIC_PASSWORD`에 넣고, 멤버십 페이지의 팀 ID를 `APPLE_TEAM_ID`에 넣는다.
+
+Windows는 두 경로 중에서 고른다.
+
+- Azure Trusted Signing(권장): 월 10달러 수준으로 저렴하고 파일 인증서가 필요 없다. Azure
+  구독과 3년 이상 조직 이력 검증이 필요하다. electron-builder 26이 기본 지원하지만
+  `azureSignOptions`를 설정 파일에 상주시킬 수 없어(있으면 무조건 Azure 경로로 감), 채택이
+  결정되면 워크플로우에서 조건 주입하는 후속 변경이 필요하다.
+- OV Authenticode: 연 200~500달러. 2023년 6월부터 개인키의 HSM 보관이 강제되어 파일
+  `.pfx` 발급이 사실상 막혔으므로, CI에서 쓰려면 DigiCert KeyLocker 같은 클라우드 HSM
+  상품이 필요하다. 발급받으면 `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`에 넣는다.
+
+어느 경로든 SmartScreen 평판은 서명 후에도 다운로드가 쌓여야 해소된다(EV 인증서만 즉시
+확보).
+
+### 서명 확인 (첫 서명 릴리스 후)
+
+```bash
+# macOS
+codesign -dv --verbose BomLens.app
+spctl -a -t open --context context:primary-signature BomLens-Setup.dmg
+xcrun stapler validate BomLens-Setup.dmg
+```
+
+```powershell
+# Windows
+Get-AuthenticodeSignature BomLens-Setup.exe
+```
+
+서명이 자리 잡으면 후속으로 검토할 것: 사용자 문서의 Gatekeeper 우회 안내
+(`docs/start/no-cli.md`) 축소, 그리고 electron-updater 기반 완전 자동 업데이트 도입
+(macOS 자동 업데이트는 서명된 앱에서만 동작하므로 서명이 선결 조건이다).

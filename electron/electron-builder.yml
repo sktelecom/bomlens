@@ -10,7 +10,12 @@ files:
   - assets/**/*
   - package.json
 # 백엔드와 React SPA는 스캐너 Docker 이미지가 서빙하므로 사이드카/프론트 동봉이 없다.
-# 1차는 미서명(코드 서명 인증서 주체 미정). 정식 배포 시 win.certificate / mac.notarize 추가.
+# 서명·공증은 이 파일이 아니라 CI 시크릿으로만 제어된다(desktop.yml) — Windows는
+# WIN_CSC_LINK/WIN_CSC_KEY_PASSWORD, macOS 서명은 CSC_LINK/CSC_KEY_PASSWORD,
+# 공증은 APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID 3종(전부 넣거나 전부 뺄 것).
+# 시크릿이 없으면 미서명으로 빌드된다(공증은 서명이 성공한 경우에만 시도되므로
+# notarize 키를 여기 둘 필요가 없다). hardened runtime과 기본 entitlements는
+# electron-builder 기본값으로 충분하다.
 # 버전 없는 고정 파일명. 릴리스마다 이름이 같아 영구 다운로드 URL
 # (releases/latest/download/BomLens-Setup.exe)이 성립한다. 버전은
 # 파일명이 아니라 인스톨러 내부(extraMetadata.version, desktop.yml)에 주입된다.
@@ -21,7 +26,6 @@ win:
 mac:
   target: dmg
   category: public.app-category.developer-tools
-  identity: null
 linux:
   target: AppImage
   category: Development
