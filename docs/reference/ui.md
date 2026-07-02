@@ -74,7 +74,7 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 ![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
 
-**Conformance** appears when you analyze an existing SBOM (the SBOM upload / ANALYZE mode), under Risk & compliance. It shows the format verdict — pass or fail — and the base CycloneDX checks (timestamp, tools, top-level component, name and version coverage, PURL coverage, transitive dependencies), with the missing items listed for each failed check. When the analyzed SBOM carries a machine-learning-model component, the G7 AI minimum-element checks (all advisory, "N of 6 present") appear here as a sub-block.
+**Conformance** appears when you analyze an existing SBOM (the SBOM upload / ANALYZE mode), under Risk & compliance. It shows the format verdict — pass or fail — and the base CycloneDX checks (timestamp, tools, top-level component, name and version coverage, PURL coverage, transitive dependencies), with the missing items listed for each failed check. When the analyzed SBOM carries a machine-learning-model component, the G7 AI minimum-element checks (all advisory) appear here as a sub-block, grouped by the seven G7 clusters and tagged by data source — read directly, inferred, or review-needed when no automated source exists.
 
 ![Conformance — format verdict with the G7 advisory sub-block](../images/web-ui-g7.png)
 
