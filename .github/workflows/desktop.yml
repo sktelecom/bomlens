@@ -101,6 +101,68 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Stay unsigned on macOS unless a Developer ID cert is provided.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+      # Installer smoke: the artifact users actually download was never
+      # installed or launched anywhere — release verification checked size and
+      # checksum only, so a packaging regression (missing asar entry, broken
+      # relative path, bad executable bits) could ship. Mount/install the just-
+      # built installer, launch the INSTALLED binary with SBOM_SMOKE=1 (no
+      # Docker, no image pull), and require the startup log's ready line. Runs
+      # before upload/attach, so a broken installer never reaches a release.
+      - name: Installer smoke (mount dmg, launch installed app)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          dmg="$(ls dist-electron/BomLens-Setup*.dmg | head -1)"
+          mnt="$RUNNER_TEMP/dmg"
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mnt"
+          cp -R "$mnt/BomLens.app" "$RUNNER_TEMP/"
+          hdiutil detach "$mnt"
+          # userData keeps the technical id (package.json name), not the display
+          # name — the same path the app uses in every install.
+          log="$HOME/Library/Application Support/sbom-generator-desktop/startup.log"
+          rm -f "$log"
+          SBOM_SMOKE=1 SBOM_LANG=en "$RUNNER_TEMP/BomLens.app/Contents/MacOS/BomLens" &
+          pid=$!
+          ok=0
+          for _ in $(seq 1 60); do
+            grep -q "Ready. Opening the UI." "$log" 2>/dev/null && { ok=1; break; }
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          if [ "$ok" != 1 ]; then
+            echo "::error::installed app never reached the ready line"
+            cat "$log" 2>/dev/null || true
+            exit 1
+          fi
+          echo "installed .app booted to the ready line"
+
+      - name: Installer smoke (silent NSIS install, launch installed app)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist-electron -Filter 'BomLens-Setup*.exe' | Select-Object -First 1
+          Start-Process -FilePath $exe.FullName -ArgumentList '/S' -Wait
+          $app = "$env:LOCALAPPDATA\Programs\BomLens\BomLens.exe"
+          if (!(Test-Path $app)) { throw "installed app not found: $app" }
+          # userData keeps the technical id (package.json name), not the display name.
+          $log = "$env:APPDATA\sbom-generator-desktop\startup.log"
+          Remove-Item $log -ErrorAction SilentlyContinue
+          $env:SBOM_SMOKE = "1"; $env:SBOM_LANG = "en"
+          $p = Start-Process -FilePath $app -PassThru
+          $ok = $false
+          foreach ($i in 1..60) {
+            if ((Test-Path $log) -and (Select-String -Path $log -Pattern "Ready. Opening the UI." -Quiet)) { $ok = $true; break }
+            if ($p.HasExited) { break }
+            Start-Sleep 1
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) {
+            if (Test-Path $log) { Get-Content $log }
+            throw "installed app never reached the ready line"
+          }
+          Write-Host "installed .exe booted to the ready line"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
