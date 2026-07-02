@@ -106,7 +106,7 @@ test("Re-scan prefills the New scan form from the config", async ({ page }) => {
 
   // Toggles mirror the config: security off, deep license on.
   await expect(page.getByRole("switch", { name: "Security report" })).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByRole("switch", { name: "License scan (ScanCode)" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("switch", { name: "Per-file license scan" })).toHaveAttribute("aria-checked", "true");
 
   // The git token is never seeded (not in the contract).
   await expect(page.locator("#gitToken")).toHaveValue("");

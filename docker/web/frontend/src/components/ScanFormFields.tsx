@@ -13,10 +13,33 @@ import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
  * generation options, validation messages and the run button.
  */
 
+/** Red asterisk marking a required field; hidden from AT — the input itself
+ *  carries `aria-required`, so the mark is purely visual. */
+export function RequiredMark() {
+  return (
+    <span className="text-destructive" aria-hidden>
+      {" "}
+      *
+    </span>
+  );
+}
+
+/** Per-field inline validation message, announced as an alert. Renders nothing
+ *  while the field is valid. */
+export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
+  const { t } = useTranslation();
+  if (!msgKey) return null;
+  return (
+    <p id={id} className="text-xs text-destructive" role="alert">
+      {t(msgKey)}
+    </p>
+  );
+}
+
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities } = state;
+  const { source, target, setTarget, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   return (
     <>
@@ -34,14 +57,21 @@ export function SourceControls({ state }: { state: ScanFormState }) {
 
       {textInput && (
         <div className="space-y-2">
-          <Label htmlFor="target">{t(textInput.label)}</Label>
+          <Label htmlFor="target">
+            {t(textInput.label)}
+            <RequiredMark />
+          </Label>
           <Input
             id="target"
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             placeholder={t(textInput.placeholder)}
             disabled={busy}
+            aria-required
+            aria-invalid={errors.target ? true : undefined}
+            aria-describedby={errors.target ? "target-error" : undefined}
           />
+          <FieldError id="target-error" msgKey={errors.target} />
           <p className="text-xs text-muted-foreground">{t(textInput.hint)}</p>
         </div>
       )}
@@ -70,6 +100,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
               : uploadKind === "sbom"
                 ? t("source.sbomUpload")
                 : t("source.firmwareUpload")}
+            <RequiredMark />
           </Label>
           <input
             id="file"
@@ -77,8 +108,12 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             accept={ACCEPT[uploadKind]}
             disabled={busy}
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            aria-required
+            aria-invalid={errors.file ? true : undefined}
+            aria-describedby={errors.file ? "file-error" : undefined}
             className="block w-full rounded-md border bg-background text-sm text-muted-foreground file:mr-3 file:cursor-pointer file:border-0 file:border-r file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
           />
+          <FieldError id="file-error" msgKey={errors.file} />
           {isAnalyze && (
             <p className="text-xs text-muted-foreground">{t("source.sbomAnalyzeHint")}</p>
           )}
@@ -231,15 +266,19 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
   );
 }
 
-/** Validation / upload error messages. */
+/** Validation / upload error messages (the summary near the Run button; the
+ *  per-field messages render inline next to their inputs). */
 export function FormMessages({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { invalid, uploadError, uploadKind, file } = state;
+  const { errors, uploadError } = state;
+  const hasErrors = Object.keys(errors).length > 0;
   return (
     <>
-      {invalid && (
+      {hasErrors && (
         <p className="text-sm text-destructive" role="alert">
-          {uploadKind && !file ? t("validation.file") : t("validation.required")}
+          {errors.file && !errors.project && !errors.version && !errors.target
+            ? t("validation.file")
+            : t("validation.required")}
         </p>
       )}
       {uploadError && (

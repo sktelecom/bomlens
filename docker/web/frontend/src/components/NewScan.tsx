@@ -21,8 +21,10 @@ import { useScanForm } from "@/lib/useScanForm";
 import { cn } from "@/lib/utils";
 
 import {
+  FieldError,
   FormMessages,
   GenerationOptions,
+  RequiredMark,
   RunButton,
   ScanOptions,
   SourceControls,
@@ -188,7 +190,10 @@ export function NewScan({
             <div className="space-y-3">
               <p className={SECTION_LABEL}>{t("newscan.settings")}</p>
               <div className="space-y-2">
-                <Label htmlFor="project">{t("form.project")}</Label>
+                <Label htmlFor="project">
+                  {t("form.project")}
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="project"
                   value={state.project}
@@ -196,17 +201,28 @@ export function NewScan({
                   placeholder={t("form.projectPlaceholder")}
                   disabled={state.busy}
                   autoFocus
+                  aria-required
+                  aria-invalid={state.errors.project ? true : undefined}
+                  aria-describedby={state.errors.project ? "project-error" : undefined}
                 />
+                <FieldError id="project-error" msgKey={state.errors.project} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="version">{t("form.version")}</Label>
+                <Label htmlFor="version">
+                  {t("form.version")}
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="version"
                   value={state.version}
                   onChange={(e) => state.setVersion(e.target.value)}
                   placeholder={t("form.versionPlaceholder")}
                   disabled={state.busy}
+                  aria-required
+                  aria-invalid={state.errors.version ? true : undefined}
+                  aria-describedby={state.errors.version ? "version-error" : undefined}
                 />
+                <FieldError id="version-error" msgKey={state.errors.version} />
               </div>
             </div>
 

@@ -4,7 +4,7 @@
  * upload, git-cred stash, ANALYZE forcing, vendored gating). UI-only; the
  * components render it.
  */
-import { type Dispatch, type SetStateAction, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
   stashGitCred,
@@ -15,6 +15,7 @@ import {
   type SourceType,
   type UploadKind,
 } from "@/lib/api";
+import { parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -39,6 +40,18 @@ export const TEXT_INPUT: Partial<
   "rootfs-dir": { label: "source.rootfsDir", placeholder: "source.rootfsPlaceholder", hint: "source.rootfsHint" },
   "ai-model": { label: "source.aiModel", placeholder: "source.aiModelPlaceholder", hint: "source.aiModelHint" },
 };
+
+/** Per-field validation errors; values are i18n keys for the inline message.
+ *  Keys double as the input element ids, so the first invalid field can be
+ *  focused directly on a failed submit. */
+export interface FieldErrors {
+  project?: string;
+  version?: string;
+  target?: string;
+  file?: string;
+}
+
+const FIELD_ORDER: Array<keyof FieldErrors> = ["project", "version", "target", "file"];
 
 export interface OptionToggle {
   key: string;
@@ -65,14 +78,19 @@ export function useScanForm({
    */
   initialConfig?: ScanConfig | null;
 }) {
-  const [project, setProject] = useState(() => initialConfig?.project ?? "");
-  const [version, setVersion] = useState(() => initialConfig?.version ?? "");
+  const [project, setProjectRaw] = useState(() => initialConfig?.project ?? "");
+  const [version, setVersionRaw] = useState(() => initialConfig?.version ?? "");
+  // Dirty = the user (or a re-scan seed) owns the field, so the source-based
+  // autofill below must never overwrite it. A re-scan (`initialConfig`) starts
+  // dirty: the seeded identity is deliberate, not a suggestion to replace.
+  const [projectDirty, setProjectDirty] = useState(() => Boolean(initialConfig));
+  const [versionDirty, setVersionDirty] = useState(() => Boolean(initialConfig));
   const [source, setSource] = useState<SourceType>(
     () => initialConfig?.source ?? "current-dir",
   );
-  const [target, setTarget] = useState(() => initialConfig?.target ?? "");
+  const [target, setTargetRaw] = useState(() => initialConfig?.target ?? "");
   const [gitToken, setGitToken] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
   const [deepLicense, setDeepLicense] = useState(
@@ -86,9 +104,18 @@ export function useScanForm({
     () => initialConfig?.includeOsv ?? false,
   );
   const [scanossToken, setScanossToken] = useState("");
-  const [invalid, setInvalid] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  /** Typing into a field resolves its inline error immediately. */
+  const clearError = (k: keyof FieldErrors) =>
+    setErrors((prev) => {
+      if (!(k in prev)) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
 
   const uploadKind = UPLOAD_KIND[source];
   const textInput = TEXT_INPUT[source];
@@ -112,22 +139,84 @@ export function useScanForm({
   const showScanOptions = showDeepLicense || showVendored || showIncludeOsv;
   const busy = running || uploading;
 
+  /** A user edit owns the field from then on — even when cleared to empty,
+   *  so the autofill never fights someone who deliberately blanked it. */
+  const setProject = (v: string) => {
+    setProjectDirty(true);
+    clearError("project");
+    setProjectRaw(v);
+  };
+  const setVersion = (v: string) => {
+    setVersionDirty(true);
+    clearError("version");
+    setVersionRaw(v);
+  };
+  const setTarget = (v: string) => {
+    clearError("target");
+    setTargetRaw(v);
+  };
+  const setFile = (f: File | null) => {
+    clearError("file");
+    setFileRaw(f);
+  };
+
+  // Prefill project/version from the scan source while the user hasn't touched
+  // them. Clean fields *mirror* the suggestion (including clearing when it goes
+  // away), so switching source or retyping the target never leaves a stale
+  // guess behind. Version is only ever a real value from the source (docker
+  // tag, versioned file name, SBOM metadata) — never a made-up "1.0".
+  const hostDir = capabilities.hostDir;
+  useEffect(() => {
+    if (projectDirty && versionDirty) return;
+    let cancelled = false;
+    const apply = (s: { project?: string; version?: string }) => {
+      if (cancelled) return;
+      if (!projectDirty) setProjectRaw(s.project ?? "");
+      if (!versionDirty) setVersionRaw(s.version ?? "");
+    };
+    if (source === "sbom-upload" && file) {
+      // The SBOM's own metadata beats filename guessing; fall back to the
+      // filename when the file isn't parseable JSON (xml / tag-value SPDX)
+      // or its metadata names nothing.
+      void file
+        .text()
+        .then((text) => parseSbomIdentity(text))
+        .catch(() => null)
+        .then((id) => apply(id ?? suggestIdentity(source, { fileName: file.name })));
+    } else {
+      apply(suggestIdentity(source, { target, fileName: file?.name, hostDir }));
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [source, target, file, hostDir, projectDirty, versionDirty]);
+
   /** Switching source resets the dependent inputs. */
   const changeSource = (s: SourceType) => {
     setSource(s);
-    setFile(null);
-    setTarget("");
+    setFileRaw(null);
+    setTargetRaw("");
     setGitToken("");
     setUploadError(null);
-    setInvalid(false);
+    setErrors({});
   };
 
   const submit = async () => {
     setUploadError(null);
-    if (!project.trim() || !version.trim()) return setInvalid(true);
-    if (isText && !target.trim()) return setInvalid(true);
-    if (uploadKind && !file) return setInvalid(true);
-    setInvalid(false);
+    const errs: FieldErrors = {};
+    if (!project.trim()) errs.project = "validation.project";
+    if (!version.trim()) errs.version = "validation.version";
+    if (isText && !target.trim()) errs.target = "validation.target";
+    if (uploadKind && !file) errs.file = "validation.file";
+    setErrors(errs);
+    const firstInvalid = FIELD_ORDER.find((k) => errs[k]);
+    if (firstInvalid) {
+      // Land keyboard/screen-reader users on the first field that needs fixing
+      // (field keys double as the input ids). The Run button itself stays
+      // enabled — disabling it would hide *why* the scan can't start.
+      document.getElementById(firstInvalid)?.focus();
+      return;
+    }
 
     let token: string | undefined;
     let cred: string | undefined;
@@ -212,7 +301,7 @@ export function useScanForm({
     identifyVendored, setIdentifyVendored,
     includeOsv, setIncludeOsv,
     scanossToken, setScanossToken,
-    invalid, uploadError, uploading,
+    errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showIncludeOsv, showScanOptions,
     options, submit,
