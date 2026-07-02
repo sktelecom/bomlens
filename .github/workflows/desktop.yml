@@ -41,8 +41,10 @@ jobs:
           - os: windows-latest
             args: --win nsis
             artifact: desktop-windows
+          # --universal 필수: CLI 타깃 명시가 yml의 arch 설정을 덮어쓰므로,
+          # 이 플래그가 없으면 러너 아키텍처(arm64) 단일 빌드가 된다.
           - os: macos-latest
-            args: --mac dmg
+            args: --mac dmg --universal
             artifact: desktop-macos
     runs-on: ${{ matrix.os }}
     defaults:

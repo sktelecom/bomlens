@@ -19,16 +19,17 @@ files:
 # 버전 없는 고정 파일명. 릴리스마다 이름이 같아 영구 다운로드 URL
 # (releases/latest/download/BomLens-Setup.exe)이 성립한다. 버전은
 # 파일명이 아니라 인스톨러 내부(extraMetadata.version, desktop.yml)에 주입된다.
-# 타깃마다 확장자가 달라 .exe/.dmg/.AppImage가 구분된다.
+# 타깃마다 확장자가 달라 .exe/.dmg가 구분된다.
 artifactName: BomLens-Setup.${ext}
 win:
   target: nsis
 mac:
-  target: dmg
+  # universal(arm64+x64) 단일 dmg. 주의: CLI에서 타깃을 명시하면 이 arch가
+  # 무시되므로 워크플로우와 dist:mac 스크립트도 --universal을 함께 넘긴다.
+  target:
+    - target: dmg
+      arch: universal
   category: public.app-category.developer-tools
-linux:
-  target: AppImage
-  category: Development
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
