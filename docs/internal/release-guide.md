@@ -49,10 +49,16 @@ git push origin vX.Y.Z
 
 태그 push로 트리거되는 결과는 세 가지다.
 
-- GitHub Release: 릴리스 노트, 자산 묶음, 무결성 검증용 `SHA256SUMS.txt`
+- GitHub Release: 릴리스 노트, 자산 묶음, 무결성 검증용 `SHA256SUMS.txt`. 인스톨러 체크섬은
+  release-gate가 인스톨러 첨부를 확인한 뒤 `scripts/attach-installer-checksums.sh`로 덧붙인다.
 - GHCR 이미지: `sbom-generator`와 `sbom-scanner` 공동 발행, Android SDK 6종과 firmware
   이미지, cosign 키리스 서명과 SBOM attestation, Trivy 이미지 스캔
-- 데스크톱 인스톨러: `SBOM-Generator-*.exe`와 `.dmg`(현재 미서명)
+- 데스크톱 인스톨러: `BomLens-Setup.exe`와 `BomLens-Setup.dmg`(macOS는 universal —
+  Intel과 Apple Silicon 모두 지원). 서명은 CI 시크릿이 등록된 경우에만 켜진다.
+
+주의: 릴리스 공개 후 desktop 워크플로만 재실행해 인스톨러를 교체하면 `SHA256SUMS.txt`의
+인스톨러 행이 낡은 값이 된다. 교체 후에는 `scripts/attach-installer-checksums.sh <tag>`를
+한 번 다시 실행해 체크섬을 맞춘다.
 
 `workflow_dispatch`로 버전을 직접 입력해 수동 릴리스도 가능하다.
 

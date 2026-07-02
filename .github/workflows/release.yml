@@ -181,6 +181,16 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: bash scripts/verify-release.sh "${{ needs.create-release.outputs.version }}"
 
+      # The installers are attached by desktop.yml after upload-assets wrote
+      # SHA256SUMS.txt, so their checksums are appended here — after the verify
+      # step confirmed both installers are present (every other asset writer has
+      # finished by then) and before the release goes public.
+      - name: Add installer checksums to SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/attach-installer-checksums.sh "${{ needs.create-release.outputs.version }}"
+
       # Only now make it the public, latest release.
       - name: Publish the release
         env:
