@@ -777,6 +777,14 @@ else
     { [ -f "$w/supplier_2.3.1_risk-report.md" ] && grep -q "7일" "$w/supplier_2.3.1_risk-report.md" && grep -q "30일" "$w/supplier_2.3.1_risk-report.md"; } \
         && pass "analyze: risk report with 7d/30d deadlines (container)" \
         || fail "analyze: risk report with 7d/30d deadlines (container)"
+    # The docs promise a _conformance.{json,md,html} trio; only the .json was
+    # asserted above, so a renderer regression in the md/html twins was invisible.
+    [ -s "$w/supplier_2.3.1_conformance.md" ] \
+        && pass "analyze: conformance markdown report produced" \
+        || fail "analyze: conformance markdown report produced"
+    [ -s "$w/supplier_2.3.1_conformance.html" ] \
+        && pass "analyze: conformance HTML report produced" \
+        || fail "analyze: conformance HTML report produced"
     rm -rf "$w"
 fi
 
@@ -895,6 +903,36 @@ else
         else
             fail "merge: deduped overlapping layers by purl" "got total=$ntotal unique=$nuniq (expected 3/3)"
         fi
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
+# Group 7b: --timestamp output layout (requires image)
+# --------------------------------------------------------
+# cli.md promises: with --timestamp each run lands in its own
+# {Project}_{Version}_{YYYYMMDD-HHMMSS}/ folder (repeat scans don't overwrite),
+# while the files inside keep the plain {Project}_{Version}_ prefix. Nothing
+# executed this flag before. The suite-global SBOM_OUTPUT_FLAT=1 must be
+# cleared here — flat layout and timestamped folders are mutually exclusive.
+section "Timestamped output folder"
+if [ "$have_image" != 1 ]; then
+    skip "--timestamp layout (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/ts.XXXXXX")"
+    cp "$FIX/good-cyclonedx.json" "$w/"
+    ( cd "$w" && SBOM_OUTPUT_FLAT='' SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "tstest" --version "1.0" --analyze good-cyclonedx.json --timestamp --generate-only ) > "$w/_scan.log" 2>&1
+    tsdir="$(find "$w" -maxdepth 1 -type d -name 'tstest_1.0_[0-9]*-[0-9]*' | head -1)"
+    if [ -n "$tsdir" ] && [[ "$(basename "$tsdir")" =~ ^tstest_1\.0_[0-9]{8}-[0-9]{6}$ ]]; then
+        pass "--timestamp: run folder named {prefix}_{YYYYMMDD-HHMMSS}"
+    else
+        fail "--timestamp: run folder named {prefix}_{YYYYMMDD-HHMMSS}" "$(ls "$w"; tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+    fi
+    if [ -n "$tsdir" ] && jq -e '.bomFormat=="CycloneDX"' "$tsdir/tstest_1.0_bom.json" >/dev/null 2>&1; then
+        pass "--timestamp: files inside keep the plain {prefix}_ names"
+    else
+        fail "--timestamp: files inside keep the plain {prefix}_ names" "$(ls "$tsdir" 2>/dev/null)"
     fi
     rm -rf "$w"
 fi

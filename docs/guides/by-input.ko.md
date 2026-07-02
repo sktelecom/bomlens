@@ -53,9 +53,10 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 개발1팀이 GitHub 저장소 정보를 전달한 경우. 수동 `git clone` 없이 URL을 그대로 전달합니다.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/org/team1-app" \
+  --git "https://github.com/sktelecom/sbom-tools" \
   --all --generate-only
 ```
 
@@ -69,6 +70,7 @@ $SBOM --project team1-app --version 1.0.0 \
 
 개발2팀이 소스 코드를 ZIP으로 전달한 경우. 수동 해제 없이 아카이브를 그대로 전달합니다.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team2-app --version 1.0.0 \
   --target "./team2-app.zip" \
@@ -102,6 +104,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 
 개발4팀이 SBOM(JSON)을 전달한 경우. 소스가 없어도 검증하고 분석합니다.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team4-proj --version 2.0.0 \
   --analyze "./team4-sbom.json" \
