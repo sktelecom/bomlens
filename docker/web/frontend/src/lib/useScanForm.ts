@@ -4,7 +4,7 @@
  * upload, git-cred stash, ANALYZE forcing, vendored gating). UI-only; the
  * components render it.
  */
-import { type Dispatch, type SetStateAction, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
   stashGitCred,
@@ -15,6 +15,7 @@ import {
   type SourceType,
   type UploadKind,
 } from "@/lib/api";
+import { parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -65,8 +66,13 @@ export function useScanForm({
    */
   initialConfig?: ScanConfig | null;
 }) {
-  const [project, setProject] = useState(() => initialConfig?.project ?? "");
-  const [version, setVersion] = useState(() => initialConfig?.version ?? "");
+  const [project, setProjectRaw] = useState(() => initialConfig?.project ?? "");
+  const [version, setVersionRaw] = useState(() => initialConfig?.version ?? "");
+  // Dirty = the user (or a re-scan seed) owns the field, so the source-based
+  // autofill below must never overwrite it. A re-scan (`initialConfig`) starts
+  // dirty: the seeded identity is deliberate, not a suggestion to replace.
+  const [projectDirty, setProjectDirty] = useState(() => Boolean(initialConfig));
+  const [versionDirty, setVersionDirty] = useState(() => Boolean(initialConfig));
   const [source, setSource] = useState<SourceType>(
     () => initialConfig?.source ?? "current-dir",
   );
@@ -111,6 +117,48 @@ export function useScanForm({
   const showDeepLicense = isSourceScan;
   const showScanOptions = showDeepLicense || showVendored || showIncludeOsv;
   const busy = running || uploading;
+
+  /** A user edit owns the field from then on — even when cleared to empty,
+   *  so the autofill never fights someone who deliberately blanked it. */
+  const setProject = (v: string) => {
+    setProjectDirty(true);
+    setProjectRaw(v);
+  };
+  const setVersion = (v: string) => {
+    setVersionDirty(true);
+    setVersionRaw(v);
+  };
+
+  // Prefill project/version from the scan source while the user hasn't touched
+  // them. Clean fields *mirror* the suggestion (including clearing when it goes
+  // away), so switching source or retyping the target never leaves a stale
+  // guess behind. Version is only ever a real value from the source (docker
+  // tag, versioned file name, SBOM metadata) — never a made-up "1.0".
+  const hostDir = capabilities.hostDir;
+  useEffect(() => {
+    if (projectDirty && versionDirty) return;
+    let cancelled = false;
+    const apply = (s: { project?: string; version?: string }) => {
+      if (cancelled) return;
+      if (!projectDirty) setProjectRaw(s.project ?? "");
+      if (!versionDirty) setVersionRaw(s.version ?? "");
+    };
+    if (source === "sbom-upload" && file) {
+      // The SBOM's own metadata beats filename guessing; fall back to the
+      // filename when the file isn't parseable JSON (xml / tag-value SPDX)
+      // or its metadata names nothing.
+      void file
+        .text()
+        .then((text) => parseSbomIdentity(text))
+        .catch(() => null)
+        .then((id) => apply(id ?? suggestIdentity(source, { fileName: file.name })));
+    } else {
+      apply(suggestIdentity(source, { target, fileName: file?.name, hostDir }));
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [source, target, file, hostDir, projectDirty, versionDirty]);
 
   /** Switching source resets the dependent inputs. */
   const changeSource = (s: SourceType) => {
