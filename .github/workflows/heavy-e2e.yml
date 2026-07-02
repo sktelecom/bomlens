@@ -126,5 +126,12 @@ jobs:
       - name: Build scanner image (base)
         run: docker build -t sbom-scanner:test ./docker
 
+      # docs/reference/docker-image.md's runnable blocks name the PUBLISHED
+      # image verbatim (that is what a reader pastes). Point that tag at the
+      # image built from THIS commit so the blocks run against repo HEAD; the
+      # nightly user journey covers the genuinely published image instead.
+      - name: Tag built image with the published name (docs run verbatim)
+        run: docker tag sbom-scanner:test ghcr.io/sktelecom/bomlens:latest
+
       - name: Run docs walkthrough
         run: bash tests/test-docs-walkthrough.sh
