@@ -1,4 +1,4 @@
-// SBOM Generator UI 컨테이너 수명주기 관리(순수 Node — electron 비의존, 단위 테스트 가능).
+// BomLens UI 컨테이너 수명주기 관리(순수 Node — electron 비의존, 단위 테스트 가능).
 //
 // onot의 lib/sidecar.mjs가 PyInstaller 바이너리를 spawn하는 자리에서, 우리는 Docker로
 // `MODE=UI` 컨테이너를 띄운다. 우리 웹 UI 백엔드(docker/web/server.py)와 React SPA는 이미
@@ -13,7 +13,11 @@ import path from "node:path";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const DEFAULT_IMAGE =
-  process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/sbom-generator:latest";
+  process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/bomlens:latest";
+
+// 데스크톱 앱이 띄운 UI 컨테이너 식별 라벨. 앱이 강제 종료되면 --rm 컨테이너도 살아남는데,
+// 다음 기동 때 이 라벨로 고아를 찾아 정리한다(cleanupOrphans).
+export const DESKTOP_LABEL = "bomlens.desktop=1";
 
 // Opt-in scan images the base UI container launches as SIBLING containers (via
 // the mounted host Docker socket) for firmware and AI-model inputs — the GPL
@@ -65,7 +69,8 @@ export function findFreePort() {
 }
 
 // /capabilities는 200 + JSON을 반환하는 가벼운 엔드포인트라 readiness 신호로 적합하다.
-function ping(port) {
+// 기동 대기(UiContainer.start)와 로드 이후의 헬스 모니터(main.mjs)가 함께 쓴다.
+export function ping(port) {
   return new Promise((resolve) => {
     const req = http.get(
       { host: "127.0.0.1", port, path: "/capabilities", timeout: 1500 },
@@ -112,6 +117,23 @@ export function pullImage(image = DEFAULT_IMAGE, onProgress = () => {}) {
   });
 }
 
+// 이전 실행이 남긴 고아 UI 컨테이너를 정리한다(DESKTOP_LABEL 기준). excludeId가 주어지면
+// 그 컨테이너(현재 실행분)는 남긴다. docker ps는 짧은 ID를, run -d는 전체 ID를 돌려주므로
+// 접두 일치로 비교한다. Docker 오류는 조용히 0을 반환한다(정리는 최선 노력이면 충분).
+export async function cleanupOrphans({ runImpl = run, excludeId = null } = {}) {
+  const r = await runImpl("docker", ["ps", "-q", "--filter", `label=${DESKTOP_LABEL}`]);
+  if (r.code !== 0) return 0;
+  const ids = r.out
+    .split(/\r?\n/)
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .filter((id) => !(excludeId && (excludeId.startsWith(id) || id.startsWith(excludeId))));
+  for (const id of ids) {
+    await runImpl("docker", ["stop", "-t", "3", id]);
+  }
+  return ids.length;
+}
+
 export class UiContainer {
   constructor({
     image = DEFAULT_IMAGE,
@@ -137,6 +159,8 @@ export class UiContainer {
       "--rm",
       "--name",
       name,
+      "--label",
+      DESKTOP_LABEL,
       "-p",
       `${this.hostPort}:8080`,
       "-v",

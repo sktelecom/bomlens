@@ -49,6 +49,23 @@
       .line.latest {
         color: #ffffff;
       }
+      #retry {
+        display: none;
+        margin: 0 32px 24px;
+        align-self: flex-start;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #ffffff;
+        background: #ea002c;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #retry:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
     </style>
   </head>
   <body>
@@ -57,16 +74,25 @@
       <p id="subtitle"></p>
     </header>
     <div id="log" aria-live="polite"></div>
+    <button id="retry" type="button"></button>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
       const lang =
         new URLSearchParams(location.search).get("lang") === "ko" ? "ko" : "en";
       document.documentElement.lang = lang;
-      const SUBTITLE = {
-        ko: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
-        en: "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
+      const STR = {
+        ko: {
+          subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
+          retry: "다시 시도",
+        },
+        en: {
+          subtitle:
+            "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
+          retry: "Try again",
+        },
       };
-      document.getElementById("subtitle").textContent = SUBTITLE[lang];
+      const s = STR[lang];
+      document.getElementById("subtitle").textContent = s.subtitle;
 
       const log = document.getElementById("log");
       function add(line) {
@@ -81,6 +107,27 @@
       if (window.sbomDesktop && window.sbomDesktop.onStatus) {
         window.sbomDesktop.onStatus(add);
       }
+
+      // 실패 종착 상태(failed-*)면 재시도 버튼을 보여준다. 재시도가 시작되면(checking)
+      // main이 상태를 브로드캐스트하므로 그때 다시 숨긴다.
+      const retry = document.getElementById("retry");
+      retry.textContent = s.retry;
+      if (window.sbomDesktop && window.sbomDesktop.onStartupState) {
+        window.sbomDesktop.onStartupState(({ state }) => {
+          if (String(state).startsWith("failed-")) {
+            retry.style.display = "block";
+            retry.disabled = false;
+          } else {
+            retry.style.display = "none";
+          }
+        });
+      }
+      retry.addEventListener("click", async () => {
+        retry.disabled = true;
+        const result = await window.sbomDesktop.retryStartup();
+        // 가드에 걸려 거절되면(ok:false) 다시 누를 수 있게 되돌린다.
+        if (!result || !result.ok) retry.disabled = false;
+      });
     </script>
   </body>
 </html>
