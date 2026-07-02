@@ -3,7 +3,7 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, session, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,7 +109,9 @@ async function createWindow() {
   const { bounds, maximized } = restoreWindowState();
   mainWindow = new BrowserWindow({
     ...bounds,
-    backgroundColor: "#0a0a0c",
+    // 첫 페인트 배경을 OS 테마에 맞춰 흰/검 플래시를 막는다. 시작 화면의 CSS
+    // (prefers-color-scheme)와 같은 색이어야 한다.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0a0a0c" : "#f5f5f7",
     title: "BomLens",
     // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
     // Menu.setApplicationMenu(null)은 단축키까지 없애므로 쓰지 않는다.
