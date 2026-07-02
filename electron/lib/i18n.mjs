@@ -23,6 +23,7 @@ const MAIN = {
     image: (img) => `이미지: ${img}`,
     network: "네트워크 상황에 따라 수 분 걸릴 수 있어요...",
     pullFailed: "이미지 다운로드에 실패했습니다. 인터넷 연결을 확인하고 앱을 다시 실행하세요.",
+    cleanedOrphans: (n) => `이전 실행에서 남은 컨테이너 ${n}개를 정리했습니다.`,
     startingUi: "UI 컨테이너를 시작하는 중...",
     ready: "준비 완료. UI를 엽니다.",
     startFailed: (msg) => `시작에 실패했습니다: ${msg}`,
@@ -38,6 +39,10 @@ const MAIN = {
     image: (img) => `Image: ${img}`,
     network: "This can take a few minutes depending on your network...",
     pullFailed: "Image download failed. Check your internet connection and restart the app.",
+    cleanedOrphans: (n) =>
+      n === 1
+        ? "Cleaned up 1 leftover container from a previous run."
+        : `Cleaned up ${n} leftover containers from a previous run.`,
     startingUi: "Starting the UI container...",
     ready: "Ready. Opening the UI.",
     startFailed: (msg) => `Startup failed: ${msg}`,

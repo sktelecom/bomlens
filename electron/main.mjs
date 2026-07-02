@@ -7,6 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  cleanupOrphans,
   DEFAULT_IMAGE,
   dockerStatus,
   findFreePort,
@@ -93,6 +94,10 @@ async function startup() {
     });
     return;
   }
+
+  // 이전 실행(강제 종료 등)이 남긴 고아 UI 컨테이너를 라벨 기준으로 정리한다.
+  const cleaned = await cleanupOrphans({ excludeId: container?.id ?? null });
+  if (cleaned > 0) status(t.cleanedOrphans(cleaned));
 
   if (!(await imagePresent(DEFAULT_IMAGE))) {
     setBootState(BOOT.PULLING);
