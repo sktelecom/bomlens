@@ -91,7 +91,7 @@ To restore the previous flat layout, where every file is written directly in the
 Override the scanner image with `SBOM_SCANNER_IMAGE`.
 
 ```bash
-SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.1.0" \
+SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.5.5" \
   ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --generate-only
 ```
 
