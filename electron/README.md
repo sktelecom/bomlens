@@ -48,6 +48,10 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 SBOM_LANG=en npm start
 ```
 
+앱은 시작할 때 GitHub 최신 릴리스를 확인해 새 버전이 있으면 다운로드 안내 대화상자를
+띄운다(`lib/update.mjs`). 실패는 조용히 무시되어 부팅에 영향을 주지 않는다. 개발
+실행(`npm start`)에서는 꺼져 있고, `SBOM_FORCE_UPDATE_CHECK=1`로 켜서 확인할 수 있다.
+
 ## 빌드 (인스톨러)
 
 ```bash
