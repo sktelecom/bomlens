@@ -61,7 +61,9 @@ jobs:
                 --project "${ex}-compat" --version "1.0.0" --generate-only ) || {
               report="${report}- ❌ ${ex}: scan-sbom.sh failed (latest cdxgen)\n"
               failed=1; echo "::endgroup::"; continue; }
-            sbom=$(find "examples/$ex" -maxdepth 1 -name '*_bom.json' 2>/dev/null | head -1)
+            # scan-sbom.sh writes into a <project>_<version>/ subfolder, so
+            # search recursively rather than only the example root.
+            sbom=$(find "examples/$ex" -name '*_bom.json' 2>/dev/null | head -1)
             if [ -z "$sbom" ] || ! jq empty "$sbom" 2>/dev/null; then
               report="${report}- ❌ ${ex}: no valid SBOM produced\n"; failed=1; echo "::endgroup::"; continue
             fi
