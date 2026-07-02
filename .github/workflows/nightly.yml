@@ -23,6 +23,89 @@ jobs:
     with:
       suites: web-e2e full-e2e docs-walkthrough
       examples_only: ""
+      # Firmware coverage via the published image (fast pull instead of the
+      # 20-30 min GPL build) — test-e2e.sh's firmware group auto-enables.
+      firmware_pull: true
+
+  # What a real user gets TODAY: pull the published image and run the docs
+  # walkthrough and the full behavioral suite against it — not against repo
+  # HEAD. This is the only lane that catches "the published image rotted"
+  # (base-image CVE rebuilds, registry issues, a bad publish) and it also
+  # verifies every version-pinned image tag the docs mention is pullable.
+  published-user-journey:
+    name: Published-image user journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Pull the published scanner image
+        run: docker pull ghcr.io/sktelecom/bomlens:latest
+
+      - name: Docs walkthrough against the published image
+        env:
+          SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
+        run: bash tests/test-docs-walkthrough.sh
+
+      - name: Full CLI behavioral suite against the published image
+        env:
+          SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
+        run: bash tests/test-e2e.sh
+
+      # Every ghcr.io/sktelecom/*:x.y.z the docs pin must actually be pullable
+      # (the offline drift check only verifies the git tag exists).
+      - name: Verify pinned doc tags are pullable
+        run: |
+          set -e
+          pins="$(grep -rhoE 'ghcr\.io/sktelecom/[a-z0-9._-]+:[0-9]+\.[0-9]+\.[0-9]+' \
+                    README.md docs 2>/dev/null | sort -u)"
+          [ -z "$pins" ] && { echo "no pinned tags in docs"; exit 0; }
+          rc=0
+          while IFS= read -r pin; do
+            if docker manifest inspect "$pin" >/dev/null 2>&1; then
+              echo "OK: $pin"
+            else
+              echo "::error::docs pin $pin, which is not pullable"
+              rc=1
+            fi
+          done <<< "$pins"
+          exit "$rc"
+
+  # External links rot on their own schedule, so they are checked here (with
+  # retries and a cache) rather than on PRs — matching the split anticipated in
+  # scripts/check-doc-links.sh, which covers internal links on every PR.
+  doc-links:
+    name: External doc links (lychee)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install lychee
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release view --repo lycheeverse/lychee --json tagName --jq .tagName)"
+          gh release download "$tag" --repo lycheeverse/lychee \
+            --pattern '*x86_64-unknown-linux-gnu.tar.gz' --output /tmp/lychee.tgz
+          tar -C /tmp -xzf /tmp/lychee.tgz lychee
+          /tmp/lychee --version
+
+      - name: Check external links
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          /tmp/lychee --config tests/lychee.toml --no-progress \
+            README.md 'docs/**/*.md' 'examples/**/*.md'
+
+  # Desktop lanes (unit + boot smoke + installer build/smoke on Windows and
+  # macOS) run daily so Electron/runner/OS drift surfaces within 24h even when
+  # electron/ itself has not changed.
+  desktop:
+    name: Desktop
+    uses: ./.github/workflows/desktop.yml
 
   macos-real-scan:
     name: macOS real scan (Colima)
@@ -83,7 +166,7 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, macos-real-scan]
+    needs: [heavy-e2e, macos-real-scan, published-user-journey, doc-links, desktop]
     if: failure()
     permissions:
       contents: read
@@ -96,10 +179,16 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEAVY: ${{ needs.heavy-e2e.result }}
           MACOS: ${{ needs.macos-real-scan.result }}
+          JOURNEY: ${{ needs.published-user-journey.result }}
+          LINKS: ${{ needs.doc-links.result }}
+          DESKTOP: ${{ needs.desktop.result }}
         run: |
           title="Nightly checks are failing"
           body="Nightly run failed: ${RUN_URL}
           - Heavy E2E: ${HEAVY}
+          - Published-image user journey: ${JOURNEY}
+          - External doc links: ${LINKS}
+          - Desktop: ${DESKTOP}
           - macOS real scan: ${MACOS}"
           num=$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
                 --json number --jq '.[0].number // empty')

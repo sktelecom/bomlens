@@ -71,6 +71,21 @@ for proj in "${PROJECTS[@]}"; do
         else
             fail "$proj: SBOM has components" "0 components — dependency resolution may have failed"
         fi
+        # The example READMEs promise a component-count range; the promise is
+        # machine-readable via an adjacent <!-- expected-components: lo-hi -->
+        # marker. When a dependency bump moves the real count out of range,
+        # this fails so the doc claim gets updated instead of rotting.
+        marker=$(grep -oE '<!-- expected-components: [0-9]+-[0-9]+ -->' "$src/README.md" 2>/dev/null \
+            | grep -oE '[0-9]+-[0-9]+' | head -1)
+        if [ -n "$marker" ]; then
+            lo="${marker%-*}"; hi="${marker#*-}"
+            if [ "$ncomp" -ge "$lo" ] && [ "$ncomp" -le "$hi" ]; then
+                pass "$proj: component count $ncomp within the documented $lo-$hi"
+            else
+                fail "$proj: component count within the documented range" \
+                    "got $ncomp, README promises $lo-$hi — update the README claim (and its marker)"
+            fi
+        fi
     else
         fail "$proj: valid CycloneDX SBOM" "rc=$rc; $(grep -iE 'error|fail' "$w/_scan.log" | tail -2 | tr '\n' ' ')"
     fi
