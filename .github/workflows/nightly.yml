@@ -105,6 +105,15 @@ jobs:
   # electron/ itself has not changed.
   desktop:
     name: Desktop
+    # The called workflow's build-desktop job declares contents: write (used
+    # only by its tag-release attach step, which never runs here). A caller
+    # granting LESS than a called job requests fails the whole run at startup
+    # ("workflow file issue", zero jobs), so this grant is required even though
+    # nothing in the nightly path writes. Secrets are inherited so the signing
+    # secrets keep working if they are ever configured.
+    permissions:
+      contents: write
+    secrets: inherit
     uses: ./.github/workflows/desktop.yml
 
   macos-real-scan:
