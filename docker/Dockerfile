@@ -222,8 +222,13 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 #   docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=true ...
 #   GAD (GitLab Advisory) crashes cve-bin-tool 3.4 on fetch, so it is disabled; the
 #   source set / NVD method are build-args finalised by native-amd64 verification.
-#   RELEASE GATE: the build now FAILS if the DB ends up empty (cve_severity=0), so a
-#   broken/keyless build can never ship a silent 0-CVE image again.
+#   RELEASE GATE: the build FAILS unless the DB carries a real NVD CPE-range corpus
+#   (cve_range where data_source=NVD). cve-bin-tool matches BINARIES against those
+#   NVD ranges, so a non-empty-but-NVD-less DB (a keyless/rate-limited build that
+#   fetched only Red Hat + Curl advisories still fills cve_severity) matches ZERO
+#   binaries — exactly how a silent 0-CVE firmware image shipped before. Gating on
+#   NVD presence, not just cve_severity>0, catches that; the changed RUN also busts
+#   the GHA build cache so a stale NVD-less DB layer can't be reused.
 #   Size: the populated cve.db is ~0.5–1.5 GB; bundle it only in the firmware image.
 # GAD crashes cve-bin-tool 3.4; OSV is excluded because some constituent feeds
 # (e.g. Ubuntu, CC-BY-SA 4.0) carry share-alike terms we do not want to take on in
@@ -246,10 +251,12 @@ RUN --mount=type=secret,id=nvd_api_key \
       HOME="$CVE_BIN_TOOL_HOME" cve-bin-tool --update now $nvd_arg $dis_arg $key_arg /tmp/cvedb-probe || true; \
       db="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"; \
       n=0; [ -f "$db" ] && n="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_severity").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
-      echo "[build] CVE DB rows: ${n:-0} ($([ -f "$db" ] && du -h "$db" | cut -f1 || echo 'no file'))"; \
-      if [ "${n:-0}" -lt 1 ]; then \
-        echo "[build] ERROR: CVE DB is empty (cve_severity=${n:-0}); firmware scans would report 0 CVEs."; \
-        echo "[build]        Pass the NVD key as a BuildKit secret (--secret id=nvd_api_key,env=NVD_API_KEY)"; \
+      nvd=0; [ -f "$db" ] && nvd="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_range where data_source=\"NVD\"").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
+      echo "[build] CVE DB rows: cve_severity=${n:-0}, NVD cve_range=${nvd:-0} ($([ -f "$db" ] && du -h "$db" | cut -f1 || echo 'no file'))"; \
+      if [ "${n:-0}" -lt 1 ] || [ "${nvd:-0}" -lt 1000 ]; then \
+        echo "[build] ERROR: CVE DB has no usable NVD data (cve_severity=${n:-0}, NVD cve_range=${nvd:-0})."; \
+        echo "[build]        cve-bin-tool matches binaries via NVD CPE ranges, so this DB would report 0 CVEs."; \
+        echo "[build]        Pass a valid NVD key as a BuildKit secret (--secret id=nvd_api_key,env=NVD_API_KEY)"; \
         echo "[build]        and/or try --build-arg SBOM_FIRMWARE_NVD_METHOD=api2. Build aborted."; \
         exit 1; \
       fi; \
