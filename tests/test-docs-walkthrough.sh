@@ -219,7 +219,11 @@ while IFS= read -r entry; do
             if jq -e "$assert" "$found" >/dev/null 2>&1; then
                 pass "$page: $glob (assert ok)"
             else
-                fail "$page: $glob exists but violates: $assert"
+                # Dump what the file actually is (size, jq parse error, head) so
+                # an environment-specific failure is self-diagnosing instead of
+                # needing a local re-run to guess at.
+                fail "$page: $glob exists but violates: $assert" \
+                    "size=$(wc -c <"$found" 2>/dev/null) bytes; jq: $(jq -e "$assert" "$found" 2>&1 | head -1); head: $(head -c 200 "$found" 2>/dev/null | tr '\n' ' ')"
             fi
         else
             pass "$page: $glob"
