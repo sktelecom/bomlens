@@ -22,7 +22,14 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const fakeDockerDir = path.join(appRoot, "tests", "fake-docker");
 const serverPy = path.resolve(appRoot, "..", "docker", "web", "server.py");
 
-test.skip(process.platform === "win32", "fake docker CLI is POSIX sh");
+// Linux-only. The wiring under test is shared main-process JS, and the ubuntu
+// desktop-linux CI lane runs this on every PR. The fake-docker -> real server.py
+// -> /capabilities health-poll handshake is timing-flaky on the hosted macOS
+// runner specifically (the poll intermittently never sees the listening server
+// within the window, even at 60s), so restrict to Linux rather than ship a
+// spec that reds the nightly macOS build lane on runner variance. The macOS and
+// Windows build lanes still run the deterministic smoke.spec boot checks.
+test.skip(process.platform !== "linux", "fake docker CLI is POSIX sh; health poll is macOS-runner-flaky");
 
 test("docker-missing recovers to READY after the daemon comes back", async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "bomlens-boot-"));
