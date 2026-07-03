@@ -4,6 +4,9 @@ name: Desktop App
 # 더블클릭 진입점을 제공한다. electron/ 변경 PR, 수동 실행, 태그 푸시에서 빌드한다.
 on:
   workflow_dispatch:
+  # Callable from other workflows (nightly runs it daily so Electron/runner/OS
+  # drift surfaces within 24h even when electron/ itself has not changed).
+  workflow_call:
   pull_request:
     paths:
       - electron/**
