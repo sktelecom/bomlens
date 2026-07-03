@@ -238,16 +238,18 @@ ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
 # return "CVEDataMissing: No data" (NVD retired the legacy JSON 1.1 feeds in late
 # 2023; the community mirror is gone), so a default build populated only Red Hat +
 # Curl and matched zero binaries. api2 (the current NVD REST API 2.0) is the only
-# working NVD source in 3.4.
+# NVD source that still exists in 3.4.
 #
-# Fetched KEYLESS on purpose: cve-bin-tool 3.4 returns HTTP 403 from NVD whenever
-# an API key is supplied (via --nvd-api-key OR the NVD_API_KEY env), even though
-# the key itself is valid — a direct `curl -H "apiKey: <key>"` to the NVD 2.0 API
-# returns 200, so 3.4 is sending the key in a form NVD rejects (query param). The
-# keyless path works; NVD's keyless rate limit just makes the one-shot full
-# download slower (~20-40 min, well within the build timeout). Re-enable the key
-# once cve-bin-tool ships a fix. The NVD-data release gate below confirms the
-# result either way.
+# KNOWN BLOCKER (needs an infra/upstream decision — see the fetch below): on a
+# GitHub-hosted runner, api2 cannot populate NVD either way:
+#   - WITH a key: cve-bin-tool 3.4 AND 3.4.1rc0 get HTTP 403 from NVD's metadata
+#     call even though the key is valid (a direct `curl -H "apiKey: <k>"` returns
+#     200). Reproduces from any IP, so it is an upstream cve-bin-tool bug.
+#   - WITHOUT a key: NVD returns 403 to datacenter/cloud IPs (GitHub runners), so
+#     keyless works from a laptop but not in CI.
+# The NVD-data release gate below fails the build until this is resolved, which
+# keeps a 0-CVE firmware image from shipping. We keep passing the (valid) key so
+# the build succeeds automatically once cve-bin-tool fixes its keyed request.
 ARG SBOM_FIRMWARE_NVD_METHOD="api2"
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
 # Attribution + required notices for the bundled CVE data (NVD non-endorsement,
@@ -256,11 +258,13 @@ COPY CVE-DATA-NOTICE.txt /opt/cve-bin-tool-home/CVE-DATA-NOTICE.txt
 RUN --mount=type=secret,id=nvd_api_key \
     if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] pre-fetching cve-bin-tool CVE DB into $CVE_BIN_TOOL_HOME ..."; \
+      key=""; [ -f /run/secrets/nvd_api_key ] && key="$(cat /run/secrets/nvd_api_key)"; \
+      [ -n "$key" ] || echo "[build] WARN: no nvd_api_key secret; NVD is unreachable keyless from cloud IPs."; \
       nvd_arg=""; [ -n "$SBOM_FIRMWARE_NVD_METHOD" ] && nvd_arg="-n $SBOM_FIRMWARE_NVD_METHOD"; \
       dis_arg=""; [ -n "$SBOM_FIRMWARE_DISABLE_SOURCES" ] && dis_arg="-d $SBOM_FIRMWARE_DISABLE_SOURCES"; \
+      key_arg=""; [ -n "$key" ] && key_arg="--nvd-api-key $key"; \
       mkdir -p /tmp/cvedb-probe; \
-      echo "[build] fetching NVD via api2 (keyless; rate-limited but reliable)..."; \
-      HOME="$CVE_BIN_TOOL_HOME" cve-bin-tool --update now $nvd_arg $dis_arg /tmp/cvedb-probe || true; \
+      HOME="$CVE_BIN_TOOL_HOME" cve-bin-tool --update now $nvd_arg $dis_arg $key_arg /tmp/cvedb-probe || true; \
       db="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"; \
       n=0; [ -f "$db" ] && n="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_severity").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
       nvd=0; [ -f "$db" ] && nvd="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_range where data_source=\"NVD\"").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
