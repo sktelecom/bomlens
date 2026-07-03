@@ -234,7 +234,14 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # (e.g. Ubuntu, CC-BY-SA 4.0) carry share-alike terms we do not want to take on in
 # a redistributed image. See CVE-DATA-NOTICE.txt. Override to widen coverage.
 ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
-ARG SBOM_FIRMWARE_NVD_METHOD=""
+# NVD fetch method. cve-bin-tool 3.4's default source and its json-mirror BOTH
+# return "CVEDataMissing: No data" (NVD retired the legacy JSON 1.1 feeds in late
+# 2023; the community mirror is gone), so a default build populated only Red Hat +
+# Curl and matched zero binaries. api2 (the current NVD REST API 2.0) is the only
+# working NVD source in 3.4 — verified it actively downloads CVE data. It needs
+# the nvd_api_key secret to run at a usable rate; the NVD-data release gate below
+# then confirms it populated cve_range.
+ARG SBOM_FIRMWARE_NVD_METHOD="api2"
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
 # Attribution + required notices for the bundled CVE data (NVD non-endorsement,
 # Red Hat CC-BY, MIT for curl/purl2cpe, EPSS). Shipped alongside the DB.
