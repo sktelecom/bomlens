@@ -90,14 +90,20 @@ jobs:
           tag="$(gh release view --repo lycheeverse/lychee --json tagName --jq .tagName)"
           gh release download "$tag" --repo lycheeverse/lychee \
             --pattern '*x86_64-unknown-linux-gnu.tar.gz' --output /tmp/lychee.tgz
-          tar -C /tmp -xzf /tmp/lychee.tgz lychee
-          /tmp/lychee --version
+          # The binary is not always at the archive root (layout varies by
+          # release), so extract everything and locate it rather than naming it.
+          mkdir -p /tmp/lychee-bin
+          tar -C /tmp/lychee-bin -xzf /tmp/lychee.tgz
+          bin="$(find /tmp/lychee-bin -type f -name lychee | head -1)"
+          [ -n "$bin" ] || { echo "::error::lychee binary not found in the release archive"; exit 1; }
+          install -m 0755 "$bin" /usr/local/bin/lychee
+          lychee --version
 
       - name: Check external links
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          /tmp/lychee --config tests/lychee.toml --no-progress \
+          lychee --config tests/lychee.toml --no-progress \
             README.md 'docs/**/*.md' 'examples/**/*.md'
 
   # Desktop lanes (unit + boot smoke + installer build/smoke on Windows and
