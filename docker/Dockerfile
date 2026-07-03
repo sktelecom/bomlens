@@ -212,6 +212,15 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi
 
+# Work around cve-bin-tool's dead NVD count endpoint (see the script header). Its
+# NVD update aborts on a 403 from a legacy dashboard URL before the real, working
+# keyed CVE download runs; the patch reads the total from the keyed API instead.
+# Runs only for the firmware image, right after cve-bin-tool is installed and
+# before the DB pre-fetch below.
+COPY patch-cve-bin-tool-nvd.py /tmp/patch-cve-bin-tool-nvd.py
+RUN if [ "$SBOM_FIRMWARE" = "true" ]; then python3 /tmp/patch-cve-bin-tool-nvd.py; fi \
+    && rm -f /tmp/patch-cve-bin-tool-nvd.py
+
 # Pre-fetch cve-bin-tool's vulnerability DB into the image so firmware scans match
 # CVEs OFFLINE at runtime (Plan 2): a runtime NVD download is slow (~minutes) and
 # air-gapped scans cannot do it at all. cve-bin-tool 3.x hard-codes its DB cache to
@@ -238,18 +247,11 @@ ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
 # return "CVEDataMissing: No data" (NVD retired the legacy JSON 1.1 feeds in late
 # 2023; the community mirror is gone), so a default build populated only Red Hat +
 # Curl and matched zero binaries. api2 (the current NVD REST API 2.0) is the only
-# NVD source that still exists in 3.4.
-#
-# KNOWN BLOCKER (needs an infra/upstream decision — see the fetch below): on a
-# GitHub-hosted runner, api2 cannot populate NVD either way:
-#   - WITH a key: cve-bin-tool 3.4 AND 3.4.1rc0 get HTTP 403 from NVD's metadata
-#     call even though the key is valid (a direct `curl -H "apiKey: <k>"` returns
-#     200). Reproduces from any IP, so it is an upstream cve-bin-tool bug.
-#   - WITHOUT a key: NVD returns 403 to datacenter/cloud IPs (GitHub runners), so
-#     keyless works from a laptop but not in CI.
-# The NVD-data release gate below fails the build until this is resolved, which
-# keeps a 0-CVE firmware image from shipping. We keep passing the (valid) key so
-# the build succeeds automatically once cve-bin-tool fixes its keyed request.
+# NVD source that still works in 3.4 — and only once patch-cve-bin-tool-nvd.py
+# (applied above) routes its total-CVE count around a dead dashboard endpoint that
+# 403s and would otherwise abort the update before the real download. The keyed
+# API accepts a valid key from any IP (needed because NVD 403s keyless requests
+# from cloud/CI IPs), so the nvd_api_key secret is passed to the fetch below.
 ARG SBOM_FIRMWARE_NVD_METHOD="api2"
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
 # Attribution + required notices for the bundled CVE data (NVD non-endorsement,
