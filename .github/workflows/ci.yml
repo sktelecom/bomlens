@@ -108,7 +108,7 @@ jobs:
           shellcheck tests/test-scan.sh || true
           echo ""
           echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/test-e2e.sh tests/test-examples-e2e.sh tests/check-examples-sync.sh tests/check-docs-drift.sh tests/test-docs-walkthrough.sh examples/test-all.sh || true
+          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/test-e2e.sh tests/test-examples-e2e.sh tests/test-merge.sh tests/check-examples-sync.sh tests/check-docs-drift.sh tests/test-docs-walkthrough.sh examples/test-all.sh || true
           echo ""
           echo "Checking onboarding-guarantee gates..."
           shellcheck scripts/check-doc-links.sh scripts/check-ux-heuristics.sh scripts/verify-release.sh || true
@@ -156,6 +156,9 @@ jobs:
       # test-all.sh. Guards the verification-report defects B-1..B-6 cheaply.
       - name: Post-process unit tests
         run: bash tests/test-postprocess.sh
+
+      - name: Merge-mode unit tests
+        run: bash tests/test-merge.sh
 
       - name: Output regression snapshots
         run: bash tests/test-snapshot.sh
