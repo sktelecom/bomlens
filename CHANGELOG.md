@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.6.0] - 2026-07-03
+
+### Added
+
+- AI SBOM conformance now covers the full G7 minimum-elements checklist: seven clusters rendered as 51 checks, each tagged as read from the SBOM, inferred from signals, or requiring human review. The web UI groups the results by cluster, and the AI model guide explains what the checklist is, its EU AI Act context, and how to read the report.
+- The desktop app checks for a newer release on startup and offers the download page.
+- The desktop app recovers without a relaunch: the Docker-missing and failure screens have retry buttons, a scanner container that dies after the UI loads is detected and reported, containers left behind by a crash are cleaned up on the next start, and a second launch focuses the running window instead of starting a duplicate.
+- Desktop quality of life: the version is visible on the start screen and About panel, window size and position are remembered, startup progress is written to a log file, and the start screens support light mode, a language toggle, and per-OS Docker installation guidance.
+- New scan prefills the project name and version from the scan source (git URL, Docker image tag, uploaded file name, or SBOM metadata), marks required fields, and validates them inline.
+- The macOS installer is universal: it now runs on Intel Macs as well as Apple Silicon.
+- The desktop installers are covered by the release's `SHA256SUMS.txt`, so downloads can be integrity-checked.
+
+### Changed
+
+- Advanced scan option labels lead with what they do ("Per-file license scan", "Detect copied-in open source", "More vulnerability advisories"); the tool names moved into the hints.
+- The desktop app pulls the documented image tag (`ghcr.io/sktelecom/bomlens`) — the same image it used before, under its current name.
+- Installer code signing and notarization turn on automatically once certificates are registered as CI secrets; installers remain unsigned until then.
+
+### Fixed
+
+- OS package CVE matching in SBOM security scans was restored.
+- syft output is pinned to CycloneDX 1.6 because Trivy 0.70 cannot read 1.7; security scans of syft-generated SBOMs work again.
+- A failed security scan is now marked as failed in the report instead of silently reporting zero findings.
+- PyPI version ranges no longer duplicate the installed version as a lower bound.
+- The `--deep-license` image builds and runs again.
+
 ## [v1.5.5] - 2026-07-01
 
 ### Fixed
