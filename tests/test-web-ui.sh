@@ -893,6 +893,226 @@ else
 fi
 [ ! -f "$OUT/legacy_1.0_bom.json" ] && pass "/scan-delete left no legacy flat artifact behind" || fail "legacy flat artifacts still present after delete"
 
+echo "== /scan-stream SSE contract (stub scanner via SBOM_RUN_SCAN) =="
+# The SSE scan stream was previously exercised only by the container-based
+# tests/test-web-e2e.sh, which is gated to push/dispatch CI — so the protocol
+# the frontend depends on (log/progress/error events, one terminal `done`
+# payload, cancel-on-disconnect) had no always-on coverage. A second server
+# instance runs with SBOM_RUN_SCAN pointing at a stub scanner whose behavior
+# each test selects through a control file, so every branch is reachable
+# without Docker.
+PORT2=$((PORT + 1))
+BASE2="http://127.0.0.1:${PORT2}"
+OUT2="$WORK/out2"; mkdir -p "$OUT2"
+STUB_MODE_FILE="$WORK/stub-mode"
+STUB_HEARTBEAT="$WORK/stub-heartbeat"
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/run-scan" <<'STUB'
+#!/bin/bash
+# Stub scanner for the SSE contract tests. Reads its behavior from the control
+# file each run; writes the bom artifact into $PWD (the server sets cwd to the
+# per-run output folder, exactly like the real run-scan).
+mode="$(cat "$STUB_MODE_FILE" 2>/dev/null || echo ok)"
+echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
+write_bom() {
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
+        > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
+}
+case "$mode" in
+    ok) write_bom; echo "[stub] done" ;;
+    progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
+    fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
+    hang)
+        i=0
+        while [ "$i" -lt 100 ]; do
+            date +%s >> "$STUB_HEARTBEAT"
+            echo "[stub] tick $i"
+            sleep 0.2
+            i=$((i + 1))
+        done
+        ;;
+esac
+STUB
+chmod +x "$WORK/bin/run-scan"
+
+SRV2_PID=""
+cleanup2() { [ -n "$SRV2_PID" ] && kill "$SRV2_PID" 2>/dev/null; }
+trap 'cleanup2; cleanup' EXIT
+SBOM_OUTPUT_DIR="$OUT2" UI_PORT="$PORT2" SBOM_UI_HOST_DIR="$WORK" \
+    SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
+    STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
+    python3 "$SERVER" > "$WORK/server2.log" 2>&1 &
+SRV2_PID=$!
+disown "$SRV2_PID" 2>/dev/null || true
+ready2=0
+for _ in $(seq 1 30); do
+    if curl -fsS "$BASE2/capabilities" >/dev/null 2>&1; then ready2=1; break; fi
+    kill -0 "$SRV2_PID" 2>/dev/null || { echo "[ERROR] SSE server exited early:"; cat "$WORK/server2.log"; exit 1; }
+    sleep 0.3
+done
+[ "$ready2" = 1 ] && pass "stub-scanner server is up" || { fail "stub-scanner server did not become ready" "$(tail -5 "$WORK/server2.log")"; exit 1; }
+
+# Fetch one SSE stream (headers + body) and normalize the events to a JSON
+# array [{"event":..., "data":<parsed>}] for python3 assertions.
+sse_events() { # $1=query-string  -> writes $WORK/sse-headers, prints events JSON
+    curl -sN -D "$WORK/sse-headers" "$BASE2/scan-stream?$1" | python3 -c '
+import sys, json
+events, ev, data = [], None, []
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if line.startswith("event: "):
+        ev = line[len("event: "):]
+    elif line.startswith("data: "):
+        data.append(line[len("data: "):])
+    elif line == "" and ev is not None:
+        try:
+            parsed = json.loads("\n".join(data)) if data else None
+        except ValueError:
+            parsed = "\n".join(data)
+        events.append({"event": ev, "data": parsed})
+        ev, data = None, []
+print(json.dumps(events))
+'
+}
+
+echo ok > "$STUB_MODE_FILE"
+events=$(sse_events "project=demo&version=1.0&source=current-dir")
+if grep -qi '^content-type: text/event-stream' "$WORK/sse-headers"; then
+    pass "scan-stream responds with Content-Type: text/event-stream"
+else
+    fail "wrong content type" "$(grep -i '^content-type' "$WORK/sse-headers")"
+fi
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [e for e in evs if e['event'] == 'log']
+dones = [e for e in evs if e['event'] == 'done']
+assert logs, 'no log events'
+assert len(dones) == 1, 'expected exactly one done, got %d' % len(dones)
+d = dones[0]['data']
+assert d['ok'] is True, d
+assert d['id'] == 'demo_1.0', d['id']
+assert d['mode'] == 'SOURCE', d['mode']
+assert any(r['name'] == 'demo_1.0_bom.json' for r in d['results']), d['results']
+assert d['sbom'] and d['sbom'].get('components') == 2, d.get('sbom')
+assert d['scanConfig']['source'] == 'current-dir', d['scanConfig']
+assert evs[-1]['event'] == 'done', 'done is not the terminal event'
+"; then
+    pass "happy path: log events then a single terminal done (ok, id, results, sbom, scanConfig)"
+else
+    fail "happy-path SSE contract violated" "$events"
+fi
+[ -f "$OUT2/demo_1.0/.scanmeta.json" ] && pass "scan writes the .scanmeta.json sidecar into the run folder" || fail "missing .scanmeta.json sidecar"
+
+echo progress > "$STUB_MODE_FILE"
+events=$(sse_events "project=prog&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+progs = [e for e in evs if e['event'] == 'progress']
+assert len(progs) == 1, 'expected one progress event, got %d' % len(progs)
+assert progs[0]['data'] == {'phase': 'cvedb', 'percent': 42}, progs[0]['data']
+assert not any('firmware-cvedb-progress' in str(e['data']) for e in evs if e['event'] == 'log'), \
+    'progress marker leaked into log events'
+"; then
+    pass "cvedb progress marker becomes a progress event (not duplicated as log)"
+else
+    fail "progress event contract violated" "$events"
+fi
+
+echo fail > "$STUB_MODE_FILE"
+events=$(sse_events "project=bad&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+dones = [e for e in evs if e['event'] == 'done']
+assert len(dones) == 1 and dones[0]['data']['ok'] is False, evs
+"; then
+    pass "scanner exit 1 ends the stream with done ok:false"
+else
+    fail "failed scan did not report done ok:false" "$events"
+fi
+
+echo ok > "$STUB_MODE_FILE"
+code=$(curl -s -o "$WORK/sse-400" -w '%{http_code}' "$BASE2/scan-stream?version=1.0")
+if [ "$code" = "400" ] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$WORK/sse-400" 2>/dev/null; then
+    pass "missing project is rejected pre-stream with HTTP 400 JSON"
+else
+    fail "missing project returned $code (expected 400 JSON)"
+fi
+
+events=$(sse_events "project=nodocker&version=1.0&source=docker-image&target=alpine:latest")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e for e in evs if e['event'] == 'error']
+dones = [e for e in evs if e['event'] == 'done']
+assert errs and 'Docker socket' in errs[0]['data'], evs
+assert len(dones) == 1, evs
+d = dones[0]['data']
+assert d['ok'] is False and d['sbom'] is None and isinstance(d['results'], list), d
+"; then
+    pass "docker-image without a socket fails in-stream (error + done ok:false shape)"
+else
+    fail "socketless docker-image error contract violated" "$events"
+fi
+
+events=$(sse_events "project=weird&version=1.0&source=carrier-pigeon")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'error' and 'unknown input type' in e['data'] for e in evs), evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
+"; then
+    pass "unknown source is rejected in-stream"
+else
+    fail "unknown source contract violated" "$events"
+fi
+
+events=$(sse_events "project=gitfail&version=1.0&source=git-url&target=file:///nonexistent-repo-path")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
+"; then
+    pass "failed git clone reports error + done ok:false"
+else
+    fail "git clone failure contract violated" "$events"
+fi
+
+echo hang > "$STUB_MODE_FILE"
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 2 "$BASE2/scan-stream?project=cancel&version=1.0&source=current-dir" >/dev/null 2>&1 || true
+sleep 3
+hb1=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
+sleep 1.5
+hb2=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
+if [ "$hb1" -gt 0 ] && [ "$hb1" = "$hb2" ]; then
+    pass "client disconnect terminates the running scan (heartbeat stopped)"
+else
+    fail "scan kept running after client disconnect" "heartbeat $hb1 -> $hb2"
+fi
+
+echo ok > "$STUB_MODE_FILE"
+events=$(sse_events "project=demo2&version=1.0&source=current-dir&timestamp=true")
+ts_dirs=$(find "$OUT2" -maxdepth 1 -type d -name 'demo2_1.0_[0-9]*-[0-9]*' | wc -l | tr -d ' ')
+if [ "$ts_dirs" = "1" ] && compgen -G "$OUT2"/demo2_1.0_[0-9]*/demo2_1.0_bom.json >/dev/null; then
+    pass "timestamp=true: run folder gets the _YYYYMMDD-HHMMSS suffix, file names keep the plain prefix"
+else
+    fail "timestamped run layout violated" "$(ls "$OUT2")"
+fi
+if echo "$events" | python3 -c "
+import sys, json, re
+evs = json.load(sys.stdin)
+d = [e for e in evs if e['event'] == 'done'][0]['data']
+assert re.fullmatch(r'demo2_1\.0_\d{8}-\d{6}', d['id']), d['id']
+"; then
+    pass "done event id carries the timestamped run id"
+else
+    fail "done id is not the timestamped run id" "$events"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
