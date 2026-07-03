@@ -99,6 +99,8 @@
     "severityTitle": "심각도 분포",
     "severityFilterHint": "심각도를 클릭하면 필터됩니다",
     "noVulns": "발견된 취약점이 없습니다",
+    "securityScanFailed": "보안 스캔이 실패해 결과가 생성되지 않았습니다. 여기 표시된 수치는 실제 취약점 노출을 반영하지 않습니다.",
+    "securityScanPartial": "보안 스캐너가 오류를 보고했습니다. 아래 결과는 불완전할 수 있습니다.",
     "artifacts": "생성된 결과물",
     "artifactsEmpty": "생성된 결과물이 없습니다.",
     "artifactCount": "결과물 {{count}}개 · {{size}}",

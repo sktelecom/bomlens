@@ -105,6 +105,9 @@ export interface VulnItem {
 export type SecuritySummary = Record<Severity, number> & {
   TOTAL: number;
   vulnerabilities?: VulnItem[];
+  /** Engine failure message when the scan did not complete (scan-security.sh
+   *  ScanError). Present => the counts above understate the real exposure. */
+  scanError?: string;
 };
 
 /** One conformance check (base format requirement or a G7 AI minimum element). */
