@@ -72,7 +72,7 @@ case "$FORMAT" in
         ;;
     SPDX-JSON|SPDX-TagValue)
         echo "[convert] input is $FORMAT; converting to CycloneDX..."
-        if command -v syft >/dev/null 2>&1 && syft convert "$INPUT" -o cyclonedx-json="$OUTPUT" >/dev/null 2>&1 \
+        if command -v syft >/dev/null 2>&1 && syft convert "$INPUT" -o cyclonedx-json@1.6="$OUTPUT" >/dev/null 2>&1 \
            && [ -s "$OUTPUT" ] && jq -e '.bomFormat=="CycloneDX"' "$OUTPUT" >/dev/null 2>&1; then
             echo "[convert] syft convert succeeded."
         elif [ "$FORMAT" = "SPDX-JSON" ]; then
