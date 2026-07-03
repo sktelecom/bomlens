@@ -215,22 +215,38 @@ while IFS= read -r entry; do
             fail "$page: promised artifact $glob not produced"
             continue
         fi
+        # The docker-image.md blocks are raw `docker run` invocations: the
+        # container writes artifacts as root, so on a rootful daemon (CI) they
+        # land root-owned and this non-root harness cannot read them. Reclaim
+        # readability only when needed (a no-op locally, where Docker Desktop
+        # already maps them to the invoking user), so the jq assert can run.
+        if [ ! -r "$found" ]; then
+            sudo chown "$(id -u):$(id -g)" "$found" 2>/dev/null \
+                || sudo chmod a+r "$found" 2>/dev/null || true
+        fi
         if [ -n "$assert" ]; then
             if jq -e "$assert" "$found" >/dev/null 2>&1; then
                 pass "$page: $glob (assert ok)"
             else
-                fail "$page: $glob exists but violates: $assert"
+                # Dump what the file actually is (size, jq parse error, head) so
+                # an environment-specific failure is self-diagnosing instead of
+                # needing a local re-run to guess at.
+                fail "$page: $glob exists but violates: $assert" \
+                    "size=$(wc -c <"$found" 2>/dev/null) bytes; jq: $(jq -e "$assert" "$found" 2>&1 | head -1); head: $(head -c 200 "$found" 2>/dev/null | tr '\n' ' ')"
             fi
         else
             pass "$page: $glob"
         fi
     done <<< "$EXPECT"
 
-    # Clean the artifacts the walkthrough wrote.
+    # Clean the artifacts the walkthrough wrote. Root-owned outputs from the
+    # direct docker-run pages need sudo to remove on a rootful daemon; fall back
+    # to it only if the plain rm leaves the tree behind (no-op locally).
     if [ "$prep" = "root" ]; then
-        rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null
+        rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null || sudo rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null || true
     else
-        rm -rf "$wd"
+        rm -rf "$wd" 2>/dev/null
+        [ -d "$wd" ] && sudo rm -rf "$wd" 2>/dev/null || true
     fi
     rm -f "$log"
 done <<< "$TARGETS"
