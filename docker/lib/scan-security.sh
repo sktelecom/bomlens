@@ -36,8 +36,14 @@ echo "[security] running Trivy SBOM scan..."
 if ! trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$SBOM" 2>/tmp/trivy.err; then
     echo "[security] WARN: Trivy scan failed:" >&2
     cat /tmp/trivy.err >&2
-    # Emit an empty-but-valid report so downstream steps don't break.
-    echo '{"Results":[]}' > "$JSON"
+    # Emit an empty-but-valid report so downstream steps don't break, but record
+    # the failure in the report itself (ScanError): an empty Results array is
+    # otherwise indistinguishable from a clean "0 vulnerabilities" result, and
+    # consumers have misread failed scans (DB download failure, undecodable
+    # SBOM) as a pass. Trivy prints its fatal reason as the last stderr line.
+    ERR_MSG=$(tr -d '\000\r' < /tmp/trivy.err | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-400)
+    jq -n --arg msg "${ERR_MSG:-trivy sbom exited with an error}" \
+        '{Results: [], ScanError: {Engine: "Trivy", Message: $msg}}' > "$JSON"
 fi
 
 # Ensure .Results exists even when Trivy omits it (e.g. SBOM with no components).
@@ -118,6 +124,10 @@ FINDINGS=$(echo "$FINDINGS" | jq --argjson epss "$EPSS_MAP" --argjson kev "$KEV_
 echo "$FINDINGS" | jq 'map({key: .id, value: {epss: .epss, kev: .kev}}) | from_entries' \
     > "${OUT_PREFIX}_security_epss.json" 2>/dev/null || echo "{}" > "${OUT_PREFIX}_security_epss.json"
 
+# Failure marker written above (survives the sidecar merge, which keeps every
+# non-Results key). Non-empty => the Trivy findings are missing, not zero.
+SCAN_ERR=$(jq -r '.ScanError.Message // empty' "$JSON" 2>/dev/null)
+
 count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
@@ -136,6 +146,12 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
     echo ""
+    if [ -n "$SCAN_ERR" ]; then
+        echo "> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure."
+        echo ">"
+        echo "> Error: \`${SCAN_ERR}\`"
+        echo ""
+    fi
     if [ "$ENRICHED" = "true" ]; then
         echo "- Actively exploited (CISA KEV): **${KEV_COUNT}**"
         echo "- Priority order: KEV first, then severity, then EPSS (exploit probability)."
@@ -152,6 +168,8 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             " | \(.cvss // "")" +
             " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
             " | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
+    elif [ -n "$SCAN_ERR" ]; then
+        echo "_Scan failed — no results were produced._"
     else
         echo "_No known vulnerabilities found._"
     fi
@@ -250,6 +268,10 @@ HTMLHEAD
     [ "$ENRICHED" = "true" ] && echo " <span class=\"pill pill-kev\">KEV <span class=\"count\">${KEV_COUNT}</span></span>"
     echo "</div>"
     [ "$ENRICHED" = "true" ] && echo "<p class=\"meta\">EPSS = exploit probability (FIRST.org) &middot; KEV = CISA known-exploited &middot; priority: KEV → severity → EPSS</p>"
+    if [ -n "$SCAN_ERR" ]; then
+        ERR_HTML=$(printf '%s' "$SCAN_ERR" | jq -Rr '@html')
+        echo "<div class=\"note\"><b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure.<br><code>${ERR_HTML}</code></div>"
+    fi
 
     if [ "$TOTAL" -gt 0 ]; then
         echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>KEV</th><th>CVSS</th><th>EPSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr>"
@@ -262,10 +284,16 @@ HTMLHEAD
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + (.title|@html) + "</td></tr>"'
         echo "</table></div>"
+    elif [ -n "$SCAN_ERR" ]; then
+        echo "<p>Scan failed &mdash; no results were produced.</p>"
     else
         echo "<p>No known vulnerabilities found.</p>"
     fi
     echo "</body></html>"
 } > "$HTML"
 
-echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT})"
+if [ -n "$SCAN_ERR" ]; then
+    echo "[security] generated: $JSON, $MD, $HTML (SCAN FAILED — results incomplete: ${SCAN_ERR})"
+else
+    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT})"
+fi

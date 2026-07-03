@@ -474,6 +474,63 @@ bash "$LIB/normalize-sbom.sh" "$WORK/os.json" >/dev/null 2>&1
 total_src=$(jq '[.components[].properties[]? | select(.name=="aquasecurity:trivy:SrcName")] | length' "$WORK/os.json")
 [ "$total_src" = "7" ] && pass "idempotent: second normalize adds no duplicate properties" || fail "SrcName count after 2nd run = $total_src, expected 7"
 
+echo "== sec-fail: a failed Trivy run is recorded in the report, not passed off as 0 findings =="
+# Regression for the SCA-benchmark follow-up report: any Trivy failure (SBOM
+# decode error, vulnerability-DB download failure) was swallowed as a WARN and
+# the report came back {"Results":[]} — indistinguishable from a clean scan.
+# scan-security.sh must stamp a ScanError marker and say so in the MD/HTML.
+FAKEBIN="$WORK/fakebin"
+mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+echo "2026-07-03T00:00:00Z	FATAL	Fatal error	run error: sbom scan error: SBOM decode error: CycloneDX decode error: invalid specification version" >&2
+exit 1
+SH
+chmod +x "$FAKEBIN/trivy"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "$WORK/secfail-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secfail" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on an engine failure (must stay report-only)"
+err_msg=$(jq -r '.ScanError.Message // "ABSENT"' "$WORK/secfail_security.json")
+case "$err_msg" in
+    *"invalid specification version"*) pass "ScanError.Message carries the Trivy fatal line" ;;
+    *) fail "ScanError.Message='$err_msg', expected the Trivy fatal line" ;;
+esac
+[ "$(jq -r '.ScanError.Engine // "ABSENT"' "$WORK/secfail_security.json")" = "Trivy" ] \
+    && pass "ScanError.Engine = Trivy" || fail "ScanError.Engine missing"
+[ "$(jq '.Results | length' "$WORK/secfail_security.json")" = "0" ] \
+    && pass "Results stays an empty array (downstream contract intact)" \
+    || fail "Results is not an empty array on failure"
+grep -q "Scan failed" "$WORK/secfail_security.md" \
+    && pass "markdown report says the scan failed" \
+    || fail "markdown report still reads like a clean 0-findings result"
+grep -q "No known vulnerabilities found" "$WORK/secfail_security.md" \
+    && fail "markdown report still claims 'No known vulnerabilities found' after a failure" \
+    || pass "markdown report does not claim a clean result"
+grep -q "Scan failed" "$WORK/secfail_security.html" \
+    && pass "html report says the scan failed" \
+    || fail "html report still reads like a clean 0-findings result"
+
+echo "== sec-ok: a successful Trivy run gets no ScanError marker =="
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2020-1111","PkgName":"libfoo","InstalledVersion":"1.0","Severity":"LOW"}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secok" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh failed on a successful engine run"
+[ "$(jq -r 'has("ScanError")' "$WORK/secok_security.json")" = "false" ] \
+    && pass "no ScanError on a successful run" || fail "ScanError present on a successful run"
+[ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
+    && pass "findings intact on a successful run" || fail "findings lost on a successful run"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

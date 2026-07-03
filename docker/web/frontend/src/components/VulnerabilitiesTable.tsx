@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { EmptyState } from "@/components/ui/state";
+import { EmptyState, ErrorState } from "@/components/ui/state";
 import { type SecuritySummary, type Severity, type VulnItem } from "@/lib/api";
 import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
@@ -170,6 +170,16 @@ export function VulnerabilitiesTable({ security, initialQuery, initialSeverity }
     );
 
   if (security.TOTAL === 0 || items.length === 0) {
+    // A failed engine run also yields zero rows — say so instead of implying
+    // a clean result (scanError mirrors the report's ScanError marker).
+    if (security.scanError) {
+      return (
+        <ErrorState>
+          <span>{t("result.securityScanFailed")}</span>
+          <span className="max-w-xl break-all font-mono text-xs">{security.scanError}</span>
+        </ErrorState>
+      );
+    }
     return <EmptyState icon={ShieldCheck}>{t("result.noVulns")}</EmptyState>;
   }
 
@@ -182,6 +192,14 @@ export function VulnerabilitiesTable({ security, initialQuery, initialSeverity }
 
   return (
     <div className="space-y-4">
+      {security.scanError && (
+        // Findings exist (e.g. merged from a sidecar engine) but the primary
+        // engine failed — the list below is incomplete, not the full picture.
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {t("result.securityScanPartial")}{" "}
+          <span className="break-all font-mono">{security.scanError}</span>
+        </p>
+      )}
       <SeverityBar
         security={security}
         selected={severityFilter as Severity | ""}

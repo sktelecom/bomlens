@@ -99,6 +99,8 @@
     "severityTitle": "Severity distribution",
     "severityFilterHint": "Click a severity to filter",
     "noVulns": "No vulnerabilities found",
+    "securityScanFailed": "Security scan failed — no results were produced. The counts here do not reflect the target's actual exposure.",
+    "securityScanPartial": "The security scanner reported an error; these results may be incomplete.",
     "artifacts": "Generated artifacts",
     "artifactsEmpty": "No artifacts were generated.",
     "artifactCount": "{{count}} artifacts · {{size}}",

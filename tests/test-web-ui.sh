@@ -354,6 +354,33 @@ else
 fi
 rm -f "$OUT"/sec_1.0_*
 
+echo "== scanError exposure (security_summary) =="
+# scan-security.sh stamps ScanError when the engine run fails; the summary must
+# surface it so the UI can tell "scan failed" from a clean 0-findings result,
+# and must omit it on a normal report.
+cat > "$OUT/serr_1.0_security.json" <<'JSON'
+{"Results":[],"ScanError":{"Engine":"Trivy","Message":"CycloneDX decode error: invalid specification version"}}
+JSON
+cat > "$OUT/sok_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[{"VulnerabilityID":"CVE-1","Severity":"LOW","PkgName":"libfoo","InstalledVersion":"1.0"}]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.security_summary("serr_1.0")
+assert s["TOTAL"] == 0, s
+assert "invalid specification version" in s["scanError"], s
+ok = server.security_summary("sok_1.0")
+assert "scanError" not in ok, ok
+PY
+then
+    pass "scanError surfaced on failure, absent on a clean report"
+else
+    fail "scanError exposure is wrong"
+fi
+rm -f "$OUT"/serr_1.0_* "$OUT"/sok_1.0_*
+
 rm -f "$OUT"/demo_1.0_* "$OUT"/flat_1.0_* "$OUT"/bad_1.0_*
 
 echo "== conformance checks exposure (G7 split) =="

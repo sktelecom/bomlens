@@ -456,6 +456,11 @@ def security_summary(run_id):
                 vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
+    # scan-security.sh records a failed engine run as ScanError; surface it so
+    # consumers can tell "scan failed" from a genuine zero-findings result.
+    err = data.get("ScanError")
+    if isinstance(err, dict) and err.get("Message"):
+        sev["scanError"] = str(err["Message"])[:400]
     return sev
 
 
