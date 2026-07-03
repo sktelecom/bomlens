@@ -1,0 +1,137 @@
+name: Heavy E2E (reusable)
+
+# The heavy end-to-end suites (web UI E2E, comprehensive CLI E2E, docs
+# walkthrough) in one reusable workflow. Both ci.yml (main pushes, dispatch,
+# path-filtered PRs) and nightly.yml (daily full run) call this, so the step
+# definitions exist exactly once and the two schedules can never drift apart.
+#
+# `suites` selects which of the three jobs run; the other inputs mirror ci.yml's
+# workflow_dispatch knobs (opt-in firmware/deep-license image builds, example
+# subset for the real-example scan suite).
+on:
+  workflow_call:
+    inputs:
+      suites:
+        description: "Space-separated subset of: web-e2e full-e2e docs-walkthrough"
+        type: string
+        default: "web-e2e full-e2e docs-walkthrough"
+      firmware:
+        description: "Also build the firmware image so full-e2e's firmware group runs"
+        type: boolean
+        default: false
+      deep_license:
+        description: "Also build the deep-license (scancode) image; its build gate runs a real license scan"
+        type: boolean
+        default: false
+      examples_only:
+        description: "ONLY= subset for test-examples-e2e.sh (empty = all bundled examples)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  web-e2e:
+    name: Web UI E2E (container scan -> done)
+    runs-on: ubuntu-latest
+    if: contains(inputs.suites, 'web-e2e')
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Base image + SCANOSS only: gives us server.py, run-scan, syft and
+      # scanoss-py — enough for the sbom-upload (ANALYZE), docker-image (IMAGE),
+      # current-dir (SOURCE/syft) cases and the dot-path SCANOSS regression. The
+      # 15GB cdxgen language image and firmware/aibom flavors are deliberately
+      # excluded to keep the build light; those scan paths fall back to syft.
+      - name: Build scanner image (base + scanoss)
+        run: |
+          docker build --build-arg SBOM_SCANOSS=true \
+            -t bomlens-e2e:ci ./docker
+
+      - name: Run web UI e2e (SSE scan-stream -> done)
+        env:
+          SBOM_E2E_IMAGE: bomlens-e2e:ci
+        run: bash tests/test-web-e2e.sh
+
+  full-e2e:
+    name: Full CLI E2E (comprehensive + examples)
+    runs-on: ubuntu-latest
+    if: contains(inputs.suites, 'full-e2e')
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Grant script permissions
+        run: chmod +x scripts/scan-sbom.sh tests/test-e2e.sh tests/test-examples-e2e.sh
+
+      # Tag as sbom-scanner:test — the default image name both scripts expect, so
+      # they run with no extra env. base + scanoss covers analyze/source/image/
+      # cosign; cdxgen per-language images are pulled on demand for source scans.
+      - name: Build scanner image (base + scanoss)
+        run: docker build --build-arg SBOM_SCANOSS=true -t sbom-scanner:test ./docker
+
+      # Opt-in: building the GPL firmware image (unblob/cve-bin-tool) is slow, so
+      # it is only built when the caller asks for it. test-e2e.sh skips its
+      # firmware group when this image is absent.
+      - name: Build firmware image (opt-in)
+        if: inputs.firmware
+        run: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware:test ./docker
+
+      # Opt-in: the deep-license (scancode) image compiles PyICU and pulls native
+      # libarchive/libmagic, so it is slow and only built when the caller asks.
+      # Its Dockerfile build gate runs a real license scan, so a regression in
+      # those native deps fails the build here rather than at runtime.
+      - name: Build deep-license image (opt-in)
+        if: inputs.deep_license
+        run: docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner-deep-license:test ./docker
+
+      - name: Run comprehensive CLI e2e (test-e2e.sh)
+        run: bash tests/test-e2e.sh
+
+      # examples_only bounds runtime for callers on a budget (main pushes scan a
+      # representative npm/pip/gomod subset); empty scans every bundled example.
+      - name: Run real-example scan e2e (test-examples-e2e.sh)
+        env:
+          ONLY: ${{ inputs.examples_only }}
+        run: bash tests/test-examples-e2e.sh
+
+  docs-walkthrough:
+    name: Docs Walkthrough (getting-started commands)
+    runs-on: ubuntu-latest
+    if: contains(inputs.suites, 'docs-walkthrough')
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # Base image (syft) is enough: the first-scan walkthrough scans the bundled
+      # example as a directory (ROOTFS/syft). Tag it sbom-scanner:test, the
+      # default the harness expects.
+      - name: Build scanner image (base)
+        run: docker build -t sbom-scanner:test ./docker
+
+      # docs/reference/docker-image.md's runnable blocks name the PUBLISHED
+      # image verbatim (that is what a reader pastes). Point that tag at the
+      # image built from THIS commit so the blocks run against repo HEAD; the
+      # nightly user journey covers the genuinely published image instead.
+      - name: Tag built image with the published name (docs run verbatim)
+        run: docker tag sbom-scanner:test ghcr.io/sktelecom/bomlens:latest
+
+      - name: Run docs walkthrough
+        run: bash tests/test-docs-walkthrough.sh
