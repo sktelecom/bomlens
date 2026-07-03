@@ -119,7 +119,7 @@ fi
 # --------------------------------------------------------
 PKG_SBOM="$WORK/pkg.cdx.json"
 echo "[firmware] syft: cataloging packages under rootfs..."
-if ! syft "dir:$ROOTFS" -o cyclonedx-json > "$PKG_SBOM" 2>/dev/null; then
+if ! syft "dir:$ROOTFS" -o cyclonedx-json@1.6 > "$PKG_SBOM" 2>/dev/null; then
     echo "[firmware] WARN: syft directory scan failed; continuing without package components." >&2
     echo '{"components":[]}' > "$PKG_SBOM"
 fi

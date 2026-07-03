@@ -139,6 +139,12 @@ echo "=========================================="
 # ========================================================
 # Produce / locate the SBOM
 # ========================================================
+# Every syft invocation below pins its CycloneDX output to @1.6. syft >= 1.28
+# defaults to emitting CycloneDX 1.7, but the rest of this pipeline standardizes
+# on 1.6 (cdxgen is run with --spec-version 1.6; convert-to-cdx.sh writes 1.6;
+# the docs promise 1.6) and the bundled Trivy 0.70 cannot decode 1.7 ("invalid
+# specification version"), which would silently empty the security report. The
+# @1.6 selector keeps syft output aligned with cdxgen and readable by Trivy.
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
@@ -164,13 +170,13 @@ case "$SCAN_MODE" in
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
             if ! generate_sbom_cdxgen "$SRC_ROOT" "$SOURCE_ROOT_HOST" "$OUTPUT_FILE"; then
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
-                syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
+                syft "dir:$SRC_ROOT" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
                 mark_sbom_degraded "$OUTPUT_FILE" "${CDXGEN_FAIL_REASON:-cdxgen-unavailable}"
             fi
         else
             echo "[1/2] syft: source dir $SRC_ROOT (manifest-only; docker.sock/CLI/host-path unavailable)"
-            syft "dir:$SRC_ROOT" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null \
+            syft "dir:$SRC_ROOT" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null \
                 || { echo "[ERROR] syft source scan failed."; exit 1; }
             mark_sbom_degraded "$OUTPUT_FILE" "cdxgen-unavailable"
         fi
@@ -200,7 +206,7 @@ case "$SCAN_MODE" in
             echo "[ERROR] Docker socket not mounted: -v /var/run/docker.sock:/var/run/docker.sock"; exit 1
         fi
         echo "[1/2] syft: Docker image $TARGET_IMAGE"
-        if ! syft "$TARGET_IMAGE" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
+        if ! syft "$TARGET_IMAGE" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null; then
             echo "[ERROR] syft failed (image missing or inaccessible)."; exit 1
         fi
         ;;
@@ -208,7 +214,7 @@ case "$SCAN_MODE" in
     BINARY)
         if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
         echo "[1/2] syft: binary $TARGET_FILE"
-        if ! syft "file:$TARGET_FILE" -o cyclonedx-json > "$OUTPUT_FILE" 2>&1; then
+        if ! syft "file:$TARGET_FILE" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>&1; then
             echo "[WARN] syft binary scan failed; emitting minimal SBOM."
             FILE_INFO=$(file "$TARGET_FILE")
             cat > "$OUTPUT_FILE" <<EOF
@@ -226,7 +232,7 @@ EOF
     ROOTFS)
         if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR"; exit 1; fi
         echo "[1/2] syft: RootFS $TARGET_DIR"
-        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json > "$OUTPUT_FILE" 2>/dev/null; then
+        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null; then
             echo "[ERROR] syft directory scan failed."; exit 1
         fi
         ;;

@@ -581,11 +581,21 @@ if docker pull alpine:latest > /dev/null 2>&1; then
     if run_scan_with_logs "test-docker-image" "TestDockerImage" "1.0.0" "--target alpine:latest"; then
         if FOUND=$(find_bom_file "TestDockerImage" "1.0.0"); then
             COMP_COUNT=$(cat "$FOUND" | jq '.components | length' 2>/dev/null || echo "0")
-            if [ "$COMP_COUNT" -gt 0 ]; then
-                print_success "Docker Image ($COMP_COUNT components)"
+            # Pin the syft image-scan output to CycloneDX 1.6. syft >= 1.28
+            # defaults to 1.7, which the bundled Trivy 0.70 cannot decode (the
+            # security report then silently empties) and which contradicts the
+            # docs' 1.6 promise. entrypoint.sh selects cyclonedx-json@1.6; guard
+            # it here so a syft bump can't reintroduce 1.7 unnoticed.
+            SPEC_V=$(cat "$FOUND" | jq -r '.specVersion' 2>/dev/null || echo "?")
+            if [ "$COMP_COUNT" -gt 0 ] && [ "$SPEC_V" = "1.6" ]; then
+                print_success "Docker Image ($COMP_COUNT components, CycloneDX $SPEC_V)"
                 ((PASSED++))
-            else
+            elif [ "$COMP_COUNT" -le 0 ]; then
                 print_error "Docker Image (SBOM is empty)"
+                show_failure_log "test-docker-image"
+                ((FAILED++))
+            else
+                print_error "Docker Image (specVersion=$SPEC_V, expected 1.6 — syft spec pin drifted)"
                 show_failure_log "test-docker-image"
                 ((FAILED++))
             fi
