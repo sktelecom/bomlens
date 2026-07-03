@@ -93,6 +93,7 @@ done
 
 외부 시스템이 제품당 단일 BOM을 요구할 때만 병합합니다(Dependency-Track과 TRUSCA 모두 프로젝트당 BOM 하나를 등록합니다). `--merge`는 층을 합치고 purl 기준으로 컴포넌트 중복을 제거한 뒤, 최상위 컴포넌트를 제품명·버전으로 기재합니다.
 
+<!-- runnable -->
 ```bash
 $SBOM --project mms-relay-server --version 1.0.0 \
   --merge mms-relay-os_6.10_bom.json \

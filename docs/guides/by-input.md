@@ -53,9 +53,10 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 A team handed you a GitHub repository. Pass the URL directly, no manual `git clone`.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/org/team1-app" \
+  --git "https://github.com/sktelecom/sbom-tools" \
   --all --generate-only
 ```
 
@@ -69,6 +70,7 @@ $SBOM --project team1-app --version 1.0.0 \
 
 A team handed you the source as a ZIP. Pass the archive directly, no manual extraction.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team2-app --version 1.0.0 \
   --target "./team2-app.zip" \
@@ -102,6 +104,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 
 A team handed you an SBOM (JSON). Validate and analyze it even without the source.
 
+<!-- runnable -->
 ```bash
 $SBOM --project team4-proj --version 2.0.0 \
   --analyze "./team4-sbom.json" \

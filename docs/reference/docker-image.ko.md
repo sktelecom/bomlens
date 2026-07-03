@@ -36,6 +36,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 ### Docker 이미지 분석
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/host-output \
@@ -66,6 +67,7 @@ docker run --rm \
 
 ### 소스 디렉터리 분석
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/src \
@@ -84,6 +86,7 @@ docker run --rm \
 
 직접 실행에서는 고지문과 보안 보고서가 기본으로 꺼져 있습니다. 다음 변수를 켜면 CLI의 `--all`과 같은 산출물이 나옵니다.
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/host-output \

@@ -40,6 +40,7 @@ Select the analysis mode with the `MODE` environment variable. All examples belo
 
 ### Analyze a Docker image
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/host-output \
@@ -70,6 +71,7 @@ docker run --rm \
 
 ### Analyze a source directory
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/src \
@@ -88,6 +90,7 @@ In direct runs, `SOURCE` mode has syft read the package manifests inside the con
 
 In direct runs, the notice and security reports are off by default. Turn on the following variables to get the same outputs as the CLI's `--all`.
 
+<!-- runnable -->
 ```bash
 docker run --rm \
   -v "$(pwd)":/host-output \

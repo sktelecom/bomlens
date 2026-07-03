@@ -2,12 +2,11 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# test-docs-walkthrough.sh — run the getting-started guide exactly as a reader
-# would and prove the documented commands still work. A user copies the install
-# and first-scan steps out of the docs and runs them verbatim; if a flag, an
-# output name or a scan mode changed, the walkthrough breaks for them while every
-# other test stays green. This harness executes the commands the docs mark as
-# runnable and checks the promised artifact appears.
+# test-docs-walkthrough.sh — run the user guides exactly as a reader would and
+# prove the documented commands still work AND produce every artifact the page
+# promises. A user copies commands out of the docs and runs them verbatim; if a
+# flag, an output name, a spec version or a scan mode changed, the walkthrough
+# breaks for them while every other test stays green.
 #
 # Runnable blocks are opted in with an HTML comment on the line immediately
 # before the fence (invisible in the rendered docs):
@@ -18,8 +17,13 @@
 #     ```
 #
 # Blocks without the marker (placeholder URLs, `--ui` server, OS install steps)
-# are left out. The marked blocks of a page run in order from the repo root in
-# one shell, so a later block can read an earlier block's output.
+# are left out. A page's marked blocks run in order in ONE shell, so a later
+# block can read an earlier block's output. Where a page's prose names an input
+# the reader is assumed to have (a supplier ZIP, an SBOM handed over by a team),
+# the page's prep hook below materializes exactly that object — the doc text
+# itself stays verbatim. The pairing rule: if a page's prose declares a
+# placeholder, prep_page() must define it; renaming one without the other fails
+# this harness. (See docs/internal/runnable-doc-blocks.md.)
 #
 # Usage:   bash tests/test-docs-walkthrough.sh
 # Env:     SBOM_SCANNER_IMAGE  scanner image (default: sbom-scanner:test)
@@ -29,13 +33,59 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 2
 SCANNER_IMG="${SBOM_SCANNER_IMAGE:-sbom-scanner:test}"
+# docker-image.md's blocks name the published image verbatim — that is the whole
+# point of running them (a reader pastes exactly this). The CI docs job tags its
+# freshly built image with this name; the nightly user journey pulls the real one.
+PUBLISHED_IMG="ghcr.io/sktelecom/bomlens:latest"
 
-# Pages whose runnable blocks we execute, and the artifact each must produce.
-# (page : expected-artifact-glob). Scans land in a per-run {Project}_{Version}/
-# subfolder by default, which is what the documented command produces and what
-# the docs show — so the artifact lives under that subfolder.
-TARGETS=(
-    "docs/start/first-scan.md:MyApp_1.0.0/MyApp_1.0.0_bom.json"
+# Pages whose runnable blocks we execute.
+#   page :: prep-key :: image-kind
+#     prep-key    'root' = no prep, run from the repo root (the page's commands
+#                 reference repo-relative paths); anything else = a fresh workdir
+#                 under tests/test-workspace/docs/ plus that prep_page() case.
+#     image-kind  'test'      the page runs scan-sbom.sh, honoring $SCANNER_IMG
+#                 'published' the page's blocks name $PUBLISHED_IMG verbatim;
+#                             executed only when that exact tag is present.
+TARGETS=$(cat <<'EOF'
+docs/start/first-scan.md       :: root      :: test
+docs/guides/by-input.md        :: by-input  :: test
+docs/guides/server-delivery.md :: merge     :: test
+docs/reference/docker-image.md :: dockerimg :: published
+EOF
+)
+
+# Every artifact a page's prose/tables promise for its runnable commands.
+#   page :: artifact-glob (relative to the page's workdir) :: optional jq assert
+EXPECT=$(cat <<'EOF'
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_bom.json        :: .bomFormat=="CycloneDX" and .specVersion=="1.6"
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_NOTICE.txt      ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_NOTICE.html     ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.json   ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.md     ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.html   ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.md  ::
+docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.html ::
+docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
+docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_NOTICE.txt        ::
+docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_risk-report.md    ::
+docs/guides/by-input.md :: team2-app_1.0.0/team2-app_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
+docs/guides/by-input.md :: team2-app_1.0.0/team2-app_1.0.0_NOTICE.txt        ::
+docs/guides/by-input.md :: team2-app_1.0.0/team2-app_1.0.0_risk-report.md    ::
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_bom.json        :: .bomFormat=="CycloneDX" and .specVersion=="1.6"
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_NOTICE.txt      ::
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_risk-report.md  ::
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_conformance.json ::
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_conformance.md   ::
+docs/guides/by-input.md :: team4-proj_2.0.0/team4-proj_2.0.0_conformance.html ::
+docs/guides/server-delivery.md :: mms-relay-server_1.0.0/mms-relay-server_1.0.0_bom.json :: [.components[]?.properties[]? | select(.name=="bomlens:layer")] | length > 0
+docs/guides/server-delivery.md :: mms-relay-server_1.0.0/mms-relay-server_1.0.0_NOTICE.txt ::
+docs/guides/server-delivery.md :: mms-relay-server_1.0.0/mms-relay-server_1.0.0_risk-report.md ::
+docs/reference/docker-image.md :: MyApp_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
+docs/reference/docker-image.md :: Nginx_alpine_bom.json         :: .bomFormat=="CycloneDX"
+docs/reference/docker-image.md :: Nginx_alpine_NOTICE.txt       ::
+docs/reference/docker-image.md :: Nginx_alpine_security.json    ::
+docs/reference/docker-image.md :: Nginx_alpine_risk-report.md   ::
+EOF
 )
 
 PASS=0; FAIL=0; SKIP=0
@@ -48,6 +98,11 @@ have_docker=0
 command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && have_docker=1
 have_image=0
 [ "$have_docker" = 1 ] && docker image inspect "$SCANNER_IMG" >/dev/null 2>&1 && have_image=1
+have_published=0
+[ "$have_docker" = 1 ] && docker image inspect "$PUBLISHED_IMG" >/dev/null 2>&1 && have_published=1
+
+# Nth '::'-separated field of a manifest line, whitespace-trimmed.
+field() { printf '%s' "$1" | awk -F'::' -v n="$2" '{gsub(/^[ \t]+|[ \t]+$/, "", $n); print $n}'; }
 
 # Emit the shell lines of every <!-- runnable --> bash block in a markdown file.
 runnable_blocks() {
@@ -59,13 +114,49 @@ runnable_blocks() {
     ' "$1"
 }
 
+# Materialize the placeholder inputs a page's prose names, into the workdir.
+# $1 = prep-key, $2 = workdir. Runs in the harness shell so exports (the guide's
+# "keep the script path in a variable" $SBOM convention) reach the eval below.
+prep_page() {
+    case "$1" in
+        by-input)
+            export SBOM="$ROOT/scripts/scan-sbom.sh"
+            # Scenario 2: "a team handed you the source as a ZIP".
+            if command -v zip >/dev/null 2>&1; then
+                (cd "$ROOT/examples" && zip -qr "$2/team2-app.zip" nodejs -x 'nodejs/node_modules/*')
+            else
+                (cd "$ROOT/examples" && python3 -m zipfile -c "$2/team2-app.zip" nodejs)
+            fi
+            # Scenario 4: "a team handed you an SBOM (JSON)". An SPDX document,
+            # so the page's "converted to CycloneDX internally" claim (and the
+            # 1.6 specVersion of the converted output) is actually exercised —
+            # a CycloneDX input would pass through keeping its own specVersion.
+            cp "$ROOT/tests/fixtures/good-spdx.json" "$2/team4-sbom.json"
+            ;;
+        merge)
+            export SBOM="$ROOT/scripts/scan-sbom.sh"
+            # The three per-layer SBOMs the server guide's earlier steps produce.
+            cp "$ROOT/tests/fixtures/good-cyclonedx.json"      "$2/mms-relay-os_6.10_bom.json"
+            cp "$ROOT/tests/fixtures/cdxgen-node-managed.json" "$2/mms-relay-app_2.0.0_bom.json"
+            cp "$ROOT/tests/fixtures/good-cyclonedx.json"      "$2/mms-relay-bin_2.0.0_bom.json"
+            ;;
+        dockerimg)
+            # "Analyze a source directory" mounts $(pwd) as /src.
+            cp -R "$ROOT/examples/nodejs/." "$2/"
+            ;;
+    esac
+}
+
 echo "=================================================="
-echo " docs walkthrough (image: $SCANNER_IMG, present=$have_image)"
+echo " docs walkthrough (image: $SCANNER_IMG present=$have_image," \
+     "published: $PUBLISHED_IMG present=$have_published)"
 echo "=================================================="
 
-for entry in "${TARGETS[@]}"; do
-    page="${entry%%:*}"
-    artifact="${entry##*:}"
+while IFS= read -r entry; do
+    [ -z "${entry//[[:space:]]/}" ] && continue
+    page="$(field "$entry" 1)"
+    prep="$(field "$entry" 2)"
+    kind="$(field "$entry" 3)"
     echo "- $page"
 
     if [ ! -f "$page" ]; then
@@ -82,37 +173,67 @@ for entry in "${TARGETS[@]}"; do
     fi
     pass "$page: $(printf '%s\n' "$script" | grep -c .) runnable command line(s) extracted"
 
-    if [ "$have_image" != 1 ]; then
+    if [ "$kind" = "published" ]; then
+        if [ "$have_published" != 1 ]; then
+            skip "$page: execution ($PUBLISHED_IMG not present — CI tags the built image as it; nightly pulls the real one)"
+            continue
+        fi
+    elif [ "$have_image" != 1 ]; then
         skip "$page: execution (scanner image '$SCANNER_IMG' not available)"
         continue
     fi
 
-    # Run the marked blocks verbatim from the repo root, exactly where the guide
-    # tells the reader to be. Outputs land in the repo root (cwd anchor), so the
-    # later jq block reads them from the same place.
+    # Workdir: 'root' pages run at the repo root, exactly where the guide tells
+    # the reader to be (their commands use repo-relative paths). Every other
+    # page gets a fresh folder — Docker-shareable, since it lives in the tree.
+    if [ "$prep" = "root" ]; then
+        wd="$ROOT"
+    else
+        wd="$ROOT/tests/test-workspace/docs/$(basename "$page" .md)"
+        rm -rf "$wd"; mkdir -p "$wd"
+        prep_page "$prep" "$wd"
+    fi
+
     [ "${VERBOSE:-}" = "true" ] && { echo "    --- walkthrough script ---"; printf '%s\n' "$script" | sed 's/^/    /'; }
     log="$(mktemp)"
-    if ( cd "$ROOT" && set -e && eval "$script" ) >"$log" 2>&1; then
+    if ( cd "$wd" && set -e && eval "$script" ) >"$log" 2>&1; then
         pass "$page: documented commands ran clean"
     else
         fail "$page: documented commands failed" "$(tail -5 "$log")"
         [ "${VERBOSE:-}" = "true" ] && sed 's/^/       /' "$log"
     fi
 
-    if compgen -G "$ROOT/$artifact" >/dev/null; then
-        if jq -e '.bomFormat=="CycloneDX"' "$ROOT/$artifact" >/dev/null 2>&1; then
-            pass "$page: produced valid CycloneDX $artifact"
-        else
-            fail "$page: $artifact is not valid CycloneDX"
+    # Every artifact the page promises must exist (and satisfy its jq assert).
+    while IFS= read -r exp; do
+        [ -z "${exp//[[:space:]]/}" ] && continue
+        [ "$(field "$exp" 1)" = "$page" ] || continue
+        glob="$(field "$exp" 2)"
+        assert="$(field "$exp" 3)"
+        found=""
+        for f in "$wd"/$glob; do [ -e "$f" ] && { found="$f"; break; }; done
+        if [ -z "$found" ]; then
+            fail "$page: promised artifact $glob not produced"
+            continue
         fi
-    else
-        fail "$page: expected artifact $artifact not produced"
-    fi
+        if [ -n "$assert" ]; then
+            if jq -e "$assert" "$found" >/dev/null 2>&1; then
+                pass "$page: $glob (assert ok)"
+            else
+                fail "$page: $glob exists but violates: $assert"
+            fi
+        else
+            pass "$page: $glob"
+        fi
+    done <<< "$EXPECT"
 
-    # Clean the artifacts the walkthrough wrote into the repo root.
-    rm -f "$ROOT"/MyApp_1.0.0_* 2>/dev/null
+    # Clean the artifacts the walkthrough wrote.
+    if [ "$prep" = "root" ]; then
+        rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null
+    else
+        rm -rf "$wd"
+    fi
     rm -f "$log"
-done
+done <<< "$TARGETS"
 
 echo ""
 echo "=================================================="

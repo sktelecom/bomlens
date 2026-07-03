@@ -93,6 +93,7 @@ Keeping the layers separate is the default for a reason: a reviewer sees at a gl
 
 Merge only when an external system expects a single product BOM (Dependency-Track and TRUSCA both register one BOM per project). `--merge` combines the layers, dedupes components by purl, and stamps the top-level component with the product name and version.
 
+<!-- runnable -->
 ```bash
 $SBOM --project mms-relay-server --version 1.0.0 \
   --merge mms-relay-os_6.10_bom.json \
