@@ -31,6 +31,7 @@ cd examples/java-gradle
 
 The scan generates `JavaGradle_1.0.0_bom.json` containing:
 - ~40-50 total components (including transitive dependencies)
+<!-- expected-components: 40-50 -->
 - Guava and its dependencies
 - Jackson core, annotations, databind
 - SLF4J and Logback

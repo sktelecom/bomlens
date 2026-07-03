@@ -23,6 +23,10 @@ on:
         description: "Also build the deep-license (scancode) image; its build gate runs a real license scan"
         type: boolean
         default: false
+      firmware_pull:
+        description: "PULL the published firmware image (fast) instead of building, so full-e2e's firmware group runs"
+        type: boolean
+        default: false
       examples_only:
         description: "ONLY= subset for test-examples-e2e.sh (empty = all bundled examples)"
         type: string
@@ -88,6 +92,18 @@ jobs:
       - name: Build firmware image (opt-in)
         if: inputs.firmware
         run: docker build --build-arg SBOM_FIRMWARE=true -t sbom-scanner-firmware:test ./docker
+
+      # Nightly firmware coverage without the 20-30 min GPL-image build: pull
+      # the PUBLISHED firmware image and tag it as the name test-e2e.sh's
+      # firmware group auto-enables on. This validates the published image plus
+      # HEAD's harness within 24h; HEAD's firmware Dockerfile itself is still
+      # validated by docker-publish.yml on main pushes and by dispatching with
+      # firmware=true.
+      - name: Pull published firmware image (opt-in, fast)
+        if: inputs.firmware_pull && !inputs.firmware
+        run: |
+          docker pull ghcr.io/sktelecom/bomlens-firmware:latest
+          docker tag ghcr.io/sktelecom/bomlens-firmware:latest sbom-scanner-firmware:test
 
       # Opt-in: the deep-license (scancode) image compiles PyICU and pulls native
       # libarchive/libmagic, so it is slow and only built when the caller asks.

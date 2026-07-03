@@ -236,6 +236,7 @@ cat NodeJsExpressExample_1.0.0_bom.json | jq -r '.components[] | select(.name | 
 ```
 
 예상 컴포넌트 수는 약 80-120개입니다(전이적 의존성 포함).
+<!-- expected-components: 80-120 -->
 
 ## 예상 SBOM 내용
 
