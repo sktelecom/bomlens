@@ -227,6 +227,12 @@ jobs:
   build-firmware:
     name: Build firmware image
     runs-on: ubuntu-latest
+    # NVD blocks/throttles sustained CVE downloads from GitHub's cloud runner IPs
+    # even with a valid key, and cve-bin-tool has no request timeout, so the DB
+    # pre-fetch can hang until the 6h default. Cap it: a working (non-blocked)
+    # build finishes the NVD download in ~20 min, so this fails fast instead of
+    # burning a runner for hours. See docker/patch-cve-bin-tool-nvd.py.
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
