@@ -72,6 +72,26 @@ jobs:
           done <<< "$pins"
           exit "$rc"
 
+  # Android (AGP) release-scope regression. Resolves the full androidx graph from
+  # Google Maven through the published android-sdk image, so it is slow and
+  # network-dependent — hence nightly, not per-PR. Guards the build-prep filter
+  # that keeps Android SBOMs to the deployable release runtime classpath.
+  android-scope:
+    name: Android release scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Pull the published android-sdk image
+        run: docker pull ghcr.io/sktelecom/bomlens-android-sdk34:latest
+
+      - name: Android release-scope regression
+        env:
+          SBOM_ANDROID_IMAGE: ghcr.io/sktelecom/bomlens-android-sdk34:latest
+        run: bash tests/test-android-scope.sh
+
   # External links rot on their own schedule, so they are checked here (with
   # retries and a cache) rather than on PRs — matching the split anticipated in
   # scripts/check-doc-links.sh, which covers internal links on every PR.
@@ -181,7 +201,7 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, macos-real-scan, published-user-journey, doc-links, desktop]
+    needs: [heavy-e2e, macos-real-scan, published-user-journey, android-scope, doc-links, desktop]
     if: failure()
     permissions:
       contents: read
@@ -195,6 +215,7 @@ jobs:
           HEAVY: ${{ needs.heavy-e2e.result }}
           MACOS: ${{ needs.macos-real-scan.result }}
           JOURNEY: ${{ needs.published-user-journey.result }}
+          ANDROID: ${{ needs.android-scope.result }}
           LINKS: ${{ needs.doc-links.result }}
           DESKTOP: ${{ needs.desktop.result }}
         run: |
@@ -202,6 +223,7 @@ jobs:
           body="Nightly run failed: ${RUN_URL}
           - Heavy E2E: ${HEAVY}
           - Published-image user journey: ${JOURNEY}
+          - Android release scope: ${ANDROID}
           - External doc links: ${LINKS}
           - Desktop: ${DESKTOP}
           - macOS real scan: ${MACOS}"

@@ -1,0 +1,8 @@
+// Test fixture (nightly Android scope regression). A minimal AGP app whose
+// three declared dependencies pull in a large androidx transitive closure plus
+// the AGP build/test toolchain. scan-sbom.sh must report the deployable release
+// runtime classpath only — no androidTestUtil / Unified Test Platform / lint /
+// ddmlib / grpc-netty toolchain. See tests/test-android-scope.sh.
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}

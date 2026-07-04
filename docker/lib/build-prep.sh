@@ -59,12 +59,77 @@ fi
 
 # Gradle (java-gradle / Android) — resolve so cdxgen sees the full graph.
 # For Android, ANDROID_HOME is set in the android-sdk image, enabling AGP.
+#
+# ANDROID_RELEASE_SET, when set below, points at a file of "group:artifact:version"
+# lines (the deployable release runtime classpath). The post-cdxgen step near the
+# end of this script filters the generated SBOM down to that set.
+ANDROID_RELEASE_SET=""
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
-    log "gradle dependencies"
-    if [ -x ./gradlew ]; then
-        ./gradlew --no-daemon dependencies >/dev/null 2>&1 || true
+    if [ -x ./gradlew ]; then GRADLEW="./gradlew"; else GRADLEW="gradle"; fi
+
+    # Android scope fix: cdxgen resolves EVERY Gradle configuration, so an AGP
+    # project drags its build/test toolchain (androidTestUtil, Unified Test
+    # Platform, lint, ddmlib, grpc/netty) into the SBOM as if it shipped in the
+    # APK — and it also emits pre-resolution duplicate versions. Precision
+    # collapses (~0.25 on a 3-dep app). We cannot fix this by passing
+    # `--configuration <x>` to cdxgen: cdxgen runs the ROOT project's bare
+    # `dependencies` task too, which has no release configuration, so a global
+    # --configuration fails the whole build. Instead we resolve the deployable
+    # release runtime classpath OURSELVES and post-filter cdxgen's full BOM to it.
+    #
+    # We DETECT the configuration name instead of hardcoding
+    # "releaseRuntimeClasspath": build flavors rename it (e.g.
+    # prodReleaseRuntimeClasspath). If nothing is found we leave the filter off
+    # (full graph, unchanged behavior) so recall never regresses.
+    # BOMLENS_ANDROID_FULL_GRAPH=1 opts out entirely (keep the build+test superset).
+    if [ -n "${ANDROID_HOME:-}" ] && [ -z "${BOMLENS_ANDROID_FULL_GRAPH:-}" ]; then
+        log "android: resolving deployable release runtime classpath"
+        _relset=$(mktemp)
+        _subs=$("$GRADLEW" --no-daemon -q --console=plain projects 2>/dev/null \
+                | sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p")
+        # Include the root ("") as a fallback for single-module projects.
+        for _s in $_subs ""; do
+            _dep=$("$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" 2>/dev/null)
+            [ -n "$_dep" ] || continue
+            # Pick the deployable release runtime config for this module: prefer the
+            # plain releaseRuntimeClasspath, else the first flavored release variant.
+            _cfg=$(printf '%s\n' "$_dep" \
+                   | sed -n 's/^\([A-Za-z][A-Za-z0-9]*RuntimeClasspath\) .*/\1/p' \
+                   | grep -i release | grep -viE 'test|debug|lint' | sort -u \
+                   | { grep -x releaseRuntimeClasspath || cat; } | head -1)
+            [ -n "$_cfg" ] || continue
+            log "android: ${_s:-:} -> --configuration $_cfg"
+            # Extract that config's subtree as resolved group:artifact:version.
+            # Take the version after "->" when Gradle upgraded/downgraded it; skip
+            # (c) constraints and (n) not-resolved markers.
+            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" '
+                $0 ~ ("^" cfg " ") { insec=1; next }
+                insec && /^[[:space:]]*$/ { insec=0 }
+                insec {
+                    line=$0
+                    if (!match(line, /[+\\]--- /)) next
+                    sub(/^.*[+\\]--- /, "", line)
+                    if (line ~ /\(c\)|\(n\)/) next
+                    resolved=""
+                    if (match(line, /-> [^ ]+/)) resolved=substr(line, RSTART+3, RLENGTH-3)
+                    split(line, a, " "); split(a[1], ga, ":")
+                    g=ga[1]; art=ga[2]; ver=ga[3]; if (resolved!="") ver=resolved
+                    gsub(/[()*]/, "", ver)
+                    if (g!="" && art!="" && ver!="") print g":"art":"ver
+                }' >> "$_relset"
+        done
+        if [ -s "$_relset" ]; then
+            sort -u "$_relset" -o "$_relset"
+            ANDROID_RELEASE_SET="$_relset"
+            log "android: release runtime set = $(wc -l < "$_relset") components"
+        else
+            log "android: no release runtime configuration found; using full graph"
+            rm -f "$_relset"
+        fi
     else
-        gradle --no-daemon dependencies >/dev/null 2>&1 || true
+        # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
+        log "gradle dependencies"
+        "$GRADLEW" --no-daemon dependencies >/dev/null 2>&1 || true
     fi
 fi
 
@@ -114,6 +179,55 @@ elif [ -f /opt/bin/cdxgen ]; then
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
+fi
+
+# Android release-scope filter: keep only components in the deployable release
+# runtime classpath resolved earlier; drop the build/test toolchain and the
+# pre-resolution duplicate versions cdxgen emits from the other configurations.
+# Match on maven group:artifact:version; keep non-maven components and the app's
+# own modules (root project group). Prune the dependency graph to the kept refs.
+if [ "${rc:-1}" -eq 0 ] && [ -n "${ANDROID_RELEASE_SET:-}" ] && [ -s "$ANDROID_RELEASE_SET" ] \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    log "android: filtering SBOM to release runtime scope"
+    _flt=$(mktemp).js
+    cat > "$_flt" <<'FILTER_JS'
+const fs = require('fs');
+const [bomPath, relPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+const rel = new Set(fs.readFileSync(relPath, 'utf8').split('\n').filter(Boolean));
+if (!rel.size || !Array.isArray(bom.components)) process.exit(0);
+const gav = p => {
+  const m = /^pkg:maven\/([^/]+)\/([^@?]+)@([^?]+)/.exec(p || '');
+  return m ? m[1] + ':' + m[2] + ':' + decodeURIComponent(m[3]) : null;
+};
+const mc = bom.metadata && bom.metadata.component;
+const rootGroup = (/^pkg:maven\/([^/@?]+)/.exec((mc && mc.purl) || '') || [])[1];
+const keep = c => {
+  const p = c.purl || '';
+  if (!p.startsWith('pkg:maven/')) return true;   // non-maven: leave alone
+  const g = gav(p);
+  if (!g) return true;                            // app root (single segment)
+  if (rootGroup && g.split(':')[0] === rootGroup) return true; // first-party modules
+  return rel.has(g);
+};
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+const refOf = c => c['bom-ref'] || c.purl;
+const keptRefs = new Set(bom.components.map(refOf));
+if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
+if (Array.isArray(bom.dependencies)) {
+  bom.dependencies = bom.dependencies
+    .filter(d => keptRefs.has(d.ref))
+    .map(d => Array.isArray(d.dependsOn)
+      ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) })
+      : d);
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components\n');
+FILTER_JS
+    node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
+    rm -f "$_flt" "$ANDROID_RELEASE_SET"
 fi
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
