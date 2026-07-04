@@ -226,12 +226,18 @@ jobs:
   # ---------------------------------------------------------------
   build-firmware:
     name: Build firmware image
-    runs-on: ubuntu-latest
-    # NVD blocks/throttles sustained CVE downloads from GitHub's cloud runner IPs
-    # even with a valid key, and cve-bin-tool has no request timeout, so the DB
-    # pre-fetch can hang until the 6h default. Cap it: a working (non-blocked)
-    # build finishes the NVD download in ~20 min, so this fails fast instead of
-    # burning a runner for hours. See docker/patch-cve-bin-tool-nvd.py.
+    # Self-hosted, NOT ubuntu-latest: this job pre-fetches the NVD CVE corpus,
+    # and NVD throttles/blocks sustained downloads from GitHub's cloud runner IPs
+    # even with a valid key (a keyed build from a cloud IP hangs; from a normal IP
+    # it finishes in ~20 min). Run it on a self-hosted runner with a non-blocked
+    # IP. Only this job needs it — the other image builds don't touch NVD.
+    # Adjust the labels to match your runner if they differ; it must be linux/x64
+    # (the firmware image is amd64-only) with Docker + Buildx available.
+    runs-on: [self-hosted, linux, x64]
+    # Safety cap: a working NVD download is ~20 min. If NVD is unreachable the
+    # keyless/keyed request can still hang (no cve-bin-tool request timeout), so
+    # fail fast rather than tie up the self-hosted runner. See
+    # docker/patch-cve-bin-tool-nvd.py for the NVD-fetch details.
     timeout-minutes: 45
     permissions:
       contents: read
