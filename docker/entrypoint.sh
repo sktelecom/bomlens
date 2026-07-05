@@ -130,6 +130,12 @@ mark_sbom_degraded() {
     fi
 }
 
+# Observability helpers for best-effort post-process steps (run_optional_step /
+# mark_pipeline_warning): a failed enrichment/normalize/conformance step is now
+# logged and recorded on the SBOM instead of being swallowed by `... || true`.
+# shellcheck source=docker/lib/pipeline-step.sh
+. "$LIBDIR/pipeline-step.sh"
+
 echo "=========================================="
 echo " BomLens (post-process)"
 echo " Mode: $SCAN_MODE"
@@ -263,7 +269,7 @@ EOF
         # pedigree/performance metrics harvested from cdxgen -t ai when present.
         # Best-effort — a missing network or tool just leaves those fields unfilled,
         # and the G7 conformance step then reports them honestly as not present.
-        bash "$LIBDIR/enrich-aibom.sh" "$OUTPUT_FILE" "$MODEL_ID" || true
+        run_optional_step enrich-aibom bash "$LIBDIR/enrich-aibom.sh" "$OUTPUT_FILE" "$MODEL_ID"
         ;;
 
     MERGE)
@@ -298,7 +304,7 @@ EOF
         fi
         echo "[1/2] Validating supplier SBOM (conformance, original input)..."
         # Conformance never aborts the pipeline (best-effort report).
-        bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME" || true
+        run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
         echo "[1/2] Converting supplier SBOM to CycloneDX..."
         if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
             echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
@@ -361,7 +367,7 @@ if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
         fi
     fi
 elif [ -d "$VENDORED_SRC" ]; then
-    bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC" || true
+    run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
 fi
 
 # ========================================================
@@ -386,9 +392,9 @@ case "$SCAN_MODE" in
 esac
 
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
-    bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable || true
+    run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable
 else
-    bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" || true
+    run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE"
 fi
 
 # CPE enrichment (Plan 1): firmware/image/rootfs components often arrive with
@@ -397,7 +403,7 @@ fi
 # can match by CPE. Skipped for AI SBOMs (no OS/library components to match) and
 # disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
 if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
-    bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE" || true
+    run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
 fi
 
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
@@ -407,7 +413,7 @@ fi
 # in the risk-report block below.
 if [ "$SCAN_MODE" = "AIBOM" ]; then
     echo "[2/2] aibom: G7 minimum-element conformance"
-    bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" || true
+    run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
 fi
 
 # Deep license detection (scancode, opt-in). Only meaningful for source trees.
