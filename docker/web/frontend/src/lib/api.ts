@@ -223,6 +223,11 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** Optional upload of the generated SBOM. "" leaves the scan generate-only. */
+  uploadTarget?: "" | "dependency-track" | "trusca";
+  uploadUrl?: string; // upload server base URL (API_URL)
+  uploadCred?: string; // single-use credId for the upload token (API_KEY)
+  truscaProjectId?: string; // required when uploadTarget === "trusca"
 }
 
 /** A determinate progress update (e.g. CVE database download). */
@@ -417,6 +422,10 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    upload_target: params.uploadTarget ?? "",
+    upload_url: params.uploadUrl ?? "",
+    upload_cred: params.uploadCred ?? "",
+    trusca_project_id: params.truscaProjectId ?? "",
   });
 
   const es = new EventSource(`/scan-stream?${qs.toString()}`);

@@ -28,6 +28,7 @@ import {
   RunButton,
   ScanOptions,
   SourceControls,
+  UploadOptions,
 } from "./ScanFormFields";
 
 interface Props {
@@ -238,6 +239,13 @@ export function NewScan({
               <div className="space-y-3 border-t pt-5">
                 <p className={SECTION_LABEL}>{t("newscan.scanOptions")}</p>
                 <ScanOptions state={state} />
+              </div>
+            )}
+
+            {state.showUpload && (
+              <div className="space-y-3 border-t pt-5">
+                <p className={SECTION_LABEL}>{t("newscan.upload")}</p>
+                <UploadOptions state={state} />
               </div>
             )}
 

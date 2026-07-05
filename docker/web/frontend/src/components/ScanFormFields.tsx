@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
 
@@ -272,6 +273,105 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setByteStable}
           disabled={busy}
         />
+      )}
+    </div>
+  );
+}
+
+/** Optional upload of the generated SBOM to a Dependency-Track or TRUSCA server.
+ *  The server URL and token are used for this run only and never persisted. */
+export function UploadOptions({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const {
+    uploadEnabled,
+    setUploadEnabled,
+    uploadTarget,
+    setUploadTarget,
+    uploadUrl,
+    setUploadUrl,
+    uploadToken,
+    setUploadToken,
+    truscaProjectId,
+    setTruscaProjectId,
+    showUpload,
+    errors,
+    busy,
+  } = state;
+  if (!showUpload) return null;
+  return (
+    <div className="space-y-3">
+      <ToggleRow
+        labelKey="upload"
+        checked={uploadEnabled}
+        onChange={setUploadEnabled}
+        disabled={busy}
+      />
+      {uploadEnabled && (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="uploadTarget">{t("upload.target")}</Label>
+            <Select
+              id="uploadTarget"
+              value={uploadTarget}
+              onChange={(e) =>
+                setUploadTarget(e.target.value as "dependency-track" | "trusca")
+              }
+              disabled={busy}
+            >
+              <option value="dependency-track">{t("upload.targetDT")}</option>
+              <option value="trusca">{t("upload.targetTrusca")}</option>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="uploadUrl">{t("upload.url")}</Label>
+            <Input
+              id="uploadUrl"
+              value={uploadUrl}
+              onChange={(e) => setUploadUrl(e.target.value)}
+              placeholder={t("upload.urlPlaceholder")}
+              disabled={busy}
+              aria-invalid={errors.uploadUrl ? true : undefined}
+              aria-describedby={errors.uploadUrl ? "uploadUrl-error" : undefined}
+            />
+            <FieldError id="uploadUrl-error" msgKey={errors.uploadUrl} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="uploadToken">{t("upload.token")}</Label>
+            <Input
+              id="uploadToken"
+              type="password"
+              autoComplete="off"
+              value={uploadToken}
+              onChange={(e) => setUploadToken(e.target.value)}
+              placeholder={t("upload.tokenPlaceholder")}
+              disabled={busy}
+              aria-invalid={errors.uploadToken ? true : undefined}
+              aria-describedby={errors.uploadToken ? "uploadToken-error" : undefined}
+            />
+            <FieldError id="uploadToken-error" msgKey={errors.uploadToken} />
+            <p className="text-xs text-muted-foreground">{t("upload.tokenHint")}</p>
+          </div>
+          {uploadTarget === "trusca" && (
+            <div className="space-y-1">
+              <Label htmlFor="truscaProjectId">{t("upload.projectId")}</Label>
+              <Input
+                id="truscaProjectId"
+                value={truscaProjectId}
+                onChange={(e) => setTruscaProjectId(e.target.value)}
+                placeholder={t("upload.projectIdPlaceholder")}
+                disabled={busy}
+                aria-invalid={errors.truscaProjectId ? true : undefined}
+                aria-describedby={
+                  errors.truscaProjectId ? "truscaProjectId-error" : undefined
+                }
+              />
+              <FieldError
+                id="truscaProjectId-error"
+                msgKey={errors.truscaProjectId}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
