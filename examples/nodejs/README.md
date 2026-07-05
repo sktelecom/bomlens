@@ -235,8 +235,8 @@ cat NodeJsExpressExample_1.0.0_bom.json | jq '.components | length'
 cat NodeJsExpressExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("express")) | "\(.name)@\(.version)"'
 ```
 
-예상 컴포넌트 수는 약 80-120개입니다(전이적 의존성 포함).
-<!-- expected-components: 80-120 -->
+예상 컴포넌트 수는 약 100-140개입니다(배포 의존성 + 전이적 의존성). 스캔은 배포에 포함되는 `dependencies`만 담고, `devDependencies`(jest·eslint 등 빌드/테스트 도구)는 제외합니다.
+<!-- expected-components: 100-140 -->
 
 ## 예상 SBOM 내용
 

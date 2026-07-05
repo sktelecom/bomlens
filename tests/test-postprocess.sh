@@ -572,6 +572,60 @@ else
     fail "mark_pipeline_warning errored on a missing file"
 fi
 
+echo "== node-scope: production filter drops the devDependencies tree =="
+# Guards docker/lib/build-prep.sh's node production-scope filter: cdxgen pulls a
+# deployed app's devDependencies (jest/eslint/@babel/...) into the SBOM, and the
+# filter must drop them (npm components not in the resolved production set) while
+# keeping production deps, non-npm components, and a consistent dependency graph.
+# Extract the real inlined filter JS from build-prep.sh (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    NFLT="$WORK/node-prod-filter.js"
+    sed -n "/<<'NFILTER_JS'/,/^NFILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" \
+        | sed '1d;$d' > "$NFLT"
+    if [ -s "$NFLT" ]; then
+        cat > "$WORK/node-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"express","version":"4.18.2","purl":"pkg:npm/express@4.18.2","bom-ref":"express@4.18.2"},
+   {"name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21","bom-ref":"lodash@4.17.21"},
+   {"name":"jest","version":"29.7.0","purl":"pkg:npm/jest@29.7.0","bom-ref":"jest@29.7.0"},
+   {"group":"@babel","name":"core","version":"7.0.0","purl":"pkg:npm/%40babel/core@7.0.0","bom-ref":"babel-core"},
+   {"name":"somelib","version":"1.0","purl":"pkg:pypi/somelib@1.0","bom-ref":"pylib"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["express@4.18.2","jest@29.7.0"]},
+   {"ref":"express@4.18.2","dependsOn":["lodash@4.17.21"]},
+   {"ref":"jest@29.7.0","dependsOn":[]}
+ ]}
+JSON
+        printf 'express@4.18.2\nlodash@4.17.21\n' > "$WORK/node-prod.set"
+        node "$NFLT" "$WORK/node-bom.json" "$WORK/node-prod.set" 2>/dev/null
+        names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/node-bom.json")
+        [ "$names" = "express,lodash,somelib" ] \
+            && pass "dev tree dropped; production npm + non-npm kept (got: $names)" \
+            || fail "unexpected components after node filter" "$names"
+        # A dropped dev dep must not linger as a dangling graph edge.
+        if jq -e '[.dependencies[].ref] | index("jest@29.7.0")' "$WORK/node-bom.json" >/dev/null 2>&1; then
+            fail "dropped jest still has a dependency entry"
+        else
+            pass "dropped dev dep removed from the dependency graph"
+        fi
+        if jq -e '.dependencies[] | select(.ref=="root") | .dependsOn | index("jest@29.7.0")' "$WORK/node-bom.json" >/dev/null 2>&1; then
+            fail "root still dependsOn the dropped jest"
+        else
+            pass "root dependsOn pruned to kept refs (jest edge gone)"
+        fi
+        jq -e '.dependencies[] | select(.ref=="root") | .dependsOn | index("express@4.18.2")' "$WORK/node-bom.json" >/dev/null 2>&1 \
+            && pass "kept production edge (root -> express) preserved" \
+            || fail "production edge wrongly dropped"
+    else
+        fail "could not extract NFILTER_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable — skipping node production-filter test"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

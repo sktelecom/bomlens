@@ -150,6 +150,49 @@ if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
     swift package resolve >/dev/null 2>&1 || true
 fi
 
+# Node (npm) — cdxgen reads package.json's devDependencies and pulls the whole dev
+# tree (jest/eslint/babel/prettier…) into the SBOM as if a deployed app shipped its
+# build/test tooling. It is the npm analogue of the Android over-scan and inflates a
+# 10-dependency app to ~470 components. cdxgen has no reliable prod-only mode here:
+# --required-only drops the transitive graph (only ~8 direct deps survive). So we
+# resolve the production dependency set OURSELVES — a lockfile-only npm resolve in a
+# scratch copy (metadata only, no tarball downloads, source tree untouched) — and
+# post-filter cdxgen's BOM to it near the end, mirroring the Android release-scope
+# filter. BOMLENS_NODE_FULL_GRAPH=1 opts out (keep the dev+prod superset).
+NODE_PROD_SET=""
+if [ -f package.json ] && [ -z "${BOMLENS_NODE_FULL_GRAPH:-}" ] \
+   && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    log "node: resolving production dependency set"
+    _npmtmp=$(mktemp -d)
+    cp package.json "$_npmtmp/" 2>/dev/null
+    # Copy a committed lockfile too so the prod resolve pins the same versions cdxgen sees.
+    [ -f package-lock.json ] && cp package-lock.json "$_npmtmp/" 2>/dev/null
+    _nodeset=$(mktemp)
+    if ( cd "$_npmtmp" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts >/dev/null 2>&1 ) \
+       && [ -f "$_npmtmp/package-lock.json" ]; then
+        # Emit name@version for every non-dev node_modules entry in the resolved lockfile.
+        node -e '
+          const fs=require("fs");
+          let lock; try { lock=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); } catch(e){ process.exit(0); }
+          const pkgs=lock.packages||{}, out=[];
+          for (const [k,v] of Object.entries(pkgs)) {
+            if (!k.startsWith("node_modules/")) continue;
+            if (v.dev===true || !v.version) continue;
+            out.push(k.replace(/^.*node_modules\//,"")+"@"+v.version);
+          }
+          process.stdout.write([...new Set(out)].join("\n"));
+        ' "$_npmtmp/package-lock.json" > "$_nodeset" 2>/dev/null
+    fi
+    if [ -s "$_nodeset" ]; then
+        NODE_PROD_SET="$_nodeset"
+        log "node: production set = $(wc -l < "$_nodeset") components"
+    else
+        log "node: could not resolve production set; using full graph"
+        rm -f "$_nodeset"
+    fi
+    rm -rf "$_npmtmp"
+fi
+
 # --- build the cdxgen argument list (shared across the per-image binary paths) ---
 # Do NOT pass --project-name/--project-version. For npm cdxgen keeps the root purl
 # (pkg:npm/<name>@<ver>) and rewires the dependency graph onto it, but for Maven and
@@ -228,6 +271,46 @@ process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' o
 FILTER_JS
     node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
     rm -f "$_flt" "$ANDROID_RELEASE_SET"
+fi
+
+# Node production-scope filter: keep only npm components in the resolved production
+# set; drop the devDependencies tree cdxgen pulls in from package.json. Keep non-npm
+# components and the app root, and prune the dependency graph to the kept refs.
+if [ "${rc:-1}" -eq 0 ] && [ -n "${NODE_PROD_SET:-}" ] && [ -s "$NODE_PROD_SET" ] \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    log "node: filtering SBOM to production scope"
+    _nflt=$(mktemp).js
+    cat > "$_nflt" <<'NFILTER_JS'
+const fs = require('fs');
+const [bomPath, setPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+const prod = new Set(fs.readFileSync(setPath, 'utf8').split('\n').filter(Boolean));
+if (!prod.size || !Array.isArray(bom.components)) process.exit(0);
+const mc = bom.metadata && bom.metadata.component;
+const rootRef = mc && (mc['bom-ref'] || mc.purl);
+const nameOf = c => (c.group ? c.group + '/' + c.name : c.name);
+const keep = c => {
+  if (!(c.purl || '').startsWith('pkg:npm/')) return true;   // non-npm: leave alone
+  return prod.has(nameOf(c) + '@' + (c.version || ''));
+};
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+const refOf = c => c['bom-ref'] || c.purl;
+const keptRefs = new Set(bom.components.map(refOf));
+if (rootRef) keptRefs.add(rootRef);
+if (Array.isArray(bom.dependencies)) {
+  bom.dependencies = bom.dependencies
+    .filter(d => keptRefs.has(d.ref))
+    .map(d => Array.isArray(d.dependsOn)
+      ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) })
+      : d);
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] node: kept ' + bom.components.length + ' of ' + before + ' components\n');
+NFILTER_JS
+    node "$_nflt" "$OUT" "$NODE_PROD_SET" || log "node: filter skipped (non-fatal)"
+    rm -f "$_nflt" "$NODE_PROD_SET"
 fi
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
