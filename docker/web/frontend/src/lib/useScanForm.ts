@@ -49,9 +49,14 @@ export interface FieldErrors {
   version?: string;
   target?: string;
   file?: string;
+  uploadUrl?: string;
+  uploadToken?: string;
+  truscaProjectId?: string;
 }
 
-const FIELD_ORDER: Array<keyof FieldErrors> = ["project", "version", "target", "file"];
+const FIELD_ORDER: Array<keyof FieldErrors> = [
+  "project", "version", "target", "file", "uploadUrl", "uploadToken", "truscaProjectId",
+];
 
 export interface OptionToggle {
   key: string;
@@ -104,6 +109,16 @@ export function useScanForm({
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
+  // Optional upload of the generated SBOM to Dependency-Track or TRUSCA. The
+  // server URL and token are never persisted (not in the re-scan sidecar), so a
+  // re-scan always starts with upload off and the fields blank.
+  const [uploadEnabled, setUploadEnabled] = useState(false);
+  const [uploadTarget, setUploadTarget] = useState<"dependency-track" | "trusca">(
+    "dependency-track",
+  );
+  const [uploadUrl, setUploadUrlRaw] = useState("");
+  const [uploadToken, setUploadTokenRaw] = useState("");
+  const [truscaProjectId, setTruscaProjectIdRaw] = useState("");
   // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
   const [includeOsv, setIncludeOsv] = useState(
     () => initialConfig?.includeOsv ?? false,
@@ -146,6 +161,8 @@ export function useScanForm({
   const showByteStable = !isAnalyze && !isAiModel;
   const showScanOptions =
     showDeepLicense || showVendored || showIncludeOsv || showByteStable;
+  // Any scan produces an SBOM, so upload is offered for every source.
+  const showUpload = true;
   const busy = running || uploading;
 
   /** A user edit owns the field from then on — even when cleared to empty,
@@ -167,6 +184,18 @@ export function useScanForm({
   const setFile = (f: File | null) => {
     clearError("file");
     setFileRaw(f);
+  };
+  const setUploadUrl = (v: string) => {
+    clearError("uploadUrl");
+    setUploadUrlRaw(v);
+  };
+  const setUploadToken = (v: string) => {
+    clearError("uploadToken");
+    setUploadTokenRaw(v);
+  };
+  const setTruscaProjectId = (v: string) => {
+    clearError("truscaProjectId");
+    setTruscaProjectIdRaw(v);
   };
 
   // Prefill project/version from the scan source while the user hasn't touched
@@ -217,6 +246,12 @@ export function useScanForm({
     if (!version.trim()) errs.version = "validation.version";
     if (isText && !target.trim()) errs.target = "validation.target";
     if (uploadKind && !file) errs.file = "validation.file";
+    if (showUpload && uploadEnabled) {
+      if (!uploadUrl.trim()) errs.uploadUrl = "validation.uploadUrl";
+      if (!uploadToken.trim()) errs.uploadToken = "validation.uploadToken";
+      if (uploadTarget === "trusca" && !truscaProjectId.trim())
+        errs.truscaProjectId = "validation.truscaProjectId";
+    }
     setErrors(errs);
     const firstInvalid = FIELD_ORDER.find((k) => errs[k]);
     if (firstInvalid) {
@@ -230,6 +265,7 @@ export function useScanForm({
     let token: string | undefined;
     let cred: string | undefined;
     let scanossCred: string | undefined;
+    let uploadCred: string | undefined;
     if (uploadKind && file) {
       try {
         setUploading(true);
@@ -268,6 +304,20 @@ export function useScanForm({
       setUploading(false);
     }
 
+    // Upload token: stashed the same single-use way so the API key never hits the
+    // scan-stream query string.
+    if (showUpload && uploadEnabled && uploadToken.trim()) {
+      try {
+        setUploading(true);
+        uploadCred = (await stashGitCred(uploadToken.trim())).credId;
+      } catch (e) {
+        setUploadError((e as Error).message);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
     onRun({
       project: project.trim(),
       version: version.trim(),
@@ -285,6 +335,13 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
+      uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
+      uploadCred,
+      truscaProjectId:
+        showUpload && uploadEnabled && uploadTarget === "trusca"
+          ? truscaProjectId.trim()
+          : "",
     });
   };
 
@@ -310,9 +367,14 @@ export function useScanForm({
     includeOsv, setIncludeOsv,
     byteStable, setByteStable,
     scanossToken, setScanossToken,
+    uploadEnabled, setUploadEnabled,
+    uploadTarget, setUploadTarget,
+    uploadUrl, setUploadUrl,
+    uploadToken, setUploadToken,
+    truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showByteStable, showScanOptions,
+    showDeepLicense, showIncludeOsv, showByteStable, showScanOptions, showUpload,
     options, submit,
     capabilities,
   };

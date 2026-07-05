@@ -61,7 +61,21 @@
     "includeOsv": "More vulnerability advisories",
     "includeOsvHint": "Adds OSV.dev advisories to the firmware vulnerability match. The OSV database is not bundled in the image, so it downloads from osv.dev on this run (progress is shown below).",
     "byteStable": "Reproducible output",
-    "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs."
+    "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
+    "upload": "Upload to a server",
+    "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored."
+  },
+  "upload": {
+    "target": "Destination",
+    "targetDT": "Dependency-Track",
+    "targetTrusca": "TRUSCA",
+    "url": "Server URL",
+    "urlPlaceholder": "https://dtrack.example.com",
+    "token": "API token",
+    "tokenPlaceholder": "Paste the upload token",
+    "tokenHint": "Dependency-Track uses an X-Api-Key; TRUSCA uses a Bearer token. The token is used for this run only and never stored.",
+    "projectId": "TRUSCA project id",
+    "projectIdPlaceholder": "Project UUID"
   },
   "progress": {
     "title": "Run log",
@@ -284,6 +298,7 @@
     "settings": "Scan settings",
     "outputs": "Outputs",
     "scanOptions": "Advanced scan options",
+    "upload": "Upload (optional)",
     "catCode": "Code",
     "catArtifact": "Artifact",
     "catSbom": "SBOM",
@@ -630,6 +645,9 @@
     "file": "Choose a file to analyze.",
     "project": "Enter a project name.",
     "version": "Enter a version.",
-    "target": "Enter the scan target."
+    "target": "Enter the scan target.",
+    "uploadUrl": "Enter the upload server URL.",
+    "uploadToken": "Enter the upload API token.",
+    "truscaProjectId": "Enter the TRUSCA project id."
   }
 }

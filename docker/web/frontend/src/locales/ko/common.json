@@ -61,7 +61,21 @@
     "includeOsv": "더 많은 취약점 권고",
     "includeOsvHint": "펌웨어 취약점 매칭에 OSV.dev 권고를 추가합니다. OSV 데이터베이스는 이미지에 포함돼 있지 않아, 이 실행에서 osv.dev로부터 내려받습니다(진행률은 아래에 표시됩니다).",
     "byteStable": "재현 가능한 출력",
-    "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다."
+    "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
+    "upload": "서버로 업로드",
+    "uploadHint": "스캔 후 생성된 SBOM을 Dependency-Track 또는 TRUSCA 서버로 보냅니다. 서버 주소와 토큰은 이 실행에만 쓰이고 저장하지 않습니다."
+  },
+  "upload": {
+    "target": "대상",
+    "targetDT": "Dependency-Track",
+    "targetTrusca": "TRUSCA",
+    "url": "서버 주소",
+    "urlPlaceholder": "https://dtrack.example.com",
+    "token": "API 토큰",
+    "tokenPlaceholder": "업로드 토큰을 붙여넣으세요",
+    "tokenHint": "Dependency-Track은 X-Api-Key, TRUSCA는 Bearer 토큰을 씁니다. 토큰은 이 실행에만 쓰이고 저장하지 않습니다.",
+    "projectId": "TRUSCA 프로젝트 id",
+    "projectIdPlaceholder": "프로젝트 UUID"
   },
   "progress": {
     "title": "실행 로그",
@@ -284,6 +298,7 @@
     "settings": "스캔 설정",
     "outputs": "산출물",
     "scanOptions": "고급 스캔 옵션",
+    "upload": "업로드(선택)",
     "catCode": "코드",
     "catArtifact": "아티팩트",
     "catSbom": "SBOM",
@@ -630,6 +645,9 @@
     "file": "분석할 파일을 선택하세요.",
     "project": "프로젝트 이름을 입력하세요.",
     "version": "버전을 입력하세요.",
-    "target": "스캔 대상을 입력하세요."
+    "target": "스캔 대상을 입력하세요.",
+    "uploadUrl": "업로드 서버 주소를 입력하세요.",
+    "uploadToken": "업로드 API 토큰을 입력하세요.",
+    "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요."
   }
 }

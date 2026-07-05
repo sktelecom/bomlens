@@ -1564,6 +1564,26 @@ class Handler(BaseHTTPRequestHandler):
             tok = _GIT_CREDS.pop(scanoss_cred, None)
             if tok:
                 env["SCANOSS_API_KEY"] = tok
+        # Optional upload: push the generated SBOM to Dependency-Track or TRUSCA.
+        # The API token is a secret, so it arrives as a single-use credId (stashed
+        # via POST /git-cred), never in the scan-stream query string — same as
+        # scanoss_cred. The non-secret fields (target, url, project id) are plain
+        # params. Upload turns on only when fully specified; a partially-filled
+        # form leaves the scan generate-only rather than failing the run. The
+        # server URL and token are used for this run only and never persisted.
+        upload_target = g("upload_target").strip()
+        if upload_target in ("dependency-track", "trusca"):
+            upload_url = g("upload_url").strip()
+            upload_cred = g("upload_cred").strip()
+            api_key = _GIT_CREDS.pop(upload_cred, None) if upload_cred else None
+            trusca_pid = g("trusca_project_id").strip()
+            if upload_url and api_key and (upload_target != "trusca" or trusca_pid):
+                env["UPLOAD_ENABLED"] = "true"
+                env["UPLOAD_TARGET"] = upload_target
+                env["API_URL"] = upload_url
+                env["API_KEY"] = api_key
+                if upload_target == "trusca":
+                    env["TRUSCA_PROJECT_ID"] = trusca_pid
         cwd = run_out
         cleanup_dir = None
         mode = None

@@ -943,6 +943,13 @@ cat > "$WORK/bin/run-scan" <<'STUB'
 # per-run output folder, exactly like the real run-scan).
 mode="$(cat "$STUB_MODE_FILE" 2>/dev/null || echo ok)"
 echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
+# Record the upload-relevant env the server passed, so the contract test can
+# assert the web upload params map to the run-scan environment.
+{ echo "UPLOAD_ENABLED=${UPLOAD_ENABLED:-}"
+  echo "UPLOAD_TARGET=${UPLOAD_TARGET:-}"
+  echo "API_URL=${API_URL:-}"
+  echo "API_KEY=${API_KEY:-}"
+  echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
 write_bom() {
     printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
         > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
@@ -970,6 +977,7 @@ trap 'cleanup2; cleanup' EXIT
 SBOM_OUTPUT_DIR="$OUT2" UI_PORT="$PORT2" SBOM_UI_HOST_DIR="$WORK" \
     SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
     STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
+    STUB_ENV_FILE="$WORK/stub-env" \
     python3 "$SERVER" > "$WORK/server2.log" 2>&1 &
 SRV2_PID=$!
 disown "$SRV2_PID" 2>/dev/null || true
@@ -1140,6 +1148,47 @@ assert re.fullmatch(r'demo2_1\.0_\d{8}-\d{6}', d['id']), d['id']
     pass "done event id carries the timestamped run id"
 else
     fail "done id is not the timestamped run id" "$events"
+fi
+
+echo "== upload: web upload params map to the run-scan env (token via single-use cred) =="
+echo ok > "$STUB_MODE_FILE"
+# No upload params -> the scan stays generate-only (UPLOAD_ENABLED not "true").
+rm -f "$WORK/stub-env"
+sse_events "project=noup&version=1.0&source=current-dir" >/dev/null
+if [ "$(sed -n 's/^UPLOAD_ENABLED=//p' "$WORK/stub-env")" != "true" ]; then
+    pass "no upload params -> scan stays generate-only"
+else
+    fail "scan enabled upload without any upload params" "$(cat "$WORK/stub-env")"
+fi
+# Stash the upload token the same single-use way the frontend does, then scan
+# with TRUSCA upload params and assert the server mapped them into run-scan's env.
+UPCID=$(curl -sS -X POST "$BASE2/git-cred" -H 'Content-Type: application/json' \
+    -d '{"token":"secret-upload-tok"}' \
+    | python3 -c 'import sys,json;print(json.load(sys.stdin)["credId"])')
+rm -f "$WORK/stub-env"
+sse_events "project=up&version=1.0&source=current-dir&upload_target=trusca&upload_url=https://trusca.example&trusca_project_id=proj-123&upload_cred=$UPCID" >/dev/null
+if python3 - "$WORK/stub-env" <<'PY'
+import sys
+env = dict(l.rstrip("\n").split("=", 1) for l in open(sys.argv[1]) if "=" in l)
+assert env.get("UPLOAD_ENABLED") == "true", env
+assert env.get("UPLOAD_TARGET") == "trusca", env
+assert env.get("API_URL") == "https://trusca.example", env
+assert env.get("API_KEY") == "secret-upload-tok", env
+assert env.get("TRUSCA_PROJECT_ID") == "proj-123", env
+PY
+then
+    pass "TRUSCA upload params -> UPLOAD_ENABLED/UPLOAD_TARGET/API_URL/TRUSCA_PROJECT_ID + API_KEY from the single-use cred"
+else
+    fail "upload env mapping is wrong" "$(cat "$WORK/stub-env")"
+fi
+# The credId is single-use: a second scan reusing it must not carry the token.
+rm -f "$WORK/stub-env"
+sse_events "project=up2&version=1.0&source=current-dir&upload_target=trusca&upload_url=https://trusca.example&trusca_project_id=proj-123&upload_cred=$UPCID" >/dev/null
+if [ -z "$(sed -n 's/^API_KEY=//p' "$WORK/stub-env")" ] \
+   && [ "$(sed -n 's/^UPLOAD_ENABLED=//p' "$WORK/stub-env")" != "true" ]; then
+    pass "upload credId is single-use (reuse carries no token, upload stays off)"
+else
+    fail "upload credId was reusable (token leaked to a second scan)" "$(cat "$WORK/stub-env")"
 fi
 
 echo ""
