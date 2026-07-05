@@ -531,6 +531,7 @@ cfg = {
     "deepLicense": False,
     "identifyVendored": True,
     "includeOsv": False,
+    "byteStable": True,
 }
 server.write_scanmeta(run_out, cfg)
 
@@ -544,7 +545,7 @@ assert not server.SCANMETA_NAME.endswith(server.ARTIFACT_SUFFIXES), server.SCANM
 got = server.scanmeta("cfg_2.0")
 assert got == cfg, got
 expected_keys = {"source", "target", "project", "version", "notice", "security",
-                 "deepLicense", "identifyVendored", "includeOsv"}
+                 "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
 assert set(got) == expected_keys, set(got)
 # No secret material is ever stored.
 assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
@@ -576,6 +577,7 @@ d = json.load(sys.stdin)
 c = d.get('scanConfig')
 assert c is not None and c['source'] == 'git-url', c
 assert c['identifyVendored'] is True and c['deepLicense'] is False, c
+assert c['byteStable'] is True, c
 assert 'token' not in c and 'scanoss_cred' not in c, c
 "; then
     pass "/scan?id= exposes scanConfig (no secrets)"

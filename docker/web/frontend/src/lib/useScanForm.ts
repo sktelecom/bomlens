@@ -99,6 +99,11 @@ export function useScanForm({
   const [identifyVendored, setIdentifyVendored] = useState(
     () => initialConfig?.identifyVendored ?? false,
   );
+  // Byte-stable (reproducible) output: identical SBOM when the same input is
+  // re-scanned, so it can be diffed/checksummed.
+  const [byteStable, setByteStable] = useState(
+    () => initialConfig?.byteStable ?? false,
+  );
   // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
   const [includeOsv, setIncludeOsv] = useState(
     () => initialConfig?.includeOsv ?? false,
@@ -136,7 +141,11 @@ export function useScanForm({
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
   // models, where there is nothing to scan and the toggle would be a no-op.
   const showDeepLicense = isSourceScan;
-  const showScanOptions = showDeepLicense || showVendored || showIncludeOsv;
+  // Reproducible output applies to any generated SBOM. It is a near no-op for a
+  // supplier SBOM we only analyze, and for an AI model, so hide it there.
+  const showByteStable = !isAnalyze && !isAiModel;
+  const showScanOptions =
+    showDeepLicense || showVendored || showIncludeOsv || showByteStable;
   const busy = running || uploading;
 
   /** A user edit owns the field from then on — even when cleared to empty,
@@ -275,8 +284,7 @@ export function useScanForm({
       identifyVendored: showVendored ? identifyVendored : false,
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
-      // Byte-stable (reproducible) output is a CI concern; not exposed in the UI.
-      byteStable: false,
+      byteStable: showByteStable ? byteStable : false,
     });
   };
 
@@ -300,10 +308,11 @@ export function useScanForm({
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
     includeOsv, setIncludeOsv,
+    byteStable, setByteStable,
     scanossToken, setScanossToken,
     errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showScanOptions,
+    showDeepLicense, showIncludeOsv, showByteStable, showScanOptions,
     options, submit,
     capabilities,
   };

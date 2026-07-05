@@ -1515,6 +1515,7 @@ class Handler(BaseHTTPRequestHandler):
             "deepLicense": g("deep_license") == "true",
             "identifyVendored": g("identify_vendored") == "true",
             "includeOsv": g("includeOsv") == "true",
+            "byteStable": g("byte_stable") == "true",
         }
         write_scanmeta(run_out, scan_config)
 
