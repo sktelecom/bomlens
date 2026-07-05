@@ -560,6 +560,9 @@ if [ "$MODE" = "SOURCE" ]; then
     # and the run folder as /host-output. -w /host-output makes the bom written by
     # stage 1 the cwd, so POSTPROCESS finds it and writes the bundle in place — the
     # scanned tree (/src) is never written to.
+    # pp_env/cosign_run intentionally expand to several -e KEY=VAL tokens, so the
+    # word splitting SC2046 flags here is required, not a bug.
+    # shellcheck disable=SC2046
     eval docker run --rm \
         -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$OUTPUT_HOST_DIR\"":/host-output \
         -w /host-output \
@@ -596,6 +599,9 @@ else
             done
             ENVV="-e MERGE_FILES=\"${MF_CONTAINER# }\"$ROOT_ENV" ;;
     esac
+    # VOL/ENVV/pp_env/cosign_run intentionally expand to multiple tokens (-v, -e
+    # pairs), so the word splitting SC2046 flags here is required, not a bug.
+    # shellcheck disable=SC2046
     eval docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" $ENVV $(pp_env)$(cosign_run) \
