@@ -206,11 +206,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setIdentifyVendored,
     includeOsv,
     setIncludeOsv,
+    byteStable,
+    setByteStable,
     scanossToken,
     setScanossToken,
     showVendored,
     showDeepLicense,
     showIncludeOsv,
+    showByteStable,
     busy,
   } = state;
   return (
@@ -259,6 +262,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="includeOsv"
           checked={includeOsv}
           onChange={setIncludeOsv}
+          disabled={busy}
+        />
+      )}
+      {showByteStable && (
+        <ToggleRow
+          labelKey="byteStable"
+          checked={byteStable}
+          onChange={setByteStable}
           disabled={busy}
         />
       )}

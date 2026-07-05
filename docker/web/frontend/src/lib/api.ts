@@ -157,6 +157,7 @@ export interface ScanConfig {
   deepLicense: boolean;
   identifyVendored: boolean;
   includeOsv: boolean;
+  byteStable: boolean;
 }
 
 export interface DoneEvent {
