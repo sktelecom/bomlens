@@ -212,6 +212,15 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi
 
+# Work around cve-bin-tool's dead NVD count endpoint (see the script header). Its
+# NVD update aborts on a 403 from a legacy dashboard URL before the real, working
+# keyed CVE download runs; the patch reads the total from the keyed API instead.
+# Runs only for the firmware image, right after cve-bin-tool is installed and
+# before the DB pre-fetch below.
+COPY patch-cve-bin-tool-nvd.py /tmp/patch-cve-bin-tool-nvd.py
+RUN if [ "$SBOM_FIRMWARE" = "true" ]; then python3 /tmp/patch-cve-bin-tool-nvd.py; fi \
+    && rm -f /tmp/patch-cve-bin-tool-nvd.py
+
 # Pre-fetch cve-bin-tool's vulnerability DB into the image so firmware scans match
 # CVEs OFFLINE at runtime (Plan 2): a runtime NVD download is slow (~minutes) and
 # air-gapped scans cannot do it at all. cve-bin-tool 3.x hard-codes its DB cache to
@@ -234,7 +243,16 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # (e.g. Ubuntu, CC-BY-SA 4.0) carry share-alike terms we do not want to take on in
 # a redistributed image. See CVE-DATA-NOTICE.txt. Override to widen coverage.
 ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
-ARG SBOM_FIRMWARE_NVD_METHOD=""
+# NVD fetch method. cve-bin-tool 3.4's default source and its json-mirror BOTH
+# return "CVEDataMissing: No data" (NVD retired the legacy JSON 1.1 feeds in late
+# 2023; the community mirror is gone), so a default build populated only Red Hat +
+# Curl and matched zero binaries. api2 (the current NVD REST API 2.0) is the only
+# NVD source that still works in 3.4 — and only once patch-cve-bin-tool-nvd.py
+# (applied above) routes its total-CVE count around a dead dashboard endpoint that
+# 403s and would otherwise abort the update before the real download. The keyed
+# API accepts a valid key from any IP (needed because NVD 403s keyless requests
+# from cloud/CI IPs), so the nvd_api_key secret is passed to the fetch below.
+ARG SBOM_FIRMWARE_NVD_METHOD="api2"
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
 # Attribution + required notices for the bundled CVE data (NVD non-endorsement,
 # Red Hat CC-BY, MIT for curl/purl2cpe, EPSS). Shipped alongside the DB.
@@ -243,7 +261,7 @@ RUN --mount=type=secret,id=nvd_api_key \
     if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] pre-fetching cve-bin-tool CVE DB into $CVE_BIN_TOOL_HOME ..."; \
       key=""; [ -f /run/secrets/nvd_api_key ] && key="$(cat /run/secrets/nvd_api_key)"; \
-      [ -n "$key" ] || echo "[build] WARN: no nvd_api_key secret; NVD fetch will be rate-limited."; \
+      [ -n "$key" ] || echo "[build] WARN: no nvd_api_key secret; NVD is unreachable keyless from cloud IPs."; \
       nvd_arg=""; [ -n "$SBOM_FIRMWARE_NVD_METHOD" ] && nvd_arg="-n $SBOM_FIRMWARE_NVD_METHOD"; \
       dis_arg=""; [ -n "$SBOM_FIRMWARE_DISABLE_SOURCES" ] && dis_arg="-d $SBOM_FIRMWARE_DISABLE_SOURCES"; \
       key_arg=""; [ -n "$key" ] && key_arg="--nvd-api-key $key"; \
