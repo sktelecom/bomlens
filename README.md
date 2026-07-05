@@ -28,7 +28,7 @@ One Docker image, two jobs:
 
 Every scan also emits the risk report by default. Run it from a browser UI (or the desktop app), or from the CLI. Originally built by SK Telecom for supply-chain security, now open source.
 
-Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, C/C++ (Conan/vcpkg, or `--identify-vendored` for sources with no package manager). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware, and a HuggingFace AI model (CycloneDX ML-BOM).
+Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, Swift, C/C++ (Conan/vcpkg, or `--identify-vendored` for sources with no package manager). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware, and a HuggingFace AI model (CycloneDX ML-BOM).
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
 
