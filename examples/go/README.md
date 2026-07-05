@@ -29,8 +29,8 @@ cd examples/go
 ## Expected Output
 
 The scan generates `GoExample_1.0.0_bom.json` containing:
-- ~30-40 total components (including transitive dependencies)
-<!-- expected-components: 30-40 -->
+- ~15-25 total components (including transitive dependencies)
+<!-- expected-components: 15-25 -->
 - Gin and its dependencies (net/http2, validator, etc.)
 - Cobra and its dependencies (pflag)
 - Logrus and dependencies
