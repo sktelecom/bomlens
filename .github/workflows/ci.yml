@@ -82,38 +82,15 @@ jobs:
       
       - name: Lint Bash scripts
         run: |
-          echo "Linting shell scripts..."
-          echo "Checking scripts/scan-sbom.sh..."
-          shellcheck scripts/scan-sbom.sh || true
-          echo ""
-          echo "Checking scripts/check-setup.sh..."
-          shellcheck scripts/check-setup.sh || true
-          echo ""
-          echo "Checking scripts/check-doc-coverage.sh..."
-          shellcheck scripts/check-doc-coverage.sh || true
-          echo ""
-          echo "Checking docker/entrypoint.sh..."
-          shellcheck docker/entrypoint.sh || true
-          echo ""
-          echo "Checking docker/lib/scan-firmware.sh..."
-          shellcheck docker/lib/scan-firmware.sh docker/lib/scan-aibom.sh docker/lib/enrich-aibom.sh || true
-          echo ""
-          echo "Checking docker/lib analyze scripts..."
-          shellcheck docker/lib/validate-sbom.sh docker/lib/convert-to-cdx.sh docker/lib/generate-risk-report.sh || true
-          echo ""
-          echo "Checking docker/lib post-process scripts..."
-          shellcheck docker/lib/normalize-sbom.sh docker/lib/generate-notice.sh docker/lib/stamp-metadata.sh docker/lib/source-detect.sh docker/lib/build-prep.sh docker/lib/identify-vendored.sh docker/lib/suggest-vendored.sh docker/lib/reconcile-vendored.sh docker/lib/merge-sbom.sh || true
-          echo ""
-          echo "Checking tests/test-scan.sh..."
-          shellcheck tests/test-scan.sh || true
-          echo ""
-          echo "Checking new test/helper scripts..."
-          shellcheck tests/test-postprocess.sh tests/test-snapshot.sh tests/test-aibom.sh tests/test-vendored-adversarial.sh tests/test-web-ui.sh tests/test-web-e2e.sh tests/test-e2e.sh tests/test-examples-e2e.sh tests/test-merge.sh tests/test-android-scope.sh tests/check-examples-sync.sh tests/check-docs-drift.sh tests/test-docs-walkthrough.sh examples/test-all.sh || true
-          echo ""
-          echo "Checking onboarding-guarantee gates..."
-          shellcheck scripts/check-doc-links.sh scripts/check-ux-heuristics.sh scripts/verify-release.sh || true
-          echo ""
-          echo "✅ Shellcheck completed (warnings are informational)"
+          echo "Linting every tracked shell script (severity: warning and above)..."
+          # shellcheck exits non-zero on any finding at or above the configured
+          # severity, and there is no `|| true`, so a real issue fails this job.
+          # We gate at `warning` (genuine bugs: unsafe word splitting, unused
+          # assignments, array/string mix-ups); style/info notes stay ungated.
+          # Linting the tracked file list means new scripts are covered without
+          # editing this workflow.
+          git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
+          echo "✅ Shellcheck passed (warning severity and above)"
       
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
@@ -473,8 +450,8 @@ jobs:
         run: npm run i18n:check
       - name: Lib test gate (every src/lib module has a unit test)
         run: npm run test:lib-gate
-      - name: Unit tests (Vitest)
-        run: npm run test:unit
+      - name: Unit tests (Vitest) + coverage thresholds
+        run: npm run test:coverage
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run UI tests (functional + axe)

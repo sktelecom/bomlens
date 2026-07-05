@@ -173,7 +173,7 @@ run_scan_with_logs() {
     local project=$2
     local version=$3
     shift 3
-    local extra_args="$@"
+    local extra_args="$*"
     
     local log_file="$LOG_DIR/${test_name}.log"
     
@@ -208,7 +208,7 @@ show_failure_log() {
         echo ""
         
         # Show last 50 lines or full log
-        if [ $(wc -l < "$log_file") -gt 50 ]; then
+        if [ "$(wc -l < "$log_file")" -gt 50 ]; then
             echo "... (showing last 50 lines) ..."
             echo ""
             tail -50 "$log_file"
@@ -684,7 +684,6 @@ EXAMPLE_TOTAL=0
 
 for example in "$EXAMPLES_DIR"/*; do
     if [ -d "$example" ]; then
-        example_name=$(basename "$example")
         ((EXAMPLE_TOTAL++))
         
         cd "$example"

@@ -531,6 +531,47 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== B-obs: best-effort steps log + mark failures instead of swallowing them =="
+# run_optional_step keeps the "never abort a scan" guarantee of the old
+# `... || true`, but a failed step must now be observable: a WARN line and a
+# marker on the SBOM, so a silently-wrong SBOM is no longer produced.
+. "$LIB/pipeline-step.sh"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{},"components":[]}' > "$WORK/obs.json"
+# run_optional_step reads OUTPUT_FILE from the sourced lib, which shellcheck
+# cannot see, so the assignment looks unused.
+# shellcheck disable=SC2034
+OUTPUT_FILE="$WORK/obs.json"
+if run_optional_step normalize false 2>"$WORK/obs-warn.log"; then
+    pass "run_optional_step returns 0 on a failed step (scan is not aborted)"
+else
+    fail "run_optional_step propagated a non-zero exit (would abort the scan)"
+fi
+grep -q "post-process step 'normalize' failed" "$WORK/obs-warn.log" \
+    && pass "a failed step logs a WARN (no longer silent)" \
+    || fail "no WARN logged for a failed step"
+if jq -e '.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed" and .value=="normalize")' "$WORK/obs.json" >/dev/null 2>&1; then
+    pass "the SBOM records bomlens:pipeline-step-failed=normalize"
+else
+    fail "failed step not recorded on the SBOM"
+fi
+# A succeeding step adds neither a WARN nor a marker.
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{},"components":[]}' > "$WORK/obs2.json"
+# shellcheck disable=SC2034  # read by run_optional_step in the sourced lib
+OUTPUT_FILE="$WORK/obs2.json"
+run_optional_step enrich-cpe true 2>/dev/null
+if jq -e '.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed")' "$WORK/obs2.json" >/dev/null 2>&1; then
+    fail "a successful step wrongly recorded a failure marker"
+else
+    pass "a successful step adds no failure marker"
+fi
+# A missing SBOM must be a no-op, never a crash (e.g. ANALYZE conformance runs
+# before the CycloneDX output exists).
+if mark_pipeline_warning "$WORK/does-not-exist.json" normalize; then
+    pass "mark_pipeline_warning no-ops on a missing SBOM"
+else
+    fail "mark_pipeline_warning errored on a missing file"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
