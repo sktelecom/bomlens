@@ -415,6 +415,18 @@ cat > pom.xml <<'EOF'
             <artifactId>spring-boot-starter-web</artifactId>
             <version>3.2.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.34</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>
 EOF
@@ -430,8 +442,16 @@ if run_scan_with_logs "test-java-maven" "TestJavaMaven" "1.0.0"; then
             print_error "Java Maven project (root metadata.component has no direct dependsOn — direct deps orphaned)"
             show_failure_log "test-java-maven"
             ((FAILED++))
+        elif jq -e '[.components[]? | select((.purl // "") | test("pkg:maven/(org.junit|org.projectlombok)"))] | length > 0' "$FOUND" >/dev/null 2>&1; then
+            print_error "Java Maven project (test/provided deps not filtered — junit/lombok present in SBOM)"
+            show_failure_log "test-java-maven"
+            ((FAILED++))
+        elif ! jq -e '[.components[]? | select(.name == "spring-web")] | length > 0' "$FOUND" >/dev/null 2>&1; then
+            print_error "Java Maven project (deployable transitive dropped — spring-web missing after scope filter)"
+            show_failure_log "test-java-maven"
+            ((FAILED++))
         else
-            print_success "Java Maven project ($COMP_COUNT components, root declares direct deps)"
+            print_success "Java Maven project ($COMP_COUNT components, test/provided filtered, runtime closure kept)"
             ((PASSED++))
         fi
     else
