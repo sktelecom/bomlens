@@ -605,12 +605,16 @@ EOF
             && pass "firmware scan: notice + security artifacts produced" \
             || fail "firmware scan: notice + security artifacts produced"
 
-        # Offline-CVE matching: only meaningful when the firmware image ships the
-        # bundled cve-bin-tool DB at the HOME-controlled cache path. A key-less /
-        # local build leaves it empty, so probe first and SKIP (never FAIL) when
-        # absent — the assertion is real only on CI/native where the DB is baked in.
+        # Offline-CVE matching: only meaningful when the bundled cve-bin-tool DB
+        # actually carries NVD data. cve-bin-tool matches firmware binaries against
+        # NVD CPE ranges (cve_range where data_source=NVD), so a DB built without
+        # NVD — a key-less/local build, or a CI build whose NVD fetch 403s (the
+        # published image's current state) — matches nothing. Probe the NVD row
+        # count and SKIP (never FAIL) when it is empty; the assertion self-heals
+        # once an NVD-backed firmware image is published.
         bundled_db="/opt/cve-bin-tool-home/.cache/cve-bin-tool/cve.db"
-        if docker run --rm --entrypoint sh "$FW_IMG" -c "[ -s '$bundled_db' ]" >/dev/null 2>&1; then
+        nvd_rows=$(docker run --rm --entrypoint python3 "$FW_IMG" -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_range where data_source=\"NVD\"").fetchone()[0])' "$bundled_db" 2>/dev/null || echo 0)
+        if [ "${nvd_rows:-0}" -gt 0 ]; then
             wc="$(mktemp -d "$WORK_ROOT/fwcve.XXXXXX")"
             # Pack a fixture whose binaries carry a known-vulnerable component so the
             # offline DB has something to match. cve-bin-tool keys off binary
@@ -645,7 +649,7 @@ EOF
             fi
             rm -rf "$wc"
         else
-            skip "firmware offline CVE matching (no bundled CVE DB in firmware image; skipping offline-CVE assertion)"
+            skip "firmware offline CVE matching (bundled DB carries no NVD data; skipping until an NVD-backed firmware image is published)"
         fi
     else
         fail "firmware fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
