@@ -92,11 +92,18 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
             _dep=$("$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" 2>/dev/null)
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
-            # plain releaseRuntimeClasspath, else the first flavored release variant.
-            _cfg=$(printf '%s\n' "$_dep" \
-                   | sed -n 's/^\([A-Za-z][A-Za-z0-9]*RuntimeClasspath\) .*/\1/p' \
-                   | grep -i release | grep -viE 'test|debug|lint' | sort -u \
-                   | { grep -x releaseRuntimeClasspath || cat; } | head -1)
+            # plain releaseRuntimeClasspath, else the first flavored release variant
+            # (alphabetical, e.g. freeReleaseRuntimeClasspath). Capture the candidates
+            # first — piping straight into `{ grep -x … || cat; }` silently drops
+            # everything when there is no exact match: grep drains stdin before it
+            # exits non-zero, so `cat` then reads an already-empty pipe and the filter
+            # falls back to the full build+test graph on flavored projects (reported
+            # by the SCA benchmark team). Selecting from a saved variable avoids that.
+            _cands=$(printf '%s\n' "$_dep" \
+                     | sed -n 's/^\([A-Za-z][A-Za-z0-9]*RuntimeClasspath\) .*/\1/p' \
+                     | grep -i release | grep -viE 'test|debug|lint' | sort -u)
+            _cfg=$(printf '%s\n' "$_cands" | grep -x releaseRuntimeClasspath \
+                   || printf '%s\n' "$_cands" | head -1)
             [ -n "$_cfg" ] || continue
             log "android: ${_s:-:} -> --configuration $_cfg"
             # Extract that config's subtree as resolved group:artifact:version.

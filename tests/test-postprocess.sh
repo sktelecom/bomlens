@@ -626,6 +626,40 @@ else
     echo "  SKIP: node unavailable — skipping node production-filter test"
 fi
 
+echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
+# Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
+# team found the old `{ grep -x releaseRuntimeClasspath || cat; }` idiom dropped
+# every candidate when there was no exact match (grep drains stdin before it
+# fails, so `cat` reads an already-empty pipe), and flavored projects silently
+# fell back to the full build+test graph. Extract the REAL selection snippet from
+# build-prep.sh (no logic duplication) and drive it with fixture `:dependencies`.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+SEL=$(sed -n '/_cands=/,/head -1)/p' "$PREP")
+pick_cfg() { local _dep="$1" _cands _cfg; eval "$SEL"; printf '%s' "$_cfg"; }
+_plain='releaseRuntimeClasspath - Runtime classpath of release.
++--- a:b:1.0
+debugRuntimeClasspath - dbg'
+_flavor='freeReleaseRuntimeClasspath - Free release.
++--- a:b:1.0
+paidReleaseRuntimeClasspath - Paid release.
+freeDebugRuntimeClasspath - dbg
+releaseUnitTestRuntimeClasspath - test'
+_none='debugRuntimeClasspath - dbg'
+[ "$(pick_cfg "$_plain")" = "releaseRuntimeClasspath" ] \
+    && pass "plain project selects releaseRuntimeClasspath" \
+    || fail "plain selection wrong" "got [$(pick_cfg "$_plain")]"
+[ "$(pick_cfg "$_flavor")" = "freeReleaseRuntimeClasspath" ] \
+    && pass "flavored project selects the first release variant (freeReleaseRuntimeClasspath)" \
+    || fail "flavored selection dropped to full graph or wrong variant" "got [$(pick_cfg "$_flavor")]"
+[ -z "$(pick_cfg "$_none")" ] \
+    && pass "no release config -> empty (module skipped, full graph)" \
+    || fail "unexpected config for a release-less module" "got [$(pick_cfg "$_none")]"
+if grep -q 'grep -x releaseRuntimeClasspath || cat' "$PREP"; then
+    fail "the stdin-draining '{ grep -x ... || cat; }' idiom is back in build-prep.sh"
+else
+    pass "build-prep.sh no longer uses the stdin-draining grep||cat idiom"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
