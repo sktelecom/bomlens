@@ -41,7 +41,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # renovate: datasource=github-releases depName=anchore/syft
 ARG SYFT_VERSION=v1.46.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy
-ARG TRIVY_VERSION=v0.70.0
+ARG TRIVY_VERSION=v0.72.0
 # renovate: datasource=github-releases depName=sigstore/cosign
 ARG COSIGN_VERSION=v2.4.1
 # renovate: datasource=pypi depName=scancode-toolkit
