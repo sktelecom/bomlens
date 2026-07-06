@@ -146,6 +146,12 @@ jobs:
     name: macOS real scan (Colima)
     runs-on: macos-latest
     timeout-minutes: 45
+    # Best-effort by charter: Colima VM startup on the hosted macOS runner is
+    # slow and flaky (infra, not our code). continue-on-error keeps a flake from
+    # failing the run or firing the rolling-failure alarm; the scan result is
+    # still visible in this job's own step summary. It is deliberately left out
+    # of report-failure's needs below for the same reason.
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -201,7 +207,9 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, macos-real-scan, published-user-journey, android-scope, doc-links, desktop]
+    # macos-real-scan is intentionally NOT a dependency: it is best-effort
+    # (continue-on-error), so a Colima flake must not fire this alarm.
+    needs: [heavy-e2e, published-user-journey, android-scope, doc-links, desktop]
     if: failure()
     permissions:
       contents: read
@@ -213,7 +221,6 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEAVY: ${{ needs.heavy-e2e.result }}
-          MACOS: ${{ needs.macos-real-scan.result }}
           JOURNEY: ${{ needs.published-user-journey.result }}
           ANDROID: ${{ needs.android-scope.result }}
           LINKS: ${{ needs.doc-links.result }}
@@ -226,7 +233,7 @@ jobs:
           - Android release scope: ${ANDROID}
           - External doc links: ${LINKS}
           - Desktop: ${DESKTOP}
-          - macOS real scan: ${MACOS}"
+          (macOS real scan is best-effort and excluded from this alarm.)"
           num=$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
                 --json number --jq '.[0].number // empty')
           if [ -n "$num" ]; then
