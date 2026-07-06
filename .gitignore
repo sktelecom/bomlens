@@ -23,6 +23,7 @@ bom.json
 *_vendored.cdx.json
 *_files.json
 *.wfp
+.scanmeta.json
 
 # Test Workspace
 tests/test-workspace/
@@ -75,6 +76,7 @@ dist/
 build/
 !electron/build/
 *.egg-info/
+.gradle/
 
 # Environment Variables
 .env
