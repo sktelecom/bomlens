@@ -45,7 +45,7 @@ ARG TRIVY_VERSION=v0.70.0
 # renovate: datasource=github-releases depName=sigstore/cosign
 ARG COSIGN_VERSION=v2.4.1
 # renovate: datasource=pypi depName=scancode-toolkit
-ARG SCANCODE_VERSION=32.3.0
+ARG SCANCODE_VERSION=32.5.0
 ARG SBOM_DEEP_LICENSE=false
 # Vendored-OSS identification (on by default; disable with --build-arg SBOM_SCANOSS=false).
 # scanoss.py is MIT, so unlike the firmware GPL tools it can live in the base image.
