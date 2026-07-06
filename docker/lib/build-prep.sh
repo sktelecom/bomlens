@@ -56,6 +56,21 @@ fi
 # error to stdout on every Java scan. Dropping it removes that noise with no
 # effect on the SBOM — cdxgen alone already resolves transitive deps (verified:
 # the same scan yields 91 components with this step gone).
+#
+# Maven scope over-scan: cdxgen keeps EVERY resolved node, so a deployed app's
+# SBOM also carries its test/provided toolchain (junit, lombok, ...) as if it
+# shipped them. This is the Maven analogue of the Android/npm over-scan. cdxgen
+# already tags each node with its resolved scope (compile/runtime -> "required",
+# test -> "optional", provided/system -> "excluded"), so we post-filter the BOM
+# to the deployable set using those tags near the end of this script — no second
+# maven run needed (that would hit the empty-repo NoPluginFoundForPrefix above).
+# Caveat: cdxgen maps both test scope and <optional>true</optional> to "optional",
+# so a rare optional=true runtime dep is dropped too; BOMLENS_MAVEN_FULL_GRAPH=1
+# opts out (keep the full graph, unchanged behavior).
+MAVEN_SCOPE_FILTER=""
+if [ -f pom.xml ] && [ -z "${BOMLENS_MAVEN_FULL_GRAPH:-}" ]; then
+    MAVEN_SCOPE_FILTER=1
+fi
 
 # Gradle (java-gradle / Android) — resolve so cdxgen sees the full graph.
 # For Android, ANDROID_HOME is set in the android-sdk image, enabling AGP.
@@ -318,6 +333,47 @@ process.stderr.write('[build-prep] node: kept ' + bom.components.length + ' of '
 NFILTER_JS
     node "$_nflt" "$OUT" "$NODE_PROD_SET" || log "node: filter skipped (non-fatal)"
     rm -f "$_nflt" "$NODE_PROD_SET"
+fi
+
+# Maven scope filter: cdxgen tags each maven component with its resolved scope
+# (compile/runtime -> required, test -> optional, provided/system -> excluded).
+# Drop the non-deployable ones, keeping non-maven components, the app root, and
+# anything cdxgen left unscoped. Prune the dependency graph to the kept refs.
+# Guard: only act when cdxgen actually populated scopes (at least one maven node
+# marked "required") — the syft fallback path emits no scope, and dropping there
+# would gut the BOM, so we leave it untouched and recall never regresses.
+if [ "${rc:-1}" -eq 0 ] && [ -n "${MAVEN_SCOPE_FILTER:-}" ] \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    log "maven: filtering SBOM to deployable scope"
+    _mflt=$(mktemp).js
+    cat > "$_mflt" <<'MFILTER_JS'
+const fs = require('fs');
+const [bomPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+const isMaven = c => (c.purl || '').startsWith('pkg:maven/');
+const hasScopes = bom.components.some(c => isMaven(c) && c.scope === 'required');
+if (!hasScopes) process.exit(0);   // scopes not populated (e.g. syft fallback): leave as-is
+const keep = c => !isMaven(c) || (c.scope !== 'optional' && c.scope !== 'excluded');
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+const mc = bom.metadata && bom.metadata.component;
+const refOf = c => c['bom-ref'] || c.purl;
+const keptRefs = new Set(bom.components.map(refOf));
+if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
+if (Array.isArray(bom.dependencies)) {
+  bom.dependencies = bom.dependencies
+    .filter(d => keptRefs.has(d.ref))
+    .map(d => Array.isArray(d.dependsOn)
+      ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) })
+      : d);
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] maven: kept ' + bom.components.length + ' of ' + before + ' components\n');
+MFILTER_JS
+    node "$_mflt" "$OUT" || log "maven: filter skipped (non-fatal)"
+    rm -f "$_mflt"
 fi
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
