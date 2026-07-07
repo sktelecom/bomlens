@@ -10,9 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The web UI can upload the generated SBOM to a Dependency-Track or TRUSCA server (previously CLI-only). New scan has an optional Upload section for the destination, server URL, API token, and — for TRUSCA — the project id. The token is stashed single-use and the server URL and token are used for that run only, never stored.
+- New scan exposes a "Reproducible output" toggle in the advanced options, surfacing the byte-stable mode that was previously CLI-only. When on, re-scanning the same source produces a byte-for-byte identical SBOM. The toggle is hidden for supplier-SBOM analysis and AI model scans, where it does not apply.
+
+### Changed
+
+- Best-effort post-processing steps (normalize, CPE and AIBOM enrichment, conformance, vendored-OSS suggestion) no longer swallow real failures. They kept the never-abort guarantee by ending in `|| true`, which also hid genuine errors; each step now logs a WARN and stamps `bomlens:pipeline-step-failed` on the SBOM when it fails, so a degraded run is visible instead of silently incomplete.
 
 ### Fixed
 
+- Maven source scans no longer inflate the SBOM with the test and provided toolchain (junit, lombok, etc.). The scan is scoped to the deployable runtime set using cdxgen's resolved scope tags — compile and runtime dependencies are kept, test and provided ones are dropped — the Maven analogue of the Android and npm release-scope fixes. Set `BOMLENS_MAVEN_FULL_GRAPH=1` to keep the full graph.
 - Android product-flavor projects now scope to the release runtime classpath instead of silently falling back to the full build + test graph. The release-config selection dropped every candidate when a project had no plain `releaseRuntimeClasspath` (only flavored variants such as `freeReleaseRuntimeClasspath`), so flavored apps were reported with their whole toolchain. It now prefers the plain classpath and otherwise takes the first flavored release variant.
 - Node.js (npm) source scans no longer inflate the SBOM with the `devDependencies` tree (jest, eslint, the Babel toolchain, etc.). The scan is scoped to the deployed `dependencies`, so build and test tooling the app never ships is excluded — the npm analogue of the Android release-scope fix. Set `BOMLENS_NODE_FULL_GRAPH=1` to keep the dev + prod superset.
 - Android (AGP) source scans no longer inflate the SBOM with the build and test toolchain. The scan is scoped to the deployable release runtime classpath, so only the components shipped in the APK are recorded.
@@ -329,7 +335,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.6.0...HEAD
+[v1.6.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.6.0
+[v1.5.5]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.5
+[v1.5.4]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.4
+[v1.5.3]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.3
+[v1.5.2]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.2
+[v1.5.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.1
+[v1.5.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.0
+[v1.4.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.4.0
+[v1.3.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.3.1
 [v1.3.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.3.0
 [v1.2.2]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.2
 [v1.2.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.1
