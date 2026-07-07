@@ -8,15 +8,61 @@ REM The full 2-stage orchestration (language detection -> cdxgen language image
 REM -> build-prep -> post-process image) lives in scan-sbom.sh. To avoid
 REM duplicating that logic in batch, we run it via Git Bash (Git for Windows),
 REM which ships a POSIX bash. Docker Desktop must be installed and running.
+REM
+REM IMPORTANT: a bare `bash` on a standard Windows PATH resolves to WSL's
+REM C:\Windows\System32\bash.exe (or a WindowsApps app-execution alias), NOT Git
+REM Bash. WSL bash reads C:\... as a path inside its own filesystem and fails to
+REM find this script. So we locate Git Bash explicitly instead of trusting PATH.
 
-setlocal
+setlocal EnableDelayedExpansion
 
-where bash >nul 2>&1
-if errorlevel 1 (
+REM --- Locate Git Bash (never WSL bash) ---
+set "BASH_EXE="
+
+REM 1) Explicit override.
+if defined SBOM_BASH if exist "%SBOM_BASH%" set "BASH_EXE=%SBOM_BASH%"
+
+REM 2) Derive from git on PATH: <root>\cmd\git.exe -> <root>\bin\bash.exe. Git for
+REM    Windows puts cmd\ on PATH (so `where git` works) even when bin\ is not.
+if not defined BASH_EXE (
+    for /f "delims=" %%i in ('where git 2^>nul') do (
+        if not defined BASH_EXE (
+            for %%r in ("%%~dpi..") do set "GITROOT=%%~fr"
+            if exist "!GITROOT!\bin\bash.exe" set "BASH_EXE=!GITROOT!\bin\bash.exe"
+            if not defined BASH_EXE if exist "!GITROOT!\usr\bin\bash.exe" set "BASH_EXE=!GITROOT!\usr\bin\bash.exe"
+        )
+    )
+)
+
+REM 3) Known install locations.
+if not defined BASH_EXE if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH_EXE=%ProgramFiles%\Git\bin\bash.exe"
+if not defined BASH_EXE if exist "%ProgramW6432%\Git\bin\bash.exe" set "BASH_EXE=%ProgramW6432%\Git\bin\bash.exe"
+if not defined BASH_EXE if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
+
+REM 4) Last resort: a bash on PATH that is neither the WSL launcher nor the
+REM    WindowsApps alias stub.
+if not defined BASH_EXE (
+    for /f "delims=" %%i in ('where bash 2^>nul') do (
+        if not defined BASH_EXE (
+            echo %%i | find /i "\System32\" >nul
+            if errorlevel 1 (
+                echo %%i | find /i "\WindowsApps\" >nul
+                if errorlevel 1 set "BASH_EXE=%%i"
+            )
+        )
+    )
+)
+
+if not defined BASH_EXE (
     echo [ERROR] Git Bash not found.
-    echo   scan-sbom on Windows runs through Git Bash. Install Git for Windows:
-    echo     https://git-scm.com/download/win
-    echo   ^(or run scan-sbom.sh under WSL^). For the no-CLI UI, double-click sbom-ui.bat.
+    echo   scan-sbom on Windows must run through Git Bash, not WSL's bash.
+    echo   The 'bash' on your PATH is likely C:\Windows\System32\bash.exe ^(WSL^)
+    echo   or a WindowsApps alias, which cannot run this script.
+    echo   Fix any one of:
+    echo     - Install Git for Windows: https://git-scm.com/download/win
+    echo     - Set SBOM_BASH to your Git bash.exe ^(e.g. C:\Program Files\Git\bin\bash.exe^)
+    echo     - Run scan-sbom.sh inside WSL.
+    echo   For the no-CLI UI, double-click sbom-ui.bat instead.
     exit /b 1
 )
 
@@ -29,6 +75,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-bash "%~dp0scan-sbom.sh" %*
+REM Hand Git Bash a forward-slash script path; it takes those most reliably.
+set "SCRIPT_SH=%~dp0scan-sbom.sh"
+set "SCRIPT_SH=%SCRIPT_SH:\=/%"
 
-endlocal
+"%BASH_EXE%" "%SCRIPT_SH%" %*
+set "RC=%ERRORLEVEL%"
+
+endlocal & exit /b %RC%

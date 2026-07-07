@@ -67,11 +67,12 @@ Pass "이미지 준비됨: $Image"
 #    scan-sbom.bat 는 Git Bash 를 통해 동작한다. 없으면 이 단계는 SKIP.
 # ---------------------------------------------------------------------------
 Section '3. CLI 스캔 e2e (명명 파이프 + 파일 공유 + NOTICE)'
+# scan-sbom.bat 는 스스로 Git bash 를 찾아 부른다(표준 PATH 의 bash 는 WSL 런처라
+# 신뢰하지 않는다). 그래서 여기서 PATH 의 bash 유무로 건너뛰지 않고, .bat 을 직접 돌린 뒤
+# 출력으로 원인을 가른다. $bash 는 아래 섹션 5 가 쓰므로 정의만 유지한다.
 $bash = Get-Command bash -ErrorAction SilentlyContinue
 $nodejsExample = Join-Path $script:RepoRoot 'examples\nodejs'
-if (-not $bash) {
-    Skip 'Git Bash(bash)가 없어 CLI 스캔 단계를 건너뜁니다. UI 흐름은 수동 체크리스트로 확인하세요.'
-} elseif (-not (Test-Path $nodejsExample)) {
+if (-not (Test-Path $nodejsExample)) {
     Skip "examples\nodejs 예제를 찾지 못해 CLI 스캔을 건너뜁니다: $nodejsExample"
 } else {
     # 파일 공유 기본 경로인 홈 디렉터리 아래에 작업 폴더를 만든다.
@@ -79,10 +80,13 @@ if (-not $bash) {
     New-Item -ItemType Directory -Path $work -Force | Out-Null
     try {
         Copy-Item -Path (Join-Path $nodejsExample '*') -Destination $work -Recurse -Force
+        $bat = Join-Path $script:RepoRoot 'scripts\scan-sbom.bat'
         Push-Location $work
+        $batOut = ''
         try {
-            $bat = Join-Path $script:RepoRoot 'scripts\scan-sbom.bat'
-            Invoke-Native { & $bat --project SmokeApp --version 0.0.1 --notice --generate-only } | Out-Null
+            $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            $batOut = (& $bat --project SmokeApp --version 0.0.1 --notice --generate-only 2>&1 | Out-String)
+            $ErrorActionPreference = $prev
         } finally {
             Pop-Location
         }
@@ -90,8 +94,12 @@ if (-not $bash) {
         $noticeHtml = Join-Path $work 'SmokeApp_0.0.1_NOTICE.html'
         if ((Test-Path $noticeTxt) -and (Test-Path $noticeHtml)) {
             Pass "고지문이 호스트 폴더에 생성됨: $work"
+        } elseif ($batOut -match 'Git Bash not found') {
+            # bash 해석 단계에서 멈춘 경우. 마운트/파일 공유 문제가 아니다.
+            Skip "Git bash 가 없어 scan-sbom.bat 진입점을 검증하지 못했습니다(PATH 의 bash 는 WSL). Git for Windows 설치 또는 SBOM_BASH 지정 후 다시 실행하세요."
         } else {
-            Failed "고지문이 호스트 폴더에 나타나지 않았습니다. 파일 공유 또는 명명 파이프 마운트를 의심하세요: $work"
+            # bash 는 정상 해석됐으나 스캔이 산출물을 못 냈다. 이제 파일 공유/마운트를 의심한다.
+            Failed "고지문이 나타나지 않았습니다. bash 해석은 정상이나 스캔이 산출물을 못 냈습니다(파일 공유/마운트/명명 파이프 의심): $work`n--- scan-sbom.bat 출력 ---`n$batOut"
         }
     } finally {
         Remove-Item -Path $work -Recurse -Force -ErrorAction SilentlyContinue
