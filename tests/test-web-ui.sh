@@ -92,15 +92,22 @@ assert "`" not in server._env_flag_value("`id`")
 assert len(server._env_flag_value("x" * 5000)) <= 256
 
 # Host bind-mount paths are gated by an inline _HOSTPATH_RE full-match barrier:
-# absolute, no ':' (which would split the mount), no flag-leading '-', no
-# whitespace or shell metacharacters. (run_sibling_scan refuses non-matching
-# paths; see the fail-closed cases below.)
+# absolute, no ':' in the body (which would split the mount), no flag-leading
+# '-', no whitespace or shell metacharacters. (run_sibling_scan refuses
+# non-matching paths; see the fail-closed cases below.)
 assert server._HOSTPATH_RE.fullmatch("/host/out")
 assert server._HOSTPATH_RE.fullmatch("/host/git-abc123/repo")
 assert not server._HOSTPATH_RE.fullmatch("relative/path")
 assert not server._HOSTPATH_RE.fullmatch("/etc:/etc")
 assert not server._HOSTPATH_RE.fullmatch("/path with space")
 assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
+# Windows host paths (SBOM_UI_HOST_DIR is a cygpath -m form under Git for Windows)
+# must pass: a single drive-letter colon at a fixed position, forward slashes,
+# still no ':' in the body so a drive path cannot smuggle an extra -v mount.
+assert server._HOSTPATH_RE.fullmatch("C:/Users/dev/out")
+assert server._HOSTPATH_RE.fullmatch("D:/scan/run_1/fw.bin")
+assert not server._HOSTPATH_RE.fullmatch("C:/foo:/evil")      # no injected second mount
+assert not server._HOSTPATH_RE.fullmatch("C:\\Users\\dev")    # backslash form not accepted (we always emit cygpath -m)
 
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).

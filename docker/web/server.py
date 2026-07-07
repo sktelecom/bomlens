@@ -953,6 +953,12 @@ def host_path_of(container_path):
     hostdir = os.environ.get("SBOM_UI_HOST_DIR", "")
     if not hostdir:
         return ""
+    # scan-sbom.sh --ui passes a cygpath -m form (C:/…, forward slashes) under
+    # Git for Windows, but a manual `docker run -e SBOM_UI_HOST_DIR=C:\…` could
+    # supply backslashes. Normalize to forward slashes so this Linux-side path
+    # math (os.path.join over posixpath) and the _HOSTPATH_RE barrier both see
+    # the drive form the host Docker daemon accepts. No-op for POSIX host dirs.
+    hostdir = hostdir.replace("\\", "/")
     p = os.path.normpath(container_path)
     for base in (OUTPUT_DIR, SRC_DIR):
         b = os.path.normpath(base)
@@ -967,11 +973,17 @@ def host_path_of(container_path):
 # command line. Each is enforced as an inline `re.fullmatch(<const>, value)`
 # barrier in run_sibling_scan, in the same scope as the flow it gates: string
 # substitution (re.sub) does NOT break command-injection taint, but a full-match
-# guard the value must pass to reach the sink does. None of these admit a leading
-# '-', whitespace, ':' (which would split a -v mount), or a shell metacharacter.
+# guard the value must pass to reach the sink does. Apart from the fixed Windows
+# drive-letter colon in _HOSTPATH_RE (see below), none admit a leading '-',
+# whitespace, ':' (which would split a -v mount), or a shell metacharacter.
 _REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
-_HOSTPATH_RE = re.compile(r"/[A-Za-z0-9._@/-]*")                # absolute bind-mount path
+# Absolute bind-mount source. POSIX '/…' (macOS/Linux) or a Windows drive path
+# 'C:/…' — the latter reaches here when the UI runs under Git for Windows, where
+# SBOM_UI_HOST_DIR is a cygpath -m form the host Docker daemon needs. The body
+# still forbids ':' so the only colon is the drive letter's, at a fixed position;
+# docker's -v parser treats that as a drive, not a mount separator.
+_HOSTPATH_RE = re.compile(r"(?:[A-Za-z]:)?/[A-Za-z0-9._@/-]*")  # absolute bind-mount path
 _BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
 _CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")  # docker --name
 

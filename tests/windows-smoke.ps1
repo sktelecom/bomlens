@@ -129,7 +129,23 @@ try {
                 # 아직 기동 중일 수 있다. 계속 폴링.
             }
         }
-        if ($ok) { Pass "웹 UI 응답 200 OK (http://localhost:$UiPort)" }
+        if ($ok) {
+            Pass "웹 UI 응답 200 OK (http://localhost:$UiPort)"
+            # 웹 UI의 firmware/AI 스캔은 호스트 도커 소켓으로 sibling 컨테이너를
+            # 띄우고, 그 -v 소스는 SBOM_UI_HOST_DIR에서 나온다. Windows에서는 이 값이
+            # 드라이브 경로(C:\... 또는 C:/...)여야 호스트 데몬이 마운트한다. capabilities의
+            # hostDir로 그 형태를 확인한다(빈 값이면 sibling 스캔이 소스를 못 붙인다).
+            try {
+                $caps = Invoke-RestMethod -Uri "http://localhost:$UiPort/capabilities" -TimeoutSec 5
+                if ($caps.hostDir -match '^[A-Za-z]:[\\/]') {
+                    Pass "capabilities.hostDir가 드라이브 경로로 잡힘: $($caps.hostDir)"
+                } else {
+                    Failed "capabilities.hostDir가 드라이브 경로가 아닙니다(sibling firmware/AI 스캔이 실패할 수 있음): '$($caps.hostDir)'"
+                }
+            } catch {
+                Failed "capabilities 조회 실패: $($_.Exception.Message)"
+            }
+        }
         else { Failed "웹 UI가 시간 내에 200을 반환하지 않았습니다 (포트 $UiPort 충돌 여부 확인)." }
     }
 } finally {

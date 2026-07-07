@@ -24,6 +24,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
 
+# Windows / Git-for-Windows (MSYS) docker-mount compatibility.
+# Under MSYS bash, arguments to a native docker.exe get path-mangled two ways
+# that both break `docker run -v <src>:<dst>`:
+#   - container targets (/app, /out, /tmp/build-prep.sh) are rewritten to
+#     C:\Program Files\Git\... , so the mount lands in the wrong place;
+#   - host sources from `pwd` come out as /c/... , which Docker Desktop/Rancher
+#     cannot resolve, so it mounts an empty anonymous dir instead of the file.
+# Fix both by disabling container-path conversion (applied per docker call so
+# git and other native tools are untouched) and by rewriting host mount sources
+# to Windows form (hostpath -> cygpath -m -> C:/...). Both are no-ops off MSYS,
+# so macOS and Linux behavior is unchanged. Two prefix forms are kept because the
+# env assignment must reach docker differently: DOCKER_MSYS is a literal
+# assignment string for the `eval docker run` calls; DOCKER_ENV is an `env`
+# argv array for the direct (exec/cleanup) calls, where a variable-expanded
+# assignment would not be honored as one.
+DOCKER_MSYS=""
+DOCKER_ENV=()
+case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+        DOCKER_MSYS="MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "
+        DOCKER_ENV=(env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*')
+        hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; } ;;
+    *)
+        hostpath() { printf '%s' "$1"; } ;;
+esac
+
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/bomlens-firmware:latest}"     # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
 AIBOM_IMAGE="${SBOM_AIBOM_IMAGE:-ghcr.io/sktelecom/bomlens-aibom:latest}"               # opt-in (OWASP AIBOM Generator; HuggingFace network)
@@ -202,10 +228,10 @@ if [ "$UI_MODE" = "true" ]; then
     echo "=========================================="
     ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
         || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &
-    exec docker run --rm -it -p "${UI_PORT}:8080" \
-        -v "$UI_BASE":/src -v "$UI_BASE":/host-output \
+    exec "${DOCKER_ENV[@]}" docker run --rm -it -p "${UI_PORT}:8080" \
+        -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$UI_BASE" "$POSTPROCESS_IMAGE"
+        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" "$POSTPROCESS_IMAGE"
 fi
 
 # ========================================================
@@ -249,7 +275,7 @@ cleanup() {
         [ -n "$d" ] || continue
         rm -rf -- "$d" 2>/dev/null
         if [ -e "$d" ] && command -v docker >/dev/null 2>&1; then
-            docker run --rm -v "$(dirname "$d")":/cleanup alpine:latest \
+            "${DOCKER_ENV[@]}" docker run --rm -v "$(hostpath "$(dirname "$d")")":/cleanup alpine:latest \
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
@@ -281,7 +307,7 @@ pp_env() {
 cosign_run() {
     [ "$SIGN_SBOM" = "true" ] && [ -n "${COSIGN_KEY:-}" ] && [ -f "$COSIGN_KEY" ] || return 0
     local d f
-    d="$(cd "$(dirname "$COSIGN_KEY")" && pwd)"; f="$(basename "$COSIGN_KEY")"
+    d="$(hostpath "$(cd "$(dirname "$COSIGN_KEY")" && pwd)")"; f="$(basename "$COSIGN_KEY")"
     printf ' -v %q:/cosign:ro -e COSIGN_KEY=%q -e COSIGN_PASSWORD=%q' "$d" "/cosign/$f" "${COSIGN_PASSWORD:-}"
 }
 
@@ -533,17 +559,17 @@ if [ "$MODE" = "SOURCE" ]; then
     fi
     echo "[1/2] Generating SBOM (cdxgen)..."
     CACHE_MOUNTS=""
-    [ -d "$HOME/.gradle" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$HOME/.gradle\":/root/.gradle"
-    [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$HOME/.m2\":/root/.m2"
+    [ -d "$HOME/.gradle" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle")\":/root/.gradle"
+    [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2")\":/root/.m2"
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not
     # write the host-owned /app on Linux (EACCES). Per-language images are already
     # root (no-op); the resulting bom is chown'd back to the host user in stage 2.
-    eval docker run --rm -u 0:0 \
-        -v "\"$SCAN_INPUT_DIR\"":/app \
-        -v "\"$OUTPUT_HOST_DIR\"":/out \
-        -v "\"$BUILD_PREP\"":/tmp/build-prep.sh:ro \
+    eval "$DOCKER_MSYS"docker run --rm -u 0:0 \
+        -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/app \
+        -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
+        -v "\"$(hostpath "$BUILD_PREP")\"":/tmp/build-prep.sh:ro \
         $CACHE_MOUNTS \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
@@ -563,8 +589,8 @@ if [ "$MODE" = "SOURCE" ]; then
     # pp_env/cosign_run intentionally expand to several -e KEY=VAL tokens, so the
     # word splitting SC2046 flags here is required, not a bug.
     # shellcheck disable=SC2046
-    eval docker run --rm \
-        -v "\"$SCAN_INPUT_DIR\"":/src -v "\"$OUTPUT_HOST_DIR\"":/host-output \
+    eval "$DOCKER_MSYS"docker run --rm \
+        -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
         -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
@@ -575,23 +601,23 @@ else
     # need their heavier opt-in images; others use the base image.
     VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
-        IMAGE)  VOL="-v \"$OUTPUT_HOST_DIR\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
-        BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
-        ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$TD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
-        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$FD\":/target -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
-        AIBOM)  VOL="-v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
-        ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$FD\":/input:ro -v \"$OUTPUT_HOST_DIR\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
+        IMAGE)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
+        BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
+        ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
+        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
+        AIBOM)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
+        ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$(hostpath "$FD")\":/input:ro -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files
             # that share a basename (three layers all named *_bom.json) don't
             # collide. MERGE_FILES carries the container-side paths.
-            VOL="-v \"$OUTPUT_HOST_DIR\":/host-output"; MF_CONTAINER=""; i=0
+            VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; MF_CONTAINER=""; i=0
             ROOT_ENV=""
             MR_RESOLVED=""
             [ -n "$MERGE_ROOT" ] && MR_RESOLVED="$(cd "$(dirname "$MERGE_ROOT")" && pwd)/$(basename "$MERGE_ROOT")"
             for mf in "${MERGE_FILES[@]}"; do
                 FD="$(cd "$(dirname "$mf")" && pwd)"; FN="$(basename "$mf")"
-                VOL="$VOL -v \"$FD\":/merge-in-$i:ro"
+                VOL="$VOL -v \"$(hostpath "$FD")\":/merge-in-$i:ro"
                 MF_CONTAINER="$MF_CONTAINER /merge-in-$i/$FN"
                 # --merge-root: point merge-sbom.sh at this input's container path.
                 [ -n "$MR_RESOLVED" ] && [ "$FD/$FN" = "$MR_RESOLVED" ] && ROOT_ENV=" -e MERGE_ROOT_FROM=\"/merge-in-$i/$FN\""
@@ -602,7 +628,7 @@ else
     # VOL/ENVV/pp_env/cosign_run intentionally expand to multiple tokens (-v, -e
     # pairs), so the word splitting SC2046 flags here is required, not a bug.
     # shellcheck disable=SC2046
-    eval docker run --rm $VOL \
+    eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" $ENVV $(pp_env)$(cosign_run) \
         "\"$RUN_IMAGE\""
