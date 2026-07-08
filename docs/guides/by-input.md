@@ -200,4 +200,4 @@ As it runs, logs stream live; when done you can view or download the notice, SBO
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Usage guide](../reference/cli.md)
+> **Related**: [Getting started](../start/first-scan.md) | [CLI reference](../reference/cli.md)

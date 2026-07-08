@@ -200,4 +200,4 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 ---
 
-> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [사용 가이드](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)
+> **관련 문서**: [시작하기](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md)

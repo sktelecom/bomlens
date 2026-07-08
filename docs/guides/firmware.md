@@ -82,4 +82,4 @@ The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors t
 
 ---
 
-> **Related**: [Getting started](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [Usage guide](../reference/cli.md) | [Notice and security guide](../guides/reports.md)
+> **Related**: [Getting started](../start/first-scan.md) | [Scenarios guide](../guides/by-input.md) | [CLI reference](../reference/cli.md) | [Notice and security guide](../guides/reports.md)
