@@ -27,7 +27,7 @@ cd examples/rust
 
 ## Expected Output
 
-The scan generates `RustExample_1.0.0_bom.json` with roughly 35–45 crates. actix-web pulls a large transitive tree, so most entries are indirect.
+The scan writes its outputs into a `RustExample_1.0.0/` folder (`RustExample_1.0.0_bom.json` and related files). The SBOM lists roughly 35–45 crates. actix-web pulls a large transitive tree, so most entries are indirect.
 
 ### Sample Components
 
@@ -48,10 +48,10 @@ cargo run
 
 ```bash
 # Count components
-jq '.components | length' RustExample_1.0.0_bom.json
+jq '.components | length' RustExample_1.0.0/RustExample_1.0.0_bom.json
 
 # List all crates
-jq -r '.components[].name' RustExample_1.0.0_bom.json | sort -u
+jq -r '.components[].name' RustExample_1.0.0/RustExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues

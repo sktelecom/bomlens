@@ -2,24 +2,7 @@
 
 > **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
 
-Flask 기반 간단한 REST API 애플리케이션입니다. SBOM 생성 테스트를 위한 예제로 사용됩니다.
-
-## 프로젝트 정보
-
-- 언어: Python 3.11+
-- 프레임워크: Flask 3.0
-- 주요 의존성:
-  - Flask (웹 프레임워크)
-  - Pandas (데이터 처리)
-  - NumPy (수치 계산)
-  - Requests (HTTP 클라이언트)
-  - SQLAlchemy (ORM)
-  - Pytest (테스트)
-
-## 사전 요구사항
-
-- Python 3.8 이상
-- pip (또는 Docker)
+Flask 기반 간단한 REST API 애플리케이션입니다. SBOM 생성 테스트를 위한 예제로 사용됩니다. Flask, Pandas, NumPy, Requests, SQLAlchemy, Pytest 등 널리 쓰이는 Python 패키지를 의존성으로 포함합니다.
 
 ## SBOM 생성
 
@@ -38,7 +21,7 @@ cd examples/python
   --generate-only
 ```
 
-결과로 `PythonFlaskExample_1.0.0_bom.json` 파일이 생성됩니다.
+결과는 `PythonFlaskExample_1.0.0/` 폴더에 저장됩니다(`PythonFlaskExample_1.0.0_bom.json` 등).
 
 ### 방법 2: Docker 직접 사용
 
@@ -54,6 +37,8 @@ docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
+이 방법은 스크립트와 달리 출력 폴더에 바로(하위 폴더 없이) 저장됩니다.
+
 ### 방법 3: cyclonedx-py 사용
 
 ```bash
@@ -67,154 +52,21 @@ cyclonedx-py requirements \
   --format json
 ```
 
-## 애플리케이션 실행
-
-### 가상 환경 생성 및 활성화
-
-```bash
-# 가상 환경 생성
-python3 -m venv venv
-
-# 활성화 (Linux/macOS)
-source venv/bin/activate
-
-# 활성화 (Windows)
-venv\Scripts\activate
-```
-
-### 의존성 설치
-
-```bash
-pip install -r requirements.txt
-```
-
-### 애플리케이션 실행
-
-```bash
-# 개발 모드
-python app.py
-
-# 또는
-flask run
-```
-
-접속 주소는 http://localhost:5000 입니다.
-
-### Docker로 실행
-
-```bash
-# Dockerfile 생성
-cat > Dockerfile <<EOF
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY app.py .
-
-EXPOSE 5000
-
-CMD ["python", "app.py"]
-EOF
-
-# 빌드 및 실행
-docker build -t python-example:latest .
-docker run -p 5000:5000 python-example:latest
-```
-
-## API 엔드포인트
-
-### GET /
-
-메인 페이지 - 애플리케이션 정보 반환
-
-```bash
-curl http://localhost:5000/
-```
-
-응답:
-```json
-{
-  "message": "SBOM Example Application is running!",
-  "version": "1.0.0",
-  "timestamp": "2026-01-15T10:30:00.123456"
-}
-```
-
-### GET /health
-
-헬스 체크
-
-```bash
-curl http://localhost:5000/health
-```
-
-응답:
-```json
-{
-  "status": "OK"
-}
-```
-
-### GET /data
-
-샘플 데이터 반환 (Pandas 사용)
-
-```bash
-curl http://localhost:5000/data
-```
-
-응답:
-```json
-{
-  "data": [
-    {"id": 1, "value": 0.123, "label": "Item 1"},
-    {"id": 2, "value": 0.456, "label": "Item 2"}
-  ],
-  "count": 10
-}
-```
-
-### POST /analyze
-
-숫자 배열 통계 분석 (NumPy 사용)
-
-```bash
-curl -X POST http://localhost:5000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"numbers": [1, 2, 3, 4, 5]}'
-```
-
-응답:
-```json
-{
-  "mean": 3.0,
-  "median": 3.0,
-  "std": 1.4142135623730951,
-  "min": 1.0,
-  "max": 5.0
-}
-```
-
 ## 생성된 SBOM 확인
 
 ```bash
 # SBOM 파일 확인
-ls -lh PythonFlaskExample_1.0.0_bom.json
+ls -lh PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json
 
 # 컴포넌트 개수 확인 (jq 필요)
-cat PythonFlaskExample_1.0.0_bom.json | jq '.components | length'
+cat PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json | jq '.components | length'
 
 # Flask 관련 의존성 확인
-cat PythonFlaskExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("flask")) | "\(.name)@\(.version)"'
+cat PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("flask")) | "\(.name)@\(.version)"'
 ```
 
 예상 컴포넌트 수는 약 30-40개입니다(전이적 의존성 포함).
 <!-- expected-components: 30-40 -->
-
-## 예상 SBOM 내용
 
 생성된 SBOM에는 다음과 같은 정보가 포함됩니다:
 
@@ -226,45 +78,7 @@ cat PythonFlaskExample_1.0.0_bom.json | jq -r '.components[] | select(.name | co
 - 테스트: pytest, pytest-cov, coverage
 - 유틸리티: python-dotenv, click
 
-## 개발
-
-### 테스트 실행
-
-```bash
-# pytest 설치 (requirements.txt에 포함)
-pip install pytest pytest-cov
-
-# 테스트 실행
-pytest
-
-# 커버리지 포함
-pytest --cov=.
-```
-
-### 코드 포맷팅
-
-```bash
-# black 설치 (requirements.txt에 포함)
-pip install black
-
-# 코드 포맷팅
-black app.py
-
-# 린팅
-flake8 app.py
-```
-
 ## 문제 해결
-
-### pip 설치 실패
-
-```bash
-# pip 업그레이드
-pip install --upgrade pip
-
-# 캐시 삭제 후 재설치
-pip install --no-cache-dir -r requirements.txt
-```
 
 ### SBOM이 비어있음
 
@@ -276,43 +90,19 @@ ls -la requirements.txt
 pip freeze > requirements.txt
 ```
 
-### Python 버전 오류
+### pip 설치 실패
 
 ```bash
-# Python 버전 확인
-python --version
+# pip 업그레이드
+pip install --upgrade pip
 
-# Python 3.8 이상 필요
-# pyenv 등으로 Python 버전 관리 권장
-```
-
-### 가상 환경 문제
-
-```bash
-# 가상 환경 삭제 후 재생성
-rm -rf venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# 캐시 삭제 후 재설치
+pip install --no-cache-dir -r requirements.txt
 ```
 
 ## Poetry 사용 (선택)
 
-Poetry를 사용하는 경우:
-
-```bash
-# pyproject.toml 생성
-poetry init
-
-# 의존성 추가
-poetry add flask pandas numpy requests
-
-# SBOM 생성
-../../scripts/scan-sbom.sh \
-  --project "PythonPoetryExample" \
-  --version "1.0.0" \
-  --generate-only
-```
+Poetry(`pyproject.toml`)를 쓰는 프로젝트도 같은 방식으로 스캔할 수 있습니다. `--project` 이름만 바꿔서 방법 1 명령을 그대로 실행하면 됩니다.
 
 ## 다음 단계
 

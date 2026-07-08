@@ -28,7 +28,7 @@ cd examples/go
 
 ## Expected Output
 
-The scan generates `GoExample_1.0.0_bom.json` containing:
+The scan writes its outputs into a `GoExample_1.0.0/` folder. The main SBOM, `GoExample_1.0.0/GoExample_1.0.0_bom.json`, contains:
 - ~15-25 total components (including transitive dependencies)
 <!-- expected-components: 15-25 -->
 - Gin and its dependencies (net/http2, validator, etc.)
@@ -67,13 +67,13 @@ curl http://localhost:8080/health
 
 ```bash
 # Count components
-jq '.components | length' GoExample_1.0.0_bom.json
+jq '.components | length' GoExample_1.0.0/GoExample_1.0.0_bom.json
 
 # View Gin entry
-jq '.components[] | select(.name | contains("gin"))' GoExample_1.0.0_bom.json
+jq '.components[] | select(.name | contains("gin"))' GoExample_1.0.0/GoExample_1.0.0_bom.json
 
 # List all modules
-jq -r '.components[] | select(.name | startswith("github.com")) | .name' GoExample_1.0.0_bom.json | sort -u
+jq -r '.components[] | select(.name | startswith("github.com")) | .name' GoExample_1.0.0/GoExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues
