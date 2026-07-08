@@ -120,6 +120,40 @@ plugins:
             Package managers: 패키지 매니저
             Testing: 테스트
             Release notes: 릴리스 노트
+  # Redirects for URLs from the pre-IA-restructure site (#154), which served
+  # Korean at the root and English under /en/. Old bookmarks, external links
+  # and search-engine results keep working. Old /en/ paths map to the now
+  # canonical English pages by doc path. The Korean targets are absolute /ko/
+  # URLs on purpose: this plugin resolves doc-path targets before the i18n
+  # plugin relocates .ko.md pages under /ko/, so a `x.ko.md` target would
+  # emit a stub pointing at the nonexistent /x.ko/ URL.
+  - redirects:
+      redirect_maps:
+        getting-started.md: https://sktelecom.github.io/sbom-tools/ko/start/first-scan/
+        quickstart-no-cli.md: https://sktelecom.github.io/sbom-tools/ko/start/no-cli/
+        scenarios-guide.md: https://sktelecom.github.io/sbom-tools/ko/guides/by-input/
+        usage-guide.md: https://sktelecom.github.io/sbom-tools/ko/reference/cli/
+        notice-and-security.md: https://sktelecom.github.io/sbom-tools/ko/guides/reports/
+        examples-guide.md: https://sktelecom.github.io/sbom-tools/ko/reference/ecosystems/
+        docker-image.md: https://sktelecom.github.io/sbom-tools/ko/reference/docker-image/
+        architecture.md: https://sktelecom.github.io/sbom-tools/ko/concepts/architecture/
+        firmware-analysis-guide.md: https://sktelecom.github.io/sbom-tools/ko/guides/firmware/
+        supplier-sbom-validation.md: https://sktelecom.github.io/sbom-tools/ko/guides/supplier-sbom/
+        contributing/package-manager-guide.md: https://sktelecom.github.io/sbom-tools/ko/contribute/package-managers/
+        contributing/testing-guide.md: https://sktelecom.github.io/sbom-tools/ko/contribute/testing/
+        en/index.md: index.md
+        en/getting-started.md: start/first-scan.md
+        en/quickstart-no-cli.md: start/no-cli.md
+        en/scenarios-guide.md: guides/by-input.md
+        en/usage-guide.md: reference/cli.md
+        en/notice-and-security.md: guides/reports.md
+        en/examples-guide.md: reference/ecosystems.md
+        en/docker-image.md: reference/docker-image.md
+        en/architecture.md: concepts/architecture.md
+        en/firmware-analysis-guide.md: guides/firmware.md
+        en/supplier-sbom-validation.md: guides/supplier-sbom.md
+        en/contributing/package-manager-guide.md: contribute/package-managers.md
+        en/contributing/testing-guide.md: contribute/testing.md
 
 extra:
   # 방문 분석(GoatCounter, 쿠키·개인정보 없음). goatcounter.com에서 사이트를 등록한 뒤
