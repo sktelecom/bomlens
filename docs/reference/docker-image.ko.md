@@ -23,10 +23,10 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 도구 | 버전 | 역할 |
 |------|------|------|
 | syft | v1.46.0 | 이미지, 바이너리, 디렉터리 스캔 |
-| Trivy | v0.70.0 | 취약점 보고서 |
+| Trivy | v0.72.0 | 취약점 보고서 |
 | cosign | v2.4.1 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
-| ScanCode Toolkit | 32.3.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
+| ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
 
