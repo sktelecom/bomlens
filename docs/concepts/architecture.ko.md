@@ -388,4 +388,4 @@ flowchart TB
 
 ---
 
-> **관련 문서**: [입력 형태별 파이프라인](pipeline-by-input.ko.md) | [시작하기](../start/first-scan.ko.md) | [사용 가이드](../reference/cli.ko.md) | [Docker 이미지 직접 사용](../reference/docker-image.ko.md) | [패키지 매니저 추가](../contribute/package-managers.ko.md)
+> **관련 문서**: [입력 형태별 파이프라인](pipeline-by-input.ko.md) | [시작하기](../start/first-scan.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md) | [Docker 이미지 직접 사용](../reference/docker-image.ko.md) | [패키지 매니저 추가](../contribute/package-managers.ko.md)

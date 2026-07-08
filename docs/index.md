@@ -49,10 +49,10 @@ Prefer no command line? Download the installer and double-click it. A Docker eng
 
     [:octicons-arrow-right-24: Reports](guides/reports.md)
 
--   :material-cog: __Usage guide__
+-   :material-cog: __CLI reference__
 
     Every option, analysis modes, CI/CD.
 
-    [:octicons-arrow-right-24: Usage guide](reference/cli.md)
+    [:octicons-arrow-right-24: CLI reference](reference/cli.md)
 
 </div>

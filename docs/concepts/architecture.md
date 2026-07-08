@@ -392,4 +392,4 @@ flowchart TB
 
 ---
 
-> **Related**: [Pipeline by input type](pipeline-by-input.md) | [Getting started](../start/first-scan.md) | [Usage guide](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)
+> **Related**: [Pipeline by input type](pipeline-by-input.md) | [Getting started](../start/first-scan.md) | [CLI reference](../reference/cli.md) | [Use the Docker image directly](../reference/docker-image.md)

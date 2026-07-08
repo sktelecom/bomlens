@@ -104,4 +104,4 @@ G7 블록의 머리에는 "N / 38 충족" 같은 수치가 옵니다. 분모는 
 
 ---
 
-> **관련 문서**: [입력 형태별 파이프라인](../concepts/pipeline-by-input.ko.md) | [웹 UI 레퍼런스](../reference/ui.ko.md) | [사용 가이드](../reference/cli.ko.md)
+> **관련 문서**: [입력 형태별 파이프라인](../concepts/pipeline-by-input.ko.md) | [웹 UI 레퍼런스](../reference/ui.ko.md) | [CLI 레퍼런스](../reference/cli.ko.md)

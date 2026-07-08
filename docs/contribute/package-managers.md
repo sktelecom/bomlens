@@ -91,8 +91,8 @@ source "$(dirname "$0")/cases/test-kotlin.sh"
 After adding a new language, update the following documents.
 
 - `README.md` — add it to the supported language list
-- [Examples guide](../reference/ecosystems.md) — add a section for the new language (follow the format of the existing language examples)
-- [Usage guide](../reference/cli.md) — add a row to the "language not detected" table in the troubleshooting section:
+- [Supported ecosystems](../reference/ecosystems.md) — add a section for the new language (follow the format of the existing language examples)
+- [CLI reference](../reference/cli.md) — add a row to the "language not detected" table in the troubleshooting section:
 
 ```markdown
 | Kotlin | `build.gradle.kts` + `gradle.lockfile` |

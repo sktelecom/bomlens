@@ -87,8 +87,8 @@ source "$(dirname "$0")/cases/test-kotlin.sh"
 새로운 언어를 추가하면 아래 문서를 업데이트해야 합니다.
 
 - `README.md` — 지원 언어 목록에 추가
-- [예제 가이드](../reference/ecosystems.ko.md) — 새 언어 섹션 추가 (다른 언어 예시 형식 참고)
-- [사용 가이드](../reference/cli.ko.md) — 트러블슈팅의 "언어 미감지" 표에 추가:
+- [지원 생태계](../reference/ecosystems.ko.md) — 새 언어 섹션 추가 (다른 언어 예시 형식 참고)
+- [CLI 레퍼런스](../reference/cli.ko.md) — 트러블슈팅의 "언어 미감지" 표에 추가:
 
 ```markdown
 | Kotlin | `build.gradle.kts` + `gradle.lockfile` |

@@ -109,7 +109,7 @@ plugins:
             Artifacts: 산출물 종류
             Reading reports: 보고서 읽는 법
             Advanced: 고급
-            CLI options: CLI 옵션
+            CLI reference: CLI 레퍼런스
             Docker image: Docker 이미지
             Ecosystems: 지원 생태계
             About: 프로젝트 정보
@@ -160,7 +160,7 @@ nav:
       - Artifacts: reference/artifacts.md
       - Reading reports: concepts/reports-explained.md
   - Advanced:
-      - CLI options: reference/cli.md
+      - CLI reference: reference/cli.md
       - Docker image: reference/docker-image.md
       - Ecosystems: reference/ecosystems.md
   - About:

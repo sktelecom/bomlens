@@ -60,7 +60,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
 
-> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 위험분석 보고서를 한 번에 만듭니다. 전체 옵션은 [사용 가이드](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
+> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 위험분석 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
 
 ## 결과 파일 이해하기
 
@@ -173,11 +173,11 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 |------|------|
 | 입력 형태(GitHub, ZIP, SBOM, 펌웨어 등)별 처리 | [시나리오별 가이드](../guides/by-input.ko.md) |
 | 고지문, 보안 보고서, 위험분석보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
-| 전체 옵션과 CI/CD 연동 방법 | [사용 가이드](../reference/cli.ko.md) |
-| 언어별 예제 프로젝트 실습 | [예제 가이드](../reference/ecosystems.ko.md) |
+| 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
+| 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |
 | 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md) |
 
 ---
 
-> **관련 문서**: [사용 가이드](../reference/cli.ko.md) | [예제 가이드](../reference/ecosystems.ko.md) | [시나리오 가이드](../guides/by-input.ko.md)
+> **관련 문서**: [CLI 레퍼런스](../reference/cli.ko.md) | [지원 생태계](../reference/ecosystems.ko.md) | [시나리오 가이드](../guides/by-input.ko.md)
