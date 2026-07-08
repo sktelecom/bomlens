@@ -371,6 +371,36 @@ elif [ -d "$VENDORED_SRC" ]; then
 fi
 
 # ========================================================
+# CocoaPods (iOS) — cdxgen's swift language image has no `pod` CLI, so a CocoaPods
+# project comes back with zero components. syft parses Podfile.lock offline (no `pod`,
+# no network); fill the gap here for the CLI source scan (/src) and the web-UI source
+# scan (SOURCE_ROOT), and merge before normalize/security so CVE/notice generation picks
+# the pods up. No-op when the main scan already carries pkg:cocoapods components (e.g. a
+# future pod-capable image), so this never double-counts.
+# ========================================================
+COCOA_SRC="${SOURCE_ROOT:-/src}"
+if [ -d "$COCOA_SRC" ] \
+   && find "$COCOA_SRC" -type f -name Podfile.lock -not -path '*/Pods/*' 2>/dev/null | grep -q .; then
+    HAS_COCOA=$(jq '[.components[]? | select((.purl // "") | startswith("pkg:cocoapods/"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    if [ "${HAS_COCOA:-0}" -eq 0 ]; then
+        echo "[INFO] Identifying CocoaPods dependencies from Podfile.lock (syft)..."
+        COCOA_SBOM="${OUT_PREFIX}_cocoapods.cdx.json"
+        if bash "$LIBDIR/identify-cocoapods.sh" "$COCOA_SRC" "$COCOA_SBOM" "$PROJECT_VERSION"; then
+            COCOA_N=$(jq '[.components[]?] | length' "$COCOA_SBOM" 2>/dev/null || echo 0)
+            if [ "${COCOA_N:-0}" -gt 0 ]; then
+                echo "[INFO] CocoaPods components identified: $COCOA_N — merging into SBOM."
+                if bash "$LIBDIR/merge-sbom.sh" "${OUTPUT_FILE}.merged" "$PROJECT_NAME" "$PROJECT_VERSION" "$OUTPUT_FILE" "$COCOA_SBOM"; then
+                    mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
+                else
+                    echo "[WARN] merge of CocoaPods components failed; keeping the original SBOM." >&2
+                    rm -f "${OUTPUT_FILE}.merged"
+                fi
+            fi
+        fi
+    fi
+fi
+
+# ========================================================
 # Common pipeline: normalize / deep-license / notice / security / sign
 # ========================================================
 ARTIFACTS=("$OUTPUT_FILE")

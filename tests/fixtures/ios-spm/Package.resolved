@@ -1,0 +1,11 @@
+{
+  "pins" : [
+    { "identity" : "alamofire", "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : { "revision" : "f3b09a368f1582ab751b3fff5460276e0d2cf5c9", "version" : "5.8.1" } },
+    { "identity" : "swift-log", "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : { "revision" : "e97a6fcb14bc39c1b426e51db00b6b57837d8ff2", "version" : "1.5.3" } }
+  ],
+  "version" : 2
+}
