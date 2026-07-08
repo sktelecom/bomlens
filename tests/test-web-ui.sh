@@ -91,23 +91,23 @@ assert "$" not in server._env_flag_value("$(whoami)")
 assert "`" not in server._env_flag_value("`id`")
 assert len(server._env_flag_value("x" * 5000)) <= 256
 
-# Host bind-mount paths are gated by an inline _HOSTPATH_RE full-match barrier:
-# absolute, no ':' in the body (which would split the mount), no flag-leading
-# '-', no whitespace or shell metacharacters. (run_sibling_scan refuses
-# non-matching paths; see the fail-closed cases below.)
-assert server._HOSTPATH_RE.fullmatch("/host/out")
-assert server._HOSTPATH_RE.fullmatch("/host/git-abc123/repo")
-assert not server._HOSTPATH_RE.fullmatch("relative/path")
-assert not server._HOSTPATH_RE.fullmatch("/etc:/etc")
-assert not server._HOSTPATH_RE.fullmatch("/path with space")
-assert not server._HOSTPATH_RE.fullmatch("/a;rm -rf /")
-# Windows host paths (SBOM_UI_HOST_DIR is a cygpath -m form under Git for Windows)
-# must pass: a single drive-letter colon at a fixed position, forward slashes,
-# still no ':' in the body so a drive path cannot smuggle an extra -v mount.
-assert server._HOSTPATH_RE.fullmatch("C:/Users/dev/out")
-assert server._HOSTPATH_RE.fullmatch("D:/scan/run_1/fw.bin")
-assert not server._HOSTPATH_RE.fullmatch("C:/foo:/evil")      # no injected second mount
-assert not server._HOSTPATH_RE.fullmatch("C:\\Users\\dev")    # backslash form not accepted (we always emit cygpath -m)
+# The sibling shares files via --volumes-from THIS container, not a host bind: the
+# output dir and firmware upload are CONTAINER paths, gated by containment
+# (_path_under) so a traversal-crafted path cannot escape OUTPUT_DIR / UPLOAD_DIR.
+assert server._path_under(server.OUTPUT_DIR + "/run_1", server.OUTPUT_DIR)
+assert server._path_under(server.OUTPUT_DIR, server.OUTPUT_DIR)                 # equal ok
+assert server._path_under(server.UPLOAD_DIR + "/tok/fw.bin", server.UPLOAD_DIR)
+assert not server._path_under("/etc/passwd", server.OUTPUT_DIR)                 # outside
+assert not server._path_under(server.OUTPUT_DIR + "/../etc", server.OUTPUT_DIR) # traversal escapes
+assert not server._path_under("/tmp/evil", server.UPLOAD_DIR)
+# self id: reads /proc/self/mountinfo, falls back to $HOSTNAME; always a str.
+assert isinstance(server._self_container_id(), str)
+
+run_out = server.OUTPUT_DIR + "/run_1"
+up_file = server.UPLOAD_DIR + "/tok/fw.bin"
+
+# Deterministic self id so the sibling launch does not depend on the test host.
+server._self_container_id = lambda: "selfcid000000"
 
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
@@ -120,7 +120,7 @@ server._stream_cmd = fake_stream
 server._sibling_image_present = lambda image: True
 
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
     lambda ln: None, model_id="openai/clip",
     extra_env={"PROJECT_NAME": "a;rm -rf /", "PROJECT_VERSION": "1.0"},
 )
@@ -131,17 +131,19 @@ args = captured["args"]
 pname = [a for a in args if a.startswith("PROJECT_NAME=")][0]
 assert not any(c in pname for c in ";`$&|<>\n"), pname
 assert "MODE=AIBOM" in args and "MODEL_ID=openai/clip" in args, args
-# The image ref and host_out pass the inline full-match barriers and reach the
-# command line as charset-constrained tokens; valid inputs are interpolated
-# verbatim (the guard rejects, it does not rewrite).
 assert "ghcr.io/sktelecom/bomlens-aibom:1.5.0" in args, args
-assert "/host/out:/host-output" in args, args
+# Shared via --volumes-from, NOT a host-path bind mount; the run dir is the workdir
+# and HOST_OUTPUT_DIR (container paths).
+assert "--volumes-from" in args and "selfcid000000" in args, args
+assert not any(a.endswith(":/host-output") for a in args), args
+assert ("HOST_OUTPUT_DIR=%s" % run_out) in args, args
+assert args[args.index("-w") + 1] == run_out, args
 
 # Cancel support: a valid container_name reaches docker run as a `--name`
 # (so a cancelled scan can be stopped); an invalid one is dropped, not smuggled.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
     lambda ln: None, model_id="openai/clip", container_name="bomlens-sib-demo_1.0",
 )
 assert rc == 0 and "--name" in captured["args"], captured.get("args")
@@ -149,29 +151,30 @@ assert "bomlens-sib-demo_1.0" in captured["args"], captured["args"]
 assert captured["container"] == "bomlens-sib-demo_1.0", captured["container"]
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
     lambda ln: None, model_id="openai/clip", container_name="evil; rm -rf /",
 )
 assert rc == 0 and "--name" not in captured["args"], captured["args"]
 assert captured["container"] is None, captured["container"]
 
-# A firmware host_file passes the bind-mount barrier and is mounted read-only
-# under a basename-only in-sibling path.
+# A firmware upload is read in place (TARGET_FILE = its container path), with no
+# extra bind mount — --volumes-from already exposes it under UPLOAD_DIR.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
-    lambda ln: None, host_file="/host/up/fw.bin",
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
 )
 assert rc == 0, rc
-assert "/host/up/fw.bin:/input/fw.bin:ro" in captured["args"], captured["args"]
+assert ("TARGET_FILE=%s" % up_file) in captured["args"], captured["args"]
+assert not any("/input/" in a for a in captured["args"]), captured["args"]
 
 # Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
 # they are forwarded to the sibling as exactly two fixed -e literals. AIBOM and
 # the default (off) firmware path must NOT carry them.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
-    lambda ln: None, host_file="/host/up/fw.bin",
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
     extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
 )
 assert rc == 0, rc
@@ -181,8 +184,8 @@ assert "CVE_BIN_TOOL_MODE=online" in captured["args"], captured["args"]
 # Default firmware (no opt-in) forwards neither var -> offline-bundle default.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
-    lambda ln: None, host_file="/host/up/fw.bin",
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
 )
 assert rc == 0, rc
 assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
@@ -190,7 +193,7 @@ assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), capture
 # AIBOM never carries the OSV control vars even if present in extra_env.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
     lambda ln: None, model_id="openai/clip",
     extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
 )
@@ -200,30 +203,30 @@ assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), capture
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "EVIL", "/host/out", lambda ln: None,
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "EVIL", run_out, lambda ln: None,
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 
 # A bogus model id is refused too.
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
     lambda ln: None, model_id="--privileged",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 
-# A host_out that fails the bind-mount allowlist is refused before any run.
+# An output dir outside OUTPUT_DIR (traversal / absolute escape) is refused.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/host/out:/evil",
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", "/etc",
     lambda ln: None, model_id="openai/clip",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 
-# A hostile firmware host_file path is refused too.
+# A firmware upload outside UPLOAD_DIR is refused too.
 captured.clear()
 rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", "/host/out",
-    lambda ln: None, host_file="/host/up:ro,Z",
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file="/etc/passwd",
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 

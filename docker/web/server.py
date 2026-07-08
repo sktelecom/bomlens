@@ -953,11 +953,11 @@ def host_path_of(container_path):
     hostdir = os.environ.get("SBOM_UI_HOST_DIR", "")
     if not hostdir:
         return ""
-    # scan-sbom.sh --ui passes a cygpath -m form (C:/…, forward slashes) under
-    # Git for Windows, but a manual `docker run -e SBOM_UI_HOST_DIR=C:\…` could
-    # supply backslashes. Normalize to forward slashes so this Linux-side path
-    # math (os.path.join over posixpath) and the _HOSTPATH_RE barrier both see
-    # the drive form the host Docker daemon accepts. No-op for POSIX host dirs.
+    # Normalize backslashes so the posixpath math below joins cleanly on Windows.
+    # Only the SOURCE path still calls this — to signal to the entrypoint that the
+    # scanned tree is under a mount we own (the sibling then inherits it via
+    # --volumes-from; the returned value itself is no longer used as a mount source,
+    # so its drive form no longer matters). No-op for POSIX host dirs.
     hostdir = hostdir.replace("\\", "/")
     p = os.path.normpath(container_path)
     for base in (OUTPUT_DIR, SRC_DIR):
@@ -969,22 +969,15 @@ def host_path_of(container_path):
     return ""
 
 
-# Allowlist charsets for every value interpolated into the sibling docker-run
-# command line. Each is enforced as an inline `re.fullmatch(<const>, value)`
-# barrier in run_sibling_scan, in the same scope as the flow it gates: string
-# substitution (re.sub) does NOT break command-injection taint, but a full-match
-# guard the value must pass to reach the sink does. Apart from the fixed Windows
-# drive-letter colon in _HOSTPATH_RE (see below), none admit a leading '-',
-# whitespace, ':' (which would split a -v mount), or a shell metacharacter.
+# Allowlist charsets for the image ref / model id / container name interpolated into
+# the sibling docker-run command line. Each is enforced as an inline
+# `re.fullmatch(<const>, value)` barrier in run_sibling_scan, in the same scope as the
+# flow it gates: string substitution (re.sub) does NOT break command-injection taint, but
+# a full-match guard the value must pass to reach the sink does. (Container paths — the
+# output dir and the upload — are no longer bind-mounted by host path; they ride
+# --volumes-from and are guarded by containment, see _path_under.)
 _REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
-# Absolute bind-mount source. POSIX '/…' (macOS/Linux) or a Windows drive path
-# 'C:/…' — the latter reaches here when the UI runs under Git for Windows, where
-# SBOM_UI_HOST_DIR is a cygpath -m form the host Docker daemon needs. The body
-# still forbids ':' so the only colon is the drive letter's, at a fixed position;
-# docker's -v parser treats that as a drive, not a mount separator.
-_HOSTPATH_RE = re.compile(r"(?:[A-Za-z]:)?/[A-Za-z0-9._@/-]*")  # absolute bind-mount path
-_BASENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")       # in-sibling file name
 _CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")  # docker --name
 
 # scan-firmware.sh emits `[firmware-cvedb-progress] NN%` on stdout while the
@@ -1043,7 +1036,34 @@ def _env_flag_value(value):
     return re.sub(r"[^\w.+:/ @=-]", "", (value or ""))[:256]
 
 
-def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=None,
+def _self_container_id():
+    """This container's own id, for `docker run --volumes-from` (mirrors
+    entrypoint.sh's self_container_id). Docker bind-mounts /etc/hostname et al. from
+    /var/lib/docker/containers/<id>/, so the full id is in /proc/self/mountinfo
+    regardless of cgroup version; fall back to $HOSTNAME (the short id by default)."""
+    try:
+        with open("/proc/self/mountinfo", encoding="utf-8") as fh:
+            for line in fh:
+                m = re.search(r"/containers/([0-9a-f]{64})/", line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return os.environ.get("HOSTNAME", "")
+
+
+def _path_under(path, base):
+    """True when `path` resolves inside `base` (both realpath'd) — the containment
+    guard for a container path handed to a sibling via --volumes-from."""
+    try:
+        rp = os.path.realpath(path)
+        rb = os.path.realpath(base)
+    except OSError:
+        return False
+    return rp == rb or rp.startswith(rb + os.sep)
+
+
+def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id=None,
                      extra_env=None, on_progress=None, cancel=None, container_name=None):
     """Run a firmware/aibom SBOM scan in a SIBLING container.
 
@@ -1053,14 +1073,18 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     socket — the same sibling pattern entrypoint.sh uses for cdxgen language
     images. The sibling runs the FULL run-scan pipeline (generate + normalize +
     notice + security + sign) with MODE set, writing finished artifacts straight
-    into the shared host output dir, which is also THIS container's OUTPUT_DIR.
-    So the base container just streams the sibling's log and then summarizes the
+    into the run's output dir, which is under THIS container's OUTPUT_DIR. So the
+    base container just streams the sibling's log and then summarizes the
     artifacts exactly as it does for an in-process scan.
 
-    Mounts (host paths — the sibling is launched by the host daemon, which can
-    only bind-mount host paths):
-      host_out  -> /host-output  (shared artifacts; == our OUTPUT_DIR)
-      host_file -> /input/<name> read-only (firmware upload)  [firmware only]
+    Sharing is by --volumes-from THIS container, NOT by host-path bind mounts: a
+    host path (e.g. a Windows drive path C:/…) cannot be consumed by the
+    in-container Linux docker CLI (the ':' splits the -v spec), which silently
+    broke firmware/AI on Windows. --volumes-from replays the daemon's already
+    resolved OUTPUT_DIR mount, so both `out_dir` and `upload_file` (both container
+    paths under OUTPUT_DIR) are visible at the same paths on every host OS.
+      out_dir      the run's output dir (HOST_OUTPUT_DIR / -w; == run_out)
+      upload_file  the firmware upload, read in place as TARGET_FILE  [firmware only]
     The host socket is mounted so the firmware image can, in turn, do its own
     work; AIBOM needs only outbound network (HuggingFace).
 
@@ -1086,18 +1110,23 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
         return -1
     # Pin MODE to the exact matched literal (drops the caller's string identity).
     mode = _SIBLING_MODES[_SIBLING_MODES.index(mode)]
-    _m = _HOSTPATH_RE.fullmatch(host_out) if host_out else None
-    if _m is None:
-        on_log("[ui] cannot launch sibling: host output dir unknown or unsafe "
-               "(SBOM_UI_HOST_DIR unset — relaunch the UI via the desktop app or scan-sbom.sh --ui)")
+    # Share via --volumes-from THIS container; we need its id.
+    self_cid = _self_container_id()
+    if not self_cid:
+        on_log("[ui] cannot launch sibling: could not determine this container's id "
+               "for --volumes-from")
         return -1
-    host_out = _m.group(0)
-    if host_file is not None:
-        _m = _HOSTPATH_RE.fullmatch(host_file)
-        if _m is None:
-            on_log("[ui] refusing to launch sibling: unsafe host input path")
-            return -1
-        host_file = _m.group(0)
+    # out_dir and upload_file are container paths passed into the sibling's -w /
+    # HOST_OUTPUT_DIR / TARGET_FILE (never a -v spec, so no ':' split concern; the
+    # subprocess list carries them as single argv values, so no shell parsing). Guard
+    # each by CONTAINMENT — it must resolve inside OUTPUT_DIR / UPLOAD_DIR — which also
+    # keeps a traversal-crafted path from escaping the shared tree.
+    if not out_dir or not _path_under(out_dir, OUTPUT_DIR):
+        on_log("[ui] cannot launch sibling: output dir is outside OUTPUT_DIR")
+        return -1
+    if upload_file is not None and not _path_under(upload_file, UPLOAD_DIR):
+        on_log("[ui] refusing to launch sibling: upload is outside the uploads dir")
+        return -1
     if model_id is not None:
         _m = _MODEL_RE.fullmatch(model_id)
         if _m is None:
@@ -1124,12 +1153,14 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
     args = [
         "docker", "run", "--rm",
         *(["--name", safe_name] if safe_name else []),
-        "-v", "%s:/host-output" % host_out,  # host_out passed _HOSTPATH_RE above
+        # Inherit THIS container's mounts (incl. OUTPUT_DIR) instead of bind-mounting a
+        # host path — a Windows drive path cannot be consumed by the in-container CLI.
+        "--volumes-from", self_cid,
         "-v", "/var/run/docker.sock:/var/run/docker.sock",
         "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
         "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
         "-e", "PROJECT_VERSION=%s" % _env_flag_value(env.get("PROJECT_VERSION", "")),
-        "-e", "HOST_OUTPUT_DIR=/host-output",
+        "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
@@ -1144,20 +1175,17 @@ def run_sibling_scan(image, mode, host_out, on_log, *, host_file=None, model_id=
             args += ["-e", "CVE_BIN_TOOL_DISABLE_SOURCES=GAD"]
         if env.get("CVE_BIN_TOOL_MODE") == "online":
             args += ["-e", "CVE_BIN_TOOL_MODE=online"]
-    if host_file is not None:
-        # Mount the upload read-only under a fixed in-sibling path. Reduce to a
-        # bare basename and take it from the allowlist match so the in-sibling
-        # path is a single charset-constrained file name (host_file itself was
-        # rebound from _HOSTPATH_RE above).
-        _bm = _BASENAME_RE.fullmatch(os.path.basename(host_file))
-        base = _bm.group(0) if _bm else "upload.bin"
-        args += ["-v", "%s:/input/%s:ro" % (host_file, base),
-                 "-e", "TARGET_FILE=/input/%s" % base]
+    if upload_file is not None:
+        # The upload lives under UPLOAD_DIR (inside OUTPUT_DIR), so --volumes-from
+        # already exposes it at this same container path — read it in place, no extra
+        # mount. Contained in UPLOAD_DIR (checked above) and passed as a single argv
+        # value, so an odd upload filename cannot inject a flag or split a mount.
+        args += ["-e", "TARGET_FILE=%s" % upload_file]
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
-    # The sibling writes into /host-output; run-scan also cds there via cwd.
-    args += ["-w", "/host-output", "--entrypoint", "/usr/local/bin/run-scan", image]
+    # The sibling writes into the run's output dir; run-scan also cds there via cwd.
+    args += ["-w", out_dir, "--entrypoint", "/usr/local/bin/run-scan", image]
 
     # Pull progress first so the (heavy, one-time) firmware/aibom image download
     # shows up in the live log rather than as a silent stall.
@@ -1600,7 +1628,7 @@ class Handler(BaseHTTPRequestHandler):
         cleanup_dir = None
         mode = None
         # When set, run the scan in a SIBLING container (firmware/aibom image)
-        # instead of in-process run-scan. dict: {image, host_file?, model_id?}.
+        # instead of in-process run-scan. dict: {image, upload_file?, model_id?}.
         sibling = None
 
         try:
@@ -1717,13 +1745,10 @@ class Handler(BaseHTTPRequestHandler):
                     pass
                 elif docker_cli_present() and docker_capable():
                     # Permissive-only base UI image: hand the GPL-isolated firmware
-                    # image the job as a sibling container. It needs the HOST path
-                    # of the upload (the host daemon bind-mounts host paths only).
-                    host_file = host_path_of(up)
-                    if not host_file:
-                        fail("Cannot reach the firmware image: host output dir unknown "
-                             "(relaunch the UI via the desktop app or scan-sbom.sh --ui)."); return
-                    sibling = {"image": FIRMWARE_IMAGE, "host_file": host_file}
+                    # image the job as a sibling container. It reads the upload in place
+                    # via --volumes-from (up is a container path under UPLOAD_DIR), so no
+                    # host path is needed.
+                    sibling = {"image": FIRMWARE_IMAGE, "upload_file": up}
                 else:
                     fail("Firmware analysis requires Docker (to run the firmware image) "
                          "or relaunching the UI from the firmware image."); return
@@ -1764,14 +1789,13 @@ class Handler(BaseHTTPRequestHandler):
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
-                # the full pipeline and writes artifacts into the shared host
-                # output dir, which is also our run_out folder — so the summary
-                # below reads them just like an in-process scan.
-                host_out = host_path_of(run_out)
+                # the full pipeline and writes artifacts into our run_out folder
+                # (shared via --volumes-from) — so the summary below reads them
+                # just like an in-process scan.
                 rc = run_sibling_scan(
-                    sibling["image"], env["MODE"], host_out,
+                    sibling["image"], env["MODE"], run_out,
                     lambda ln: sse("log", json.dumps(ln)),
-                    host_file=sibling.get("host_file"),
+                    upload_file=sibling.get("upload_file"),
                     model_id=sibling.get("model_id"),
                     extra_env=env,
                     on_progress=lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
