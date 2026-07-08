@@ -51,6 +51,13 @@ if bash "$LIB/merge-sbom.sh" "$WORK/merged.json" "App" "1.0" \
     jq -e '[.components[]? | select((.purl//"")|startswith("pkg:cocoapods/")) | .properties[]? | select(.name=="bomlens:layer" and .value=="cocoapods")] | length >= 1' "$WORK/merged.json" >/dev/null 2>&1 \
         && pass "cocoapods provenance (bomlens:layer) retained through merge" \
         || fail "cocoapods provenance lost in merge"
+    # dependency graph carried through the merge (Moya -> Moya/Core -> Alamofire)
+    jq -e '[.dependencies[]? | select(.ref=="pkg:cocoapods/Moya@15.0.0" and (.dependsOn|index("pkg:cocoapods/Moya%2FCore@15.0.0")))] | length == 1' "$WORK/merged.json" >/dev/null 2>&1 \
+        && pass "dependency edge Moya -> Moya/Core preserved through merge" \
+        || fail "dependency edge Moya -> Moya/Core missing after merge"
+    jq -e '[.dependencies[]? | select(.ref=="pkg:cocoapods/Moya%2FCore@15.0.0" and (.dependsOn|index("pkg:cocoapods/Alamofire@5.8.1")))] | length == 1' "$WORK/merged.json" >/dev/null 2>&1 \
+        && pass "transitive edge Moya/Core -> Alamofire preserved through merge" \
+        || fail "transitive edge Moya/Core -> Alamofire missing after merge"
 else
     fail "merge-sbom.sh failed on cocoapods aux SBOM"
 fi
@@ -63,6 +70,7 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     # possibly-stale published image. --network none proves no `pod`/network dependency.
     if docker run --rm --network none \
         -v "$LIB/identify-cocoapods.sh":/usr/local/lib/sbom/identify-cocoapods.sh:ro \
+        -v "$LIB/parse-podfile-lock.py":/usr/local/lib/sbom/parse-podfile-lock.py:ro \
         -v "$FIX/ios-cocoapods":/src:ro \
         --entrypoint bash "$IMG" \
         -c '/usr/local/lib/sbom/identify-cocoapods.sh /src /tmp/coco.json 1.0 >/dev/null 2>&1; cat /tmp/coco.json' \
@@ -74,6 +82,10 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
         jq -e '[.components[]? | select(.name=="Alamofire")] | length == 1' "$WORK/coco.json" >/dev/null 2>&1 \
             && pass "transitive pod (Alamofire) identified by syft" \
             || fail "transitive pod (Alamofire) missing from syft output"
+        # graph reconstructed from Podfile.lock nested lists
+        jq -e '[.dependencies[]? | select(.ref=="pkg:cocoapods/Moya%2FCore@15.0.0" and (.dependsOn|index("pkg:cocoapods/Alamofire@5.8.1")))] | length == 1' "$WORK/coco.json" >/dev/null 2>&1 \
+            && pass "dependency graph rebuilt from Podfile.lock (Moya/Core -> Alamofire)" \
+            || fail "dependency graph edge missing from identify-cocoapods output"
     else
         fail "identify-cocoapods.sh did not produce a valid SBOM in image $IMG"
     fi

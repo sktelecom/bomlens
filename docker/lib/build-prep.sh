@@ -233,6 +233,14 @@ fi
 # name/version post-hoc (and covers the syft fallback path), so dropping them lets
 # cdxgen keep its ecosystem-correct, fully-linked root graph.
 set -- -r --spec-version "$SPEC" -o "$OUT"
+# CocoaPods: cdxgen's cataloger shells out to the `pod` CLI, which the swift image does
+# not bundle. With a Podfile present it does not just skip — it throws
+# (TypeError on an undefined `pod` stdout) and aborts the whole scan. Exclude the type so
+# cdxgen resolves SPM only; BomLens fills CocoaPods from Podfile.lock via syft in
+# post-processing (identify-cocoapods.sh).
+if find . -name Podfile -type f 2>/dev/null | grep -q .; then
+    set -- "$@" --exclude-type cocoapods
+fi
 set -- "$@" "$SRC"
 
 # --- locate cdxgen (path differs per image) and generate the SBOM ---

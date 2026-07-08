@@ -7,11 +7,15 @@
     "properties": [ { "name": "bomlens:cocoapods:status", "value": "matched" } ]
   },
   "components": [
-    { "type": "library", "name": "Alamofire", "version": "5.8.1", "purl": "pkg:cocoapods/Alamofire@5.8.1",
+    { "bom-ref": "pkg:cocoapods/Alamofire@5.8.1", "type": "library", "name": "Alamofire", "version": "5.8.1", "purl": "pkg:cocoapods/Alamofire@5.8.1",
       "properties": [ { "name": "bomlens:layer", "value": "cocoapods" }, { "name": "bomlens:identifiedBy", "value": "syft" } ] },
-    { "type": "library", "name": "Moya", "version": "15.0.0", "purl": "pkg:cocoapods/Moya@15.0.0",
+    { "bom-ref": "pkg:cocoapods/Moya@15.0.0", "type": "library", "name": "Moya", "version": "15.0.0", "purl": "pkg:cocoapods/Moya@15.0.0",
       "properties": [ { "name": "bomlens:layer", "value": "cocoapods" }, { "name": "bomlens:identifiedBy", "value": "syft" } ] },
-    { "type": "library", "name": "Moya/Core", "version": "15.0.0", "purl": "pkg:cocoapods/Moya%2FCore@15.0.0",
+    { "bom-ref": "pkg:cocoapods/Moya%2FCore@15.0.0", "type": "library", "name": "Moya/Core", "version": "15.0.0", "purl": "pkg:cocoapods/Moya%2FCore@15.0.0",
       "properties": [ { "name": "bomlens:layer", "value": "cocoapods" }, { "name": "bomlens:identifiedBy", "value": "syft" } ] }
+  ],
+  "dependencies": [
+    { "ref": "pkg:cocoapods/Moya@15.0.0", "dependsOn": [ "pkg:cocoapods/Moya%2FCore@15.0.0" ] },
+    { "ref": "pkg:cocoapods/Moya%2FCore@15.0.0", "dependsOn": [ "pkg:cocoapods/Alamofire@5.8.1" ] }
   ]
 }

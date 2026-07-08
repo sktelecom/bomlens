@@ -27,6 +27,7 @@ set -e
 SRC="$1"
 OUTPUT="$2"
 VERSION="${3:-unknown}"
+SELFDIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
     echo "[cocoapods] source directory not found: $SRC" >&2
@@ -101,11 +102,14 @@ $LOCKS
 EOF
 
 # Assemble components: dedupe by purl, keep name/version/licenses, tag provenance so the
-# UI and downstream steps can tell these apart from the package-manager scan.
+# UI and downstream steps can tell these apart from the package-manager scan. bom-ref is
+# set to the purl so the dependency edges below (and the merge in entrypoint.sh) link to
+# these exact components.
 COMPS_FILE="$WORK/comps.json"
 jq -s '
     [ .[]
-      | { type: (.type // "library"),
+      | { "bom-ref": (.purl // ((.name // "") + "@" + (.version // ""))),
+          type: (.type // "library"),
           name: .name,
           version: (.version // ""),
           purl: (.purl // null),
@@ -126,8 +130,40 @@ fi
 NCOMP=$(jq 'length' "$COMPS_FILE" 2>/dev/null || echo 0)
 if [ "${NCOMP:-0}" -gt 0 ]; then STATUS="matched"; else STATUS="no-match"; fi
 
+# Dependency graph. syft emits components but no edges; rebuild them from Podfile.lock's
+# nested PODS lists (each pod's indented children are its sub-dependencies), keyed by the
+# component bom-refs (= purls) so merge-sbom.sh unions them into the final graph. Names
+# are mapped to refs via the syft component set — never reconstructed — so a ref always
+# matches an emitted component. Best-effort: any parse issue leaves dependencies empty.
+NAME2REF="$WORK/name2ref.json"
+jq 'map({ (.name): (."bom-ref") }) | add // {}' "$COMPS_FILE" > "$NAME2REF" 2>/dev/null || echo '{}' > "$NAME2REF"
+DEPS_NDJSON="$WORK/deps.ndjson"
+: > "$DEPS_NDJSON"
+if command -v python3 >/dev/null 2>&1; then
+    while IFS= read -r lock; do
+        [ -n "$lock" ] || continue
+        python3 "$SELFDIR/parse-podfile-lock.py" "$lock" "$NAME2REF" >> "$DEPS_NDJSON" 2>/dev/null || true
+    done <<EOF
+$LOCKS
+EOF
+fi
+
+DEPS_FILE="$WORK/deps.json"
+# Union edges across lockfiles by ref; drop empties. `jq -s` slurps the newline-delimited
+# edge objects into one array (do NOT `add` — that would merge the objects, not the list).
+jq -s '
+    group_by(.ref)
+    | map({ ref: .[0].ref, dependsOn: ([ .[].dependsOn[]? ] | unique) })
+    | map(select((.ref != null) and ((.dependsOn | length) > 0)))
+' "$DEPS_NDJSON" > "$DEPS_FILE" 2>/dev/null || echo '[]' > "$DEPS_FILE"
+if [ ! -s "$DEPS_FILE" ] || ! jq -e 'type=="array"' "$DEPS_FILE" >/dev/null 2>&1; then
+    echo '[]' > "$DEPS_FILE"
+fi
+NEDGES=$(jq '[.[].dependsOn[]?] | length' "$DEPS_FILE" 2>/dev/null || echo 0)
+
 jq -n \
     --slurpfile comps "$COMPS_FILE" \
+    --slurpfile deps "$DEPS_FILE" \
     --arg version "$VERSION" \
     --arg ts "$GEN_AT" \
     --arg status "$STATUS" '
@@ -141,7 +177,8 @@ jq -n \
     component: { type: "application", name: "cocoapods", version: $version },
     properties: [ { name: "bomlens:cocoapods:status", value: $status } ]
   },
-  components: $comps[0]
+  components: $comps[0],
+  dependencies: $deps[0]
 }' > "$OUTPUT"
 
-echo "[cocoapods] SBOM written: $OUTPUT (cocoapods components=${NCOMP})"
+echo "[cocoapods] SBOM written: $OUTPUT (cocoapods components=${NCOMP}, dependency edges=${NEDGES})"
