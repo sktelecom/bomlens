@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.7.0] - 2026-07-08
+
 ### Added
 
+- iOS apps are now supported: a CocoaPods `Podfile.lock` or a Swift Package Manager `Package.resolved` is read into the SBOM with the full transitive pod/package set, and — for CocoaPods — the dependency graph reconstructed from the lockfile. Resolution is lockfile-first, so it runs offline and needs neither the `pod` CLI nor macOS. (cdxgen's own CocoaPods path requires `pod`, which the Swift image does not carry, and it aborted the scan when a `Podfile` was present.)
 - The web UI can upload the generated SBOM to a Dependency-Track or TRUSCA server (previously CLI-only). New scan has an optional Upload section for the destination, server URL, API token, and — for TRUSCA — the project id. The token is stashed single-use and the server URL and token are used for that run only, never stored.
 - New scan exposes a "Reproducible output" toggle in the advanced options, surfacing the byte-stable mode that was previously CLI-only. When on, re-scanning the same source produces a byte-for-byte identical SBOM. The toggle is hidden for supplier-SBOM analysis and AI model scans, where it does not apply.
 
@@ -23,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node.js (npm) source scans no longer inflate the SBOM with the `devDependencies` tree (jest, eslint, the Babel toolchain, etc.). The scan is scoped to the deployed `dependencies`, so build and test tooling the app never ships is excluded — the npm analogue of the Android release-scope fix. Set `BOMLENS_NODE_FULL_GRAPH=1` to keep the dev + prod superset.
 - Android (AGP) source scans no longer inflate the SBOM with the build and test toolchain. The scan is scoped to the deployable release runtime classpath, so only the components shipped in the APK are recorded.
 - Firmware scans no longer silently report zero CVEs from a vulnerability database that lacks NVD data. The build gate now rejects a bundled CVE database without a real NVD advisory corpus instead of shipping it.
+- Native Windows source scans work under Git for Windows: docker bind mounts and the Git Bash resolution in `scan-sbom.bat` were corrected so a Windows (MSYS) shell can run a scan instead of failing at container start.
+- Windows web/desktop UI source scans resolve transitive dependencies again. The cdxgen (and firmware/AIBOM) sibling containers were bind-mounted by a Windows drive path (`C:/…`) that the in-container Linux docker CLI cannot consume, so the scan silently fell back to syft (direct dependencies only). The siblings now inherit the UI container's mounts with `--volumes-from`, so they run on every host OS — verified on Windows, where UI and CLI scans now produce identical SBOMs.
+- Firmware security reports are no longer empty. The bundled Trivy could not decode the firmware SBOM's `firmware` root component type and failed the whole scan; Trivy is now retried on an input copy whose root type is coerced to one it accepts, so the vulnerability report is populated while the delivered SBOM keeps its accurate `firmware` type.
 
 ## [v1.6.0] - 2026-07-03
 
