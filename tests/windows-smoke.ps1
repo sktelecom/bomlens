@@ -90,10 +90,13 @@ if (-not (Test-Path $nodejsExample)) {
         } finally {
             Pop-Location
         }
-        $noticeTxt = Join-Path $work 'SmokeApp_0.0.1_NOTICE.txt'
-        $noticeHtml = Join-Path $work 'SmokeApp_0.0.1_NOTICE.html'
+        # scan-sbom.sh 는 각 실행을 <project>_<version>\ 하위 폴더에 쓴다
+        # (SBOM_OUTPUT_FLAT=1 이면 평평하게). 루트가 아니라 그 하위를 본다.
+        $runDir = Join-Path $work 'SmokeApp_0.0.1'
+        $noticeTxt = Join-Path $runDir 'SmokeApp_0.0.1_NOTICE.txt'
+        $noticeHtml = Join-Path $runDir 'SmokeApp_0.0.1_NOTICE.html'
         if ((Test-Path $noticeTxt) -and (Test-Path $noticeHtml)) {
-            Pass "고지문이 호스트 폴더에 생성됨: $work"
+            Pass "고지문이 호스트 폴더에 생성됨: $runDir"
         } elseif ($batOut -match 'Git Bash not found') {
             # bash 해석 단계에서 멈춘 경우. 마운트/파일 공유 문제가 아니다.
             Skip "Git bash 가 없어 scan-sbom.bat 진입점을 검증하지 못했습니다(PATH 의 bash 는 WSL). Git for Windows 설치 또는 SBOM_BASH 지정 후 다시 실행하세요."
@@ -182,7 +185,7 @@ if (-not $bash) {
         } finally {
             Pop-Location
         }
-        if (Test-Path (Join-Path $unshared 'UnsharedApp_0.0.1_bom.json')) {
+        if (Test-Path (Join-Path $unshared 'UnsharedApp_0.0.1' 'UnsharedApp_0.0.1_bom.json')) {
             Skip '이 경로가 파일 공유에 포함되어 함정이 재현되지 않았습니다. 환경에 따라 정상입니다.'
         } else {
             Pass '공유 밖 경로에서는 산출물이 나타나지 않음을 확인(scan-sbom.sh가 이 경우를 오류로 잡음).'
