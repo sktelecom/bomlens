@@ -1,3 +1,7 @@
+---
+description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호출하는 방법. 스크립트를 둘 수 없는 CI 러너, Kubernetes 잡 등의 환경을 위한 안내입니다.
+---
+
 # Docker 이미지 직접 사용
 
 평소에는 [`scan-sbom.sh`](../reference/cli.ko.md) 스크립트 사용을 권장합니다. 스크립트가 언어 감지와 이미지 선택, 볼륨 마운트를 대신 처리하기 때문입니다. 이 문서는 스크립트를 둘 수 없는 환경(CI 러너, 쿠버네티스 잡 등)에서 이미지를 `docker run`으로 직접 호출하는 방법을 설명합니다.
