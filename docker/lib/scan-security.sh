@@ -33,7 +33,24 @@ GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "[security] running Trivy SBOM scan..."
 # --exit-code 0: report-only (never fail the scan pipeline on findings).
-if ! trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$SBOM" 2>/tmp/trivy.err; then
+trivy_ok=""
+if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$SBOM" 2>/tmp/trivy.err; then
+    trivy_ok=1
+elif grep -qi "unmarshal component type\|unsupported type" /tmp/trivy.err && command -v jq >/dev/null 2>&1; then
+    # Trivy 0.70's CycloneDX decoder rejects some valid-but-newer ROOT component types
+    # ("firmware" from a firmware scan is CycloneDX 1.4+), failing the whole decode with
+    # "unsupported type". Retry with the root coerced to a type Trivy accepts; the
+    # delivered SBOM keeps its accurate type — only Trivy's input copy is remapped, and
+    # component types are left untouched, so vulnerability matching is unaffected.
+    trivy_in="$(mktemp)"
+    if jq '.metadata.component.type = "application"' "$SBOM" > "$trivy_in" 2>/dev/null \
+       && trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>/tmp/trivy.err; then
+        echo "[security] Trivy could not decode the SBOM's root component type; re-ran with it coerced to 'application' for Trivy input (delivered SBOM unchanged)."
+        trivy_ok=1
+    fi
+    rm -f "$trivy_in"
+fi
+if [ -z "$trivy_ok" ]; then
     echo "[security] WARN: Trivy scan failed:" >&2
     cat /tmp/trivy.err >&2
     # Emit an empty-but-valid report so downstream steps don't break, but record

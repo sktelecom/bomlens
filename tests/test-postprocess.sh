@@ -531,6 +531,46 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== sec-firmware-type: a root type Trivy cannot decode is retried, not failed =="
+# Regression for the SCA-benchmark report: a firmware scan's root component
+# (metadata.component.type = "firmware", CycloneDX 1.4+) made the bundled Trivy 0.70
+# fail the whole SBOM decode with "unsupported type", emptying the security report.
+# This stub trivy mimics that: it rejects a newer root type and succeeds once the root
+# is coerced to a type it accepts — exactly the retry scan-security.sh now performs.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; sbom=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) out="$2"; shift ;;
+        *.json)   sbom="$1" ;;
+    esac
+    shift
+done
+rt=$(jq -r '.metadata.component.type // ""' "$sbom" 2>/dev/null)
+case "$rt" in
+    firmware|device|platform|data|machine-learning-model|cryptographic-asset)
+        echo "2026-07-03T00:00:00Z	FATAL	Fatal error	failed to parse metadata component: failed to unmarshal component type: unsupported type" >&2
+        exit 1 ;;
+esac
+echo '{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2020-2222","PkgName":"busybox","InstalledVersion":"1.36.0","Severity":"HIGH"}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"firmware","name":"rootfs.squashfs","version":"1.0.0"}},"components":[{"type":"library","name":"busybox","version":"1.36.0","purl":"pkg:generic/busybox@1.36.0"}]}' > "$WORK/fwtype-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/fwtype-bom.json" "$WORK/fwtype" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on the firmware-type retry path"
+[ "$(jq -r '.ScanError.Message // "none"' "$WORK/fwtype_security.json")" = "none" ] \
+    && pass "firmware root type retried with a coerced type -> no ScanError" \
+    || fail "firmware root type still produced a ScanError"
+[ "$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$WORK/fwtype_security.json")" -ge 1 ] \
+    && pass "Trivy vulnerabilities present after the retry" \
+    || fail "no vulnerabilities after the firmware-type retry"
+[ "$(jq -r '.metadata.component.type' "$WORK/fwtype-bom.json")" = "firmware" ] \
+    && pass "delivered SBOM still declares type=firmware (only Trivy's input was remapped)" \
+    || fail "delivered SBOM root type was mutated"
+
 echo "== B-obs: best-effort steps log + mark failures instead of swallowing them =="
 # run_optional_step keeps the "never abort a scan" guarantee of the old
 # `... || true`, but a failed step must now be observable: a WARN line and a
