@@ -25,31 +25,25 @@ examples/
 
 ## 공통 실행 방법
 
-모든 소스 코드 예제는 동일한 방식으로 실행합니다.
+모든 소스 코드 예제는 저장소 루트에서 같은 방식으로 실행합니다. `--target`에 예제 폴더를 지정하고 프로젝트 이름을 정하면, 결과는 `{Project}_{Version}/` 하위 폴더에 저장됩니다. Node.js 예제로 보면 다음과 같습니다.
 
+<!-- runnable -->
 ```bash
-# 1. 예제 디렉토리로 이동
-cd examples/{언어}
+# 1. SBOM 생성 (저장소 루트에서)
+./scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --target examples/nodejs --generate-only
 
-# 2. SBOM 생성
-../../scripts/scan-sbom.sh \
-  --project "{언어}Example" \
-  --version "1.0.0" \
-  --generate-only
-
-# 3. 결과 확인
-python3 -m json.tool *_bom.json | head -60
-# jq 사용 시
-jq '.components | length' *_bom.json
+# 2. 결과 확인
+jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 ```
+
+아래 언어별 절에 그대로 붙여넣을 수 있는 명령을 정리했습니다.
 
 ---
 
 ## Java (Maven)
 
 ```bash
-cd examples/java-maven
-../../scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --target examples/java-maven --generate-only
 ```
 
 감지 파일: `pom.xml`
@@ -70,8 +64,7 @@ cd examples/java-maven
 ## Java (Gradle)
 
 ```bash
-cd examples/java-gradle
-../../scripts/scan-sbom.sh --project "JavaGradleExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "JavaGradleExample" --version "1.0.0" --target examples/java-gradle --generate-only
 ```
 
 감지 파일: `build.gradle` 또는 `build.gradle.kts`
@@ -81,21 +74,19 @@ cd examples/java-gradle
 ## Node.js
 
 ```bash
-cd examples/nodejs
-../../scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --target examples/nodejs --generate-only
 ```
 
 감지 파일: `package.json` + `package-lock.json` (또는 `yarn.lock`, `pnpm-lock.yaml`)
 
-> 주의: 잠금 파일이 없으면 의존성이 불완전하게 잡힙니다. `npm install`을 먼저 실행한 뒤 시도하세요.
+> 주의: 잠금 파일은 실제로 설치된 버전을 정확히 고정합니다. 잠금 파일이 없어도 `package.json`에서 의존성을 찾아내지만, 잠금 파일을 커밋해 두면 결과가 재현 가능해집니다.
 
 ---
 
 ## Python
 
 ```bash
-cd examples/python
-../../scripts/scan-sbom.sh --project "PythonExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "PythonExample" --version "1.0.0" --target examples/python --generate-only
 ```
 
 감지 파일: `requirements.txt` 또는 `pyproject.toml` + `poetry.lock`
@@ -105,8 +96,7 @@ cd examples/python
 ## Go
 
 ```bash
-cd examples/go
-../../scripts/scan-sbom.sh --project "GoExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "GoExample" --version "1.0.0" --target examples/go --generate-only
 ```
 
 감지 파일: `go.mod` + `go.sum`
@@ -118,8 +108,7 @@ cd examples/go
 ## Ruby
 
 ```bash
-cd examples/ruby
-../../scripts/scan-sbom.sh --project "RubyExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "RubyExample" --version "1.0.0" --target examples/ruby --generate-only
 ```
 
 감지 파일: `Gemfile.lock`
@@ -129,8 +118,7 @@ cd examples/ruby
 ## PHP
 
 ```bash
-cd examples/php
-../../scripts/scan-sbom.sh --project "PHPExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "PHPExample" --version "1.0.0" --target examples/php --generate-only
 ```
 
 감지 파일: `composer.lock`
@@ -140,8 +128,7 @@ cd examples/php
 ## Rust
 
 ```bash
-cd examples/rust
-../../scripts/scan-sbom.sh --project "RustExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "RustExample" --version "1.0.0" --target examples/rust --generate-only
 ```
 
 감지 파일: `Cargo.lock`
@@ -151,8 +138,7 @@ cd examples/rust
 ## .NET
 
 ```bash
-cd examples/dotnet
-../../scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --target examples/dotnet --generate-only
 ```
 
 감지 파일: `*.csproj` + `packages.lock.json`
@@ -162,8 +148,7 @@ cd examples/dotnet
 ## Swift / iOS
 
 ```bash
-cd examples/swift
-../../scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --target examples/swift --generate-only
 ```
 
 감지 파일: Swift Package Manager는 `Package.swift` (+ `Package.resolved`), CocoaPods는 `Podfile.lock`.

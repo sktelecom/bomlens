@@ -36,6 +36,8 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 ## 한눈에 보기
 
+아래 모든 명령의 `$SBOM`은 [공통 준비](#공통-준비)에서 정의한 스크립트 경로 변수입니다. 그 단계를 건너뛰었다면 `$SBOM` 자리에 `scan-sbom.sh`의 전체 경로를 그대로 넣으면 됩니다.
+
 | 입력 형태 | 모드 | 핵심 명령(요약) | 산출물 |
 |-----------|------|-----------------|--------|
 | GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 위험분석보고서 |
@@ -51,7 +53,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 ## 시나리오 1 — GitHub URL
 
-개발1팀이 GitHub 저장소 정보를 전달한 경우. 수동 `git clone` 없이 URL을 그대로 전달합니다.
+개발1팀이 GitHub 저장소 정보를 전달한 경우. 수동 `git clone` 없이 URL을 그대로 전달합니다. (`$SBOM`은 [공통 준비](#공통-준비)에서 정의했습니다.)
 
 <!-- runnable -->
 ```bash

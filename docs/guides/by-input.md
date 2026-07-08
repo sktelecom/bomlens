@@ -36,6 +36,8 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 ## At a glance
 
+`$SBOM` in every command below is the script path variable from [Common setup](#common-setup) — if you skipped that step, put the full path to `scan-sbom.sh` in its place.
+
 | Input form | Mode | Core command (summary) | Deliverables |
 |------------|------|------------------------|--------------|
 | GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | notice, SBOM, risk report |
@@ -51,7 +53,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 ## Scenario 1 — GitHub URL
 
-A team handed you a GitHub repository. Pass the URL directly, no manual `git clone`.
+A team handed you a GitHub repository. Pass the URL directly, no manual `git clone`. (`$SBOM` is defined in [Common setup](#common-setup).)
 
 <!-- runnable -->
 ```bash

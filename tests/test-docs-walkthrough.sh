@@ -48,6 +48,7 @@ PUBLISHED_IMG="ghcr.io/sktelecom/bomlens:latest"
 #                             executed only when that exact tag is present.
 TARGETS=$(cat <<'EOF'
 docs/start/first-scan.md       :: root      :: test
+docs/reference/ecosystems.md   :: root      :: test
 docs/guides/by-input.md        :: by-input  :: test
 docs/guides/server-delivery.md :: merge     :: test
 docs/reference/docker-image.md :: dockerimg :: published
@@ -65,6 +66,7 @@ docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.md     ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_security.html   ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.md  ::
 docs/start/first-scan.md :: MyApp_1.0.0/MyApp_1.0.0_risk-report.html ::
+docs/reference/ecosystems.md :: NodeExample_1.0.0/NodeExample_1.0.0_bom.json :: .bomFormat=="CycloneDX" and .specVersion=="1.6"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_bom.json          :: .bomFormat=="CycloneDX"
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_NOTICE.txt        ::
 docs/guides/by-input.md :: team1-app_1.0.0/team1-app_1.0.0_risk-report.md    ::
@@ -243,7 +245,9 @@ while IFS= read -r entry; do
     # direct docker-run pages need sudo to remove on a rootful daemon; fall back
     # to it only if the plain rm leaves the tree behind (no-op locally).
     if [ "$prep" = "root" ]; then
-        rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null || sudo rm -rf "$ROOT/MyApp_1.0.0" 2>/dev/null || true
+        for out in "$ROOT/MyApp_1.0.0" "$ROOT/NodeExample_1.0.0"; do
+            rm -rf "$out" 2>/dev/null || sudo rm -rf "$out" 2>/dev/null || true
+        done
     else
         rm -rf "$wd" 2>/dev/null
         [ -d "$wd" ] && sudo rm -rf "$wd" 2>/dev/null || true
