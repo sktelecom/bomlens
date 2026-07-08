@@ -16,7 +16,7 @@ Download [BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/re
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
-Prefer scripts over an installer? Download the repo ZIP (the green Code button, then Download ZIP), unzip it, and double-click `scripts\sbom-ui.bat` — the same flow, with no console app to install.
+Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step by step in [Path B of the no-CLI quick start](../start/no-cli.md#path-b--zip-and-double-click-batch-file-alternative).
 
 ## Web UI
 
