@@ -6,7 +6,7 @@ hide:
 
 # Generate SBOMs and assess open-source risk, all locally
 
-A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an SBOM (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
+A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
 
 [Get started](start/first-scan.md){ .md-button .md-button--primary }
 [Download for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe){ .md-button }

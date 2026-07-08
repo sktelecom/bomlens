@@ -10,7 +10,7 @@ You do not need to have ever typed a command. This page covers the shortest path
 
 A document that lists the open-source components in a product and their licenses, provided alongside the product when it ships. Many open-source licenses (MIT, Apache-2.0, BSD, and others) require the copyright notice and the full license text to be included with the product, so a notice that gathers them is needed.
 
-This tool analyzes source code to build a component list (an SBOM), then groups components by license to generate two notice files.
+This tool analyzes source code to build a component list (an [SBOM](../concepts/what-is-sbom.md)), then groups components by license to generate two notice files.
 
 - `..._NOTICE.txt` — a text format to ship as-is with the distribution
 - `..._NOTICE.html` — a format that reads well in a browser
