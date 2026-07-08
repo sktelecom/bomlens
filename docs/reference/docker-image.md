@@ -27,10 +27,10 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 | Tool | Version | Role |
 |------|------|------|
 | syft | v1.46.0 | Scans images, binaries, and directories |
-| Trivy | v0.70.0 | Vulnerability report |
+| Trivy | v0.72.0 | Vulnerability report |
 | cosign | v2.4.1 | SBOM signing |
 | jq | — | SBOM normalization and notice generation |
-| ScanCode Toolkit | 32.3.0 | Precise license detection (included only in opt-in builds) |
+| ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
 
 Tool versions are pinned with `ARG` in `docker/Dockerfile`.
 
