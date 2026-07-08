@@ -25,31 +25,25 @@ examples/
 
 ## Common run steps
 
-Every source-code example runs the same way.
+Every source-code example runs the same way from the repository root: point `--target` at the example folder and pick a project name. The results are saved in a `{Project}_{Version}/` subfolder. For the Node.js example:
 
+<!-- runnable -->
 ```bash
-# 1. Move into the example directory
-cd examples/{language}
+# 1. Generate the SBOM (from the repository root)
+./scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --target examples/nodejs --generate-only
 
-# 2. Generate the SBOM
-../../scripts/scan-sbom.sh \
-  --project "{language}Example" \
-  --version "1.0.0" \
-  --generate-only
-
-# 3. Check the result
-python3 -m json.tool *_bom.json | head -60
-# with jq
-jq '.components | length' *_bom.json
+# 2. Check the result
+jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 ```
+
+The sections below give the ready-to-paste command for each language.
 
 ---
 
 ## Java (Maven)
 
 ```bash
-cd examples/java-maven
-../../scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --target examples/java-maven --generate-only
 ```
 
 Detected file: `pom.xml`
@@ -70,8 +64,7 @@ Detected file: `pom.xml`
 ## Java (Gradle)
 
 ```bash
-cd examples/java-gradle
-../../scripts/scan-sbom.sh --project "JavaGradleExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "JavaGradleExample" --version "1.0.0" --target examples/java-gradle --generate-only
 ```
 
 Detected file: `build.gradle` or `build.gradle.kts`
@@ -81,8 +74,7 @@ Detected file: `build.gradle` or `build.gradle.kts`
 ## Node.js
 
 ```bash
-cd examples/nodejs
-../../scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --target examples/nodejs --generate-only
 ```
 
 Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.yaml`)
@@ -94,8 +86,7 @@ Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.
 ## Python
 
 ```bash
-cd examples/python
-../../scripts/scan-sbom.sh --project "PythonExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "PythonExample" --version "1.0.0" --target examples/python --generate-only
 ```
 
 Detected file: `requirements.txt`, or `pyproject.toml` + `poetry.lock`
@@ -105,8 +96,7 @@ Detected file: `requirements.txt`, or `pyproject.toml` + `poetry.lock`
 ## Go
 
 ```bash
-cd examples/go
-../../scripts/scan-sbom.sh --project "GoExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "GoExample" --version "1.0.0" --target examples/go --generate-only
 ```
 
 Detected file: `go.mod` + `go.sum`
@@ -118,8 +108,7 @@ Detected file: `go.mod` + `go.sum`
 ## Ruby
 
 ```bash
-cd examples/ruby
-../../scripts/scan-sbom.sh --project "RubyExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "RubyExample" --version "1.0.0" --target examples/ruby --generate-only
 ```
 
 Detected file: `Gemfile.lock`
@@ -129,8 +118,7 @@ Detected file: `Gemfile.lock`
 ## PHP
 
 ```bash
-cd examples/php
-../../scripts/scan-sbom.sh --project "PHPExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "PHPExample" --version "1.0.0" --target examples/php --generate-only
 ```
 
 Detected file: `composer.lock`
@@ -140,8 +128,7 @@ Detected file: `composer.lock`
 ## Rust
 
 ```bash
-cd examples/rust
-../../scripts/scan-sbom.sh --project "RustExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "RustExample" --version "1.0.0" --target examples/rust --generate-only
 ```
 
 Detected file: `Cargo.lock`
@@ -151,8 +138,7 @@ Detected file: `Cargo.lock`
 ## .NET
 
 ```bash
-cd examples/dotnet
-../../scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --target examples/dotnet --generate-only
 ```
 
 Detected file: `*.csproj` + `packages.lock.json`
@@ -162,8 +148,7 @@ Detected file: `*.csproj` + `packages.lock.json`
 ## Swift / iOS
 
 ```bash
-cd examples/swift
-../../scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --generate-only
+./scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --target examples/swift --generate-only
 ```
 
 Detected files: `Package.swift` (+ `Package.resolved`) for Swift Package Manager, or `Podfile.lock` for CocoaPods.

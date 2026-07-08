@@ -62,12 +62,12 @@ Enter a project name and version, pick a scan target (current folder, GitHub URL
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest   # aliases: sbom-generator and sbom-scanner serve the same image
-./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
+./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target examples/nodejs --all --generate-only
 ```
 
 On Windows, run the same command through `scripts\scan-sbom.bat` (Git for Windows required). Other inputs — GitHub URL, source archive, Docker image, firmware — and every option are in the [input-scenarios guide](docs/guides/by-input.md) and the [CLI reference](docs/reference/cli.md).
 
-Outputs (`{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy).
+Outputs (in a `{Project}_{Version}/` subfolder, files prefixed `{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy).
 
 ## Documentation
 
