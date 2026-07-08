@@ -27,7 +27,7 @@ cd examples/dotnet
 
 ## Expected Output
 
-The scan generates `DotNetExample_1.0.0_bom.json` with roughly 50–60 NuGet packages:
+The scan writes its outputs into a `DotNetExample_1.0.0/` folder (`DotNetExample_1.0.0_bom.json` and related files). The SBOM lists roughly 50–60 NuGet packages:
 
 - Newtonsoft.Json
 - Serilog and Serilog.AspNetCore with its sinks
@@ -52,10 +52,10 @@ dotnet run
 
 ```bash
 # Count components
-jq '.components | length' DotNetExample_1.0.0_bom.json
+jq '.components | length' DotNetExample_1.0.0/DotNetExample_1.0.0_bom.json
 
 # List all packages
-jq -r '.components[].name' DotNetExample_1.0.0_bom.json | sort -u
+jq -r '.components[].name' DotNetExample_1.0.0/DotNetExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues

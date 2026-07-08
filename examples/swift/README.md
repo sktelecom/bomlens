@@ -26,7 +26,7 @@ cd examples/swift
 
 ## Expected Output
 
-The scan generates `SwiftExample_1.0.0_bom.json` with swift-argument-parser, swift-log, and the transitive packages they pull in.
+The scan writes its outputs into a `SwiftExample_1.0.0/` folder (`SwiftExample_1.0.0_bom.json` and related files). The SBOM lists swift-argument-parser, swift-log, and the transitive packages they pull in.
 
 ### Sample Components
 
@@ -46,10 +46,10 @@ Requires a Swift toolchain (Linux or macOS).
 
 ```bash
 # Count components
-jq '.components | length' SwiftExample_1.0.0_bom.json
+jq '.components | length' SwiftExample_1.0.0/SwiftExample_1.0.0_bom.json
 
 # List all packages
-jq -r '.components[].name' SwiftExample_1.0.0_bom.json | sort -u
+jq -r '.components[].name' SwiftExample_1.0.0/SwiftExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues

@@ -27,7 +27,7 @@ cd examples/php
 
 ## Expected Output
 
-The scan generates `PHPExample_1.0.0_bom.json` containing:
+The scan writes its outputs into a `PHPExample_1.0.0/` folder. The main SBOM, `PHPExample_1.0.0/PHPExample_1.0.0_bom.json`, contains:
 
 - Slim and its PSR-7 dependencies (psr/http-message, nikic/fast-route, etc.)
 - Monolog and psr/log
@@ -54,13 +54,13 @@ curl http://localhost:8080/
 
 ```bash
 # Count components
-jq '.components | length' PHPExample_1.0.0_bom.json
+jq '.components | length' PHPExample_1.0.0/PHPExample_1.0.0_bom.json
 
 # View the Slim entry
-jq '.components[] | select(.name | contains("slim"))' PHPExample_1.0.0_bom.json
+jq '.components[] | select(.name | contains("slim"))' PHPExample_1.0.0/PHPExample_1.0.0_bom.json
 
 # List all packages
-jq -r '.components[].name' PHPExample_1.0.0_bom.json | sort -u
+jq -r '.components[].name' PHPExample_1.0.0/PHPExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues

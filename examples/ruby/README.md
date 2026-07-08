@@ -29,7 +29,7 @@ cd examples/ruby
 
 ## Expected Output
 
-The scan generates `RubyExample_1.0.0_bom.json` containing:
+The scan writes its outputs into a `RubyExample_1.0.0/` folder. The main SBOM, `RubyExample_1.0.0/RubyExample_1.0.0_bom.json`, contains:
 - ~10-15 total components (including transitive dependencies)
 - Sinatra and its dependencies (rack, tilt, mustermann, etc.)
 - Puma and Rack
@@ -63,13 +63,13 @@ curl http://localhost:4567/health
 
 ```bash
 # Count components
-jq '.components | length' RubyExample_1.0.0_bom.json
+jq '.components | length' RubyExample_1.0.0/RubyExample_1.0.0_bom.json
 
 # View the Sinatra entry
-jq '.components[] | select(.name == "sinatra")' RubyExample_1.0.0_bom.json
+jq '.components[] | select(.name == "sinatra")' RubyExample_1.0.0/RubyExample_1.0.0_bom.json
 
 # List all gems
-jq -r '.components[] | .name' RubyExample_1.0.0_bom.json | sort -u
+jq -r '.components[] | .name' RubyExample_1.0.0/RubyExample_1.0.0_bom.json | sort -u
 ```
 
 ## Common Issues

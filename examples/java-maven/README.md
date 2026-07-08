@@ -39,7 +39,7 @@ cd examples/java-maven
   --generate-only
 ```
 
-결과로 `JavaMavenExample_1.0.0_bom.json` 파일이 생성됩니다.
+결과는 `JavaMavenExample_1.0.0/` 폴더에 저장됩니다(`JavaMavenExample_1.0.0_bom.json` 등).
 
 ### 방법 2: Docker 직접 사용
 
@@ -54,6 +54,8 @@ docker run --rm \
   -e PROJECT_VERSION="1.0.0" \
   ghcr.io/sktelecom/bomlens:latest
 ```
+
+이 방법은 스크립트와 달리 출력 폴더에 바로(하위 폴더 없이) 저장됩니다.
 
 ### 방법 3: Maven 플러그인 사용
 
@@ -121,13 +123,13 @@ docker run -p 8080:8080 java-example:latest
 
 ```bash
 # SBOM 파일 확인
-ls -lh JavaMavenExample_1.0.0_bom.json
+ls -lh JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json
 
 # 컴포넌트 개수 확인 (jq 필요)
-cat JavaMavenExample_1.0.0_bom.json | jq '.components | length'
+cat JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json | jq '.components | length'
 
 # 주요 의존성 확인
-cat JavaMavenExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("spring")) | "\(.name)@\(.version)"'
+cat JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("spring")) | "\(.name)@\(.version)"'
 ```
 
 예상 컴포넌트 수는 약 50-80개입니다(전이적 의존성 포함).

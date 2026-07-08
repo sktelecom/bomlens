@@ -29,7 +29,7 @@ cd examples/java-gradle
 
 ## Expected Output
 
-The scan generates `JavaGradle_1.0.0_bom.json` containing:
+The scan writes its outputs into a `JavaGradle_1.0.0/` folder. The main SBOM, `JavaGradle_1.0.0/JavaGradle_1.0.0_bom.json`, contains:
 - ~18-28 total components (including transitive dependencies)
 <!-- expected-components: 18-28 -->
 - Guava and its dependencies
@@ -58,13 +58,13 @@ The scan generates `JavaGradle_1.0.0_bom.json` containing:
 
 ```bash
 # Count components
-jq '.components | length' JavaGradle_1.0.0_bom.json
+jq '.components | length' JavaGradle_1.0.0/JavaGradle_1.0.0_bom.json
 
 # View Guava entry
-jq '.components[] | select(.name == "guava")' JavaGradle_1.0.0_bom.json
+jq '.components[] | select(.name == "guava")' JavaGradle_1.0.0/JavaGradle_1.0.0_bom.json
 
 # List all dependencies
-jq -r '.components[].name' JavaGradle_1.0.0_bom.json | sort
+jq -r '.components[].name' JavaGradle_1.0.0/JavaGradle_1.0.0_bom.json | sort
 ```
 
 ## Common Issues
