@@ -159,16 +159,21 @@ cd examples/dotnet
 
 ---
 
-## Swift
+## Swift / iOS
 
 ```bash
 cd examples/swift
 ../../scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --generate-only
 ```
 
-감지 파일: `Package.swift` (+ `Package.resolved`)
+감지 파일: Swift Package Manager는 `Package.swift` (+ `Package.resolved`), CocoaPods는 `Podfile.lock`.
 
-> 주의: `Package.resolved`가 있어야 의존성이 정확히 잡힙니다. `swift package resolve`를 먼저 실행한 뒤 시도하세요.
+의존성은 커밋된 잠금 파일에서 읽으므로 스캔에 함께 포함하세요.
+
+- Swift Package Manager: `Package.resolved` (없으면 `swift package resolve`를 먼저 실행).
+- CocoaPods: `Podfile.lock` (`pod install`로 생성). BomLens가 이 파일을 직접 파싱하므로 스캔 장비에 macOS나 CocoaPods 설치가 필요 없습니다.
+
+> 주의: UIKit 등 Xcode가 관리하는 플랫폼 의존성은 macOS가 필요하며 Linux 스캐너에서는 해석되지 않습니다.
 
 ---
 

@@ -159,16 +159,21 @@ Detected file: `*.csproj` + `packages.lock.json`
 
 ---
 
-## Swift
+## Swift / iOS
 
 ```bash
 cd examples/swift
 ../../scripts/scan-sbom.sh --project "SwiftExample" --version "1.0.0" --generate-only
 ```
 
-Detected file: `Package.swift` (+ `Package.resolved`)
+Detected files: `Package.swift` (+ `Package.resolved`) for Swift Package Manager, or `Podfile.lock` for CocoaPods.
 
-> Note: `Package.resolved` is required for dependencies to be captured accurately. Run `swift package resolve` first, then try again.
+Dependencies are read from the committed lockfiles, so include them in the scan:
+
+- Swift Package Manager: `Package.resolved` (run `swift package resolve` first if it is missing).
+- CocoaPods: `Podfile.lock` (produced by `pod install`). BomLens parses it directly, so the scanning machine needs neither macOS nor a CocoaPods install.
+
+> Note: UIKit and other Xcode-driven platform dependencies require macOS and are not resolved in the Linux scanner.
 
 ---
 

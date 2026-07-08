@@ -163,13 +163,20 @@ if [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
       || pip3 install -q --break-system-packages -r requirements.txt 2>/dev/null
 fi
 
-# Swift / SPM — cdxgen marks swift transitive as unsupported; resolve generates
-# Package.resolved so cdxgen sees the graph. CocoaPods (Podfile.lock) needs no
-# prep (cdxgen parses the lockfile). NOTE: iOS-platform (UIKit) / Xcode-driven
-# resolution needs macOS — on Linux only non-platform Swift deps resolve.
+# Swift / SPM — cdxgen reads Package.resolved for the resolved graph, and parses it
+# offline (verified: both the v1 `object.pins` and v2 top-level `pins` formats). Only run
+# `swift package resolve` when NO Package.resolved is committed: a committed lockfile is
+# already the resolved truth, and re-resolving reaches the network, where a partial fetch
+# leaves versions "unspecified" and drags in unrelated tooling. CocoaPods (Podfile.lock)
+# needs no prep here — it is filled from the lockfile by syft in post-processing. NOTE:
+# UIKit/Xcode-driven resolution needs macOS; on Linux only non-platform Swift deps resolve.
 if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
-    log "swift package resolve"
-    swift package resolve >/dev/null 2>&1 || true
+    if find . -name Package.resolved -type f 2>/dev/null | grep -q .; then
+        log "swift: committed Package.resolved present; skipping network resolve"
+    else
+        log "swift package resolve (no committed Package.resolved)"
+        swift package resolve >/dev/null 2>&1 || true
+    fi
 fi
 
 # Node (npm) — cdxgen reads package.json's devDependencies and pulls the whole dev

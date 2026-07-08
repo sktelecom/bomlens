@@ -544,8 +544,8 @@ if [ "$MODE" = "SOURCE" ]; then
         CDX_IMG=$(img_for_lang "$LANG_DET")
         echo "[INFO] Language: $LANG_DET -> $CDX_IMG"
         if [ "$LANG_DET" = "swift" ]; then
-            echo "[WARN] iOS/Swift: CocoaPods(Podfile.lock) resolves fully; SPM is augmented via 'swift package resolve'."
-            echo "[WARN]   iOS-platform (UIKit) and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
+            echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
+            echo "[WARN]   UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
         fi
         if [ "$LANG_DET" = "cpp" ]; then
             echo "[WARN] C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
