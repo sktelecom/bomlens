@@ -92,6 +92,7 @@ plugins:
           nav_translations:
             Home: 홈
             Get started: 빠른 시작
+            What is an SBOM: SBOM이란
             First scan: 시작하기
             No-CLI quickstart: 비개발자 빠른 시작
             Web UI & app: 웹 UI·데스크톱
@@ -143,6 +144,7 @@ validation:
 nav:
   - Home: index.md
   - Get started:
+      - What is an SBOM: concepts/what-is-sbom.md
       - First scan: start/first-scan.md
       - No-CLI quickstart: start/no-cli.md
       - Web UI & app: reference/ui.md

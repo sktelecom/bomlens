@@ -26,6 +26,7 @@ fail=0
 DOCS=(
   README.md
   docs/index.md docs/index.ko.md
+  docs/concepts/what-is-sbom.md docs/concepts/what-is-sbom.ko.md
   docs/start/first-scan.md docs/start/first-scan.ko.md
   docs/start/no-cli.md docs/start/no-cli.ko.md
   docs/guides/by-input.md docs/guides/by-input.ko.md

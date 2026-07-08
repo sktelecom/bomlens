@@ -4,7 +4,7 @@ description: Install BomLens and generate your first SBOM. The fastest path need
 
 # Getting started
 
-From install to your first SBOM, step by step. The fastest path needs no command line — download the app and double-click.
+From install to your first [SBOM](../concepts/what-is-sbom.md), step by step. The fastest path needs no command line — download the app and double-click.
 
 > Just want an SBOM or a notice quickly, no commands? Start with the [no-CLI quick start](../start/no-cli.md).
 
