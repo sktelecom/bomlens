@@ -53,23 +53,42 @@ LIBDIR="/usr/local/lib/sbom"
 # shellcheck source=docker/lib/source-detect.sh
 . "$LIBDIR/source-detect.sh"
 
+# self_container_id: THIS container's own id, for --volumes-from. Docker bind-mounts
+# /etc/hostname, /etc/hosts and /etc/resolv.conf from /var/lib/docker/containers/<id>/,
+# so the full id appears in /proc/self/mountinfo regardless of cgroup version; fall back
+# to $HOSTNAME (the short id, unless a launcher set --hostname — ours do not).
+self_container_id() {
+    local id
+    id=$(sed -n 's|.*/containers/\([0-9a-f]\{64\}\)/.*|\1|p' /proc/self/mountinfo 2>/dev/null | head -1)
+    [ -n "$id" ] || id="${HOSTNAME:-}"
+    echo "$id"
+}
+
 # generate_sbom_cdxgen: run a cdxgen language image as a SIBLING container (via the
 # mounted host Docker socket) so a web-UI source scan resolves transitive deps,
-# matching the CLI. The sibling is launched by the HOST daemon, which can only
-# bind-mount HOST paths — so we mount the scanned tree by its host path
-# ($src_host) and inject build-prep.sh inline (it lives only inside THIS image,
-# not on the host, so it cannot be bind-mounted). cdxgen writes the bom into the
-# scanned tree; we move it into the working dir for the common pipeline.
-#   $1 = scanned tree, this container's path   (for detect_lang / reading output)
-#   $2 = scanned tree, host path               (for the sibling bind-mount)
-#   $3 = output bom filename (relative)
+# matching the CLI. The sibling reaches the scanned tree by inheriting THIS container's
+# mounts (--volumes-from), NOT by a host path. Passing a host path was the Windows UI
+# defect: SOURCE_ROOT_HOST is a drive path (C:/…) there, and the in-container Linux
+# docker CLI cannot consume a drive letter — the ':' splits the -v spec ("invalid mode")
+# so cdxgen never ran and the scan silently fell back to syft. --volumes-from replays the
+# daemon's already-resolved mount, so the source appears at the SAME container path on
+# every host OS. build-prep.sh is injected inline (it lives only inside THIS image, not on
+# the host). cdxgen writes the bom into the scanned tree; we move it to the working dir.
+#   $1 = scanned tree, this container's path (also the sibling's, via --volumes-from)
+#   $2 = output bom filename (relative)
 generate_sbom_cdxgen() {
-    local src_container="$1" src_host="$2" out="$3"
-    local lang img api rc=0
+    local src="$1" out="$2"
+    local lang img api rc=0 self
     CDXGEN_FAIL_REASON=""
-    lang=$(detect_lang "$src_container")
+    self=$(self_container_id)
+    if [ -z "$self" ]; then
+        CDXGEN_FAIL_REASON="cdxgen-unavailable"
+        echo "[WARN] cdxgen sibling: could not determine this container's id for --volumes-from."
+        return 1
+    fi
+    lang=$(detect_lang "$src")
     if [ "$lang" = "android" ]; then
-        api=$(android_api "$src_container")
+        api=$(android_api "$src")
         img="${ANDROID_IMAGE_PREFIX}${api}:latest"
         echo "[INFO] Android source (compileSdk=$api) -> $img"
     else
@@ -82,14 +101,14 @@ generate_sbom_cdxgen() {
     # a bare rc=125) and recorded for the UI.
     local logf; logf=$(mktemp)
     docker run --rm -u 0:0 \
-        -v "$src_host":/app \
+        --volumes-from "$self" \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="$PROJECT_NAME" \
         -e PROJECT_VERSION="$PROJECT_VERSION" \
         --entrypoint sh "$img" \
-        -c "$prep" _ /app "/app/$out" 1.6 2>&1 | tee "$logf"
+        -c "$prep" _ "$src" "$src/$out" 1.6 2>&1 | tee "$logf"
     rc=${PIPESTATUS[0]}
     if [ "$rc" -ne 0 ]; then
         if grep -qi "no space left on device" "$logf"; then
@@ -103,11 +122,11 @@ generate_sbom_cdxgen() {
         return 1
     fi
     rm -f "$logf"
-    if [ -f "$src_container/$out" ]; then
-        mv "$src_container/$out" "./$out"
+    if [ -f "$src/$out" ]; then
+        mv "$src/$out" "./$out"
     else
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        echo "[WARN] cdxgen produced no SBOM at $src_container/$out."; return 1
+        echo "[WARN] cdxgen produced no SBOM at $src/$out."; return 1
     fi
     return 0
 }
@@ -156,10 +175,12 @@ case "$SCAN_MODE" in
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
         # Preferred path: run a cdxgen language image as a sibling container so
         # transitive dependencies resolve, matching the CLI. This needs the host
-        # Docker socket, a docker CLI in this image, and the HOST path of the
-        # scanned tree (SOURCE_ROOT_HOST, supplied by the web server). When any is
-        # missing we fall back to syft, which parses package manifests
-        # (package.json/go.mod/pom.xml/Gemfile/…) without building — direct deps only.
+        # Docker socket and a docker CLI in this image. SOURCE_ROOT_HOST (set by the
+        # web server) is required only as the signal that the scanned tree is under a
+        # mount this container owns — the sibling inherits that mount via --volumes-from
+        # rather than re-mounting a host path, so its VALUE is no longer used. When the
+        # socket/CLI/signal is missing we fall back to syft, which parses package
+        # manifests (package.json/go.mod/pom.xml/Gemfile/…) without building — direct deps.
         SRC_ROOT="${SOURCE_ROOT:-/src}"
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
@@ -174,7 +195,7 @@ case "$SCAN_MODE" in
                 echo "[WARN] Low disk space (~${avail_mb} MB) — cdxgen may fail to pull its language image; consider 'docker system prune'."
             fi
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
-            if ! generate_sbom_cdxgen "$SRC_ROOT" "$SOURCE_ROOT_HOST" "$OUTPUT_FILE"; then
+            if ! generate_sbom_cdxgen "$SRC_ROOT" "$OUTPUT_FILE"; then
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
                 syft "dir:$SRC_ROOT" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
