@@ -622,6 +622,22 @@ def sbom_summary(run_id):
         if review:
             row["licenseReview"] = review
 
+        # End-of-life: set by enrich-eol.sh from a bundled endoflife.date snapshot.
+        # "true"/"false"/"unknown" for a mapped component; absent for unmapped ones
+        # (implicitly unknown). Surfaced read-only so a reviewer sees which runtimes
+        # /frameworks are past upstream support (a risk distinct from CVEs).
+        eol = next(
+            (p.get("value") for p in props if p.get("name") == "bomlens:eol"), None
+        )
+        if eol:
+            row["eol"] = eol
+            eol_date = next(
+                (p.get("value") for p in props if p.get("name") == "bomlens:eol:date"),
+                None,
+            )
+            if eol_date:
+                row["eolDate"] = eol_date
+
         rows.append(row)
     # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like
     # C/C++ embedded source with no package manager. Drives the result banner.
@@ -652,6 +668,24 @@ def sbom_summary(run_id):
                 direct_count += 1
             elif sc == "transitive":
                 transitive_count += 1
+    # End-of-life counts across ALL components (not just the capped rows), so the
+    # KPI is accurate on large SBOMs. eolCount = components flagged past upstream
+    # support; atRiskCount = those that ALSO carry a vulnerability — the actionable
+    # set, since an EOL component has no upstream patch coming for its CVEs.
+    eol_count = at_risk_count = 0
+    for c in comps:
+        cprops = c.get("properties") or []
+        if not any(
+            p.get("name") == "bomlens:eol" and p.get("value") == "true" for p in cprops
+        ):
+            continue
+        eol_count += 1
+        npurl = _norm_purl(c.get("purl"))
+        risk = risk_by_purl.get(npurl) if npurl else None
+        if risk is None:
+            risk = risk_by_nv.get(((c.get("name") or "").lower(), c.get("version") or ""))
+        if risk and risk.get("count", 0) > 0:
+            at_risk_count += 1
     meta_comp = (data.get("metadata") or {}).get("component") or {}
     return {
         "components": len(comps),
@@ -664,6 +698,8 @@ def sbom_summary(run_id):
         "componentType": meta_comp.get("type"),
         "directCount": direct_count,
         "transitiveCount": transitive_count,
+        "eolCount": eol_count,
+        "atRiskCount": at_risk_count,
     }
 
 

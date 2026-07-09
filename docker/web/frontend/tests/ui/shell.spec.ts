@@ -486,6 +486,51 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
 });
 
+test("end-of-life surfaces as a KPI tile, a badge and a filter chip", async ({ page }) => {
+  // A scan whose SBOM flagged an end-of-life component (openssl, also
+  // vulnerable → at-risk) alongside a still-supported one (zlib).
+  const EOL_DONE = {
+    ...DONE,
+    sbom: {
+      components: 2,
+      eolCount: 1,
+      atRiskCount: 1,
+      componentList: [
+        { name: "openssl", version: "3.0.0", group: "", purl: "pkg:github/openssl/openssl", type: "library", licenses: ["Apache-2.0"], scope: "direct", maxSeverity: "CRITICAL", vulnCount: 1, eol: "true", eolDate: "2023-09-11" },
+        { name: "zlib", version: "1.2.0", group: "", purl: "pkg:github/madler/zlib", type: "library", licenses: ["Zlib"], scope: "transitive", eol: "false" },
+      ],
+    },
+  };
+  await seedThemeLang(page, "light", "en");
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(EOL_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // Overview KPI tile links into Components; the at-risk hint is present.
+  const tile = page.getByRole("link", { name: "View End of life" });
+  await expect(tile).toBeVisible();
+  await expect(tile.getByText("1 also vulnerable")).toBeVisible();
+  await tile.click();
+  await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
+
+  // The EOL component carries the badge; the supported one does not.
+  await expect(page.getByText("End of life · since 2023-09-11")).toBeVisible();
+
+  // The filter chip narrows the table to end-of-life rows only.
+  await page.getByRole("button", { name: "End of life", exact: true }).click();
+  await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
+});
+
 test("Overview leads with needs-attention and jumps into sections", async ({ page }) => {
   await stubAndRun(page);
 

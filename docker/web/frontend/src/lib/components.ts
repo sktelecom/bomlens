@@ -15,6 +15,8 @@ export interface ComponentFilters {
   directOnly: boolean;
   /** Only components flagged for review (vendored / copied-in open source). */
   needsReview: boolean;
+  /** Only components past their upstream end-of-life (eol === "true"). */
+  eolOnly: boolean;
 }
 
 export const EMPTY_FILTERS: ComponentFilters = {
@@ -24,6 +26,7 @@ export const EMPTY_FILTERS: ComponentFilters = {
   hasVulns: false,
   directOnly: false,
   needsReview: false,
+  eolOnly: false,
 };
 
 export type ComponentSortKey = "name" | "version" | "type" | "scope" | "risk";
@@ -69,13 +72,20 @@ export function matchesFilters(c: ComponentItem, f: ComponentFilters): boolean {
   if (f.hasVulns && !(c.vulnCount && c.vulnCount > 0)) return false;
   if (f.directOnly && c.scope !== "direct") return false;
   if (f.needsReview && !c.vendored) return false;
+  if (f.eolOnly && c.eol !== "true") return false;
   return true;
 }
 
 /** True when any filter would actually narrow the set (drives reset affordances). */
 export function hasActiveFilters(f: ComponentFilters): boolean {
   return Boolean(
-    f.query || f.type || f.license || f.hasVulns || f.directOnly || f.needsReview,
+    f.query ||
+      f.type ||
+      f.license ||
+      f.hasVulns ||
+      f.directOnly ||
+      f.needsReview ||
+      f.eolOnly,
   );
 }
 

@@ -26,6 +26,15 @@ The table puts KEV-listed items at the top, then sorts by severity, and finally 
 
 EPSS and KEV require external API lookups. On an air-gapped network, set `SECURITY_ENRICH=false` to omit the two columns and still generate the rest of the report.
 
+## Component end-of-life (EOL)
+
+BomLens also flags whether each component's release cycle has reached its upstream end-of-life. This is a supply-chain risk separate from CVEs: a runtime or framework past its support date gets no more upstream security fixes, so a Critical or High reported later has no patch to apply.
+
+- The dates come from a snapshot of endoflife.date bundled into the scanner image, so the check runs offline with no network call and works air-gapped. The source and snapshot date are recorded on each flagged component (`bomlens:eol:source`).
+- Coverage follows endoflife.date, which tracks runtimes, major frameworks, operating systems and databases (spring-boot, express, django, nodejs, python, php, nginx, openssl, ubuntu, debian, and so on). Most smaller libraries are not tracked, and a component with no mapping is left unknown rather than guessed.
+- In the web UI, the Overview shows an "End of life" count tile, with the components that are also vulnerable highlighted in the risk colour — an EOL component gets no upstream patch for its CVEs, so that is the set to act on. The Components table adds an "End of life" badge, with the EOL date where known, and an "End of life" filter.
+- It is on by default and adds no delay because it is offline. To turn it off, set `ENRICH_EOL=false`. AI/ML model scans skip it, since they have no runtime or framework components.
+
 ## Interpreting results & follow-up
 
 | Severity | Meaning | Recommended action |

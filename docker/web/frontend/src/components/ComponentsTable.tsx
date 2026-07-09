@@ -131,6 +131,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
   const anyScope = useMemo(() => items.some((c) => c.scope), [items]);
   const anyVulns = useMemo(() => items.some((c) => c.vulnCount), [items]);
   const anyVendored = useMemo(() => items.some((c) => c.vendored), [items]);
+  const anyEol = useMemo(() => items.some((c) => c.eol === "true"), [items]);
 
   const filtered = useMemo(
     () => selectComponents(items, filters, sort),
@@ -195,7 +196,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
         )}
       </div>
 
-      {(anyVulns || anyScope || anyVendored) && (
+      {(anyVulns || anyScope || anyVendored || anyEol) && (
         <div className="flex flex-wrap items-center gap-2">
           {anyVulns && (
             <FilterChip
@@ -219,6 +220,14 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
               onClick={() => patch({ needsReview: !filters.needsReview })}
             >
               {t("result.filterNeedsReview")}
+            </FilterChip>
+          )}
+          {anyEol && (
+            <FilterChip
+              active={filters.eolOnly}
+              onClick={() => patch({ eolOnly: !filters.eolOnly })}
+            >
+              {t("result.filterEol")}
             </FilterChip>
           )}
         </div>
@@ -286,6 +295,12 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
                         }
                       >
                         {t("result.vendoredBadge")}
+                      </Badge>
+                    )}
+                    {c.eol === "true" && (
+                      <Badge tone="high" title={t("result.eolBadgeHint")}>
+                        {t("result.eolBadge")}
+                        {c.eolDate ? ` · ${t("result.eolSince", { date: c.eolDate })}` : ""}
                       </Badge>
                     )}
                   </div>
@@ -373,6 +388,15 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
                         <>
                           <dt className="font-medium text-muted-foreground">{t("result.colLicense")}</dt>
                           <dd>{c.licenses.join(", ")}</dd>
+                        </>
+                      ) : null}
+                      {c.eol === "true" ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("result.colEol")}</dt>
+                          <dd>
+                            {t("result.eolBadge")}
+                            {c.eolDate ? ` (${c.eolDate})` : ""}
+                          </dd>
                         </>
                       ) : null}
                       {c.vulnCount ? (

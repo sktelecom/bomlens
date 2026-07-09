@@ -1,5 +1,6 @@
 import {
   Boxes,
+  CalendarX,
   ChevronRight,
   Cpu,
   Eye,
@@ -251,6 +252,12 @@ interface Jump {
   value: number | null;
   /** Optional secondary line, e.g. the dependency direct/transitive split. */
   sub?: string;
+  /** Overrides the nav-derived label (e.g. the End-of-life tile → Components). */
+  label?: string;
+  /** Emphasis class for the number (e.g. at-risk end-of-life in the risk tone). */
+  valueClass?: string;
+  /** Stable list key when several tiles target the same section. */
+  key?: string;
 }
 
 function JumpCards({
@@ -273,8 +280,26 @@ function JumpCards({
   const direct = result.sbom?.directCount ?? 0;
   const transitive = result.sbom?.transitiveCount ?? 0;
   const depTotal = direct + transitive;
+  const eolCount = result.sbom?.eolCount ?? 0;
+  const atRiskCount = result.sbom?.atRiskCount ?? 0;
   const jumps: Jump[] = [
     { id: "components", icon: Boxes, value: result.sbom?.components ?? 0 },
+    // End-of-life tile: only when the scan flagged EOL components. It routes into
+    // Components; the count turns risk-toned when some are also vulnerable (the
+    // actionable set — an EOL component gets no upstream patch for its CVEs).
+    ...(eolCount > 0
+      ? [
+          {
+            id: "components" as SectionId,
+            key: "eol",
+            icon: CalendarX,
+            value: eolCount,
+            label: t("result.eolTile"),
+            valueClass: atRiskCount > 0 ? "text-risk-critical" : undefined,
+            sub: atRiskCount > 0 ? t("result.eolAtRisk", { count: atRiskCount }) : undefined,
+          },
+        ]
+      : []),
     ...(result.security
       ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
       : []),
@@ -299,11 +324,13 @@ function JumpCards({
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      {jumps.map(({ id, icon: Icon, value, sub }) => (
+      {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
+        const text = label ?? t(`nav.${id}`);
+        return (
         <a
-          key={id}
+          key={key ?? id}
           href={scanId ? scanHash(scanId, id) : undefined}
-          aria-label={t("overview.jumpHint", { section: t(`nav.${id}`) })}
+          aria-label={t("overview.jumpHint", { section: text })}
           className={cn(
             "group rounded-lg border bg-card p-4 text-left",
             "transition-[border-color,background-color,box-shadow] duration-fast ease-out-soft",
@@ -315,17 +342,23 @@ function JumpCards({
             <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
             <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-fast ease-out-soft group-hover:translate-x-0.5" aria-hidden />
           </div>
-          <div className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
+          <div
+            className={cn(
+              "mt-3 text-2xl font-semibold tabular-nums text-foreground",
+              valueClass,
+            )}
+          >
             {value ?? "—"}
           </div>
-          <div className="truncate text-xs text-muted-foreground">{t(`nav.${id}`)}</div>
+          <div className="truncate text-xs text-muted-foreground">{text}</div>
           {sub && (
             <div className="mt-0.5 truncate text-[0.6875rem] text-muted-foreground">
               {sub}
             </div>
           )}
         </a>
-      ))}
+        );
+      })}
     </div>
   );
 }
