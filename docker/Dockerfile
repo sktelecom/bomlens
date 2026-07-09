@@ -336,9 +336,10 @@ RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh
 # skips cleanly at scan time (EOL flagging is optional, never a blocker). Attribution
 # and snapshot date live in the bundle's _snapshot field. See build-eol-index.py.
 COPY build-eol-index.py /tmp/build-eol-index.py
-RUN python3 /tmp/build-eol-index.py \
+RUN timeout 120 python3 /tmp/build-eol-index.py \
         /usr/local/lib/sbom/eol-purl-map.json \
         /usr/local/lib/sbom/eol-data.json \
+    || echo "[build] endoflife snapshot skipped; EOL flagging will be inactive at scan time" \
     ; rm -f /tmp/build-eol-index.py
 
 WORKDIR /src

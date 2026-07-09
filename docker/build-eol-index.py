@@ -25,6 +25,7 @@
 import datetime
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -32,6 +33,11 @@ API = "https://endoflife.date/api/{}.json"
 # Only the fields enrich-eol.sh (and later staleness) actually reads, to keep the
 # bundle small.
 KEEP = ("cycle", "eol", "releaseDate", "latest", "latestReleaseDate")
+# Bound the whole fetch so a slow or black-holed network can never stall the image
+# build: each request is capped, and once the total budget is spent the remaining
+# products are skipped (best-effort — whatever was fetched is still bundled).
+REQUEST_TIMEOUT = 15
+TOTAL_BUDGET = 60
 
 
 def distinct_products(map_path):
@@ -48,7 +54,7 @@ def distinct_products(map_path):
 def fetch(product):
     url = API.format(product)
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 (https only)
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:  # noqa: S310 (https only)
         cycles = json.load(resp)
     return [{k: c[k] for k in KEEP if k in c} for c in cycles]
 
@@ -61,14 +67,23 @@ def main():
     map_path, out_path = sys.argv[1], sys.argv[2]
     products = distinct_products(map_path)
     out = {"_snapshot": datetime.date.today().isoformat()}
-    ok, failed = 0, []
+    ok, failed, skipped = 0, [], []
+    deadline = time.monotonic() + TOTAL_BUDGET
     for product in products:
+        if time.monotonic() > deadline:
+            skipped.append(product)
+            continue
         try:
             out[product] = fetch(product)
             ok += 1
         except (urllib.error.URLError, OSError, ValueError, KeyError) as exc:
             failed.append(product)
             sys.stderr.write(f"[eol-index] WARN: could not fetch {product}: {exc}\n")
+    if skipped:
+        sys.stderr.write(
+            f"[eol-index] WARN: time budget ({TOTAL_BUDGET}s) spent; "
+            f"skipped {len(skipped)}: {skipped}\n"
+        )
 
     if ok == 0:
         sys.stderr.write(
