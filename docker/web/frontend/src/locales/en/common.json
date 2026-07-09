@@ -215,7 +215,15 @@
     "eolBadgeHint": "Past upstream end-of-life — no security patches expected",
     "eolSince": "since {{date}}",
     "filterEol": "End of life",
-    "colEol": "Support"
+    "colEol": "Support",
+    "outdatedTile": "Outdated",
+    "outdatedBadge": "Outdated",
+    "outdatedBadgeHint": "A newer patch is available in its release cycle",
+    "outdatedLatest": "latest: {{version}}",
+    "outdatedReleasesBehind": "{{count}} releases behind",
+    "outdatedLastReleased": "released {{date}}",
+    "filterOutdated": "Outdated",
+    "colCurrency": "Version currency"
   },
   "deps": {
     "loading": "Loading dependencies…",

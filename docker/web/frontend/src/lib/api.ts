@@ -52,6 +52,16 @@ export interface ComponentItem {
   eol?: "true" | "false" | "unknown";
   /** The published end-of-life date (ISO), when known. */
   eolDate?: string;
+  /** Behind the latest patch in its own release cycle ("true"/"false"), computed
+   *  offline from the endoflife snapshot (enrich-eol.sh currency). */
+  outdated?: "true" | "false";
+  /** Newest known version — absolute latest from deps.dev (opt-in) if present,
+   *  else the latest patch in-cycle from the offline snapshot. */
+  latestVersion?: string;
+  /** How many releases newer than the installed one — deps.dev opt-in only. */
+  releasesBehind?: number;
+  /** Publish date (ISO) of the newest version — deps.dev opt-in only. */
+  lastReleased?: string;
 }
 
 export interface SbomSummary {
@@ -78,6 +88,9 @@ export interface SbomSummary {
   /** EOL components that ALSO carry a vulnerability — the actionable set, since an
    *  end-of-life component has no upstream patch coming for its CVEs. */
   atRiskCount?: number;
+  /** Components behind the latest patch in their own release cycle (offline
+   *  currency from the endoflife snapshot). */
+  outdatedCount?: number;
 }
 
 export const SEVERITY_ORDER = [

@@ -215,7 +215,15 @@
     "eolBadgeHint": "상위 지원이 종료됨 — 보안 패치가 제공되지 않습니다",
     "eolSince": "{{date}} 종료",
     "filterEol": "지원 종료",
-    "colEol": "지원 상태"
+    "colEol": "지원 상태",
+    "outdatedTile": "최신 아님",
+    "outdatedBadge": "최신 아님",
+    "outdatedBadgeHint": "같은 릴리스 주기에 더 최신 패치가 있습니다",
+    "outdatedLatest": "최신: {{version}}",
+    "outdatedReleasesBehind": "릴리스 {{count}}개 뒤처짐",
+    "outdatedLastReleased": "{{date}} 배포",
+    "filterOutdated": "최신 아님",
+    "colCurrency": "버전 최신성"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",

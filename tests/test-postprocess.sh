@@ -750,6 +750,30 @@ eolprop() { jq -r --arg n "$1" --arg p "$2" '.components[] | select(.name==$n)
 [ "$(eolprop django bomlens:eol:source)" = "endoflife.date@2026-01-01" ] \
     && pass "source attribution recorded (endoflife.date@<snapshot>)" \
     || fail "source='$(eolprop django bomlens:eol:source)', expected endoflife.date@2026-01-01"
+# Offline version currency: endoflife's per-cycle `latest` lets us flag a
+# component behind the newest patch of its OWN cycle, no network.
+[ "$(eolprop spring-boot-starter-web bomlens:currency:outdated)" = "true" ] \
+    && pass "behind the latest patch in-cycle -> currency:outdated=true (3.2.0 < 3.2.12)" \
+    || fail "boot 3.2.0 outdated='$(eolprop spring-boot-starter-web bomlens:currency:outdated)', expected true"
+[ "$(eolprop spring-boot-starter-web bomlens:currency:latestPatch)" = "3.2.12" ] \
+    && pass "the latest in-cycle patch is recorded (currency:latestPatch)" \
+    || fail "latestPatch='$(eolprop spring-boot-starter-web bomlens:currency:latestPatch)', expected 3.2.12"
+# Numeric compare, not lexicographic (4.18.2 < 4.21.0 must be true).
+[ "$(eolprop express bomlens:currency:outdated)" = "true" ] \
+    && pass "numeric version compare (4.18.2 < 4.21.0 -> outdated)" \
+    || fail "express outdated='$(eolprop express bomlens:currency:outdated)', expected true"
+# On the latest patch of its cycle -> not outdated.
+[ "$(eolprop spring-boot-uptodate bomlens:currency:outdated)" = "false" ] \
+    && pass "on the latest in-cycle patch -> currency:outdated=false (3.3.5)" \
+    || fail "uptodate outdated='$(eolprop spring-boot-uptodate bomlens:currency:outdated)', expected false"
+# A cycle with no `latest` in the dataset -> no currency props (nothing to compare).
+[ "$(eolprop express-old bomlens:currency:latestPatch)" = "ABSENT" ] \
+    && pass "no dataset latest -> no currency:latestPatch" \
+    || fail "express-old wrongly got latestPatch='$(eolprop express-old bomlens:currency:latestPatch)'"
+# Unknown cycle (no entry) -> no currency either.
+[ "$(eolprop spring-boot-experimental bomlens:currency:outdated)" = "ABSENT" ] \
+    && pass "unknown cycle -> no currency:outdated" \
+    || fail "experimental wrongly got outdated"
 # Idempotent: a second run changes nothing.
 cp "$WORK/eol.json" "$WORK/eol2.json"
 EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol2.json" >/dev/null 2>&1
@@ -763,6 +787,40 @@ if [ "$rc" = "0" ] && diff -q "$FIX/eol-components.json" "$WORK/eol3.json" >/dev
 else
     fail "missing-dataset path changed the SBOM or failed (rc=$rc)"
 fi
+
+echo "== staleness: opt-in deps.dev version currency (enrich-staleness.py, offline fixture) =="
+cp "$FIX/staleness-components.json" "$WORK/stale.json"
+STALENESS_FIXTURE_DIR="$FIX/staleness" python3 "$LIB/enrich-staleness.py" "$WORK/stale.json" >/dev/null 2>&1
+src=$?
+stprop() { jq -r --arg n "$1" --arg p "$2" '.components[] | select(.name==$n)
+    | [(.properties // [])[] | select(.name==$p) | .value][0] // "ABSENT"' "$WORK/stale.json"; }
+[ "$src" = "0" ] && pass "enrich-staleness exits 0 (best-effort)" || fail "enrich-staleness rc=$src"
+# Latest across all lines = the deps.dev default version.
+[ "$(stprop express bomlens:staleness:latest)" = "5.0.0" ] \
+    && pass "absolute latest from deps.dev default (5.0.0)" \
+    || fail "express latest='$(stprop express bomlens:staleness:latest)', expected 5.0.0"
+# releasesBehind counts non-deprecated versions published after the installed one.
+[ "$(stprop express bomlens:staleness:releasesBehind)" = "2" ] \
+    && pass "releasesBehind excludes deprecated, counts newer (4.19.0 + 5.0.0 = 2)" \
+    || fail "express releasesBehind='$(stprop express bomlens:staleness:releasesBehind)', expected 2"
+[ "$(stprop express bomlens:staleness:lastReleased)" = "2024-09-10T00:00:00Z" ] \
+    && pass "lastReleased = publish date of the latest version" \
+    || fail "express lastReleased='$(stprop express bomlens:staleness:lastReleased)'"
+# Installed version unknown to deps.dev -> report latest, but no untrusted behind count.
+[ "$(stprop express-future bomlens:staleness:latest)" = "5.0.0" ] \
+    && pass "unknown installed version still reports latest" \
+    || fail "express-future latest='$(stprop express-future bomlens:staleness:latest)'"
+[ "$(stprop express-future bomlens:staleness:releasesBehind)" = "ABSENT" ] \
+    && pass "unknown installed version -> no releasesBehind (not guessed)" \
+    || fail "express-future wrongly got releasesBehind"
+# An ecosystem deps.dev does not index (pkg:generic) is left untouched.
+[ "$(stprop internal-thing bomlens:staleness:latest)" = "ABSENT" ] \
+    && pass "unsupported ecosystem (pkg:generic) untouched" \
+    || fail "internal-thing wrongly enriched"
+# Idempotent: a second run does not duplicate staleness props.
+STALENESS_FIXTURE_DIR="$FIX/staleness" python3 "$LIB/enrich-staleness.py" "$WORK/stale.json" >/dev/null 2>&1
+n_latest=$(jq '[.components[] | (.properties // [])[] | select(.name=="bomlens:staleness:latest")] | length' "$WORK/stale.json")
+[ "$n_latest" = "2" ] && pass "enrich-staleness is idempotent (no duplicate props)" || fail "staleness props duplicated: $n_latest latest entries"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

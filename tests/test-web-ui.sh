@@ -379,6 +379,44 @@ then
 else
     fail "EOL summary produced wrong values (see assertion above)"
 fi
+echo "== version currency surfaced + counted (sbom_summary) =="
+# enrich-eol.sh writes bomlens:currency:* (offline, behind latest patch in cycle);
+# enrich-staleness.py (opt-in) writes bomlens:staleness:* (deps.dev absolute). The
+# summary surfaces both per-row (outdated/latestVersion/releasesBehind/lastReleased)
+# and counts outdatedCount. deps.dev latest wins over the in-cycle patch.
+cat > "$OUT/cur_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "components":[
+   {"name":"boot","version":"3.2.0","type":"library","purl":"pkg:maven/x/boot@3.2.0",
+    "properties":[{"name":"bomlens:currency:outdated","value":"true"},{"name":"bomlens:currency:latestPatch","value":"3.2.12"},
+                  {"name":"bomlens:staleness:latest","value":"4.1.0"},{"name":"bomlens:staleness:releasesBehind","value":"82"},
+                  {"name":"bomlens:staleness:lastReleased","value":"2026-06-10T00:00:00Z"}]},
+   {"name":"fresh","version":"1.0","type":"library","purl":"pkg:npm/fresh@1.0",
+    "properties":[{"name":"bomlens:currency:outdated","value":"false"},{"name":"bomlens:currency:latestPatch","value":"1.0"}]},
+   {"name":"plain","version":"1.0","type":"library","purl":"pkg:npm/plain@1.0"}
+ ]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("cur_1.0")
+assert s["outdatedCount"] == 1, s                       # boot outdated; fresh is current
+rows = {r["name"]: r for r in s["componentList"]}
+assert rows["boot"]["outdated"] == "true", rows["boot"]
+assert rows["boot"]["latestVersion"] == "4.1.0", rows["boot"]   # deps.dev wins over in-cycle
+assert rows["boot"]["releasesBehind"] == 82, rows["boot"]
+assert rows["boot"]["lastReleased"] == "2026-06-10T00:00:00Z", rows["boot"]
+assert rows["fresh"]["outdated"] == "false", rows["fresh"]
+assert rows["fresh"]["latestVersion"] == "1.0", rows["fresh"]   # offline latestPatch when no deps.dev
+assert "releasesBehind" not in rows["fresh"], rows["fresh"]     # offline tier has no behind count
+assert "outdated" not in rows["plain"], rows["plain"]           # unmapped -> no currency
+PY
+then
+    pass "currency surfaced per-row + outdatedCount (offline + deps.dev, deps.dev latest wins)"
+else
+    fail "currency summary produced wrong values (see assertion above)"
+fi
 echo "== EPSS / KEV enrichment join (security_summary) =="
 # The raw _security.json has no EPSS/KEV; scan-security.sh writes them as a
 # sidecar map. security_summary must join them onto the matching CVE rows.

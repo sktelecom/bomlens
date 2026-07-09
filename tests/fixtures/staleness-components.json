@@ -1,0 +1,12 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "components": [
+    { "type": "library", "name": "express", "version": "4.18.2",
+      "purl": "pkg:npm/express@4.18.2" },
+    { "type": "library", "name": "express-future", "version": "9.9.9",
+      "purl": "pkg:npm/express@9.9.9" },
+    { "type": "library", "name": "internal-thing", "version": "1.0",
+      "purl": "pkg:generic/internal-thing@1.0" }
+  ]
+}

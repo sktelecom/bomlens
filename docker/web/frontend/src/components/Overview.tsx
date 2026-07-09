@@ -7,6 +7,7 @@ import {
   FileCheck2,
   GitBranch,
   type LucideIcon,
+  History,
   Package,
   ShieldAlert,
 } from "lucide-react";
@@ -282,6 +283,7 @@ function JumpCards({
   const depTotal = direct + transitive;
   const eolCount = result.sbom?.eolCount ?? 0;
   const atRiskCount = result.sbom?.atRiskCount ?? 0;
+  const outdatedCount = result.sbom?.outdatedCount ?? 0;
   const jumps: Jump[] = [
     { id: "components", icon: Boxes, value: result.sbom?.components ?? 0 },
     // End-of-life tile: only when the scan flagged EOL components. It routes into
@@ -297,6 +299,19 @@ function JumpCards({
             label: t("result.eolTile"),
             valueClass: atRiskCount > 0 ? "text-risk-critical" : undefined,
             sub: atRiskCount > 0 ? t("result.eolAtRisk", { count: atRiskCount }) : undefined,
+          },
+        ]
+      : []),
+    // Version-currency tile: components behind the latest in-cycle patch. Routes
+    // into Components. Weaker signal than EOL (still supported), so no risk tone.
+    ...(outdatedCount > 0
+      ? [
+          {
+            id: "components" as SectionId,
+            key: "outdated",
+            icon: History,
+            value: outdatedCount,
+            label: t("result.outdatedTile"),
           },
         ]
       : []),

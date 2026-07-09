@@ -17,6 +17,9 @@ export interface ComponentFilters {
   needsReview: boolean;
   /** Only components past their upstream end-of-life (eol === "true"). */
   eolOnly: boolean;
+  /** Only components behind the latest patch in their cycle (outdated === "true").
+   *  Distinct from eolOnly: an outdated component is still supported. */
+  outdatedOnly: boolean;
 }
 
 export const EMPTY_FILTERS: ComponentFilters = {
@@ -27,6 +30,7 @@ export const EMPTY_FILTERS: ComponentFilters = {
   directOnly: false,
   needsReview: false,
   eolOnly: false,
+  outdatedOnly: false,
 };
 
 export type ComponentSortKey = "name" | "version" | "type" | "scope" | "risk";
@@ -73,6 +77,7 @@ export function matchesFilters(c: ComponentItem, f: ComponentFilters): boolean {
   if (f.directOnly && c.scope !== "direct") return false;
   if (f.needsReview && !c.vendored) return false;
   if (f.eolOnly && c.eol !== "true") return false;
+  if (f.outdatedOnly && c.outdated !== "true") return false;
   return true;
 }
 
@@ -85,7 +90,8 @@ export function hasActiveFilters(f: ComponentFilters): boolean {
       f.hasVulns ||
       f.directOnly ||
       f.needsReview ||
-      f.eolOnly,
+      f.eolOnly ||
+      f.outdatedOnly,
   );
 }
 

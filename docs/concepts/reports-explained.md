@@ -35,6 +35,14 @@ BomLens also flags whether each component's release cycle has reached its upstre
 - In the web UI, the Overview shows an "End of life" count tile, with the components that are also vulnerable highlighted in the risk colour — an EOL component gets no upstream patch for its CVEs, so that is the set to act on. The Components table adds an "End of life" badge, with the EOL date where known, and an "End of life" filter.
 - It is on by default and adds no delay because it is offline. To turn it off, set `ENRICH_EOL=false`. AI/ML model scans skip it, since they have no runtime or framework components.
 
+## Version currency
+
+Sitting on a supported release cycle is not the same as running its latest version, so BomLens also flags whether a component has fallen behind. This works in two layers.
+
+- The offline layer is on by default, alongside the EOL check. The same endoflife.date snapshot records the latest patch of each release cycle, so BomLens can tell offline whether the installed version trails the newest patch within its own cycle. That is a safe, in-cycle upgrade found with no network call, exactly like the EOL check. A component that is behind carries `bomlens:currency:outdated=true`, with the target patch in `bomlens:currency:latestPatch`. It runs inside the EOL step, so `ENRICH_EOL=false` turns it off as well, and AI/ML model scans skip it.
+- The deps.dev layer is opt-in. Set `STALENESS_ENRICH=true` to look each component up on deps.dev, Google's public package metadata, and record the absolute newest version (`bomlens:staleness:latest`), how many releases the installed one is behind (`bomlens:staleness:releasesBehind`), and when the newest version shipped (`bomlens:staleness:lastReleased`). This makes one network call per component, so it trades the scan's offline determinism for freshness and does not suit an air-gapped run, which is why it is off by default. It is best-effort and time-bounded, so a failed lookup never aborts the scan. The supported ecosystems are npm, PyPI, Maven, Go, Cargo, NuGet and RubyGems. Whether a project is still actively maintained is not part of this release; it is a later addition.
+- In the web UI, the Overview adds a count tile for components behind their latest version, and the Components table marks a component that is not on its latest version and adds an "Outdated" filter. With the deps.dev layer on, each such component also shows how many releases it is behind and its last-release date.
+
 ## Interpreting results & follow-up
 
 | Severity | Meaning | Recommended action |

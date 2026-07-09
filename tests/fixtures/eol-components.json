@@ -15,6 +15,10 @@
     { "type": "library", "name": "lodash", "version": "4.17.21",
       "purl": "pkg:npm/lodash@4.17.21" },
     { "type": "library", "name": "express-session", "version": "1.17.3",
-      "purl": "pkg:npm/express-session@1.17.3" }
+      "purl": "pkg:npm/express-session@1.17.3" },
+    { "type": "library", "name": "spring-boot-uptodate", "version": "3.3.5",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-uptodate@3.3.5?type=jar" },
+    { "type": "library", "name": "express-old", "version": "3.0.0",
+      "purl": "pkg:npm/express@3.0.0" }
   ]
 }
