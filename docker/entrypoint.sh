@@ -457,6 +457,17 @@ if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
 fi
 
+# EOL enrichment: flag components whose release cycle is past its published
+# end-of-life, fully OFFLINE from a bundled endoflife.date snapshot (no network,
+# works air-gapped). Answers "is this still maintained?" — a supply-chain risk
+# separate from CVEs. Matches by PURL against a curated whitelist (eol-purl-map.json);
+# unmapped components are left untouched (implicitly unknown), never guessed.
+# Skipped for AI SBOMs (no runtime/framework components) and with ENRICH_EOL=false
+# (e.g. an image built without the dataset). Best-effort; never aborts the scan.
+if [ "${ENRICH_EOL:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    run_optional_step enrich-eol bash "$LIBDIR/enrich-eol.sh" "$OUTPUT_FILE"
+fi
+
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
 # detects the machine-learning-model component and appends the G7 checks (model
 # id/license/card/integrity, datasets, openness — all advisory). Best-effort

@@ -1,0 +1,22 @@
+{
+  "_comment": "Component PURL coordinate -> endoflife.date product, for offline end-of-life (EOL) flagging (enrich-eol.sh). A component whose purl starts with a rule's `purlPrefix` is mapped to that endoflife product; its version's leading segments form the release `cycle` (per the rule's `cycle` granularity), which is looked up in the bundled endoflife dataset (eol-data.json) to decide EOL. This is a CLOSED, curated whitelist on purpose: an unmapped component gets bomlens:eol=unknown, never a guess. Match is by PURL, not display name, because one product arrives under many component names (e.g. spring-boot-starter-web, spring-boot-autoconfigure all map to spring-boot). endoflife.date coverage is runtimes/frameworks/OS, so long-tail libraries are intentionally absent. Keep this map and eol-data.json's product set in sync.",
+
+  "_cycle": "cycle granularity: 'major' uses the first numeric version segment (express 4.18.2 -> '4'); 'major.minor' uses the first two joined by '.' (spring-boot 3.2.0 -> '3.2'). Must match how endoflife.date keys that product's cycles.",
+
+  "rules": [
+    { "purlPrefix": "pkg:maven/org.springframework.boot/", "product": "spring-boot", "cycle": "major.minor" },
+    { "purlPrefix": "pkg:maven/org.springframework/",      "product": "spring-framework", "cycle": "major.minor" },
+
+    { "purlPrefix": "pkg:npm/express@",   "product": "express", "cycle": "major" },
+    { "purlPrefix": "pkg:npm/next@",      "product": "nextjs",  "cycle": "major.minor" },
+    { "purlPrefix": "pkg:npm/@angular/core@", "product": "angular", "cycle": "major" },
+    { "purlPrefix": "pkg:npm/vue@",       "product": "vue",     "cycle": "major.minor" },
+
+    { "purlPrefix": "pkg:pypi/django@",   "product": "django",  "cycle": "major.minor" },
+
+    { "purlPrefix": "pkg:gem/rails@",     "product": "rails",   "cycle": "major.minor" },
+
+    { "purlPrefix": "pkg:composer/symfony/symfony@", "product": "symfony", "cycle": "major.minor" },
+    { "purlPrefix": "pkg:composer/laravel/framework@", "product": "laravel", "cycle": "major" }
+  ]
+}
