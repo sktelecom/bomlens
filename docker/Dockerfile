@@ -329,6 +329,18 @@ COPY web/server.py /usr/local/lib/sbom-web/server.py
 COPY --from=web /web/dist /usr/local/lib/sbom-web/dist
 RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh
 
+# Bundle an endoflife.date snapshot beside enrich-eol.sh so component end-of-life
+# flagging runs OFFLINE at scan time (no per-scan network, works air-gapped). The
+# bundle holds only the products eol-purl-map.json references and is a few KB.
+# Best-effort: if the fetch fails at build time no file is written and enrich-eol.sh
+# skips cleanly at scan time (EOL flagging is optional, never a blocker). Attribution
+# and snapshot date live in the bundle's _snapshot field. See build-eol-index.py.
+COPY build-eol-index.py /tmp/build-eol-index.py
+RUN python3 /tmp/build-eol-index.py \
+        /usr/local/lib/sbom/eol-purl-map.json \
+        /usr/local/lib/sbom/eol-data.json \
+    ; rm -f /tmp/build-eol-index.py
+
 WORKDIR /src
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

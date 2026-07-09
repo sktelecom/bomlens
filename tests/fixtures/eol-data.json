@@ -1,0 +1,15 @@
+{
+  "_comment": "Deterministic endoflife.date-shaped fixture for tests/test-postprocess.sh (enrich-eol.sh). Dates are far past / far future so EOL true/false never depends on the run date. NOT the bundled snapshot (that is built from the live API at image build).",
+  "_snapshot": "2026-01-01",
+  "spring-boot": [
+    { "cycle": "3.2", "eol": "2020-01-01", "latest": "3.2.12" },
+    { "cycle": "3.3", "eol": "2099-12-31", "latest": "3.3.5" }
+  ],
+  "express": [
+    { "cycle": "3", "eol": true },
+    { "cycle": "4", "eol": false, "latest": "4.21.0" }
+  ],
+  "django": [
+    { "cycle": "4.2", "eol": "2020-01-01", "latest": "4.2.16" }
+  ]
+}

@@ -700,6 +700,70 @@ else
     pass "build-prep.sh no longer uses the stdin-draining grep||cat idiom"
 fi
 
+echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
+cp "$FIX/eol-components.json" "$WORK/eol.json"
+EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol.json" >/dev/null 2>&1
+# Helper: read a component's bomlens:eol* property value (ABSENT if not present).
+eolprop() { jq -r --arg n "$1" --arg p "$2" '.components[] | select(.name==$n)
+    | [(.properties // [])[] | select(.name==$p) | .value][0] // "ABSENT"' "$WORK/eol.json"; }
+# A cycle whose published EOL date is in the past is flagged true, with the date.
+[ "$(eolprop spring-boot-starter-web bomlens:eol)" = "true" ] \
+    && pass "past-EOL cycle flagged bomlens:eol=true (spring-boot 3.2)" \
+    || fail "spring-boot 3.2 eol='$(eolprop spring-boot-starter-web bomlens:eol)', expected true"
+[ "$(eolprop spring-boot-starter-web bomlens:eol:date)" = "2020-01-01" ] \
+    && pass "the published EOL date is recorded (bomlens:eol:date)" \
+    || fail "eol:date='$(eolprop spring-boot-starter-web bomlens:eol:date)', expected 2020-01-01"
+[ "$(eolprop spring-boot-starter-web bomlens:eol:cycle)" = "3.2" ] \
+    && pass "major.minor cycle derived from version (3.2.0 -> 3.2)" \
+    || fail "cycle='$(eolprop spring-boot-starter-web bomlens:eol:cycle)', expected 3.2"
+[ "$(eolprop spring-boot-starter-web bomlens:eol:product)" = "spring-boot" ] \
+    && pass "mapped to the endoflife product by PURL namespace" \
+    || fail "product='$(eolprop spring-boot-starter-web bomlens:eol:product)', expected spring-boot"
+# A cycle whose EOL date is in the future is flagged false (still supported).
+[ "$(eolprop spring-boot-actuator bomlens:eol)" = "false" ] \
+    && pass "future-EOL cycle flagged bomlens:eol=false (spring-boot 3.3)" \
+    || fail "spring-boot 3.3 eol='$(eolprop spring-boot-actuator bomlens:eol)', expected false"
+# A boolean eol:false in the dataset is honored (express 4 is not EOL).
+[ "$(eolprop express bomlens:eol)" = "false" ] \
+    && pass "boolean eol:false honored (express 4)" \
+    || fail "express eol='$(eolprop express bomlens:eol)', expected false"
+# A mapped product but a cycle absent from the dataset -> unknown, never a guess.
+[ "$(eolprop spring-boot-experimental bomlens:eol)" = "unknown" ] \
+    && pass "mapped product, unknown cycle -> bomlens:eol=unknown" \
+    || fail "spring-boot 9.9 eol='$(eolprop spring-boot-experimental bomlens:eol)', expected unknown"
+[ "$(eolprop spring-boot-experimental bomlens:eol:date)" = "ABSENT" ] \
+    && pass "unknown cycle carries no eol:date" \
+    || fail "unexpected eol:date on unknown cycle"
+# django 4.2 EOL date is past -> true (pypi PURL match).
+[ "$(eolprop django bomlens:eol)" = "true" ] \
+    && pass "pypi PURL mapped and flagged (django 4.2)" \
+    || fail "django eol='$(eolprop django bomlens:eol)', expected true"
+# An unmapped component is left untouched (implicitly unknown), no property added.
+[ "$(eolprop lodash bomlens:eol)" = "ABSENT" ] \
+    && pass "unmapped component untouched (no bomlens:eol property)" \
+    || fail "lodash wrongly annotated: '$(eolprop lodash bomlens:eol)'"
+# PURL prefix guard: express-session must NOT match the express@ rule.
+[ "$(eolprop express-session bomlens:eol)" = "ABSENT" ] \
+    && pass "prefix guard: express-session not mis-matched to express" \
+    || fail "express-session wrongly matched express: '$(eolprop express-session bomlens:eol)'"
+# Attribution is recorded on every flagged component.
+[ "$(eolprop django bomlens:eol:source)" = "endoflife.date@2026-01-01" ] \
+    && pass "source attribution recorded (endoflife.date@<snapshot>)" \
+    || fail "source='$(eolprop django bomlens:eol:source)', expected endoflife.date@2026-01-01"
+# Idempotent: a second run changes nothing.
+cp "$WORK/eol.json" "$WORK/eol2.json"
+EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol2.json" >/dev/null 2>&1
+if diff -q "$WORK/eol.json" "$WORK/eol2.json" >/dev/null 2>&1; then pass "enrich-eol.sh is idempotent"; else fail "second enrich-eol run changed the SBOM"; fi
+# No bundled dataset -> clean skip (SBOM unchanged), never an abort.
+cp "$FIX/eol-components.json" "$WORK/eol3.json"
+EOL_DATA_FILE="$WORK/does-not-exist.json" bash "$LIB/enrich-eol.sh" "$WORK/eol3.json" >/dev/null 2>&1
+rc=$?
+if [ "$rc" = "0" ] && diff -q "$FIX/eol-components.json" "$WORK/eol3.json" >/dev/null 2>&1; then
+    pass "missing dataset -> clean skip, SBOM untouched (air-gap safe)"
+else
+    fail "missing-dataset path changed the SBOM or failed (rc=$rc)"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
