@@ -17,7 +17,7 @@ cd ~/sbom-output      # 출력 폴더(아무 곳이나 가능)
 
 **Windows — 더블클릭(명령줄 없이):** 압축을 푼 폴더에서 `scripts\sbom-ui.bat`을 더블클릭하면 잠시 후 브라우저가 `http://localhost:8080`을 엽니다. Docker만 실행 중이면 되고, `sbom-ui.bat`은 Rancher Desktop이나 Docker Desktop에서 동작합니다(WSL2에서는 WSL 안에서 `scan-sbom.sh --ui`를 실행하세요).
 
-> 실행 위치는 출력 베이스이며, 스캔 대상으로 "현재 폴더"를 고를 때만 그 폴더의 소스를 스캔합니다. GitHub URL, 업로드, Docker 이미지를 쓰면 실행 위치는 무관합니다. 스캔마다 베이스 아래 자체 `{Project}_{Version}/` 하위 폴더에 저장됩니다. 데스크톱 앱은 기본 베이스로 `~/sbom-output`(Windows는 `C:\Users\<사용자>\sbom-output`)을 쓰며, `SBOM_OUTPUT_DIR`로 바꿉니다.
+> 실행 위치는 출력 베이스이며, 스캔 대상으로 "현재 폴더"를 고를 때만 그 폴더의 소스를 스캔합니다. GitHub URL, 업로드, Docker 이미지를 쓰면 실행 위치는 무관합니다. 스캔마다 `{Project}_{Version}/` 하위 폴더에 저장되며, 기본 베이스와 바꾸는 방법은 [산출물 위치](cli.ko.md#산출물-위치)를 참고하세요.
 
 ## 셸 구성
 
@@ -62,7 +62,7 @@ cd ~/sbom-output      # 출력 폴더(아무 곳이나 가능)
 
 ![컴포넌트 — 범위·위험 컬럼과 필터](../images/web-ui-components.png)
 
-**취약점**은 심각도에 이어 CVSS로 정렬하며, CVSS 컬럼과 수정 버전을 보여주고, 각 행을 펼치면 CVSS 벡터·설명·참조가 그 자리에서 나옵니다. 심각도 막대에서 한 구간을 클릭하면 그 심각도로 필터링되고, CVE나 패키지로 검색할 수 있으며, 표의 열 너비는 드래그로 조절됩니다.
+**취약점**은 심각도에 이어 CVSS로 정렬하며, CVSS 컬럼과 수정 버전을 보여주고, 각 행을 펼치면 CVSS 벡터·설명·참조가 그 자리에서 나옵니다. 심각도 막대에서 한 구간을 클릭하면 그 심각도로 필터링되고, CVE나 패키지로 검색할 수 있습니다.
 
 ![취약점 — CVSS 컬럼과 펼침 행](../images/web-ui-vulns.png)
 

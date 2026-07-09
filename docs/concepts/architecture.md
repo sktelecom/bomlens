@@ -71,7 +71,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 |------|------|------|------|-----------|
 | **cdxgen** | bundled in the language image | Stage 1 | Generates the SBOM from source code (`--spec-version 1.6`) | `MODE=SOURCE` |
 | **build-prep.sh** | — | Stage 1 | Dependency preparation right before cdxgen (cargo, go, bundle, mvn, pip) | `MODE=SOURCE` |
-| **syft** | `v1.18.1` | Stage 1 | Scans images, binaries, and root filesystems | `MODE=IMAGE/BINARY/ROOTFS` |
+| **syft** | `v1.46.0` | Stage 1 | Scans images, binaries, and root filesystems | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | Normalizes and sorts the SBOM | Always |
 | **ScanCode Toolkit** | `32.3.0` | Stage 2 | Precise license detection on first-party source | `--deep-license` (opt-in build) |
 | **SCANOSS** | `1.25.2` | Stage 2 | Identify vendored open source in C/C++ source with no package manager | `--identify-vendored` |

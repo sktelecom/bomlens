@@ -71,7 +71,7 @@ flowchart TB
 |------|------|------|------|-----------|
 | **cdxgen** | 언어 이미지 동봉 | Stage 1 | 소스 코드 SBOM 생성 (`--spec-version 1.6`) | `MODE=SOURCE` |
 | **build-prep.sh** | — | Stage 1 | cdxgen 직전 의존성 보강(cargo·go·bundle·mvn·pip) | `MODE=SOURCE` |
-| **syft** | `v1.18.1` | Stage 1 | 이미지·바이너리·RootFS 스캔 | `MODE=IMAGE/BINARY/ROOTFS` |
+| **syft** | `v1.46.0` | Stage 1 | 이미지·바이너리·RootFS 스캔 | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | SBOM 정규화·정렬 | 항상 |
 | **ScanCode Toolkit** | `32.3.0` | Stage 2 | 1st-party 소스 정밀 라이선스 탐지 | `--deep-license` (opt-in 빌드) |
 | **SCANOSS** | `1.25.2` | Stage 2 | 패키지 매니저 없는 C/C++ 소스의 vendored 오픈소스 식별 | `--identify-vendored` |

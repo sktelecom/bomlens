@@ -49,7 +49,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 
 > 모든 명령에 `--project <이름> --version <버전>`이 필요합니다(아래 예시 참고).
 >
-> 패키지 매니저(Conan/vcpkg)가 없는 C/C++ 소스라면 `--identify-vendored`를 추가하세요. 소스 트리에 통째로 복사된 오픈소스를 이름 있는 구성요소로 탐지합니다. 이 경우 강력히 권장하며, 자세한 내용은 [내장 오픈소스 식별](identify-vendored.md)을 참고하세요.
+> 패키지 매니저(Conan/vcpkg)가 없는 C/C++ 소스라면 `--identify-vendored`를 추가하세요. 소스 트리에 통째로 복사된 오픈소스를 이름 있는 구성요소로 탐지합니다. 이 경우 강력히 권장하며, 자세한 내용은 [시나리오 3](#시나리오-3--로컬-cc-소스-디렉터리)을 참고하세요.
 
 ## 시나리오 1 — GitHub URL
 

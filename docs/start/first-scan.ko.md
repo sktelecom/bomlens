@@ -28,7 +28,7 @@ git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
 #   Windows: scripts\sbom-ui.bat 더블클릭
 ```
 
-실행한 폴더가 산출물 베이스이고, 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장됩니다. Windows에서는 그 폴더가 Docker 파일 공유에 포함된 경로여야 하며, 홈 디렉터리(`C:\Users\...`) 아래는 기본으로 공유됩니다. 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고, GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
+실행한 폴더가 산출물 베이스이고, 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장됩니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다. 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고, GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
 
 ![BomLens 웹 UI](../images/web-ui.png)
 
