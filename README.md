@@ -22,7 +22,7 @@
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, existing SBOM, firmware
 - Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md); maintainer design notes live under [docs/internal/](docs/internal/) (Korean)
 
-One Docker image, two jobs: **generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice, and a security report — and **assess open-source risk** in what you *receive*, such as a supplier's finished SBOM or a firmware binary (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines). Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
+One Docker image, two jobs: **generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice, and a security report — and **assess open-source risk** in what you *receive*, such as a supplier's finished SBOM (`--analyze`) or a firmware binary (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines). Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
 
 Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, Swift, C/C++ (Conan/vcpkg, or `--identify-vendored` for sources with no package manager). Inputs: source folder, GitHub URL, ZIP archive, Docker image, binary/RootFS, existing SBOM, firmware, and a HuggingFace AI model (CycloneDX ML-BOM).
 
