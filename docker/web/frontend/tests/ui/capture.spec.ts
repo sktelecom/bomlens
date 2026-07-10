@@ -218,8 +218,10 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.goto("/#/new");
     await page.locator("#project").waitFor();
     // SCANOSS is the same token in every locale — a stable anchor that the
-    // advanced-options section has rendered.
-    await page.getByText(/SCANOSS/).first().waitFor();
+    // advanced-options section has rendered. It sits inside the collapsed
+    // disclosure (the default state the guide should show), so wait for
+    // attachment, not visibility.
+    await page.getByText(/SCANOSS/).first().waitFor({ state: "attached" });
     await killAnim(page);
     await settleMain(page);
     await page.screenshot({ path: `${IMAGES}/web-ui${suffix}.png` });
