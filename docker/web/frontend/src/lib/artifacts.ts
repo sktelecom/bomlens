@@ -89,7 +89,10 @@ const GROUPS: GroupSpec[] = [
     Icon: ShieldCheck,
     primary: false,
     rank: 4,
-    match: (n) => n.includes("_security"),
+    // _security_epss.json is the raw EPSS feed the pipeline enriches with —
+    // an internal intermediate, not a report format; listing it produced two
+    // identical "JSON" chips on the card. Still in the download-all ZIP.
+    match: (n) => n.includes("_security") && !n.includes("_security_epss"),
   },
   {
     key: "license",

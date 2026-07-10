@@ -337,8 +337,10 @@ function JumpCards({
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 
+  // auto-fit: the card set is conditional (2–6 cards), so a fixed 4-column
+  // grid left a lopsided empty tail. Let however many render fill the row.
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:[grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
       {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
         const text = label ?? t(`nav.${id}`);
         return (

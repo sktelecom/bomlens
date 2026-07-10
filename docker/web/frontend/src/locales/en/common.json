@@ -314,6 +314,8 @@
     "outputs": "Outputs",
     "scanOptions": "Advanced scan options",
     "upload": "Upload (optional)",
+    "enabledCount": "{{n}} on",
+    "on": "on",
     "catCode": "Code",
     "catArtifact": "Artifact",
     "catSbom": "SBOM",

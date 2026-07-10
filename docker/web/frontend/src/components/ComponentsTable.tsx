@@ -247,7 +247,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
         {truncated ? ` · ${t("result.truncated")}` : ""}
       </div>
 
-      <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border">
+      <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">
