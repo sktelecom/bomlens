@@ -314,6 +314,8 @@
     "outputs": "산출물",
     "scanOptions": "고급 스캔 옵션",
     "upload": "업로드(선택)",
+    "enabledCount": "{{n}}개 켜짐",
+    "on": "켜짐",
     "catCode": "코드",
     "catArtifact": "아티팩트",
     "catSbom": "SBOM",

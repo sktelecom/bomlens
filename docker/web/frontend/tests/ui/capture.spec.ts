@@ -320,14 +320,13 @@ test("@capture advanced toggle", async ({ page }) => {
   await page.goto("/#/new");
   await page.locator("#project").waitFor();
   await killAnim(page);
-  // The vendored-ID toggle sits inline under "Advanced scan options" for a
-  // source scan — capture that whole section (heading + toggle) so the guide
-  // shows users where to find it, not just the bare switch.
+  // The vendored-ID toggle lives inside the collapsed "Advanced scan options"
+  // disclosure — expand it and capture the whole open section (summary +
+  // toggle) so the guide shows users where to find it, not just the switch.
+  await page.getByText("Advanced scan options").click();
   const toggle = page.getByText("Detect copied-in open source");
   await toggle.waitFor({ state: "visible" });
-  const section = toggle.locator(
-    "xpath=ancestor::div[contains(@class,'border-t')][1]",
-  );
+  const section = toggle.locator("xpath=ancestor::details[1]");
   await section.screenshot({
     path: `${IMAGES}/web-ui-identify-vendored-en.png`,
   });
