@@ -212,73 +212,47 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi
 
-# Work around cve-bin-tool's dead NVD count endpoint (see the script header). Its
-# NVD update aborts on a 403 from a legacy dashboard URL before the real, working
-# keyed CVE download runs; the patch reads the total from the keyed API instead.
-# Runs only for the firmware image, right after cve-bin-tool is installed and
-# before the DB pre-fetch below.
-COPY patch-cve-bin-tool-nvd.py /tmp/patch-cve-bin-tool-nvd.py
-RUN if [ "$SBOM_FIRMWARE" = "true" ]; then python3 /tmp/patch-cve-bin-tool-nvd.py; fi \
-    && rm -f /tmp/patch-cve-bin-tool-nvd.py
-
-# Pre-fetch cve-bin-tool's vulnerability DB into the image so firmware scans match
-# CVEs OFFLINE at runtime (Plan 2): a runtime NVD download is slow (~minutes) and
-# air-gapped scans cannot do it at all. cve-bin-tool 3.x hard-codes its DB cache to
-# $HOME/.cache/cve-bin-tool/cve.db and ignores CVE_DATA_DIR, so we set HOME to a
-# fixed location (CVE_BIN_TOOL_HOME); scan-firmware.sh reads the bundled DB from the
-# same place. The NVD key is injected as a BuildKit secret (not a build-arg) so it
-# never lands in the image history: build with
-#   docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=true ...
-#   GAD (GitLab Advisory) crashes cve-bin-tool 3.4 on fetch, so it is disabled; the
-#   source set / NVD method are build-args finalised by native-amd64 verification.
-#   RELEASE GATE: the build FAILS unless the DB carries a real NVD CPE-range corpus
-#   (cve_range where data_source=NVD). cve-bin-tool matches BINARIES against those
-#   NVD ranges, so a non-empty-but-NVD-less DB (a keyless/rate-limited build that
-#   fetched only Red Hat + Curl advisories still fills cve_severity) matches ZERO
-#   binaries — exactly how a silent 0-CVE firmware image shipped before. Gating on
-#   NVD presence, not just cve_severity>0, catches that; the changed RUN also busts
-#   the GHA build cache so a stale NVD-less DB layer can't be reused.
-#   Size: the populated cve.db is ~0.5–1.5 GB; bundle it only in the firmware image.
-# GAD crashes cve-bin-tool 3.4; OSV is excluded because some constituent feeds
-# (e.g. Ubuntu, CC-BY-SA 4.0) carry share-alike terms we do not want to take on in
-# a redistributed image. See CVE-DATA-NOTICE.txt. Override to widen coverage.
-ARG SBOM_FIRMWARE_DISABLE_SOURCES="GAD,OSV"
-# NVD fetch method. cve-bin-tool 3.4's default source and its json-mirror BOTH
-# return "CVEDataMissing: No data" (NVD retired the legacy JSON 1.1 feeds in late
-# 2023; the community mirror is gone), so a default build populated only Red Hat +
-# Curl and matched zero binaries. api2 (the current NVD REST API 2.0) is the only
-# NVD source that still works in 3.4 — and only once patch-cve-bin-tool-nvd.py
-# (applied above) routes its total-CVE count around a dead dashboard endpoint that
-# 403s and would otherwise abort the update before the real download. The keyed
-# API accepts a valid key from any IP (needed because NVD 403s keyless requests
-# from cloud/CI IPs), so the nvd_api_key secret is passed to the fetch below.
-ARG SBOM_FIRMWARE_NVD_METHOD="api2"
+# Firmware CVE matching data (Plan 2, rebuilt). cve-bin-tool identifies binaries
+# (its signature checkers) and lib/firmware-cpe-match.py matches their CPEs against
+# a distilled NVD index. Two artifacts are baked into the firmware image:
+#   (1) a tiny STUB cve.db — cve-bin-tool refuses to run on an empty cache
+#       (EmptyCache in cvedb.check_cve_entries), so we seed its schema with one
+#       sentinel row. Identification never reads CVE data from it. (~57 KB)
+#   (2) cpe_match.sqlite — the application-part CPE->CVE applicability index,
+#       distilled by build-cpe-index.py from the fkie-cad NVD 2.0 JSON feeds. (~130 MB)
+# The NVD data comes from a plain git clone (no api2 rate limit, no key, builds on
+# GitHub cloud runners), replacing the old ~1.5 GB api2-fetched cve.db that NVD
+# throttled into multi-hour stalls.
+# RELEASE GATE: the build FAILS unless the index has a substantial row count AND a
+# BusyBox 1.30.1 smoke match yields >=1 CVE. The smoke test runs the real matcher,
+# so a broken distill or an empty feed cannot ship a silent 0-CVE firmware image.
 ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
-# Attribution + required notices for the bundled CVE data (NVD non-endorsement,
-# Red Hat CC-BY, MIT for curl/purl2cpe, EPSS). Shipped alongside the DB.
+# Attribution + required notices for the bundled NVD-derived data. Shipped with it.
 COPY CVE-DATA-NOTICE.txt /opt/cve-bin-tool-home/CVE-DATA-NOTICE.txt
-RUN --mount=type=secret,id=nvd_api_key \
-    if [ "$SBOM_FIRMWARE" = "true" ]; then \
-      echo "[build] pre-fetching cve-bin-tool CVE DB into $CVE_BIN_TOOL_HOME ..."; \
-      key=""; [ -f /run/secrets/nvd_api_key ] && key="$(cat /run/secrets/nvd_api_key)"; \
-      [ -n "$key" ] || echo "[build] WARN: no nvd_api_key secret; NVD is unreachable keyless from cloud IPs."; \
-      nvd_arg=""; [ -n "$SBOM_FIRMWARE_NVD_METHOD" ] && nvd_arg="-n $SBOM_FIRMWARE_NVD_METHOD"; \
-      dis_arg=""; [ -n "$SBOM_FIRMWARE_DISABLE_SOURCES" ] && dis_arg="-d $SBOM_FIRMWARE_DISABLE_SOURCES"; \
-      key_arg=""; [ -n "$key" ] && key_arg="--nvd-api-key $key"; \
-      mkdir -p /tmp/cvedb-probe; \
-      HOME="$CVE_BIN_TOOL_HOME" cve-bin-tool --update now $nvd_arg $dis_arg $key_arg /tmp/cvedb-probe || true; \
-      db="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"; \
-      n=0; [ -f "$db" ] && n="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_severity").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
-      nvd=0; [ -f "$db" ] && nvd="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_range where data_source=\"NVD\"").fetchone()[0])' "$db" 2>/dev/null || echo 0)"; \
-      echo "[build] CVE DB rows: cve_severity=${n:-0}, NVD cve_range=${nvd:-0} ($([ -f "$db" ] && du -h "$db" | cut -f1 || echo 'no file'))"; \
-      if [ "${n:-0}" -lt 1 ] || [ "${nvd:-0}" -lt 1000 ]; then \
-        echo "[build] ERROR: CVE DB has no usable NVD data (cve_severity=${n:-0}, NVD cve_range=${nvd:-0})."; \
-        echo "[build]        cve-bin-tool matches binaries via NVD CPE ranges, so this DB would report 0 CVEs."; \
-        echo "[build]        Pass a valid NVD key as a BuildKit secret (--secret id=nvd_api_key,env=NVD_API_KEY)"; \
-        echo "[build]        and/or try --build-arg SBOM_FIRMWARE_NVD_METHOD=api2. Build aborted."; \
+# renovate: datasource=git-refs depName=fkie-cad/nvd-json-data-feeds
+ARG NVD_FEED_REPO="https://github.com/fkie-cad/nvd-json-data-feeds"
+COPY build-cpe-index.py /tmp/build-cpe-index.py
+COPY lib/firmware-cpe-match.py /tmp/firmware-cpe-match.py
+RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
+      set -e; \
+      echo "[build] seeding stub cve.db (cve-bin-tool EmptyCache guard) ..."; \
+      mkdir -p "$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool"; \
+      HOME="$CVE_BIN_TOOL_HOME" python3 -c "import sqlite3, os; from cve_bin_tool.cvedb import CVEDB; CVEDB().init_database(); p=os.path.expanduser('~/.cache/cve-bin-tool/cve.db'); c=sqlite3.connect(p); c.execute(\"INSERT OR IGNORE INTO cve_severity VALUES (?,?,?,?,?,?,?,datetime('now'))\", ('CVE-0000-00000','UNKNOWN','stub row for cve-bin-tool EmptyCache check; not used for matching',0,3,'','STUB')); c.commit(); c.close()"; \
+      echo "[build] cloning NVD data feeds (shallow) ..."; \
+      git clone --quiet --depth 1 "$NVD_FEED_REPO" /tmp/nvd-feeds; \
+      echo "[build] distilling CPE index ..."; \
+      python3 /tmp/build-cpe-index.py /tmp/nvd-feeds "$CVE_BIN_TOOL_HOME/cpe_match.sqlite"; \
+      rm -rf /tmp/nvd-feeds; \
+      idx="$CVE_BIN_TOOL_HOME/cpe_match.sqlite"; \
+      rows="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cpe_match").fetchone()[0])' "$idx" 2>/dev/null || echo 0)"; \
+      printf '%s' '{"components":[{"type":"application","name":"busybox","version":"1.30.1","cpe":"cpe:/a:busybox:busybox:1.30.1"}]}' > /tmp/smoke.json; \
+      nsmoke="$(python3 /tmp/firmware-cpe-match.py /tmp/smoke.json "$idx" 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"; \
+      echo "[build] CPE index: rows=${rows:-0}, busybox-1.30.1 smoke CVEs=${nsmoke:-0} ($(du -h "$idx" | cut -f1))"; \
+      if [ "${rows:-0}" -lt 500000 ] || [ "${nsmoke:-0}" -lt 1 ]; then \
+        echo "[build] ERROR: CPE index looks broken (rows=${rows:-0}, busybox smoke=${nsmoke:-0}). Build aborted."; \
         exit 1; \
       fi; \
-      rm -rf /tmp/cvedb-probe; \
+      rm -f /tmp/build-cpe-index.py /tmp/firmware-cpe-match.py /tmp/smoke.json; \
     fi
 
 # OWASP AIBOM Generator (opt-in: --build-arg SBOM_AIBOM=true). Generates an AI

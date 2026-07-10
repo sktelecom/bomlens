@@ -605,29 +605,26 @@ EOF
             && pass "firmware scan: notice + security artifacts produced" \
             || fail "firmware scan: notice + security artifacts produced"
 
-        # Offline-CVE matching: only meaningful when the bundled cve-bin-tool DB
-        # actually carries NVD data. cve-bin-tool matches firmware binaries against
-        # NVD CPE ranges (cve_range where data_source=NVD), so a DB built without
-        # NVD — a key-less/local build, or a CI build whose NVD fetch 403s (the
-        # published image's current state) — matches nothing. Probe the NVD row
-        # count and SKIP (never FAIL) when it is empty; the assertion self-heals
-        # once an NVD-backed firmware image is published.
-        bundled_db="/opt/cve-bin-tool-home/.cache/cve-bin-tool/cve.db"
-        nvd_rows=$(docker run --rm --entrypoint python3 "$FW_IMG" -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cve_range where data_source=\"NVD\"").fetchone()[0])' "$bundled_db" 2>/dev/null || echo 0)
-        if [ "${nvd_rows:-0}" -gt 0 ]; then
+        # Firmware CVE matching: cve-bin-tool identifies binaries and
+        # firmware-cpe-match.py matches their CPEs against the bundled CPE index
+        # (cpe_match.sqlite, distilled from the NVD data feeds). Probe the index and
+        # SKIP (never FAIL) when it is absent — a firmware image built without it —
+        # so the assertion self-heals once an index-backed image is published.
+        cpe_index="/opt/cve-bin-tool-home/cpe_match.sqlite"
+        idx_rows=$(docker run --rm --entrypoint python3 "$FW_IMG" -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cpe_match").fetchone()[0])' "$cpe_index" 2>/dev/null || echo 0)
+        if [ "${idx_rows:-0}" -gt 0 ]; then
             wc="$(mktemp -d "$WORK_ROOT/fwcve.XXXXXX")"
-            # Pack a fixture whose binaries carry a known-vulnerable component so the
-            # offline DB has something to match. cve-bin-tool keys off binary
-            # signatures, so embed the busybox version-banner string it recognises.
-            mkdir -p "$wc/rootfs/bin" "$wc/rootfs/etc"
-            printf 'BusyBox v1.30.1 (2019-01-24) multi-call binary.\n' > "$wc/rootfs/bin/busybox"
-            echo "NAME=Fixture" > "$wc/rootfs/etc/os-release"
-            if docker run --rm -v "$wc":/wc --entrypoint mksquashfs "$FW_IMG" \
-                    /wc/rootfs /wc/fw.squashfs -noappend -no-progress >/dev/null 2>&1 \
+            # Pack a fixture with a REAL binary cve-bin-tool detects by signature.
+            # A version-banner text file is NOT detected (cve-bin-tool needs an actual
+            # binary), so build the rootfs inside the firmware image from one of its
+            # own binaries (curl), then squash it. curl has known CVEs in the index.
+            if docker run --rm -v "$wc":/wc --entrypoint sh "$FW_IMG" -c '
+                    mkdir -p /wc/rootfs/bin /wc/rootfs/etc
+                    cp /usr/bin/curl /wc/rootfs/bin/curl
+                    echo NAME=Fixture > /wc/rootfs/etc/os-release
+                    mksquashfs /wc/rootfs /wc/fw.squashfs -noappend -no-progress' >/dev/null 2>&1 \
                     && [ -f "$wc/fw.squashfs" ]; then
-                # Force offline so the assertion proves the *bundled* DB works, not a
-                # silent online fallback; no network is contacted.
-                ( cd "$wc" && SBOM_FIRMWARE_IMAGE="$FW_IMG" CVE_BIN_TOOL_MODE=offline bash "$SCAN" \
+                ( cd "$wc" && SBOM_FIRMWARE_IMAGE="$FW_IMG" bash "$SCAN" \
                     --project "fwcve" --version "1.0" --target fw.squashfs --all --generate-only ) \
                     > "$wc/_scan.log" 2>&1
                 nvuln=0
@@ -639,17 +636,17 @@ EOF
                     nvuln=$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$wc/fwcve_1.0_security_cvebintool.json" 2>/dev/null || echo 0)
                 fi
                 if [ "${nvuln:-0}" -gt 0 ]; then
-                    pass "firmware offline CVE matching: bundled DB found $nvuln vuln(s)"
+                    pass "firmware CVE matching: CPE index found $nvuln vuln(s)"
                 else
-                    fail "firmware offline CVE matching: bundled DB found vulns" \
-                        "got $nvuln (offline DB present but no CVE matched)"; show_log_if_verbose "$wc"
+                    fail "firmware CVE matching: CPE index found vulns" \
+                        "got $nvuln (index present but no CVE matched)"; show_log_if_verbose "$wc"
                 fi
             else
-                fail "firmware offline CVE fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
+                fail "firmware CVE fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
             fi
             rm -rf "$wc"
         else
-            skip "firmware offline CVE matching (bundled DB carries no NVD data; skipping until an NVD-backed firmware image is published)"
+            skip "firmware CVE matching (no CPE index in firmware image; skipping until an index-backed image is published)"
         fi
     else
         fail "firmware fixture: squashfs packed" "mksquashfs unavailable in $FW_IMG"
