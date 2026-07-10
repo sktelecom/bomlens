@@ -26,6 +26,8 @@ const FLASK = c({ name: "flask", scope: "direct" });
 const WERKZEUG = c({ name: "werkzeug", scope: "transitive", maxSeverity: "CRITICAL", vulnCount: 2 });
 const ZLIB = c({ name: "zlib", scope: "transitive", maxSeverity: "LOW", vulnCount: 1 });
 const VENDORED = c({ name: "blob", vendored: true });
+const EOL_PKG = c({ name: "openssl", eol: "true", eolDate: "2023-09-11" });
+const SUPPORTED = c({ name: "curl", eol: "false" });
 const ALL = [FLASK, WERKZEUG, ZLIB, VENDORED];
 
 describe("matchesFilters", () => {
@@ -42,6 +44,18 @@ describe("matchesFilters", () => {
   it("needsReview keeps only vendored components", () => {
     const kept = ALL.filter((x) => matchesFilters(x, { ...EMPTY_FILTERS, needsReview: true }));
     expect(kept.map((x) => x.name)).toEqual(["blob"]);
+  });
+
+  it("eolOnly keeps only components past upstream end-of-life", () => {
+    const set = [FLASK, EOL_PKG, SUPPORTED];
+    const kept = set.filter((x) => matchesFilters(x, { ...EMPTY_FILTERS, eolOnly: true }));
+    expect(kept.map((x) => x.name)).toEqual(["openssl"]);
+  });
+
+  it("eolOnly excludes false/unknown/unmapped components", () => {
+    expect(matchesFilters(SUPPORTED, { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
+    expect(matchesFilters(c({ eol: "unknown" }), { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
+    expect(matchesFilters(FLASK, { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
   });
 
   it("query matches name/version/type/license, combinable with toggles", () => {

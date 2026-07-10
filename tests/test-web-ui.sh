@@ -335,6 +335,50 @@ then
 else
     fail "Risk/Scope join produced wrong values (see assertion above)"
 fi
+echo "== EOL flag surfaced + counted (sbom_summary) =="
+# enrich-eol.sh writes bomlens:eol / bomlens:eol:date on mapped components.
+# sbom_summary must surface them per-row (eol/eolDate) and aggregate: eolCount =
+# every eol=true; atRiskCount = eol=true that ALSO has a vulnerability (the
+# actionable set). boot has a CVE (at risk); ex is EOL but clean; dj is supported;
+# lo is unmapped (no property, not counted).
+cat > "$OUT/eolsum_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "components":[
+   {"name":"boot","version":"3.2.0","type":"library","purl":"pkg:maven/org.springframework.boot/boot@3.2.0",
+    "properties":[{"name":"bomlens:eol","value":"true"},{"name":"bomlens:eol:date","value":"2024-12-31"}]},
+   {"name":"ex","version":"3.0","type":"library","purl":"pkg:npm/ex@3.0",
+    "properties":[{"name":"bomlens:eol","value":"true"}]},
+   {"name":"dj","version":"5.0","type":"library","purl":"pkg:pypi/dj@5.0",
+    "properties":[{"name":"bomlens:eol","value":"false"},{"name":"bomlens:eol:date","value":"2099-01-01"}]},
+   {"name":"lo","version":"4.0","type":"library","purl":"pkg:npm/lo@4.0"}
+ ]}
+JSON
+cat > "$OUT/eolsum_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-9","Severity":"HIGH","PkgName":"boot","InstalledVersion":"3.2.0","PkgIdentifier":{"PURL":"pkg:maven/org.springframework.boot/boot@3.2.0"}}
+]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("eolsum_1.0")
+assert s["eolCount"] == 2, s              # boot + ex
+assert s["atRiskCount"] == 1, s           # boot (EOL + CVE); ex is EOL but clean
+rows = {r["name"]: r for r in s["componentList"]}
+assert rows["boot"]["eol"] == "true", rows["boot"]
+assert rows["boot"]["eolDate"] == "2024-12-31", rows["boot"]
+assert rows["boot"]["vulnCount"] == 1, rows["boot"]
+assert rows["ex"]["eol"] == "true", rows["ex"]
+assert "eolDate" not in rows["ex"], rows["ex"]      # no date property -> absent
+assert rows["dj"]["eol"] == "false", rows["dj"]
+assert "eol" not in rows["lo"], rows["lo"]          # unmapped -> no eol field
+PY
+then
+    pass "EOL surfaced per-row and aggregated (eolCount/atRiskCount, date, unmapped skip)"
+else
+    fail "EOL summary produced wrong values (see assertion above)"
+fi
 echo "== EPSS / KEV enrichment join (security_summary) =="
 # The raw _security.json has no EPSS/KEV; scan-security.sh writes them as a
 # sidecar map. security_summary must join them onto the matching CVE rows.

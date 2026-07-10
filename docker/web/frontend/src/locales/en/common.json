@@ -208,7 +208,14 @@
     "vulnReferences": "References",
     "vulnNoDetail": "No additional details available.",
     "vulnRowToggle": "Show vulnerability details",
-    "componentRowToggle": "Show component details"
+    "componentRowToggle": "Show component details",
+    "eolTile": "End of life",
+    "eolAtRisk": "{{count}} also vulnerable",
+    "eolBadge": "End of life",
+    "eolBadgeHint": "Past upstream end-of-life — no security patches expected",
+    "eolSince": "since {{date}}",
+    "filterEol": "End of life",
+    "colEol": "Support"
   },
   "deps": {
     "loading": "Loading dependencies…",

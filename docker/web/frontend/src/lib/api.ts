@@ -46,6 +46,12 @@ export interface ComponentItem {
   source?: string;
   /** Copyright holder line, when the SBOM captured one. */
   copyright?: string;
+  /** End-of-life state from a bundled endoflife.date snapshot (enrich-eol.sh):
+   *  "true" past upstream support, "false" still supported, "unknown" mapped but
+   *  the cycle wasn't in the snapshot. Absent for unmapped components. */
+  eol?: "true" | "false" | "unknown";
+  /** The published end-of-life date (ISO), when known. */
+  eolDate?: string;
 }
 
 export interface SbomSummary {
@@ -67,6 +73,11 @@ export interface SbomSummary {
    *  has no dependency graph). Drives the Overview dependency tile. */
   directCount?: number;
   transitiveCount?: number;
+  /** Components flagged past their upstream end-of-life (enrich-eol.sh). */
+  eolCount?: number;
+  /** EOL components that ALSO carry a vulnerability — the actionable set, since an
+   *  end-of-life component has no upstream patch coming for its CVEs. */
+  atRiskCount?: number;
 }
 
 export const SEVERITY_ORDER = [

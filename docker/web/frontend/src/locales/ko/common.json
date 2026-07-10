@@ -208,7 +208,14 @@
     "vulnReferences": "참고 링크",
     "vulnNoDetail": "추가 상세 정보가 없습니다.",
     "vulnRowToggle": "취약점 상세 보기",
-    "componentRowToggle": "컴포넌트 상세 보기"
+    "componentRowToggle": "컴포넌트 상세 보기",
+    "eolTile": "지원 종료",
+    "eolAtRisk": "취약점 동반 {{count}}건",
+    "eolBadge": "지원 종료",
+    "eolBadgeHint": "상위 지원이 종료됨 — 보안 패치가 제공되지 않습니다",
+    "eolSince": "{{date}} 종료",
+    "filterEol": "지원 종료",
+    "colEol": "지원 상태"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
