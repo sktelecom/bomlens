@@ -156,9 +156,20 @@ jobs:
             release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz
             release-assets/SHA256SUMS.txt
   
+  # Run the docs walkthrough on the TAGGED COMMIT before the gate publishes
+  # anything. verify-release.sh re-runs it later on the published image, but
+  # only after polling for async assets; a broken runnable block in the docs
+  # should stop the release as early and cheaply as possible. Runs in parallel
+  # with upload-assets, so it adds little wall-clock time.
+  docs-walkthrough:
+    name: Docs Walkthrough (release gate)
+    uses: ./.github/workflows/heavy-e2e.yml
+    with:
+      suites: docs-walkthrough
+
   release-gate:
     name: Release Gate (verify entry points, then publish)
-    needs: [create-release, upload-assets]
+    needs: [create-release, upload-assets, docs-walkthrough]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -201,7 +212,7 @@ jobs:
 
   summary:
     name: Release Summary
-    needs: [create-release, upload-assets, release-gate]
+    needs: [create-release, upload-assets, docs-walkthrough, release-gate]
     runs-on: ubuntu-latest
     
     steps:
