@@ -44,6 +44,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER="$ROOT_DIR/docker/web/server.py"
 IMAGE="${SBOM_E2E_IMAGE:-bomlens-full:local}"
 PORT="${WEB_E2E_TEST_PORT:-18091}"
+LPORT="${WEB_E2E_LAUNCHER_PORT:-18092}"
 BASE="http://127.0.0.1:${PORT}"
 PASS=0
 FAIL=0
@@ -74,6 +75,10 @@ mkdir -p "$SRC" "$OUT"
 CID=""
 cleanup() {
     [ -n "$CID" ] && docker rm -f "$CID" >/dev/null 2>&1
+    # The launcher exec's into the docker client, so killing its pid does not
+    # stop the container it published — remove it by port.
+    [ -n "${LPID:-}" ] && kill "$LPID" >/dev/null 2>&1
+    docker ps -q --filter "publish=${LPORT}" | xargs -r docker rm -f >/dev/null 2>&1
     rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -344,6 +349,56 @@ if docker exec "$CID" sh -c 'command -v scanoss-py >/dev/null 2>&1'; then
 else
     skip "regression #1: scanoss-py not in this image (use a SBOM_SCANOSS=true build)"
 fi
+
+echo "== launcher: scan-sbom.sh --ui boots the UI without a TTY =="
+# The wrapper a user actually runs (README, docs/start/first-scan.md). No other
+# suite executed it: test-web-ui.sh talks to server.py directly and the cases
+# above boot the container by hand. Guards the conditional -it fix — with no
+# TTY (CI, </dev/null) docker run must not be handed -t. The browser openers
+# are stubbed so the run is deterministic AND we can assert the launcher tried
+# to open the right URL.
+mkdir -p "$WORK/stubbin" "$WORK/launcher-out"
+for opener in open xdg-open; do
+    printf '#!/bin/sh\necho "$1" >> "%s"\n' "$WORK/opened.url" > "$WORK/stubbin/$opener"
+    chmod +x "$WORK/stubbin/$opener"
+done
+( cd "$SRC" && PATH="$WORK/stubbin:$PATH" SBOM_SCANNER_IMAGE="$IMAGE" UI_PORT="$LPORT" \
+    bash "$ROOT_DIR/scripts/scan-sbom.sh" --ui --output-dir "$WORK/launcher-out" ) \
+    > "$WORK/launcher.log" 2>&1 < /dev/null &
+LPID=$!
+lready=0
+for _ in $(seq 1 60); do
+    if curl -fsS "http://127.0.0.1:${LPORT}/capabilities" >/dev/null 2>&1; then lready=1; break; fi
+    kill -0 "$LPID" 2>/dev/null || break
+    sleep 0.5
+done
+if [ "$lready" = 1 ]; then
+    pass "scan-sbom.sh --ui boots and binds UI_PORT=$LPORT with no TTY"
+else
+    fail "scan-sbom.sh --ui did not answer on port $LPORT" \
+         "$(tail -8 "$WORK/launcher.log" 2>/dev/null)"
+fi
+if grep -q "http://localhost:${LPORT}" "$WORK/launcher.log"; then
+    pass "launcher banner advertises http://localhost:${LPORT} (UI_PORT honoured)"
+else
+    fail "launcher banner does not mention http://localhost:${LPORT}" \
+         "$(tail -4 "$WORK/launcher.log" 2>/dev/null)"
+fi
+# The opener subshell sleeps 2s before firing; poll briefly.
+opened=0
+for _ in $(seq 1 10); do
+    if grep -qs "http://localhost:${LPORT}" "$WORK/opened.url"; then opened=1; break; fi
+    sleep 0.5
+done
+if [ "$opened" = 1 ]; then
+    pass "launcher invoked the (stubbed) browser opener with http://localhost:${LPORT}"
+else
+    fail "launcher never invoked open/xdg-open with the UI URL"
+fi
+# wait reaps the job so bash does not print an async "Terminated" notice.
+{ kill "$LPID" && wait "$LPID"; } >/dev/null 2>&1
+docker ps -q --filter "publish=${LPORT}" | xargs -r docker rm -f >/dev/null 2>&1
+LPID=""
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

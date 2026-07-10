@@ -231,7 +231,11 @@ if [ "$UI_MODE" = "true" ]; then
     echo "=========================================="
     ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
         || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &
-    exec "${DOCKER_ENV[@]}" docker run --rm -it -p "${UI_PORT}:8080" \
+    # -it only when attached to a terminal: docker refuses -t without one
+    # (CI, pipes), and Ctrl+C passthrough is moot there anyway.
+    TTY_FLAGS=()
+    if [ -t 0 ] && [ -t 1 ]; then TTY_FLAGS=(-it); fi
+    exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" "$POSTPROCESS_IMAGE"

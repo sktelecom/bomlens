@@ -216,7 +216,7 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           changed="$(git diff --name-only "$BASE_SHA" HEAD)"
           echo "$changed"
-          if echo "$changed" | grep -qE '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'; then
+          if echo "$changed" | grep -qE '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
