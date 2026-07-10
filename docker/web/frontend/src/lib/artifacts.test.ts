@@ -11,6 +11,9 @@ const PREFIX = "app_1.0";
 // SBOM signature. Order is intentionally scrambled to exercise rank sorting.
 const RESULTS: ResultFile[] = [
   file(`${PREFIX}_security.json`),
+  // Internal EPSS enrichment feed — must NOT surface as a second JSON chip
+  // on the security card.
+  file(`${PREFIX}_security_epss.json`, 3),
   file(`${PREFIX}_risk-report.md`),
   file(`${PREFIX}_bom.json`, 4096),
   file(`${PREFIX}_risk-report.html`),

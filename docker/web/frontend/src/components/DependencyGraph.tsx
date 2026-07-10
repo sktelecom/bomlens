@@ -211,13 +211,18 @@ export function DependencyGraph({
         // First view: a big graph fits to unreadable dots, so when fit zoomed
         // far out, snap to zoom 1 (labels legible) and anchor the top-left —
         // the user pans/scrolls from there. Small graphs keep their fit.
-        cy.one("layoutstop", () => {
+        // dagre runs synchronously inside cytoscape(config), so layoutstop
+        // has already fired before any listener can attach — snap now, and
+        // keep the listener for any later async re-layout.
+        const snapLegible = () => {
           if (cy.zoom() < 0.9) {
             cy.zoom(1);
             const bb = cy.elements().boundingBox();
             cy.pan({ x: 24 - bb.x1, y: 24 - bb.y1 });
           }
-        });
+        };
+        snapLegible();
+        cy.one("layoutstop", snapLegible);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cy.on("tap", "node", (evt: any) => {
           setSelected(nodeById.get(evt.target.id()) ?? null);
