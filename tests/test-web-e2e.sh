@@ -76,9 +76,10 @@ CID=""
 cleanup() {
     [ -n "$CID" ] && docker rm -f "$CID" >/dev/null 2>&1
     # The launcher exec's into the docker client, so killing its pid does not
-    # stop the container it published — remove it by port.
-    [ -n "${LPID:-}" ] && kill "$LPID" >/dev/null 2>&1
+    # stop the container it published — remove the container (by port) first,
+    # which also lets the client exit on its own.
     docker ps -q --filter "publish=${LPORT}" | xargs -r docker rm -f >/dev/null 2>&1
+    [ -n "${LPID:-}" ] && kill "$LPID" >/dev/null 2>&1
     rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -395,9 +396,12 @@ if [ "$opened" = 1 ]; then
 else
     fail "launcher never invoked open/xdg-open with the UI URL"
 fi
-# wait reaps the job so bash does not print an async "Terminated" notice.
-{ kill "$LPID" && wait "$LPID"; } >/dev/null 2>&1
+# Remove the container FIRST: the launcher's docker client forwards SIGTERM
+# to the container's PID 1, which ignores it (PID-1 semantics), so waiting on
+# a merely-killed client blocks forever. Once the container is gone the
+# client exits on its own; wait then reaps the job quickly and quietly.
 docker ps -q --filter "publish=${LPORT}" | xargs -r docker rm -f >/dev/null 2>&1
+{ kill "$LPID"; wait "$LPID"; } >/dev/null 2>&1
 LPID=""
 
 echo ""
