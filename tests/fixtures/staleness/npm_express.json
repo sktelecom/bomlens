@@ -1,0 +1,9 @@
+{
+  "_comment": "Deterministic deps.dev package-response fixture for tests/test-postprocess.sh (enrich-staleness.py via STALENESS_FIXTURE_DIR). NOT a live capture; small and stable. installed 4.18.2 publishedAt is before 4.19.0 and 5.0.0, so releasesBehind=2 (the deprecated 3.x is excluded); default (latest) is 5.0.0.",
+  "versions": [
+    { "versionKey": { "version": "3.0.0" }, "publishedAt": "2012-01-01T00:00:00Z", "isDefault": false, "isDeprecated": true },
+    { "versionKey": { "version": "4.18.2" }, "publishedAt": "2022-10-08T00:00:00Z", "isDefault": false },
+    { "versionKey": { "version": "4.19.0" }, "publishedAt": "2024-03-25T00:00:00Z", "isDefault": false },
+    { "versionKey": { "version": "5.0.0" }, "publishedAt": "2024-09-10T00:00:00Z", "isDefault": true }
+  ]
+}

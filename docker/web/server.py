@@ -638,6 +638,57 @@ def sbom_summary(run_id):
             if eol_date:
                 row["eolDate"] = eol_date
 
+        # Version currency. bomlens:currency:* is offline (behind the latest patch
+        # in the same cycle, from the endoflife snapshot). bomlens:staleness:* is
+        # the opt-in deps.dev signal (absolute newest version, releases behind,
+        # last-release date). Surfaced read-only.
+        outdated = next(
+            (
+                p.get("value")
+                for p in props
+                if p.get("name") == "bomlens:currency:outdated"
+            ),
+            None,
+        )
+        if outdated:
+            row["outdated"] = outdated
+        latest_version = next(
+            (p.get("value") for p in props if p.get("name") == "bomlens:staleness:latest"),
+            None,
+        ) or next(
+            (
+                p.get("value")
+                for p in props
+                if p.get("name") == "bomlens:currency:latestPatch"
+            ),
+            None,
+        )
+        if latest_version:
+            row["latestVersion"] = latest_version
+        releases_behind = next(
+            (
+                p.get("value")
+                for p in props
+                if p.get("name") == "bomlens:staleness:releasesBehind"
+            ),
+            None,
+        )
+        if releases_behind is not None:
+            try:
+                row["releasesBehind"] = int(releases_behind)
+            except (TypeError, ValueError):
+                pass
+        last_released = next(
+            (
+                p.get("value")
+                for p in props
+                if p.get("name") == "bomlens:staleness:lastReleased"
+            ),
+            None,
+        )
+        if last_released:
+            row["lastReleased"] = last_released
+
         rows.append(row)
     # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like
     # C/C++ embedded source with no package manager. Drives the result banner.
@@ -672,9 +723,14 @@ def sbom_summary(run_id):
     # KPI is accurate on large SBOMs. eolCount = components flagged past upstream
     # support; atRiskCount = those that ALSO carry a vulnerability — the actionable
     # set, since an EOL component has no upstream patch coming for its CVEs.
-    eol_count = at_risk_count = 0
+    eol_count = at_risk_count = outdated_count = 0
     for c in comps:
         cprops = c.get("properties") or []
+        if any(
+            p.get("name") == "bomlens:currency:outdated" and p.get("value") == "true"
+            for p in cprops
+        ):
+            outdated_count += 1
         if not any(
             p.get("name") == "bomlens:eol" and p.get("value") == "true" for p in cprops
         ):
@@ -700,6 +756,7 @@ def sbom_summary(run_id):
         "transitiveCount": transitive_count,
         "eolCount": eol_count,
         "atRiskCount": at_risk_count,
+        "outdatedCount": outdated_count,
     }
 
 

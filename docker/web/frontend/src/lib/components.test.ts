@@ -28,6 +28,8 @@ const ZLIB = c({ name: "zlib", scope: "transitive", maxSeverity: "LOW", vulnCoun
 const VENDORED = c({ name: "blob", vendored: true });
 const EOL_PKG = c({ name: "openssl", eol: "true", eolDate: "2023-09-11" });
 const SUPPORTED = c({ name: "curl", eol: "false" });
+const OUTDATED_PKG = c({ name: "lodash", outdated: "true", latestVersion: "4.17.21" });
+const CURRENT_PKG = c({ name: "axios", outdated: "false" });
 const ALL = [FLASK, WERKZEUG, ZLIB, VENDORED];
 
 describe("matchesFilters", () => {
@@ -56,6 +58,19 @@ describe("matchesFilters", () => {
     expect(matchesFilters(SUPPORTED, { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
     expect(matchesFilters(c({ eol: "unknown" }), { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
     expect(matchesFilters(FLASK, { ...EMPTY_FILTERS, eolOnly: true })).toBe(false);
+  });
+
+  it("outdatedOnly keeps only components behind the latest patch", () => {
+    const set = [FLASK, OUTDATED_PKG, CURRENT_PKG];
+    const kept = set.filter((x) => matchesFilters(x, { ...EMPTY_FILTERS, outdatedOnly: true }));
+    expect(kept.map((x) => x.name)).toEqual(["lodash"]);
+  });
+
+  it("outdatedOnly excludes false/unmapped components and is distinct from eol", () => {
+    expect(matchesFilters(CURRENT_PKG, { ...EMPTY_FILTERS, outdatedOnly: true })).toBe(false);
+    expect(matchesFilters(FLASK, { ...EMPTY_FILTERS, outdatedOnly: true })).toBe(false);
+    // An EOL component is not automatically outdated (separate signal).
+    expect(matchesFilters(EOL_PKG, { ...EMPTY_FILTERS, outdatedOnly: true })).toBe(false);
   });
 
   it("query matches name/version/type/license, combinable with toggles", () => {

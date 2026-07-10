@@ -468,6 +468,15 @@ if [ "${ENRICH_EOL:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-eol bash "$LIBDIR/enrich-eol.sh" "$OUTPUT_FILE"
 fi
 
+# Staleness enrichment (OPT-IN, default off): query deps.dev for absolute version
+# currency (newest version, how many releases behind, last-release date). Unlike
+# EOL this makes one network call per package, so it trades the scan's offline
+# determinism for freshness and is only run when STALENESS_ENRICH=true. Best-effort
+# and bounded (per-request timeout + wall-clock budget); never aborts the scan.
+if [ "${STALENESS_ENRICH:-false}" = "true" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    run_optional_step enrich-staleness python3 "$LIBDIR/enrich-staleness.py" "$OUTPUT_FILE"
+fi
+
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
 # detects the machine-learning-model component and appends the G7 checks (model
 # id/license/card/integrity, datasets, openness — all advisory). Best-effort

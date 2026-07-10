@@ -132,6 +132,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
   const anyVulns = useMemo(() => items.some((c) => c.vulnCount), [items]);
   const anyVendored = useMemo(() => items.some((c) => c.vendored), [items]);
   const anyEol = useMemo(() => items.some((c) => c.eol === "true"), [items]);
+  const anyOutdated = useMemo(() => items.some((c) => c.outdated === "true"), [items]);
 
   const filtered = useMemo(
     () => selectComponents(items, filters, sort),
@@ -196,7 +197,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
         )}
       </div>
 
-      {(anyVulns || anyScope || anyVendored || anyEol) && (
+      {(anyVulns || anyScope || anyVendored || anyEol || anyOutdated) && (
         <div className="flex flex-wrap items-center gap-2">
           {anyVulns && (
             <FilterChip
@@ -228,6 +229,14 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
               onClick={() => patch({ eolOnly: !filters.eolOnly })}
             >
               {t("result.filterEol")}
+            </FilterChip>
+          )}
+          {anyOutdated && (
+            <FilterChip
+              active={filters.outdatedOnly}
+              onClick={() => patch({ outdatedOnly: !filters.outdatedOnly })}
+            >
+              {t("result.filterOutdated")}
             </FilterChip>
           )}
         </div>
@@ -301,6 +310,16 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
                       <Badge tone="high" title={t("result.eolBadgeHint")}>
                         {t("result.eolBadge")}
                         {c.eolDate ? ` · ${t("result.eolSince", { date: c.eolDate })}` : ""}
+                      </Badge>
+                    )}
+                    {/* Weaker emphasis than EOL: a supported component that simply
+                        has a newer patch available. Muted, not warning-toned. */}
+                    {c.outdated === "true" && (
+                      <Badge variant="muted" title={t("result.outdatedBadgeHint")}>
+                        {t("result.outdatedBadge")}
+                        {c.latestVersion
+                          ? ` · ${t("result.outdatedLatest", { version: c.latestVersion })}`
+                          : ""}
                       </Badge>
                     )}
                   </div>
@@ -396,6 +415,22 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
                           <dd>
                             {t("result.eolBadge")}
                             {c.eolDate ? ` (${c.eolDate})` : ""}
+                          </dd>
+                        </>
+                      ) : null}
+                      {c.outdated === "true" ? (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("result.colCurrency")}</dt>
+                          <dd>
+                            {c.latestVersion
+                              ? t("result.outdatedLatest", { version: c.latestVersion })
+                              : t("result.outdatedBadge")}
+                            {typeof c.releasesBehind === "number"
+                              ? ` · ${t("result.outdatedReleasesBehind", { count: c.releasesBehind })}`
+                              : ""}
+                            {c.lastReleased
+                              ? ` · ${t("result.outdatedLastReleased", { date: c.lastReleased })}`
+                              : ""}
                           </dd>
                         </>
                       ) : null}

@@ -83,8 +83,16 @@ if jq --argjson rules "$RULES" \
         elif gran == "major" then $s[0]
         else (if ($s | length) >= 2 then ($s[0] + "." + $s[1]) else $s[0] end)
         end;
-  def strip_eol_props:
-      (.properties // []) | map(select((.name // "") | startswith("bomlens:eol") | not));
+  # Numeric version tuple for comparison: jq compares number arrays element-wise
+  # ([3,2,0] < [3,2,12] because 0 < 12), so this gives correct semver-ish ordering
+  # without lexicographic bugs. A non-numeric qualifier (3.2.0-RC1) collapses to
+  # its numeric base ([3,2,0]) — good enough for a low-noise "behind?" check.
+  def vnum(v):
+      ((v // "") | ltrimstr("v") | split(".")
+        | map(capture("^(?<n>[0-9]+)").n // empty) | map(tonumber));
+  def strip_props:
+      (.properties // []) | map(select(((.name // "")) as $n
+        | (($n | startswith("bomlens:eol")) or ($n | startswith("bomlens:currency"))) | not));
   def put(nm; val): [{name: nm, value: (val|tostring)}];
 
   (.components) |= (if type == "array" then map(
@@ -103,19 +111,31 @@ if jq --argjson rules "$RULES" \
            elif ($entry.eol | type) == "string"
              then {state: (if ($entry.eol < $today) then "true" else "false" end), date: $entry.eol}
            else {state: "unknown", date: null} end) as $v
-        | .properties = (strip_eol_props
+        # Offline version currency: endoflife.date gives the latest patch IN this
+        # cycle, so we can tell "behind the newest patch of your release line"
+        # OFFLINE (a safe, in-cycle upgrade). Absolute cross-major currency needs
+        # the deps.dev opt-in (enrich-staleness.sh). Only when both versions parse.
+        | ($entry.latest // null) as $latest
+        | (if ($latest != null)
+              and ((vnum(.version)) | length) > 0 and ((vnum($latest)) | length) > 0
+           then (if (vnum(.version)) < (vnum($latest)) then "true" else "false" end)
+           else null end) as $outdated
+        | .properties = (strip_props
             + put("bomlens:eol"; $v.state)
             + put("bomlens:eol:product"; $rule.product)
             + (if $cyc != null then put("bomlens:eol:cycle"; $cyc) else [] end)
             + (if $v.date != null then put("bomlens:eol:date"; $v.date) else [] end)
-            + put("bomlens:eol:source"; "endoflife.date@" + $snap))
+            + put("bomlens:eol:source"; "endoflife.date@" + $snap)
+            + (if $latest != null then put("bomlens:currency:latestPatch"; $latest) else [] end)
+            + (if $outdated != null then put("bomlens:currency:outdated"; $outdated) else [] end))
       end
   ) else . end)
 ' "$SBOM" > "$TMP" 2>/dev/null; then
     E=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:eol" and .value=="true"))] | length' "$TMP" 2>/dev/null || echo 0)
     F=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:eol" and .value=="false"))] | length' "$TMP" 2>/dev/null || echo 0)
+    O=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:currency:outdated" and .value=="true"))] | length' "$TMP" 2>/dev/null || echo 0)
     mv "$TMP" "$SBOM"
-    echo "[eol] flagged ${E} end-of-life and ${F} still-supported component(s) from endoflife.date@${SNAP}."
+    echo "[eol] flagged ${E} end-of-life and ${F} still-supported component(s), ${O} behind the latest patch in their cycle, from endoflife.date@${SNAP}."
 else
     rm -f "$TMP"
     echo "[eol] WARN: EOL enrichment jq failed; leaving SBOM unchanged" >&2
