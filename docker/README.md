@@ -52,16 +52,15 @@ docker run --rm --entrypoint trivy sbom-scanner:local --version
 
 | 빌드 인자 | 기본값 | 켜면 포함되는 것 |
 |-----------|--------|------------------|
-| `SBOM_FIRMWARE` | `false` | 펌웨어 분석 도구(unblob, cve-bin-tool, ubi_reader)와 CVE DB 번들. `bomlens-firmware` 이미지가 이 옵션으로 빌드되며, NVD API 키를 BuildKit secret(`--secret id=nvd_api_key,env=NVD_API_KEY`)으로 넣어야 CVE DB 게이트를 통과합니다 |
+| `SBOM_FIRMWARE` | `false` | 펌웨어 분석 도구(unblob, cve-bin-tool, ubi_reader)와 CPE→CVE 인덱스 번들. `bomlens-firmware` 이미지가 이 옵션으로 빌드됩니다. NVD 데이터는 빌드 시 `fkie-cad/nvd-json-data-feeds`를 clone해 로컬에서 인덱스로 증류하므로 NVD API 키나 시크릿이 필요 없습니다 |
 | `SBOM_AIBOM` | `false` | AI 모델 SBOM 생성 도구(OWASP aibom-generator + cdxgen) |
 | `SBOM_DEEP_LICENSE` | `false` | scancode-toolkit 기반 딥 라이선스 스캔 |
 | `SBOM_SCANOSS` | `true` | vendored OSS 식별 클라이언트(scanoss.py). 실행은 런타임 `--identify-vendored`로 다시 gate됩니다 |
 | `SBOM_PDF` | `false` | 고지문 PDF 렌더러(weasyprint) |
 
 ```bash
-# 예: 펌웨어 분석 이미지 빌드
+# 예: 펌웨어 분석 이미지 빌드 (NVD 키·시크릿 불필요)
 docker build --build-arg SBOM_FIRMWARE=true \
-  --secret id=nvd_api_key,env=NVD_API_KEY \
   -t sbom-scanner-firmware:local .
 ```
 
