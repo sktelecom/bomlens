@@ -12,13 +12,38 @@ on:
       - overrides/**
       - mkdocs.yml
       - .github/workflows/docs.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - overrides/**
+      - mkdocs.yml
+      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # PR에서는 배포 없이 빌드만 검증한다. --strict라 깨진 링크·설정 오류가
+  # main 병합 전에 드러난다.
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      # 시스템 파이썬은 externally-managed라 venv로 격리해 의존성을 설치한다.
+      - name: Build (no deploy)
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r docs/requirements.txt
+          mkdocs build --strict
+
   deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # gh-deploy가 gh-pages 브랜치로 푸시하므로 쓰기 권한이 필요하다.
     permissions:

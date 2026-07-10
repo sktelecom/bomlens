@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    # The three defaults must be listed explicitly: naming any type replaces
+    # the default set. `labeled` lets the run-heavy-e2e label re-trigger CI so
+    # the heavy suites below can run on an opted-in PR.
+    types: [ opened, synchronize, reopened, labeled ]
   workflow_dispatch:
     inputs:
       firmware:
@@ -119,6 +123,15 @@ jobs:
         shell: bash
         run: bash tests/test-windows.sh
 
+      # The .bat entry points a Windows user actually runs (double-click,
+      # cmd) are a separate layer — cmd.exe parsing, Git Bash discovery,
+      # PATHEXT resolution — that the bash suite above bypasses. Execute
+      # them for real under cmd.exe with a stub docker.exe on PATH.
+      - name: Run .bat wrapper contract tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/test-bat-contract.ps1
+
   desktop-linux:
     name: Desktop boot tests (linux)
     runs-on: ubuntu-latest
@@ -216,7 +229,7 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           changed="$(git diff --name-only "$BASE_SHA" HEAD)"
           echo "$changed"
-          if echo "$changed" | grep -qE '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'; then
+          if echo "$changed" | grep -qE '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
@@ -228,9 +241,10 @@ jobs:
   #     stack (docker/web/**, image entry, its own harness) — the layer where a
   #     PR regression is most user-visible and the always-on contract suite
   #     cannot see container wiring.
-  #   - full-e2e / docs-walkthrough: main pushes and dispatch only (scanner PRs
+  #   - full-e2e / docs-walkthrough: main pushes and dispatch (scanner PRs
   #     already run the real-Docker integration suite); the nightly run bounds
-  #     drift on quiet days to 24h.
+  #     drift on quiet days to 24h. A PR can opt in by adding the
+  #     run-heavy-e2e label (e.g. a risky scanner or docs change).
   web-e2e:
     name: Web UI E2E
     needs: [changes]
@@ -244,7 +258,10 @@ jobs:
 
   full-e2e:
     name: Full CLI E2E
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'run-heavy-e2e'))
     uses: ./.github/workflows/heavy-e2e.yml
     with:
       suites: full-e2e
@@ -256,7 +273,10 @@ jobs:
 
   docs-walkthrough:
     name: Docs Walkthrough
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'run-heavy-e2e'))
     uses: ./.github/workflows/heavy-e2e.yml
     with:
       suites: docs-walkthrough

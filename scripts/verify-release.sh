@@ -86,6 +86,12 @@ while ! docker pull "$IMAGE" >/dev/null 2>&1; do
 done
 if docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "  ✓ pulled $IMAGE"
+    # The walkthrough's published-image page (docs/reference/docker-image.md)
+    # names the :latest tag, which docker-publish.yml only pushes from the
+    # default branch — at tag time it may not exist yet, so that page would
+    # silently SKIP. Alias the just-pulled release image locally (the same
+    # trick heavy-e2e.yml uses) so the page actually runs against THIS release.
+    docker tag "$IMAGE" "ghcr.io/${OWNER}/bomlens:latest"
 else
     echo "  ❌ could not pull $IMAGE within ${TIMEOUT}s"; fail=1
 fi
