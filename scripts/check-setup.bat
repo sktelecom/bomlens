@@ -60,7 +60,7 @@ netstat -an | findstr /R /C:":%UI_PORT% .*LISTENING" >nul 2>&1
 if errorlevel 1 (
     echo [O] UI 포트 %UI_PORT% 사용 가능
 ) else (
-    echo [X] UI 포트 %UI_PORT%이(가) 이미 사용 중입니다.
+    echo [X] UI 포트 %UI_PORT%이^(가^) 이미 사용 중입니다.
     echo     다른 포트로 실행하려면 UI_PORT를 바꾸세요. 예: set UI_PORT=9090 후 다시 실행
     set /a PROBLEMS+=1
 )
