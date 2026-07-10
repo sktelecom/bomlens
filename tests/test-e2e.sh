@@ -237,30 +237,14 @@ else
     fail "firmware merge dedupes by purl (3 unique of 4)" "got $merged"
 fi
 
-# _cvedb_progress_filter: rich repaints the same line with \r and ANSI escapes;
-# the filter must split on \r, strip ANSI, and emit one monotonic, de-duplicated
-# "[firmware-cvedb-progress] NN%" marker per advance. Source the function out of
-# scan-firmware.sh (extract just its definition so the file's top-level code,
-# which expects a real rootfs, never runs) and feed it a rich-style stream.
-if [ -f "$LIB/scan-firmware.sh" ]; then
-    sed -n '/^_cvedb_progress_filter() {/,/^}/p' "$LIB/scan-firmware.sh" > "$tmp/progress_fn.sh"
-    if [ -s "$tmp/progress_fn.sh" ]; then
-        # A rich-like repaint: one CR-terminated frame per percentage, ANSI colour
-        # codes inline, an out-of-order/duplicate frame that must be suppressed, and
-        # a final newline-terminated 100%.
-        printf '\033[36mDownloading\033[0m 0%%\r\033[36mDownloading\033[0m 37%%\r37%%\r\033[1m12%%\033[0m\r\033[36mDownloading\033[0m 100%%\n' \
-            > "$tmp/progress_in.txt"
-        got_progress="$( ( . "$tmp/progress_fn.sh"; _cvedb_progress_filter < "$tmp/progress_in.txt" ) )"
-        expected_progress="$(printf '[firmware-cvedb-progress] 0%%\n[firmware-cvedb-progress] 37%%\n[firmware-cvedb-progress] 100%%')"
-        if [ "$got_progress" = "$expected_progress" ]; then
-            pass "cvedb progress filter extracts monotonic NN% from rich \\r+ANSI stream"
-        else
-            fail "cvedb progress filter extracts monotonic NN% from rich \\r+ANSI stream" \
-                "got: $(printf '%s' "$got_progress" | tr '\n' '|')"
-        fi
-    else
-        fail "cvedb progress filter: could not extract _cvedb_progress_filter from scan-firmware.sh"
-    fi
+# The cve.db download progress filter (_cvedb_progress_filter) is gone: the
+# CPE index ships in the image, so nothing is downloaded at scan time and
+# scan-firmware.sh must no longer emit the progress marker. Guard against it
+# coming back without its consumer contract.
+if [ -f "$LIB/scan-firmware.sh" ] && grep -q "firmware-cvedb-progress" "$LIB/scan-firmware.sh"; then
+    fail "scan-firmware.sh emits firmware-cvedb-progress again — restore the filter test and the server.py consumer contract"
+else
+    pass "scan-firmware.sh no longer emits cve.db download progress (bundled CPE index)"
 fi
 rm -rf "$tmp"
 
