@@ -119,6 +119,15 @@ jobs:
         shell: bash
         run: bash tests/test-windows.sh
 
+      # The .bat entry points a Windows user actually runs (double-click,
+      # cmd) are a separate layer — cmd.exe parsing, Git Bash discovery,
+      # PATHEXT resolution — that the bash suite above bypasses. Execute
+      # them for real under cmd.exe with a stub docker.exe on PATH.
+      - name: Run .bat wrapper contract tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/test-bat-contract.ps1
+
   desktop-linux:
     name: Desktop boot tests (linux)
     runs-on: ubuntu-latest
