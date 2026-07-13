@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { DoneEvent } from "./api";
+import type { ConformanceCheck, DoneEvent } from "./api";
 import {
+  conformanceCount,
   deriveScanContext,
   sectionCounts,
   sourceTreeFileName,
@@ -142,5 +143,63 @@ describe("sectionCounts", () => {
     const counts = sectionCounts(makeResult({ sbom: { components: 5 } }));
     expect(counts.dependencies).toBeUndefined();
     expect(counts.licenses).toBeUndefined();
+  });
+
+  it("carries the conformance coverage as a badge", () => {
+    const counts = sectionCounts(
+      makeResult({
+        conformance: {
+          result: "pass",
+          checks: [
+            check({ id: "g7-a", status: "pass", source: "auto" }),
+            check({ id: "g7-b", status: "warn", source: "auto" }),
+          ],
+        },
+      }),
+    );
+    expect(counts.conformance).toBe("1/2");
+    expect(sectionCounts(makeResult()).conformance).toBeUndefined();
+  });
+});
+
+function check(over: Partial<ConformanceCheck>): ConformanceCheck {
+  return { id: "x", label: "", required: false, status: "pass", detail: "", ...over };
+}
+
+describe("conformanceCount", () => {
+  it("tallies G7 present over the automatable total", () => {
+    const result = makeResult({
+      conformance: {
+        result: "pass",
+        checks: [
+          check({ id: "purl", required: true }), // base check, ignored when G7 exists
+          check({ id: "g7-a", status: "pass", source: "auto" }),
+          check({ id: "g7-b", status: "pass", source: "inferred" }),
+          check({ id: "g7-c", status: "warn", source: "auto" }),
+          check({ id: "g7-d", status: "warn", source: "na" }), // review-only, excluded
+        ],
+      },
+    });
+    expect(conformanceCount(result)).toBe("2/3");
+  });
+
+  it("falls back to the base format tally when there are no G7 checks", () => {
+    const result = makeResult({
+      conformance: {
+        result: "fail",
+        checks: [
+          check({ id: "purl", required: true, status: "pass" }),
+          check({ id: "license", required: true, status: "fail" }),
+        ],
+      },
+    });
+    expect(conformanceCount(result)).toBe("1/2");
+  });
+
+  it("is undefined without a conformance report", () => {
+    expect(conformanceCount(makeResult())).toBeUndefined();
+    expect(
+      conformanceCount(makeResult({ conformance: { result: "unknown", checks: [] } })),
+    ).toBeUndefined();
   });
 });

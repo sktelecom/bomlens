@@ -111,7 +111,12 @@ export function Sidebar({
                     {!collapsed && <span className="truncate">{label}</span>}
                     {!collapsed && count !== undefined && (
                       <span
-                        className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground"
+                        className={cn(
+                          "ml-auto shrink-0 tabular-nums text-xs",
+                          // Muted fails AA on the active row's brand tint — keep
+                          // the count at foreground contrast there, like the label.
+                          active ? "text-foreground" : "text-muted-foreground",
+                        )}
                         title={
                           section.id === "dependencies"
                             ? t("nav.depSplitTitle")
