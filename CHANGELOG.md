@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.8.0] - 2026-07-13
+
+### Added
+
+- Components past their published end-of-life are now flagged, offline by default. A bundled endoflife.date snapshot is matched by PURL coordinate (accuracy-first closed mapping — an unmapped component is left untouched, never guessed), and the result is surfaced in the web UI results. A runtime or framework past EOL receives no upstream fixes, so this answers a supply-chain question distinct from CVEs.
+- Component version currency: the same snapshot reports when a component is behind the newest patch of its own release line (offline, default on — a safe in-cycle upgrade signal). With `STALENESS_ENRICH=true`, deps.dev is queried per package (opt-in, default off) for the absolute newest version, releases-behind, and last-release date across npm, PyPI, Maven, Go, Cargo, NuGet, and RubyGems.
+- Opt-in SPDX output: `--spdx` (env `GENERATE_SPDX`, included in `--all`) additionally exports the finished BOM as SPDX 2.3 JSON (`{prefix}_bom.spdx.json`) after every enrichment step, with its own signature under `--sign` and byte-stable output under `--byte-stable`. The web UI gains an "SPDX export" toggle. CycloneDX remains the working and upload format; CycloneDX-only data (vulnerabilities, `bomlens:*` properties) is not carried over.
+- The web UI can scan directories outside the launch folder — including the running host OS. `scan-sbom.sh --ui --mount <dir>` (repeatable; `SBOM_UI_MOUNT_DIR` for the Windows launcher) mounts each directory read-only and the Directory path input offers them as scan locations. The desktop app adds an in-app folder picker that persists the mounts across restarts. Scanning a live `/` excludes `/proc`, `/sys`, `/dev`, and `/run`.
+- The sidebar rail and the overview jump card now show the conformance coverage figure (G7 element coverage for AI SBOMs, passed/total format checks otherwise), like the component and vulnerability counts.
+- THIRD_PARTY_LICENSES.md now records the web UI's bundled fonts (Inter and JetBrains Mono, both OFL-1.1) with the attribution the license requires.
+
 ### Changed
 
+- Supplier-SBOM conformance now enforces two more submission requirements as mandatory checks: the spec version must be in the accepted range (CycloneDX 1.3–1.6 and SPDX 2.2–2.3, overridable via `CYCLONEDX_SPEC_VERSIONS`/`SPDX_SPEC_VERSIONS`; AI SBOMs also accept CycloneDX 1.7, which the AIBOM toolchain emits), and every PURL must follow the standard `pkg:type/name@version` shape — colon coordinates, a missing `pkg:` prefix, a missing version, or raw spaces now fail with the offending PURLs listed. Previously only PURL presence and the `pkg:generic` ban were enforced, so a schema-valid SBOM with malformed PURLs passed.
 - Firmware CVE matching no longer bundles cve-bin-tool's ~1.5 GB NVD database, which could not be built reliably — cve-bin-tool's NVD `api2` fetch is rate-limited into multi-hour stalls (and blocked outright from cloud runner IPs), and its `json-mirror` source is dead. cve-bin-tool now only identifies firmware binaries; their CPEs are matched against a compact index (~130 MB) distilled at build time from the NVD data feeds (`fkie-cad/nvd-json-data-feeds`, a plain git clone with no rate limit or API key). The firmware image builds on standard cloud runners again — no NVD key, no BuildKit secret, and no self-hosted runner — while offline/air-gap matching and the security-report contract are unchanged.
+
+### Fixed
+
+- `scan-sbom.sh --ui` no longer requires a TTY, so the documented web UI entry point works from CI, pipes, and wrappers instead of dying with `the input device is not a TTY`.
+- When a zip created by PowerShell `Compress-Archive` is rejected by the container's `unzip` (backslash-separated entries), the scan now explains the cause and suggests re-zipping with Explorer instead of printing a bare `unzip failed`.
+- Web UI layout defects found in a full-screen visual audit: the new-scan settings panel fits one screen again (advanced options and upload are collapsed disclosures with an enabled-count badge), large dependency graphs snap to a legible zoom instead of rendering as a dot cloud (the snap handler was attached after the synchronous initial layout and never fired), small result tables no longer pad to an empty 256px box, the overview card grid no longer leaves a lopsided empty tail, and the security artifact card no longer shows two identical "JSON" chips.
 
 ## [v1.7.0] - 2026-07-08
 
