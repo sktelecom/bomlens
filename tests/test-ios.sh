@@ -2,7 +2,8 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# test-ios.sh — regression tests for iOS lockfile coverage (CocoaPods + SPM).
+# test-ios.sh — regression tests for iOS lockfile coverage (CocoaPods; SPM is
+# covered by cdxgen's offline Package.resolved support and needs no fixture here).
 #
 # Guards the defect where a CocoaPods project produced an EMPTY SBOM: cdxgen's swift
 # language image has no `pod` CLI, so its CocoaPods cataloger yields zero components.
