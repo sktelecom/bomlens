@@ -606,6 +606,11 @@ cat > "$OUT/cfg_2.0/cfg_2.0_bom.json" <<'JSON'
 {"bomFormat":"CycloneDX","metadata":{"component":{"name":"cfg","version":"2.0","type":"application"}},
  "components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
 JSON
+# Opt-in SPDX export: an allowlisted artifact that must surface in list_results.
+cat > "$OUT/cfg_2.0/cfg_2.0_bom.spdx.json" <<'JSON'
+{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"cfg",
+ "packages":[{"SPDXID":"SPDXRef-Package-flask","name":"flask","versionInfo":"2.0"}]}
+JSON
 if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
@@ -620,6 +625,7 @@ cfg = {
     "version": "2.0",
     "notice": True,
     "security": True,
+    "spdx": True,
     "deepLicense": False,
     "identifyVendored": True,
     "includeOsv": False,
@@ -637,7 +643,7 @@ assert not server.SCANMETA_NAME.endswith(server.ARTIFACT_SUFFIXES), server.SCANM
 got = server.scanmeta("cfg_2.0")
 assert got == cfg, got
 expected_keys = {"source", "target", "project", "version", "notice", "security",
-                 "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
+                 "spdx", "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
 assert set(got) == expected_keys, set(got)
 # No secret material is ever stored.
 assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
@@ -647,6 +653,8 @@ assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
 names = [r["name"] for r in server.list_results("cfg_2.0")]
 assert server.SCANMETA_NAME not in names, names
 assert "cfg_2.0_bom.json" in names, names
+# The SPDX export is an allowlisted artifact suffix, so it is listed/downloadable.
+assert "cfg_2.0_bom.spdx.json" in names, names
 
 # scan_detail carries scanConfig for a re-opened scan.
 detail = server.scan_detail("cfg_2.0")

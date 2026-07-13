@@ -98,6 +98,8 @@ export function useScanForm({
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
+  // SPDX 2.3 export (opt-in): an extra artifact converted from the CycloneDX BOM.
+  const [spdx, setSpdx] = useState(() => initialConfig?.spdx ?? false);
   const [deepLicense, setDeepLicense] = useState(
     () => initialConfig?.deepLicense ?? false,
   );
@@ -330,6 +332,7 @@ export function useScanForm({
       // scans have no package CVEs, so security is off there.
       notice: isAnalyze ? true : notice,
       security: isAiModel ? false : isAnalyze ? true : security,
+      spdx,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
@@ -353,6 +356,7 @@ export function useScanForm({
     ...(isAiModel
       ? []
       : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
+    { key: "spdx", value: spdx, set: setSpdx },
   ];
 
   return {

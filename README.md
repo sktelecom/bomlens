@@ -61,7 +61,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest   # aliases: sbom-generator and sbo
 
 On Windows, run the same command through `scripts\scan-sbom.bat` (Git for Windows required). Other inputs — GitHub URL, source archive, Docker image, firmware — and every option are in the [input-scenarios guide](docs/guides/by-input.md) and the [CLI reference](docs/reference/cli.md).
 
-Outputs (in a `{Project}_{Version}/` subfolder, files prefixed `{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy).
+Outputs (in a `{Project}_{Version}/` subfolder, files prefixed `{Project}_{Version}_…`): `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}` (default), and `security.{json,md,html}` (Trivy). Add `--spdx` for an SPDX 2.3 copy of the SBOM (`bom.spdx.json`).
 
 ## Contributing & License
 

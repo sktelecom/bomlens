@@ -150,6 +150,19 @@ assert_bom_sane() {
         "$file" >/dev/null 2>&1
 }
 
+# Assert the opt-in SPDX export (--spdx / --all) is well-formed: an SPDX 2.x
+# JSON document with the document SPDXID and a packages array (the converted
+# components). The export is converted from the final CycloneDX BOM, so a
+# missing/malformed file means the convert-to-spdx.sh step silently broke.
+assert_spdx_sane() {
+    local file=$1
+    [ -f "$file" ] || return 1
+    jq -e '(.spdxVersion | type == "string" and startswith("SPDX-"))
+           and (.SPDXID == "SPDXRef-DOCUMENT")
+           and ((.packages | type) == "array")' \
+        "$file" >/dev/null 2>&1
+}
+
 # Assert the root component declares its direct dependencies: the dependency
 # graph entry whose ref is metadata.component's bom-ref must exist with a
 # non-empty dependsOn. Guards the JVM regression where build-prep passed
@@ -744,12 +757,15 @@ EOF
     ( cd zip-src && zip -qr app.zip app )
     cd zip-src || true
     if run_scan_with_logs "test-zip" "TestZipApp" "1.0.0" "--target app.zip --all"; then
-        if find_bom_file "TestZipApp" "1.0.0" > /dev/null \
-           && [ -f "TestZipApp_1.0.0_risk-report.md" ]; then
-            print_success "ZIP ingestion (SBOM + risk-report)"
+        # --all also turns on the SPDX export, which lands next to the CycloneDX BOM.
+        ZIP_BOM=$(find_bom_file "TestZipApp" "1.0.0" || true)
+        if [ -n "$ZIP_BOM" ] \
+           && [ -f "TestZipApp_1.0.0_risk-report.md" ] \
+           && assert_spdx_sane "$(dirname "$ZIP_BOM")/TestZipApp_1.0.0_bom.spdx.json"; then
+            print_success "ZIP ingestion (SBOM + risk-report + SPDX export)"
             ((PASSED++))
         else
-            print_error "ZIP ingestion (SBOM or risk-report missing)"
+            print_error "ZIP ingestion (SBOM, risk-report or SPDX export missing)"
             show_failure_log "test-zip"
             ((FAILED++))
         fi

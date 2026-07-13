@@ -188,6 +188,7 @@ const PARAMS: ScanParams = {
   target: "https://example.com/r.git",
   notice: true,
   security: true,
+  spdx: false,
   deepLicense: false,
   identifyVendored: false,
   includeOsv: false,

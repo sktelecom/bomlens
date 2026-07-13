@@ -68,7 +68,7 @@ TRUSCA_PROJECT_ID="${TRUSCA_PROJECT_ID:-}"
 TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
-GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
+GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
@@ -107,7 +107,8 @@ while [[ "$#" -gt 0 ]]; do
         --trusca) UPLOAD_TARGET="trusca"; TRUSCA_PROJECT_ID="$2"; shift ;;
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true" ;;
-        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true" ;;
+        --spdx) GENERATE_SPDX="true" ;;
+        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
@@ -153,7 +154,9 @@ Options:
   --upload-target <t>    Upload destination: dependency-track (default) | trusca
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
-  --all                  --notice --security
+  --spdx                 Also export the SBOM as SPDX 2.3 JSON (converted from
+                         the CycloneDX output; CycloneDX stays the primary format)
+  --all                  --notice --security --spdx
   --no-report            Skip the 오픈소스위험분석보고서 (risk-report). By default
                          the risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
@@ -307,8 +310,8 @@ SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -664,6 +667,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     echo "  SBOM: ${OUTPUT_FILE}"
     [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
     [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
+    [ "$GENERATE_SPDX" = "true" ]     && echo "  SPDX:     ${SAFE_PROJECT}_${SAFE_VERSION}_bom.spdx.json"
     [ "$MODE" = "ANALYZE" ] && echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
     [ "$GENERATE_REPORT" = "true" ] && echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
 fi
