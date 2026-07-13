@@ -53,7 +53,7 @@ ARG SBOM_DEEP_LICENSE=false
 # so shipping the client just makes the web-UI toggle available out of the box.
 ARG SBOM_SCANOSS=true
 # renovate: datasource=pypi depName=scanoss
-ARG SCANOSS_VERSION=1.25.2
+ARG SCANOSS_VERSION=1.54.1
 ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
