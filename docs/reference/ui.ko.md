@@ -36,7 +36,7 @@ cd ~/sbom-output      # 출력 폴더(아무 곳이나 가능)
 | 스캔 대상 | 입력 방식 | 백엔드 모드 |
 |-----------|-----------|-------------|
 | 현재 폴더 | UI 실행 폴더의 소스를 스캔 | SOURCE |
-| 디렉터리 경로 | 실행 폴더 하위 폴더(예: OS rootfs), 또는 `--ui --mount <dir>`로 마운트한 폴더 | ROOTFS |
+| 디렉터리 경로 | 실행 폴더 하위 폴더(예: OS rootfs), `--ui --mount <dir>`로 마운트한 폴더, 데스크톱 앱에서는 "폴더 추가" 버튼으로 고른 폴더 | ROOTFS |
 | GitHub URL | 저장소 URL 입력 | SOURCE (clone) |
 | ZIP 업로드 | `.zip`/tar 파일 업로드 | SOURCE (extract) |
 | SBOM 업로드 | 기존 SBOM(JSON) 업로드 | ANALYZE |

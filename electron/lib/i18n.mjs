@@ -33,6 +33,7 @@ const MAIN = {
       `새 버전(v${latest})이 나왔습니다. 현재 버전은 v${current}입니다.`,
     updateDownload: "다운로드 페이지 열기",
     updateLater: "나중에",
+    scanMountChooseTitle: "스캔할 폴더 선택",
   },
   en: {
     dockerChecking: "Checking Docker status...",
@@ -53,6 +54,7 @@ const MAIN = {
       `A new version (v${latest}) is available. You are on v${current}.`,
     updateDownload: "Open download page",
     updateLater: "Later",
+    scanMountChooseTitle: "Choose folders to scan",
   },
 };
 
