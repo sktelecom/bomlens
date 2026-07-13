@@ -753,7 +753,10 @@ for (const { theme, lang } of COMBOS) {
 
 test("AI scan exposes G7 conformance with present/advisory split", async ({ page }) => {
   await stubAiAndRun(page);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toBeVisible();
+  // The coverage figure surfaces before entering the section: as the rail badge
+  // and as the overview jump-card value (both from conformanceCount).
+  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toContainText("6/8");
+  await expect(page.locator("main").getByText("6/8")).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
 
   // Headline tally comes straight from the check statuses: 6 of 8 auto-covered,
@@ -779,9 +782,10 @@ for (const { theme, lang } of COMBOS) {
   test(`conformance section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAiAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-    // "6/8" and the CycloneDX label are the same in every locale.
+    // "6/8" and the CycloneDX label are the same in every locale. Scoped to
+    // <main> — the rail's conformance badge carries the same 6/8 figure.
     await expect(page.getByText("CycloneDX")).toBeVisible();
-    await expect(page.getByText(/6\s*\/\s*8/)).toBeVisible();
+    await expect(page.locator("main").getByText(/6\s*\/\s*8/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a
     // non-deterministic frame, so the whole tall section is sometimes captured 4px
