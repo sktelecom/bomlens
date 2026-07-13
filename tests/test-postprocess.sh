@@ -415,6 +415,62 @@ else
     fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
 fi
 
+echo "== conformance: spec-version range and PURL syntax are mandatory checks =="
+# The SKT submission requirements pin the accepted spec versions (CycloneDX
+# 1.3-1.6, SPDX 2.2/2.3) and require standard pkg:type/name@version PURLs.
+# A schema-valid SBOM violating either must fail conformance — the online
+# CycloneDX schema validator cannot catch these.
+jq '.specVersion="1.2"' "$FIX/good-cyclonedx.json" > "$WORK/spec-old.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spec-old.json" "$WORK/so" "supplier" >/dev/null 2>&1
+so_spec=$(jq -r '.checks[] | select(.id=="spec-version") | .status' "$WORK/so_conformance.json")
+so_res=$(jq -r '.result' "$WORK/so_conformance.json")
+[ "$so_spec/$so_res" = "fail/fail" ] && pass "CycloneDX 1.2 fails the spec-version check (and overall)" || fail "CycloneDX 1.2: spec=$so_spec result=$so_res, expected fail/fail"
+
+# Tolerated real-world PURL shapes must NOT be flagged: unencoded and
+# percent-encoded npm scopes, golang multi-segment namespaces, rpm qualifiers.
+jq '.components += [
+  {"type":"library","name":"scoped","version":"7.0.0","purl":"pkg:npm/@babel/core@7.0.0"},
+  {"type":"library","name":"scoped-enc","version":"20.1.0","purl":"pkg:npm/%40types/node@20.1.0"},
+  {"type":"library","name":"gin","version":"v1.8.1","purl":"pkg:golang/github.com/gin-gonic/gin@v1.8.1"},
+  {"type":"library","name":"glibc","version":"2.17","purl":"pkg:rpm/centos/glibc@2.17-317.el7?arch=x86_64"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/purl-ok.json"
+bash "$LIB/validate-sbom.sh" "$WORK/purl-ok.json" "$WORK/pok" "supplier" >/dev/null 2>&1
+pok=$(jq -r '"\(.result)/\(.checks[] | select(.id=="purl-syntax") | .status)"' "$WORK/pok_conformance.json")
+[ "$pok" = "pass/pass" ] && pass "scoped npm / golang / rpm-qualifier PURLs are accepted" || fail "valid PURL shapes rejected: $pok"
+
+# Malformed PURLs (colon coordinates, missing @version, raw space) must fail
+# with the offenders listed. They still carry a purl, so the coverage check
+# stays green — only the new syntax check may catch them.
+jq '.components += [
+  {"type":"library","name":"commons-lang3","version":"3.12.0","purl":"commons-lang3:3.12.0"},
+  {"type":"library","name":"noversion","version":"1.0","purl":"pkg:npm/noversion"},
+  {"type":"library","name":"spacey","version":"1.0","purl":"pkg:npm/bad name@1.0"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/purl-bad.json"
+bash "$LIB/validate-sbom.sh" "$WORK/purl-bad.json" "$WORK/pbad" "supplier" >/dev/null 2>&1
+pb_stat=$(jq -r '.checks[] | select(.id=="purl-syntax") | "\(.status) \(.detail)"' "$WORK/pbad_conformance.json")
+[ "$pb_stat" = "fail 3 malformed" ] && pass "malformed PURLs fail the syntax check (3 offenders)" || fail "purl-syntax check: '$pb_stat', expected 'fail 3 malformed'"
+jq -e '.checks[] | select(.id=="purl-syntax") | .missing | index("commons-lang3:3.12.0")' "$WORK/pbad_conformance.json" >/dev/null \
+    && pass "purl-syntax missing list names the offending PURL" || fail "purl-syntax missing list lacks commons-lang3:3.12.0"
+pb_cov=$(jq -r '.checks[] | select(.id=="purl") | .status' "$WORK/pbad_conformance.json")
+[ "$pb_cov" = "pass" ] && pass "PURL coverage stays green (syntax is a separate check)" || fail "purl coverage='$pb_cov', expected pass"
+
+# SPDX JSON: version range + purl syntax over externalRefs locators.
+jq '.spdxVersion="SPDX-2.1"' "$FIX/good-spdx.json" > "$WORK/spdx-old.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-old.json" "$WORK/sdo" "supplier" >/dev/null 2>&1
+sdo=$(jq -r '.checks[] | select(.id=="spec-version") | .status' "$WORK/sdo_conformance.json")
+[ "$sdo" = "fail" ] && pass "SPDX-2.1 fails the spec-version check" || fail "SPDX-2.1 spec-version='$sdo', expected fail"
+jq '.packages[0].externalRefs[0].referenceLocator="express@4.18.2"' "$FIX/good-spdx.json" > "$WORK/spdx-badpurl.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-badpurl.json" "$WORK/sdb" "supplier" >/dev/null 2>&1
+sdb=$(jq -r '.checks[] | select(.id=="purl-syntax") | "\(.status)|\(.missing|join(","))"' "$WORK/sdb_conformance.json")
+[ "$sdb" = "fail|express@4.18.2" ] && pass "SPDX bad purl locator fails with the offender listed" || fail "SPDX purl-syntax: '$sdb'"
+
+# SPDX Tag-Value: coarse spec-version gate (the clean fixture passing both new
+# checks is covered by D-4 above).
+sed 's/^SPDXVersion: SPDX-2.3$/SPDXVersion: SPDX-2.1/' "$FIX/supplier-clean-tagvalue.spdx" > "$WORK/tv-old.spdx"
+bash "$LIB/validate-sbom.sh" "$WORK/tv-old.spdx" "$WORK/tvo" "supplier" >/dev/null 2>&1
+tvo=$(jq -r '"\(.checks[] | select(.id=="spec-version") | .status)/\(.result)"' "$WORK/tvo_conformance.json")
+[ "$tvo" = "fail/fail" ] && pass "Tag-Value SPDX-2.1 fails the spec-version check" || fail "Tag-Value spec-version: '$tvo', expected fail/fail"
+
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
 # `pip install`) emits BOTH the requirements.txt range lower bound (flask@2.0,
