@@ -68,7 +68,7 @@ TRUSCA_PROJECT_ID="${TRUSCA_PROJECT_ID:-}"
 TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
-GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; DEEP_LICENSE="false"
+GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
@@ -78,6 +78,7 @@ INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
 MERGE_ROOT=""
 OUTPUT_BASE=""; TIMESTAMP="false"
+UI_MOUNTS=()
 
 # ========================================================
 # Parse arguments
@@ -107,7 +108,8 @@ while [[ "$#" -gt 0 ]]; do
         --trusca) UPLOAD_TARGET="trusca"; TRUSCA_PROJECT_ID="$2"; shift ;;
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true" ;;
-        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true" ;;
+        --spdx) GENERATE_SPDX="true" ;;
+        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
@@ -116,6 +118,7 @@ while [[ "$#" -gt 0 ]]; do
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
         --ui) UI_MODE="true" ;;
+        --mount) UI_MOUNTS+=("$2"); shift ;;
         --help)
             cat << EOF
 Usage: $0 --project <name> --version <ver> [OPTIONS]
@@ -153,7 +156,9 @@ Options:
   --upload-target <t>    Upload destination: dependency-track (default) | trusca
   --notice               Open-source NOTICE (txt+html)
   --security             Trivy security report (json+md+html)
-  --all                  --notice --security
+  --spdx                 Also export the SBOM as SPDX 2.3 JSON (converted from
+                         the CycloneDX output; CycloneDX stays the primary format)
+  --all                  --notice --security --spdx
   --no-report            Skip the 오픈소스위험분석보고서 (risk-report). By default
                          the risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
@@ -173,6 +178,10 @@ Options:
                          instead of overwritten. Folder name only; SBOM bytes are
                          unchanged (orthogonal to --byte-stable).
   --ui                   Launch local web UI
+  --mount <dir>          With --ui: expose an extra host directory to the web
+                         UI as a read-only rootfs scan target (repeatable).
+                         Lets the UI scan OS trees outside the launch folder,
+                         e.g. --mount / to scan the running host OS.
   --help                 Show this help
 
 Environment:
@@ -230,6 +239,26 @@ if [ "$UI_MODE" = "true" ]; then
     # The web UI owns per-run subfolders itself (server.py creates them under the
     # mounted base). Honor --output-dir as that base; default to the current dir.
     UI_BASE="${OUTPUT_BASE:-$(pwd)}"
+    # Extra --mount dirs become read-only rootfs scan targets under
+    # /scan-targets/<name>. SBOM_UI_SCAN_ROOTS carries "<container>|<host>"
+    # lines so server.py can allow-list them and the UI can label them by
+    # their host path ('|' cannot appear in the container path we build, and
+    # is illegal in Windows host paths). Read-only keeps a mounted live OS
+    # (e.g. --mount /) safe, and outputs still land only in /host-output.
+    MOUNT_FLAGS=(); SCAN_ROOTS=""; SEEN_NAMES=" "
+    for m in "${UI_MOUNTS[@]}"; do
+        [ -d "$m" ] || { echo "[ERROR] --mount path is not a directory: $m"; exit 1; }
+        abs="$(cd "$m" && pwd)"
+        name="$(printf '%s' "$(basename "$abs")" | tr -c 'A-Za-z0-9._-' '-')"
+        case "$name" in ''|-|.|..) name="root" ;; esac
+        n=2; uniq="$name"
+        while case "$SEEN_NAMES" in *" $uniq "*) true ;; *) false ;; esac; do
+            uniq="$name-$n"; n=$((n+1))
+        done
+        SEEN_NAMES="$SEEN_NAMES$uniq "
+        MOUNT_FLAGS+=(-v "$(hostpath "$abs"):/scan-targets/$uniq:ro")
+        SCAN_ROOTS="$SCAN_ROOTS/scan-targets/$uniq|$(hostpath "$abs")"$'\n'
+    done
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
@@ -241,9 +270,12 @@ if [ "$UI_MODE" = "true" ]; then
     if [ -t 0 ] && [ -t 1 ]; then TTY_FLAGS=(-it); fi
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
+        "${MOUNT_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" "$POSTPROCESS_IMAGE"
+        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
+        -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" "$POSTPROCESS_IMAGE"
 fi
+[ "${#UI_MOUNTS[@]}" -eq 0 ] || { echo "[ERROR] --mount requires --ui."; exit 1; }
 
 # ========================================================
 # Validate
@@ -307,8 +339,8 @@ SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -664,6 +696,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     echo "  SBOM: ${OUTPUT_FILE}"
     [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
     [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
+    [ "$GENERATE_SPDX" = "true" ]     && echo "  SPDX:     ${SAFE_PROJECT}_${SAFE_VERSION}_bom.spdx.json"
     [ "$MODE" = "ANALYZE" ] && echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
     [ "$GENERATE_REPORT" = "true" ] && echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
 fi

@@ -4,7 +4,7 @@ description: The output files BomLens produces — file list, when each is gener
 
 # Artifacts reference
 
-The generated SBOM is CycloneDX 1.6 JSON.
+The generated SBOM is CycloneDX 1.6 JSON. With `--spdx` an SPDX 2.3 JSON copy is exported alongside it, converted from the final CycloneDX BOM — CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties) is not carried over.
 
 The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
@@ -13,12 +13,13 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 | File | When generated | Description |
 |------|----------------|-------------|
 | `{Project}_{Version}_bom.json` | always | SBOM (CycloneDX 1.6) |
+| `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all` | SBOM (SPDX 2.3, converted from the CycloneDX output) |
 | `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / risk report default | open-source notice |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / risk report default | Trivy security report |
 | `{Project}_{Version}_risk-report.md` / `.html` | default (all modes) — omit with `--no-report` | open-source risk report |
 | `{Project}_{Version}_conformance.json` / `.md` / `.html` | `--analyze` | format conformance report |
 | `{Project}_{Version}_scancode.json` | `--deep-license` | raw scancode result |
-| `{Project}_{Version}_bom.json.sig` | `--sign` | cosign signature |
+| `{Project}_{Version}_bom.json.sig` | `--sign` | cosign signature (with `--spdx`, a `_bom.spdx.json.sig` is produced too) |
 
 `{P}` = project name, `{V}` = version (special characters are normalized to `_`).
 

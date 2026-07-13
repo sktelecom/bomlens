@@ -259,7 +259,15 @@ EOF
     ROOTFS)
         if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR"; exit 1; fi
         echo "[1/2] syft: RootFS $TARGET_DIR"
-        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null; then
+        # Skip pseudo filesystems: a live host / mounted via `--ui --mount /`
+        # brings /proc, /sys, /dev and /run along (docker bind mounts recurse
+        # into submounts), and walking them is slow and can error out. They
+        # never hold packages, so excluding them is safe for extracted
+        # rootfs trees too.
+        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json@1.6 \
+                --exclude './proc/**' --exclude './sys/**' \
+                --exclude './dev/**' --exclude './run/**' \
+                > "$OUTPUT_FILE" 2>/dev/null; then
             echo "[ERROR] syft directory scan failed."; exit 1
         fi
         ;;
@@ -538,12 +546,31 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
     fi
 fi
 
+# SPDX export (opt-in): convert the FINISHED CycloneDX BOM to SPDX 2.3 JSON as an
+# additional artifact. Runs after every enrichment (so the SPDX reflects the final
+# BOM) and before signing (so an enabled --sign covers it too). CycloneDX remains
+# the working/upload format — Trivy, notice and Dependency-Track all consume it.
+SPDX_FILE="${OUT_PREFIX}_bom.spdx.json"
+if [ "${GENERATE_SPDX:-false}" = "true" ]; then
+    SPDX_ARGS=("$OUTPUT_FILE" "$SPDX_FILE")
+    [ "${BYTE_STABLE:-false}" = "true" ] && SPDX_ARGS+=(--stable)
+    if bash "$LIBDIR/convert-to-spdx.sh" "${SPDX_ARGS[@]}"; then
+        ARTIFACTS+=("$SPDX_FILE")
+    else
+        echo "[WARN] SPDX export failed; the CycloneDX SBOM and other artifacts are unaffected."
+    fi
+fi
+
 if [ "${SIGN_SBOM:-false}" = "true" ]; then
     if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
         echo "[INFO] Signing SBOM with cosign..."
         if cosign sign-blob --yes --tlog-upload=false --key "$COSIGN_KEY" \
                --output-signature "${OUTPUT_FILE}.sig" "$OUTPUT_FILE"; then
             ARTIFACTS+=("${OUTPUT_FILE}.sig")
+        fi
+        if [ -f "$SPDX_FILE" ] && cosign sign-blob --yes --tlog-upload=false --key "$COSIGN_KEY" \
+               --output-signature "${SPDX_FILE}.sig" "$SPDX_FILE"; then
+            ARTIFACTS+=("${SPDX_FILE}.sig")
         fi
     else
         echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."

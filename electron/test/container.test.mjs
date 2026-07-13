@@ -12,6 +12,7 @@ import {
   FIRMWARE_IMAGE,
   defaultOutputDir,
   findFreePort,
+  scanMountArgs,
 } from "../lib/container.mjs";
 
 // cleanupOrphans용 가짜 run: docker 호출을 기록하고 ps 응답만 주입한다.
@@ -92,6 +93,46 @@ test("cleanupOrphans returns 0 quietly when docker ps fails", async () => {
   const { calls, runImpl } = fakeRun({ code: 1, out: "", err: "docker daemon down" });
   assert.equal(await cleanupOrphans({ runImpl }), 0);
   assert.equal(calls.length, 1);
+});
+
+test("scanMountArgs mounts each folder read-only and passes the roots env", () => {
+  // scan-sbom.sh --ui --mount와 같은 계약: /scan-targets/<이름>:ro 마운트 +
+  // SBOM_UI_SCAN_ROOTS("<컨테이너 경로>|<호스트 경로>" 줄 단위).
+  const args = scanMountArgs(["/data/server-rootfs"]);
+  assert.deepEqual(args, [
+    "-v",
+    "/data/server-rootfs:/scan-targets/server-rootfs:ro",
+    "-e",
+    "SBOM_UI_SCAN_ROOTS=/scan-targets/server-rootfs|/data/server-rootfs\n",
+  ]);
+});
+
+test("scanMountArgs dedupes clashing folder names with a numeric suffix", () => {
+  const args = scanMountArgs(["/a/rootfs", "/b/rootfs"]);
+  assert.equal(args[1], "/a/rootfs:/scan-targets/rootfs:ro");
+  assert.equal(args[3], "/b/rootfs:/scan-targets/rootfs-2:ro");
+});
+
+test("scanMountArgs names filesystem roots 'root' and sanitizes odd characters", () => {
+  // 리눅스 루트("/")와 윈도우 드라이브 루트("C:\")는 마지막 경로 조각이 없다.
+  assert.equal(scanMountArgs(["/"])[1], "/:/scan-targets/root:ro");
+  assert.equal(scanMountArgs(["C:\\"])[1], "C:\\:/scan-targets/root:ro");
+  // 한글·공백 등 허용 밖 문자는 '-'로 치환된다(컨테이너 경로만; 호스트 경로는 그대로).
+  assert.equal(scanMountArgs(["/mnt/서버 백업"])[1], "/mnt/서버 백업:/scan-targets/-----:ro");
+});
+
+test("scanMountArgs skips blank entries and returns [] for an empty list", () => {
+  assert.deepEqual(scanMountArgs([]), []);
+  assert.deepEqual(scanMountArgs(["", "   ", null]), []);
+});
+
+test("scanMountArgs keeps a Windows folder path intact in mount and env", () => {
+  const args = scanMountArgs(["C:\\Users\\me\\extracted-rootfs"]);
+  assert.equal(args[1], "C:\\Users\\me\\extracted-rootfs:/scan-targets/extracted-rootfs:ro");
+  assert.equal(
+    args[3],
+    "SBOM_UI_SCAN_ROOTS=/scan-targets/extracted-rootfs|C:\\Users\\me\\extracted-rootfs\n",
+  );
 });
 
 test("sibling image refs default to the firmware/aibom images", () => {

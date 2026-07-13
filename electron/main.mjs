@@ -18,6 +18,7 @@ import {
   UiContainer,
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
+import { addScanMounts, parseScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
 import { createStartupLogger } from "./lib/log.mjs";
 import { parseWindowState, sanitizeBounds } from "./lib/winstate.mjs";
@@ -70,6 +71,62 @@ function hardenWebContents(contents) {
       if (url.startsWith("http:") || url.startsWith("https:")) shell.openExternal(url);
     }
   });
+}
+
+// 추가 스캔 폴더(웹 UI "디렉터리 경로" 입력의 선택지가 되는 읽기 전용 마운트):
+// userData/scan-mounts.json에 저장하고 컨테이너 기동 인자에 반영한다(lib/scanmounts.mjs).
+// 마운트는 기동 시점에만 붙일 수 있으므로, 목록이 바뀌면 컨테이너를 재시작한다.
+function scanMountsPath() {
+  return path.join(app.getPath("userData"), "scan-mounts.json");
+}
+
+// 저장된 목록 그대로(존재하지 않는 폴더 포함) — IPC 추가/제거의 기준이 된다.
+function savedScanMounts() {
+  try {
+    return parseScanMounts(fs.readFileSync(scanMountsPath(), "utf8"));
+  } catch {
+    // 파일 없음/읽기 실패: 첫 실행처럼 빈 목록.
+    return [];
+  }
+}
+
+// 실제로 마운트할 목록: 사라진 폴더(이동/삭제/USB 분리)는 이번 기동에서만 빼고
+// 목록에는 남긴다 — 폴더가 돌아오면 다음 실행에서 다시 붙는다. docker run이
+// 없는 경로로 실패하는 것보다 낫다.
+function mountableScanMounts() {
+  return savedScanMounts().filter((dir) => {
+    try {
+      return fs.statSync(dir).isDirectory();
+    } catch {
+      startupLogger?.line(`scan mount skipped (not a directory): ${dir}`);
+      return false;
+    }
+  });
+}
+
+function saveScanMounts(list) {
+  try {
+    fs.writeFileSync(scanMountsPath(), JSON.stringify(list));
+  } catch {
+    // 저장 실패는 무시한다(이번 실행의 마운트는 유지되고, 다음 실행에서 빠질 뿐이다).
+  }
+}
+
+// 마운트 목록 변경 후 컨테이너 재시작: 상태 화면으로 돌아가 부팅을 재개한다.
+// 진행 중인 스캔도 함께 끊기므로, 호출부(렌더러)가 사용자 동작에만 묶는다.
+async function restartForScanMounts() {
+  healthMonitor?.stop();
+  healthMonitor = null;
+  const current = container;
+  container = null;
+  appOrigin = "file://";
+  await current?.stop();
+  if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
+  await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
+    query: { lang, v: app.getVersion() },
+  });
+  setBootState(BOOT.IDLE);
+  startup().catch((err) => status(t.startFailed(err.message)));
 }
 
 // 창 위치/크기 기억: userData/window-state.json에 저장하고 다음 실행에서 복원한다.
@@ -168,7 +225,11 @@ async function startup() {
   status(t.startingUi);
   try {
     const port = await findFreePort();
-    container = new UiContainer({ image: DEFAULT_IMAGE, hostPort: port });
+    container = new UiContainer({
+      image: DEFAULT_IMAGE,
+      hostPort: port,
+      scanMounts: mountableScanMounts(),
+    });
     await container.start({ timeoutMs: 90000 });
 
     appOrigin = `http://127.0.0.1:${port}`;
@@ -286,6 +347,42 @@ function registerApp() {
     container = null;
     startup().catch((err) => status(t.startFailed(err.message)));
     return { ok: true };
+  });
+
+  // 스캔 폴더 추가/제거(웹 UI의 "디렉터리 경로" 입력에서 호출). 가드:
+  // 1) 우리 출처에서 온 요청만 — 컨테이너 SPA(appOrigin) 또는 시작 화면(file://).
+  // 2) 부팅 진행 중이나 종료 절차 중에는 거부(재시작 경합 방지).
+  // 추가/제거 후에는 컨테이너를 재시작해야 마운트가 반영된다(진행 중 스캔도 끊긴다).
+  function scanMountsAllowed(event) {
+    const url = event.senderFrame?.url ?? "";
+    if (!url.startsWith("file://") && !(appOrigin !== "file://" && url.startsWith(appOrigin))) {
+      return false;
+    }
+    return !isBusy(bootState) && !shutdownPromise;
+  }
+
+  ipcMain.handle("scan-mounts:choose", async (event) => {
+    if (!scanMountsAllowed(event)) return { ok: false, reason: "busy" };
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: t.scanMountChooseTitle,
+      properties: ["openDirectory", "multiSelections"],
+    });
+    if (canceled || filePaths.length === 0) return { ok: false, reason: "canceled" };
+    const next = addScanMounts(savedScanMounts(), filePaths);
+    saveScanMounts(next);
+    await restartForScanMounts();
+    return { ok: true, mounts: next };
+  });
+
+  ipcMain.handle("scan-mounts:remove", async (event, hostPath) => {
+    if (!scanMountsAllowed(event)) return { ok: false, reason: "busy" };
+    if (typeof hostPath !== "string" || !hostPath) return { ok: false, reason: "bad-path" };
+    const current = savedScanMounts();
+    const next = removeScanMount(current, hostPath);
+    if (next.length === current.length) return { ok: false, reason: "not-found" };
+    saveScanMounts(next);
+    await restartForScanMounts();
+    return { ok: true, mounts: next };
   });
 
   app.whenReady().then(async () => {

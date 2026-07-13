@@ -24,7 +24,8 @@ import {
 import type { ResultFile } from "./api";
 
 export interface ArtifactFormat {
-  /** Lowercase extension: "html" | "md" | "json" | "txt" | "sig". */
+  /** Lowercase extension: "html" | "md" | "json" | "txt" | "sig", or the
+   *  pseudo-extension "spdx" for the `.spdx.json` export. */
   ext: string;
   /** Full filename (download/view target). */
   name: string;
@@ -68,7 +69,8 @@ const GROUPS: GroupSpec[] = [
     Icon: FileJson,
     primary: false,
     rank: 1,
-    match: (n) => n.endsWith("_bom.json"),
+    // The opt-in SPDX export rides on the SBOM card as an extra format chip.
+    match: (n) => n.endsWith("_bom.json") || n.endsWith("_bom.spdx.json"),
   },
   {
     key: "notice",
@@ -104,9 +106,12 @@ const GROUPS: GroupSpec[] = [
 ];
 
 // Preferred chip order within a card: rich/human formats first.
-const FORMAT_RANK: Record<string, number> = { html: 0, md: 1, txt: 2, json: 3 };
+const FORMAT_RANK: Record<string, number> = { html: 0, md: 1, txt: 2, json: 3, spdx: 4 };
 
 function extOf(name: string): string {
+  // The SPDX export is also .json; a distinct pseudo-extension keeps its chip
+  // distinguishable from the CycloneDX one ("SPDX" vs "JSON").
+  if (name.endsWith(".spdx.json")) return "spdx";
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
 }
@@ -117,7 +122,7 @@ function toFormat(f: ResultFile): ArtifactFormat {
     ext,
     name: f.name,
     size: f.size,
-    viewable: ext !== "sig" && ["html", "json", "txt", "md"].includes(ext),
+    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx"].includes(ext),
   };
 }
 
@@ -126,7 +131,11 @@ function byFormatPref(a: ArtifactFormat, b: ArtifactFormat): number {
 }
 
 export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
-  const sig = results.find((r) => r.name.endsWith(".sig"));
+  // With --sign + --spdx two signatures exist; the card carries the CycloneDX
+  // one (the primary SBOM). The SPDX .sig stays in the download-all ZIP.
+  const sig =
+    results.find((r) => r.name.endsWith("_bom.json.sig")) ??
+    results.find((r) => r.name.endsWith(".sig"));
   const out: LogicalArtifact[] = [];
 
   for (const spec of GROUPS) {

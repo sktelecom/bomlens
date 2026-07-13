@@ -21,7 +21,15 @@
     "currentDirHint": "Scans the source in this folder (mounted as /src). To scan a different folder, run --ui from there.",
     "rootfsDir": "Directory / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (relative to the current folder)",
-    "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. Paths outside the folder are rejected — place the rootfs under the launch folder, or use a Docker image instead.",
+    "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. Paths outside the folder are rejected — place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
+    "scanRoot": "Scan location",
+    "scanRootCurrent": "Current folder ({{path}})",
+    "scanRootCurrentNoPath": "Current folder",
+    "rootfsSubpath": "Subfolder (optional)",
+    "rootfsSubpathHint": "Leave empty to scan the whole mounted folder, or narrow the scan to a subfolder inside it.",
+    "addScanFolder": "Add folder…",
+    "removeScanFolder": "Remove this folder from the list",
+    "scanFolderDesktopHint": "Added folders are read-only scan targets. Adding or removing one restarts the scanner briefly.",
     "gitUrl": "GitHub URL",
     "gitHint": "Public repos clone directly; for private repos enter a token below.",
     "gitPlaceholder": "https://github.com/org/repo",
@@ -51,6 +59,8 @@
     "aiNoticeHint": "For an AI model the notice lists the model and dataset licenses and flags use-restricted ones (RAIL, non-commercial) for review — worth keeping on.",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
+    "spdx": "SPDX export",
+    "spdxHint": "Also export the SBOM as SPDX 2.3 JSON, converted from the CycloneDX output",
     "deepLicense": "Per-file license scan",
     "deepLicenseHint": "Scans your own source files with ScanCode for per-file license text and headers, in addition to the licenses each package declares (slow).",
     "scanMethodHint": "Advanced analysis for source scanned without a package manager. If your project builds with one (Maven, npm, pip, Go modules…), the SBOM is already complete and these can stay off.",
@@ -132,7 +142,7 @@
       },
       "sbom": {
         "title": "SBOM (CycloneDX)",
-        "desc": "The normalized software bill of materials in CycloneDX JSON."
+        "desc": "The normalized software bill of materials in CycloneDX JSON, plus an SPDX 2.3 conversion when enabled."
       },
       "notice": {
         "title": "Open-source notice",

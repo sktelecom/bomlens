@@ -4,6 +4,7 @@
  * Pure functions, unit tested — the rail's adaptation depends on them.
  */
 import type { DoneEvent } from "./api";
+import { baseTally, g7Tally, splitChecks } from "./conformance";
 import { EMPTY_SCAN, type ScanContext, type SectionId } from "./nav";
 
 /** The generated CycloneDX SBOM artifact, if present (drives the graph view). */
@@ -55,6 +56,21 @@ export function isAiScan(result: DoneEvent): boolean {
 }
 
 /**
+ * Conformance coverage as a `passed/total` string, mirroring the panel
+ * headlines: G7 `present/autoTotal` when the scan has G7 AI checks, otherwise
+ * the base format tally. Undefined when there is nothing to count, so both
+ * the rail badge and the overview tile can simply omit it.
+ */
+export function conformanceCount(result: DoneEvent): string | undefined {
+  const { base, g7 } = splitChecks(result.conformance?.checks ?? []);
+  const g7t = g7Tally(g7);
+  if (g7t.autoTotal > 0) return `${g7t.present}/${g7t.autoTotal}`;
+  const baseT = baseTally(base);
+  if (baseT.total > 0) return `${baseT.passed}/${baseT.total}`;
+  return undefined;
+}
+
+/**
  * Counts shown as trailing rail badges (mirrors the classic tab counts). Most
  * are a single number; dependencies is a `direct/transitive` split, which is
  * more telling than the total (the total just mirrors the component count).
@@ -74,6 +90,7 @@ export function sectionCounts(
     components: result.sbom?.components ?? 0,
     dependencies: direct + transitive > 0 ? `${direct}/${transitive}` : undefined,
     vulnerabilities: result.security?.TOTAL ?? 0,
+    conformance: conformanceCount(result),
     licenses: licenses.size > 0 ? licenses.size : undefined,
     artifacts: result.results.length,
     models: componentList.filter((c) => c.type === "machine-learning-model")

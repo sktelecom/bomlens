@@ -178,6 +178,8 @@ export interface ScanConfig {
   version: string;
   notice: boolean;
   security: boolean;
+  /** SPDX 2.3 export (opt-in extra artifact). Absent on older sidecars. */
+  spdx?: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
   includeOsv: boolean;
@@ -239,6 +241,8 @@ export interface ScanParams {
   scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
+  /** Also export the SBOM as SPDX 2.3 JSON (converted from the CycloneDX BOM). */
+  spdx: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
   /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
@@ -285,6 +289,9 @@ export interface Capabilities {
   firmwareImage?: string;
   aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
+  /** Extra read-only scan targets from `--ui --mount <dir>`: container path
+   *  (sent as the rootfs-dir scan target) + host path (shown to the user). */
+  scanRoots?: { path: string; hostPath: string }[];
 }
 
 /** Which input types this running image supports (firmware needs the fw image). */
@@ -442,6 +449,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
+    spdx: String(params.spdx),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),

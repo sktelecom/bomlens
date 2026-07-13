@@ -31,7 +31,13 @@ cleanup() { [ -n "$SRV_PID" ] && kill "$SRV_PID" 2>/dev/null; rm -rf "$WORK"; }
 trap cleanup EXIT
 
 echo "== starting server.py standalone (SBOM_OUTPUT_DIR=$OUT, port $PORT) =="
+# An extra --mount scan target, as scan-sbom.sh --ui --mount would pass it:
+# "<container path>|<host path>" (one per line). A bogus second entry must be
+# dropped with a warning, not break startup.
+SCANROOT="$WORK/scanroot"; mkdir -p "$SCANROOT/etc"
 SBOM_OUTPUT_DIR="$OUT" UI_PORT="$PORT" SBOM_UI_HOST_DIR="$WORK" \
+    SBOM_UI_SCAN_ROOTS="$SCANROOT|/host/mounted
+/does-not-exist|/host/bogus" \
     python3 "$SERVER" > "$WORK/server.log" 2>&1 &
 SRV_PID=$!
 disown "$SRV_PID" 2>/dev/null || true  # silence the job-control "Terminated" notice on cleanup
@@ -59,6 +65,17 @@ if curl -fsS "$BASE/results" 2>/dev/null | python3 -c "import sys,json;assert is
     pass "/results returns a JSON array"
 else
     fail "/results is not a JSON array"
+fi
+# Extra --mount scan targets are surfaced (path + host label); the entry whose
+# container path does not exist is dropped.
+if echo "$caps" | SCANROOT="$SCANROOT" python3 -c "
+import sys, json, os
+roots = json.load(sys.stdin).get('scanRoots')
+assert roots == [{'path': os.environ['SCANROOT'], 'hostPath': '/host/mounted'}], roots
+" 2>/dev/null; then
+    pass "/capabilities lists the valid scan root and drops the bogus one"
+else
+    fail "/capabilities scanRoots wrong" "$caps"
 fi
 
 echo "== sibling docker-run dispatch is allowlist-guarded =="
@@ -250,6 +267,45 @@ fi
 echo "== path traversal is blocked =="
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?name=../../etc/passwd")
 [ "$code" = "404" ] && pass "/file blocks path traversal (404)" || fail "/file traversal returned $code (expected 404)"
+
+echo "== rootfs scan-root boundary (safe_scan_dir with extra --mount roots) =="
+if SBOM_OUTPUT_DIR="$OUT" SBOM_UI_SCAN_ROOTS="$SCANROOT|/host/mounted" \
+   python3 - "$ROOT_DIR" "$SCANROOT" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+root = sys.argv[2]
+real_root = os.path.realpath(root)
+
+# The mounted root itself and subfolders inside it are allowed.
+assert server.safe_scan_dir(root) == real_root
+assert server.safe_scan_dir(root + "/etc") == os.path.join(real_root, "etc")
+
+# Traversal, absolute outside paths and control characters are rejected.
+assert server.safe_scan_dir(root + "/../outside") is None
+assert server.safe_scan_dir("/etc") is None
+assert server.safe_scan_dir("/scan-targets-evil") is None
+assert server.safe_scan_dir(root + "/etc\n") is None
+assert server.safe_scan_dir("") is None
+
+# A symlink inside the mount pointing outside must not escape the boundary.
+link = os.path.join(root, "escape")
+if not os.path.lexists(link):
+    os.symlink("/etc", link)
+assert server.safe_scan_dir(link) is None
+
+# Non-mounted input still resolves relative to /src (classic behavior): with
+# no /src on this host it must come back None (rejected), never throw or fall
+# through to some other root.
+assert server.safe_scan_dir("relative/subdir") is None
+assert server.safe_scan_dir("/absolute-under-src") is None
+PY
+then
+    pass "safe_scan_dir allows inside-the-mount paths and blocks escapes"
+else
+    fail "safe_scan_dir extra-root boundary failed (see assertion above)"
+fi
 
 echo "== upload round-trip (the regression that shows as 'Failed to fetch') =="
 echo "hello" > "$WORK/payload.txt"
@@ -606,6 +662,11 @@ cat > "$OUT/cfg_2.0/cfg_2.0_bom.json" <<'JSON'
 {"bomFormat":"CycloneDX","metadata":{"component":{"name":"cfg","version":"2.0","type":"application"}},
  "components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
 JSON
+# Opt-in SPDX export: an allowlisted artifact that must surface in list_results.
+cat > "$OUT/cfg_2.0/cfg_2.0_bom.spdx.json" <<'JSON'
+{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"cfg",
+ "packages":[{"SPDXID":"SPDXRef-Package-flask","name":"flask","versionInfo":"2.0"}]}
+JSON
 if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
@@ -620,6 +681,7 @@ cfg = {
     "version": "2.0",
     "notice": True,
     "security": True,
+    "spdx": True,
     "deepLicense": False,
     "identifyVendored": True,
     "includeOsv": False,
@@ -637,7 +699,7 @@ assert not server.SCANMETA_NAME.endswith(server.ARTIFACT_SUFFIXES), server.SCANM
 got = server.scanmeta("cfg_2.0")
 assert got == cfg, got
 expected_keys = {"source", "target", "project", "version", "notice", "security",
-                 "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
+                 "spdx", "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
 assert set(got) == expected_keys, set(got)
 # No secret material is ever stored.
 assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
@@ -647,6 +709,8 @@ assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
 names = [r["name"] for r in server.list_results("cfg_2.0")]
 assert server.SCANMETA_NAME not in names, names
 assert "cfg_2.0_bom.json" in names, names
+# The SPDX export is an allowlisted artifact suffix, so it is listed/downloadable.
+assert "cfg_2.0_bom.spdx.json" in names, names
 
 # scan_detail carries scanConfig for a re-opened scan.
 detail = server.scan_detail("cfg_2.0")

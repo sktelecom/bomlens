@@ -21,7 +21,15 @@
     "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 그 폴더에서 --ui를 실행하세요.",
     "rootfsDir": "디렉터리 / rootfs",
     "rootfsPlaceholder": "centos-rootfs/  (현재 폴더 기준 상대경로)",
-    "rootfsHint": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 Docker 이미지 입력을 사용하세요.",
+    "rootfsHint": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 --mount로 마운트하거나 Docker 이미지 입력을 사용하세요.",
+    "scanRoot": "스캔 위치",
+    "scanRootCurrent": "현재 폴더 ({{path}})",
+    "scanRootCurrentNoPath": "현재 폴더",
+    "rootfsSubpath": "하위 폴더 (선택)",
+    "rootfsSubpathHint": "비워 두면 마운트한 폴더 전체를 스캔합니다. 하위 폴더를 적으면 그 범위만 스캔합니다.",
+    "addScanFolder": "폴더 추가…",
+    "removeScanFolder": "이 폴더를 목록에서 제거",
+    "scanFolderDesktopHint": "추가한 폴더는 읽기 전용 스캔 대상이 됩니다. 폴더를 추가하거나 제거하면 스캐너가 잠시 재시작됩니다.",
     "gitUrl": "GitHub URL",
     "gitHint": "공개 저장소는 그대로, 비공개는 아래 토큰을 입력하세요.",
     "gitPlaceholder": "https://github.com/org/repo",
@@ -51,6 +59,8 @@
     "aiNoticeHint": "AI 모델은 고지문이 모델과 데이터셋 라이선스를 정리하고, 사용 제한이 있는 라이선스(RAIL·비상업)를 검토 대상으로 표시합니다. 켜 두기를 권장합니다.",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
+    "spdx": "SPDX 내보내기",
+    "spdxHint": "CycloneDX 결과를 변환한 SPDX 2.3 JSON 파일을 함께 생성",
     "deepLicense": "파일 단위 라이선스 스캔",
     "deepLicenseHint": "패키지가 선언한 라이선스에 더해, ScanCode로 내 소스 파일을 직접 스캔해 파일 단위 라이선스 텍스트와 헤더를 찾아냅니다 (느림).",
     "scanMethodHint": "패키지 매니저 없이 스캔하는 소스를 위한 고급 분석입니다. 프로젝트를 패키지 매니저(Maven, npm, pip, Go modules 등)로 빌드한다면 SBOM이 이미 충분하므로 꺼 둬도 됩니다.",
@@ -132,7 +142,7 @@
       },
       "sbom": {
         "title": "SBOM (CycloneDX)",
-        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다."
+        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다. SPDX 내보내기를 켜면 SPDX 2.3 변환본이 함께 제공됩니다."
       },
       "notice": {
         "title": "오픈소스 고지문",

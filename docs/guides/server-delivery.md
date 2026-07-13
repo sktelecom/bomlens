@@ -115,7 +115,7 @@ The merge preserves each layer's `dependencies` graph (edges unioned by ref), so
 
 ## Using the web UI
 
-The OS and application layers can also run from the web UI (`$SBOM --ui`). Put the rootfs under the folder where you launch the UI and use the **Directory path** input, or scan a container image with the **Docker image** input. Paths outside the launch folder are rejected for safety, so the static-link layer and the optional merge are most direct from the CLI.
+The OS and application layers can also run from the web UI (`$SBOM --ui`). Put the rootfs under the folder where you launch the UI and use the **Directory path** input, or scan a container image with the **Docker image** input. Paths outside the launch folder are rejected for safety; to scan a rootfs stored elsewhere, launch the UI with `--ui --mount <dir>` and the folder appears as a read-only location in the Directory path input. `--mount /` exposes the running host OS itself the same way (pseudo filesystems such as `/proc` and `/sys` are skipped automatically, and results still save under the launch folder). The static-link layer and the optional merge are most direct from the CLI.
 
 ---
 

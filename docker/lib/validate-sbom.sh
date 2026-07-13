@@ -14,9 +14,11 @@
 # conversion), so SPDX-specific metadata is judged accurately. It NEVER aborts
 # the pipeline: a non-conformant SBOM yields result="fail" but exit 0.
 #
-# Requirements (see docs/supplier-sbom-analysis.md §4):
-#   mandatory : timestamp, tool info, top component, name+version coverage,
-#               PURL coverage (>= threshold), no pkg:generic, transitive edges
+# Requirements (see docs/internal/supplier-sbom-analysis.md §4):
+#   mandatory : spec version (CycloneDX 1.3-1.6 / SPDX 2.2-2.3; AI SBOMs also
+#               accept CycloneDX 1.7), timestamp, tool info, top component,
+#               name+version coverage, PURL coverage (>= threshold), PURL
+#               syntax, no pkg:generic, transitive edges
 #   recommended (warn only): license coverage, hash coverage
 #   AI SBOMs (machine-learning-model present): the full G7 minimum-element
 #               checklist is appended (7 clusters / 50 elements, data-driven from
@@ -33,6 +35,20 @@ PURL_MIN_PCT="${PURL_MIN_PCT:-90}"      # mandatory
 LICENSE_MIN_PCT="${LICENSE_MIN_PCT:-80}" # recommended (warn)
 HASH_MIN_PCT="${HASH_MIN_PCT:-50}"       # recommended (warn)
 MISSING_CAP=50                            # cap missing-item lists in the report
+
+# Accepted spec versions (space-separated), per the SKT submission
+# requirements. Override via env. AI SBOMs (ML-BOM) additionally accept
+# CycloneDX 1.7: the OWASP AIBOM Generator emits 1.7 and the G7 model fields
+# need it, while the plain dependency-SBOM submission range stays 1.3-1.6.
+CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6}"
+AI_CYCLONEDX_SPEC_VERSIONS="${AI_CYCLONEDX_SPEC_VERSIONS:-$CYCLONEDX_SPEC_VERSIONS 1.7}"
+SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3}"
+
+# Practical PURL shape gate (purl-spec): pkg:type/[namespace/]name@version
+# [?qualifiers][#subpath]. The segment charset tolerates the unencoded '@'
+# some tools emit for npm scopes; spaces, colon coordinates, a missing 'pkg:'
+# prefix and a missing '@version' are offenders.
+PURL_SYNTAX_REGEX='^pkg:[a-z][a-z0-9.+-]*(/[A-Za-z0-9._%~@+-]+)+@[A-Za-z0-9._%~+:-]+(\?[A-Za-z0-9._%~+=&:,/-]+)?(#[A-Za-z0-9._%~+/-]+)?$'
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[validate] SBOM file not found: $SBOM" >&2
@@ -65,12 +81,15 @@ PCT_DEF='def pct($n;$d): if $d==0 then 0 else (($n*100/$d)|floor) end;'
 # Per-format check arrays. Each emits a JSON array of:
 #   {id,label,required(bool),status("pass"|"fail"|"warn"),detail,missing[]}
 # --------------------------------------------------------
+# $1: space-separated accepted specVersion values for this SBOM kind.
 cdx_checks() {
     jq -c \
        --argjson purlmin "$PURL_MIN_PCT" \
        --argjson licmin "$LICENSE_MIN_PCT" \
        --argjson hashmin "$HASH_MIN_PCT" \
-       --argjson cap "$MISSING_CAP" "
+       --argjson cap "$MISSING_CAP" \
+       --arg okvers "${1:-$CYCLONEDX_SPEC_VERSIONS}" \
+       --arg purlre "$PURL_SYNTAX_REGEX" "
     $PCT_DEF
     ([.components[]?]) as \$c
     | (\$c|length) as \$tot
@@ -81,6 +100,9 @@ cdx_checks() {
     | ([ \$c[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$c[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
     | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
+    | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
+    | (\$okvers | split(\" \")) as \$vers
+    | ((.specVersion // \"\") | tostring) as \$sv
     | ((\$c | map(select((.licenses // []) | length > 0)) | length)) as \$lic_ok
     | ((\$c | map(select((.hashes // []) | length > 0)) | length)) as \$hash_ok
     | ([ .dependencies[]? | .dependsOn[]? ] | length) as \$dep_edges
@@ -88,6 +110,9 @@ cdx_checks() {
     | (.metadata.component // {}) as \$top
     | (\$tot - (\$miss_purl|length)) as \$purl_ok
     | [
+       {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|join(\"/\")) + \")\"), required:true,
+        status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),
+        detail:(\"CycloneDX \" + \$sv), missing:[]},
        {id:\"timestamp\", label:\"Timestamp (metadata.timestamp)\", required:true,
         status:(if (\$ts|length)>0 then \"pass\" else \"fail\" end), detail:\$ts, missing:[]},
        {id:\"tools\", label:\"Tool info (metadata.tools)\", required:true,
@@ -104,6 +129,9 @@ cdx_checks() {
        {id:\"no-generic\", label:\"No pkg:generic / custom PURL (0)\", required:true,
         status:(if (\$generic|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$generic|length) offending\", missing:(\$generic[0:\$cap])},
+       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
+        status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
+        detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (graph edges)\", required:true,
         status:(if \$dep_edges>0 then \"pass\" else \"fail\" end),
         detail:\"\(\$dep_edges) edge(s)\", missing:[]},
@@ -199,7 +227,9 @@ spdx_json_checks() {
        --argjson purlmin "$PURL_MIN_PCT" \
        --argjson licmin "$LICENSE_MIN_PCT" \
        --argjson hashmin "$HASH_MIN_PCT" \
-       --argjson cap "$MISSING_CAP" "
+       --argjson cap "$MISSING_CAP" \
+       --arg okvers "$SPDX_SPEC_VERSIONS" \
+       --arg purlre "$PURL_SYNTAX_REGEX" "
     $PCT_DEF
     ([.packages[]?]) as \$p
     | (\$p|length) as \$tot
@@ -208,6 +238,9 @@ spdx_json_checks() {
     | ([ \$p[] | select((.name==null) or (.versionInfo==null)) | (.name // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$p[] | select(([.externalRefs[]? | select(.referenceType==\"purl\")]|length)==0) | (.name // \"(unnamed)\") ]) as \$miss_purl
     | ([ \$p[] | .externalRefs[]? | select((.referenceLocator // \"\")|startswith(\"pkg:generic\")) | .referenceLocator ]) as \$generic
+    | ([ \$p[] | .externalRefs[]? | select(.referenceType==\"purl\") | (.referenceLocator // \"\") | select(test(\$purlre) | not) ]) as \$badpurl
+    | (\$okvers | split(\" \")) as \$vers
+    | (.spdxVersion // \"\") as \$sv
     | ((\$p | map(select(((.licenseConcluded // \"NOASSERTION\") != \"NOASSERTION\") or ((.licenseDeclared // \"NOASSERTION\") != \"NOASSERTION\"))) | length)) as \$lic_ok
     | ((\$p | map(select((.checksums // [])|length>0)) | length)) as \$hash_ok
     | ([ .relationships[]? | select(.relationshipType==\"DEPENDS_ON\") ] | length) as \$dep_edges
@@ -215,6 +248,9 @@ spdx_json_checks() {
     | ((.documentDescribes // []) | length) as \$describes
     | (\$tot - (\$miss_purl|length)) as \$purl_ok
     | [
+       {id:\"spec-version\", label:(\"Spec version (\" + (\$vers|join(\"/\")) + \")\"), required:true,
+        status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),
+        detail:\$sv, missing:[]},
        {id:\"timestamp\", label:\"Timestamp (creationInfo.created)\", required:true,
         status:(if (\$ts|length)>0 then \"pass\" else \"fail\" end), detail:\$ts, missing:[]},
        {id:\"tools\", label:\"Tool info (creationInfo.creators Tool:)\", required:true,
@@ -231,6 +267,9 @@ spdx_json_checks() {
        {id:\"no-generic\", label:\"No pkg:generic / custom PURL (0)\", required:true,
         status:(if (\$generic|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$generic|length) offending\", missing:(\$generic[0:\$cap])},
+       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
+        status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
+        detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON)\", required:true,
         status:(if \$dep_edges>0 then \"pass\" else \"fail\" end),
         detail:\"\(\$dep_edges) edge(s)\", missing:[]},
@@ -252,22 +291,28 @@ spdx_tv_checks() {
     # so a well-formed Tag-Value SBOM — where pkg:generic is always 0 — never got a
     # conformance report. Capture the count and emit exactly one integer.
     g() { local n; n=$(grep -cE "$1" "$SBOM" 2>/dev/null) || true; printf '%s' "${n:-0}"; }
-    local ts tools names vers purls generic deps lics hashes
+    local ts tools names vers purls generic deps lics hashes verpat specok purlok
     ts=$(g '^Created:'); tools=$(g '^Creator: ?Tool:')
     names=$(g '^PackageName:'); vers=$(g '^PackageVersion:')
     purls=$(g 'ExternalRef: ?PACKAGE-MANAGER purl'); generic=$(g 'purl +pkg:generic')
     deps=$(g 'Relationship:.*DEPENDS_ON'); lics=$(g '^PackageLicenseConcluded:'); hashes=$(g '^PackageChecksum:')
+    verpat=$(printf '%s' "$SPDX_SPEC_VERSIONS" | sed 's/\./\\./g; s/ /|/g')
+    specok=$(g "^SPDXVersion: *($verpat) *\$")
+    purlok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:[a-z][a-z0-9.+-]*/[^ ]+@[^ ]+ *$')
     jq -cn \
        --argjson ts "$ts" --argjson tools "$tools" --argjson names "$names" \
        --argjson vers "$vers" --argjson purls "$purls" --argjson generic "$generic" \
-       --argjson deps "$deps" --argjson lics "$lics" --argjson hashes "$hashes" '
+       --argjson deps "$deps" --argjson lics "$lics" --argjson hashes "$hashes" \
+       --argjson specok "$specok" --argjson purlok "$purlok" --arg okvers "$SPDX_SPEC_VERSIONS" '
     [
+      {id:"spec-version", label:"Spec version (\($okvers|split(" ")|join("/")))", required:true, status:(if $specok>0 then "pass" else "fail" end), detail:"\($specok) accepted SPDXVersion line(s)", missing:[]},
       {id:"timestamp", label:"Timestamp (Created:)", required:true, status:(if $ts>0 then "pass" else "fail" end), detail:"\($ts) found", missing:[]},
       {id:"tools", label:"Tool info (Creator: Tool:)", required:true, status:(if $tools>0 then "pass" else "fail" end), detail:"\($tools) tool(s)", missing:[]},
       {id:"top-component", label:"Document/package present", required:true, status:(if $names>0 then "pass" else "fail" end), detail:"\($names) package(s)", missing:[]},
       {id:"name-version", label:"PackageName + PackageVersion present", required:true, status:(if $names>0 and $vers>=$names then "pass" else "fail" end), detail:"names=\($names), versions=\($vers)", missing:[]},
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:"No pkg:generic / custom PURL (0)", required:true, status:(if $generic==0 then "pass" else "fail" end), detail:"\($generic) offending", missing:[]},
+      {id:"purl-syntax", label:"PURL syntax (pkg:type/name@version)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
       {id:"transitive", label:"Transitive dependencies (DEPENDS_ON)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
       {id:"hash", label:"Checksums present (recommended)", required:false, status:(if $hashes>0 then "pass" else "warn" end), detail:"\($hashes) checksum(s)", missing:[]}
@@ -279,14 +324,21 @@ spdx_tv_checks() {
 # --------------------------------------------------------
 case "$FORMAT" in
     CycloneDX)
-        CHECKS=$(cdx_checks)
-        # Append G7 AI minimum-element checks when this is an AI SBOM (carries a
-        # machine-learning-model component) — works for both a generated AIBOM and
+        # AI SBOMs (carry a machine-learning-model component) get two extras:
+        # the widened spec-version range (the AIBOM toolchain emits 1.7) and
+        # the G7 minimum-element checks — works for both a generated AIBOM and
         # a supplier-submitted AI SBOM under ANALYZE.
+        IS_AI=false
         if jq -e '[.components[]? | select(.type=="machine-learning-model")] | length > 0' "$SBOM" >/dev/null 2>&1; then
+            IS_AI=true
+        fi
+        if [ "$IS_AI" = true ]; then
+            CHECKS=$(cdx_checks "$AI_CYCLONEDX_SPEC_VERSIONS")
             G7=$(g7_ai_checks)
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$G7" | jq -cs 'add')
             echo "[validate] AI SBOM detected -> added G7 minimum-element checks"
+        else
+            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
         fi
         ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;

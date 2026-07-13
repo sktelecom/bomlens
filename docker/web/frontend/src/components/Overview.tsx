@@ -21,7 +21,7 @@ import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
-import { isAiScan, sbomFileName } from "@/lib/results";
+import { conformanceCount, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
@@ -250,7 +250,7 @@ function TypeSummary({ components }: { components: ComponentItem[] }) {
 interface Jump {
   id: SectionId;
   icon: LucideIcon;
-  value: number | null;
+  value: number | string | null;
   /** Optional secondary line, e.g. the dependency direct/transitive split. */
   sub?: string;
   /** Overrides the nav-derived label (e.g. the End-of-life tile → Components). */
@@ -331,8 +331,16 @@ function JumpCards({
         ]
       : []),
     ...(ai ? [{ id: "models" as SectionId, icon: Cpu, value: modelCount }] : []),
+    // Coverage as `passed/total` — same figure as the rail badge (G7 when the
+    // scan has AI checks, base format tally otherwise).
     ...(hasConformance
-      ? [{ id: "conformance" as SectionId, icon: FileCheck2, value: null }]
+      ? [
+          {
+            id: "conformance" as SectionId,
+            icon: FileCheck2,
+            value: conformanceCount(result) ?? null,
+          },
+        ]
       : []),
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
