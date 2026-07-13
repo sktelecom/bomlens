@@ -289,6 +289,9 @@ export interface Capabilities {
   firmwareImage?: string;
   aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
+  /** Extra read-only scan targets from `--ui --mount <dir>`: container path
+   *  (sent as the rootfs-dir scan target) + host path (shown to the user). */
+  scanRoots?: { path: string; hostPath: string }[];
 }
 
 /** Which input types this running image supports (firmware needs the fw image). */

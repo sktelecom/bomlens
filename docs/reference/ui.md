@@ -31,12 +31,12 @@ The global actions (New scan, Scan management) live in the top bar so the rail s
 
 ## New scan
 
-The New scan screen is two panes. On the left, pick a source — grouped into **Code** (current folder, a directory path, a GitHub URL, a ZIP upload), **Artifact** (a Docker image, a firmware image), **SBOM** (analyze an existing SBOM) and **AI model** (generate an ML-BOM from a HuggingFace model) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
+The New scan screen is two panes. On the left, pick a source — grouped into Code (current folder, a directory path, a GitHub URL, a ZIP upload), Artifact (a Docker image, a firmware image), SBOM (analyze an existing SBOM) and AI model (generate an ML-BOM from a HuggingFace model) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
 
 | Scan target | Input method | Backend mode |
 |-------------|--------------|--------------|
 | Current folder | scans the source in the UI's run folder | SOURCE |
-| Directory path | a subfolder under the run folder (e.g. an OS rootfs) | ROOTFS |
+| Directory path | a subfolder under the run folder (e.g. an OS rootfs), or a folder mounted with `--ui --mount <dir>` | ROOTFS |
 | GitHub URL | enter the repository URL | SOURCE (clone) |
 | ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
 | SBOM upload | upload an existing SBOM (JSON) | ANALYZE |
@@ -44,7 +44,7 @@ The New scan screen is two panes. On the left, pick a source — grouped into **
 | Docker image | enter the image name | IMAGE |
 | AI model | enter a HuggingFace model id (`org/model`) | AIBOM |
 
-Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: **License scan (ScanCode)**, which scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies), and **File-level identification (SCANOSS)**, which finds third-party open source copied into the tree (mainly C/C++), both for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
+Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: License scan (ScanCode), which scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies), and File-level identification (SCANOSS), which finds third-party open source copied into the tree (mainly C/C++), both for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
 
 ## Scan running
 

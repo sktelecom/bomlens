@@ -259,7 +259,15 @@ EOF
     ROOTFS)
         if [ -z "$TARGET_DIR" ] || [ ! -d "$TARGET_DIR" ]; then echo "[ERROR] TARGET_DIR not found: $TARGET_DIR"; exit 1; fi
         echo "[1/2] syft: RootFS $TARGET_DIR"
-        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json@1.6 > "$OUTPUT_FILE" 2>/dev/null; then
+        # Skip pseudo filesystems: a live host / mounted via `--ui --mount /`
+        # brings /proc, /sys, /dev and /run along (docker bind mounts recurse
+        # into submounts), and walking them is slow and can error out. They
+        # never hold packages, so excluding them is safe for extracted
+        # rootfs trees too.
+        if ! syft "dir:$TARGET_DIR" -o cyclonedx-json@1.6 \
+                --exclude './proc/**' --exclude './sys/**' \
+                --exclude './dev/**' --exclude './run/**' \
+                > "$OUTPUT_FILE" 2>/dev/null; then
             echo "[ERROR] syft directory scan failed."; exit 1
         fi
         ;;

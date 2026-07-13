@@ -29,6 +29,7 @@ import re
 import secrets
 import shutil
 import subprocess
+import sys
 import urllib.parse
 import zipfile
 from datetime import datetime
@@ -211,23 +212,51 @@ def run_artifact_path(run_id, name):
     return safe_output_path(base)
 
 
-# Directories the UI is allowed to scan as a ROOTFS target. Only /src is mounted
-# into the UI container today; a future `--ui --mount <host-path>` would append
-# its container path here, and the boundary check below extends to it for free.
-ALLOWED_SCAN_ROOTS = [SRC_DIR]
+# Extra read-only scan-target mounts from `scan-sbom.sh --ui --mount <dir>`
+# (or the Windows launcher's SBOM_UI_MOUNT_DIR). One "<container>|<host>" pair
+# per line: the container path joins the rootfs-dir allow-list below, the host
+# path is the label the UI shows the user. Server-env only — never derived
+# from request input. Entries whose container path does not exist are dropped
+# with a warning (a typo'd launcher mount, or a stale env).
+def _parse_scan_roots(raw):
+    roots = []
+    for line in (raw or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        cpath, _, hpath = line.partition("|")
+        cpath = os.path.normpath(cpath)
+        if not os.path.isabs(cpath) or not os.path.isdir(cpath):
+            print(f"[WARN] SBOM_UI_SCAN_ROOTS entry ignored (not a directory): "
+                  f"{cpath}", file=sys.stderr)
+            continue
+        roots.append({"path": cpath, "hostPath": hpath})
+    return roots
+
+
+EXTRA_SCAN_ROOTS = _parse_scan_roots(os.environ.get("SBOM_UI_SCAN_ROOTS", ""))
+
+# Directories the UI is allowed to scan as a ROOTFS target: the /src mount the
+# UI was launched from, plus any extra `--mount` scan targets. The boundary
+# check below applies to every root alike.
+ALLOWED_SCAN_ROOTS = [SRC_DIR] + [r["path"] for r in EXTRA_SCAN_ROOTS]
 
 
 def safe_scan_dir(rel):
     """Resolve a user-supplied directory path strictly inside an allowed scan
     root (block path traversal and symlink escape). Returns the real path on
-    success, or None. Used by the rootfs-dir input — a relative path under /src.
+    success, or None. Used by the rootfs-dir input — a relative path under /src,
+    or an absolute container path inside an extra `--mount` scan root.
     """
     if not rel or any(c in rel for c in ("\x00", "\n", "\r")):
         return None
-    # Treat input as relative to /src: stripping any leading '/' folds an
-    # absolute path like /etc back under /src, so it can't escape the boundary.
-    rel = rel.lstrip("/")
-    real = os.path.realpath(os.path.join(SRC_DIR, rel))
+    if any(rel == r["path"] or rel.startswith(r["path"] + os.sep)
+           for r in EXTRA_SCAN_ROOTS):
+        real = os.path.realpath(rel)
+    else:
+        # Treat input as relative to /src: stripping any leading '/' folds an
+        # absolute path like /etc back under /src, so it can't escape the boundary.
+        real = os.path.realpath(os.path.join(SRC_DIR, rel.lstrip("/")))
     for root in ALLOWED_SCAN_ROOTS:
         r = os.path.realpath(root)
         if (real == r or real.startswith(r + os.sep)) and os.path.isdir(real):
@@ -1385,6 +1414,10 @@ class Handler(BaseHTTPRequestHandler):
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
+                # Extra --mount scan targets the rootfs-dir input can pick
+                # from: container path (what the scan request sends) + host
+                # path (what the user recognizes).
+                "scanRoots": EXTRA_SCAN_ROOTS,
             }))
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
@@ -1747,13 +1780,15 @@ class Handler(BaseHTTPRequestHandler):
                 env["SOURCE_ROOT"] = SRC_DIR
 
             elif source == "rootfs-dir":
-                # Scan an OS rootfs (or any subfolder) under /src as a directory.
-                # The path is validated to stay inside the mounted folder so it
-                # can't reach /host-output uploads or container system paths.
+                # Scan an OS rootfs (or any subfolder) under /src — or under an
+                # extra --mount scan target — as a directory. The path is
+                # validated to stay inside an allowed mount so it can't reach
+                # /host-output uploads or container system paths.
                 scan_dir = safe_scan_dir(target)
                 if not scan_dir:
-                    fail("Invalid or out-of-bounds directory path "
-                         "(must be a folder inside the current folder)"); return
+                    fail("Invalid or out-of-bounds directory path (must be a "
+                         "folder inside the current folder or a mounted scan "
+                         "target)"); return
                 mode = "ROOTFS"
                 env["MODE"] = "ROOTFS"
                 env["TARGET_DIR"] = scan_dir
