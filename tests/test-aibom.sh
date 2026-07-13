@@ -182,7 +182,7 @@ sed 's/length > 0/length >(BROKEN/' "$LIB/g7-registry.json" > "$WORK/broken-reg.
 BRLOG=$(G7_REGISTRY="$WORK/broken-reg.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf4" "broken" 2>&1)
 grep -q "G7 registry evaluation failed" <<<"$BRLOG" && pass "broken registry warns on stderr" || fail "no loud warning for a broken registry"
 bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) base=\([.checks[]|select(.id|startswith("g7-")|not)]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
-[ "$bshape" = "g7=0 base=9 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
+[ "$bshape" = "g7=0 base=11 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
 
 echo "== legacy CycloneDX tools array does not false-negative the tool checks =="
 # metadata.tools as a bare array (pre-1.5 shape) used to hard-error inside the

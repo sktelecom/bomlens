@@ -113,17 +113,19 @@ flowchart TD
 
 | 항목 | CycloneDX | SPDX | 판정 |
 |------|-----------|------|------|
+| spec version 범위 | `.specVersion` (1.3~1.6) | `.spdxVersion` (SPDX-2.2/2.3) | 필수 |
 | timestamp | `.metadata.timestamp` | `.creationInfo.created` | 필수 |
 | tool info | `.metadata.tools[\|.components]` | `.creationInfo.creators[] (Tool:)` | 필수 |
 | top component | `.metadata.component.name/.version` | document name + describes root | 필수 |
 | name/version 커버리지 | `.components[]` | `.packages[]` (name+versionInfo) | 필수(100%) |
 | PURL 커버리지 | `.components[].purl` | `.packages[].externalRefs(purl)` | 필수(임계치) |
+| PURL 문법 | purl 정규식 검사 | referenceLocator 정규식 검사 | 필수(0건) |
 | `pkg:generic` 금지 | purl startswith 검사 | referenceLocator 검사 | 필수(0건) |
 | transitive 포함 | `.dependencies[].dependsOn` edge 존재 | `.relationships[] DEPENDS_ON` | 필수(추정) |
 | license 커버리지 | `.components[].licenses` | `.packages[].licenseConcluded/Declared` | 권장(warn) |
 | hash 커버리지 | `.components[].hashes` | `.packages[].checksums` | 권장(warn) |
 
-임계치(`PURL_MIN_PCT` 등)는 스크립트 상단 변수로 노출합니다. 필수 항목이 미달이면 `fail`, 권장 항목이 미달이면 `warn`으로 판정합니다. HTML은 `scan-security.sh`의 카드와 테이블, CSP, 이스케이프 패턴을 차용했습니다.
+임계치(`PURL_MIN_PCT` 등)와 허용 spec version 목록(`CYCLONEDX_SPEC_VERSIONS`, `SPDX_SPEC_VERSIONS`)은 스크립트 상단 변수로 노출합니다. AI SBOM(machine-learning-model 컴포넌트 보유)은 AIBOM 도구체인이 CycloneDX 1.7로 산출하므로 1.7까지 허용합니다(`AI_CYCLONEDX_SPEC_VERSIONS`). PURL 문법 검사는 purl-spec의 `pkg:type/[namespace/]name@version[?qualifiers][#subpath]` 형태를 정규식으로 가리는 실용 검사이며, npm 스코프의 비인코딩 `@`는 허용하고 `pkg:` 접두어 누락, 버전 누락, 공백 등은 위반으로 잡습니다. 필수 항목이 미달이면 `fail`, 권장 항목이 미달이면 `warn`으로 판정합니다. HTML은 `scan-security.sh`의 카드와 테이블, CSP, 이스케이프 패턴을 차용했습니다.
 
 ---
 

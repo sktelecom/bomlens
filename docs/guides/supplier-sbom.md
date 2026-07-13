@@ -18,7 +18,7 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 |----------|----------|
 | Format | CycloneDX v1.3–1.6 or SPDX v2.2–2.3 |
 | Required metadata | timestamp, tool info, top-level component name and version |
-| Required component fields | name, version, PURL (`pkg:generic` not allowed) |
+| Required component fields | name, version, PURL in standard `pkg:type/name@version` form (`pkg:generic` not allowed) |
 | Completeness | both direct and transitive dependencies included |
 | Recommended | supplier, license (SPDX ID), hash |
 
@@ -62,7 +62,7 @@ Unlike a self-generated SBOM, a received SBOM additionally produces a conformanc
 
 The conformance report is the per-item check of whether the received SBOM meets the quality criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
 
-- If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — timestamp, tool info, top-level component, name/version coverage, PURL coverage (no `pkg:generic`), and transitive dependencies.
+- If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — spec version range (CycloneDX v1.3–1.6, SPDX v2.2–2.3), timestamp, tool info, top-level component, name/version coverage, PURL coverage and syntax (standard `pkg:type/name@version` form, no `pkg:generic`), and transitive dependencies. AI SBOMs are also accepted at CycloneDX 1.7, which the AIBOM toolchain emits.
 - If a recommended item (license, hash coverage) falls short, it is a `warn`, not a `fail`.
 - The cards at the top of the HTML report show pass/fail and the list of missing items.
 
