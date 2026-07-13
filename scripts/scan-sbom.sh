@@ -464,7 +464,13 @@ ingest_archive() {
                 if unzip -l "$arc" 2>/dev/null | awk '{print $4}' | grep -qE '(^/|(^|/)\.\.(/|$))'; then
                     echo "[ERROR] unsafe path in archive (zip-slip)"; exit 1
                 fi
-                unzip -q -d "$tmp" -- "$arc" || { echo "[ERROR] unzip failed"; exit 1; }
+                if ! unzip -q -d "$tmp" -- "$arc"; then
+                    echo "[ERROR] unzip failed for $arc"
+                    echo "[HINT] A zip made on Windows with PowerShell Compress-Archive stores"
+                    echo "       backslash path separators that unzip rejects. Re-create it with"
+                    echo "       Windows Explorer (Send to > Compressed folder) and scan again."
+                    exit 1
+                fi
             else
                 # bsdtar (Git Bash on Windows) extracts .zip and rejects traversal.
                 tar -tf "$arc" 2>/dev/null | grep -qE '(^/|(^|/)\.\.(/|$))' && { echo "[ERROR] unsafe path in archive"; exit 1; }

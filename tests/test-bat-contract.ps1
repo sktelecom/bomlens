@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows .bat 진입점 계약 테스트 — 스텁 docker로 실제 cmd.exe에서 .bat을 실행한다.
 

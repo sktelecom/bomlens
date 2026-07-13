@@ -185,7 +185,7 @@ if (-not $bash) {
         } finally {
             Pop-Location
         }
-        if (Test-Path (Join-Path $unshared 'UnsharedApp_0.0.1' 'UnsharedApp_0.0.1_bom.json')) {
+        if (Test-Path (Join-Path (Join-Path $unshared 'UnsharedApp_0.0.1') 'UnsharedApp_0.0.1_bom.json')) {
             Skip '이 경로가 파일 공유에 포함되어 함정이 재현되지 않았습니다. 환경에 따라 정상입니다.'
         } else {
             Pass '공유 밖 경로에서는 산출물이 나타나지 않음을 확인(scan-sbom.sh가 이 경우를 오류로 잡음).'
