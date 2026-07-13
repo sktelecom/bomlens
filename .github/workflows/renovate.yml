@@ -5,7 +5,7 @@
 #
 # Prerequisite: a repo/org secret RENOVATE_TOKEN — a PAT (classic: repo + workflow,
 # or a fine-grained token with contents+pull-requests write) used to open bump PRs.
-# Without it the run no-ops. See docs/internal/dependency-upgrade-policy.md.
+# Without it the run no-ops. See docs/maintainers/dependency-upgrade-policy.md.
 name: Renovate
 
 on:

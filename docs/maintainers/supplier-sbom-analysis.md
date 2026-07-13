@@ -42,7 +42,7 @@ SK텔레콤은 [공급망 보안 가이드](https://sktelecom.github.io/guide/su
 | **권장** | supplier, license(SPDX ID), hash |
 
 SKT 검증 프로세스는 세 단계로 나뉩니다.
-1. 포맷 검증 — 필수 필드 누락 확인 (제출 후 3일 내)
+1. 포맷 검증 — 필수 필드 누락 확인
 2. 보안 분석 — 자동 취약점 스캔, 임계치 초과 탐지
 3. 개선 요청 — Critical 7일, High 30일 내에 대응 계획이나 위험 정당화 제출 요청
 

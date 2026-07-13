@@ -23,7 +23,7 @@
 # the page's prep hook below materializes exactly that object — the doc text
 # itself stays verbatim. The pairing rule: if a page's prose declares a
 # placeholder, prep_page() must define it; renaming one without the other fails
-# this harness. (See docs/internal/runnable-doc-blocks.md.)
+# this harness. (See docs/maintainers/runnable-doc-blocks.md.)
 #
 # Usage:   bash tests/test-docs-walkthrough.sh
 # Env:     SBOM_SCANNER_IMAGE  scanner image (default: sbom-scanner:test)

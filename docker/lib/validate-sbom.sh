@@ -14,7 +14,7 @@
 # conversion), so SPDX-specific metadata is judged accurately. It NEVER aborts
 # the pipeline: a non-conformant SBOM yields result="fail" but exit 0.
 #
-# Requirements (see docs/internal/supplier-sbom-analysis.md §4):
+# Requirements (see docs/maintainers/supplier-sbom-analysis.md §4):
 #   mandatory : spec version (CycloneDX 1.3-1.6 / SPDX 2.2-2.3; AI SBOMs also
 #               accept CycloneDX 1.7), timestamp, tool info, top component,
 #               name+version coverage, PURL coverage (>= threshold), PURL

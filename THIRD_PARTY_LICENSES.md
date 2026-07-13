@@ -41,7 +41,7 @@ OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 
 > 무거운 언팩·바이너리 분석 도구와 GPL 컴포넌트를 격리하기 위한 별도 opt-in 이미지입니다.
 > 빌드: `docker build --build-arg SBOM_FIRMWARE=true -t bomlens-firmware ./docker`.
-> 설계는 [docs/internal/firmware-analysis.md](docs/internal/firmware-analysis.md) 참조.
+> 설계는 [docs/maintainers/firmware-analysis.md](docs/maintainers/firmware-analysis.md) 참조.
 
 아래 버전은 `docker/Dockerfile`의 빌드 ARG 기본값과 일치합니다(공급망 위생을 위한 핀; ARG로 재정의 가능).
 
