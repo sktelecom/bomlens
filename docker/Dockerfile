@@ -82,7 +82,7 @@ ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
 # harvest model pedigree / performance metrics that the OWASP tool omits. Opt-in
 # with the aibom image only; enrich-aibom.sh degrades gracefully when it is absent.
 # renovate: datasource=npm depName=@cyclonedx/cdxgen
-ARG CDXGEN_VERSION=12.7.0
+ARG CDXGEN_VERSION=12.7.1
 
 # NOTICE PDF rendering (opt-in: --build-arg SBOM_PDF=true). weasyprint renders the
 # generated _NOTICE.html to _NOTICE.pdf. It is Python-based (consistent with onot)
