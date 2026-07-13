@@ -151,7 +151,7 @@ jobs:
         run: trivy config --quiet --format sarif --output trivy-config.sarif --exit-code 0 ./docker
       - name: Upload Dockerfile scan results
         if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        uses: github/codeql-action/upload-sarif@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
         with:
           sarif_file: 'trivy-config.sarif'
           category: trivy-config
@@ -166,7 +166,7 @@ jobs:
         run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
       - name: Upload image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        uses: github/codeql-action/upload-sarif@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
         with:
           sarif_file: 'trivy-image.sarif'
           category: trivy-image
