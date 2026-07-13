@@ -41,6 +41,16 @@ export const TEXT_INPUT: Partial<
   "ai-model": { label: "source.aiModel", placeholder: "source.aiModelPlaceholder", hint: "source.aiModelHint" },
 };
 
+/** Rootfs-dir target to submit: with a mounted scan root selected, `target`
+ *  is an optional subpath inside it and the result is the absolute container
+ *  path (the server allow-lists the root); without one, `target` passes
+ *  through (a path relative to /src). */
+export function composeRootfsTarget(scanRoot: string, target: string): string {
+  if (!scanRoot) return target.trim();
+  const sub = target.trim().replace(/^\/+/, "");
+  return sub ? `${scanRoot}/${sub}` : scanRoot;
+}
+
 /** Per-field validation errors; values are i18n keys for the inline message.
  *  Keys double as the input element ids, so the first invalid field can be
  *  focused directly on a failed submit. */
@@ -94,6 +104,11 @@ export function useScanForm({
     () => initialConfig?.source ?? "current-dir",
   );
   const [target, setTargetRaw] = useState(() => initialConfig?.target ?? "");
+  // Extra --mount scan targets (capabilities.scanRoots): the rootfs-dir input
+  // offers them as base locations. "" = the /src launch folder (classic
+  // behavior). A re-scan seeds the *full* container path into `target`
+  // instead — safe_scan_dir accepts it as-is, so no root matching is needed.
+  const [scanRoot, setScanRootRaw] = useState("");
   const [gitToken, setGitToken] = useState("");
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
@@ -140,6 +155,13 @@ export function useScanForm({
   const uploadKind = UPLOAD_KIND[source];
   const textInput = TEXT_INPUT[source];
   const isText = textInput !== undefined;
+  const scanRoots = capabilities.scanRoots ?? [];
+  // With a mounted scan root selected, `target` becomes an optional subpath
+  // inside it (empty = scan the whole mount); the submitted target is the
+  // absolute container path the server allow-lists.
+  const activeScanRoot = source === "rootfs-dir" ? scanRoot : "";
+  const activeScanRootHost =
+    scanRoots.find((r) => r.path === activeScanRoot)?.hostPath ?? "";
   const isAnalyze = source === "sbom-upload";
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply.
@@ -180,6 +202,10 @@ export function useScanForm({
   const setTarget = (v: string) => {
     clearError("target");
     setTargetRaw(v);
+  };
+  const setScanRoot = (v: string) => {
+    clearError("target");
+    setScanRootRaw(v);
   };
   const setFile = (f: File | null) => {
     clearError("file");
@@ -222,18 +248,24 @@ export function useScanForm({
         .catch(() => null)
         .then((id) => apply(id ?? suggestIdentity(source, { fileName: file.name })));
     } else {
-      apply(suggestIdentity(source, { target, fileName: file?.name, hostDir }));
+      // A selected scan root with no subpath: suggest from its host path (the
+      // folder the user actually mounted), not the synthetic container path.
+      const suggestFrom =
+        activeScanRoot && !target.trim() ? activeScanRootHost : target;
+      apply(suggestIdentity(source, { target: suggestFrom, fileName: file?.name, hostDir }));
     }
     return () => {
       cancelled = true;
     };
-  }, [source, target, file, hostDir, projectDirty, versionDirty]);
+  }, [source, target, file, hostDir, projectDirty, versionDirty,
+      activeScanRoot, activeScanRootHost]);
 
   /** Switching source resets the dependent inputs. */
   const changeSource = (s: SourceType) => {
     setSource(s);
     setFileRaw(null);
     setTargetRaw("");
+    setScanRootRaw("");
     setGitToken("");
     setUploadError(null);
     setErrors({});
@@ -244,7 +276,8 @@ export function useScanForm({
     const errs: FieldErrors = {};
     if (!project.trim()) errs.project = "validation.project";
     if (!version.trim()) errs.version = "validation.version";
-    if (isText && !target.trim()) errs.target = "validation.target";
+    if (isText && !target.trim() && !activeScanRoot)
+      errs.target = "validation.target";
     if (uploadKind && !file) errs.file = "validation.file";
     if (showUpload && uploadEnabled) {
       if (!uploadUrl.trim()) errs.uploadUrl = "validation.uploadUrl";
@@ -318,11 +351,13 @@ export function useScanForm({
       setUploading(false);
     }
 
+    const effectiveTarget = composeRootfsTarget(activeScanRoot, target);
+
     onRun({
       project: project.trim(),
       version: version.trim(),
       source,
-      target: isText ? target.trim() : undefined,
+      target: isText ? effectiveTarget : undefined,
       token,
       cred,
       scanossCred,
@@ -360,6 +395,7 @@ export function useScanForm({
     version, setVersion,
     source, changeSource,
     target, setTarget,
+    scanRoot, setScanRoot, scanRoots,
     gitToken, setGitToken,
     file, setFile,
     deepLicense, setDeepLicense,

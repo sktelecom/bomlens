@@ -40,7 +40,13 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+
+  // Extra --mount scan targets make the rootfs-dir path a subpath inside the
+  // chosen base — and optional when a mounted base is selected (empty = scan
+  // the whole mount).
+  const showScanRoots = source === "rootfs-dir" && scanRoots.length > 0;
+  const targetOptional = showScanRoots && scanRoot !== "";
 
   return (
     <>
@@ -56,11 +62,34 @@ export function SourceControls({ state }: { state: ScanFormState }) {
         </div>
       )}
 
+      {showScanRoots && (
+        <div className="space-y-2">
+          <Label htmlFor="scanRoot">{t("source.scanRoot")}</Label>
+          <Select
+            id="scanRoot"
+            value={scanRoot}
+            onChange={(e) => setScanRoot(e.target.value)}
+            disabled={busy}
+          >
+            <option value="">
+              {capabilities.hostDir
+                ? t("source.scanRootCurrent", { path: capabilities.hostDir })
+                : t("source.scanRootCurrentNoPath")}
+            </option>
+            {scanRoots.map((r) => (
+              <option key={r.path} value={r.path}>
+                {r.hostPath || r.path}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
       {textInput && (
         <div className="space-y-2">
           <Label htmlFor="target">
-            {t(textInput.label)}
-            <RequiredMark />
+            {targetOptional ? t("source.rootfsSubpath") : t(textInput.label)}
+            {!targetOptional && <RequiredMark />}
           </Label>
           <Input
             id="target"
@@ -68,12 +97,14 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             onChange={(e) => setTarget(e.target.value)}
             placeholder={t(textInput.placeholder)}
             disabled={busy}
-            aria-required
+            aria-required={!targetOptional || undefined}
             aria-invalid={errors.target ? true : undefined}
             aria-describedby={errors.target ? "target-error" : undefined}
           />
           <FieldError id="target-error" msgKey={errors.target} />
-          <p className="text-xs text-muted-foreground">{t(textInput.hint)}</p>
+          <p className="text-xs text-muted-foreground">
+            {targetOptional ? t("source.rootfsSubpathHint") : t(textInput.hint)}
+          </p>
         </div>
       )}
 

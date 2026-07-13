@@ -22,6 +22,22 @@ set OUTDIR=%SBOM_OUTPUT_DIR%
 if "%OUTDIR%"=="" set OUTDIR=%USERPROFILE%\sbom-output
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
+REM --- 추가 스캔 대상 폴더 (선택) ---
+REM SBOM_UI_MOUNT_DIR에 폴더를 지정하면 웹 UI의 "루트 파일시스템" 입력에
+REM 읽기 전용 스캔 대상으로 나타난다 (예: 추출해 둔 리눅스 rootfs 폴더).
+REM scan-sbom.sh --ui --mount 와 같은 기능의 더블클릭용 통로다.
+set "MOUNT_V="
+set "SCAN_ROOTS="
+if "%SBOM_UI_MOUNT_DIR%"=="" goto :mount_done
+if not exist "%SBOM_UI_MOUNT_DIR%\" (
+    echo [오류] SBOM_UI_MOUNT_DIR 폴더가 없습니다: %SBOM_UI_MOUNT_DIR%
+    pause
+    exit /b 1
+)
+set "MOUNT_V=-v "%SBOM_UI_MOUNT_DIR%":/scan-targets/mounted:ro"
+set "SCAN_ROOTS=/scan-targets/mounted|%SBOM_UI_MOUNT_DIR%"
+:mount_done
+
 REM --- Docker 점검 (진짜 사전 요구사항) ---
 docker version >nul 2>&1
 if errorlevel 1 (
@@ -72,10 +88,12 @@ docker run --rm -it ^
     -p %UI_PORT%:8080 ^
     -v "%OUTDIR%":/src ^
     -v "%OUTDIR%":/host-output ^
+    %MOUNT_V% ^
     -v /var/run/docker.sock:/var/run/docker.sock ^
     -e MODE=UI ^
     -e UI_PORT=8080 ^
     -e SBOM_UI_HOST_DIR="%OUTDIR%" ^
+    -e SBOM_UI_SCAN_ROOTS="%SCAN_ROOTS%" ^
     "%DOCKER_IMAGE%"
 
 endlocal

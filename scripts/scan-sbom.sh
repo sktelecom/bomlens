@@ -78,6 +78,7 @@ INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
 MERGE_ROOT=""
 OUTPUT_BASE=""; TIMESTAMP="false"
+UI_MOUNTS=()
 
 # ========================================================
 # Parse arguments
@@ -116,6 +117,7 @@ while [[ "$#" -gt 0 ]]; do
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
         --ui) UI_MODE="true" ;;
+        --mount) UI_MOUNTS+=("$2"); shift ;;
         --help)
             cat << EOF
 Usage: $0 --project <name> --version <ver> [OPTIONS]
@@ -173,6 +175,10 @@ Options:
                          instead of overwritten. Folder name only; SBOM bytes are
                          unchanged (orthogonal to --byte-stable).
   --ui                   Launch local web UI
+  --mount <dir>          With --ui: expose an extra host directory to the web
+                         UI as a read-only rootfs scan target (repeatable).
+                         Lets the UI scan OS trees outside the launch folder,
+                         e.g. --mount / to scan the running host OS.
   --help                 Show this help
 
 Environment:
@@ -230,6 +236,26 @@ if [ "$UI_MODE" = "true" ]; then
     # The web UI owns per-run subfolders itself (server.py creates them under the
     # mounted base). Honor --output-dir as that base; default to the current dir.
     UI_BASE="${OUTPUT_BASE:-$(pwd)}"
+    # Extra --mount dirs become read-only rootfs scan targets under
+    # /scan-targets/<name>. SBOM_UI_SCAN_ROOTS carries "<container>|<host>"
+    # lines so server.py can allow-list them and the UI can label them by
+    # their host path ('|' cannot appear in the container path we build, and
+    # is illegal in Windows host paths). Read-only keeps a mounted live OS
+    # (e.g. --mount /) safe, and outputs still land only in /host-output.
+    MOUNT_FLAGS=(); SCAN_ROOTS=""; SEEN_NAMES=" "
+    for m in "${UI_MOUNTS[@]}"; do
+        [ -d "$m" ] || { echo "[ERROR] --mount path is not a directory: $m"; exit 1; }
+        abs="$(cd "$m" && pwd)"
+        name="$(printf '%s' "$(basename "$abs")" | tr -c 'A-Za-z0-9._-' '-')"
+        case "$name" in ''|-|.|..) name="root" ;; esac
+        n=2; uniq="$name"
+        while case "$SEEN_NAMES" in *" $uniq "*) true ;; *) false ;; esac; do
+            uniq="$name-$n"; n=$((n+1))
+        done
+        SEEN_NAMES="$SEEN_NAMES$uniq "
+        MOUNT_FLAGS+=(-v "$(hostpath "$abs"):/scan-targets/$uniq:ro")
+        SCAN_ROOTS="$SCAN_ROOTS/scan-targets/$uniq|$(hostpath "$abs")"$'\n'
+    done
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
@@ -241,9 +267,12 @@ if [ "$UI_MODE" = "true" ]; then
     if [ -t 0 ] && [ -t 1 ]; then TTY_FLAGS=(-it); fi
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
+        "${MOUNT_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" "$POSTPROCESS_IMAGE"
+        -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
+        -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" "$POSTPROCESS_IMAGE"
 fi
+[ "${#UI_MOUNTS[@]}" -eq 0 ] || { echo "[ERROR] --mount requires --ui."; exit 1; }
 
 # ========================================================
 # Validate

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SourceType } from "./api";
-import { ACCEPT, TEXT_INPUT, UPLOAD_KIND } from "./useScanForm";
+import { ACCEPT, composeRootfsTarget, TEXT_INPUT, UPLOAD_KIND } from "./useScanForm";
 
 // useScanForm is a React hook. This repo's Vitest runs in the "node"
 // environment with no @testing-library/react or jsdom installed, so the
@@ -49,6 +49,33 @@ describe("ACCEPT", () => {
       expect(parts.length).toBeGreaterThan(1);
       expect(parts.every((p) => p.startsWith("."))).toBe(true);
     }
+  });
+});
+
+describe("composeRootfsTarget", () => {
+  it("passes the target through when no scan root is selected", () => {
+    expect(composeRootfsTarget("", "centos-rootfs/")).toBe("centos-rootfs/");
+    expect(composeRootfsTarget("", "  sub/dir  ")).toBe("sub/dir");
+  });
+
+  it("submits the root itself when the subpath is empty", () => {
+    expect(composeRootfsTarget("/scan-targets/root", "")).toBe("/scan-targets/root");
+    expect(composeRootfsTarget("/scan-targets/root", "   ")).toBe("/scan-targets/root");
+  });
+
+  it("joins a subpath under the selected root", () => {
+    expect(composeRootfsTarget("/scan-targets/root", "usr/lib")).toBe(
+      "/scan-targets/root/usr/lib",
+    );
+  });
+
+  it("folds a leading slash so an absolute subpath cannot restate the base", () => {
+    expect(composeRootfsTarget("/scan-targets/root", "/etc")).toBe(
+      "/scan-targets/root/etc",
+    );
+    expect(composeRootfsTarget("/scan-targets/root", "//etc")).toBe(
+      "/scan-targets/root/etc",
+    );
   });
 });
 
