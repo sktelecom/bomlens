@@ -1,4 +1,5 @@
 import { Loader2, Play, Upload } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
 
 /**
@@ -44,9 +46,31 @@ export function SourceControls({ state }: { state: ScanFormState }) {
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
-  // the whole mount).
-  const showScanRoots = source === "rootfs-dir" && scanRoots.length > 0;
-  const targetOptional = showScanRoots && scanRoot !== "";
+  // the whole mount). In the desktop app the list is editable in place: the
+  // shell picks a folder, remounts and restarts the UI container (the page
+  // reloads on its own, so no state cleanup is needed after an ok response).
+  const bridge = desktopBridge();
+  const desktopFolders = canManageScanFolders(bridge);
+  const showScanRoots =
+    source === "rootfs-dir" && (scanRoots.length > 0 || desktopFolders);
+  const targetOptional =
+    source === "rootfs-dir" && scanRoots.length > 0 && scanRoot !== "";
+  const [mountBusy, setMountBusy] = useState(false);
+
+  const addScanFolder = async () => {
+    if (!bridge?.chooseScanFolder) return;
+    setMountBusy(true);
+    const res = await bridge.chooseScanFolder().catch(() => ({ ok: false }));
+    // ok면 앱이 컨테이너를 재시작하며 이 페이지를 다시 로드한다.
+    if (!res.ok) setMountBusy(false);
+  };
+  const removeScanFolder = async () => {
+    const host = scanRoots.find((r) => r.path === scanRoot)?.hostPath;
+    if (!bridge?.removeScanFolder || !host) return;
+    setMountBusy(true);
+    const res = await bridge.removeScanFolder(host).catch(() => ({ ok: false }));
+    if (!res.ok) setMountBusy(false);
+  };
 
   return (
     <>
@@ -64,24 +88,54 @@ export function SourceControls({ state }: { state: ScanFormState }) {
 
       {showScanRoots && (
         <div className="space-y-2">
-          <Label htmlFor="scanRoot">{t("source.scanRoot")}</Label>
-          <Select
-            id="scanRoot"
-            value={scanRoot}
-            onChange={(e) => setScanRoot(e.target.value)}
-            disabled={busy}
-          >
-            <option value="">
-              {capabilities.hostDir
-                ? t("source.scanRootCurrent", { path: capabilities.hostDir })
-                : t("source.scanRootCurrentNoPath")}
-            </option>
-            {scanRoots.map((r) => (
-              <option key={r.path} value={r.path}>
-                {r.hostPath || r.path}
-              </option>
-            ))}
-          </Select>
+          {scanRoots.length > 0 && <Label htmlFor="scanRoot">{t("source.scanRoot")}</Label>}
+          <div className="flex items-center gap-2">
+            {scanRoots.length > 0 && (
+              <Select
+                id="scanRoot"
+                className="flex-1"
+                value={scanRoot}
+                onChange={(e) => setScanRoot(e.target.value)}
+                disabled={busy || mountBusy}
+              >
+                <option value="">
+                  {capabilities.hostDir
+                    ? t("source.scanRootCurrent", { path: capabilities.hostDir })
+                    : t("source.scanRootCurrentNoPath")}
+                </option>
+                {scanRoots.map((r) => (
+                  <option key={r.path} value={r.path}>
+                    {r.hostPath || r.path}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {desktopFolders && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy || mountBusy}
+                onClick={addScanFolder}
+              >
+                {mountBusy && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                {t("source.addScanFolder")}
+              </Button>
+            )}
+          </div>
+          {desktopFolders && scanRoot !== "" && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+              disabled={busy || mountBusy}
+              onClick={removeScanFolder}
+            >
+              {t("source.removeScanFolder")}
+            </button>
+          )}
+          {desktopFolders && (
+            <p className="text-xs text-muted-foreground">{t("source.scanFolderDesktopHint")}</p>
+          )}
         </div>
       )}
 

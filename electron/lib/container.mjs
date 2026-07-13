@@ -36,6 +36,32 @@ export function defaultOutputDir() {
   return override && override.trim() ? override : path.join(os.homedir(), "sbom-output");
 }
 
+// 추가 스캔 대상 폴더(--ui --mount의 데스크톱판)를 docker run 인자로 변환한다(순수 —
+// 단위 테스트 가능). scan-sbom.sh와 같은 규칙: 폴더 이름을 안전한 문자로 정리해
+// /scan-targets/<이름>에 읽기 전용으로 붙이고, 겹치면 -2, -3을 덧붙인다. 서버에는
+// SBOM_UI_SCAN_ROOTS("<컨테이너 경로>|<호스트 경로>" 줄 단위)로 전달한다.
+export function scanMountArgs(dirs = []) {
+  const args = [];
+  const seen = new Set();
+  let scanRoots = "";
+  for (const dir of dirs) {
+    const trimmed = String(dir ?? "").trim();
+    if (!trimmed) continue;
+    // 끝의 구분자를 떼고 마지막 경로 조각을 이름으로 쓴다(윈도우 드라이브 루트
+    // "C:\" 는 조각이 없어 아래 루트 폴백을 탄다).
+    const segments = trimmed.split(/[/\\]+/).filter((s) => s && !/^[A-Za-z]:$/.test(s));
+    let name = (segments[segments.length - 1] ?? "").replace(/[^A-Za-z0-9._-]/g, "-");
+    if (!name || name === "-" || name === "." || name === "..") name = "root";
+    let unique = name;
+    for (let n = 2; seen.has(unique); n += 1) unique = `${name}-${n}`;
+    seen.add(unique);
+    args.push("-v", `${trimmed}:/scan-targets/${unique}:ro`);
+    scanRoots += `/scan-targets/${unique}|${trimmed}\n`;
+  }
+  if (scanRoots) args.push("-e", `SBOM_UI_SCAN_ROOTS=${scanRoots}`);
+  return args;
+}
+
 // 호스트의 Docker 엔진을 컨테이너에 연결하는 마운트. UI 컨테이너가 언어별 cdxgen 이미지를
 // 띄우려면 호스트 엔진에 접근해야 한다. Windows 명명 파이프(\\.\pipe\docker_engine)는 Docker
 // Desktop만 특수처리하고 Rancher Desktop은 거부하므로(invalid volume name), 양쪽 모두 지원하고
@@ -141,12 +167,14 @@ export class UiContainer {
     outputDir = defaultOutputDir(),
     firmwareImage = FIRMWARE_IMAGE,
     aibomImage = AIBOM_IMAGE,
+    scanMounts = [],
   } = {}) {
     this.image = image;
     this.hostPort = hostPort;
     this.outputDir = outputDir;
     this.firmwareImage = firmwareImage;
     this.aibomImage = aibomImage;
+    this.scanMounts = scanMounts;
     this.id = null;
   }
 
@@ -167,6 +195,8 @@ export class UiContainer {
       `${this.outputDir}:/src`,
       "-v",
       `${this.outputDir}:/host-output`,
+      // 추가 스캔 대상 폴더(읽기 전용) — 웹 UI의 "디렉터리 경로" 입력 선택지가 된다.
+      ...scanMountArgs(this.scanMounts),
       "-v",
       engineMount(),
       "-e",
