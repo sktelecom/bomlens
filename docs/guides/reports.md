@@ -25,7 +25,7 @@ From the project folder you want to scan:
 
 ```bash
 cd /path/to/your-project
-/path/to/sbom-tools/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
+/path/to/bomlens/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
 ```
 
 On Windows, use `scripts\scan-sbom.bat` (Git Bash) or run as-is under WSL2. Installation is in [Getting started](../start/first-scan.md).

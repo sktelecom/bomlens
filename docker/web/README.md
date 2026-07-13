@@ -1,7 +1,7 @@
 # 웹 UI (서버 계층)
 
 BomLens 웹 UI의 백엔드와 프런트엔드를 다루는 기여자 문서입니다. 웹 UI를 사용만
-한다면 사이트의 [웹 UI로 스캔하기](https://sktelecom.github.io/sbom-tools/) 가이드를
+한다면 사이트의 [웹 UI로 스캔하기](https://sktelecom.github.io/bomlens/) 가이드를
 보세요.
 
 웹 UI는 스캐너 이미지 안에서 `MODE=UI`로 실행됩니다. 데스크톱 앱(`electron/`)은 이

@@ -24,11 +24,11 @@ This project follows a [Code of Conduct](CODE_OF_CONDUCT.en.md) based on the [Co
 
 | Type | How |
 |------|-----|
-| Bug fix | Find and fix a bug from [Issues](https://github.com/sktelecom/sbom-tools/issues) |
+| Bug fix | Find and fix a bug from [Issues](https://github.com/sktelecom/bomlens/issues) |
 | New language support | See [adding a package manager](docs/contribute/package-managers.md) |
 | Documentation | Fix typos, add examples, improve explanations |
 | Tests | See the [testing guide](docs/contribute/testing.md) |
-| Feature proposal | Discuss first in [Discussions](https://github.com/sktelecom/sbom-tools/discussions) |
+| Feature proposal | Discuss first in [Discussions](https://github.com/sktelecom/bomlens/discussions) |
 
 When writing or editing Korean documentation, follow the [Korean style guide](docs/korean-style-guide.md).
 
@@ -43,8 +43,8 @@ When writing or editing Korean documentation, follow the [Korean style guide](do
 ### Clone and prepare
 
 ```bash
-git clone https://github.com/sktelecom/sbom-tools.git
-cd sbom-tools
+git clone https://github.com/sktelecom/bomlens.git
+cd bomlens
 
 # Build the Docker image (when changing it locally)
 cd docker && docker build -t sbom-scanner:local .
@@ -149,7 +149,7 @@ Closes #42
 
 ### Bug reports
 
-Please use [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues). Including the following helps us resolve it faster.
+Please use [GitHub Issues](https://github.com/sktelecom/bomlens/issues). Including the following helps us resolve it faster.
 
 - Environment: OS, Docker version, script version
 - Reproduction: the minimal steps that reproduce the bug
@@ -157,7 +157,7 @@ Please use [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues). Incl
 
 ### Feature proposals
 
-Discuss first in [GitHub Discussions](https://github.com/sktelecom/sbom-tools/discussions), then move to an issue.
+Discuss first in [GitHub Discussions](https://github.com/sktelecom/bomlens/discussions), then move to an issue.
 
 ---
 

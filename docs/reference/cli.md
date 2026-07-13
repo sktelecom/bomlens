@@ -133,6 +133,6 @@ docker system prune -f
 
 1. Check verbose logs with `VERBOSE=true ./tests/test-scan.sh`.
 2. Update the Docker image: `docker pull ghcr.io/sktelecom/bomlens:latest`.
-3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/sbom-tools/issues) with your environment info and logs.
+3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/bomlens/issues) with your environment info and logs.
 
 For how to use each mode, see the [input scenarios guide](../guides/by-input.md); for the kinds of outputs, see the [artifacts reference](artifacts.md); for language detection, see [supported ecosystems](ecosystems.md).

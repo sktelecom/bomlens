@@ -55,7 +55,7 @@ flowchart TD
 1. **Docker 엔진 설치**. [rancherdesktop.io](https://rancherdesktop.io/)에서 Windows용 설치
    파일을 받아 설치하고 실행합니다. 설치 중 Kubernetes 사용 여부를 물으면 꺼도 됩니다. 작업
    표시줄 아이콘이 안정되면(보통 1~2분) 준비가 끝난 것입니다.
-2. **앱 받아 실행**. [Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe)를
+2. **앱 받아 실행**. [Windows용 BomLens 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe)를
    눌러 받은 파일을 더블클릭합니다. 아직 미서명이라 Windows에서 "Windows가 PC를
    보호했습니다" 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고릅니다. 콘솔 창 없이 앱이 열립니다.
 3. **첫 실행 이미지 다운로드**. 처음 한 번만 스캐너 이미지를 받습니다. 앱이 아래처럼 진행 상황을

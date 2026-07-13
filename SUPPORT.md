@@ -13,8 +13,8 @@ Many questions are answered there, including the Windows and web UI flows.
 
 | You want to… | Use |
 |--------------|-----|
-| Report a bug or unexpected behavior | [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues) |
-| Ask a question or propose a feature | [GitHub Discussions](https://github.com/sktelecom/sbom-tools/discussions) |
+| Report a bug or unexpected behavior | [GitHub Issues](https://github.com/sktelecom/bomlens/issues) |
+| Ask a question or propose a feature | [GitHub Discussions](https://github.com/sktelecom/bomlens/discussions) |
 | Report a security vulnerability | See [SECURITY.md](SECURITY.md) — please do **not** open a public issue |
 | Contribute a change | See [CONTRIBUTING.md](CONTRIBUTING.md) |
 

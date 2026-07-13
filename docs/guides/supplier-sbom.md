@@ -6,7 +6,7 @@ description: Validate that an SBOM (CycloneDX/SPDX) you received meets your qual
 
 How to validate that an SBOM (JSON) received from a supplier or another team meets your quality requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report. You only need the SBOM file — no source code required.
 
-For the design background and the internal validation logic, see the maintainer doc [Supplier SBOM validation and analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/maintainers/supplier-sbom-analysis.md) (Korean).
+For the design background and the internal validation logic, see the maintainer doc [Supplier SBOM validation and analysis](https://github.com/sktelecom/bomlens/blob/main/docs/maintainers/supplier-sbom-analysis.md) (Korean).
 
 ## When to use it
 

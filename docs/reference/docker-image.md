@@ -134,7 +134,7 @@ For the full mapping between CLI flags and environment variables, see the flag m
 
 ## Building and publishing the image
 
-The procedure for building the image yourself or publishing it for multiple platforms is in the contributor-facing [docker/README](https://github.com/sktelecom/sbom-tools/blob/main/docker/README.md).
+The procedure for building the image yourself or publishing it for multiple platforms is in the contributor-facing [docker/README](https://github.com/sktelecom/bomlens/blob/main/docker/README.md).
 
 ---
 

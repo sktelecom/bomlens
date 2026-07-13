@@ -100,7 +100,7 @@ After adding a new language, update the following documents.
 
 ### 6. Submit a PR
 
-Submit a PR following the [contributing guide](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.md). Include the following in the PR description.
+Submit a PR following the [contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md). Include the following in the PR description.
 
 - The name of the language or package manager you added
 - Test run results (screenshot or log)
@@ -160,4 +160,4 @@ Confirm every item before submitting a PR that adds a new language.
 
 ---
 
-> **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Testing guide](testing.md)
+> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Testing guide](testing.md)

@@ -31,7 +31,7 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어, HuggingFace
 docker pull ghcr.io/sktelecom/bomlens:latest   # 이전 이름 sbom-scanner 도 같은 이미지
 
 # 편의를 위해 스크립트 경로를 변수로 둡니다.
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 ```
 
 ## 한눈에 보기
@@ -58,7 +58,7 @@ SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
 <!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/sktelecom/sbom-tools" \
+  --git "https://github.com/sktelecom/bomlens" \
   --all --generate-only
 ```
 

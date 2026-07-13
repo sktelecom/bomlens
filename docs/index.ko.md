@@ -9,7 +9,7 @@ hide:
 SaaS 없이 로컬에서 단일 프로젝트의 [SBOM](concepts/what-is-sbom.ko.md)(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드나 컨테이너 이미지, 바이너리, 받은 SBOM에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다.
 
 [시작하기](start/first-scan.ko.md){ .md-button .md-button--primary }
-[Windows용 내려받기 (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe){ .md-button }
+[Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
 
 CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
 

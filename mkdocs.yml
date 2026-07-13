@@ -5,9 +5,9 @@
 site_name: BomLens
 site_description: BomLens is a local-first SBOM generator and open-source risk assessor. Produce a CycloneDX SBOM, an open-source notice, and a security and license risk report from source code, containers, binaries, firmware, or an SBOM you received — from the CLI or a browser UI, with no SaaS.
 site_author: SK Telecom
-site_url: https://sktelecom.github.io/sbom-tools/
-repo_url: https://github.com/sktelecom/sbom-tools
-repo_name: sktelecom/sbom-tools
+site_url: https://sktelecom.github.io/bomlens/
+repo_url: https://github.com/sktelecom/bomlens
+repo_name: sktelecom/bomlens
 edit_uri: edit/main/docs/
 copyright: SK Telecom
 
@@ -129,18 +129,18 @@ plugins:
   # emit a stub pointing at the nonexistent /x.ko/ URL.
   - redirects:
       redirect_maps:
-        getting-started.md: https://sktelecom.github.io/sbom-tools/ko/start/first-scan/
-        quickstart-no-cli.md: https://sktelecom.github.io/sbom-tools/ko/start/no-cli/
-        scenarios-guide.md: https://sktelecom.github.io/sbom-tools/ko/guides/by-input/
-        usage-guide.md: https://sktelecom.github.io/sbom-tools/ko/reference/cli/
-        notice-and-security.md: https://sktelecom.github.io/sbom-tools/ko/guides/reports/
-        examples-guide.md: https://sktelecom.github.io/sbom-tools/ko/reference/ecosystems/
-        docker-image.md: https://sktelecom.github.io/sbom-tools/ko/reference/docker-image/
-        architecture.md: https://sktelecom.github.io/sbom-tools/ko/concepts/architecture/
-        firmware-analysis-guide.md: https://sktelecom.github.io/sbom-tools/ko/guides/firmware/
-        supplier-sbom-validation.md: https://sktelecom.github.io/sbom-tools/ko/guides/supplier-sbom/
-        contributing/package-manager-guide.md: https://sktelecom.github.io/sbom-tools/ko/contribute/package-managers/
-        contributing/testing-guide.md: https://sktelecom.github.io/sbom-tools/ko/contribute/testing/
+        getting-started.md: https://sktelecom.github.io/bomlens/ko/start/first-scan/
+        quickstart-no-cli.md: https://sktelecom.github.io/bomlens/ko/start/no-cli/
+        scenarios-guide.md: https://sktelecom.github.io/bomlens/ko/guides/by-input/
+        usage-guide.md: https://sktelecom.github.io/bomlens/ko/reference/cli/
+        notice-and-security.md: https://sktelecom.github.io/bomlens/ko/guides/reports/
+        examples-guide.md: https://sktelecom.github.io/bomlens/ko/reference/ecosystems/
+        docker-image.md: https://sktelecom.github.io/bomlens/ko/reference/docker-image/
+        architecture.md: https://sktelecom.github.io/bomlens/ko/concepts/architecture/
+        firmware-analysis-guide.md: https://sktelecom.github.io/bomlens/ko/guides/firmware/
+        supplier-sbom-validation.md: https://sktelecom.github.io/bomlens/ko/guides/supplier-sbom/
+        contributing/package-manager-guide.md: https://sktelecom.github.io/bomlens/ko/contribute/package-managers/
+        contributing/testing-guide.md: https://sktelecom.github.io/bomlens/ko/contribute/testing/
         en/index.md: index.md
         en/getting-started.md: start/first-scan.md
         en/quickstart-no-cli.md: start/no-cli.md
@@ -205,4 +205,4 @@ nav:
       - Local-first: concepts/local-first.md
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md
-  - Release notes: https://github.com/sktelecom/sbom-tools/releases
+  - Release notes: https://github.com/sktelecom/bomlens/releases

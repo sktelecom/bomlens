@@ -27,12 +27,12 @@
 # Usage: verify-release.sh <tag>            e.g. verify-release.sh v1.5.1
 # Env:   GH_TOKEN          token for `gh` (GITHUB_TOKEN in Actions)
 #        VERIFY_TIMEOUT    seconds to wait for async artifacts (default 2100)
-#        GITHUB_REPOSITORY owner/repo (default sktelecom/sbom-tools)
+#        GITHUB_REPOSITORY owner/repo (default sktelecom/bomlens)
 set -uo pipefail
 
 TAG="${1:?usage: verify-release.sh <tag e.g. v1.5.1>}"
 IMAGE_VERSION="${TAG#v}"
-REPO="${GITHUB_REPOSITORY:-sktelecom/sbom-tools}"
+REPO="${GITHUB_REPOSITORY:-sktelecom/bomlens}"
 OWNER="${REPO%%/*}"
 IMAGE="ghcr.io/${OWNER}/bomlens:${IMAGE_VERSION}"
 TIMEOUT="${VERIFY_TIMEOUT:-2100}"

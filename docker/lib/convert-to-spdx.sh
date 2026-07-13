@@ -60,7 +60,7 @@ if [ "$MODE" = "--stable" ]; then
     TMP="${OUTPUT}.stable.tmp"
     if jq '
         .creationInfo.created = "1970-01-01T00:00:00Z"
-        | .documentNamespace = "https://github.com/sktelecom/sbom-tools/spdxdocs/\(.name)"
+        | .documentNamespace = "https://github.com/sktelecom/bomlens/spdxdocs/\(.name)"
     ' "$OUTPUT" > "$TMP" 2>/dev/null; then
         mv "$TMP" "$OUTPUT"
     else

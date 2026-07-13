@@ -295,7 +295,7 @@ LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
       com.sktelecom.sbom.scanoss-tools="${SBOM_SCANOSS}" \
       com.sktelecom.sbom.aibom-tools="${SBOM_AIBOM}" \
       com.sktelecom.sbom.pdf-tools="${SBOM_PDF}" \
-      com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md"
+      com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan
 COPY lib/ /usr/local/lib/sbom/

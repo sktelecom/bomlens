@@ -4,7 +4,7 @@
 Docker 컨테이너로 실행되며, 이 앱은 Docker 점검과 이미지 다운로드, 컨테이너 기동과 정리를
 대신 처리한다.
 
-> 일반 사용자는 빌드할 필요 없이 [최신 릴리스](https://github.com/sktelecom/sbom-tools/releases/latest)에서
+> 일반 사용자는 빌드할 필요 없이 [최신 릴리스](https://github.com/sktelecom/bomlens/releases/latest)에서
 > `BomLens-Setup.exe`(또는 `.dmg`)를 받아 설치하면 된다. 아직 미서명이라 Windows에서
 > SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고른다. 아래 내용은 개발자용 빌드 안내다.
 

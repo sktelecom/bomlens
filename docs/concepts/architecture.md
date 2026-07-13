@@ -59,7 +59,7 @@ Previously, every language runtime plus every analysis tool lived in a single hu
 | **Acquisition** | Pulled **on demand** after detecting the project language | Pulled once and reused |
 | **Benefit** | cdxgen maintains up-to-date per-language toolchains | Small image; pinned tool versions ensure reproducibility |
 
-> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is decisively better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/sbom-tools#why-a-docker-image-vs-plain-cdxgen).
+> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is decisively better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen).
 
 ---
 

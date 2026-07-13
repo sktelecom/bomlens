@@ -3,9 +3,9 @@
 // 조용히 무시하고 null을 돌려준다. 부팅을 막거나 오류 화면을 띄우지 않는다.
 
 export const RELEASES_API =
-  "https://api.github.com/repos/sktelecom/sbom-tools/releases/latest";
+  "https://api.github.com/repos/sktelecom/bomlens/releases/latest";
 export const RELEASES_PAGE =
-  "https://github.com/sktelecom/sbom-tools/releases/latest";
+  "https://github.com/sktelecom/bomlens/releases/latest";
 
 // "v1.5.5"나 "1.5.5-rc.1" 같은 문자열에서 숫자 세 자리만 뽑는다.
 // 프리릴리스 접미사는 비교에서 무시한다(/releases/latest는 어차피 정식 릴리스만 준다).

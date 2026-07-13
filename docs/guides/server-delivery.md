@@ -28,7 +28,7 @@ One tool, BomLens, produces both layers; only the input changes. The requirement
 docker pull ghcr.io/sktelecom/bomlens:latest
 
 # Keep the script path in a variable.
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 ```
 
 ## Layer 1 — OS packages
