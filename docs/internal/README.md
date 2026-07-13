@@ -13,5 +13,6 @@
 | [펌웨어 분석](firmware-analysis.md) | FIRMWARE 모드 언팩·바이너리 식별 설계와 도구 선정 |
 | [배포 절차](release-guide.md) | 태그 기반 릴리스 체크리스트와 실행 절차 |
 | [도구 버전 업그레이드 안전장치](dependency-upgrade-policy.md) | 외부 도구 신규 버전 도입을 지키는 4계층(감지·스냅샷·정본·호환성 점검) |
+| [Windows 종합 검증 절차](windows-verification.md) | 실제 Windows PC에서 CLI·웹 UI 전체 흐름을 검증하는 절차(사람 또는 코딩 에이전트 실행용) |
 
 > 사용자용 경량 가이드는 상위 [docs/](../)에 있습니다. 펌웨어는 [펌웨어 분석 가이드](../guides/firmware.ko.md), 공급사 SBOM 검증은 [공급사 SBOM 검증 가이드](../guides/supplier-sbom.ko.md)를 참고하세요.
