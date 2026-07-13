@@ -20,7 +20,7 @@
 - [No-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) — no command line at all, click by click, for non-developers
 - [CLI reference](docs/reference/cli.md) — every option and environment variable
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, existing SBOM, firmware
-- Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md); maintainer design notes live under [docs/internal/](docs/internal/) (Korean)
+- Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md); maintainer design notes live under [docs/maintainers/](docs/maintainers/) (Korean)
 
 One Docker image, two jobs: **generate** — scan your source code (or a container image / binary) and produce a CycloneDX SBOM, an open-source notice, and a security report — and **assess open-source risk** in what you *receive*, such as a supplier's finished SBOM (`--analyze`) or a firmware binary (licenses + known vulnerabilities, with Critical-7d / High-30d remediation deadlines). Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
 

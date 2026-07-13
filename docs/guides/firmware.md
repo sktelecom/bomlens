@@ -6,7 +6,7 @@ description: Unpack network-device firmware binaries (.bin, squashfs, and more) 
 
 How to identify components and check the SBOM, licenses, and vulnerabilities in a network-device firmware binary (`.bin`, `.img`, squashfs, and so on). Use it when you only have the binary and no source, such as firmware received from a supplier.
 
-For the tool selection rationale and the internal design, see the maintainer doc [Firmware analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/internal/firmware-analysis.md) (Korean).
+For the tool selection rationale and the internal design, see the maintainer doc [Firmware analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/maintainers/firmware-analysis.md) (Korean).
 
 ## How it works
 

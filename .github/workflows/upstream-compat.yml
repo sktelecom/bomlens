@@ -8,7 +8,7 @@
 # Scope: cdxgen (pulled at runtime via CDXGEN_TAG / CDXGEN_ALLINONE, so it can
 # drift even on the moving v12 tag). syft/trivy are baked into the image by ARG;
 # their drift surfaces on the Renovate bump PR, which runs the full CI (example
-# scans + output snapshots). See docs/internal/dependency-upgrade-policy.md.
+# scans + output snapshots). See docs/maintainers/dependency-upgrade-policy.md.
 name: Upstream compatibility
 
 on:
@@ -100,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
           title="Upstream compatibility: latest cdxgen breaks example scans"
-          body=$(printf '%b\n\nRun: %s\n\nThe pinned version still works; this is an early warning that bumping cdxgen will need attention. See docs/internal/dependency-upgrade-policy.md.' "$REPORT" "$RUN_URL")
+          body=$(printf '%b\n\nRun: %s\n\nThe pinned version still works; this is an early warning that bumping cdxgen will need attention. See docs/maintainers/dependency-upgrade-policy.md.' "$REPORT" "$RUN_URL")
           existing=$(gh issue list --label upstream-compat --state open \
             --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then

@@ -1,7 +1,7 @@
 # 사용자 문서 사이트 설정. 정본 마크다운은 docs/에 있고, 이 설정으로 GitHub Pages에
 # 렌더링한다(검색, 사이드바, 한국어/영어). 룩은 Gemini API 문서(Google DevSite) 인상을
 # MkDocs Material과 docs/stylesheets/extra.css로 재현하되, 강조색만 SK 브랜드 색을 쓴다.
-# internal/(메인테이너 설계 문서)과 contributing/는 사이트 빌드에서 제외한다.
+# maintainers/(메인테이너 설계 문서)과 contributing/는 사이트 빌드에서 제외한다.
 site_name: BomLens
 site_description: BomLens is a local-first SBOM generator and open-source risk assessor. Produce a CycloneDX SBOM, an open-source notice, and a security and license risk report from source code, containers, binaries, firmware, or an SBOM you received — from the CLI or a browser UI, with no SaaS.
 site_author: SK Telecom
@@ -161,7 +161,7 @@ extra:
   goatcounter: ""
 
 exclude_docs: |
-  internal/
+  maintainers/
   korean-style-guide.md
 
 # Validate internal links and heading anchors against the rendered site. Anchors
