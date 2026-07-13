@@ -2,19 +2,19 @@
   <img src="docs/images/logo.svg" alt="BomLens — an SBOM generator" width="300" />
 </p>
 
-> **BomLens** is a local-first [SBOM](https://sktelecom.github.io/sbom-tools/concepts/what-is-sbom/) generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security/license risk report for a single project in seconds — from source code, containers, binaries, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS.
+> **BomLens** is a local-first [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is-sbom/) generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security/license risk report for a single project in seconds — from source code, containers, binaries, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS.
 
-[![GitHub release](https://img.shields.io/github/v/release/sktelecom/sbom-tools?style=flat-square)](https://github.com/sktelecom/sbom-tools/releases)
-[![Container image](https://img.shields.io/badge/ghcr.io-bomlens-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/sbom-tools/pkgs/container/bomlens)
+[![GitHub release](https://img.shields.io/github/v/release/sktelecom/bomlens?style=flat-square)](https://github.com/sktelecom/bomlens/releases)
+[![Container image](https://img.shields.io/badge/ghcr.io-bomlens-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/bomlens/pkgs/container/bomlens)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/sbom-tools/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/sbom-tools)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/bomlens/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/bomlens)
 
 <p align="center">
   <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI showing a scan result: the Overview with counts and a severity/license summary, the Components table with filters, the Vulnerabilities list, the Dependencies as a graph and tree, and the Licenses section" width="860" />
 </p>
 
-**Where to start** — the full docs are a navigable site at **[sktelecom.github.io/sbom-tools](https://sktelecom.github.io/sbom-tools/)** (search, sidebar, English/Korean); the same content lives under [docs/](docs/):
+**Where to start** — the full docs are a navigable site at **[sktelecom.github.io/bomlens](https://sktelecom.github.io/bomlens/)** (search, sidebar, English/Korean); the same content lives under [docs/](docs/):
 
 - [First scan](docs/start/first-scan.md) ([한국어](docs/start/first-scan.ko.md)) — install and your first SBOM (desktop app, web UI, CLI)
 - [No-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) — no command line at all, click by click, for non-developers
@@ -34,7 +34,7 @@ Everything runs on a Docker engine (20.10+). On Windows, free [Rancher Desktop](
 
 ### Desktop app — no command line (recommended)
 
-Download the installer and double-click it — [BomLens-Setup.exe](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now; if Windows SmartScreen or macOS blocks it, the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) shows how to proceed — it also walks a non-developer through the common case of a source ZIP handed over by a dev team. Build details are in [`electron/`](electron/README.md).
+Download the installer and double-click it — [BomLens-Setup.exe](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now; if Windows SmartScreen or macOS blocks it, the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) shows how to proceed — it also walks a non-developer through the common case of a source ZIP handed over by a dev team. Build details are in [`electron/`](electron/README.md).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](docs/images/desktop-startup-en.png)
 
@@ -43,7 +43,7 @@ Download the installer and double-click it — [BomLens-Setup.exe](https://githu
 Launch, scan, and download in the browser; live logs stream as it runs.
 
 ```bash
-git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
+git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
@@ -65,6 +65,6 @@ Outputs (in a `{Project}_{Version}/` subfolder, files prefixed `{Project}_{Versi
 
 ## Contributing & License
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues).
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/bomlens/issues).
 
 Apache License 2.0 · © 2026 SK Telecom Co., Ltd. Bundled third-party tools keep their own licenses — see [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

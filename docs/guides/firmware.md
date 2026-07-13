@@ -6,7 +6,7 @@ description: Unpack network-device firmware binaries (.bin, squashfs, and more) 
 
 How to identify components and check the SBOM, licenses, and vulnerabilities in a network-device firmware binary (`.bin`, `.img`, squashfs, and so on). Use it when you only have the binary and no source, such as firmware received from a supplier.
 
-For the tool selection rationale and the internal design, see the maintainer doc [Firmware analysis](https://github.com/sktelecom/sbom-tools/blob/main/docs/maintainers/firmware-analysis.md) (Korean).
+For the tool selection rationale and the internal design, see the maintainer doc [Firmware analysis](https://github.com/sktelecom/bomlens/blob/main/docs/maintainers/firmware-analysis.md) (Korean).
 
 ## How it works
 
@@ -71,7 +71,7 @@ OSV (Open Source Vulnerabilities) advisories are not bundled, to keep the redist
 
 ## License note
 
-The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.
+The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.
 
 ## Limits
 

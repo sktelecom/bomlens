@@ -89,10 +89,10 @@ jobs:
             
             ### Documentation
             
-            - [Getting Started](https://sktelecom.github.io/sbom-tools/start/first-scan/)
-            - [Notice, security & risk reports](https://sktelecom.github.io/sbom-tools/guides/reports/)
-            - [Usage Guide](https://sktelecom.github.io/sbom-tools/reference/cli/)
-            - [Examples](https://sktelecom.github.io/sbom-tools/reference/ecosystems/)
+            - [Getting Started](https://sktelecom.github.io/bomlens/start/first-scan/)
+            - [Notice, security & risk reports](https://sktelecom.github.io/bomlens/guides/reports/)
+            - [Usage Guide](https://sktelecom.github.io/bomlens/reference/cli/)
+            - [Examples](https://sktelecom.github.io/bomlens/reference/ecosystems/)
           # Created as a draft so it is not shown as the latest release until the
           # release-gate job confirms a first-time user's entry points actually
           # work (installers attached, published image runs the documented

@@ -12,7 +12,7 @@ BomLens runs on a Docker engine, but the desktop app and web UI set it up and pu
 
 ## Start without the command line (recommended)
 
-Download [BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 3–4 GB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
+Download [BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click it; the UI opens with no console window. On first run it checks Docker, pulls the scanner image (about 3–4 GB), and opens http://localhost:8080. The app is unsigned for now, so if Windows SmartScreen warns, click **More info**, then **Run anyway**. A click-by-click walkthrough is in the [no-CLI quick start](../start/no-cli.md).
 
 ![BomLens desktop app — the startup screen shows Docker checks, image download progress, and container startup](../images/desktop-startup-en.png)
 
@@ -23,7 +23,7 @@ Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step 
 No commands beyond launching it: run in the browser, scan, and download results.
 
 ```bash
-git clone https://github.com/sktelecom/sbom-tools.git && cd sbom-tools
+git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
@@ -136,7 +136,7 @@ Clone the repo inside WSL and run `./scripts/scan-sbom.sh ...` as above. For the
 | Every option and CI/CD | [CLI reference](../reference/cli.md) |
 | Language example projects | [Ecosystems](../reference/ecosystems.md) |
 | Internals | [Architecture](../concepts/architecture.md) |
-| Contributing | [Contributing guide](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) |
+| Contributing | [Contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) |
 
 ---
 

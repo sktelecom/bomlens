@@ -256,7 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - BomLens brand identity: aperture logo, app icons, and favicon across the docs site, web UI, and desktop app. (#125, #127, #128, #130)
-- Rendered documentation site (sktelecom.github.io/sbom-tools) with sidebar navigation, search, and a one-click Windows download, replacing repo-only docs. (#112, #113, #114, #115, #116)
+- Rendered documentation site (sktelecom.github.io/bomlens) with sidebar navigation, search, and a one-click Windows download, replacing repo-only docs. (#112, #113, #114, #115, #116)
 - New documentation pages on the site: use the Docker image directly, architecture, and the two contributing guides, each with an English translation. (#126)
 - English translations for the five previously Korean-only guides. (#117)
 
@@ -363,20 +363,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/sbom-tools/compare/v1.6.0...HEAD
-[v1.6.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.6.0
-[v1.5.5]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.5
-[v1.5.4]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.4
-[v1.5.3]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.3
-[v1.5.2]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.2
-[v1.5.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.1
-[v1.5.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.5.0
-[v1.4.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.4.0
-[v1.3.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.3.1
-[v1.3.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.3.0
-[v1.2.2]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.2
-[v1.2.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.1
-[v1.2.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.2.0
-[v1.1.1]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.1
-[v1.1.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.1.0
-[v1.0.0]: https://github.com/sktelecom/sbom-tools/releases/tag/v1.0.0
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.6.0...HEAD
+[v1.6.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.6.0
+[v1.5.5]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.5
+[v1.5.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.4
+[v1.5.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.3
+[v1.5.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.2
+[v1.5.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.1
+[v1.5.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.0
+[v1.4.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.4.0
+[v1.3.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.3.1
+[v1.3.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.3.0
+[v1.2.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.2.2
+[v1.2.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.2.1
+[v1.2.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.2.0
+[v1.1.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.1.1
+[v1.1.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.1.0
+[v1.0.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.0.0

@@ -31,7 +31,7 @@ For any input form, adding `--all --generate-only` produces all three at once (t
 docker pull ghcr.io/sktelecom/bomlens:latest   # legacy name sbom-scanner serves the same image
 
 # For convenience, keep the script path in a variable.
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 ```
 
 ## At a glance
@@ -58,7 +58,7 @@ A team handed you a GitHub repository. Pass the URL directly, no manual `git clo
 <!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/sktelecom/sbom-tools" \
+  --git "https://github.com/sktelecom/bomlens" \
   --all --generate-only
 ```
 

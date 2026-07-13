@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Check latest-release installers resolve
         run: |
-          base="https://github.com/sktelecom/sbom-tools/releases/latest/download"
+          base="https://github.com/sktelecom/bomlens/releases/latest/download"
           # Minimum plausible installer size (bytes); a real .exe/.dmg is tens of MB.
           min=1000000
           fail=0

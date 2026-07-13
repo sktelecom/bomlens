@@ -45,7 +45,7 @@ flowchart TD
 ### Path A — desktop app (recommended)
 
 1. **Install a Docker engine**. Download the Windows installer from [rancherdesktop.io](https://rancherdesktop.io/), install it, and run it. If it asks whether to use Kubernetes during install, you can turn it off. When the taskbar icon settles (usually 1–2 minutes), it is ready.
-2. **Get and run the app**. Click [Download BomLens for Windows (.exe)](https://github.com/sktelecom/sbom-tools/releases/latest/download/BomLens-Setup.exe) and double-click the file. It is unsigned for now, so if Windows shows a "Windows protected your PC" warning, click "More info" and choose "Run anyway". The app opens with no console window.
+2. **Get and run the app**. Click [Download BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click the file. It is unsigned for now, so if Windows shows a "Windows protected your PC" warning, click "More info" and choose "Run anyway". The app opens with no console window.
 3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait.
 
 ![Click "More info" on the SmartScreen warning and proceed with "Run anyway"](../images/smartscreen.png)

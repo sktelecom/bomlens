@@ -11,7 +11,7 @@ Scan from a browser without the CLI. The UI server is built into the scanner ima
 **macOS / Linux:**
 ```bash
 cd ~/sbom-output      # output folder (anywhere is fine)
-/path/to/sbom-tools/scripts/scan-sbom.sh --ui
+/path/to/bomlens/scripts/scan-sbom.sh --ui
 # → opens http://localhost:8080 automatically
 ```
 

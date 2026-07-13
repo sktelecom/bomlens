@@ -190,8 +190,8 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 1. Rerun with `DEBUG_MODE=true` and review the detailed logs.
 2. Run `scan-sbom.sh` directly in the example directory of the failing language.
 3. Update the Docker image to the latest version: `docker pull ghcr.io/sktelecom/bomlens:latest`
-4. If the problem persists, report it on [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues) with your environment details and logs.
+4. If the problem persists, report it on [GitHub Issues](https://github.com/sktelecom/bomlens/issues) with your environment details and logs.
 
 ---
 
-> **Related**: [Contributing](https://github.com/sktelecom/sbom-tools/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Adding a package manager](package-managers.md)
+> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Adding a package manager](package-managers.md)

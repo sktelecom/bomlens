@@ -19,12 +19,12 @@
 #
 # Usage: attach-installer-checksums.sh <tag>    e.g. attach-installer-checksums.sh v1.5.5
 # Env:   GH_TOKEN          token for `gh` (GITHUB_TOKEN in Actions)
-#        GITHUB_REPOSITORY owner/repo (default sktelecom/sbom-tools)
+#        GITHUB_REPOSITORY owner/repo (default sktelecom/bomlens)
 #        DRY_RUN=1         compute and print, but do not upload
 set -euo pipefail
 
 TAG="${1:?usage: attach-installer-checksums.sh <tag e.g. v1.5.5>}"
-REPO="${GITHUB_REPOSITORY:-sktelecom/sbom-tools}"
+REPO="${GITHUB_REPOSITORY:-sktelecom/bomlens}"
 INSTALLERS=(BomLens-Setup.exe BomLens-Setup.dmg)
 
 work="$(mktemp -d)"

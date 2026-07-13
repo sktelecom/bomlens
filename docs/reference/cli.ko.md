@@ -133,6 +133,6 @@ docker system prune -f
 
 1. `VERBOSE=true ./tests/test-scan.sh` 로 상세 로그를 확인합니다.
 2. Docker 이미지를 최신 버전으로 업데이트합니다: `docker pull ghcr.io/sktelecom/bomlens:latest`
-3. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/sbom-tools/issues)에 환경 정보와 로그를 첨부해 리포트해 주세요.
+3. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/bomlens/issues)에 환경 정보와 로그를 첨부해 리포트해 주세요.
 
 모드별 사용법은 [입력 시나리오 가이드](../guides/by-input.ko.md), 산출물 종류는 [산출물 레퍼런스](artifacts.ko.md), 언어 감지는 [지원 생태계](ecosystems.ko.md)를 참고하세요.

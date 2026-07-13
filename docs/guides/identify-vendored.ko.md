@@ -75,4 +75,4 @@ scan-sbom.sh --project trelay --version 26.4.0 --target ./src --identify-vendore
 
 귀속(어느 프로젝트인지)도 틀릴 수 있습니다. 여러 프로젝트가 흔히 복사하는 파일(예: zlib의 `deflate.c`)은 정식 upstream이 아니라 그것을 vendored한 다운스트림 프로젝트로 매치될 수 있습니다. 이 노이즈를 줄이기 위해 BomLens는 **최소 두 개 이상의 파일이 지지하는 라이브러리만 보고**하고(`SCANOSS_MIN_FILES`로 조정, `1`이면 모두 유지) 버전·PURL은 그 파일들의 **다수결**로 정합화합니다. 그래서 단발성 포크 매치는 떨어지고, 여러 포크로 흩어진 라이브러리는 하나의 컴포넌트로 합쳐집니다. 다만 완전한 해결은 아니며, 실제 사본이 여전히 다른 이름으로 보고되고 그 CVE를 놓칠 수 있습니다. 이는 지식 베이스의 랭킹·커버리지 한계이며 무료 OSSKB에서 더 두드러집니다. 더 정확한 귀속이 필요하면 `SCANOSS_API_URL`을 SCANOSS 상용·자체 호스팅 엔드포인트로 지정하세요. 또한 공개 저장소에 이미 게시된 소스를 스캔하면 그 저장소로 매치됩니다(자기 1st-party 파일이 자기 공개 프로젝트로 매치) — 의도한 용도인 비공개 공급사 소스에서는 발생하지 않습니다.
 
-결과는 사람 검토가 도움이 되는 best-effort 추정입니다. OSSKB 약관과 라이선스 설명은 [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/sbom-tools/blob/main/THIRD_PARTY_LICENSES.md)를 참조하세요.
+결과는 사람 검토가 도움이 되는 best-effort 추정입니다. OSSKB 약관과 라이선스 설명은 [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md)를 참조하세요.

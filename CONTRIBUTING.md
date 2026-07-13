@@ -24,11 +24,11 @@ BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 
 
 | 유형 | 방법 |
 |------|------|
-| 버그 수정 | [Issues](https://github.com/sktelecom/sbom-tools/issues)에서 버그를 찾아 수정 |
+| 버그 수정 | [Issues](https://github.com/sktelecom/bomlens/issues)에서 버그를 찾아 수정 |
 | 새 언어 지원 | [패키지 매니저 추가 가이드](docs/contribute/package-managers.ko.md) 참고 |
 | 문서 개선 | 오타 수정, 예제 추가, 설명 보완 |
 | 테스트 작성 | [테스트 가이드](docs/contribute/testing.ko.md) 참고 |
-| 기능 제안 | [Discussions](https://github.com/sktelecom/sbom-tools/discussions)에서 먼저 논의 |
+| 기능 제안 | [Discussions](https://github.com/sktelecom/bomlens/discussions)에서 먼저 논의 |
 
 한국어 문서를 작성·수정할 때는 [한국어 문서 문체 가이드](docs/korean-style-guide.md)를 따른다.
 
@@ -43,8 +43,8 @@ BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 
 ### 저장소 클론 및 환경 준비
 
 ```bash
-git clone https://github.com/sktelecom/sbom-tools.git
-cd sbom-tools
+git clone https://github.com/sktelecom/bomlens.git
+cd bomlens
 
 # Docker 이미지 빌드 (로컬 수정 시)
 cd docker && docker build -t sbom-scanner:local .
@@ -149,7 +149,7 @@ Closes #42
 
 ### 버그 리포트
 
-[GitHub Issues](https://github.com/sktelecom/sbom-tools/issues)를 이용해 주세요. 아래 정보를 포함하면 빠른 해결에 도움이 됩니다.
+[GitHub Issues](https://github.com/sktelecom/bomlens/issues)를 이용해 주세요. 아래 정보를 포함하면 빠른 해결에 도움이 됩니다.
 
 - 환경: OS, Docker 버전, 스크립트 버전
 - 재현 방법: 버그를 재현하는 최소한의 단계
@@ -157,7 +157,7 @@ Closes #42
 
 ### 기능 제안
 
-[GitHub Discussions](https://github.com/sktelecom/sbom-tools/discussions)에서 먼저 논의한 뒤 이슈로 이어가면 좋습니다.
+[GitHub Discussions](https://github.com/sktelecom/bomlens/discussions)에서 먼저 논의한 뒤 이슈로 이어가면 좋습니다.
 
 ---
 

@@ -25,7 +25,7 @@ UI를 실행하고 프로젝트 이름과 버전을 입력한 뒤 스캔 대상�
 
 ```bash
 cd /path/to/your-project
-/path/to/sbom-tools/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
+/path/to/bomlens/scripts/scan-sbom.sh --project MyApp --version 1.0.0 --all --generate-only
 ```
 
 Windows에서는 `scripts\scan-sbom.bat`(Git Bash)를 쓰거나 WSL2에서 그대로 실행합니다. 설치는 [시작하기](../start/first-scan.ko.md)를 참고하세요.

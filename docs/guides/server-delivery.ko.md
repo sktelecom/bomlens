@@ -28,7 +28,7 @@ description: 서버의 SBOM을 만드는 방법. OS rootfs, 애플리케이션, 
 docker pull ghcr.io/sktelecom/bomlens:latest
 
 # 스크립트 경로를 변수에 둡니다.
-SBOM=/path/to/sbom-tools/scripts/scan-sbom.sh
+SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 ```
 
 ## 1층 — OS 패키지
