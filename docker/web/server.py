@@ -92,6 +92,9 @@ ARTIFACT_SUFFIXES = (
     "_conformance.json", "_conformance.md", "_conformance.html",
     "_risk-report.md", "_risk-report.html",
     "_bom.json.sig", "_scancode.json",
+    # SPDX 2.3 export (opt-in --spdx / GENERATE_SPDX): converted from the final
+    # CycloneDX BOM, plus its cosign signature when signing is enabled.
+    "_bom.spdx.json", "_bom.spdx.json.sig",
     # Source file tree (ScanCode-shaped, structure-only). Emitted by the scanner
     # for source-having modes so the UI's source-tree view works without the
     # opt-in ScanCode deep-license scan; the frontend prefers _scancode (which
@@ -1256,6 +1259,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
+        # SPDX export is opt-in, so absent means "false" (unlike _bool_env).
+        "-e", "GENERATE_SPDX=%s" % ("true" if env.get("GENERATE_SPDX") == "true" else "false"),
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
     ]
     # Opt-in OSV advisories for firmware: forward only the two fixed control
@@ -1645,6 +1650,7 @@ class Handler(BaseHTTPRequestHandler):
             "version": version,
             "notice": g("notice", "true") == "true",
             "security": g("security", "true") == "true",
+            "spdx": g("spdx") == "true",
             "deepLicense": g("deep_license") == "true",
             "identifyVendored": g("identify_vendored") == "true",
             "includeOsv": g("includeOsv") == "true",
@@ -1682,6 +1688,7 @@ class Handler(BaseHTTPRequestHandler):
             "HOST_OUTPUT_DIR": run_out,
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
             "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
+            "GENERATE_SPDX": "true" if g("spdx") == "true" else "false",
             "GENERATE_REPORT": "true",  # 오픈소스위험분석보고서: default-on (mirrors CLI)
             "DEEP_LICENSE": "true" if g("deep_license") == "true" else "false",
             # Vendored-OSS identification (SCANOSS). SCANOSS_API_URL/KEY, if set in

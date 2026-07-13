@@ -35,7 +35,8 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--trusca <project_id>` | — | Upload to TRUSCA (= `--upload-target trusca` + project id). Needs `API_URL` and a Bearer `API_KEY` |
 | `--notice` | (on by default) | Generate the open-source notice (NOTICE, txt+html) |
 | `--security` | (on by default) | Generate the Trivy security report (json+md+html), including CVSS, EPSS, and CISA KEV priority signals |
-| `--all` | — | `--notice --security` |
+| `--spdx` | false | Also export the SBOM as SPDX 2.3 JSON (`_bom.spdx.json`), converted from the final CycloneDX output |
+| `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |

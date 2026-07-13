@@ -82,6 +82,34 @@ describe("groupArtifacts", () => {
     expect(sig.signature).toBeUndefined();
   });
 
+  it("folds the SPDX export onto the SBOM card as a distinct chip", () => {
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`, 4096),
+      file(`${PREFIX}_bom.spdx.json`, 2048),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom"]);
+    // CycloneDX json (rank 3) before the spdx pseudo-extension (rank 4).
+    expect(groups[0].formats.map((f) => f.ext)).toEqual(["json", "spdx"]);
+    expect(groups[0].formats.map((f) => f.name)).toEqual([
+      `${PREFIX}_bom.json`,
+      `${PREFIX}_bom.spdx.json`,
+    ]);
+    expect(groups[0].formats.every((f) => f.viewable)).toBe(true);
+  });
+
+  it("keeps the CycloneDX signature on the card when the SPDX one exists too", () => {
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`),
+      file(`${PREFIX}_bom.spdx.json`),
+      file(`${PREFIX}_bom.spdx.json.sig`, 256),
+      file(`${PREFIX}_bom.json.sig`, 256),
+    ]);
+    const sbom = groups.find((g) => g.key === "sbom")!;
+    expect(sbom.signature?.name).toBe(`${PREFIX}_bom.json.sig`);
+    // Neither .sig ever becomes a format chip.
+    expect(sbom.formats.some((f) => f.ext === "sig")).toBe(false);
+  });
+
   it("omits absent groups and returns empty for no results", () => {
     expect(groupArtifacts([])).toEqual([]);
     const only = groupArtifacts([file(`${PREFIX}_bom.json`)]);
@@ -95,6 +123,7 @@ describe("formatLabel", () => {
     expect(formatLabel("html")).toBe("HTML");
     expect(formatLabel("json")).toBe("JSON");
     expect(formatLabel("sig")).toBe("SIG");
+    expect(formatLabel("spdx")).toBe("SPDX");
     expect(formatLabel("")).toBe("");
   });
 });
