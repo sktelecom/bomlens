@@ -219,6 +219,21 @@ g7_ai_checks() {
         echo "[]"
         return
     fi
+    # Join the regulatory crosswalk (best-effort): tag each G7 element with the
+    # documentation obligations it maps to (docker/lib/regulation-crosswalk.json,
+    # keyed by element id). Purely informational — it never changes a pass/warn
+    # status or the overall result. A missing or invalid crosswalk leaves each
+    # element with regulations:[] and the run continues.
+    local xwalk="${REGULATION_CROSSWALK:-$(dirname "$0")/regulation-crosswalk.json}"
+    if [ -f "$xwalk" ]; then
+        local joined
+        if joined=$(printf '%s' "$out" | jq -c --slurpfile x "$xwalk" '
+            (($x[0].map) // {}) as $m | map(. + {regulations: ($m[.id] // [])})' 2>/dev/null); then
+            out="$joined"
+        else
+            echo "[validate] WARN: regulation crosswalk join failed; continuing without it." >&2
+        fi
+    fi
     echo "$out"
 }
 
@@ -359,12 +374,42 @@ N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn" and ((.source // "")
 N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na")] | length')
 
 # --------------------------------------------------------
+# Regulatory crosswalk summary (AI SBOMs only, informational). Groups the G7
+# checks that carry crosswalk mappings by regulation framework and, per
+# framework, counts how many mapped elements are present / a gap / review-only
+# and lists them. Never affects RESULT — it is a documentation-preparation view,
+# not a compliance verdict. Empty (frameworks:[]) for non-AI SBOMs or when the
+# crosswalk file is absent.
+# --------------------------------------------------------
+XWALK="${REGULATION_CROSSWALK:-$(dirname "$0")/regulation-crosswalk.json}"
+XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
+if [ -f "$XWALK" ]; then
+    XW_SUMMARY=$(echo "$CHECKS" | jq -c --slurpfile x "$XWALK" '
+      ($x[0].frameworks // {}) as $fw
+      | [ .[] | select((.regulations // []) | length > 0) ] as $rows
+      | { disclaimer: ($x[0].disclaimer // ""),
+          frameworks: [
+            $fw | to_entries[] | .key as $fid | .value as $meta
+            | ($rows | map(select((.regulations // []) | any(.framework==$fid)))) as $frows
+            | select(($frows|length) > 0)
+            | { id: $fid, title: ($meta.title // $fid), source: ($meta.source // ""),
+                total:   ($frows|length),
+                present: ($frows | map(select(.status=="pass")) | length),
+                gap:     ($frows | map(select(.status=="warn" and ((.source//"")!="na"))) | length),
+                review:  ($frows | map(select((.source//"")=="na")) | length),
+                elements:($frows | map({label, status, source,
+                            refs: [ (.regulations // [])[] | select(.framework==$fid) | .ref ]})) }
+          ] }' 2>/dev/null) || XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
+fi
+
+# --------------------------------------------------------
 # JSON report
 # --------------------------------------------------------
 jq -n \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
-   --arg ts "$GEN_AT" --argjson checks "$CHECKS" '
+   --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" '
 { project: $project, format: $format, result: $result, generatedAt: $ts, checks: $checks }
++ (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
 
 # --------------------------------------------------------
@@ -390,6 +435,26 @@ jq -n \
         echo ""
         echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
+    fi
+    # Regulatory crosswalk (AI SBOMs only): which documentation obligation each
+    # mapped G7 element touches. Visibility only — see the disclaimer; it does not
+    # change the result above.
+    if [ "$(echo "$XW_SUMMARY" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "## Regulatory crosswalk"
+        echo ""
+        echo "$XW_SUMMARY" | jq -r '.disclaimer'
+        echo ""
+        echo "$XW_SUMMARY" | jq -r '.frameworks[] |
+            "### \(.title)",
+            "",
+            "Source: \(.source)",
+            "",
+            "Mapped elements: \(.total) — present \(.present), gap \(.gap), needs review \(.review)",
+            "",
+            "| Status | G7 element | Reference |",
+            "|--------|-----------|-----------|",
+            (.elements[] | "| \(if .status=="pass" then "✅" elif (.source//"")=="na" then "🔍" else "⚠️" end) | \(.label | gsub("[|\n]";" ")) | \((.refs | join(", ")) | gsub("[|\n]";" ")) |"),
+            ""'
     fi
 } > "$MD"
 
@@ -484,6 +549,24 @@ HTMLHEAD
         echo "<h2>Missing / non-conformant items</h2>"
         echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
+    fi
+    # Regulatory crosswalk (AI SBOMs only): documentation obligations each mapped
+    # G7 element touches. Visibility only — the disclaimer states BomLens does not
+    # certify compliance; this section never affects the result above.
+    if [ "$(echo "$XW_SUMMARY" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "<h2>Regulatory crosswalk</h2>"
+        echo "<p class=\"meta\">$(echo "$XW_SUMMARY" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
+        echo "$XW_SUMMARY" | jq -r '.frameworks[] |
+            "<h3>" + (.title|@html) + "</h3>" +
+            "<p class=\"meta\">" + (.source|@html) + " &middot; present " + (.present|tostring)
+              + ", gap " + (.gap|tostring) + ", needs review " + (.review|tostring) + "</p>" +
+            "<div class=\"table-wrap\"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr>" +
+            ([ .elements[] |
+               "<tr><td class=\"s-" + (if .status=="pass" then "pass" else "warn" end) + "\">"
+               + (if (.source//"")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>"
+               + "<td>" + (.label|@html) + "</td>"
+               + "<td>" + ((.refs|join(", "))|@html) + "</td></tr>" ] | join(""))
+            + "</table></div>"'
     fi
     echo "</body></html>"
 } > "$HTML"

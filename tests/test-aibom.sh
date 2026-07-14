@@ -242,6 +242,41 @@ bash "$LIB/validate-sbom.sh" "$WORK/merged.json" "$WORK/mconf" "combo" >/dev/nul
 infra=$(jq -r '.checks[] | select(.id=="g7-infra-software") | .status' "$WORK/mconf_conformance.json")
 [ "$infra" = "pass" ] && pass "g7-infra-software flips to pass on the merged BOM" || fail "g7-infra-software='$infra', expected pass"
 
+echo "== regulation crosswalk: registry integrity =="
+XW="$LIB/regulation-crosswalk.json"
+jq empty "$XW" >/dev/null 2>&1 && pass "regulation-crosswalk.json is valid JSON" || fail "regulation-crosswalk.json is not valid JSON"
+# Drift guard: every mapped element id must exist in the G7 registry, else the
+# crosswalk has rotted against a renamed/removed element and would silently map
+# nothing.
+unknown=$(comm -23 <(jq -r '.map | keys[]' "$XW" | sort -u) \
+                   <(jq -r '.clusters[].elements[].id' "$LIB/g7-registry.json" | sort -u))
+[ -z "$unknown" ] && pass "every crosswalk element id exists in g7-registry.json" || fail "crosswalk maps unknown G7 element id(s)" "$unknown"
+undecl=$(comm -23 <(jq -r '.map[][].framework' "$XW" | sort -u) \
+                  <(jq -r '.frameworks | keys[]' "$XW" | sort -u))
+[ -z "$undecl" ] && pass "every crosswalk framework is declared" || fail "crosswalk references undeclared framework(s)" "$undecl"
+[ -n "$(jq -r '.disclaimer // ""' "$XW")" ] && pass "crosswalk carries a no-certification disclaimer" || fail "crosswalk lacks a disclaimer"
+
+echo "== regulation crosswalk: surfaced in the AI conformance report =="
+# $CONF is the AI-fixture conformance JSON from the G7 section above.
+xwf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$CONF" 2>/dev/null)
+[ "${xwf:-0}" -ge 1 ] && pass "AI conformance JSON has a regulatoryCrosswalk ($xwf framework(s))" || fail "regulatoryCrosswalk missing from AI conformance JSON"
+regn=$(jq '[.checks[] | select((.regulations // []) | length > 0)] | length' "$CONF")
+[ "$regn" -ge 1 ] && pass "G7 checks carry regulation refs ($regn tagged)" || fail "no G7 check carries regulations"
+grep -q "Regulatory crosswalk" "$WORK/conf_conformance.md" && pass "MD carries the crosswalk section" || fail "MD lacks the crosswalk section"
+grep -q "does not certify" "$WORK/conf_conformance.md" && pass "MD crosswalk states the no-certification disclaimer" || fail "MD lacks the disclaimer"
+grep -q "Regulatory crosswalk" "$WORK/conf_conformance.html" && pass "HTML carries the crosswalk section" || fail "HTML lacks the crosswalk section"
+
+echo "== regulation crosswalk: informational only (result + G7 count unchanged) =="
+# Re-run with the crosswalk disabled (env points at a nonexistent file): the
+# crosswalk must never add/remove a check or move the overall result.
+REGULATION_CROSSWALK="$WORK/nope.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/confx" "x" >/dev/null 2>&1
+r_with=$(jq -r '.result' "$CONF"); r_without=$(jq -r '.result' "$WORK/confx_conformance.json")
+[ "$r_with" = "$r_without" ] && pass "result identical with/without the crosswalk ($r_with)" || fail "result changed: with=$r_with without=$r_without"
+[ "$(jq 'has("regulatoryCrosswalk")' "$WORK/confx_conformance.json")" = "false" ] && pass "no crosswalk file -> no regulatoryCrosswalk (graceful)" || fail "regulatoryCrosswalk present despite disabled crosswalk"
+g7_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
+g7_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confx_conformance.json")
+[ "$g7_with" = "$g7_without" ] && pass "G7 check count unchanged by the crosswalk ($g7_with)" || fail "G7 count differs: with=$g7_with without=$g7_without"
+
 echo "== generate-notice.sh flags AI restrictive licenses for review =="
 bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
 RTXT="$WORK/rev_NOTICE.txt"

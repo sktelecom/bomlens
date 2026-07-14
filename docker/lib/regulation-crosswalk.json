@@ -1,0 +1,99 @@
+{
+  "note": "Interpretive crosswalk from G7 SBOM-for-AI minimum elements (docker/lib/g7-registry.json) to the documentation requirements of named AI regulations. It answers one question for a reviewer: when a G7 element is missing from an AI SBOM, which regulatory documentation obligation does that gap touch? Keyed by G7 element id so one element can map to several frameworks without bloating the registry. This is a documentation-preparation aid, NOT legal advice and NOT a compliance determination — each entry states the interpretive 'basis' for the link so a person can judge it. The mapping is deliberately conservative: only elements with a defensible correspondence are listed; an absent element id simply has no crosswalk entry.",
+  "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.",
+  "frameworks": {
+    "eu-ai-act": {
+      "title": "EU AI Act — Annex IV technical documentation",
+      "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
+      "granularity": "element",
+      "note": "Annex IV lists the technical documentation a provider of a high-risk AI system must prepare. References below point at Annex IV sections (e.g. IV(2)(d) = the data-requirements point of the development-process section)."
+    },
+    "kr-ai-framework-act": {
+      "title": "AI Framework Act (Korea)",
+      "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
+      "granularity": "article",
+      "note": "The Act sets framework-level duties; the granular documentation requirements live in its 시행령 (enforcement decree). References point at the Act's articles (제31조 transparency, 제32조 safety/risk management, 제33·34조 high-impact AI, 제35조 impact assessment). Links are coarser than the EU Annex IV mapping by design."
+    }
+  },
+  "map": {
+    "g7-slp-name": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "general description: what the AI system is and its intended purpose" },
+      { "framework": "kr-ai-framework-act", "ref": "제31조", "basis": "transparency: the system must be identifiable as AI-operated to users" }
+    ],
+    "g7-slp-app-area": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "intended purpose and application area of the system" },
+      { "framework": "kr-ai-framework-act", "ref": "제33조", "basis": "whether the system is high-impact AI is judged by its application area" }
+    ],
+    "g7-slp-io": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "how the system interacts with hardware/software and its input-output surface" }
+    ],
+    "g7-slp-data-flow": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "description of how data moves through and around the system" },
+      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data flows are an input to the fundamental-rights impact assessment" }
+    ],
+    "g7-slp-data-usage": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "how data is used by the system" },
+      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data usage informs the fundamental-rights impact assessment" }
+    ],
+    "g7-model-description": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "general description of the model" }
+    ],
+    "g7-model-card": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(b)-(c)", "basis": "design specifications, algorithmic logic and system architecture" }
+    ],
+    "g7-model-io": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(3)", "basis": "capabilities and limitations of the model's functioning (input-output behaviour)" }
+    ],
+    "g7-model-training": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "training methodologies, techniques and the training datasets used" },
+      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: lifecycle risk identification covers how the model was trained" }
+    ],
+    "g7-ds-name": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "the datasets (datasheets) the model was trained on" }
+    ],
+    "g7-ds-description": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "description of the training data and its main characteristics" }
+    ],
+    "g7-ds-content": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "what the training data contains (scope and main characteristics)" }
+    ],
+    "g7-ds-provenance": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "provenance of the data: where it came from and how it was acquired and selected" }
+    ],
+    "g7-ds-statistics": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "main characteristics of the data (statistical properties)" }
+    ],
+    "g7-ds-sensitivity": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "data characteristics including sensitive or personal data" },
+      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data sensitivity is central to the fundamental-rights impact assessment" }
+    ],
+    "g7-ds-license": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "how the training data was acquired (rights to use it)" }
+    ],
+    "g7-kpi-operational": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(g)", "basis": "validation and testing metrics for accuracy and robustness; performance-metric appropriateness" }
+    ],
+    "g7-kpi-security": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity measures and their metrics" },
+      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: security metrics feed the risk-management system" }
+    ],
+    "g7-sec-vulns": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity: known vulnerabilities affecting the system" },
+      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: monitoring and responding to AI-related risks" }
+    ],
+    "g7-sec-controls": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity controls built into the system" },
+      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: risk-mitigation controls across the lifecycle" }
+    ],
+    "g7-sec-policy": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(5)", "basis": "risk-management system (Article 9) documentation" },
+      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: the required risk-management framework" }
+    ],
+    "g7-infra-software": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(2)(c)", "basis": "software components and computational resources used" }
+    ],
+    "g7-infra-hardware": [
+      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "the hardware on which the system runs" }
+    ]
+  }
+}
