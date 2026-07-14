@@ -21,7 +21,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Image = $(if ($env:SBOM_SCANNER_IMAGE) { $env:SBOM_SCANNER_IMAGE } else { 'ghcr.io/sktelecom/sbom-generator:latest' }),
+    [string]$Image = $(if ($env:SBOM_SCANNER_IMAGE) { $env:SBOM_SCANNER_IMAGE } else { 'ghcr.io/sktelecom/bomlens:latest' }),
     [int]$UiPort = $(if ($env:UI_PORT) { [int]$env:UI_PORT } else { 8080 })
 )
 

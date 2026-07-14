@@ -44,7 +44,7 @@ SRC_DIR = "/src"
 UPLOAD_DIR = os.path.join(OUTPUT_DIR, ".uploads")  # uploaded files + extracted/cloned trees
 PORT = int(os.environ.get("UI_PORT", "8080"))
 FIRMWARE_IMAGE = os.environ.get(
-    "SBOM_FIRMWARE_IMAGE", "ghcr.io/sktelecom/sbom-scanner-firmware:latest"
+    "SBOM_FIRMWARE_IMAGE", "ghcr.io/sktelecom/bomlens-firmware:latest"
 )
 AIBOM_IMAGE = os.environ.get(
     "SBOM_AIBOM_IMAGE", "ghcr.io/sktelecom/bomlens-aibom:latest"
