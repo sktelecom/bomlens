@@ -277,6 +277,36 @@ g7_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
 g7_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confx_conformance.json")
 [ "$g7_with" = "$g7_without" ] && pass "G7 check count unchanged by the crosswalk ($g7_with)" || fail "G7 count differs: with=$g7_with without=$g7_without"
 
+echo "== AI compliance profile re-aggregates conformance + license flags =="
+# Reuse the AI-fixture conformance from the G7 section ($WORK/conf_conformance.json);
+# give the profile a matching _bom.json carrying one behavioral-use license flag.
+jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])' \
+   "$FIX/aibom-owasp-1_7.json" > "$WORK/conf_bom.json"
+bash "$LIB/generate-ai-profile.sh" "$WORK/conf" "demo" >/dev/null 2>&1
+PROF="$WORK/conf_ai-profile.json"
+if [ -f "$PROF" ]; then
+    pass "ai-profile artifacts written for an AI SBOM"
+    cl=$(jq -r '.g7.clusters | length' "$PROF")
+    [ "$cl" = "7" ] && pass "profile rolls up all 7 G7 clusters" || fail "profile clusters=$cl, expected 7"
+    inv=$(jq -r '(.g7.present + .g7.gap + .g7.review)' "$PROF"); tot=$(jq -r '.g7.total' "$PROF")
+    [ "$inv" = "$tot" ] && pass "G7 present+gap+review == total ($tot)" || fail "G7 counts inconsistent: $inv vs $tot"
+    lf=$(jq -r '.licenseReview.total' "$PROF"); lb=$(jq -r '.licenseReview.behavioral' "$PROF")
+    { [ "$lf" -ge 1 ] && [ "$lb" -ge 1 ]; } && pass "license-review flag surfaced ($lf total, $lb behavioral-use)" || fail "license flag not surfaced (total=$lf, behavioral=$lb)"
+    xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
+    [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
+    grep -q "makes no compliance determination" "$WORK/conf_ai-profile.md" && pass "MD states it makes no compliance determination" || fail "MD lacks the no-determination note"
+    grep -q "AI compliance profile" "$WORK/conf_ai-profile.html" && pass "HTML profile rendered" || fail "HTML profile missing"
+else
+    fail "generate-ai-profile.sh produced no profile for an AI SBOM"
+fi
+
+echo "== AI compliance profile self-gates on non-AI SBOMs =="
+# A plain conformance report (no G7 checks) must yield no profile at all.
+printf '{"project":"x","format":"CycloneDX","result":"pass","checks":[{"id":"spec-version","label":"x","required":true,"status":"pass"}]}' > "$WORK/plain_conformance.json"
+echo '{"bomFormat":"CycloneDX","components":[]}' > "$WORK/plain_bom.json"
+bash "$LIB/generate-ai-profile.sh" "$WORK/plain" "x" >/dev/null 2>&1
+[ ! -f "$WORK/plain_ai-profile.json" ] && pass "no profile written for a non-AI SBOM (self-gated)" || fail "profile wrongly written for a non-AI SBOM"
+
 echo "== generate-notice.sh flags AI restrictive licenses for review =="
 bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
 RTXT="$WORK/rev_NOTICE.txt"
