@@ -75,12 +75,16 @@ SPDX 출력·byte-stability·ANALYZE, 웹 UI 서버측, 그리고 **데스크톱
 ## 리네임 잔여 (리포트 — 별도 판단 필요)
 
 대부분의 `sbom-generator`/`sbom-scanner`는 **의도된 레거시 별칭**이다(docker-publish가 3개 이름 동시 발행, 문서에 "별칭"
-명시, CI 내부 빌드태그 `sbom-scanner:test/local`). 다만 별칭이 아닌 잔여가 있다:
+명시, CI 내부 빌드태그 `sbom-scanner:test/local`). 다만 별칭이 아닌 잔여가 있었다:
 
-- **`docker/web/server.py:47`** — `SBOM_FIRMWARE_IMAGE` 기본값이 `…/sbom-scanner-firmware:latest`. 실행 중
-  `/capabilities`에서 `firmwareImage: …/sbom-scanner-firmware`인데 `aibomImage: …/bomlens-aibom`로 **firmware만
-  구명, aibom은 신규명** — 불일치. 별칭이라 동작은 하나 `bomlens-firmware`로 통일 권장.
-  (`docs/maintainers/firmware-analysis.md:139`도 같은 구명 기본값.)
+- **`docker/web/server.py:47` — 수정함(커밋 `5145baf` 이후 후속 커밋).** `SBOM_FIRMWARE_IMAGE` 기본값이
+  `…/sbom-scanner-firmware:latest`(구명) 하나만 남아 있었다. 웹 UI 테스트의 `/capabilities` 실행 출력에서
+  `firmwareImage: …/sbom-scanner-firmware`인데 `aibomImage: …/bomlens-aibom`로 **firmware만 구명, aibom은
+  신규명** — 불일치가 실증됐다. 게다가 `scripts/scan-sbom.sh:54`·`electron/lib/container.mjs:28`은 이미
+  `bomlens-firmware`이고, `electron/test/container.test.mjs:141`이 "server.py 기본값과 일치해야 한다"며
+  `bomlens-firmware`를 못박고 있어 server.py만 어긋난 상태였다. `bomlens-firmware:latest`(동일 digest 별칭,
+  발행 확인)로 통일. No-Docker 웹 UI 계약 테스트 70/70 통과로 회귀 없음 확인. (`firmware-analysis.md:139`의
+  구명 인용은 설계 문서라 잔존.)
 - **`electron/package.json:2` `"name": "sbom-generator-desktop"`** — 실측 확인: 데스크톱 앱의 데이터/로그 폴더가
   `%APPDATA%\sbom-generator-desktop\`(startup.log 여기)로 생성된다. 변경 시 마이그레이션 필요 → 의도적 보류로 보임.
 - **`THIRD_PARTY_LICENSES.md:12`, `docker/Dockerfile:3`** — 기본 이미지 표기가 아직 `sbom-scanner`(문서 정합성).
