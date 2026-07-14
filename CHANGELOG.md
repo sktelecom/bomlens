@@ -363,7 +363,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.8.0...HEAD
+[v1.8.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.0
+[v1.7.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.7.0
 [v1.6.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.6.0
 [v1.5.5]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.5
 [v1.5.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.5.4
