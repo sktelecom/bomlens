@@ -4,8 +4,21 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
-import type { ConformanceCheck, ConformanceSummary } from "@/lib/api";
-import { baseTally, g7Tally, groupG7ByCluster, splitChecks } from "@/lib/conformance";
+import type {
+  AiProfile,
+  ConformanceCheck,
+  ConformanceSummary,
+  CrosswalkFramework,
+} from "@/lib/api";
+import {
+  baseTally,
+  crosswalkTotals,
+  elementCoverage,
+  g7Tally,
+  groupG7ByCluster,
+  profileCard,
+  splitChecks,
+} from "@/lib/conformance";
 import { G7_GUIDANCE } from "@/lib/g7Guidance";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +30,172 @@ const STATUS = {
 
 function statusOf(s: ConformanceCheck["status"]) {
   return STATUS[s] ?? STATUS.warn;
+}
+
+// Crosswalk element coverage: present / gap / review. Colour only backs the word
+// (each carries its own label), reusing the existing risk tones — no new colours.
+const COVERAGE = {
+  present: { Icon: CircleCheck, color: "text-risk-low", key: "crosswalk.present" },
+  gap: { Icon: CircleAlert, color: "text-risk-medium", key: "crosswalk.gap" },
+  review: { Icon: CircleAlert, color: "text-muted-foreground", key: "crosswalk.review" },
+} as const;
+
+/** AI compliance summary card — a compact one-glance rollup shown at the top of
+ *  the Conformance section when an AI profile exists. Consumes only the profile
+ *  summary counts (no big arrays). Documentation aid, not a compliance verdict. */
+function AiProfileCard({ profile }: { profile: AiProfile }) {
+  const { t } = useTranslation();
+  const m = profileCard(profile);
+  const verdictTone =
+    m.result === "pass"
+      ? "success"
+      : m.result === "fail"
+        ? "critical"
+        : m.result === "warn"
+          ? "medium"
+          : "info";
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-semibold text-foreground">
+            {t("aiProfile.title")}
+          </div>
+          <Badge tone={verdictTone}>
+            {t(`aiProfile.verdict.${m.result}`, { defaultValue: m.result })}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("aiProfile.note")}</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md border p-3">
+            <div className="text-xs font-medium text-muted-foreground">
+              {t("aiProfile.g7Label")}
+            </div>
+            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+              {t("aiProfile.g7Value", { present: m.g7Present, auto: m.g7Auto })}
+            </div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {t("aiProfile.g7Detail", { gap: m.g7Gap, review: m.g7Review })}
+            </div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs font-medium text-muted-foreground">
+              {t("aiProfile.licenseLabel")}
+            </div>
+            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+              {t("aiProfile.licenseValue", { count: m.licenseTotal })}
+            </div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {t("aiProfile.licenseDetail", {
+                behavioral: m.licenseBehavioral,
+                nonCommercial: m.licenseNonCommercial,
+              })}
+            </div>
+          </div>
+          <div className="rounded-md border p-3">
+            <div className="text-xs font-medium text-muted-foreground">
+              {t("aiProfile.crosswalkLabel")}
+            </div>
+            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+              {t("aiProfile.crosswalkValue", { count: m.frameworkCount })}
+            </div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {t("aiProfile.crosswalkDetail", {
+                present: m.crosswalk.present,
+                total: m.crosswalk.total,
+              })}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** One framework's mapped elements, in the detailed crosswalk sub-block. */
+function CrosswalkFrameworkBlock({ framework }: { framework: CrosswalkFramework }) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div className="text-xs font-semibold text-foreground">{framework.title}</div>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {t("crosswalk.frameworkSummary", {
+            present: framework.present,
+            gap: framework.gap,
+            review: framework.review,
+            total: framework.total,
+          })}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <ul className="min-w-full divide-y rounded-md border">
+          {framework.elements.map((el, i) => {
+            const cov = COVERAGE[elementCoverage(el)];
+            return (
+              <li key={`${el.label}-${i}`} className="flex items-start gap-2.5 px-3 py-2.5">
+                <cov.Icon className={cn("mt-0.5 h-4 w-4 shrink-0", cov.color)} aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-foreground">{el.label}</span>
+                    <Badge variant="muted">{t(cov.key)}</Badge>
+                  </div>
+                  {el.refs.length > 0 ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      <span className="font-medium">{t("crosswalk.refs")}</span>
+                      {el.refs.map((r, j) => (
+                        <code
+                          key={`${r}-${j}`}
+                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                        >
+                          {r}
+                        </code>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** "Regulatory crosswalk" sub-block inside the conformance panel — shown only for
+ *  AI SBOMs that carry `conformance.regulatoryCrosswalk`. Maps each mapped G7
+ *  element to the documentation obligation it touches. Not a certification. */
+function CrosswalkBlock({
+  crosswalk,
+}: {
+  crosswalk: NonNullable<ConformanceSummary["regulatoryCrosswalk"]>;
+}) {
+  const { t } = useTranslation();
+  const totals = crosswalkTotals(crosswalk.frameworks);
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="text-sm font-semibold text-foreground">{t("crosswalk.title")}</div>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {t("crosswalk.totals", {
+              present: totals.present,
+              gap: totals.gap,
+              review: totals.review,
+              total: totals.total,
+            })}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("crosswalk.disclaimer")}</p>
+        <div className="space-y-4">
+          {crosswalk.frameworks.map((fw) => (
+            <CrosswalkFrameworkBlock key={fw.id} framework={fw} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 // Provenance badge: where a satisfied value comes from. Reuses existing badge
@@ -135,7 +314,14 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
  * checks as a sub-block. The headline "N / total present" and the advisory count
  * come straight from the check statuses (no invented numbers); G7 is advisory.
  */
-export function ConformancePanel({ conformance }: { conformance: ConformanceSummary }) {
+export function ConformancePanel({
+  conformance,
+  aiProfile,
+}: {
+  conformance: ConformanceSummary;
+  /** AI compliance profile card (AI SBOMs only); null otherwise. */
+  aiProfile?: AiProfile | null;
+}) {
   const { t } = useTranslation();
   const checks = conformance.checks ?? [];
   if (checks.length === 0) {
@@ -158,6 +344,8 @@ export function ConformancePanel({ conformance }: { conformance: ConformanceSumm
           {pass ? t("result.verdictPass") : t("result.verdictFail")}
         </Badge>
       </div>
+
+      {aiProfile ? <AiProfileCard profile={aiProfile} /> : null}
 
       {g7.length > 0 && (
         <Card>
@@ -196,6 +384,11 @@ export function ConformancePanel({ conformance }: { conformance: ConformanceSumm
           </CardContent>
         </Card>
       )}
+
+      {conformance.regulatoryCrosswalk &&
+      conformance.regulatoryCrosswalk.frameworks.length > 0 ? (
+        <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
+      ) : null}
 
       {base.length > 0 && (
         <div className="space-y-2">

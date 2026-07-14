@@ -154,6 +154,52 @@ export interface ConformanceCheck {
    *  manifest supplied it), "na" (no automated source — human review needed).
    *  Empty/absent for base format checks. */
   source?: string;
+  /** Regulatory documentation obligations this G7 element maps to (validate-sbom.sh
+   *  joins docker/lib/regulation-crosswalk.json, keyed by check id). Present only on
+   *  the ~half of G7 checks with a defensible correspondence; absent otherwise.
+   *  Informational — it never changes a check status or the overall result. */
+  regulations?: RegulationRef[];
+}
+
+/** One regulatory-framework reference mapped onto a G7 element check. */
+export interface RegulationRef {
+  /** Framework id (e.g. "eu-ai-act", "kr-ai-framework-act"). */
+  framework: string;
+  /** The specific article / annex reference (e.g. "Annex IV(1)"). */
+  ref: string;
+  /** The interpretive basis for treating this element as touching that reference. */
+  basis: string;
+}
+
+/** One crosswalk element: a G7 element with its status and regulation refs, in
+ *  the detailed per-framework view under `conformance.regulatoryCrosswalk`. */
+export interface CrosswalkElement {
+  label: string;
+  status: "pass" | "warn" | "fail";
+  source: string;
+  refs: string[];
+}
+
+/** One framework in the detailed crosswalk under `conformance.regulatoryCrosswalk`
+ *  — carries `source` and the full `elements[]` (unlike the aiProfile card view). */
+export interface CrosswalkFramework {
+  id: string;
+  title: string;
+  source: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+  elements: CrosswalkElement[];
+}
+
+/** The detailed regulatory crosswalk under `conformance.regulatoryCrosswalk`.
+ *  Present only for AI SBOMs (validate-sbom.sh omits the key otherwise). A
+ *  documentation-preparation aid, never a certification/compliance verdict. */
+export interface RegulatoryCrosswalk {
+  /** The no-certification / visibility disclaimer shown above the sub-block. */
+  disclaimer: string;
+  frameworks: CrosswalkFramework[];
 }
 
 export interface ConformanceSummary {
@@ -161,6 +207,62 @@ export interface ConformanceSummary {
   format?: string;
   /** Per-check results; G7 checks have ids prefixed "g7-". */
   checks?: ConformanceCheck[];
+  /** Regulatory crosswalk rollup with the full per-framework element detail.
+   *  Present only on AI SBOMs; the key is omitted for non-AI SBOMs. Drives the
+   *  "Regulatory crosswalk" sub-block inside the conformance panel. */
+  regulatoryCrosswalk?: RegulatoryCrosswalk;
+}
+
+/** One G7 cluster's coverage counts in the aiProfile card. */
+export interface AiProfileCluster {
+  cluster: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+/** One framework's coverage in the aiProfile card's crosswalk (card view: no
+ *  `source`, no `elements[]` — the light rollup for the compliance card). */
+export interface AiProfileCrosswalkFramework {
+  id: string;
+  title: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+/**
+ * AI compliance profile — a card-sized rollup gathered from a run's
+ * `_ai-profile.json` (generate-ai-profile.sh re-aggregates the conformance + SBOM
+ * artifacts; no new scan). Present only on AI SBOMs; null otherwise. The big
+ * arrays (per-element detail) are dropped server-side — this card consumes only
+ * the summary counts. Documentation-preparation, not a compliance verdict.
+ */
+export interface AiProfile {
+  /** Overall conformance verdict: "pass" | "warn" | "fail" | "unknown". */
+  conformanceResult: string;
+  g7: {
+    total: number;
+    /** G7 elements with an automated source (the coverage base). */
+    auto: number;
+    present: number;
+    gap: number;
+    review: number;
+    clusters: AiProfileCluster[];
+  };
+  /** Components whose license is flagged for human review (from the SBOM). */
+  licenseReview: {
+    total: number;
+    behavioral: number;
+    nonCommercial: number;
+  };
+  /** Card-view crosswalk coverage (no per-element detail). */
+  regulatoryCrosswalk: {
+    disclaimer: string;
+    frameworks: AiProfileCrosswalkFramework[];
+  };
 }
 
 /**
@@ -199,6 +301,10 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** AI compliance profile card rollup (AI SBOMs only; null otherwise). Present on
+   *  both the SSE `done` event and the `/scan` detail (loadScan), kept in sync
+   *  server-side. Drives the AI compliance summary card. */
+  aiProfile?: AiProfile | null;
   /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
    *  status: "unavailable" (search blocked) | "no-match" | "matched". */
   scanoss?: { status: string | null; count: number } | null;

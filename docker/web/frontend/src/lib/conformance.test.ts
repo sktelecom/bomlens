@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { ConformanceCheck } from "./api";
+import type { AiProfile, ConformanceCheck } from "./api";
 import {
   baseTally,
   clusterOf,
+  crosswalkTotals,
+  elementCoverage,
   g7Tally,
   groupG7ByCluster,
+  profileCard,
   splitChecks,
 } from "./conformance";
 
@@ -136,5 +139,70 @@ describe("baseTally", () => {
   it("counts passes, required failures and warnings", () => {
     const t = baseTally(splitChecks(CHECKS).base);
     expect(t).toEqual({ passed: 1, total: 2, failed: 0, warnings: 1 });
+  });
+});
+
+describe("crosswalkTotals", () => {
+  it("sums the coverage counts across frameworks", () => {
+    expect(
+      crosswalkTotals([
+        { total: 5, present: 3, gap: 1, review: 1 },
+        { total: 4, present: 2, gap: 2, review: 0 },
+      ]),
+    ).toEqual({ total: 9, present: 5, gap: 3, review: 1 });
+  });
+
+  it("is all-zero for no frameworks", () => {
+    expect(crosswalkTotals([])).toEqual({ total: 0, present: 0, gap: 0, review: 0 });
+  });
+});
+
+describe("elementCoverage", () => {
+  it("classifies a human-review element (source na) as review regardless of status", () => {
+    expect(elementCoverage({ status: "warn", source: "na" })).toBe("review");
+    expect(elementCoverage({ status: "pass", source: "na" })).toBe("review");
+  });
+
+  it("classifies a passing element as present and anything else as gap", () => {
+    expect(elementCoverage({ status: "pass", source: "auto" })).toBe("present");
+    expect(elementCoverage({ status: "warn", source: "inferred" })).toBe("gap");
+    expect(elementCoverage({ status: "fail", source: "declared" })).toBe("gap");
+  });
+});
+
+describe("profileCard", () => {
+  const profile: AiProfile = {
+    conformanceResult: "warn",
+    g7: {
+      total: 15,
+      auto: 11,
+      present: 6,
+      gap: 5,
+      review: 4,
+      clusters: [{ cluster: "models", total: 3, present: 1, gap: 2, review: 0 }],
+    },
+    licenseReview: { total: 2, behavioral: 1, nonCommercial: 1 },
+    regulatoryCrosswalk: {
+      disclaimer: "not a verdict",
+      frameworks: [
+        { id: "eu-ai-act", title: "EU AI Act", total: 8, present: 5, gap: 2, review: 1 },
+        { id: "kr-ai", title: "Korean AI Framework Act", total: 6, present: 3, gap: 2, review: 1 },
+      ],
+    },
+  };
+
+  it("derives the card values and aggregates the crosswalk coverage", () => {
+    expect(profileCard(profile)).toEqual({
+      result: "warn",
+      g7Present: 6,
+      g7Auto: 11,
+      g7Gap: 5,
+      g7Review: 4,
+      licenseTotal: 2,
+      licenseBehavioral: 1,
+      licenseNonCommercial: 1,
+      frameworkCount: 2,
+      crosswalk: { total: 14, present: 8, gap: 4, review: 2 },
+    });
   });
 });

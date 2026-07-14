@@ -123,7 +123,10 @@ export function ResultSection({
 
     case "conformance":
       return result.conformance ? (
-        <ConformancePanel conformance={result.conformance} />
+        <ConformancePanel
+          conformance={result.conformance}
+          aiProfile={result.aiProfile ?? null}
+        />
       ) : null;
 
     default:

@@ -105,6 +105,10 @@ ARTIFACT_SUFFIXES = (
     # SBOM (identify-vendored). Both back result views, so include them in the
     # download bundle and the per-scan results listing.
     "_security_epss.json", "_vendored.cdx.json",
+    # AI compliance profile (generate-ai-profile.sh, AI SBOMs only): a governance
+    # page that re-aggregates the G7 status, regulatory crosswalk and flagged
+    # licenses. User-facing report in three formats, so list/download it.
+    "_ai-profile.json", "_ai-profile.md", "_ai-profile.html",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -391,6 +395,10 @@ MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
+MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
+MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
+MAX_CROSSWALK_ELEMENTS = 200  # mapped elements listed per framework
+MAX_CROSSWALK_REFS = 12  # regulation refs per crosswalk element
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -830,7 +838,7 @@ def conformance_summary(run_id):
     for c in (data.get("checks") or []):
         if not isinstance(c, dict):
             continue
-        checks.append({
+        row = {
             "id": str(c.get("id") or ""),
             "label": str(c.get("label") or ""),
             "required": bool(c.get("required")),
@@ -844,11 +852,142 @@ def conformance_summary(run_id):
             # badge how each element was satisfied. Dropped here => dropped from UI.
             "cluster": str(c.get("cluster") or ""),
             "source": str(c.get("source") or ""),
-        })
-    return {
+        }
+        # G7 elements can carry a regulatory-crosswalk mapping (validate-sbom.sh
+        # joins docker/lib/regulation-crosswalk.json by element id): the named
+        # documentation obligations a gap in this element touches. Informational
+        # only — it never changes a status. Preserved per check so the UI can show
+        # "which regulation does this element map to"; omitted when absent.
+        regs = [
+            {
+                "framework": str(r.get("framework") or ""),
+                "ref": str(r.get("ref") or ""),
+                "basis": str(r.get("basis") or ""),
+            }
+            for r in (c.get("regulations") or [])
+            if isinstance(r, dict)
+        ][:MAX_CHECK_REGULATIONS]
+        if regs:
+            row["regulations"] = regs
+        checks.append(row)
+    out = {
         "result": data.get("result", "unknown"),
         "format": data.get("format", ""),
         "checks": checks,
+    }
+    # Top-level regulatory crosswalk rollup (AI SBOMs only; validate-sbom.sh omits
+    # the key entirely for non-AI SBOMs or when the crosswalk registry is absent).
+    # Documentation-preparation view, not a compliance verdict. Surfaced as-is,
+    # normalized defensively and capped.
+    xwalk = _crosswalk_view(data.get("regulatoryCrosswalk"))
+    if xwalk is not None:
+        out["regulatoryCrosswalk"] = xwalk
+    return out
+
+
+def _crosswalk_view(xwalk):
+    """Normalize a regulatoryCrosswalk object (top-level in _conformance.json and
+    _ai-profile.json) to a bounded, known shape, or None when absent/empty.
+
+    Shape: {disclaimer, frameworks:[{id,title,source,total,present,gap,review,
+    elements:[{label,status,source,refs:[...]}]}]}. Trusted (our own generator)
+    but capped so the SSE/scan payload stays light."""
+    if not isinstance(xwalk, dict):
+        return None
+    frameworks = []
+    for fw in (xwalk.get("frameworks") or []):
+        if not isinstance(fw, dict):
+            continue
+        elements = []
+        for e in (fw.get("elements") or [])[:MAX_CROSSWALK_ELEMENTS]:
+            if not isinstance(e, dict):
+                continue
+            elements.append({
+                "label": str(e.get("label") or ""),
+                "status": str(e.get("status") or ""),
+                "source": str(e.get("source") or ""),
+                "refs": [str(x) for x in (e.get("refs") or [])][:MAX_CROSSWALK_REFS],
+            })
+        frameworks.append({
+            "id": str(fw.get("id") or ""),
+            "title": str(fw.get("title") or ""),
+            "source": str(fw.get("source") or ""),
+            "total": int(fw.get("total") or 0),
+            "present": int(fw.get("present") or 0),
+            "gap": int(fw.get("gap") or 0),
+            "review": int(fw.get("review") or 0),
+            "elements": elements,
+        })
+        if len(frameworks) >= MAX_CROSSWALK_FRAMEWORKS:
+            break
+    if not frameworks:
+        return None
+    return {
+        "disclaimer": str(xwalk.get("disclaimer") or ""),
+        "frameworks": frameworks,
+    }
+
+
+def ai_profile_summary(run_id):
+    """AI compliance profile card summary (AI SBOMs only), read from the run's
+    _ai-profile.json (generate-ai-profile.sh re-aggregates the conformance + SBOM
+    artifacts; no new scan). Returns a light, card-sized rollup — the big arrays
+    (g7.reviewItems, licenseReview.items, crosswalk elements) are dropped here to
+    keep the SSE/scan payload small; the full detail lives in the artifact files
+    the UI can download. None when no profile exists (i.e. not an AI SBOM)."""
+    p = run_file(run_id, "_ai-profile.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    g7 = data.get("g7") or {}
+    clusters = []
+    for cl in (g7.get("clusters") or []):
+        if not isinstance(cl, dict):
+            continue
+        clusters.append({
+            "cluster": str(cl.get("cluster") or ""),
+            "total": int(cl.get("total") or 0),
+            "present": int(cl.get("present") or 0),
+            "gap": int(cl.get("gap") or 0),
+            "review": int(cl.get("review") or 0),
+        })
+    lic = data.get("licenseReview") or {}
+    xwalk = data.get("regulatoryCrosswalk") or {}
+    frameworks = []
+    for fw in (xwalk.get("frameworks") or [])[:MAX_CROSSWALK_FRAMEWORKS]:
+        if not isinstance(fw, dict):
+            continue
+        frameworks.append({
+            "id": str(fw.get("id") or ""),
+            "title": str(fw.get("title") or ""),
+            "total": int(fw.get("total") or 0),
+            "present": int(fw.get("present") or 0),
+            "gap": int(fw.get("gap") or 0),
+            "review": int(fw.get("review") or 0),
+        })
+    return {
+        "conformanceResult": str(data.get("conformanceResult") or "unknown"),
+        "g7": {
+            "total": int(g7.get("total") or 0),
+            "auto": int(g7.get("auto") or 0),
+            "present": int(g7.get("present") or 0),
+            "gap": int(g7.get("gap") or 0),
+            "review": int(g7.get("review") or 0),
+            "clusters": clusters,
+        },
+        "licenseReview": {
+            "total": int(lic.get("total") or 0),
+            "behavioral": int(lic.get("behavioral") or 0),
+            "nonCommercial": int(lic.get("nonCommercial") or 0),
+        },
+        "regulatoryCrosswalk": {
+            "disclaimer": str(xwalk.get("disclaimer") or ""),
+            "frameworks": frameworks,
+        },
     }
 
 
@@ -943,6 +1082,9 @@ def scan_detail(run_id):
         "sbom": sbom,
         "security": security_summary(run_id),
         "conformance": conformance_summary(run_id),
+        # AI compliance profile card (AI SBOMs only); None otherwise. Paired with
+        # the done-event payload below — keep both in sync.
+        "aiProfile": ai_profile_summary(run_id),
         "scanoss": scanoss_status(run_id),
         # How the scan was launched (source + toggles), saved as a sidecar so the
         # UI can offer "re-scan with the same settings". None for pre-feature
@@ -1978,6 +2120,9 @@ class Handler(BaseHTTPRequestHandler):
                 "sbom": sbom_summary(run_id),
                 "security": security_summary(run_id) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(run_id),
+                # AI compliance profile card (AI SBOMs only); None otherwise.
+                # Paired with scan_detail() so a re-opened scan carries it too.
+                "aiProfile": ai_profile_summary(run_id),
                 "scanoss": scanoss_status(run_id),
                 # The inputs + toggles this scan ran with (no secrets); also saved
                 # as the run-folder sidecar so a re-opened scan carries it too.
