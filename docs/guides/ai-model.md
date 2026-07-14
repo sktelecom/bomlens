@@ -32,6 +32,17 @@ BomLens shows the 50 elements as 51 checks. Model openness (whether weights, arc
 
 Thirteen elements have no automated source — things like the intended application area or dataset sensitivity, which no model-card field can prove. BomLens lists them as requiring human review instead of guessing.
 
+## Regulatory crosswalk
+
+The conformance report links each G7 element that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when an element is missing, which regulatory requirement does that gap concern? Two frameworks are mapped today.
+
+- EU AI Act — the technical-documentation sections of Annex IV (Regulation (EU) 2024/1689, Article 11(1)).
+- AI Framework Act (Korea) — the Act's articles on transparency (제31조), safety and risk management (제32조), high-impact AI (제33·34조), and impact assessment (제35조). The Act sets framework-level duties, so these links are coarser than the EU ones.
+
+The crosswalk is a preparation aid, not a compliance verdict. BomLens does not certify compliance with either text, and the report says so in the section itself. Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups the same G7 findings by regulation, counting for each framework how many mapped elements are present, a gap, or review-only.
+
+The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by G7 element id. It is deliberately conservative: only elements with a defensible correspondence are mapped (23 of the 51 checks today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when an element is renamed.
+
 ## Preparing the image
 
 AI model SBOM generation needs a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships as its own image rather than in the base one.
@@ -93,7 +104,7 @@ A source badge on each row says where a satisfied value comes from:
 - Declared (4) — present only when a person or a manifest supplied the value.
 - Review needed (13) — no automated source exists; a person has to confirm it.
 
-The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary.
+The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. For an AI SBOM each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped element was checked.
 
 ## Limits
 
