@@ -12,7 +12,7 @@
       "title": "AI Framework Act (Korea)",
       "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
       "granularity": "article",
-      "note": "The Act sets framework-level duties; the granular documentation requirements live in its 시행령 (enforcement decree). References point at the Act's articles (제31조 transparency, 제32조 safety/risk management, 제33·34조 high-impact AI, 제35조 impact assessment). Links are coarser than the EU Annex IV mapping by design."
+      "note": "The Act sets framework-level duties; the granular documentation requirements live in its 시행령 (enforcement decree). References point at the Act's articles (제31조 transparency, 제32조 safety/risk management, 제33·34조 high-impact AI, 제35조 impact assessment). Links are coarser than the EU Annex IV mapping by design. Scope caveat: 제32조 (safety) applies only to systems trained above a compute threshold set by the enforcement decree, so a 제32조 link points at the duty's subject, not a determination that the duty applies to this system — that judgment is the user's."
     }
   },
   "map": {
