@@ -4,7 +4,7 @@
  * grouping (`cluster` field), and the coverage tallies. Pure and unit tested —
  * no invented numbers, every count comes from the check statuses/sources.
  */
-import type { ConformanceCheck } from "./api";
+import type { AiProfile, ConformanceCheck } from "./api";
 
 export function isG7(check: ConformanceCheck): boolean {
   return check.id.startsWith("g7-");
@@ -105,5 +105,89 @@ export function baseTally(base: ConformanceCheck[]) {
     total: base.length,
     failed: base.filter((c) => c.required && c.status === "fail").length,
     warnings: base.filter((c) => c.status === "warn").length,
+  };
+}
+
+// ── Regulatory crosswalk ────────────────────────────────────────────────────
+
+/** A framework carrying the four coverage counts (both crosswalk shapes have
+ *  these; the detailed view adds `source` + `elements[]`, the card view doesn't). */
+interface CoverageCounts {
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+export interface CrosswalkTotals {
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+/** How a crosswalk element counts toward its framework coverage. Mirrors the
+ *  backend framework tally (validate-sbom.sh): source "na" is a human-review
+ *  item, a passing element is present, anything else is a documentation gap. */
+export type CrosswalkCoverage = "present" | "gap" | "review";
+
+export function elementCoverage(el: {
+  status: string;
+  source: string;
+}): CrosswalkCoverage {
+  if (el.source === "na") return "review";
+  if (el.status === "pass") return "present";
+  return "gap";
+}
+
+/**
+ * Sum the coverage counts across crosswalk frameworks. Works for both the
+ * detailed (`conformance.regulatoryCrosswalk`) and the card
+ * (`aiProfile.regulatoryCrosswalk`) framework shapes — only the shared counts are
+ * read. Every number comes from the frameworks; nothing is invented.
+ */
+export function crosswalkTotals(frameworks: CoverageCounts[]): CrosswalkTotals {
+  return frameworks.reduce<CrosswalkTotals>(
+    (acc, f) => ({
+      total: acc.total + f.total,
+      present: acc.present + f.present,
+      gap: acc.gap + f.gap,
+      review: acc.review + f.review,
+    }),
+    { total: 0, present: 0, gap: 0, review: 0 },
+  );
+}
+
+// ── AI compliance profile card ──────────────────────────────────────────────
+
+/** Derived, card-ready values for the AI compliance summary card. Pure so the
+ *  card component stays presentational (and the derivation is unit tested). */
+export interface ProfileCardModel {
+  result: string;
+  g7Present: number;
+  g7Auto: number;
+  g7Gap: number;
+  g7Review: number;
+  licenseTotal: number;
+  licenseBehavioral: number;
+  licenseNonCommercial: number;
+  /** How many regulatory frameworks the crosswalk covers. */
+  frameworkCount: number;
+  /** Aggregate coverage across all crosswalk frameworks. */
+  crosswalk: CrosswalkTotals;
+}
+
+export function profileCard(profile: AiProfile): ProfileCardModel {
+  return {
+    result: profile.conformanceResult,
+    g7Present: profile.g7.present,
+    g7Auto: profile.g7.auto,
+    g7Gap: profile.g7.gap,
+    g7Review: profile.g7.review,
+    licenseTotal: profile.licenseReview.total,
+    licenseBehavioral: profile.licenseReview.behavioral,
+    licenseNonCommercial: profile.licenseReview.nonCommercial,
+    frameworkCount: profile.regulatoryCrosswalk.frameworks.length,
+    crosswalk: crosswalkTotals(profile.regulatoryCrosswalk.frameworks),
   };
 }

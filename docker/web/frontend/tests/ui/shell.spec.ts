@@ -666,13 +666,55 @@ const AI_DONE = {
       { id: "g7-meta-author", label: "SBOM author", required: false, status: "pass", detail: "author present", cluster: "metadata", source: "auto" },
       { id: "g7-meta-timestamp", label: "SBOM timestamp", required: false, status: "pass", detail: "1 found", cluster: "metadata", source: "auto" },
       { id: "g7-slp-data-flow", label: "System data flow", required: false, status: "warn", detail: "no automated source", cluster: "slp", source: "na" },
-      { id: "g7-model-id", label: "Model identifier", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["pkg:huggingface/google-bert/bert-base-uncased@86b5e093"] },
-      { id: "g7-model-license", label: "Model license", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["Apache-2.0"] },
+      { id: "g7-model-id", label: "Model identifier", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["pkg:huggingface/google-bert/bert-base-uncased@86b5e093"], regulations: [{ framework: "eu-ai-act", ref: "Annex IV(1)", basis: "general description of the AI system" }] },
+      { id: "g7-model-license", label: "Model license", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["Apache-2.0"], regulations: [{ framework: "kr-ai-framework-act", ref: "제31조", basis: "documentation of the AI system" }] },
       { id: "g7-model-card", label: "Model properties (model card)", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto" },
       { id: "g7-model-hash-value", label: "Model hash value", required: false, status: "warn", detail: "0/1 model component(s)", cluster: "models", source: "auto" },
       { id: "g7-model-openness", label: "Model license — openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM", cluster: "models", source: "inferred" },
       { id: "g7-ds-name", label: "Dataset name", required: false, status: "pass", detail: "2 dataset reference(s)", cluster: "dp", source: "auto" },
     ],
+    // Detailed crosswalk (present only for AI SBOMs) — per-framework element
+    // rollup with the mapped documentation obligations. source + elements[] are
+    // the detail view (unlike the aiProfile card view below).
+    regulatoryCrosswalk: {
+      disclaimer: "Documentation-preparation aid, not a compliance verdict.",
+      frameworks: [
+        {
+          id: "eu-ai-act", title: "EU AI Act — Annex IV", source: "Regulation (EU) 2024/1689",
+          total: 2, present: 1, gap: 1, review: 0,
+          elements: [
+            { label: "Model identifier", status: "pass", source: "auto", refs: ["Annex IV(1)"] },
+            { label: "Model hash value", status: "warn", source: "auto", refs: ["Annex IV(2)(d)"] },
+          ],
+        },
+        {
+          id: "kr-ai-framework-act", title: "Korean AI Framework Act", source: "AI Framework Act",
+          total: 1, present: 1, gap: 0, review: 0,
+          elements: [
+            { label: "Model license", status: "pass", source: "auto", refs: ["제31조"] },
+          ],
+        },
+      ],
+    },
+  },
+  // AI compliance profile card rollup (summary view: no per-element detail).
+  aiProfile: {
+    conformanceResult: "warn",
+    g7: {
+      total: 9, auto: 8, present: 6, gap: 2, review: 1,
+      clusters: [
+        { cluster: "metadata", total: 2, present: 2, gap: 0, review: 0 },
+        { cluster: "models", total: 4, present: 3, gap: 1, review: 0 },
+      ],
+    },
+    licenseReview: { total: 2, behavioral: 1, nonCommercial: 1 },
+    regulatoryCrosswalk: {
+      disclaimer: "Documentation-preparation aid, not a compliance verdict.",
+      frameworks: [
+        { id: "eu-ai-act", title: "EU AI Act — Annex IV", total: 2, present: 1, gap: 1, review: 0 },
+        { id: "kr-ai-framework-act", title: "Korean AI Framework Act", total: 1, present: 1, gap: 0, review: 0 },
+      ],
+    },
   },
   sbom: {
     components: 1,
@@ -772,10 +814,53 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByText("Format conformance")).toBeVisible();
   await expect(page.getByText("Model license — openness (weight/architecture/data/training)")).toBeVisible();
 
+  // AI compliance summary card (from aiProfile) is at the top of the section.
+  await expect(page.getByText("AI compliance profile")).toBeVisible();
+  await expect(page.getByText("G7 minimum elements", { exact: true })).toBeVisible();
+  await expect(page.getByText("License review flags")).toBeVisible();
+  await expect(page.getByText("Regulatory coverage")).toBeVisible();
+
+  // Regulatory crosswalk sub-block (from conformance.regulatoryCrosswalk).
+  await expect(page.getByText("Regulatory crosswalk")).toBeVisible();
+  await expect(page.getByText("EU AI Act — Annex IV").first()).toBeVisible();
+  await expect(page.getByText("Korean AI Framework Act").first()).toBeVisible();
+  await expect(page.getByText("Annex IV(1)")).toBeVisible(); // a mapped regulation ref
+
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+});
+
+// A conformance report that has G7 checks but no aiProfile and no crosswalk (a
+// plain re-open of an older AI scan, or a non-AI SBOM path): neither the summary
+// card nor the crosswalk sub-block renders — only the G7 and format checks do.
+test("conformance without a profile or crosswalk omits the AI card and crosswalk", async ({ page }) => {
+  await seedThemeLang(page, "light", "en");
+  const bare = {
+    ...AI_DONE,
+    aiProfile: null,
+    conformance: { result: AI_DONE.conformance.result, format: AI_DONE.conformance.format, checks: AI_DONE.conformance.checks },
+  };
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(AI_SBOM) }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(bare)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "model");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
+
+  // The G7 section still renders (proves we reached the conformance panel)…
+  await expect(page.getByText("6/8 present")).toBeVisible();
+  // …but neither the AI card nor the crosswalk sub-block is present.
+  await expect(page.getByText("AI compliance profile")).toHaveCount(0);
+  await expect(page.getByText("Regulatory crosswalk")).toHaveCount(0);
 });
 
 for (const { theme, lang } of COMBOS) {

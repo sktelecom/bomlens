@@ -562,15 +562,81 @@ lic = next(x for x in g7 if x["id"] == "g7-model-license")
 assert lic["status"] == "pass" and any("Apache-2.0" in e for e in lic["evidence"]), (
     "g7-model-license evidence missing", lic)
 assert lic["cluster"] == "models", ("g7-model-license cluster", lic)
+# Regulatory crosswalk: validate-sbom.sh joins regulation-crosswalk.json onto the
+# G7 checks. conformance_summary must pass through the per-check `regulations`
+# array and the top-level `regulatoryCrosswalk` rollup (dropping either hides the
+# documentation-preparation view from the UI).
+xw = c.get("regulatoryCrosswalk")
+assert isinstance(xw, dict), ("no regulatoryCrosswalk", type(xw))
+assert xw.get("disclaimer"), "crosswalk disclaimer missing"
+fws = xw.get("frameworks") or []
+assert len(fws) >= 1, "no crosswalk frameworks"
+assert {"id", "title", "source", "total", "present", "gap", "review", "elements"} <= set(fws[0]), fws[0]
+el = fws[0]["elements"][0]
+assert {"label", "status", "source", "refs"} <= set(el), el
+# The per-check mapping is preserved as {framework, ref, basis}.
+mapped = [x for x in g7 if x.get("regulations")]
+assert len(mapped) >= 1, "no per-check regulations passed through"
+reg = mapped[0]["regulations"][0]
+assert {"framework", "ref", "basis"} <= set(reg), reg
+# Base (non-G7) format checks carry no crosswalk mapping.
+assert all("regulations" not in x for x in base), "base checks should not carry regulations"
 PY
     then
-        pass "conformance_summary exposes the full G7 checklist with cluster/source"
+        pass "conformance_summary exposes the full G7 checklist with cluster/source/crosswalk"
     else
-        fail "conformance checks exposure / G7 split is wrong"
+        fail "conformance checks exposure / G7 split / crosswalk is wrong"
     fi
     rm -f "$OUT"/conf_1.0_*
 else
     echo "  SKIP: jq not available for conformance generation"
+fi
+
+echo "== ai profile summary (ai_profile_summary) =="
+# generate-ai-profile.sh re-aggregates the conformance + SBOM artifacts into a
+# governance card. ai_profile_summary must return the light rollup for an AI SBOM
+# and None when no profile exists (non-AI scan).
+if command -v jq >/dev/null 2>&1; then
+    PROJECT=aip GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
+        "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" "$OUT/aip_1.0" >/dev/null 2>&1
+    # A matching _bom.json carrying one behavioral-use license flag (test-aibom.sh
+    # pattern) so licenseReview is non-empty.
+    jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])' \
+        "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" > "$OUT/aip_1.0_bom.json"
+    bash "$ROOT_DIR/docker/lib/generate-ai-profile.sh" "$OUT/aip_1.0" "aip" >/dev/null 2>&1
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+p = server.ai_profile_summary("aip_1.0")
+assert p is not None, "no ai profile summary"
+assert p["conformanceResult"] in ("pass", "warn", "fail", "unknown"), p["conformanceResult"]
+g7 = p["g7"]
+assert {"total", "auto", "present", "gap", "review", "clusters"} <= set(g7), g7
+assert g7["total"] >= 40, ("expected full G7 checklist", g7["total"])
+assert len(g7["clusters"]) >= 7, "clusters not summarized"
+assert {"cluster", "total", "present", "gap", "review"} <= set(g7["clusters"][0]), g7["clusters"][0]
+# Light payload: the big arrays are dropped from the card summary.
+assert "reviewItems" not in g7, "reviewItems must be dropped from the card summary"
+lic = p["licenseReview"]
+assert lic["total"] >= 1 and lic["behavioral"] >= 1, lic
+assert "items" not in lic, "licenseReview.items must be dropped from the card summary"
+xw = p["regulatoryCrosswalk"]
+assert xw["disclaimer"], "crosswalk disclaimer missing"
+assert len(xw["frameworks"]) >= 1, "no crosswalk frameworks in profile"
+assert {"id", "title", "total", "present", "gap", "review"} <= set(xw["frameworks"][0]), xw["frameworks"][0]
+assert "elements" not in xw["frameworks"][0], "crosswalk elements must be dropped from the card summary"
+# Non-AI scan (no profile artifact) -> None.
+assert server.ai_profile_summary("nope_9.9") is None, "expected None without a profile"
+PY
+    then
+        pass "ai_profile_summary returns the light G7/license/crosswalk rollup, None without a profile"
+    else
+        fail "ai_profile_summary is wrong"
+    fi
+    rm -f "$OUT"/aip_1.0_*
+else
+    echo "  SKIP: jq not available for ai-profile generation"
 fi
 
 echo "== license review property (normalize -> sbom_summary) =="

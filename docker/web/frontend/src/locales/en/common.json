@@ -622,6 +622,35 @@
       }
     }
   },
+  "crosswalk": {
+    "title": "Regulatory crosswalk",
+    "disclaimer": "A documentation-preparation aid, not a compliance verdict. BomLens does not certify regulatory compliance; it only shows which documentation obligation each G7 element touches.",
+    "totals": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}} mapped",
+    "frameworkSummary": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}}",
+    "refs": "References:",
+    "present": "Present",
+    "gap": "Gap",
+    "review": "Review needed"
+  },
+  "aiProfile": {
+    "title": "AI compliance profile",
+    "note": "A one-glance rollup of the AI SBOM findings for documentation review — it makes no compliance determination.",
+    "verdict": {
+      "pass": "Pass",
+      "warn": "Advisory",
+      "fail": "Fail",
+      "unknown": "Unknown"
+    },
+    "g7Label": "G7 minimum elements",
+    "g7Value": "{{present}} of {{auto}} present",
+    "g7Detail": "{{gap}} gap, {{review}} to review",
+    "licenseLabel": "License review flags",
+    "licenseValue": "{{count}} flagged",
+    "licenseDetail": "{{behavioral}} behavioral-use, {{nonCommercial}} non-commercial",
+    "crosswalkLabel": "Regulatory coverage",
+    "crosswalkValue": "{{count}} frameworks",
+    "crosswalkDetail": "{{present}}/{{total}} elements mapped present"
+  },
   "licenses": {
     "empty": "No licenses were detected.",
     "reviewTitle": "License review needed",
