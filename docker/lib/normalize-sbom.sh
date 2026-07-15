@@ -33,6 +33,16 @@ TMP="$(mktemp)"
 # array. Apply this first so every later step receives an array.
 NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
 
+# Always: drop empty file components. syft's SPDX->CycloneDX conversion turns each
+# SPDX file entry into a CycloneDX component of type "file" with NO name and NO
+# purl — an unidentifiable noise row (no CVE match, no license, no attribution).
+# A supplier SPDX with a large file section (e.g. a 5804-package rootfs SBOM)
+# inflates the component set with thousands of these (~5956 on one real input),
+# skewing the NOTICE component count and the UI inventory. Drop only components
+# that are BOTH a file AND carry neither name nor purl — real packages (which
+# always have a name or purl) and named file components are untouched.
+DROP_EMPTY_FILES='(.components) |= (if type=="array" then map(select((.type != "file") or ((.name // "") != "") or ((.purl // "") != ""))) else . end)'
+
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
@@ -214,6 +224,7 @@ if [ "$MODE" = "--stable" ]; then
         ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
+        | ${DROP_EMPTY_FILES}
         | ${PYRANGE_DEDUP}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
@@ -231,7 +242,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

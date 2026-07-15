@@ -360,6 +360,20 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 # ========================================================
+# Source-tree enrichment (vendored OSS, CocoaPods) below only applies to a real
+# source scan: the CLI source scan (MODE=POSTPROCESS, tree at /src) or the web-UI
+# source scan (MODE=SOURCE, SOURCE_ROOT). Every other mode (ANALYZE/MERGE/IMAGE/
+# BINARY/ROOTFS/FIRMWARE/AIBOM) may still have an unrelated tree mounted at /src —
+# the web UI mounts its host dir there for EVERY mode, so an ANALYZE of a supplier
+# SBOM would otherwise scan the server's own working tree and merge stray
+# components into the result. Gate both steps on the source-scan modes, mirroring
+# the source-file-tree gate below (case "$SCAN_MODE").
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS) SOURCE_SCAN=true ;;
+    *) SOURCE_SCAN=false ;;
+esac
+
+# ========================================================
 # Vendored open source (opt-in, SCANOSS) — only meaningful for a source tree.
 # Runs for both the CLI source scan (MODE=POSTPROCESS, tree mounted at /src) and
 # the web-UI source scan (SOURCE mode, SOURCE_ROOT). When enabled, identify the
@@ -369,7 +383,7 @@ fi
 # no package manager, near-empty scan) — off-by-default discovery.
 # ========================================================
 VENDORED_SRC="${SOURCE_ROOT:-/src}"
-if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
+if [ "$SOURCE_SCAN" = "true" ] && [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
     echo "[INFO] Identifying vendored open source (SCANOSS)..."
     VEND_SBOM="${OUT_PREFIX}_vendored.cdx.json"
     if bash "$LIBDIR/identify-vendored.sh" "$VENDORED_SRC" "$VEND_SBOM" "$PROJECT_VERSION"; then
@@ -395,7 +409,7 @@ if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
             echo "[INFO] no new vendored open source to add (after reconciliation)."
         fi
     fi
-elif [ -d "$VENDORED_SRC" ]; then
+elif [ "$SOURCE_SCAN" = "true" ] && [ -d "$VENDORED_SRC" ]; then
     run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
 fi
 
@@ -408,7 +422,7 @@ fi
 # future pod-capable image), so this never double-counts.
 # ========================================================
 COCOA_SRC="${SOURCE_ROOT:-/src}"
-if [ -d "$COCOA_SRC" ] \
+if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
    && find "$COCOA_SRC" -type f -name Podfile.lock -not -path '*/Pods/*' 2>/dev/null | grep -q .; then
     HAS_COCOA=$(jq '[.components[]? | select((.purl // "") | startswith("pkg:cocoapods/"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${HAS_COCOA:-0}" -eq 0 ]; then

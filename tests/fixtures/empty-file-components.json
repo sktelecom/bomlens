@@ -1,0 +1,22 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "supplier-rootfs",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {"type": "library", "name": "openssl", "version": "3.0.0", "purl": "pkg:deb/debian/openssl@3.0.0"},
+    {"type": "library", "name": "zlib", "version": "1.2.13", "purl": "pkg:deb/debian/zlib@1.2.13"},
+    {"type": "file", "name": "usr/bin/openssl"},
+    {"type": "file", "purl": "pkg:generic/config@1.0"},
+    {"type": "file"},
+    {"type": "file", "name": ""},
+    {"type": "file", "purl": ""},
+    {"type": "file", "name": "", "purl": ""}
+  ]
+}

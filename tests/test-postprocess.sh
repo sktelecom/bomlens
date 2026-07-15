@@ -50,6 +50,41 @@ bash "$LIB/normalize-sbom.sh" "$WORK/n.json" >/dev/null 2>&1
 ctype=$(jq -r '.components | type' "$WORK/n.json" 2>/dev/null)
 if [ "$ctype" = "array" ]; then pass "components is an array (was null)"; else fail "components type is '$ctype', expected array"; fi
 
+echo "== drop-empty-files: nameless/purl-less file components pruned, real ones kept =="
+# Regression for the convert-noise defect: syft's SPDX->CycloneDX conversion emits a
+# type:"file" component with NO name and NO purl for every SPDX file entry, so a
+# supplier rootfs SBOM balloons with thousands of unidentifiable noise rows that skew
+# the NOTICE count and UI inventory. normalize-sbom.sh must drop ONLY components that
+# are BOTH a file AND carry neither name nor purl; real packages and named/purl'd file
+# components survive. The fixture has 2 libraries, 1 named file, 1 purl-only file, and
+# 4 empty file variants (absent, empty-string name, empty purl, both empty).
+cp "$FIX/empty-file-components.json" "$WORK/ef.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/ef.json" >/dev/null 2>&1
+ef_total=$(jq '[.components[]?] | length' "$WORK/ef.json")
+[ "$ef_total" = "4" ] && pass "8 -> 4 components (4 empty file rows dropped)" || fail "component count=$ef_total, expected 4"
+ef_empty=$(jq '[.components[]? | select(.type=="file" and ((.name // "")=="") and ((.purl // "")==""))] | length' "$WORK/ef.json")
+[ "$ef_empty" = "0" ] && pass "no nameless/purl-less file component remains" || fail "$ef_empty empty file component(s) survived"
+if jq -e '[.components[]? | select(.name=="openssl" or .name=="zlib")] | length == 2' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "real packages (openssl, zlib) preserved"
+else
+    fail "a real package was wrongly dropped"
+fi
+if jq -e '[.components[]? | select(.type=="file" and .name=="usr/bin/openssl")] | length == 1' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "a named file component is preserved"
+else
+    fail "a named file component was wrongly dropped"
+fi
+if jq -e '[.components[]? | select(.type=="file" and .purl=="pkg:generic/config@1.0")] | length == 1' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "a purl-carrying file component is preserved"
+else
+    fail "a purl-carrying file component was wrongly dropped"
+fi
+# --stable mode runs the same filter; the empty rows must be gone there too.
+cp "$FIX/empty-file-components.json" "$WORK/efs.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/efs.json" --stable >/dev/null 2>&1
+efs_empty=$(jq '[.components[]? | select(.type=="file" and ((.name // "")=="") and ((.purl // "")==""))] | length' "$WORK/efs.json")
+[ "$efs_empty" = "0" ] && pass "--stable mode also drops empty file components" || fail "$efs_empty empty file component(s) survived --stable"
+
 echo "== B-2/B-3: metadata stamped from input, temp path gone =="
 cp "$FIX/null-components.json" "$WORK/m.json"
 bash "$LIB/stamp-metadata.sh" "$WORK/m.json" "MyProj" "2.0.0" >/dev/null 2>&1
