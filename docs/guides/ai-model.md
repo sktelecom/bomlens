@@ -43,6 +43,10 @@ The crosswalk is a preparation aid, not a compliance verdict. BomLens does not c
 
 The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by G7 element id. It is deliberately conservative: only elements with a defensible correspondence are mapped (23 of the 51 checks today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when an element is renamed.
 
+## AI compliance profile
+
+For an AI SBOM, BomLens also writes a one-page AI compliance profile (`_ai-profile.{json,md,html}`) that gathers into one place what otherwise lives across separate artifacts: the G7 status by cluster, the regulatory crosswalk, and the components whose license is flagged for review (AI behavioral-use or non-commercial). It runs no scan and makes no compliance determination — it regroups findings the pipeline already produced, so a reviewer can read the whole picture at a glance. It is written for the AI-model (`--model`) and supplier-SBOM (`--analyze`) paths, and is a no-op for a plain (non-AI) SBOM.
+
 ## Preparing the image
 
 AI model SBOM generation needs a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships as its own image rather than in the base one.

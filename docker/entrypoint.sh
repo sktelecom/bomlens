@@ -591,6 +591,19 @@ if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; the
     fi
 fi
 
+# AI compliance profile (AI SBOMs only): a governance one-pager that re-aggregates
+# the G7 conformance status, the regulatory crosswalk and the license-review flags
+# — no new scan. generate-ai-profile.sh self-gates on the presence of G7 checks in
+# the conformance report, so it is a clean no-op for a plain (non-AI) SBOM; we wire
+# it only for the two modes that can carry a machine-learning-model component.
+if [ "$SCAN_MODE" = "AIBOM" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
+    if bash "$LIBDIR/generate-ai-profile.sh" "$OUT_PREFIX" "$PROJECT_NAME"; then
+        for ext in json md html; do
+            [ -f "${OUT_PREFIX}_ai-profile.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_ai-profile.${ext}")
+        done
+    fi
+fi
+
 # ========================================================
 # Copy artifacts to host output (always)
 # ========================================================
