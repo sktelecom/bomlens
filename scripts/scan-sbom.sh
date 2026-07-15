@@ -684,13 +684,17 @@ else
 fi
 
 # Verify artifacts actually reached the host. When the run folder is outside
-# Docker Desktop file sharing, the container runs and reports success but the
-# /host-output mount is silently empty, so nothing lands here. Catch that
-# instead of printing "Analysis Complete!" over a folder with no SBOM.
-if [ "$GENERATE_ONLY" = "true" ] && [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+# Docker Desktop file sharing (or Colima's home-only virtiofs mount), the
+# container runs and reports success but the /host-output mount is silently
+# empty, so nothing lands here. Every post-processing mode writes OUTPUT_FILE
+# (_bom.json) to /host-output, so its absence means the mount never reached the
+# host — catch that in ALL modes, not just --generate-only, instead of printing
+# "Analysis Complete!" over a folder with no SBOM.
+if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
     echo "[ERROR] SBOM not found on host: $OUTPUT_HOST_DIR/$OUTPUT_FILE"
     echo "  The container ran but no artifact reached this folder."
-    echo "  Likely cause: this folder is outside Docker Desktop file sharing."
+    echo "  Likely cause: this folder is outside Docker Desktop file sharing"
+    echo "  (or Colima's home-only mount — /tmp is not shared to the VM)."
     echo "  Run from a shared path (e.g. under your home directory) and retry."
     exit 1
 fi
