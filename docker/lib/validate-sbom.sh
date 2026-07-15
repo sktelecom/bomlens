@@ -126,9 +126,9 @@ cdx_checks() {
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
         status:(if pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:\"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\", missing:(\$miss_purl[0:\$cap])},
-       {id:\"no-generic\", label:\"No pkg:generic / custom PURL (0)\", required:true,
-        status:(if (\$generic|length)==0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$generic|length) offending\", missing:(\$generic[0:\$cap])},
+       {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
+        status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
+        detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
@@ -279,9 +279,9 @@ spdx_json_checks() {
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
         status:(if pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:\"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\", missing:(\$miss_purl[0:\$cap])},
-       {id:\"no-generic\", label:\"No pkg:generic / custom PURL (0)\", required:true,
-        status:(if (\$generic|length)==0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$generic|length) offending\", missing:(\$generic[0:\$cap])},
+       {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
+        status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
+        detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
@@ -326,7 +326,7 @@ spdx_tv_checks() {
       {id:"top-component", label:"Document/package present", required:true, status:(if $names>0 then "pass" else "fail" end), detail:"\($names) package(s)", missing:[]},
       {id:"name-version", label:"PackageName + PackageVersion present", required:true, status:(if $names>0 and $vers>=$names then "pass" else "fail" end), detail:"names=\($names), versions=\($vers)", missing:[]},
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
-      {id:"no-generic", label:"No pkg:generic / custom PURL (0)", required:true, status:(if $generic==0 then "pass" else "fail" end), detail:"\($generic) offending", missing:[]},
+      {id:"no-generic", label:"Traceable PURL (no pkg:generic, advisory)", required:false, status:(if $generic==0 then "pass" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/name@version)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
       {id:"transitive", label:"Transitive dependencies (DEPENDS_ON)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
@@ -370,8 +370,14 @@ esac
 # elements are checkable only by a human.
 RESULT=$(echo "$CHECKS" | jq -r 'if any(.[]; .required and .status=="fail") then "fail" else "pass" end')
 N_FAIL=$(echo "$CHECKS" | jq '[.[] | select(.required and .status=="fail")] | length')
-N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn" and ((.source // "") != "na"))] | length')
+# no-generic is advisory (untraceable-component visibility), counted on its own
+# line below rather than folded into the recommended-coverage warnings.
+N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn" and ((.source // "") != "na") and .id != "no-generic")] | length')
 N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na")] | length')
+# Untraceable components: count of pkg:generic / custom PURLs (from the no-generic
+# check's detail, "N untraceable"). Does NOT affect RESULT — surfaced so a pass
+# never hides components that can't be tracked for supply-chain / CVE matching.
+N_UNTRACEABLE=$(echo "$CHECKS" | jq -r '([.[] | select(.id=="no-generic")][0].detail // "0") | split(" ")[0] | (tonumber? // 0)')
 
 # --------------------------------------------------------
 # Regulatory crosswalk summary (AI SBOMs only, informational). Groups the G7
@@ -407,8 +413,10 @@ fi
 # --------------------------------------------------------
 jq -n \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
-   --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" '
-{ project: $project, format: $format, result: $result, generatedAt: $ts, checks: $checks }
+   --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
+   --argjson untraceable "$N_UNTRACEABLE" '
+{ project: $project, format: $format, result: $result, generatedAt: $ts,
+  untraceableComponents: $untraceable, checks: $checks }
 + (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
 
@@ -421,6 +429,7 @@ jq -n \
     echo "- Generated: ${GEN_AT}"
     echo "- Format: ${FORMAT}"
     echo "- Result: **$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
+    [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
     echo ""
     echo "| Status | Requirement | Required | Detail | Evidence |"
     echo "|--------|-------------|:--------:|--------|----------|"
@@ -536,6 +545,7 @@ jq -n \
  <span class="pill pill-fail">Mandatory failures: <span class="count">${N_FAIL}</span></span>
  <span class="pill pill-warn">Warnings: <span class="count">${N_WARN}</span></span>
  <span class="pill">Needs review: <span class="count">${N_REVIEW}</span></span>
+$( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">Untraceable (pkg:generic): <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
 <div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
 HTMLHEAD
@@ -571,5 +581,5 @@ HTMLHEAD
     echo "</body></html>"
 } > "$HTML"
 
-echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN, review=$N_REVIEW): $JSON, $MD, $HTML"
+echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN, review=$N_REVIEW, untraceable=$N_UNTRACEABLE): $JSON, $MD, $HTML"
 exit 0
