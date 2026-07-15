@@ -258,7 +258,7 @@ spdx_json_checks() {
     | (.spdxVersion // \"\") as \$sv
     | ((\$p | map(select(((.licenseConcluded // \"NOASSERTION\") != \"NOASSERTION\") or ((.licenseDeclared // \"NOASSERTION\") != \"NOASSERTION\"))) | length)) as \$lic_ok
     | ((\$p | map(select((.checksums // [])|length>0)) | length)) as \$hash_ok
-    | ([ .relationships[]? | select(.relationshipType==\"DEPENDS_ON\") ] | length) as \$dep_edges
+    | ([ .relationships[]? | select(.relationshipType==\"DEPENDS_ON\" or .relationshipType==\"DEPENDENCY_OF\") ] | length) as \$dep_edges
     | (.name // \"\") as \$docname
     | ((.documentDescribes // []) | length) as \$describes
     | (\$tot - (\$miss_purl|length)) as \$purl_ok
@@ -285,7 +285,7 @@ spdx_json_checks() {
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
-       {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON)\", required:true,
+       {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)\", required:true,
         status:(if \$dep_edges>0 then \"pass\" else \"fail\" end),
         detail:\"\(\$dep_edges) edge(s)\", missing:[]},
        {id:\"license\", label:\"License coverage (>= \(\$licmin)%, recommended)\", required:false,
@@ -310,7 +310,7 @@ spdx_tv_checks() {
     ts=$(g '^Created:'); tools=$(g '^Creator: ?Tool:')
     names=$(g '^PackageName:'); vers=$(g '^PackageVersion:')
     purls=$(g 'ExternalRef: ?PACKAGE-MANAGER purl'); generic=$(g 'purl +pkg:generic')
-    deps=$(g 'Relationship:.*DEPENDS_ON'); lics=$(g '^PackageLicenseConcluded:'); hashes=$(g '^PackageChecksum:')
+    deps=$(g 'Relationship:.*(DEPENDS_ON|DEPENDENCY_OF)'); lics=$(g '^PackageLicenseConcluded:'); hashes=$(g '^PackageChecksum:')
     verpat=$(printf '%s' "$SPDX_SPEC_VERSIONS" | sed 's/\./\\./g; s/ /|/g')
     specok=$(g "^SPDXVersion: *($verpat) *\$")
     purlok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:[a-z][a-z0-9.+-]*/[^ ]+@[^ ]+ *$')
@@ -328,7 +328,7 @@ spdx_tv_checks() {
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:"Traceable PURL (no pkg:generic, advisory)", required:false, status:(if $generic==0 then "pass" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/name@version)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
-      {id:"transitive", label:"Transitive dependencies (DEPENDS_ON)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
+      {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
       {id:"hash", label:"Checksums present (recommended)", required:false, status:(if $hashes>0 then "pass" else "warn" end), detail:"\($hashes) checksum(s)", missing:[]}
     ]'
