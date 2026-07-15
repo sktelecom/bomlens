@@ -2,6 +2,8 @@
   <img src="docs/images/logo.svg" alt="BomLens — an SBOM generator" width="300" />
 </p>
 
+<h1 align="center">BomLens</h1>
+
 > **BomLens** is a local-first [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is-sbom/) generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security and license risk report for a single project in seconds — from source code, a container, a binary, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS.
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/bomlens?style=flat-square)](https://github.com/sktelecom/bomlens/releases)
