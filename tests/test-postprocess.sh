@@ -506,6 +506,30 @@ bash "$LIB/validate-sbom.sh" "$WORK/tv-old.spdx" "$WORK/tvo" "supplier" >/dev/nu
 tvo=$(jq -r '"\(.checks[] | select(.id=="spec-version") | .status)/\(.result)"' "$WORK/tvo_conformance.json")
 [ "$tvo" = "fail/fail" ] && pass "Tag-Value SPDX-2.1 fails the spec-version check" || fail "Tag-Value spec-version: '$tvo', expected fail/fail"
 
+echo "== conformance: SPDX transitive check counts DEPENDENCY_OF (Syft's reverse-direction edge) =="
+# Syft writes OS-package dependency edges in SPDX as the reverse relationship
+# DEPENDENCY_OF (e.g. NetworkManager-libnm DEPENDENCY_OF NetworkManager), never
+# DEPENDS_ON, while the same scan's CycloneDX carries dependsOn. The transitive
+# check only asks whether dependency edges EXIST, so both directions must count —
+# otherwise every Syft SPDX submission gets a false transitive FAIL.
+# SPDX JSON: flip the sole DEPENDS_ON edge to DEPENDENCY_OF; nothing else changes.
+jq '(.relationships[] | select(.relationshipType=="DEPENDS_ON") | .relationshipType) = "DEPENDENCY_OF"' \
+    "$FIX/good-spdx.json" > "$WORK/spdx-depof.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-depof.json" "$WORK/sdd" "supplier" >/dev/null 2>&1
+sdd=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)|\(.detail)"' "$WORK/sdd_conformance.json")
+[ "$sdd" = "pass|1 edge(s)" ] && pass "SPDX JSON DEPENDENCY_OF counts as a transitive edge" || fail "SPDX transitive (DEPENDENCY_OF): '$sdd', expected pass|1 edge(s)"
+# An SPDX with only structural relationships (DESCRIBES/CONTAINS, no dependency
+# graph) must still FAIL — the fix widens the direction, it must not weaken the check.
+jq '.relationships = [.relationships[] | select(.relationshipType=="DESCRIBES")]' "$FIX/good-spdx.json" > "$WORK/spdx-nodeps.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-nodeps.json" "$WORK/sdn" "supplier" >/dev/null 2>&1
+sdn=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/sdn_conformance.json")
+[ "$sdn" = "fail" ] && pass "SPDX JSON with no dependency edges still fails transitive" || fail "SPDX transitive (no edges): '$sdn', expected fail"
+# Tag-Value: the same reverse-direction relationship must be matched by grep.
+sed 's/DEPENDS_ON/DEPENDENCY_OF/g' "$FIX/supplier-clean-tagvalue.spdx" > "$WORK/tv-depof.spdx"
+bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/null 2>&1
+tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
+[ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
+
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
 # `pip install`) emits BOTH the requirements.txt range lower bound (flask@2.0,
