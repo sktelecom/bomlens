@@ -213,6 +213,22 @@ LICENSE_REVIEW_FIX='(.components) |= (if type=="array" then map(
     else . end
 ) else . end)'
 
+# Stamp every component with its copyleft-strength class as a
+# bomlens:licenseClass property (network-copyleft / strong-copyleft /
+# weak-copyleft / permissive / uncategorized), using the SAME classifier the
+# web UI computes from (license-flags.jq mirrors licenses.ts), so the SBOM a
+# supplier submits, the risk report and the UI badge never disagree. When a
+# component carries several licenses the strongest class wins (licenses.ts
+# TIER_RANK precedence); no license info means "uncategorized", never
+# permissive. Runs after LICENSE_FIX so normalized .license.id is in place.
+# Any previous bomlens:licenseClass is replaced and the property is appended
+# at a fixed position, so re-runs and --byte-stable output stay byte-identical.
+# Orthogonal to bomlens:licenseReview: a component can carry both.
+LICENSE_CLASS_FIX='(.components) |= (if type=="array" then map(
+  .properties = (((.properties // []) | map(select(.name != "bomlens:licenseClass")))
+    + [{name:"bomlens:licenseClass", value: component_license_class}])
+) else . end)'
+
 if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
@@ -231,6 +247,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${OS_SRC_FIX}
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
+        | ${LICENSE_CLASS_FIX}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
         | walk(if type==\"string\" then gsub(\"cdxgen-venv-[A-Za-z0-9]+\"; \"cdxgen-venv\") else . end)
@@ -242,7 +259,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

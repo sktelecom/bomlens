@@ -7,6 +7,10 @@
         {
           "name": "bomlens:layer",
           "value": "trelay"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
         }
       ],
       "purl": "pkg:generic/config.c",
@@ -18,6 +22,10 @@
         {
           "name": "bomlens:layer",
           "value": "trelay"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
         }
       ],
       "purl": "pkg:generic/lfds.c",
@@ -29,6 +37,10 @@
         {
           "name": "bomlens:layer",
           "value": "trelay"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
         }
       ],
       "purl": "pkg:generic/main.c",
@@ -40,6 +52,10 @@
         {
           "name": "bomlens:layer",
           "value": "trelay"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
         }
       ],
       "purl": "pkg:generic/ssl_lib.c",
@@ -78,6 +94,10 @@
         {
           "name": "bomlens:layer",
           "value": "layer-1"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
         }
       ],
       "purl": "pkg:github/liblfds/liblfds",
@@ -118,6 +138,10 @@
         {
           "name": "bomlens:layer",
           "value": "layer-1"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
         }
       ],
       "purl": "pkg:github/openssl/openssl",
