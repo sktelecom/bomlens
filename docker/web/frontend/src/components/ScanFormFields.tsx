@@ -478,9 +478,12 @@ export function FormMessages({ state }: { state: ScanFormState }) {
         </p>
       )}
       {uploadError && (
-        <p className="text-sm text-destructive" role="alert">
-          {t("source.uploadFailed", { msg: uploadError })}
-        </p>
+        <div role="alert">
+          <p className="text-sm text-destructive">{t(uploadError.key)}</p>
+          {uploadError.detail && (
+            <p className="text-xs text-muted-foreground">{uploadError.detail}</p>
+          )}
+        </div>
       )}
     </>
   );
