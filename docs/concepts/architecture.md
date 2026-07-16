@@ -316,7 +316,7 @@ How CLI flags translate into environment variables and which steps they enable (
 | `--firmware` | `MODE=FIRMWARE` (firmware image) | Unpack, then syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom image) | Generate an ML-BOM from a HuggingFace model, plus a G7 check |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
-| `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (CLI only) |
+| `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (also the UI's Reproducible output toggle) |
 | `--sign` | `SIGN_SBOM=true` (plus `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ signing |
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ skips the upload |
 | `--ui` | `MODE=UI` | Web UI |

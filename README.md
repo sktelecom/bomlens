@@ -48,7 +48,7 @@ git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs.
+Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
 
 ### CLI (advanced)
 

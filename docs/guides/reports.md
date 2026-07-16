@@ -49,7 +49,7 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0_security.html`
 
 ## Generate everything at once (`--all`)
 
-`--all` is shorthand for `--notice --security`. It produces the SBOM, the notice, and the security report in a single scan.
+`--all` is shorthand for `--notice --security --spdx`. It produces the SBOM, the notice, the security report, and an SPDX copy of the SBOM in a single scan.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only

@@ -316,7 +316,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | `--firmware` | `MODE=FIRMWARE` (펌웨어 이미지) | 언팩 → syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom 이미지) | HuggingFace 모델로 ML-BOM 생성 + G7 검사 |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
-| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (CLI 전용) |
+| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (웹 UI의 Reproducible output 토글도 동일) |
 | `--sign` | `SIGN_SBOM=true` (+ `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ 서명 |
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ 업로드 생략 |
 | `--ui` | `MODE=UI` | 웹 UI |
