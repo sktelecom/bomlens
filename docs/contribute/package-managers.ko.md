@@ -28,11 +28,11 @@ newlang) echo "ghcr.io/cyclonedx/cdxgen-debian-newlang:$CDXGEN_TAG" ;;
 
 ### 2. 의존성 보강이 필요하면 build-prep.sh 수정
 
-cdxgen이 잠금 파일 없이 전이 의존성을 해석하지 못하는 생태계라면, cdxgen 실행 직전에 잠금 파일을 만들어 주는 `docker/lib/build-prep.sh`에 보강 로직을 추가합니다. Rust(`cargo generate-lockfile`)와 Go(`go mod download`)가 선례입니다. 보강은 best-effort로 작성해 스캔을 실패시키지 않아야 합니다.
+cdxgen이 잠금 파일 없이 전이 의존성을 해석하지 못하는 생태계라면, cdxgen 실행 직전에 잠금 파일을 만들어 주는 `docker/lib/build-prep.sh`에 보강 로직을 추가합니다. Rust(`cargo generate-lockfile`)와 Go(`go mod download`)가 선례입니다. 보강은 실패하더라도 스캔을 중단시키지 않도록 작성해야 합니다.
 
 ### 3. 예제 프로젝트 추가
 
-`examples/` 디렉토리에 예제 프로젝트를 추가합니다.
+`examples/` 디렉터리에 예제 프로젝트를 추가합니다.
 
 ```
 examples/kotlin/
