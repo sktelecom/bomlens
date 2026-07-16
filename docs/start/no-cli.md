@@ -101,6 +101,8 @@ From here the desktop app and the web UI are the same.
 2. For the scan target, choose "ZIP upload" and upload the source code ZIP received from the dev team.
 3. Click run. The progress log streams in real time, and the result overview appears when it finishes.
 
+> To scan a folder already on your disk instead of a ZIP, the desktop app has an **Add folder** button. On the `sbom-ui.bat` path, set `SBOM_UI_MOUNT_DIR` to that folder before running so the web UI can reach it (the CLI equivalent is `--ui --mount <dir>`).
+
 ![The scan result overview — components, vulnerabilities and licenses](../images/web-ui-scan.png)
 
 When the scan finishes, download the notice from the results screen as per-format chips (`HTML`, `TXT`). The SBOM (`..._bom.json`) and the risk report (`..._risk-report.html`) generated alongside are available on the same screen, and you can also download everything as a single ZIP. Downloaded files are saved to the results folder as well.

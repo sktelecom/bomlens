@@ -46,6 +46,10 @@ The New scan screen is two panes. On the left, pick a source — grouped into Co
 
 Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: License scan (ScanCode), which scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies), and File-level identification (SCANOSS), which finds third-party open source copied into the tree (mainly C/C++), both for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
 
+A **Reproducible output** toggle produces byte-identical SBOMs across runs (the UI equivalent of `--byte-stable`); it is available for source, image and firmware scans, not for SBOM analysis or AI models.
+
+Below the outputs, an optional **Upload** step can send the finished SBOM to a server. Turn it on to pick the destination — Dependency-Track or TRUSCA — and enter the server URL and an access token; TRUSCA also asks for the target project id. The URL and token are used for that one run and are never saved. It is the UI equivalent of the CLI upload options; see [Upload to Dependency-Track / TRUSCA](../guides/upload.md).
+
 ## Scan running
 
 During a run the screen shows the pipeline stages — generate, normalize, notices, security, report — advancing as the live log streams, so you can see where the scan is and read any error (clone failure, no Docker socket, an unsupported file) as it happens.
@@ -89,6 +93,8 @@ For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), th
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
 The G7 AI minimum-element checks appear inside the **Conformance** section above — they are added only when the SBOM has a model component.
+
+That section also shows an AI compliance profile card: a one-glance rollup of the G7 result, the number of license-flagged components, and regulatory framework coverage (EU AI Act, Korea AI Basic Act). It is advisory, not a certification, and the same data is written to the `_ai-profile` files (see [Artifacts](artifacts.md)).
 
 ## Scan management
 

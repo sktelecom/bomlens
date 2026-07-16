@@ -22,6 +22,8 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 | Completeness | both direct and transitive dependencies included |
 | Recommended | supplier, license (SPDX ID), hash |
 
+> The accepted format ranges above are the SK Telecom submission defaults. If your organization accepts a different range, override them with the `CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS` (AI SBOMs), and `SPDX_SPEC_VERSIONS` environment variables (space-separated lists). They are listed in the [Docker image environment variables](../reference/docker-image.md).
+
 ## Running it all at once
 
 ### From the web UI
