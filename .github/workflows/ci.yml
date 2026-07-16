@@ -562,6 +562,11 @@ jobs:
       - name: Check input-form documentation coverage
         run: bash scripts/check-doc-coverage.sh
 
+      # Code->docs gate: every user-facing env var in scan-sbom.sh --help must be
+      # documented in the reference pages (the reverse of check-docs-drift.sh).
+      - name: Check environment-variable documentation coverage
+        run: bash scripts/check-doc-env-coverage.sh
+
       # Deterministic internal-link gate for the getting-started pages.
       - name: Check onboarding internal links
         run: bash scripts/check-doc-links.sh
