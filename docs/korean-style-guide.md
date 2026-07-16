@@ -86,3 +86,7 @@
 이 가이드의 패턴 분류와 보존·변경 한도 원칙은 오픈소스
 [`epoko77-ai/im-not-ai`](https://github.com/epoko77-ai/im-not-ai)(MIT License)의
 한국어 AI 문체 taxonomy를 우리 문서에 맞게 추린 것이다.
+
+번역투와 용어 규칙 중 정규식으로 판별 가능한 것들은 `scripts/ko-style/`의
+린터가 CI에서 검사한다(공개 문서 대상, S1/S2 위반 시 실패). 이 가이드 자신은
+반례를 인용해야 하므로 검사 대상에서 빠진다.

@@ -147,7 +147,7 @@ Closes #42
 
 ## 이슈 및 토론
 
-### 버그 리포트
+### 버그 제보
 
 [GitHub Issues](https://github.com/sktelecom/bomlens/issues)를 이용해 주세요. 아래 정보를 포함하면 빠른 해결에 도움이 됩니다.
 

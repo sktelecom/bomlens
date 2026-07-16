@@ -218,7 +218,7 @@ SBOM_SCANNER_IMAGE=sbom-scanner:local ./tests/test-scan.sh
 - Rust 프로젝트
 - Docker 이미지
 - 바이너리 파일
-- RootFS 디렉토리
+- RootFS 디렉터리
 
 ### 수동 테스트
 
