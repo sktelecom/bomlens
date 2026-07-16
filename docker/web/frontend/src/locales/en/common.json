@@ -192,7 +192,6 @@
     "truncated": "list truncated",
     "noMatch": "No matching rows.",
     "licenseNone": "Unknown",
-    "showMore": "Show {{count}} more",
     "filterHasVulns": "Has vulnerabilities",
     "filterDirectOnly": "Direct only",
     "filterNeedsReview": "Needs review",
