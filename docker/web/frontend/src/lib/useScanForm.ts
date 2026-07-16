@@ -7,12 +7,14 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
+  describeUploadError,
   stashGitCred,
   uploadFile,
   type Capabilities,
   type ScanConfig,
   type ScanParams,
   type SourceType,
+  type UploadErrorInfo,
   type UploadKind,
 } from "@/lib/api";
 import { parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
@@ -142,7 +144,7 @@ export function useScanForm({
   );
   const [scanossToken, setScanossToken] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<UploadErrorInfo | null>(null);
   const [uploading, setUploading] = useState(false);
 
   /** Typing into a field resolves its inline error immediately. */
@@ -306,7 +308,7 @@ export function useScanForm({
         setUploading(true);
         token = (await uploadFile(file, uploadKind)).token;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -318,7 +320,7 @@ export function useScanForm({
         setUploading(true);
         cred = (await stashGitCred(gitToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -332,7 +334,7 @@ export function useScanForm({
         setUploading(true);
         scanossCred = (await stashGitCred(scanossToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -346,7 +348,7 @@ export function useScanForm({
         setUploading(true);
         uploadCred = (await stashGitCred(uploadToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }

@@ -63,6 +63,8 @@ test("a failed upload surfaces an error instead of running the scan", async ({ p
   await page.goto("/#/new");
   await selectZipAndAttach(page);
   await page.getByRole("button", { name: /Run scan/i }).click();
-  // The upload error is shown to the user (uploadFailed message), scan not started.
-  await expect(page.getByText(/file too large/i)).toBeVisible();
+  // The user sees the humanized too-large message, not the server's raw
+  // error text, and the scan does not start.
+  await expect(page.getByText(/file is too large for the server/i)).toBeVisible();
+  await expect(page.getByText("file too large for zip")).toHaveCount(0);
 });

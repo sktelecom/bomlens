@@ -51,7 +51,10 @@
     "aiModelHint": "HuggingFace 모델 ID를 '조직/모델' 형식으로 입력합니다(예: Qwen/Qwen2.5-0.5B). 컬렉션 이름이나 전체 URL이 아닙니다. 모델 카드 메타데이터를 네트워크로 가져와 CycloneDX ML-BOM을 생성합니다.",
     "aiModelUnavailable": "AI 모델 SBOM은 Docker가 실행 중이어야 사용할 수 있습니다(AIBOM 이미지를 sibling 컨테이너로 실행합니다).",
     "uploading": "업로드 중…",
-    "uploadFailed": "업로드 실패: {{msg}}"
+    "uploadErrorTooLarge": "파일이 커서 서버가 받을 수 없습니다. 더 작은 압축본으로 다시 시도하거나, 압축을 푼 폴더를 스캔해 주세요.",
+    "uploadErrorNetwork": "스캔 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하고 다시 시도해 주세요.",
+    "uploadErrorServer": "서버가 요청을 처리하지 못했습니다. 다시 시도하고, 계속 실패하면 스캐너를 재시작해 주세요.",
+    "uploadErrorRejected": "서버가 업로드를 받지 않았습니다. 파일을 확인하고 다시 시도해 주세요."
   },
   "options": {
     "notice": "고지문",

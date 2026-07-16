@@ -411,6 +411,42 @@ export async function getCapabilities(): Promise<Capabilities> {
   }
 }
 
+/** Error from a pre-scan POST (/upload, /git-cred): carries the HTTP status so
+ *  the form can pick a human message; `message` keeps the server's raw detail. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** What the scan form shows when a pre-scan POST fails: `key` is an i18n
+ *  message key (the headline the user reads), `detail` the raw server/browser
+ *  text kept as secondary fine print for bug reports. */
+export interface UploadErrorInfo {
+  key: string;
+  detail?: string;
+}
+
+/** Map an upload/stash failure to a user-facing message key. Raw error text
+ *  (HTTP statuses, "Failed to fetch") never becomes the headline. */
+export function describeUploadError(e: unknown): UploadErrorInfo {
+  if (e instanceof ApiError) {
+    if (e.status === 413) return { key: "source.uploadErrorTooLarge" };
+    if (e.status >= 500)
+      return { key: "source.uploadErrorServer", detail: e.message };
+    return { key: "source.uploadErrorRejected", detail: e.message };
+  }
+  // fetch() rejects with a TypeError when the server is unreachable.
+  if (e instanceof TypeError) return { key: "source.uploadErrorNetwork" };
+  return {
+    key: "source.uploadErrorServer",
+    detail: e instanceof Error ? e.message : undefined,
+  };
+}
+
 /** Upload a file (zip/sbom/firmware) and get back a server-side token. */
 export async function uploadFile(
   file: File,
@@ -431,7 +467,7 @@ export async function uploadFile(
     } catch {
       /* keep default */
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status);
   }
   return (await res.json()) as { token: string; filename: string };
 }
@@ -451,7 +487,7 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
     } catch {
       /* keep default */
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status);
   }
   return (await res.json()) as { credId: string };
 }
