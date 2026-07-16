@@ -131,7 +131,7 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 - Firmware analysis needs the opt-in firmware image, which includes GPL tools (unblob, cve-bin-tool, etc.). Set it via `SBOM_FIRMWARE_IMAGE`, or pull the default (`ghcr.io/sktelecom/bomlens-firmware:latest`).
 - Recognized extensions (`.bin/.img/.squashfs/.ubi/...`) are auto-detected even without `--firmware`, but being explicit is recommended.
-- For behavior and limits, see the [firmware analysis guide](../guides/firmware.md) (Korean).
+- For behavior and limits, see the [firmware analysis guide](../guides/firmware.md).
 
 **Deliverables**: notice, SBOM, risk report (three)
 
@@ -195,7 +195,7 @@ As it runs, logs stream live; when done you can view or download the notice, SBO
 - **GitHub URL**: private repos need `GIT_TOKEN`. Disallowed URL forms (shell metacharacters, `..`, spaces) are rejected for security.
 - **ZIP/tar**: archives containing a path escape (zip-slip) are rejected. If Git Bash on Windows has no `unzip`, `tar` is used.
 - **C/C++**: pure source without a package manager produces a sparse SBOM (see [Scenario 3](#scenario-3--local-cc-source-directory)).
-- **Firmware**: statically linked libraries and vendor-modified squashfs have limited detection (see the [firmware analysis guide](../guides/firmware.md) (Korean), Limits).
+- **Firmware**: statically linked libraries and vendor-modified squashfs have limited detection (see the [firmware analysis guide](../guides/firmware.md), Limits).
 - **SBOM analysis**: converting SPDX to CycloneDX may simplify some license expressions.
 
 ---

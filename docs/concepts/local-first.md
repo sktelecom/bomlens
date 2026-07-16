@@ -22,7 +22,7 @@ The three entry points — the CLI, the web UI, and the desktop app — all use 
 
 ## BomLens generates; TRUSCA governs
 
-BomLens focuses on generation. Governance — organization-wide project management, vulnerability triage, license policy gates — is delegated to the sister project TRUSCA (formerly TrustedOSS Portal, <https://github.com/trustedoss/trusca>). The two tools hand CycloneDX outputs back and forth as-is.
+BomLens focuses on generation. Governance — organization-wide project management, vulnerability triage, license policy gates — is delegated to the sister project TRUSCA (formerly TrustedOSS Portal, <https://github.com/trustedoss/trusca>). The two tools exchange CycloneDX outputs directly.
 
 ## Related
 
