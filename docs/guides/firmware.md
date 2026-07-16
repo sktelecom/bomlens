@@ -75,9 +75,9 @@ The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors t
 
 ## Limits
 
-- The open-source tool stack detects roughly 60–85%, and the result depends heavily on the firmware type, how aggressively it is stripped, and whether unpacking succeeds.
+- The open-source tool stack detects roughly 60–85% of components, and the result depends heavily on the firmware type, how aggressively it is stripped, and whether unpacking succeeds.
 - Without function-level binary fingerprinting, unlike commercial tools, stripped or inlined components and binaries with version strings removed are missed.
-- Statically linked libraries, vendor-modified squashfs, encrypted or signed firmware, and renamed libraries are not detected or are inaccurate.
+- Statically linked libraries, vendor-modified squashfs, encrypted or signed firmware, and renamed libraries go undetected or are misidentified.
 - The resulting SBOM is a best-effort estimate, so do not use it as the sole basis for legal license compliance.
 
 ---
