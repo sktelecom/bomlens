@@ -572,6 +572,22 @@ jobs:
       - name: Check environment-variable documentation coverage
         run: bash scripts/check-doc-env-coverage.sh
 
+      # Korean prose gate: translation-ese and terminology rules over the
+      # public docs surface (scripts/ko-style; decisions recorded in
+      # docs/korean-style-guide.md). S1/S2 findings fail the job. The
+      # generated fixture proves the linter actually detects violations,
+      # so a broken rule catalog cannot pass silently.
+      - name: Check Korean documentation style
+        run: |
+          node scripts/ko-style/lint.mjs --all --no-baseline
+          fixture="$RUNNER_TEMP/ko-style-selftest.md"
+          printf '%s\n' "스캐너에 의해 생성된 결과가 되어지게 됩니다." "examples 디렉토리에 예제를 추가하고, 지원 종료 뱃지를 확인하세요." > "$fixture"
+          if node scripts/ko-style/lint.mjs --files "$fixture" --no-baseline >/dev/null 2>&1; then
+            echo "FAIL: the ko-style self-test fixture did not trip the linter."
+            exit 1
+          fi
+          echo "Self-test OK: the fixture trips the linter as expected."
+
       # Deterministic internal-link gate for the getting-started pages.
       - name: Check onboarding internal links
         run: bash scripts/check-doc-links.sh

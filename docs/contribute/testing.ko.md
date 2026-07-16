@@ -186,7 +186,7 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 1. `DEBUG_MODE=true` 로 재실행하여 상세 로그를 확인합니다.
 2. 실패한 언어의 예제 디렉터리에서 `scan-sbom.sh`를 직접 실행합니다.
 3. Docker 이미지를 최신 버전으로 업데이트합니다: `docker pull ghcr.io/sktelecom/bomlens:latest`
-4. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/bomlens/issues)에 환경 정보와 로그를 첨부해 리포트해 주세요.
+4. 해결되지 않으면 [GitHub Issues](https://github.com/sktelecom/bomlens/issues)에 환경 정보와 로그를 첨부해 제보해 주세요.
 
 ---
 
