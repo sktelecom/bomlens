@@ -96,12 +96,13 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
           echo "✅ Shellcheck passed (warning severity and above)"
       
+      # Blocking at error level (warnings stay advisory); the Dockerfile passes
+      # this threshold today, so a new error-level finding should fail the build.
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
           dockerfile: docker/Dockerfile
           failure-threshold: error
-        continue-on-error: true
 
   contract:
     name: No-Docker Contract Tests
@@ -326,6 +327,10 @@ jobs:
           echo ""
           echo "✅ Documentation check completed"
       
+      # Advisory by design: this step checks EXTERNAL links, which fail for
+      # reasons outside the repo (rate limits, transient outages), so it must
+      # not block merges. Internal links are hard-gated separately by
+      # scripts/check-doc-links.sh (doc-coverage job) and `mkdocs build --strict`.
       - name: Check Markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@5c5dfc0ac2e225883c0e5f03a85311ec2830d368 # v1
         with:
