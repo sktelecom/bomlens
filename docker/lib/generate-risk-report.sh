@@ -103,6 +103,46 @@ if [ -f "$NOTICE" ]; then
 fi
 
 # --------------------------------------------------------
+# License classification (copyleft strength) from the finished SBOM. Uses the
+# SAME classifier as normalize-sbom.sh and the web UI (the shared
+# license-flags.jq, which mirrors licenses.ts), so the report's counts always
+# agree with the bomlens:licenseClass properties and the UI badges — even for
+# an SBOM that predates the property. Skipped when no BOM artifact exists.
+# --------------------------------------------------------
+BOM="${OUT_PREFIX}_bom.json"
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIC_CLASS='null'
+if [ -f "$BOM" ] && [ -f "$LIB_DIR/license-flags.jq" ] && jq empty "$BOM" >/dev/null 2>&1; then
+    LIC_CLASS=$(jq -c "$(cat "$LIB_DIR/license-flags.jq")"'
+      [ .components[]? | { class: component_license_class,
+                           label: ((.name // "?") + "@" + (.version // "?")) } ] as $rows
+      | { nc: ([$rows[] | select(.class=="network-copyleft") | .label]),
+          sc: ([$rows[] | select(.class=="strong-copyleft")  | .label]),
+          wk: ([$rows[] | select(.class=="weak-copyleft")]   | length),
+          pm: ([$rows[] | select(.class=="permissive")]      | length),
+          un: ([$rows[] | select(.class=="uncategorized")]   | length) }
+    ' "$BOM" 2>/dev/null || echo 'null')
+fi
+HAS_LIC_CLASS=false
+NC=0; SC=0; WK=0; PM=0; UN=0; COPYLEFT_TOTAL=0
+COPYLEFT_TOP='[]'
+if [ "$LIC_CLASS" != "null" ]; then
+    HAS_LIC_CLASS=true
+    NC=$(echo "$LIC_CLASS" | jq '.nc | length')
+    SC=$(echo "$LIC_CLASS" | jq '.sc | length')
+    WK=$(echo "$LIC_CLASS" | jq '.wk')
+    PM=$(echo "$LIC_CLASS" | jq '.pm')
+    UN=$(echo "$LIC_CLASS" | jq '.un')
+    COPYLEFT_TOTAL=$((NC + SC))
+    # Up to 10 drivers of the copyleft exposure: network-copyleft first, then
+    # strong; each keeps the SBOM's (sorted) component order, so the list is
+    # deterministic.
+    COPYLEFT_TOP=$(echo "$LIC_CLASS" | jq -c '
+      ([.nc[] | {label: ., class: "network-copyleft"}]
+       + [.sc[] | {label: ., class: "strong-copyleft"}]) | .[0:10]')
+fi
+
+# --------------------------------------------------------
 # Markdown
 # --------------------------------------------------------
 {
@@ -150,6 +190,25 @@ fi
         echo "_NOTICE 산출물이 없어 생략합니다._"
     else
         echo "- 식별된 distinct 라이선스: ${LIC_COUNT}건 (상세는 \`${OUT_PREFIX}_NOTICE.{txt,html}\` 참조)"
+    fi
+    if [ "$HAS_LIC_CLASS" = "true" ]; then
+        echo ""
+        echo "### 라이선스 분류 (카피레프트 강도)"
+        echo ""
+        echo "각 컴포넌트는 SBOM에 \`bomlens:licenseClass\` 속성으로도 기록되어 있습니다. 인식되지 않은 라이선스는 permissive로 간주하지 않고 미분류(uncategorized)로 남깁니다."
+        echo ""
+        echo "| Network copyleft | Strong copyleft | Weak copyleft | Permissive | 미분류 |"
+        echo "|---:|---:|---:|---:|---:|"
+        echo "| ${NC} | ${SC} | ${WK} | ${PM} | ${UN} |"
+        if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
+            echo ""
+            echo "카피레프트 노출을 만드는 컴포넌트 (network/strong, 최대 10개):"
+            echo ""
+            echo "$COPYLEFT_TOP" | jq -r '.[] | "- `" + .label + "` (" + .class + ")"'
+            if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
+                echo "- 외 $((COPYLEFT_TOTAL - 10))개 (전체는 SBOM의 \`bomlens:licenseClass\` 속성 참조)"
+            fi
+        fi
     fi
     echo ""
     echo "## ${S_NEXT}. 다음 단계"
@@ -294,6 +353,28 @@ HTMLSEC
     else
         echo "<p>식별된 distinct 라이선스: <b>${LIC_COUNT}</b>건 (상세는 NOTICE 산출물 참조).</p>"
     fi
+    if [ "$HAS_LIC_CLASS" = "true" ]; then
+        echo "<h3>라이선스 분류 (카피레프트 강도)</h3>"
+        echo "<p>각 컴포넌트는 SBOM에 <code>bomlens:licenseClass</code> 속성으로도 기록되어 있습니다. 인식되지 않은 라이선스는 permissive로 간주하지 않고 미분류(uncategorized)로 남깁니다.</p>"
+        cat <<HTMLLIC
+<div class="cards">
+ <span class="pill pill-crit">Network copyleft <span class="count">${NC}</span></span>
+ <span class="pill pill-high">Strong copyleft <span class="count">${SC}</span></span>
+ <span class="pill pill-med">Weak copyleft <span class="count">${WK}</span></span>
+ <span class="pill pill-pass">Permissive <span class="count">${PM}</span></span>
+ <span class="pill pill-info">미분류 <span class="count">${UN}</span></span>
+</div>
+HTMLLIC
+        if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
+            echo "<p>카피레프트 노출을 만드는 컴포넌트 (network/strong, 최대 10개):</p>"
+            echo "<ul class=\"mono\">"
+            echo "$COPYLEFT_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + .class + ")</li>"'
+            if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
+                echo "<li>외 $((COPYLEFT_TOTAL - 10))개 (전체는 SBOM의 <code>bomlens:licenseClass</code> 속성 참조)</li>"
+            fi
+            echo "</ul>"
+        fi
+    fi
 
     echo "<h2>${S_NEXT}. 다음 단계</h2>"
     echo "<ol>"
@@ -307,4 +388,4 @@ HTMLSEC
     echo "</body></html>"
 } > "$HTML"
 
-echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H})"
+echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL})"

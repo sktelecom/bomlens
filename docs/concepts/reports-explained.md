@@ -64,6 +64,8 @@ Sitting on a supported release cycle is not the same as running its latest versi
 
 The open-source risk report aggregates vulnerabilities by severity with recommended response deadlines (Critical 7 days, High 30 days). It includes a license summary, and for a supplier SBOM it adds the format conformance result.
 
+The license summary also classifies components by copyleft strength, with the same rules the web UI uses. Each component in the SBOM carries a `bomlens:licenseClass` property holding one of `network-copyleft`, `strong-copyleft`, `weak-copyleft`, `permissive` or `uncategorized`, and the report shows a per-class count plus the components that drive the copyleft exposure. A license the tool does not recognize is never assumed permissive; it stays `uncategorized` for a human to review.
+
 ## Related
 
 - [Generating reports](../guides/reports.md)
