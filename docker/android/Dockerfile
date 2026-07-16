@@ -13,7 +13,7 @@
 # ========================================================
 
 ARG ANDROID_API=35
-FROM ghcr.io/cyclonedx/cdxgen-temurin-java21:v12@sha256:8f2bc44d00b9b58314d7124a5e0e2d03045591df68b4f7102d9bd0658f75e37a
+FROM ghcr.io/cyclonedx/cdxgen-temurin-java21:v12@sha256:e343cdfceebb49a8747617a5b3285a114fe9a2e3cb6ad10d4c932e00b61f89a8
 
 ARG ANDROID_API=35
 ARG ANDROID_BUILD_TOOLS=${ANDROID_API}.0.0
