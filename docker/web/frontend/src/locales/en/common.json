@@ -699,7 +699,7 @@
     "source": "Delete a file and it leaves this list too."
   },
   "validation": {
-    "required": "Enter a project name and version (and any required input).",
+    "required": "Fill in the required fields marked above.",
     "file": "Choose a file to analyze.",
     "project": "Enter a project name.",
     "version": "Enter a version.",
