@@ -6,7 +6,7 @@ hide:
 
 # Generate SBOMs and assess open-source risk, all locally
 
-A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, or an SBOM you received, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run.
+A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
 
 [Get started](start/first-scan.md){ .md-button .md-button--primary }
 [Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
@@ -42,6 +42,12 @@ Prefer no command line? Download the installer and double-click it. A Docker eng
     Validate an SBOM you received and issue a risk report.
 
     [:octicons-arrow-right-24: Supplier SBOM](guides/supplier-sbom.md)
+
+-   :material-robot-outline: __AI model SBOM__
+
+    An ML-BOM for a HuggingFace model, checked against the G7 minimum elements and mapped to the EU AI Act.
+
+    [:octicons-arrow-right-24: AI model SBOM](guides/ai-model.md)
 
 -   :material-shield-check: __Notice & security report__
 

@@ -20,7 +20,7 @@
 
 One Docker image, two jobs. It **generates**: scan your source code, a container image, or a binary and get a CycloneDX SBOM, an open-source notice, and a security report. It also **assesses open-source risk** in what you receive — a supplier's finished SBOM (`--analyze`) or a firmware binary — reporting licenses and known vulnerabilities with Critical-7d / High-30d remediation deadlines. Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
 
-Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, Swift, C/C++ (Conan/vcpkg, or `--identify-vendored` when there is no package manager). Inputs: a source folder, a GitHub URL, a ZIP archive, a Docker image, a binary or RootFS, an existing SBOM, firmware, or a HuggingFace AI model (CycloneDX ML-BOM).
+Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, Swift, C/C++ (Conan/vcpkg, or `--identify-vendored` when there is no package manager). Inputs: a source folder, a GitHub URL, a ZIP archive, a Docker image, a binary or RootFS, an existing SBOM, firmware, or a HuggingFace AI model (CycloneDX ML-BOM checked against the [G7 minimum elements for AI](https://sktelecom.github.io/bomlens/guides/ai-model/), which map to the EU AI Act's Annex IV).
 
 Full docs — searchable, English and Korean — live at **[sktelecom.github.io/bomlens](https://sktelecom.github.io/bomlens/)**, mirrored under [docs/](docs/):
 
