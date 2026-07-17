@@ -730,7 +730,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     if [ "$GENERATE_SPDX" = "true" ]; then
         summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"
     fi
-    if [ "$MODE" = "ANALYZE" ]; then
+    # Conformance comes from both modes that can validate a BOM: ANALYZE (format
+    # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
+    # It used to be announced for ANALYZE only, so an AI-model scan produced the
+    # G7 report and never mentioned it.
+    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
             || note_missing "conformance report"
     fi
