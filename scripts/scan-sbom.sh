@@ -699,15 +699,56 @@ if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
     exit 1
 fi
 
+# The summary must describe what is ON DISK, not what was requested: an older
+# scanner image, or a step that degraded, leaves a requested artifact
+# unproduced, and a summary driven by the request flags would announce a file
+# the user does not have. Print a line only when its first file exists, and
+# name anything requested but missing so the gap is visible rather than silent.
+summary_line() {  # <label> <file> [more files…] — prints iff the first exists
+    local label="$1"; shift
+    [ -f "$OUTPUT_HOST_DIR/$1" ] || return 1
+    local names=""
+    for f in "$@"; do names="${names:+$names, }$f"; done
+    printf '  %-12s %s\n' "$label" "$names"
+}
+missing=""
+note_missing() { missing="${missing:+$missing }$1"; }
+
 echo "=========================================="
 echo "  Analysis Complete!"
 if [ "$GENERATE_ONLY" = "true" ]; then
+    P="${SAFE_PROJECT}_${SAFE_VERSION}"
     echo "  Output dir: ${OUTPUT_HOST_DIR}"
     echo "  SBOM: ${OUTPUT_FILE}"
-    [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
-    [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
-    [ "$GENERATE_SPDX" = "true" ]     && echo "  SPDX:     ${SAFE_PROJECT}_${SAFE_VERSION}_bom.spdx.json"
-    [ "$MODE" = "ANALYZE" ] && echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
-    [ "$GENERATE_REPORT" = "true" ] && echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
+    if [ "$GENERATE_NOTICE" = "true" ]; then
+        summary_line "Notice:" "${P}_NOTICE.txt" "${P}_NOTICE.html" || note_missing "notice"
+    fi
+    if [ "$GENERATE_SECURITY" = "true" ]; then
+        summary_line "Security:" "${P}_security.json" "${P}_security.md" "${P}_security.html" \
+            || note_missing "security report"
+    fi
+    if [ "$GENERATE_SPDX" = "true" ]; then
+        summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"
+    fi
+    # Conformance comes from both modes that can validate a BOM: ANALYZE (format
+    # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
+    # It used to be announced for ANALYZE only, so an AI-model scan produced the
+    # G7 report and never mentioned it.
+    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ]; then
+        summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
+            || note_missing "conformance report"
+    fi
+    if [ "$GENERATE_REPORT" = "true" ]; then
+        summary_line "Risk report:" "${P}_risk-report.md" "${P}_risk-report.html" \
+            || note_missing "risk report"
+    fi
+    if [ -n "$missing" ]; then
+        echo ""
+        echo "[WARN] requested but not produced: ${missing}"
+        echo "  The scan finished, but these artifacts are not in the output folder."
+        echo "  If the scanner image predates the feature, refresh it:"
+        echo "    docker pull ${RUN_IMAGE}"
+        echo "  Otherwise the step degraded — check the log above for its warning."
+    fi
 fi
 echo "=========================================="

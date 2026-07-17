@@ -205,6 +205,29 @@ unset DOCKER_STUB_NOWRITE
   && pass "empty host mount (no --generate-only) fails closed with 'not found on host'" \
   || { fail "empty host mount not caught in the default path" "rc=$RC"; show; }
 
+# The completion summary must describe what is ON DISK, not what was requested.
+# Regression: it printed a line per request flag, so a scanner image that predates
+# a feature (or a step that degraded) still produced "SPDX: <proj>_<ver>_bom.spdx.json"
+# for a file the user did not have — the exact symptom of running --spdx/--all on a
+# pre-v1.8.0 image. The stub writes only _bom.json, so every other requested
+# artifact is missing and must be reported as such instead of announced.
+d="$(new_proj summary)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project Sum --version 4.0.0 --all --generate-only
+{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+    && ! in_out "_bom.spdx.json" \
+    && in_out "requested but not produced" \
+    && in_out "SPDX export" && in_out "notice" && in_out "security report"; } \
+  && pass "summary reports only artifacts on disk and names the missing ones" \
+  || { fail "summary announced artifacts that were never produced" "rc=$RC"; show; }
+
+# The mirror case: artifacts that DID land are listed, with no false warning.
+d="$(new_proj summary_ok)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project SumOk --version 4.1.0 --generate-only --no-report
+{ [ "$RC" -eq 0 ] && in_out "SBOM: SumOk_4.1.0_bom.json" \
+    && ! in_out "requested but not produced"; } \
+  && pass "summary lists the delivered SBOM without a spurious missing-artifact warning" \
+  || { fail "summary warned about artifacts that were not requested" "rc=$RC"; show; }
+
 # --------------------------------------------------------
 section "Target-mode routing"
 # --------------------------------------------------------
