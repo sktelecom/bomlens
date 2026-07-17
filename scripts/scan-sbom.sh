@@ -69,6 +69,10 @@ TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
+# Tracks an EXPLICIT --security/--all, as opposed to the risk-report default
+# turning security on: only an explicit request is worth answering when a mode
+# cannot produce the report.
+SECURITY_REQUESTED="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
@@ -107,9 +111,10 @@ while [[ "$#" -gt 0 ]]; do
         --upload-target) UPLOAD_TARGET="$2"; shift ;;
         --trusca) UPLOAD_TARGET="trusca"; TRUSCA_PROJECT_ID="$2"; shift ;;
         --notice) GENERATE_NOTICE="true" ;;
-        --security) GENERATE_SECURITY="true" ;;
+        --security) GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
         --spdx) GENERATE_SPDX="true" ;;
-        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true" ;;
+        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true"
+               SECURITY_REQUESTED="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
@@ -568,6 +573,20 @@ fi
 # on unless the user opts out with --no-report. ANALYZE already enabled them.
 if [ "$NO_REPORT" != "true" ]; then
     GENERATE_REPORT="true"; GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
+fi
+
+# An AI model has no package dependencies, so Trivy has nothing to match and the
+# report comes back empty. The web UI already forces the toggle off for an
+# AI-model scan (useScanForm.ts) and both guides state the CLI skips it too —
+# only the CLI still ran it, shipping an empty _security.{json,md,html}. This
+# has to sit after the risk-report defaults above, which turn security on for
+# every mode; the risk report still renders from the notice, as it does in the
+# UI. Announce the skip only when the user actually asked (--security / --all),
+# so an ordinary --model run stays quiet instead of explaining a default.
+if [ "$MODE" = "AIBOM" ] && [ "$GENERATE_SECURITY" = "true" ]; then
+    [ "$SECURITY_REQUESTED" = "true" ] && \
+        echo "[INFO] Skipping the security report: an AI model has no package dependencies to scan."
+    GENERATE_SECURITY="false"
 fi
 
 echo "=========================================="
