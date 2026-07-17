@@ -17,7 +17,7 @@ import {
   type UploadErrorInfo,
   type UploadKind,
 } from "@/lib/api";
-import { parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
+import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -240,7 +240,11 @@ export function useScanForm({
     const apply = (s: { project?: string; version?: string }) => {
       if (cancelled) return;
       if (!projectDirty) setProjectRaw(s.project ?? "");
-      if (!versionDirty) setVersionRaw(s.version ?? "");
+      // Prefer a version the source states; otherwise seed the placeholder
+      // default so the required field is satisfied on a first run — but only
+      // once a target is actually identified (a suggested project). With no
+      // target yet, both fields stay empty rather than showing a lone version.
+      if (!versionDirty) setVersionRaw(s.version || (s.project ? DEFAULT_VERSION : ""));
     };
     if (source === "sbom-upload" && file) {
       // The SBOM's own metadata beats filename guessing; fall back to the

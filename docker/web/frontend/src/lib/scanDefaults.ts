@@ -4,11 +4,18 @@
  * the user usually confirms instead of typing. Pure functions; useScanForm
  * decides when a suggestion may fill the fields (never over a user edit).
  *
- * A version is suggested only when the source states one (docker tag, a
- * `name-1.2.3` file name, SBOM metadata). No made-up defaults like "1.0":
- * they would pollute the SBOM's metadata.component and the artifact names.
+ * A version is *inferred* only when the source states one (docker tag, a
+ * `name-1.2.3` file name, SBOM metadata). When it does not, useScanForm falls
+ * back to DEFAULT_VERSION so a first-time user can run straight away instead of
+ * stalling on the required field. This is a placeholder the user is expected to
+ * confirm or replace: it lands in the SBOM's metadata.component and the artifact
+ * names, so a real release version should overwrite it before publishing.
  */
 import type { SourceType } from "./api";
+
+/** Fallback version when the source carries none — matches the field's
+ *  placeholder so the prefill reads as a suggestion, not a real release. */
+export const DEFAULT_VERSION = "1.0.0";
 
 export interface IdentitySuggestion {
   project?: string;
