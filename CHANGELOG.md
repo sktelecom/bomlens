@@ -7,10 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Every component in the generated SBOM now carries a `bomlens:licenseClass` property with its copyleft-strength class (`network-copyleft`, `strong-copyleft`, `weak-copyleft`, `permissive`, `uncategorized`), mirroring the classification the web UI shows, and the risk report gains a per-class count table plus the network/strong-copyleft components driving the exposure. Unknown licenses are never assumed permissive. A test guard keeps the UI and scanner classifications from silently diverging. (#420)
+
+### Changed
+
+- The components table now renders large SBOMs with recycled row chunks: the whole filtered set (up to the 2,000-row server cap) is reachable by plain scrolling, offscreen rows are replaced by measured spacers so the DOM stays small, and the "Show more" button is gone. (#421)
+- A failed upload or token stash on the New scan form now shows a situation-specific message (file too large, server unreachable, server error, rejected input) in both languages instead of the raw exception text; the technical detail moves to fine print. (#414)
+- The nightly "macOS real scan (Colima)" job was retired: its last 19 runs all failed deterministically at Colima startup (the hosted arm64 runner boots neither the vz nor the qemu backend), so the scan never actually ran. The evidence and the re-add condition are recorded in the workflow; macOS coverage remains a maintainer-run local check. (#422)
+
+### CI
+
+- The Dockerfile lint (hadolint) is now blocking at error level, and the external-link check's advisory status is documented inline. (#413)
+- A Korean prose style gate now lints the public docs on every PR (`scripts/ko-style/`): translation-ese patterns and the repository's terminology decisions (디렉터리/배지 spellings, 컬럼→열, 리포트→보고서, no coined words), with a self-test proving the linter still detects violations. Applying it fixed six live violations. (#417)
+- The three SPDX checks the Windows verification round left to a human eye — the SPDX chip, the chip addressing the `.spdx.json` artifact, and Re-scan restoring the SPDX toggle — are now Playwright specs. (#419)
+
 ### Documentation
 
 - Synced the docs site and README with features shipped across v1.5–v1.8 that were undocumented, thin, or inaccurate: the web UI upload step (Dependency-Track/TRUSCA), the Maven/Node full-graph opt-outs (`BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_NODE_FULL_GRAPH`), the conformance spec-version overrides (`CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS`, `SPDX_SPEC_VERSIONS`), the `ENRICH_EOL` and `STALENESS_ENRICH` variables, the AI compliance profile card and `_ai-profile.*` artifacts, and the `--ui --mount` host-folder option. Corrected the `--all` description, which omitted the `--spdx` it also implies, and the "(CLI only)" note on `--byte-stable`, which has a web UI toggle as well. (#409)
 - Added a CI gate (`scripts/check-doc-env-coverage.sh`) that fails when a user-facing environment variable in `scan-sbom.sh --help` is documented in neither the CLI nor the Docker-image reference — the code-to-docs counterpart of the existing docs-to-code drift check. Applying it documented the previously missing `SBOM_AIBOM_IMAGE` override. (#410)
+- Korean pages: fixed translationese and coined terms concentrated in the web UI reference and the vendored-OSS guide, unified three drifting notations (디렉터리, 배지, 보고서), and recorded the terminology decisions in the style guide. (#415)
+- English pages: a native-quality pass fixed two real defects — firmware-guide links mislabeled "(Korean)" and stale tool version pins in the architecture page — plus literal collocations, run-on passages, and naming consistency. (#418)
+- Guide screenshots were regenerated in the pinned Playwright container, so the conformance section and New scan form images match the shipped UI (regulatory crosswalk, AI compliance card, SPDX toggle). (#416)
 
 ## [v1.8.2] - 2026-07-15
 
