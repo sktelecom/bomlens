@@ -13,9 +13,10 @@
     "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:lib-gate": "node scripts/lib-test-gate.mjs",
-    "test:ui": "playwright test --grep-invert \"@capture|@visual\"",
+    "test:ui": "playwright test --grep-invert \"@capture|@visual|@demo\"",
     "test:visual": "playwright test --grep @visual",
     "capture:ui": "playwright test --grep @capture",
+    "demo:record": "playwright test --grep @demo",
     "token:lint": "node scripts/token-lint.mjs",
     "i18n:check": "node scripts/i18n-coverage.mjs"
   },
