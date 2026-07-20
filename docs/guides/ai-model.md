@@ -49,6 +49,8 @@ For an AI SBOM, BomLens also writes a one-page AI compliance profile (`_ai-profi
 
 ## Preparing the image
 
+The commands below use `scan-sbom.sh` from the BomLens repository. If you do not have it yet, [Getting started](../start/first-scan.md) covers cloning the repository and the desktop app alternative.
+
 AI model SBOM generation needs a separate image that bundles the OWASP AIBOM Generator. It is opt-in and reaches the network (HuggingFace), so it ships as its own image rather than in the base one.
 
 ```bash
