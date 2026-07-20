@@ -36,6 +36,56 @@ test("docker-missing screen renders the BomLens title and check-again button", a
   }
 });
 
+// Pull failures are the likeliest thing an attendee hits on a corporate network, and
+// the proxy wording is the single most important string in the app for a venue demo.
+// A real failure would need a broken multi-GB download, so the screen is seeded instead.
+test("failed-pull renders proxy guidance, retry, and the log button in English", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: {
+      ...process.env,
+      SBOM_SMOKE: "1",
+      SBOM_SMOKE_SCREEN: "failed-pull:proxy",
+      SBOM_LANG: "en",
+    },
+  });
+  try {
+    const win = await app.firstWindow();
+    const help = win.locator("#help");
+    await expect(help).toBeVisible();
+    // The core correction: the daemon pulls, so app-side proxy settings do nothing.
+    await expect(help).toContainText("Docker daemon");
+    await expect(help).toContainText("Rancher Desktop");
+    await expect(win.locator("#retry")).toBeVisible();
+    await expect(win.locator("#open-logs")).toBeVisible();
+    // Nothing Korean may reach an English-locale attendee.
+    await expect(help).not.toHaveText(/[가-힣]/);
+    await expect(win.locator("#log")).not.toHaveText(/[가-힣]/);
+  } finally {
+    await app.close();
+  }
+});
+
+// Each failure mode must give different advice — "check your connection" for a disk-full
+// or DNS failure sends the attendee down the wrong path.
+test("failed-pull swaps the guidance per reason", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: {
+      ...process.env,
+      SBOM_SMOKE: "1",
+      SBOM_SMOKE_SCREEN: "failed-pull:disk",
+      SBOM_LANG: "en",
+    },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("#help")).toContainText("disk space");
+  } finally {
+    await app.close();
+  }
+});
+
 // The status screen's top-right language toggle swaps only the lang query and
 // reloads the same screen, so the copy switches without touching main-process state.
 test("language toggle on the status screen switches the copy", async () => {

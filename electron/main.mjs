@@ -15,9 +15,11 @@ import {
   imagePresent,
   ping,
   pullImage,
+  resetDockerBin,
   UiContainer,
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
+import { classifyPullFailure, createPullProgress } from "./lib/pullprogress.mjs";
 import { addScanMounts, parseScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
 import { createStartupLogger } from "./lib/log.mjs";
@@ -49,6 +51,18 @@ function status(line) {
   startupLogger?.line(line);
 }
 
+// pull 진행 요약: 로그 창(status)과 달리 한 줄을 제자리에서 갱신한다. 로그는 흐르지만
+// 요약은 "지금 어디쯤인지"를 고정된 자리에서 보여줘야 멈춘 것처럼 보이지 않는다.
+function statusProgress(line) {
+  send("status-progress", line);
+}
+
+// 예외를 사용자 언어 문구로. container.mjs는 번역 가능한 code를 실어 던지므로(ContainerError)
+// 그 경우만 사전을 태우고, 나머지는 원문 message를 그대로 쓴다.
+function describeErr(err) {
+  return err?.code ? t.containerError(err.code, err.detail) : (err?.message ?? String(err));
+}
+
 // 부팅 상태 전이: 전역 상태를 갱신하고 렌더러(상태 화면)에 브로드캐스트한다.
 // reason은 실패 상태의 부가 정보(예: docker-missing의 not-installed/not-running).
 let bootState = BOOT.IDLE;
@@ -76,6 +90,12 @@ function hardenWebContents(contents) {
 // 추가 스캔 폴더(웹 UI "디렉터리 경로" 입력의 선택지가 되는 읽기 전용 마운트):
 // userData/scan-mounts.json에 저장하고 컨테이너 기동 인자에 반영한다(lib/scanmounts.mjs).
 // 마운트는 기동 시점에만 붙일 수 있으므로, 목록이 바뀌면 컨테이너를 재시작한다.
+// 시작 로그 경로(Windows: %APPDATA%\BomLens\startup.log). 로거와 "로그 폴더 열기" IPC가
+// 같은 값을 써야 하므로 한 군데에서만 만든다.
+function startupLogPath() {
+  return path.join(app.getPath("userData"), "startup.log");
+}
+
 function scanMountsPath() {
   return path.join(app.getPath("userData"), "scan-mounts.json");
 }
@@ -126,7 +146,7 @@ async function restartForScanMounts() {
     query: { lang, v: app.getVersion() },
   });
   setBootState(BOOT.IDLE);
-  startup().catch((err) => status(t.startFailed(err.message)));
+  startup().catch((err) => status(t.startFailed(describeErr(err))));
 }
 
 // 창 위치/크기 기억: userData/window-state.json에 저장하고 다음 실행에서 복원한다.
@@ -213,10 +233,38 @@ async function startup() {
     status(t.firstPull);
     status(t.image(DEFAULT_IMAGE));
     status(t.network);
-    const ok = await pullImage(DEFAULT_IMAGE, (line) => status(line));
-    if (!ok) {
+    // 진행 요약 한 줄을 제자리에서 갱신한다. non-TTY docker pull은 레이어 하나당 한 줄만
+    // 뱉어서 Extracting 구간에 몇 분씩 출력이 멎는데, 경과 시간이 계속 움직여야 참가자가
+    // "멈췄다"고 판단하고 앱을 죽이지 않는다.
+    const progress = createPullProgress();
+    const startedAt = Date.now();
+    let tally = { total: 0, complete: 0 };
+    const render = () =>
+      statusProgress(
+        t.pullProgress(tally.complete, tally.total, Math.round((Date.now() - startedAt) / 1000)),
+      );
+    const heartbeat = setInterval(render, 1000);
+    render();
+
+    // 반환은 객체다({ok, reason, log}) — `if (!result)`로 쓰면 실패가 통과한다.
+    let pull;
+    try {
+      pull = await pullImage(DEFAULT_IMAGE, (line) => {
+        status(line);
+        const next = progress.feed(line);
+        if (next) {
+          tally = next;
+          render();
+        }
+      });
+    } finally {
+      // 어느 경로로 빠져나가도 인터벌은 반드시 멈춘다(누수 시 UI가 계속 틱한다).
+      clearInterval(heartbeat);
+    }
+    if (!pull.ok) {
       status(t.pullFailed);
-      setBootState(BOOT.FAILED_PULL);
+      // 사유를 실어 보내면 상태 화면이 프록시/DNS/디스크별 안내를 띄운다.
+      setBootState(BOOT.FAILED_PULL, classifyPullFailure(pull.log, pull.reason));
       return;
     }
   }
@@ -249,7 +297,8 @@ async function startup() {
     healthMonitor.start();
   } catch (err) {
     // 기동 실패는 상태만 전이하고 기존처럼 호출자(startFailed 로그)로 던진다.
-    setBootState(BOOT.FAILED_START, err.message);
+    // 로그에는 번역 문구가 아니라 안정적인 코드를 남긴다(진단·검색용).
+    setBootState(BOOT.FAILED_START, err.code ?? err.message);
     throw err;
   }
 }
@@ -320,6 +369,17 @@ function registerApp() {
   //    preload가 주입되므로, 원격 콘텐츠가 이 채널을 부르는 경로를 막는다.
   // 2) 실패 종착 상태에서만 — 진행 중이거나 정상이면 무시.
   // 3) 종료 절차가 시작됐으면 무시.
+  // 로그 폴더 열기: 실패한 참가자가 진단정보를 건네줄 유일한 통로다(메뉴바는 숨겨져 있고
+  // 앱 어디에도 경로가 표시되지 않았다). 가드는 startup:retry와 동일 — 시작 화면에서만.
+  ipcMain.handle("app:open-logs", (event) => {
+    if (!event.senderFrame?.url?.startsWith("file://")) return { ok: false };
+    const target = startupLogPath();
+    // 로그 파일이 아직 없으면(첫 기동 중 실패) 폴더만이라도 연다.
+    if (fs.existsSync(target)) shell.showItemInFolder(target);
+    else shell.openPath(path.dirname(target));
+    return { ok: true };
+  });
+
   ipcMain.handle("startup:retry", async (event) => {
     if (!event.senderFrame?.url?.startsWith("file://")) return { ok: false };
     if (!canRetry(bootState)) return { ok: false };
@@ -327,6 +387,9 @@ function registerApp() {
 
     if (bootState === BOOT.FAILED_DOCKER) {
       // Docker 안내 화면에서의 재확인: 여전히 불가면 화면 전환 없이 사유만 돌려준다.
+      // 캐시된 docker 경로를 버리고 다시 찾는다 — 앱을 켜 둔 채 Docker를 설치한 경우
+      // (데모에서 흔하다) 재확인만으로 복구되어야 한다.
+      resetDockerBin();
       const docker = await dockerStatus();
       if (!docker.installed || !docker.running) {
         return { ok: false, reason: !docker.installed ? "not-installed" : "not-running" };
@@ -335,7 +398,7 @@ function registerApp() {
       await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
         query: { lang, v: app.getVersion() },
       });
-      startup().catch((err) => status(t.startFailed(err.message)));
+      startup().catch((err) => status(t.startFailed(describeErr(err))));
       return { ok: true };
     }
 
@@ -345,7 +408,7 @@ function registerApp() {
     healthMonitor = null;
     await container?.stop();
     container = null;
-    startup().catch((err) => status(t.startFailed(err.message)));
+    startup().catch((err) => status(t.startFailed(describeErr(err))));
     return { ok: true };
   });
 
@@ -390,7 +453,7 @@ function registerApp() {
     lang = resolveLang(process.env.SBOM_LANG, app.getLocale());
     t = mainMessages(lang);
     // 시작 로그 파일: 실행마다 새로 쓴다. UI 전환 후 사라진 진행 내역을 문제 보고에 쓴다.
-    startupLogger = createStartupLogger(path.join(app.getPath("userData"), "startup.log"));
+    startupLogger = createStartupLogger(startupLogPath());
     // macOS About 패널에 앱 이름과 버전을 표기한다(다른 OS에서는 효과가 없고 무해).
     app.setAboutPanelOptions({ applicationName: "BomLens", applicationVersion: app.getVersion() });
     app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));
@@ -418,6 +481,17 @@ function registerApp() {
         });
         return;
       }
+      // 화면 시드: SBOM_SMOKE_SCREEN=failed-pull:<사유>로 pull 실패 화면을 직접 띄운다.
+      // 실제 실패를 재현하려면 수 GB 다운로드를 망가뜨려야 해서 스모크로는 불가능한데,
+      // 도쿄 데모에서 가장 중요한 문구(프록시 안내)라 결정론적으로 확인할 길이 필요하다.
+      const seed = process.env.SBOM_SMOKE_SCREEN ?? "";
+      if (seed.startsWith("failed-pull")) {
+        const reason = seed.split(":")[1] || "proxy";
+        status(t.firstPull);
+        status(t.pullFailed);
+        setBootState(BOOT.FAILED_PULL, reason);
+        return;
+      }
       status(t.ready);
       return;
     }
@@ -429,7 +503,7 @@ function registerApp() {
         : Promise.resolve(null);
     startup()
       .catch((err) => {
-        status(t.startFailed(err.message));
+        status(t.startFailed(describeErr(err)));
       })
       .finally(async () => {
         const info = await updatePromise;

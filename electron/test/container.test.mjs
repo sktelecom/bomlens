@@ -10,8 +10,12 @@ import {
   DEFAULT_IMAGE,
   DESKTOP_LABEL,
   FIRMWARE_IMAGE,
+  ContainerError,
+  CONTAINER_ERR,
+  currentDockerBin,
   defaultOutputDir,
   findFreePort,
+  resolveDockerBin,
   scanMountArgs,
 } from "../lib/container.mjs";
 
@@ -93,6 +97,82 @@ test("cleanupOrphans returns 0 quietly when docker ps fails", async () => {
   const { calls, runImpl } = fakeRun({ code: 1, out: "", err: "docker daemon down" });
   assert.equal(await cleanupOrphans({ runImpl }), 0);
   assert.equal(calls.length, 1);
+});
+
+test("ContainerError carries a translatable code and never a message for the user", () => {
+  const err = new ContainerError(CONTAINER_ERR.RUN_FAILED, "port is already allocated");
+  assert.equal(err.code, "run-failed");
+  assert.equal(err.detail, "port is already allocated");
+  // 코드 자체가 message가 되어야 로그에 안정적인 검색 키가 남는다.
+  assert.equal(err.message, "run-failed");
+  assert.ok(err instanceof Error);
+  // 사전이 아니라 여기에 한국어가 들어가면 영어 UI로 그대로 샌다.
+  for (const code of Object.values(CONTAINER_ERR)) assert.doesNotMatch(code, /[가-힣]/);
+});
+
+test("docker binary defaults to PATH so it is never probed eagerly", () => {
+  // 기본값이 리터럴이어야 fake-docker(PATH 주입)와 cleanupOrphans 호출 단언이 성립한다.
+  assert.equal(currentDockerBin(), "docker");
+});
+
+test("resolveDockerBin probes the known Windows install paths in order", () => {
+  const env = {
+    ProgramFiles: "C:\\Program Files",
+    LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local",
+    USERPROFILE: "C:\\Users\\u",
+    ProgramData: "C:\\ProgramData",
+  };
+  // Docker Desktop이 있으면 그것을 먼저 고른다.
+  assert.equal(
+    resolveDockerBin({ platform: "win32", env, exists: () => true }),
+    "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe",
+  );
+  // Rancher Desktop만 설치된 경우(가장 흔한 오진 상황)를 집어낸다.
+  const rancher = "C:\\Users\\u\\.rd\\bin\\docker.exe";
+  assert.equal(
+    resolveDockerBin({ platform: "win32", env, exists: (p) => p === rancher }),
+    rancher,
+  );
+  // 실제 이 개발 PC의 설치 형태: Program Files 아래 시스템 전역 Rancher Desktop.
+  // 관리형 사내 노트북에서 흔한 경로라 반드시 잡아야 한다.
+  const rdSystem = "C:\\Program Files\\Rancher Desktop\\resources\\resources\\win32\\bin\\docker.exe";
+  assert.equal(
+    resolveDockerBin({ platform: "win32", env, exists: (p) => p === rdSystem }),
+    rdSystem,
+  );
+  // 아무것도 없으면 null — 호출부는 "docker"를 그대로 쓰고 미설치로 안내한다.
+  assert.equal(resolveDockerBin({ platform: "win32", env, exists: () => false }), null);
+});
+
+test("resolveDockerBin skips candidates whose env var is missing", () => {
+  // USERPROFILE이 비어 있을 때 "\\.rd\\bin\\docker.exe" 같은 엉뚱한 경로를 만들면 안 된다.
+  const seen = [];
+  resolveDockerBin({
+    platform: "win32",
+    env: { ProgramFiles: "C:\\PF", ProgramData: "C:\\PD" },
+    exists: (p) => {
+      seen.push(p);
+      return false;
+    },
+  });
+  assert.deepEqual(seen, [
+    "C:\\PF\\Docker\\Docker\\resources\\bin\\docker.exe",
+    "C:\\PF\\Rancher Desktop\\resources\\resources\\win32\\bin\\docker.exe",
+    "C:\\PD\\chocolatey\\bin\\docker.exe",
+  ]);
+});
+
+test("resolveDockerBin probes Homebrew and Rancher paths on macOS", () => {
+  const brew = "/opt/homebrew/bin/docker";
+  assert.equal(
+    resolveDockerBin({ platform: "darwin", env: { HOME: "/Users/u" }, exists: (p) => p === brew }),
+    brew,
+  );
+  const rd = "/Users/u/.rd/bin/docker";
+  assert.equal(
+    resolveDockerBin({ platform: "darwin", env: { HOME: "/Users/u" }, exists: (p) => p === rd }),
+    rd,
+  );
 });
 
 test("scanMountArgs mounts each folder read-only and passes the roots env", () => {
