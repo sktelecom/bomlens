@@ -81,6 +81,21 @@ Pass the model id to `--model`:
 
 `--model` is mutually exclusive with `--target`, `--analyze`, `--git`, and `--merge`. It pulls the `bomlens-aibom` image automatically, produces the notice and the risk report, and skips the security report (a model has no package CVEs).
 
+### Private and gated models
+
+A public model id resolves anonymously. A private repository, or a gated one you have been granted access to, needs a HuggingFace access token with read scope in `HF_TOKEN`:
+
+```bash
+HF_TOKEN=hf_... ./scripts/scan-sbom.sh --project my-llm --version 0.9.0 \
+  --model "my-org/my-llm" --generate-only
+```
+
+`HUGGING_FACE_HUB_TOKEN` is accepted as well. The value is passed to the container by name, never as a command-line argument, so it does not appear in the process list, and it is not written to the SBOM or any report.
+
+This is what lets you review a model before you publish it: push it to a private repository, generate the ML-BOM, close the gaps the conformance report shows, and only then make the repository public. For a gated repository, the token's account also needs its access request approved — a token alone is not enough.
+
+The web UI reads the same variable from the environment that launched it, so start it with `HF_TOKEN=hf_... ./scripts/scan-sbom.sh --ui`. There is no token field in the interface: the server keeps no credentials, and a token sent over HTTP would linger in its logs.
+
 ## Reading the result
 
 In the web UI, an AI/ML SBOM adds two sections to the left rail.
@@ -114,7 +129,7 @@ The same result ships in three formats: `{Project}_{Version}_conformance.json` f
 
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model. The tool generates the report; interpreting it, and answering the 13 review-only elements, is a person's job.
 - The conformance report does not certify compliance with the EU AI Act or any other regulation. It makes documentation gaps visible so a person can close them.
-- It fetches metadata over the network; private or gated models need access (a HuggingFace token in the environment), and offline use is not supported.
+- It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).
 - The model id must be `org/model`. A collection name or a full URL will not resolve.
 
 ---

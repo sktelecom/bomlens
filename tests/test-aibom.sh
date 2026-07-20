@@ -93,6 +93,74 @@ else
     pass "scan-aibom.sh rejects a card-less stub and leaves no artifact"
 fi
 
+echo "== scan-aibom.sh forwards HF_TOKEN without leaking it =="
+# A private/gated model resolves only when huggingface_hub finds HF_TOKEN in the
+# environment, so the variable must reach the generator untouched. It must never
+# reach the logs: this mock records what it received, and the same run's combined
+# output is then searched for the value.
+HF_SENTINEL="hf_sentinel_do_not_leak_9f3a"
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+printf '%s' "\${HF_TOKEN:-<unset>}" > "$WORK/seen-token.txt"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cp "$FIX/aibom-owasp-1_7.json" "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+   bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/tok.json" "1.0.0" \
+   > "$WORK/tok.log" 2>&1; then
+    seen=$(cat "$WORK/seen-token.txt" 2>/dev/null)
+    [ "$seen" = "$HF_SENTINEL" ] \
+        && pass "HF_TOKEN reaches the generator unchanged" \
+        || fail "HF_TOKEN reaches the generator unchanged" "generator saw '$seen'"
+    if grep -qF "$HF_SENTINEL" "$WORK/tok.log"; then
+        fail "scan-aibom.sh keeps HF_TOKEN out of its output" "the token appears in the log"
+    else
+        pass "scan-aibom.sh keeps HF_TOKEN out of its output"
+    fi
+    grep -q "HuggingFace auth: enabled" "$WORK/tok.log" \
+        && pass "scan-aibom.sh reports the auth state without the value" \
+        || fail "scan-aibom.sh reports the auth state without the value" "no auth line in the log"
+else
+    fail "scan-aibom.sh runs with HF_TOKEN set" "exited non-zero against the mock generator"
+fi
+
+echo "== the card-less failure hint depends on whether a token was supplied =="
+# Same degraded stub as above. Anonymous and authenticated runs fail for
+# different reasons (no credential vs. no access), so they must say so — and
+# neither may echo the token.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"machine-learning-model","name":"stub"}]}' > "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+env -u HF_TOKEN PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/anon.json" "1.0.0" \
+    > "$WORK/anon.log" 2>&1 || true
+HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/auth.json" "1.0.0" \
+    > "$WORK/auth.log" 2>&1 || true
+if grep -q "set HF_TOKEN" "$WORK/anon.log" && ! grep -q "set HF_TOKEN" "$WORK/auth.log"; then
+    pass "the anonymous failure names HF_TOKEN and the authenticated one does not"
+else
+    fail "the anonymous failure names HF_TOKEN and the authenticated one does not" \
+         "anon/auth hints did not differ as expected"
+fi
+if grep -qF "$HF_SENTINEL" "$WORK/auth.log"; then
+    fail "the authenticated failure hint hides the token" "the token appears in the log"
+else
+    pass "the authenticated failure hint hides the token"
+fi
+
 echo "== generate-notice.sh lists the model license =="
 bash "$LIB/generate-notice.sh" "$WORK/a.json" "$WORK/notice" "bert-base-uncased" >/dev/null 2>&1
 NOTICE="$WORK/notice_NOTICE.txt"

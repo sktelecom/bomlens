@@ -392,6 +392,10 @@ export interface Capabilities {
   firmwareSibling?: boolean;
   /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
   aibomSibling?: boolean;
+  /** A HuggingFace credential was present in the environment that launched the
+   *  UI, so private and gated model repos resolve. Never the token itself — the
+   *  UI has no token field, and the server keeps no credentials. */
+  hfAuth?: boolean;
   firmwareImage?: string;
   aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
