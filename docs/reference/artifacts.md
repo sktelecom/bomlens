@@ -24,6 +24,8 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
 `{P}` = project name, `{V}` = version (special characters are normalized to `_`).
 
+The conditions above are the CLI flags. In the web UI and the desktop app the same choices are the generation options on the New scan screen — Notice, Security report and SPDX export — and every file produced is listed in the Artifacts section of the results, downloadable per format or as one ZIP. See [Web UI and desktop app](ui.md).
+
 ## SBOM structure
 
 ```
