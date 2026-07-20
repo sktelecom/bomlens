@@ -45,6 +45,10 @@ export interface LogicalArtifact {
   formats: ArtifactFormat[];
   /** Detached SBOM signature, attached to the SBOM card when present. */
   signature?: ResultFile;
+  /** SBOM card only: no SPDX file exists yet, so the card offers to convert one
+   *  (GET /spdx-export). False once the export ran — the file is then a normal
+   *  download chip and a second button would be redundant. */
+  spdxExportable?: boolean;
 }
 
 interface GroupSpec {
@@ -69,7 +73,8 @@ const GROUPS: GroupSpec[] = [
     Icon: FileJson,
     primary: false,
     rank: 1,
-    // The opt-in SPDX export rides on the SBOM card as an extra format chip.
+    // The SPDX export rides on the SBOM card as an extra format chip, whether the
+    // CLI's --spdx wrote it during the scan or the user exported it from here.
     match: (n) => n.endsWith("_bom.json") || n.endsWith("_bom.spdx.json"),
   },
   {
@@ -152,6 +157,8 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
       rank: spec.rank,
       formats: members.map(toFormat).sort(byFormatPref),
       signature: spec.key === "sbom" ? sig : undefined,
+      spdxExportable:
+        spec.key === "sbom" && !members.some((m) => m.name.endsWith(".spdx.json")),
     });
   }
 

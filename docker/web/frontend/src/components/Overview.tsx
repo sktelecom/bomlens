@@ -392,9 +392,18 @@ function JumpCards({
 export function ArtifactsSection({
   result,
   scanId,
+  onResultsChange,
 }: {
   result: DoneEvent;
   scanId: string | null;
+  /** Passed through so an on-demand SPDX export updates the owning result. */
+  onResultsChange?: (files: ResultFile[]) => void;
 }) {
-  return <ResultsList results={result.results} scanId={scanId} />;
+  return (
+    <ResultsList
+      results={result.results}
+      scanId={scanId}
+      onResultsChange={onResultsChange}
+    />
+  );
 }
