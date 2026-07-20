@@ -58,10 +58,37 @@
    저장소 코드는 정상(`docker/web/server.py:47` = `bomlens-firmware:latest`)이므로 **코드 버그가
    아니라 캐시 문제**다. 데모 전 `SBOM_PULL=always`로 한 번 갱신하거나 `docker pull` 할 것.
    이번에 추가한 `SBOM_PULL=always`가 정확히 이 문제를 위한 것이다.
-2. **"약 3~4GB" 문구와 실제 크기 불일치.** `bomlens:latest`는 997MB다. 반면 스캔 시점에
-   끌어오는 언어별 cdxgen 이미지는 `cdxgen:v12.5.0` 하나만 15.7GB다. 즉 첫 pull은 안내보다
-   작고, **첫 스캔은 안내보다 훨씬 크다**. 데모장 Wi-Fi에서 여러 명이 첫 스캔을 돌리면
-   여기서 막힐 가능성이 가장 크다. 문구 조정과, 데모에 쓸 언어 이미지의 사전 배포를 검토할 것.
+2. **"약 3~4GB" 문구와 실제 크기 불일치, 그리고 `mixed` 함정.**
+
+   `docker images`의 SIZE는 압축 해제된 디스크 크기이지 다운로드량이 아니다. 레지스트리
+   매니페스트의 레이어 합(= 실제 다운로드)과 나란히 두면 이렇다.
+
+   | 이미지 | 다운로드 | 디스크 | 언제 |
+   |---|---|---|---|
+   | `bomlens:latest` | **0.24GB** | 997MB | 첫 실행 |
+   | `cdxgen-node20:v12` | 0.81GB | 2.85GB | 첫 스캔(node) |
+   | `cdxgen-python312:v12` | 1.40GB | 5.21GB | 첫 스캔(python) |
+   | `cdxgen-temurin-java21:v12` | 1.66GB | 5.26GB | 첫 스캔(java) |
+   | `cdxgen:v12.5.0` (올인원) | **4.35GB** | 15.7GB | `mixed` 또는 `unknown`일 때만 |
+
+   따라서 **첫 실행 안내 "약 3~4GB"는 실제 0.24GB로 크게 과장**이고, 단일 언어 프로젝트의
+   현실적인 총량은 다운로드 1~2GB 수준이다.
+
+   진짜 위험은 올인원 이미지다. `docker/lib/source-detect.sh:52-54`의 판정 규칙상 최상위
+   폴더에 **인식되는 매니페스트가 2개 이상이면 `mixed`**가 되고, `source-detect.sh:68`의
+   기본 분기가 `cdxgen:v12.5.0`(다운로드 4.35GB)을 끌어온다. `package.json` +
+   `requirements.txt` 같은 흔한 조합이 여기 해당한다. C/C++(conanfile, vcpkg.json)도
+   전용 케이스가 없어 같은 분기를 탄다.
+
+   조치: (a) 데모용 샘플 프로젝트는 **최상위 매니페스트가 정확히 하나**인지 확인할 것 —
+   아니면 참가자 전원이 4.35GB를 받는다. (b) 첫 실행 문구를 실제값에 맞게 조정할 것.
+   (c) 사전 배포 시 base + 사용할 언어 이미지 1개만 담으면 충분하다.
+
+   참고: cdxgen 이미지에는 `docker pull`이 없다 — `docker run`이 암묵적으로 끌어온다
+   (`docker/entrypoint.sh:103-111`). 그래서 진행률이 브라우저가 아니라 컨테이너 stdout으로
+   흐르고, 첫 스캔 중 웹 UI가 멈춘 것처럼 보인다.
+   `/var/run/docker.sock`을 마운트하지 않으면 syft만 쓰는 경량 경로로 떨어지지만
+   (`entrypoint.sh:204-208`), SBOM이 `degraded`로 표시되고 직접 의존성만 잡힌다.
 3. **`docker run -it`는 stdin이 터미널이 아니면 실패한다**(`cannot attach stdin to a TTY-enabled
    container`). 더블클릭은 실제 콘솔이라 무관하지만, 스케줄러·파이프·원격 실행 경로에서는
    런처를 쓸 수 없다. 데모 범위 밖이라 이번에는 손대지 않았다.
