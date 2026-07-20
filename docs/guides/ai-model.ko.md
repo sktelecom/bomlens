@@ -49,6 +49,8 @@ AI SBOM에서는 BomLens가 한 장짜리 AI 컴플라이언스 프로파일(`_a
 
 ## 이미지 준비
 
+아래 명령은 BomLens 저장소의 `scan-sbom.sh`를 사용합니다. 아직 없다면 [시작하기](../start/first-scan.ko.md)에서 저장소를 내려받는 방법과 데스크톱 앱을 쓰는 방법을 안내합니다.
+
 AI 모델 SBOM 생성에는 OWASP AIBOM Generator가 들어 있는 별도 이미지가 필요합니다. opt-in이고 네트워크(HuggingFace)에 접근하므로 기본 이미지가 아니라 별도 이미지로 제공합니다.
 
 ```bash
