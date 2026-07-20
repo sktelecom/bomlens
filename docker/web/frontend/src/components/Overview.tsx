@@ -15,7 +15,13 @@ import { useTranslation } from "react-i18next";
 
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
-import type { ComponentItem, DoneEvent, RecentScan, Severity } from "@/lib/api";
+import type {
+  ComponentItem,
+  DoneEvent,
+  RecentScan,
+  ResultFile,
+  Severity,
+} from "@/lib/api";
 import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
