@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The Windows launchers (`sbom-ui.bat`, `check-setup.bat`) now speak English as well as Korean, following the same rule as the desktop app: `SBOM_LANG` wins, otherwise the Windows display language, and anything that is not Korean gets English. This also removes the boxes-instead-of-text problem on a Japanese console, where the font has no Hangul glyphs and no codepage can help.
+- `bomlens.settings.example.txt`: environment variables do not survive a double-click, so `UI_PORT`, `SBOM_LANG`, `SBOM_PULL`, `SBOM_IMAGE_TAR`, `SBOM_SCANNER_IMAGE`, `SBOM_OUTPUT_DIR` and `SBOM_UI_MOUNT_DIR` are now also read from a text file beside the scripts (or `%USERPROFILE%\.bomlens\settings.txt`). A real environment variable still wins.
+- Offline install: `SBOM_IMAGE_TAR` loads a `docker save` tar instead of pulling, and a `bomlens-image.tar` next to the scripts is picked up automatically. With `SBOM_PULL=never` the launcher never touches the network — a USB stick with the `.bat` and the `.tar` needs no registry, no command line and no proxy setup. `SBOM_PULL=always` refreshes a cached `:latest`, which previously stayed pinned forever once pulled.
+- `sbom-ui.bat` picks a free port instead of failing: a busy **or Hyper-V/WSL-reserved** port now moves to the next free one. The reserved-range case was the common false green light — nothing is listening, yet Docker still cannot bind.
+- The desktop app shows aggregate pull progress (layers complete, elapsed time) with a heartbeat, so the multi-GB first download no longer looks frozen during the long silent stretches, and both start screens gained an "Open log folder" button so a failing user can hand over `startup.log`.
+- Pull failures are now classified (proxy, DNS, auth, disk, timeout) and the screen explains the actual fix. The proxy text states the thing that trips people up: the image is fetched by the Docker daemon, so setting proxy variables for the app has no effect.
+
+### Fixed
+
+- Container start failures no longer leak Korean strings into the English UI. `lib/container.mjs` threw hardcoded Korean text that bypassed i18n, so an ordinary port conflict or start timeout produced `Startup failed: docker run 실패: ...` for a non-Korean user. Errors now carry a code that `i18n.mjs` translates, and a test asserts no Hangul in the English dictionary.
+- `sbom-ui.bat` no longer closes its window silently. Any failure after the Docker check — port conflict, bad mount, container crash — used to vanish instantly with no message; every path now explains itself and holds the window, and the container exit code is reported.
+- A stopped Docker engine is no longer reported as "Docker is not installed" by the Windows launchers, which sent users off to reinstall Docker they already had.
+- `SBOM_UI_MOUNT_DIR` handling: a trailing backslash mangled the whole `-v` argument, and a path containing `&` was executed as a command rather than printed. Trailing separators are stripped and unsafe paths are rejected with an explanation.
+- No timeouts existed on the desktop app's Docker calls, so a wedged daemon or a firewalled registry hung on a live-looking window forever. Status checks are now bounded and the pull aborts when it genuinely stops making progress (a stall timeout, not an absolute one, so a slow but healthy download is not killed).
+- The desktop app falls back to known Docker install paths when `docker` is missing from `PATH`. Installing Rancher Desktop without restarting Explorer left the app reporting "Docker isn't installed" while the engine ran visibly in the tray.
+- `check-setup.bat` and `bomlens.settings.example.txt` now ship in the Windows release zip. The launchers' own error messages tell users to double-click `check-setup.bat`, which was not in the archive.
+
 ## [v1.8.0] - 2026-07-13
 
 ### Added

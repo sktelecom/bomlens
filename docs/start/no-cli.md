@@ -109,13 +109,28 @@ When the scan finishes, download the notice from the results screen as per-forma
 
 ## When you get stuck
 
-- **I don't know what's wrong**: double-click `scripts\check-setup.bat` to check Docker, the image, and port status at once, and it tells you what to do next, in Korean.
+- **I don't know what's wrong**: double-click `scripts\check-setup.bat` to check Docker, the image, and port status at once, and it tells you what to do next. It follows your Windows display language: Korean on a Korean system, English everywhere else. To force one, put `SBOM_LANG=en` (or `ko`) in the settings file described below.
 - **A "Windows protected your PC" warning appears**: this is because the desktop app is still unsigned. Click "More info" and choose "Run anyway".
 - **macOS says the app is "damaged"**: this is the same unsigned-app block, not real damage. See [If macOS says the app is damaged](#if-macos-says-the-app-is-damaged) to clear it from a terminal.
 - **It says "Docker is not installed"**: make sure Rancher Desktop is installed and running.
 - **It says "the Docker engine is not running"**: start Rancher Desktop, wait for the icon to settle, then run it again.
 - **The scan finished but there are no files in the results folder**: this can happen if the results folder is outside Docker's file-sharing scope. This tool saves to `sbom-output` under your home directory (`C:\Users\...`), which is usually safe. If you still don't see them, download them directly with the download buttons in the browser.
-- **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself.
+- **The browser doesn't open automatically**: type `http://localhost:8080` into the address bar yourself. If port 8080 was busy the launcher moves to the next free port and prints the address it chose, so use that one.
+- **"Image download failed" on a company network**: this is almost always a proxy. The image is downloaded by the **Docker daemon**, not by the launcher, so proxy settings in your command prompt have no effect — set them in Docker Desktop (Settings → Resources → Proxies) or Rancher Desktop (Preferences → WSL → Proxy). If the proxy also intercepts `localhost`, add `localhost` to its bypass list, otherwise the browser shows an error even when the scan is running fine.
+- **No usable network at all**: the launcher can install from a file instead of downloading. Ask for `bomlens-image.tar`, put it next to the `.bat` files, and it is used automatically — no network, no command line. See "Settings file" below.
+
+## Settings file (no command line needed)
+
+Environment variables you type in a command prompt do not apply when you double-click a `.bat`, so the launchers also read a plain text file. Copy `scripts\bomlens.settings.example.txt` to `bomlens.settings.txt` in the same folder and uncomment what you need:
+
+```
+SBOM_LANG=en
+UI_PORT=9090
+SBOM_PULL=never
+SBOM_IMAGE_TAR=D:\bomlens-image.tar
+```
+
+The file is commented in both English and Korean. A real environment variable, if you set one, still wins over the file.
 
 For more detail and command-line usage, see [Getting started](../start/first-scan.md) and the [Notice and security guide](../guides/reports.md).
 
