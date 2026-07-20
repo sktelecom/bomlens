@@ -48,11 +48,20 @@ if [ -n "${HF_TOKEN:-}" ]; then HF_AUTH=enabled; else HF_AUTH=anonymous; fi
 echo "[aibom] generating AI SBOM for $MODEL_ID (OWASP AIBOM Generator)"
 echo "[aibom] HuggingFace auth: $HF_AUTH"
 # Writes the 1.6 file to $BASE and a sibling 1.7 variant to <base>_1_7.json.
+#
+# Capture the generator's own output while still streaming it: it swallows a
+# failed HuggingFace fetch (src/models/service.py returns {} / None and only
+# logs a warning), then fills the card with defaults, so its log is the one
+# place that says the model was never actually read. PIPESTATUS keeps the
+# generator's exit code rather than tee's.
+GENLOG="$WORK/generator.log"
 gen_rc=0
 if [ -f "$AIBOM_DIR/src/cli.py" ]; then
-    ( cd "$AIBOM_DIR" && python3 -m src.cli "$MODEL_ID" --version "$VERSION" --output "$BASE" ) >&2 || gen_rc=$?
+    ( cd "$AIBOM_DIR" && python3 -m src.cli "$MODEL_ID" --version "$VERSION" --output "$BASE" ) 2>&1 | tee "$GENLOG" >&2
+    gen_rc=${PIPESTATUS[0]}
 elif command -v aibom >/dev/null 2>&1; then
-    aibom "$MODEL_ID" --version "$VERSION" --output "$BASE" >&2 || gen_rc=$?
+    aibom "$MODEL_ID" --version "$VERSION" --output "$BASE" 2>&1 | tee "$GENLOG" >&2
+    gen_rc=${PIPESTATUS[0]}
 else
     echo "[aibom] ERROR: owasp-aibom-generator not installed in this image." >&2
     echo "[aibom]   Rebuild the aibom image: docker build --build-arg SBOM_AIBOM=true -t bomlens-aibom ./docker" >&2
@@ -68,6 +77,33 @@ if [ "$gen_rc" -ne 0 ]; then
     exit 1
 fi
 
+# Exit 0 does NOT mean the model was read. The generator logs a warning and
+# carries on when the fetch fails, then fills the card with generic defaults
+# ("transformer", "text-generation", string in/out) that look like a real
+# result. That fabricated card is worse than an empty one: it passes the
+# card-present gate below and yields a conformance report that reads as a pass
+# for a model nobody could open. Its log is the only honest signal, so treat a
+# failed card fetch as fatal here.
+if [ -s "$GENLOG" ] && grep -qF "Error fetching model card for $MODEL_ID" "$GENLOG"; then
+    echo "[aibom] ERROR: the model card for $MODEL_ID could not be read." >&2
+    echo "[aibom]   The generator fell back to placeholder values, so any SBOM built from" >&2
+    echo "[aibom]   this run would describe defaults rather than your model. Refusing it." >&2
+    if grep -qE "401|403" "$GENLOG"; then
+        if [ "$HF_AUTH" = anonymous ]; then
+            echo "[aibom]   HuggingFace refused the request and no credential was supplied." >&2
+            echo "[aibom]   A private or gated repo needs HF_TOKEN (read scope)." >&2
+        else
+            echo "[aibom]   HuggingFace refused the request despite a credential. Check that the" >&2
+            echo "[aibom]   token's account can read this repo; a gated repo also needs its access" >&2
+            echo "[aibom]   request approved, and an org token may still be pending approval." >&2
+        fi
+    else
+        echo "[aibom]   Check the model id and HuggingFace network access." >&2
+    fi
+    rm -f "$OUTPUT"
+    exit 1
+fi
+
 V17="${BASE%.json}_1_7.json"
 if [ -f "$V17" ] && jq empty "$V17" >/dev/null 2>&1; then
     cp "$V17" "$OUTPUT"
@@ -80,11 +116,11 @@ else
     exit 1
 fi
 
-# A written, well-formed file is not enough. When the generator cannot reach the
-# model card (offline, or a model id it is not allowed to read) it still exits 0 and
-# emits a degraded stub with no modelCard. Treat that as a hard failure so an
-# empty ML-BOM is never trusted as a real supply-chain artifact — offline use is
-# not supported (docs/guides/ai-model.md).
+# Second line of defence, for the case the log check above cannot see: a written,
+# well-formed file whose model component carries no card at all. Kept separate
+# because it holds even if the generator's wording changes upstream. Either way
+# an unusable ML-BOM must never be trusted as a real supply-chain artifact —
+# offline use is not supported (docs/guides/ai-model.md).
 ml_with_card=$(jq '[.components[]? | select(.type=="machine-learning-model" and ((.modelCard? // {}) | length) > 0)] | length' "$OUTPUT" 2>/dev/null || echo 0)
 if [ "${ml_with_card:-0}" -lt 1 ]; then
     echo "[aibom] ERROR: the generated ML-BOM carries no model card for $MODEL_ID." >&2
