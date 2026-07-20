@@ -441,6 +441,11 @@ export function NextApp() {
               seed && seed.section === activeSection ? seed.tier : undefined
             }
             onPick={handleFilterPick}
+            // An on-demand SPDX export adds an artifact after the scan ended, so
+            // fold the refreshed listing into the result every count reads from.
+            onResultsChange={(files) =>
+              setResult((r) => (r ? { ...r, results: files } : r))
+            }
           />
 
           {/* The run log is reference material for the run you just watched.

@@ -64,8 +64,6 @@
     "aiNoticeHint": "AI 모델은 고지문이 모델과 데이터셋 라이선스를 정리하고, 사용 제한이 있는 라이선스(RAIL·비상업)를 검토 대상으로 표시합니다. 켜 두기를 권장합니다.",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
-    "spdx": "SPDX 내보내기",
-    "spdxHint": "CycloneDX 결과를 변환한 SPDX 2.3 JSON 파일을 함께 생성",
     "deepLicense": "파일 단위 라이선스 스캔",
     "deepLicenseHint": "패키지가 선언한 라이선스에 더해, ScanCode로 내 소스 파일을 직접 스캔해 파일 단위 라이선스 텍스트와 헤더를 찾아냅니다 (느림).",
     "scanMethodHint": "패키지 매니저 없이 스캔하는 소스를 위한 고급 분석입니다. 프로젝트를 패키지 매니저(Maven, npm, pip, Go modules 등)로 빌드한다면 SBOM이 이미 충분하므로 꺼 둬도 됩니다.",
@@ -140,6 +138,9 @@
     "copied": "링크를 복사했습니다",
     "downloadStarted": "다운로드를 시작했습니다",
     "signed": "서명됨",
+    "spdxExport": "SPDX 2.3으로 내보내기",
+    "spdxExporting": "변환 중…",
+    "spdxExportFailed": "SPDX로 내보내지 못했습니다. CycloneDX SBOM은 그대로 사용할 수 있습니다.",
     "kind": {
       "riskReport": {
         "title": "오픈소스 위험분석 보고서",
@@ -147,7 +148,7 @@
       },
       "sbom": {
         "title": "SBOM (CycloneDX)",
-        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다. SPDX 내보내기를 켜면 SPDX 2.3 변환본이 함께 제공됩니다."
+        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다. SPDX 2.3 사본이 필요하면 언제든 내보낼 수 있습니다."
       },
       "notice": {
         "title": "오픈소스 고지문",

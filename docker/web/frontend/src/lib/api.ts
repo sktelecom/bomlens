@@ -294,7 +294,8 @@ export interface ScanConfig {
   version: string;
   notice: boolean;
   security: boolean;
-  /** SPDX 2.3 export (opt-in extra artifact). Absent on older sidecars. */
+  /** Recorded by scans run before SPDX became an on-demand export. Kept so an
+   *  older sidecar still parses; the form no longer reads it. */
   spdx?: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
@@ -361,8 +362,6 @@ export interface ScanParams {
   scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
-  /** Also export the SBOM as SPDX 2.3 JSON (converted from the CycloneDX BOM). */
-  spdx: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
   /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
@@ -406,6 +405,12 @@ export interface Capabilities {
   firmwareSibling?: boolean;
   /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
   aibomSibling?: boolean;
+  /** The results screen can convert a finished BOM to SPDX 2.3 (syft here, or a
+   *  sibling scanner container). False hides the export action. */
+  spdxExport?: boolean;
+  /** SPDX export goes through a sibling container, so the first export may pull
+   *  the scanner image — worth saying before the wait. */
+  spdxSibling?: boolean;
   /** A HuggingFace credential was present in the environment that launched the
    *  UI, so private and gated model repos resolve. Never the token itself — the
    *  UI has no token field, and the server keeps no credentials. */
@@ -520,6 +525,26 @@ export function fileUrl(id: string | null | undefined, name: string): string {
   return `/file?${idPart}name=${encodeURIComponent(name)}`;
 }
 
+/**
+ * Export a finished scan's SBOM as SPDX 2.3 JSON (server-side conversion of the
+ * CycloneDX BOM the scan already wrote). The scan form has no SPDX toggle — the
+ * choice belongs here, after the results exist, so nobody has to re-scan for a
+ * format. Idempotent: an already-converted scan returns its existing file.
+ * Resolves to the new artifact's name plus the refreshed listing, or null on
+ * failure (the caller surfaces a toast).
+ */
+export async function exportSpdx(
+  id: string,
+): Promise<{ name: string; results: ResultFile[] } | null> {
+  try {
+    const res = await fetch(`/spdx-export?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as { name: string; results: ResultFile[] };
+  } catch {
+    return null;
+  }
+}
+
 /** A past scan in the local output dir (history; no account / DB). */
 export interface RecentScan {
   /** The run_id (run-folder name); pass to loadScan/deleteScan/fileUrl. */
@@ -609,7 +634,6 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
-    spdx: String(params.spdx),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
