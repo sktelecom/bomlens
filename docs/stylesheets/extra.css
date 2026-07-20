@@ -7,18 +7,19 @@
  */
 
 /* ---- 루트 글자 크기 고정 ----
- * Material 기본값은 넓은 화면(100em/125em 이상)에서 :root font-size를 112.5%/125%로
- * 키운다. 사이트 크기가 대부분 rem이라 창 폭만 바꿔도 본문 전체가 확대·축소되어
- * 보이므로, 폭과 무관하게 100%로 고정한다.
+ * Material은 html { font-size: 125% }를 기본으로 두고, 넓은 화면에서 137.5%(100em↑)와
+ * 150%(125em↑)로 키운다. 사이트 크기가 대부분 rem이라 창 폭만 바꿔도 본문 전체가
+ * 확대·축소되어 보이므로, 넓은 화면에서도 기본값 125%를 유지한다.
+ * 선택자는 Material과 같은 html을 쓴다(:root는 특이성이 더 높아 기본값까지 덮는다).
  */
 @media screen and (min-width: 100em) {
-  :root {
-    font-size: 100%;
+  html {
+    font-size: 125%;
   }
 }
 @media screen and (min-width: 125em) {
-  :root {
-    font-size: 100%;
+  html {
+    font-size: 125%;
   }
 }
 
