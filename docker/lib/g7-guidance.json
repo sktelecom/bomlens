@@ -1,0 +1,81 @@
+{
+  "note": "Per-G7-element fill-in guidance for an AI SBOM: a small CycloneDX fragment showing the shape that would satisfy the element, plus a link to authoritative documentation. Keyed by G7 element id (docker/lib/g7-registry.json), the same convention as regulation-crosswalk.json. This is a documentation aid: validate-sbom.sh attaches it to a check for the report, and it never changes a check's status or the overall result. The map is deliberately a subset — an element with no entry renders no fragment, and the 'na' human-review elements have no meaningful fragment to show. Fragments carry CycloneDX field names, so they are not localized. The doc URLs sit outside docs/ and are therefore not covered by the link checker; they were verified by hand to resolve.",
+  "map": {
+    "g7-meta-signature": {
+      "snippet": "\"signature\": {\n  \"algorithm\": \"ES256\",\n  \"value\": \"MEUCIQD…\"\n}",
+      "docUrl": "https://cyclonedx.org/docs/1.7/json/#signature"
+    },
+    "g7-model-name": {
+      "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\"\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-id": {
+      "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\",\n  \"purl\": \"pkg:huggingface/Qwen/Qwen2.5-0.5B\"\n}",
+      "docUrl": "https://github.com/package-url/purl-spec"
+    },
+    "g7-model-version": {
+      "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\",\n  \"version\": \"0.5B\"\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-description": {
+      "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"description\": \"0.5B-parameter causal language model.\"\n}",
+      "docUrl": "https://huggingface.co/docs/hub/model-cards"
+    },
+    "g7-model-license": {
+      "snippet": "\"licenses\": [\n  { \"license\": { \"id\": \"Apache-2.0\" } }\n]",
+      "docUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    },
+    "g7-model-openness": {
+      "snippet": "\"properties\": [\n  { \"name\": \"openness:weights\", \"value\": \"open-weight\" },\n  { \"name\": \"openness:training-data\", \"value\": \"open-data\" }\n]",
+      "docUrl": "https://isitopen.ai/"
+    },
+    "g7-model-card": {
+      "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"architectureFamily\": \"transformer\",\n    \"modelArchitecture\": \"Qwen2ForCausalLM\"\n  }\n}",
+      "docUrl": "https://huggingface.co/docs/hub/model-cards"
+    },
+    "g7-model-io": {
+      "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"inputs\": [ { \"format\": \"text\" } ],\n    \"outputs\": [ { \"format\": \"text\" } ]\n  }\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-training": {
+      "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"datasets\": [ { \"ref\": \"dataset:wikipedia\" } ],\n    \"modelArchitecture\": \"Qwen2ForCausalLM\"\n  }\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-hash-value": {
+      "snippet": "\"hashes\": [\n  { \"alg\": \"SHA-256\", \"content\": \"9f86d081884c7d65…\" }\n]",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-hash-alg": {
+      "snippet": "\"hashes\": [\n  { \"alg\": \"SHA-256\", \"content\": \"9f86d081884c7d65…\" }\n]",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-model-extref": {
+      "snippet": "\"externalReferences\": [\n  { \"type\": \"distribution\", \"url\": \"https://huggingface.co/Qwen/Qwen2.5-0.5B\" }\n]",
+      "docUrl": "https://cyclonedx.org/docs/1.7/json/#components_items_externalReferences"
+    },
+    "g7-ds-name": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"bom-ref\": \"dataset:wikipedia\",\n  \"name\": \"wikipedia\"\n}",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
+    "g7-ds-description": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"description\": \"Cleaned Wikipedia article dumps.\"\n}",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
+    "g7-ds-identifier": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"bom-ref\": \"dataset:wikipedia\",\n  \"purl\": \"pkg:huggingface/datasets/wikipedia\"\n}",
+      "docUrl": "https://github.com/package-url/purl-spec"
+    },
+    "g7-ds-license": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"licenses\": [ { \"license\": { \"id\": \"CC-BY-SA-3.0\" } } ]\n}",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
+    "g7-ds-provenance": {
+      "snippet": "\"componentData\": {\n  \"governance\": { \"custodians\": [ { \"organization\": { \"name\": \"Wikimedia\" } } ] }\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-infra-hardware": {
+      "snippet": "\"externalReferences\": [\n  { \"type\": \"bom\", \"url\": \"https://example.com/hbom.json\" }\n]",
+      "docUrl": "https://cyclonedx.org/capabilities/hbom/"
+    }
+  }
+}

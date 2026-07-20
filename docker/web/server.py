@@ -396,6 +396,7 @@ MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
+MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
 MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
 MAX_CROSSWALK_ELEMENTS = 200  # mapped elements listed per framework
 MAX_CROSSWALK_REFS = 12  # regulation refs per crosswalk element
@@ -869,6 +870,20 @@ def conformance_summary(run_id):
         ][:MAX_CHECK_REGULATIONS]
         if regs:
             row["regulations"] = regs
+        # Fill-in guidance for this element (validate-sbom.sh joins
+        # docker/lib/g7-guidance.json by element id): the CycloneDX fragment that
+        # would satisfy it, plus a reference link. Runs produced before the
+        # guidance registry existed simply carry none, so treat it as optional.
+        g = c.get("guidance")
+        if isinstance(g, dict):
+            snippet = str(g.get("snippet") or "")[:MAX_GUIDANCE_SNIPPET]
+            doc_url = str(g.get("docUrl") or "")
+            # The URL is rendered into an href; only accept an absolute https one
+            # so a malformed report cannot turn it into a javascript: link.
+            if not doc_url.startswith("https://"):
+                doc_url = ""
+            if snippet or doc_url:
+                row["guidance"] = {"snippet": snippet, "docUrl": doc_url}
         checks.append(row)
     out = {
         "result": data.get("result", "unknown"),

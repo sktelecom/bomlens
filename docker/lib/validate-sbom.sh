@@ -234,6 +234,21 @@ g7_ai_checks() {
             echo "[validate] WARN: regulation crosswalk join failed; continuing without it." >&2
         fi
     fi
+    # Join the fill-in guidance the same way (best-effort): the CycloneDX fragment
+    # that would satisfy each element, so the report can answer "how do I close
+    # this gap" and not just "this is missing". Attached only where a mapping
+    # exists, and like the crosswalk it never changes a status or the result.
+    local guide="${G7_GUIDANCE:-$(dirname "$0")/g7-guidance.json}"
+    if [ -f "$guide" ]; then
+        local gjoined
+        if gjoined=$(printf '%s' "$out" | jq -c --slurpfile g "$guide" '
+            (($g[0].map) // {}) as $m
+            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)' 2>/dev/null); then
+            out="$gjoined"
+        else
+            echo "[validate] WARN: G7 guidance join failed; continuing without it." >&2
+        fi
+    fi
     echo "$out"
 }
 
@@ -445,6 +460,25 @@ jq -n \
         echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
     fi
+    # How to fill the gaps (AI SBOMs only): the CycloneDX fragment that would
+    # satisfy each advisory element still missing. Scoped to real gaps — passing
+    # elements need nothing, and the "na" ones have no fragment to show — so a
+    # well-documented model adds no section at all.
+    if echo "$CHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
+        echo "## How to fill the gaps"
+        echo ""
+        echo "Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
+        echo ""
+        echo "$CHECKS" | jq -r '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
+            "### \(.label)",
+            "",
+            "```json",
+            .guidance.snippet,
+            "```",
+            "",
+            "Reference: \(.guidance.docUrl)",
+            ""'
+    fi
     # Regulatory crosswalk (AI SBOMs only): which documentation obligation each
     # mapped G7 element touches. Visibility only — see the disclaimer; it does not
     # change the result above.
@@ -531,6 +565,9 @@ jq -n \
  .s-warn{color:#ca8a04;font-weight:700;}
  .mono{list-style:none;padding-left:0;}
  .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
+ pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
+     padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
+ pre code{font-family:var(--mono);font-size:.8rem;white-space:pre;}
  ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
  li{margin:.3rem 0;}
 </style></head><body>
@@ -559,6 +596,16 @@ HTMLHEAD
         echo "<h2>Missing / non-conformant items</h2>"
         echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
+    fi
+    # How to fill the gaps (AI SBOMs only) — same scoping as the Markdown: only
+    # advisory elements that are actually missing and have a fragment to show.
+    if echo "$CHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
+        echo "<h2>How to fill the gaps</h2>"
+        echo "<p class=\"meta\">Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it.</p>"
+        echo "$CHECKS" | jq -r '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
+            "<h3>" + (.label|@html) + "</h3>" +
+            "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>" +
+            "<p class=\"meta\">Reference: " + (.guidance.docUrl|@html) + "</p>"'
     fi
     # Regulatory crosswalk (AI SBOMs only): documentation obligations each mapped
     # G7 element touches. Visibility only — the disclaimer states BomLens does not

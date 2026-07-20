@@ -125,6 +125,8 @@ A source badge on each row says where a satisfied value comes from:
 
 The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. For an AI SBOM each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped element was checked.
 
+Knowing an element is missing does not tell you how to supply it, so the report also shows the shape that would satisfy it. For each advisory element that has an automated source and is still absent, a "How to fill the gaps" section prints a small CycloneDX fragment and a link to the authoritative documentation. Passing elements are left out, and so are the review-only ones, which have no fragment to show — a well-documented model adds no section at all. The guidance lives in `docker/lib/g7-guidance.json`, keyed by element id like the crosswalk, and it never changes a check's status or the overall result. The AI compliance profile lists the same gaps with their reference links and points back here for the fragments.
+
 ## Limits
 
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model. The tool generates the report; interpreting it, and answering the 13 review-only elements, is a person's job.

@@ -60,7 +60,12 @@ G7=$(jq -c '
                     present: (map(select(.status=="pass"))|length),
                     gap:     (map(select(.status=="warn" and ((.source//"")!="na")))|length),
                     review:  (map(select((.source//"")=="na"))|length) }) ),
-      reviewItems: ( $g | map(select((.source//"")=="na")) | map({id, label, cluster}) )
+      reviewItems: ( $g | map(select((.source//"")=="na")) | map({id, label, cluster}) ),
+      # Advisory elements that ARE automatable but absent — the closable set. The
+      # conformance report carries the CycloneDX fragment for each; here we keep
+      # the roll-up plus the reference link so the two artifacts do not duplicate.
+      gapItems: ( $g | map(select(.status=="warn" and ((.source//"")!="na")))
+                     | map({id, label, cluster, docUrl: (.guidance.docUrl // "")}) )
     }' "$CONF")
 
 XW=$(jq -c '.regulatoryCrosswalk // {frameworks:[],disclaimer:""}' "$CONF")
@@ -157,6 +162,15 @@ flag_label() {
         echo "$XW" | jq -r '.frameworks[] | "| \(.title|gsub("[|\n]";" ")) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
         echo ""
         echo "The full element-by-element mapping is in the conformance report (\`${OUT_PREFIX}_conformance.*\`)."
+        echo ""
+    fi
+
+    if [ "$Gp" -gt 0 ]; then
+        echo "## How to close the gaps"
+        echo ""
+        echo "These G7 elements have an automated source but are absent from the SBOM. The conformance report (\`${OUT_PREFIX}_conformance.md\`) carries the CycloneDX fragment that would satisfy each one."
+        echo ""
+        echo "$G7" | jq -r '.gapItems[] | "- \(.label) (\(.cluster))" + (if (.docUrl // "") != "" then " — \(.docUrl)" else "" end)'
         echo ""
     fi
 
@@ -284,6 +298,16 @@ HTMLHEAD
             "</td><td class=\"num\">" + (.total|tostring) + "</td></tr>"'
         echo "</table></div>"
         echo "<p class=\"meta\">The full element-by-element mapping is in the conformance report.</p>"
+    fi
+
+    if [ "$Gp" -gt 0 ]; then
+        echo "<h2>How to close the gaps</h2>"
+        echo "<p>These G7 elements have an automated source but are absent from the SBOM. The conformance report carries the CycloneDX fragment that would satisfy each one.</p>"
+        echo "<ul>"
+        echo "$G7" | jq -r '.gapItems[] |
+            "<li>" + ((.label + " (" + .cluster + ")")|@html) +
+            (if (.docUrl // "") != "" then " &mdash; " + (.docUrl|@html) else "" end) + "</li>"'
+        echo "</ul>"
     fi
 
     if [ "$Rv" -gt 0 ]; then

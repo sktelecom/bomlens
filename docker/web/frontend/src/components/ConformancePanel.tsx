@@ -19,7 +19,6 @@ import {
   profileCard,
   splitChecks,
 } from "@/lib/conformance";
-import { G7_GUIDANCE } from "@/lib/g7Guidance";
 import { cn } from "@/lib/utils";
 
 const STATUS = {
@@ -233,7 +232,10 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
   // Evidence: the real values pulled from the SBOM (purl, license id, hash alg…)
   // — shown only when the element is present, so it reads as "met with these".
   const evidence = isG7 && !notMet ? (check.evidence ?? []) : [];
-  const guidance = isG7 ? G7_GUIDANCE[check.id] : undefined;
+  // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
+  // so the CLI artifacts and this panel show the same fragment. Runs from before
+  // the guidance registry carry none.
+  const guidance = check.guidance;
   return (
     <li className="flex items-start gap-2.5 px-3 py-2.5">
       <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} aria-hidden />
