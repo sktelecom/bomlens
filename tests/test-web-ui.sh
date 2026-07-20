@@ -217,6 +217,40 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
 
+# HF_TOKEN: inherited from THIS container's environment (never posted to the UI)
+# and forwarded by name only, so the secret stays out of the docker-run argv.
+HF_SENTINEL = "hf_sentinel_do_not_leak_9f3a"
+os.environ["HF_TOKEN"] = HF_SENTINEL
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == 0, rc
+assert "HF_TOKEN" in captured["args"], captured["args"]
+assert captured["args"][captured["args"].index("HF_TOKEN") - 1] == "-e", captured["args"]
+# The value itself must appear nowhere in argv (bare -e, not -e NAME=VALUE).
+assert not any(HF_SENTINEL in a for a in captured["args"]), "HF_TOKEN value leaked into argv"
+
+# Firmware never carries it: only the AI-model path talks to HuggingFace.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
+)
+assert rc == 0, rc
+assert "HF_TOKEN" not in captured["args"], captured["args"]
+
+# No token in the environment -> no flag at all (anonymous, public models only).
+del os.environ["HF_TOKEN"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == 0, rc
+assert "HF_TOKEN" not in captured["args"], captured["args"]
+
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
 rc = server.run_sibling_scan(

@@ -50,6 +50,8 @@
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
     "aiModelHint": "Enter a HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B) — not a collection name or a full URL. Fetches model-card metadata over the network to build a CycloneDX ML-BOM.",
     "aiModelUnavailable": "AI-model SBOMs need Docker running (the AIBOM image runs as a sibling container).",
+    "hfAuthOn": "Authenticated to HuggingFace: private and gated model repositories resolve.",
+    "hfAuthOff": "Running anonymously, so only public models resolve. To scan a private or gated repository — for example to review a model before you publish it — restart the UI with HF_TOKEN set.",
     "uploading": "Uploading…",
     "uploadErrorTooLarge": "The file is too large for the server to accept. Try a smaller archive, or scan the unpacked folder instead.",
     "uploadErrorNetwork": "Could not reach the scan server. Check that it is still running, then try again.",

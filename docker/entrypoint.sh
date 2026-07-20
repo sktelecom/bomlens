@@ -290,6 +290,11 @@ EOF
         # post-processing runs on it unchanged (normalize keeps the 1.7 specVersion
         # and the modelCard; notice/risk cover the model & dataset licenses). It
         # sets its own metadata.component, so no stamp pass is needed below.
+        #
+        # MODEL_ID is the only variable read here by name. HF_TOKEN, when the
+        # caller passes one in, is consumed implicitly by huggingface_hub inside
+        # the generator and the enrich step — it looks unused from this file, but
+        # removing it from the environment would break private/gated models.
         if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode."; exit 1; fi
         echo "[1/2] aibom: generate AI SBOM for $MODEL_ID"
         bash "$LIBDIR/scan-aibom.sh" "$MODEL_ID" "$OUTPUT_FILE" "$PROJECT_VERSION"

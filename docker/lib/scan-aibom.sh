@@ -10,7 +10,10 @@
 #
 # The generator (owasp-aibom-generator, Apache-2.0) lives ONLY in the opt-in
 # `bomlens-aibom` image and fetches model-card metadata from the HuggingFace API
-# (network). It writes both a 1.6 file and a `<out>_1_7.json` variant; we keep the
+# (network). HF_TOKEN, when set in the environment, is picked up implicitly by
+# huggingface_hub inside the generator — that is what makes a private or gated
+# repo readable. Never echo the value. It writes both a 1.6 file and a
+# `<out>_1_7.json` variant; we keep the
 # 1.7 one to match the AI-path format decision. The common post-processing
 # (normalize/notice/risk) then runs on it unchanged — normalize preserves the 1.7
 # specVersion and the modelCard.
@@ -39,7 +42,11 @@ BASE="$WORK/aibom.json"   # absolute (mktemp -d), so it survives the cwd change 
 # fallback. Absent both => this is the base image, not the opt-in aibom image.
 AIBOM_DIR="${AIBOM_DIR:-/opt/aibom-generator}"
 
+# Report only whether a token is present, never its value or length.
+if [ -n "${HF_TOKEN:-}" ]; then HF_AUTH=enabled; else HF_AUTH=anonymous; fi
+
 echo "[aibom] generating AI SBOM for $MODEL_ID (OWASP AIBOM Generator)"
+echo "[aibom] HuggingFace auth: $HF_AUTH"
 # Writes the 1.6 file to $BASE and a sibling 1.7 variant to <base>_1_7.json.
 gen_rc=0
 if [ -f "$AIBOM_DIR/src/cli.py" ]; then
@@ -53,6 +60,11 @@ else
 fi
 if [ "$gen_rc" -ne 0 ]; then
     echo "[aibom] ERROR: generation failed for $MODEL_ID (check the model id and HuggingFace network access)." >&2
+    if [ "$HF_AUTH" = anonymous ]; then
+        echo "[aibom]   Running anonymously. A private or gated repo needs HF_TOKEN (read scope)." >&2
+    else
+        echo "[aibom]   Running authenticated. Check that the token's account can read this repo." >&2
+    fi
     exit 1
 fi
 
@@ -69,15 +81,21 @@ else
 fi
 
 # A written, well-formed file is not enough. When the generator cannot reach the
-# model card (offline, or a nonexistent/private model id) it still exits 0 and
+# model card (offline, or a model id it is not allowed to read) it still exits 0 and
 # emits a degraded stub with no modelCard. Treat that as a hard failure so an
 # empty ML-BOM is never trusted as a real supply-chain artifact — offline use is
 # not supported (docs/guides/ai-model.md).
 ml_with_card=$(jq '[.components[]? | select(.type=="machine-learning-model" and ((.modelCard? // {}) | length) > 0)] | length' "$OUTPUT" 2>/dev/null || echo 0)
 if [ "${ml_with_card:-0}" -lt 1 ]; then
     echo "[aibom] ERROR: the generated ML-BOM carries no model card for $MODEL_ID." >&2
-    echo "[aibom]   The card could not be collected — this happens offline or for a" >&2
-    echo "[aibom]   nonexistent/private model id. AIBOM needs HuggingFace network access." >&2
+    echo "[aibom]   The card could not be collected. AIBOM needs HuggingFace network access." >&2
+    if [ "$HF_AUTH" = anonymous ]; then
+        echo "[aibom]   Running anonymously, so only public models resolve. To scan a private" >&2
+        echo "[aibom]   or gated repo before publishing, set HF_TOKEN (read scope) and retry." >&2
+    else
+        echo "[aibom]   Running authenticated, so the id is missing or the token's account has" >&2
+        echo "[aibom]   no read access to it. Gated repos also need their access request approved." >&2
+    fi
     rm -f "$OUTPUT"
     exit 1
 fi

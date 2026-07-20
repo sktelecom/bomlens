@@ -1453,6 +1453,12 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
+    # A HuggingFace credential, when this container was launched with one, is
+    # forwarded by NAME ONLY so the value stays out of the argv (and out of `ps`).
+    # The UI never accepts a token over HTTP: there is no credential store here,
+    # and a posted secret would linger in request logs and run state.
+    if mode == "AIBOM" and os.environ.get("HF_TOKEN"):
+        args += ["-e", "HF_TOKEN"]
     # The sibling writes into the run's output dir; run-scan also cds there via cwd.
     args += ["-w", out_dir, "--entrypoint", "/usr/local/bin/run-scan", image]
 
@@ -1553,6 +1559,10 @@ class Handler(BaseHTTPRequestHandler):
                 # one-time "pulling the image" notice for the first sibling run.
                 "firmwareSibling": not firmware_capable() and docker_cli_present() and docker_capable(),
                 "aibomSibling": not aibom_capable() and docker_cli_present() and docker_capable(),
+                # Whether a HuggingFace credential was handed to this container, so
+                # the UI can say that private/gated models resolve. A boolean only —
+                # the token itself is never exposed over the API.
+                "hfAuth": bool(os.environ.get("HF_TOKEN")),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),

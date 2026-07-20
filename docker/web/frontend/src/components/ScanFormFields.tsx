@@ -210,6 +210,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
       )}
 
       <SiblingPullNotice state={state} />
+      <HfAuthNotice state={state} />
     </>
   );
 }
@@ -227,6 +228,21 @@ function SiblingPullNotice({ state }: { state: ScanFormState }) {
   return (
     <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
       {t("source.siblingPullNotice")}
+    </div>
+  );
+}
+
+/** Whether a HuggingFace credential reached this container, which decides
+ *  whether private and gated model repos resolve. There is no token field here
+ *  on purpose: the server keeps no credentials, so the token comes from the
+ *  environment that launched the UI. Shown only for the AI-model source. */
+function HfAuthNotice({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { source, capabilities } = state;
+  if (source !== "ai-model") return null;
+  return (
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+      {t(capabilities.hfAuth ? "source.hfAuthOn" : "source.hfAuthOff")}
     </div>
   );
 }
