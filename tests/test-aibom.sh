@@ -277,6 +277,44 @@ g7_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
 g7_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confx_conformance.json")
 [ "$g7_with" = "$g7_without" ] && pass "G7 check count unchanged by the crosswalk ($g7_with)" || fail "G7 count differs: with=$g7_with without=$g7_without"
 
+echo "== G7 fill-in guidance: registry integrity =="
+GD="$LIB/g7-guidance.json"
+jq empty "$GD" >/dev/null 2>&1 && pass "g7-guidance.json is valid JSON" || fail "g7-guidance.json is not valid JSON"
+# Same drift guard as the crosswalk: guidance keyed by an element id that no
+# longer exists would silently show nothing.
+gunknown=$(comm -23 <(jq -r '.map | keys[]' "$GD" | sort -u) \
+                    <(jq -r '.clusters[].elements[].id' "$LIB/g7-registry.json" | sort -u))
+[ -z "$gunknown" ] && pass "every guidance element id exists in g7-registry.json" || fail "guidance maps unknown G7 element id(s)" "$gunknown"
+badentry=$(jq -r '.map | to_entries[] | select((.value.snippet // "") == "" or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$GD")
+[ -z "$badentry" ] && pass "every guidance entry has a snippet and an https doc URL" || fail "guidance entries are incomplete" "$badentry"
+
+echo "== G7 fill-in guidance: surfaced in the AI conformance report =="
+gn=$(jq '[.checks[] | select((.guidance.snippet // "") != "")] | length' "$CONF")
+[ "$gn" -ge 1 ] && pass "G7 checks carry fill-in guidance ($gn tagged)" || fail "no G7 check carries guidance"
+grep -q "How to fill the gaps" "$WORK/conf_conformance.md" && pass "MD carries the fill-in section" || fail "MD lacks the fill-in section"
+grep -q "How to fill the gaps" "$WORK/conf_conformance.html" && pass "HTML carries the fill-in section" || fail "HTML lacks the fill-in section"
+# The fragment text itself must reach the reader, not just the heading.
+grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
+# Scope: the section covers gaps only. g7-model-license passes on this fixture,
+# so its guidance must NOT appear — a report that lists satisfied elements as
+# things to fix would be actively misleading.
+gapmd=$(sed -n '/## How to fill the gaps/,/^## Regulatory/p' "$WORK/conf_conformance.md")
+if printf '%s' "$gapmd" | grep -q "^### Model license$"; then
+    fail "the fill-in section is scoped to gaps" "a passing element (Model license) was listed"
+else
+    pass "the fill-in section is scoped to gaps (passing elements excluded)"
+fi
+
+echo "== G7 fill-in guidance: informational only (result + G7 count unchanged) =="
+G7_GUIDANCE="$WORK/nope.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/confg" "x" >/dev/null 2>&1
+rg_with=$(jq -r '.result' "$CONF"); rg_without=$(jq -r '.result' "$WORK/confg_conformance.json")
+[ "$rg_with" = "$rg_without" ] && pass "result identical with/without the guidance ($rg_with)" || fail "result changed: with=$rg_with without=$rg_without"
+gcount=$(jq '[.checks[] | select(has("guidance"))] | length' "$WORK/confg_conformance.json")
+[ "$gcount" = "0" ] && pass "no guidance file -> no guidance keys (graceful)" || fail "guidance present despite a disabled registry ($gcount)"
+g7g_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
+g7g_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confg_conformance.json")
+[ "$g7g_with" = "$g7g_without" ] && pass "G7 check count unchanged by the guidance ($g7g_with)" || fail "G7 count differs: with=$g7g_with without=$g7g_without"
+
 echo "== AI compliance profile re-aggregates conformance + license flags =="
 # Reuse the AI-fixture conformance from the G7 section ($WORK/conf_conformance.json);
 # give the profile a matching _bom.json carrying one behavioral-use license flag.
@@ -296,6 +334,16 @@ if [ -f "$PROF" ]; then
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
     grep -q "makes no compliance determination" "$WORK/conf_ai-profile.md" && pass "MD states it makes no compliance determination" || fail "MD lacks the no-determination note"
     grep -q "AI compliance profile" "$WORK/conf_ai-profile.html" && pass "HTML profile rendered" || fail "HTML profile missing"
+    # The profile lists the closable gaps and delegates the fragments to the
+    # conformance report, so the two artifacts stay complementary, not duplicated.
+    gi=$(jq -r '.g7.gapItems | length' "$PROF"); gc=$(jq -r '.g7.gap' "$PROF")
+    [ "$gi" = "$gc" ] && pass "profile gapItems match the gap count ($gc)" || fail "gapItems=$gi but gap=$gc"
+    grep -q "How to close the gaps" "$WORK/conf_ai-profile.md" && pass "MD carries the close-the-gaps section" || fail "MD lacks the close-the-gaps section"
+    if grep -q '```json' "$WORK/conf_ai-profile.md"; then
+        fail "the profile delegates fragments to the conformance report" "it embedded a fragment itself"
+    else
+        pass "the profile delegates fragments to the conformance report"
+    fi
 else
     fail "generate-ai-profile.sh produced no profile for an AI SBOM"
 fi

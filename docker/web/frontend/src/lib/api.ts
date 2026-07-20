@@ -159,6 +159,20 @@ export interface ConformanceCheck {
    *  the ~half of G7 checks with a defensible correspondence; absent otherwise.
    *  Informational — it never changes a check status or the overall result. */
   regulations?: RegulationRef[];
+  /** How to satisfy this element: a CycloneDX fragment plus a reference link
+   *  (validate-sbom.sh joins docker/lib/g7-guidance.json by check id, so the CLI
+   *  reports show the same text). Present on the subset of G7 elements with a
+   *  mapping; absent on base format checks and on runs generated before the
+   *  guidance registry existed. Informational — never changes a status. */
+  guidance?: G7GuidanceRef;
+}
+
+/** Fill-in guidance for one G7 element. */
+export interface G7GuidanceRef {
+  /** A CycloneDX fragment showing the shape that would satisfy the element. */
+  snippet?: string;
+  /** Authoritative documentation for providing it (absolute https URL). */
+  docUrl?: string;
 }
 
 /** One regulatory-framework reference mapped onto a G7 element check. */
