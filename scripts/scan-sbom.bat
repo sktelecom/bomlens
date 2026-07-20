@@ -66,12 +66,31 @@ if not defined BASH_EXE (
     exit /b 1
 )
 
+REM `docker version` talks to the daemon too, so it also fails when the engine is
+REM merely stopped. Tell those apart with `where`, otherwise someone whose engine
+REM is off is told to install Docker they already have.
 docker version >nul 2>&1
+if not errorlevel 1 goto :docker_ok
+where docker >nul 2>&1
+if not errorlevel 1 (
+    echo [ERROR] Docker is installed but the engine is not running.
+    echo   Start Rancher Desktop or Docker Desktop, wait for its icon to settle,
+    echo   then run this again.
+    exit /b 1
+)
+echo [ERROR] Docker is not installed or not on PATH.
+echo   Free engines for Windows: Rancher Desktop ^(https://rancherdesktop.io/^)
+echo   or WSL2 + docker-ce ^(run scan-sbom.sh inside WSL^). Docker Desktop also
+echo   works ^(paid license for larger orgs^).
+exit /b 1
+:docker_ok
+REM The engine can still be unreachable even when `docker version` succeeds
+REM (permissions, a half-started daemon), so confirm before delegating to bash.
+docker info >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Docker is not installed or not running.
-    echo   Free engines for Windows: Rancher Desktop ^(https://rancherdesktop.io/^)
-    echo   or WSL2 + docker-ce ^(run scan-sbom.sh inside WSL^). Docker Desktop also
-    echo   works ^(paid license for larger orgs^).
+    echo [ERROR] The Docker engine is not responding.
+    echo   Start Rancher Desktop or Docker Desktop and wait for its icon to settle.
+    echo   On Docker Desktop, check you are a member of the docker-users group.
     exit /b 1
 )
 
