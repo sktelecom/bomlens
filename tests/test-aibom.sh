@@ -129,6 +129,70 @@ else
     fail "scan-aibom.sh runs with HF_TOKEN set" "exited non-zero against the mock generator"
 fi
 
+echo "== scan-aibom.sh refuses a fabricated card when the model could not be read =="
+# The real failure mode observed against HuggingFace: the generator's fetch gets a
+# 401, it logs a warning, returns empty metadata, and then fills the card with
+# generic defaults — "transformer", "text-generation", string in/out. The result
+# is a well-formed ML-BOM with a NON-empty modelCard describing nothing, which
+# sails past the card-present gate and yields a conformance report that reads as
+# a pass. This mock reproduces that shape exactly: warning on stderr, exit 0,
+# plausible card.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+mid=""
+for a in "\$@"; do case "\$a" in -*) ;; *) [ -z "\$mid" ] && mid="\$a" ;; esac; done
+echo "Error fetching model info for \$mid: 401 Client Error." >&2
+echo "Error fetching model card for \$mid: 401 Client Error." >&2
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cat > "\${out%.json}_1_7.json" <<'STUB'
+{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"machine-learning-model","name":"private-test-model","modelCard":{"modelParameters":{"modelArchitecture":"transformer","task":"text-generation"}}}]}
+STUB
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if PATH="$WORK/bin:$PATH" bash "$LIB/scan-aibom.sh" "my-org/private-test-model" "$WORK/fake.json" "1.0.0" \
+   > "$WORK/fake.log" 2>&1; then
+    fail "scan-aibom.sh refuses a fabricated model card" "exited 0 on an unreadable model"
+elif [ -f "$WORK/fake.json" ]; then
+    fail "scan-aibom.sh refuses a fabricated model card" "left the fabricated SBOM behind"
+else
+    pass "scan-aibom.sh refuses a fabricated model card and leaves no artifact"
+fi
+grep -q "placeholder values" "$WORK/fake.log" \
+    && pass "the refusal says the values were placeholders, not the model" \
+    || fail "the refusal explains itself" "no placeholder wording in the message"
+# 401 with no credential must point at HF_TOKEN; the same 401 with one must not.
+grep -q "no credential was supplied" "$WORK/fake.log" \
+    && pass "an unauthenticated 401 points at HF_TOKEN" \
+    || fail "an unauthenticated 401 points at HF_TOKEN" "hint missing"
+HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-test-model" "$WORK/fake2.json" "1.0.0" \
+    > "$WORK/fake2.log" 2>&1 || true
+if grep -q "despite a credential" "$WORK/fake2.log" && ! grep -qF "$HF_SENTINEL" "$WORK/fake2.log"; then
+    pass "an authenticated 401 says the token lacks access, without echoing it"
+else
+    fail "an authenticated 401 says the token lacks access" "wrong hint or the token leaked"
+fi
+# A model that IS readable must still pass: no warning line, real card kept.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cp "$FIX/aibom-owasp-1_7.json" "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if PATH="$WORK/bin:$PATH" bash "$LIB/scan-aibom.sh" "google-bert/bert-base-uncased" "$WORK/ok.json" "1.0.0" >/dev/null 2>&1; then
+    pass "a readable model is still accepted (the new gate does not over-reject)"
+else
+    fail "a readable model is still accepted" "the new gate rejected a good run"
+fi
+
 echo "== the card-less failure hint depends on whether a token was supplied =="
 # Same degraded stub as above. Anonymous and authenticated runs fail for
 # different reasons (no credential vs. no access), so they must say so — and

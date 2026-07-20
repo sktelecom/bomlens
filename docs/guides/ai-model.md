@@ -129,6 +129,7 @@ Knowing an element is missing does not tell you how to supply it, so the report 
 
 ## Limits
 
+- A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model. The tool generates the report; interpreting it, and answering the 13 review-only elements, is a person's job.
 - The conformance report does not certify compliance with the EU AI Act or any other regulation. It makes documentation gaps visible so a person can close them.
 - It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).
