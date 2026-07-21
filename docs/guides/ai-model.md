@@ -123,6 +123,8 @@ Because the card lists its datasets, BomLens extracts the seven the model was tr
 
 A sibling variant makes the point sharper. Scanning the instruction-tuned `FINAL-Bench/Aether-7B-5Attn-it` returns 24 of 38, one fewer, because its card does not list the fine-tuning data. The training-data axis reads `undisclosed` instead of `open-data`, and the Dataset name check drops from pass to warn. The base model discloses its pre-training data; the tuned one does not document its fine-tuning data. The report keeps the two stages apart instead of averaging them into a single "open" label — which is exactly the visibility a model developer needs before publishing.
 
+The reports this run produced are here to open as-is: the [conformance report](../samples/aether-7b-5attn_conformance.html) and the [AI compliance profile](../samples/aether-7b-5attn_ai-profile.html) for the base model.
+
 ## Next steps
 
 A report is not a finished review. Some elements a tool can fill; others only a person can.
