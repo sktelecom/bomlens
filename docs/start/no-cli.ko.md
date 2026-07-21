@@ -153,7 +153,7 @@ SBOM(`..._bom.json`)과 위험분석 보고서(`..._risk-report.html`)도 같은
   8080이 사용 중이면 런처가 비어 있는 다음 포트로 옮기고 그 주소를 출력하므로, 그 주소를 쓰세요.
 - **사내 네트워크에서 "이미지 다운로드에 실패했습니다"가 떠요**: 거의 프록시 문제입니다.
   이미지는 런처가 아니라 **Docker 데몬**이 내려받으므로 명령 프롬프트의 프록시 설정은 효과가 없습니다.
-  Docker Desktop은 Settings → Resources → Proxies, Rancher Desktop은 Preferences → WSL → Proxy
+  Docker Desktop은 `Settings > Resources > Proxies`, Rancher Desktop은 `Preferences > WSL > Proxy`
   에서 설정하세요. 프록시가 `localhost`까지 가로채면 스캔이 정상 동작해도 브라우저에 오류가 뜨므로
   프록시 우회 목록에 `localhost`를 추가하세요.
 - **쓸 수 있는 네트워크가 아예 없어요**: 다운로드 대신 파일로 설치할 수 있습니다.
