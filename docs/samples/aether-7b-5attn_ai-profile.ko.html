@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>AI 준수 개요 — Aether-7B-5Attn</title>
+<style>
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .note{background:rgba(244,119,37,.09);border-left:3px solid var(--brand-2);
+  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:.875rem;}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+ table{border-collapse:collapse;width:100%;font-size:.85rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ td.num{text-align:right;font-variant-numeric:tabular-nums;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
+</style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">AI 준수 개요</div>
+</header>
+<h1>AI 준수 개요</h1>
+<p class="meta">프로젝트: Aether-7B-5Attn &middot; 생성 시각: 2026-07-21T02:38:18Z</p>
+<div class="note">이 개요는 앞서 만든 적합성 보고서와 SBOM 결과를 한데 모아 보여 줍니다.</div>
+<div class="cards">
+ <span class="pill pill-pass">G7 충족 <span class="count">25 / 38</span></span>
+ <span class="pill pill-warn">G7 미충족 <span class="count">13</span></span>
+ <span class="pill pill-info">검토 필요 <span class="count">13</span></span>
+ <span class="pill pill-fail">라이선스 표시 <span class="count">0</span></span>
+ <span class="pill pill-pass">기본 결과: PASS</span>
+</div>
+<h2>검토 대상 라이선스</h2>
+<p>AI 행위 사용 제한 또는 비상업 라이선스 표시가 붙은 구성요소가 없습니다.</p>
+<h2>클러스터별 G7 최소 요소</h2>
+<div class="table-wrap"><table><tr><th>클러스터</th><th>충족</th><th>미충족</th><th>검토</th><th>합계</th></tr>
+<tr><td>데이터셋 속성</td><td class="num">1</td><td class="num">4</td><td class="num">5</td><td class="num">10</td></tr>
+<tr><td>인프라</td><td class="num">0</td><td class="num">2</td><td class="num">0</td><td class="num">2</td></tr>
+<tr><td>핵심 성과 지표</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">2</td></tr>
+<tr><td>메타데이터</td><td class="num">7</td><td class="num">3</td><td class="num">0</td><td class="num">10</td></tr>
+<tr><td>모델</td><td class="num">14</td><td class="num">0</td><td class="num">0</td><td class="num">14</td></tr>
+<tr><td>시스템 수준 속성</td><td class="num">3</td><td class="num">2</td><td class="num">4</td><td class="num">9</td></tr>
+<tr><td>보안 속성</td><td class="num">0</td><td class="num">1</td><td class="num">3</td><td class="num">4</td></tr>
+</table></div>
+<h2>규제 대응표</h2>
+<p class="meta">BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.</p>
+<div class="table-wrap"><table><tr><th>프레임워크</th><th>충족</th><th>미충족</th><th>검토</th><th>대응</th></tr>
+<tr><td>EU AI Act — Annex IV technical documentation</td><td class="num">6</td><td class="num">7</td><td class="num">10</td><td class="num">23</td></tr>
+<tr><td>AI Framework Act (Korea)</td><td class="num">2</td><td class="num">1</td><td class="num">7</td><td class="num">10</td></tr>
+</table></div>
+<p class="meta">요소별 전체 대응은 적합성 보고서에 있습니다.</p>
+<h2>미충족 항목 채우는 방법</h2>
+<p>다음 G7 요소는 자동 확인 대상이지만 SBOM에 없습니다. 적합성 보고서에 각 항목을 충족하는 CycloneDX 조각이 있습니다.</p>
+<ul>
+<li>SBOM 작성자 (메타데이터)</li>
+<li>SBOM 작성자 서명 (메타데이터) &mdash; https://cyclonedx.org/docs/1.7/json/#signature</li>
+<li>SBOM 생성 맥락 (메타데이터)</li>
+<li>시스템 구성요소 (시스템 수준 속성)</li>
+<li>시스템 제작자 (시스템 수준 속성)</li>
+<li>데이터셋 설명 (데이터셋 속성) &mdash; https://huggingface.co/docs/hub/datasets-cards</li>
+<li>데이터셋 식별자 (데이터셋 속성) &mdash; https://github.com/package-url/purl-spec</li>
+<li>데이터셋 출처 (데이터셋 속성) &mdash; https://cyclonedx.org/capabilities/mlbom/</li>
+<li>데이터셋 라이선스 (데이터셋 속성) &mdash; https://huggingface.co/docs/hub/datasets-cards</li>
+<li>인프라 소프트웨어 (의존성) (인프라)</li>
+<li>인프라 하드웨어 (HBOM 연결) (인프라) &mdash; https://cyclonedx.org/capabilities/hbom/</li>
+<li>취약점 참조 (보안 속성)</li>
+<li>운영 성능 지표(KPI) (핵심 성과 지표)</li>
+</ul>
+<h2>사람이 직접 채워야 하는 항목</h2>
+<p>다음 G7 요소는 자동 확인 수단이 없어 추측하지 않고 사람 검토 항목으로 표시합니다.</p>
+<ul>
+<li>시스템 데이터 흐름 (시스템 수준 속성)</li>
+<li>시스템 데이터 사용 (시스템 수준 속성)</li>
+<li>시스템 입출력 속성 (시스템 수준 속성)</li>
+<li>적용 대상 분야 (시스템 수준 속성)</li>
+<li>데이터셋 내용 (데이터셋 속성)</li>
+<li>데이터셋 해시 (데이터셋 속성)</li>
+<li>데이터셋 통계 속성 (데이터셋 속성)</li>
+<li>데이터셋 민감도 (개인정보/저작권) (데이터셋 속성)</li>
+<li>데이터셋 의존성 관계 (데이터셋 속성)</li>
+<li>보안 통제 (보안 속성)</li>
+<li>보안 준수 (보안 속성)</li>
+<li>사이버보안 정책 정보 (보안 속성)</li>
+<li>보안 지표 (핵심 성과 지표)</li>
+</ul>
+</body></html>
