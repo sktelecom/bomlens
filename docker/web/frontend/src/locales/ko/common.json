@@ -638,7 +638,7 @@
     "review": "검토 필요"
   },
   "aiProfile": {
-    "title": "AI 규제 대응 요약",
+    "title": "AI 준수 개요",
     "note": "AI SBOM 분석 결과를 문서 검토용으로 한눈에 모은 요약입니다. 규정 준수 여부를 판정하지 않습니다.",
     "verdict": {
       "pass": "통과",
