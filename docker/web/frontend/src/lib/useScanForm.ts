@@ -115,8 +115,6 @@ export function useScanForm({
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
-  // SPDX 2.3 export (opt-in): an extra artifact converted from the CycloneDX BOM.
-  const [spdx, setSpdx] = useState(() => initialConfig?.spdx ?? false);
   const [deepLicense, setDeepLicense] = useState(
     () => initialConfig?.deepLicense ?? false,
   );
@@ -373,7 +371,6 @@ export function useScanForm({
       // scans have no package CVEs, so security is off there.
       notice: isAnalyze ? true : notice,
       security: isAiModel ? false : isAnalyze ? true : security,
-      spdx,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
@@ -390,14 +387,15 @@ export function useScanForm({
   };
 
   // "Outputs" = what gets generated. Scan-method options (deep license / vendored
-  // identification) are surfaced separately, not as outputs.
+  // identification) are surfaced separately, not as outputs. SPDX is NOT here: it
+  // is a format conversion of the BOM the scan always writes, so the results
+  // screen exports it on demand instead of making the user decide up front.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
     // AI-model scans skip the (empty) security report.
     ...(isAiModel
       ? []
       : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
-    { key: "spdx", value: spdx, set: setSpdx },
   ];
 
   return {

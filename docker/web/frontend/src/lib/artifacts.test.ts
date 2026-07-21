@@ -95,6 +95,20 @@ describe("groupArtifacts", () => {
       `${PREFIX}_bom.spdx.json`,
     ]);
     expect(groups[0].formats.every((f) => f.viewable)).toBe(true);
+    // The file is here, so the card must not also offer to create it.
+    expect(groups[0].spdxExportable).toBe(false);
+  });
+
+  it("marks the SBOM card exportable only while no SPDX file exists", () => {
+    const [sbom] = groupArtifacts([file(`${PREFIX}_bom.json`)]);
+    expect(sbom.spdxExportable).toBe(true);
+
+    // Other cards never carry the export affordance.
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`),
+      file(`${PREFIX}_NOTICE.txt`),
+    ]);
+    expect(groups.find((g) => g.key === "notice")!.spdxExportable).toBe(false);
   });
 
   it("keeps the CycloneDX signature on the card when the SPDX one exists too", () => {

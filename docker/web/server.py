@@ -54,6 +54,19 @@ AIBOM_IMAGE = os.environ.get(
 # substitute a stub scanner here so the /scan-stream SSE protocol is testable
 # without Docker. Server-env only — never derived from request input.
 RUN_SCAN = os.environ.get("SBOM_RUN_SCAN", "/usr/local/bin/run-scan")
+# The scanner image, used ONLY to convert a finished BOM to SPDX in a sibling
+# container when this image has no syft of its own (the desktop app's base UI
+# image). Same default+override as scan-sbom.sh's POSTPROCESS_IMAGE.
+SCANNER_IMAGE = os.environ.get(
+    "SBOM_SCANNER_IMAGE", "ghcr.io/sktelecom/bomlens:latest"
+)
+# Pipeline shell helpers. Baked in at /usr/local/lib/sbom (Dockerfile), but the
+# server also runs straight from the source tree in the contract tests, where
+# they sit next to docker/web/ — resolve both, server-env only.
+LIB_DIR = os.environ.get("SBOM_LIB_DIR") or next(
+    (d for d in ("/usr/local/lib/sbom", os.path.join(os.path.dirname(WEB_DIR), "lib"))
+     if os.path.isdir(d)), "/usr/local/lib/sbom"
+)
 
 # Per-kind upload size caps (bytes).
 MAX_BYTES = {
@@ -93,8 +106,9 @@ ARTIFACT_SUFFIXES = (
     "_conformance.json", "_conformance.md", "_conformance.html",
     "_risk-report.md", "_risk-report.html",
     "_bom.json.sig", "_scancode.json",
-    # SPDX 2.3 export (opt-in --spdx / GENERATE_SPDX): converted from the final
-    # CycloneDX BOM, plus its cosign signature when signing is enabled.
+    # SPDX 2.3 export: converted from the final CycloneDX BOM, either by the CLI's
+    # --spdx during the scan or on demand from the UI (GET /spdx-export), plus its
+    # cosign signature when the CLI signed it.
     "_bom.spdx.json", "_bom.spdx.json.sig",
     # Source file tree (ScanCode-shaped, structure-only). Emitted by the scanner
     # for source-having modes so the UI's source-tree view works without the
@@ -314,6 +328,21 @@ def aibom_usable():
     return aibom_capable() or (docker_cli_present() and docker_capable())
 
 
+def spdx_convert_capable():
+    """True when this image can convert a BOM to SPDX in-process: syft (the
+    converter) plus jq (the validator) on PATH, and the pipeline helper present.
+    The scanner image ships all three, so the normal deployment converts here."""
+    return (shutil.which("syft") is not None and shutil.which("jq") is not None
+            and os.path.isfile(os.path.join(LIB_DIR, "convert-to-spdx.sh")))
+
+
+def spdx_convert_usable():
+    """SPDX export is offered when this image can convert in-process OR we can
+    launch the scanner image as a sibling to do it (docker CLI + host socket).
+    Mirrors firmware_usable()/aibom_usable()."""
+    return spdx_convert_capable() or (docker_cli_present() and docker_capable())
+
+
 def list_results(run_id=None):
     """Generated artifacts for a scan. With a run_id, the artifacts in that scan's
     run folder OUTPUT_DIR/<run_id>/ (ARTIFACT_SUFFIXES only); when no run folder
@@ -396,6 +425,7 @@ MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
+MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
 MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
 MAX_CROSSWALK_ELEMENTS = 200  # mapped elements listed per framework
 MAX_CROSSWALK_REFS = 12  # regulation refs per crosswalk element
@@ -869,6 +899,20 @@ def conformance_summary(run_id):
         ][:MAX_CHECK_REGULATIONS]
         if regs:
             row["regulations"] = regs
+        # Fill-in guidance for this element (validate-sbom.sh joins
+        # docker/lib/g7-guidance.json by element id): the CycloneDX fragment that
+        # would satisfy it, plus a reference link. Runs produced before the
+        # guidance registry existed simply carry none, so treat it as optional.
+        g = c.get("guidance")
+        if isinstance(g, dict):
+            snippet = str(g.get("snippet") or "")[:MAX_GUIDANCE_SNIPPET]
+            doc_url = str(g.get("docUrl") or "")
+            # The URL is rendered into an href; only accept an absolute https one
+            # so a malformed report cannot turn it into a javascript: link.
+            if not doc_url.startswith("https://"):
+                doc_url = ""
+            if snippet or doc_url:
+                row["guidance"] = {"snippet": snippet, "docUrl": doc_url}
         checks.append(row)
     out = {
         "result": data.get("result", "unknown"),
@@ -1430,8 +1474,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
-        # SPDX export is opt-in, so absent means "false" (unlike _bool_env).
-        "-e", "GENERATE_SPDX=%s" % ("true" if env.get("GENERATE_SPDX") == "true" else "false"),
+        # No GENERATE_SPDX: SPDX is exported on demand after the scan
+        # (convert_bom_to_spdx), so the sibling never produces it.
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
     ]
     # Opt-in OSV advisories for firmware: forward only the two fixed control
@@ -1453,6 +1497,12 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
+    # A HuggingFace credential, when this container was launched with one, is
+    # forwarded by NAME ONLY so the value stays out of the argv (and out of `ps`).
+    # The UI never accepts a token over HTTP: there is no credential store here,
+    # and a posted secret would linger in request logs and run state.
+    if mode == "AIBOM" and os.environ.get("HF_TOKEN"):
+        args += ["-e", "HF_TOKEN"]
     # The sibling writes into the run's output dir; run-scan also cds there via cwd.
     args += ["-w", out_dir, "--entrypoint", "/usr/local/bin/run-scan", image]
 
@@ -1465,6 +1515,61 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     on_log("[ui] launching %s in a sibling container (%s)..." % (mode.lower(), image))
     return _stream_cmd(args, on_log, on_progress=on_progress, cancel=cancel,
                        container=safe_name)
+
+
+def convert_bom_to_spdx(bom_path, spdx_path, stable, on_log):
+    """Convert a finished CycloneDX BOM to SPDX 2.3 JSON, on demand.
+
+    The UI does not decide SPDX before a scan (the pipeline always writes
+    CycloneDX); the user asks for the conversion from the results screen, so this
+    runs against an already-produced BOM. lib/convert-to-spdx.sh is pure
+    post-processing on one input file — the same helper entrypoint.sh runs for the
+    CLI's --spdx, so both paths produce an identical file.
+
+    Runs in-process when this image has syft (the scanner image does). Otherwise
+    the work goes to a SIBLING scanner container, the same --volumes-from pattern
+    run_sibling_scan uses: both paths are container paths under OUTPUT_DIR, so
+    they resolve identically in the sibling without a host bind mount (which a
+    Windows drive path would break). Returns the exit code, -1 if unavailable.
+
+    Signing is deliberately not offered here: the UI has no signing toggle at all,
+    so an on-demand SPDX is unsigned like every other UI-produced artifact. Use the
+    CLI's `--spdx --sign` when a signature is required.
+    """
+    # Both paths are server-derived (run_file / a fixed suffix on its basename),
+    # never request text — but they cross into an argv, so confirm containment.
+    if not _path_under(bom_path, OUTPUT_DIR) or not _path_under(os.path.dirname(spdx_path), OUTPUT_DIR):
+        on_log("[ui] refusing to convert: path outside the output dir")
+        return -1
+    args = [bom_path, spdx_path] + (["--stable"] if stable else [])
+
+    if spdx_convert_capable():
+        return _stream_cmd(["bash", os.path.join(LIB_DIR, "convert-to-spdx.sh")] + args, on_log)
+
+    if not (docker_cli_present() and docker_capable()):
+        on_log("[ui] cannot export SPDX: no syft in this image and no docker socket")
+        return -1
+    # Same taint barrier as run_sibling_scan: rebind to the allowlist match so the
+    # value reaching the argv is the freshly extracted one.
+    _m = _REF_RE.fullmatch(SCANNER_IMAGE) if SCANNER_IMAGE else None
+    if _m is None:
+        on_log("[ui] refusing to launch sibling: invalid image reference")
+        return -1
+    image = _m.group(0)
+    self_cid = _self_container_id()
+    if not self_cid:
+        on_log("[ui] cannot launch sibling: could not determine this container's id")
+        return -1
+    if not _sibling_image_present(image):
+        on_log("[ui] pulling %s (one-time download)..." % image)
+        _stream_cmd(["docker", "pull", image], on_log)
+    return _stream_cmd([
+        "docker", "run", "--rm",
+        "--volumes-from", self_cid,
+        "-w", os.path.dirname(bom_path),
+        "--entrypoint", "bash", image,
+        "/usr/local/lib/sbom/convert-to-spdx.sh",
+    ] + args, on_log)
 
 
 def _sibling_image_present(image):
@@ -1553,6 +1658,15 @@ class Handler(BaseHTTPRequestHandler):
                 # one-time "pulling the image" notice for the first sibling run.
                 "firmwareSibling": not firmware_capable() and docker_cli_present() and docker_capable(),
                 "aibomSibling": not aibom_capable() and docker_cli_present() and docker_capable(),
+                # SPDX is exported on demand from the results screen (GET
+                # /spdx-export), not chosen before a scan, so the frontend gates
+                # the export button on this rather than on a scan-form toggle.
+                "spdxExport": spdx_convert_usable(),
+                "spdxSibling": not spdx_convert_capable() and docker_cli_present() and docker_capable(),
+                # Whether a HuggingFace credential was handed to this container, so
+                # the UI can say that private/gated models resolve. A boolean only —
+                # the token itself is never exposed over the API.
+                "hfAuth": bool(os.environ.get("HF_TOKEN")),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
@@ -1561,6 +1675,8 @@ class Handler(BaseHTTPRequestHandler):
                 # path (what the user recognizes).
                 "scanRoots": EXTRA_SCAN_ROOTS,
             }))
+        elif path == "/spdx-export":
+            self._spdx_export(urllib.parse.parse_qs(parsed.query))
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
         elif path == "/scans":
@@ -1704,6 +1820,48 @@ class Handler(BaseHTTPRequestHandler):
         with open(target, "rb") as f:
             self._send(200, f.read(), ctype)
 
+    def _spdx_export(self, qs):
+        """Convert a finished scan's CycloneDX BOM to SPDX 2.3 JSON on demand.
+
+        SPDX is a format conversion of an artifact the scan already produced, so
+        asking for it up front (as a scan option) only forced users to re-run a
+        whole scan when they decided later. The converted file lands in the run
+        folder under the name the pipeline would have used, which is already in
+        ARTIFACT_SUFFIXES — so it joins the results listing and the download
+        bundle with no further wiring.
+
+        Idempotent: an existing SPDX file is returned as-is rather than rebuilt.
+        Responds with the new artifact's name plus the refreshed results listing.
+        """
+        rid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(rid):
+            self._send(400, json.dumps({"error": "invalid scan id"}))
+            return
+        bom = run_file(rid, "_bom.json")
+        if not bom or not os.path.isfile(bom):
+            self._send(404, json.dumps({"error": "no CycloneDX SBOM for this scan"}))
+            return
+        spdx = bom[: -len("_bom.json")] + "_bom.spdx.json"
+
+        if not os.path.isfile(spdx):
+            if not spdx_convert_usable():
+                self._send(503, json.dumps({"error": "SPDX export is not available here"}))
+                return
+            # Match the original scan's reproducibility setting so the converted
+            # file is what a --byte-stable run would have written.
+            stable = bool((scanmeta(rid) or {}).get("byteStable"))
+            log = []
+            rc = convert_bom_to_spdx(bom, spdx, stable, log.append)
+            if rc != 0 or not os.path.isfile(spdx):
+                sys.stderr.write("[ui] SPDX export failed for %s:\n%s\n" % (rid, "\n".join(log)))
+                self._send(500, json.dumps({"error": "SPDX conversion failed"}))
+                return
+
+        self._send(200, json.dumps({
+            "name": os.path.basename(spdx),
+            "results": list_results(rid),
+        }))
+
     def _serve_file(self, qs):
         rid = (qs.get("id") or [""])[0]
         name = (qs.get("name") or [""])[0]
@@ -1825,7 +1983,6 @@ class Handler(BaseHTTPRequestHandler):
             "version": version,
             "notice": g("notice", "true") == "true",
             "security": g("security", "true") == "true",
-            "spdx": g("spdx") == "true",
             "deepLicense": g("deep_license") == "true",
             "identifyVendored": g("identify_vendored") == "true",
             "includeOsv": g("includeOsv") == "true",
@@ -1863,7 +2020,8 @@ class Handler(BaseHTTPRequestHandler):
             "HOST_OUTPUT_DIR": run_out,
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
             "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
-            "GENERATE_SPDX": "true" if g("spdx") == "true" else "false",
+            # No GENERATE_SPDX: the UI exports SPDX on demand from the results
+            # screen (GET /spdx-export) instead of deciding before the scan.
             "GENERATE_REPORT": "true",  # 오픈소스위험분석보고서: default-on (mirrors CLI)
             "DEEP_LICENSE": "true" if g("deep_license") == "true" else "false",
             # Vendored-OSS identification (SCANOSS). SCANOSS_API_URL/KEY, if set in

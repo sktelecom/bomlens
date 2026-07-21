@@ -51,6 +51,8 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0_security.html`
 
 `--all` is shorthand for `--notice --security --spdx`. It produces the SBOM, the notice, the security report, and an SPDX copy of the SBOM in a single scan.
 
+In the web UI and the desktop app the notice and the security report are generation options on the New scan screen, and the SPDX copy is exported from the results screen once the scan is done.
+
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
 ```

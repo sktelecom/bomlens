@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>AI compliance profile — Aether-7B-5Attn</title>
+<style>
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .note{background:rgba(244,119,37,.09);border-left:3px solid var(--brand-2);
+  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:.875rem;}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+ table{border-collapse:collapse;width:100%;font-size:.85rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ td.num{text-align:right;font-variant-numeric:tabular-nums;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
+</style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">AI compliance profile</div>
+</header>
+<h1>AI compliance profile</h1>
+<p class="meta">Project: Aether-7B-5Attn &middot; Generated: 2026-07-21T02:59:57Z</p>
+<div class="note">This profile re-aggregates the conformance and SBOM artifacts already produced.</div>
+<div class="cards">
+ <span class="pill pill-pass">G7 present <span class="count">25 / 38</span></span>
+ <span class="pill pill-warn">G7 gap <span class="count">13</span></span>
+ <span class="pill pill-info">Needs review <span class="count">13</span></span>
+ <span class="pill pill-fail">License flags <span class="count">0</span></span>
+ <span class="pill pill-pass">Base result: PASS</span>
+</div>
+<h2>Licenses flagged for review</h2>
+<p>No components carry an AI behavioral-use or non-commercial license flag.</p>
+<h2>G7 minimum elements by cluster</h2>
+<div class="table-wrap"><table><tr><th>Cluster</th><th>Present</th><th>Gap</th><th>Review</th><th>Total</th></tr>
+<tr><td>dp</td><td class="num">1</td><td class="num">4</td><td class="num">5</td><td class="num">10</td></tr>
+<tr><td>infrastructure</td><td class="num">0</td><td class="num">2</td><td class="num">0</td><td class="num">2</td></tr>
+<tr><td>kpi</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">2</td></tr>
+<tr><td>metadata</td><td class="num">7</td><td class="num">3</td><td class="num">0</td><td class="num">10</td></tr>
+<tr><td>models</td><td class="num">14</td><td class="num">0</td><td class="num">0</td><td class="num">14</td></tr>
+<tr><td>slp</td><td class="num">3</td><td class="num">2</td><td class="num">4</td><td class="num">9</td></tr>
+<tr><td>sp</td><td class="num">0</td><td class="num">1</td><td class="num">3</td><td class="num">4</td></tr>
+</table></div>
+<h2>Regulatory crosswalk</h2>
+<p class="meta">BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.</p>
+<div class="table-wrap"><table><tr><th>Framework</th><th>Present</th><th>Gap</th><th>Review</th><th>Mapped</th></tr>
+<tr><td>EU AI Act — Annex IV technical documentation</td><td class="num">6</td><td class="num">7</td><td class="num">10</td><td class="num">23</td></tr>
+<tr><td>AI Framework Act (Korea)</td><td class="num">2</td><td class="num">1</td><td class="num">7</td><td class="num">10</td></tr>
+</table></div>
+<p class="meta">The full element-by-element mapping is in the conformance report.</p>
+<h2>How to close the gaps</h2>
+<p>These G7 elements have an automated source but are absent from the SBOM. The conformance report carries the CycloneDX fragment that would satisfy each one.</p>
+<ul>
+<li>SBOM author (metadata)</li>
+<li>SBOM author signature (metadata) &mdash; https://cyclonedx.org/docs/1.7/json/#signature</li>
+<li>SBOM generation context (metadata)</li>
+<li>System components (slp)</li>
+<li>System producer (slp)</li>
+<li>Dataset description (dp) &mdash; https://huggingface.co/docs/hub/datasets-cards</li>
+<li>Dataset identifier (dp) &mdash; https://github.com/package-url/purl-spec</li>
+<li>Dataset provenance (dp) &mdash; https://cyclonedx.org/capabilities/mlbom/</li>
+<li>Dataset license (dp) &mdash; https://huggingface.co/docs/hub/datasets-cards</li>
+<li>Infrastructure software (dependencies) (infrastructure)</li>
+<li>Infrastructure hardware (HBOM link) (infrastructure) &mdash; https://cyclonedx.org/capabilities/hbom/</li>
+<li>Vulnerability referencing (sp)</li>
+<li>Operational performance KPIs (kpi)</li>
+</ul>
+<h2>Elements a person still has to fill in</h2>
+<p>These G7 elements have no automated source; they are surfaced for human review, not guessed.</p>
+<ul>
+<li>System data flow (slp)</li>
+<li>System data usage (slp)</li>
+<li>System input/output properties (slp)</li>
+<li>Intended application area (slp)</li>
+<li>Dataset content (dp)</li>
+<li>Dataset hash (dp)</li>
+<li>Dataset statistical properties (dp)</li>
+<li>Dataset sensitivity (PII/copyright) (dp)</li>
+<li>Dataset dependency relationship (dp)</li>
+<li>Security controls (sp)</li>
+<li>Security compliance (sp)</li>
+<li>Cybersecurity policy information (sp)</li>
+<li>Security metrics (kpi)</li>
+</ul>
+</body></html>
