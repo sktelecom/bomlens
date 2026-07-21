@@ -186,7 +186,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
 else
     P_MD_TITLE="AI compliance profile — ${PROJECT}"
     P_MD_GEN="- Generated: ${GEN_AT}"
-    P_MD_INTRO="- This profile re-aggregates the conformance and SBOM artifacts already produced; it runs no scan and makes no compliance determination."
+    P_MD_INTRO="- This profile re-aggregates the conformance and SBOM artifacts already produced."
     P_H2_SUMMARY="Summary"
     P_SUM_G7="- G7 minimum elements: **${P} / ${A} present** (of the automatically checkable), ${Gp} gap, ${Rv} need human review."
     P_SUM_LIC="- Licenses flagged for review: **${LT}** (${LB} behavioral-use, ${LN} non-commercial)."
@@ -204,7 +204,7 @@ else
     P_H2_REVIEW="Elements a person still has to fill in"
     P_REVIEW_INTRO="These G7 elements have no automated source; they are surfaced for human review, not guessed."
     P_HTML_TITLE="AI compliance profile — ${PROJECT}"; P_KIND="AI compliance profile"
-    P_H1="AI compliance profile"; P_NOTE="This profile re-aggregates the conformance and SBOM artifacts already produced. It runs no scan and makes no compliance determination."
+    P_H1="AI compliance profile"; P_NOTE="This profile re-aggregates the conformance and SBOM artifacts already produced."
     P_META="Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT}"
     P_PILL_G7="G7 present"; P_PILL_GAP="G7 gap"; P_PILL_REVIEW="Needs review"; P_PILL_LIC="License flags"
     P_PILL_BASE="Base result: ${CONF_UP}"

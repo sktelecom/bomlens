@@ -464,7 +464,7 @@ if [ -f "$PROF" ]; then
     { [ "$lf" -ge 1 ] && [ "$lb" -ge 1 ]; } && pass "license-review flag surfaced ($lf total, $lb behavioral-use)" || fail "license flag not surfaced (total=$lf, behavioral=$lb)"
     xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
-    grep -q "makes no compliance determination" "$WORK/conf_ai-profile.md" && pass "MD states it makes no compliance determination" || fail "MD lacks the no-determination note"
+    grep -q "re-aggregates the conformance and SBOM artifacts" "$WORK/conf_ai-profile.md" && pass "MD states it re-aggregates existing artifacts" || fail "MD lacks the re-aggregation note"
     grep -q "AI compliance profile" "$WORK/conf_ai-profile.html" && pass "HTML profile rendered" || fail "HTML profile missing"
     # The profile lists the closable gaps and delegates the fragments to the
     # conformance report, so the two artifacts stay complementary, not duplicated.
