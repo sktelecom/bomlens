@@ -101,6 +101,28 @@ A source badge on each row says where a satisfied value comes from:
 
 The report shows how to close a gap, not only that one exists. For each advisory element with an automated source that is still absent, a "How to fill the gaps" section prints a CycloneDX fragment and a link to the authoritative documentation. Passing and review-only elements are left out, so a well-documented model adds no section at all.
 
+## A worked example
+
+A concrete run helps read the rest. `FINAL-Bench/Aether-7B-5Attn` is a foundation model published on HuggingFace under Apache-2.0 with its weights, architecture, training data and training process all disclosed, so it shows what a well-documented card produces.
+
+```bash
+./scripts/scan-sbom.sh --project Aether-7B-5Attn --version 1.0 \
+  --model "FINAL-Bench/Aether-7B-5Attn" --generate-only
+```
+
+The run reports `result=pass` with 25 of 38 G7 elements present. All 14 Models-cluster checks pass, and the disclosure panel reads open on every axis:
+
+| Axis | Value |
+| --- | --- |
+| Weights | open-weight |
+| Architecture | open-architecture |
+| Training data | open-data |
+| Training process | open-training |
+
+Because the card lists its datasets, BomLens extracts the seven the model was trained on (FineWeb-Edu, the SmolLM corpus, FineMath, open-web-math, an OpenCoder code corpus, and two Korean sets from HAERAE-HUB) and shows them under Models & datasets. What still warns is the Dataset-properties cluster: the model names its datasets but does not carry each one's description, identifier, provenance and license as first-class fields, so those elements stay advisory. That is the distance between "open and reproducible" and an SBOM-grade dataset inventory, and the report marks it rather than glossing over it.
+
+A sibling variant makes the point sharper. Scanning the instruction-tuned `FINAL-Bench/Aether-7B-5Attn-it` returns 24 of 38, one fewer, because its card does not list the fine-tuning data. The training-data axis reads `undisclosed` instead of `open-data`, and the Dataset name check drops from pass to warn. The base model discloses its pre-training data; the tuned one does not document its fine-tuning data. The report keeps the two stages apart instead of averaging them into a single "open" label — which is exactly the visibility a model developer needs before publishing.
+
 ## Next steps
 
 A report is not a finished review. Some elements a tool can fill; others only a person can.
