@@ -101,85 +101,188 @@ jq -n --arg project "$PROJECT" --arg ts "$GEN_AT" --arg confResult "$CONF_RESULT
 { project: $project, generatedAt: $ts, conformanceResult: $confResult,
   g7: $g7, regulatoryCrosswalk: $xwalk, licenseReview: $lic }' > "$JSON"
 
+# --------------------------------------------------------
+# Localization (REPORT_LANG=ko). The JSON above stays English (a contract). Only
+# the Markdown/HTML below are localized. English (default) renders the exact
+# inline literals it always did (every render var = the English data, every
+# chrome var = its English literal), so its output is byte-identical. Korean
+# swaps chrome strings from docker/lib/i18n/report-strings.ko.json, element
+# labels + cluster names from g7-registry.json (label_ko / name_ko), and the
+# license-flag labels.
+# --------------------------------------------------------
+REPORT_LANG="${REPORT_LANG:-en}"; [ "$REPORT_LANG" = "ko" ] || REPORT_LANG="en"
+KO_CAT="$(dirname "$0")/i18n/report-strings.ko.json"
+if [ "$REPORT_LANG" = "ko" ] && [ ! -f "$KO_CAT" ]; then
+    echo "[ai-profile] WARN: ko report catalog not found ($KO_CAT); using English." >&2
+    REPORT_LANG="en"
+fi
+kstr() { jq -r --arg k "$1" '.[$k] // $k' "$KO_CAT"; }
+# shellcheck disable=SC2059  # the format is a trusted catalog template, not user input
+tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
+# HTML-escape helper (defined here so the chrome block below can build the meta line).
+esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+
+HTML_LANG="en"
+G7R="$G7"        # render copy of the G7 rollup (cluster names + item labels)
+FLAG_B="Behavioral-use restriction"
+FLAG_N="Non-commercial"
+if [ "$REPORT_LANG" = "ko" ]; then
+    HTML_LANG="ko"
+    FLAG_B=$(kstr aiprofile.flag_behavioral); FLAG_N=$(kstr aiprofile.flag_noncommercial)
+    REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+    # Localize element labels (by id) and cluster display names (by cluster id).
+    G7R=$(printf '%s' "$G7" | jq -c --slurpfile reg "$REG" '
+      ([ $reg[0].clusters[].elements[] | {(.id): .label_ko} ] | add) as $RK
+      | ([ $reg[0].clusters[] | {(.id): .name_ko} ] | add) as $CK
+      | .clusters   |= map(.cluster = ($CK[.cluster] // .cluster))
+      | .reviewItems |= map(.label = ($RK[.id] // .label) | .cluster = ($CK[.cluster] // .cluster))
+      | .gapItems    |= map(.label = ($RK[.id] // .label) | .cluster = ($CK[.cluster] // .cluster))') || G7R="$G7"
+fi
+
 # Human-readable label for a license-review flag.
 flag_label() {
     case "$1" in
-        behavioral-use) echo "Behavioral-use restriction" ;;
-        non-commercial) echo "Non-commercial" ;;
+        behavioral-use) echo "$FLAG_B" ;;
+        non-commercial) echo "$FLAG_N" ;;
         *)              echo "$1" ;;
     esac
 }
+
+# Headline counts (shared by the summary sentences, the pills and the section
+# guards below).
+A=$(echo "$G7" | jq -r '.auto'); P=$(echo "$G7" | jq -r '.present')
+Gp=$(echo "$G7" | jq -r '.gap'); Rv=$(echo "$G7" | jq -r '.review')
+LT=$(echo "$LIC" | jq -r '.total'); LB=$(echo "$LIC" | jq -r '.behavioral'); LN=$(echo "$LIC" | jq -r '.nonCommercial')
+CONF_UP=$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')
+
+# Chrome strings: English literals by default (byte-identical), catalog for ko.
+if [ "$REPORT_LANG" = "ko" ]; then
+    P_MD_TITLE=$(tfmt aiprofile.md_title "$PROJECT")
+    P_MD_GEN=$(tfmt aiprofile.md_generated "$GEN_AT")
+    P_MD_INTRO=$(kstr aiprofile.md_intro)
+    P_H2_SUMMARY=$(kstr aiprofile.h2_summary)
+    P_SUM_G7=$(tfmt aiprofile.sum_g7 "$P" "$A" "$Gp" "$Rv")
+    P_SUM_LIC=$(tfmt aiprofile.sum_lic "$LT" "$LB" "$LN")
+    P_SUM_BASE=$(tfmt aiprofile.sum_base "$CONF_UP")
+    P_H2_LIC=$(kstr aiprofile.h2_lic)
+    P_TH_COMP=$(kstr aiprofile.th_component); P_TH_VER=$(kstr aiprofile.th_version)
+    P_TH_LIC=$(kstr aiprofile.th_license); P_TH_FLAG=$(kstr aiprofile.th_flag)
+    P_LIC_NONE=$(kstr aiprofile.lic_none)
+    P_H2_CLUSTERS=$(kstr aiprofile.h2_clusters)
+    P_TH_CLUSTER=$(kstr aiprofile.th_cluster); P_TH_PRESENT=$(kstr aiprofile.th_present)
+    P_TH_GAP=$(kstr aiprofile.th_gap); P_TH_REVIEW=$(kstr aiprofile.th_review); P_TH_TOTAL=$(kstr aiprofile.th_total)
+    P_H2_XWALK=$(kstr aiprofile.h2_crosswalk)
+    P_TH_FRAMEWORK=$(kstr aiprofile.th_framework); P_TH_MAPPED=$(kstr aiprofile.th_mapped)
+    P_XWALK_FULL=$(tfmt aiprofile.crosswalk_full "$OUT_PREFIX"); P_XWALK_FULL_H=$(kstr aiprofile.crosswalk_full_html)
+    P_H2_CLOSE=$(kstr aiprofile.h2_close); P_CLOSE_INTRO=$(tfmt aiprofile.close_intro "$OUT_PREFIX"); P_CLOSE_INTRO_H=$(kstr aiprofile.close_intro_html)
+    P_H2_REVIEW=$(kstr aiprofile.h2_review); P_REVIEW_INTRO=$(kstr aiprofile.review_intro)
+    P_LIC_NONE_H=$(kstr aiprofile.lic_none_html)
+    P_HTML_TITLE=$(tfmt aiprofile.html_title "$PROJECT"); P_KIND=$(kstr aiprofile.kind)
+    P_H1=$(kstr aiprofile.h1); P_NOTE=$(kstr aiprofile.note)
+    P_META="$(kstr aiprofile.meta_project): $(esc "$PROJECT") &middot; $(kstr aiprofile.meta_generated): ${GEN_AT}"
+    P_PILL_G7=$(kstr aiprofile.pill_g7_present); P_PILL_GAP=$(kstr aiprofile.pill_g7_gap)
+    P_PILL_REVIEW=$(kstr aiprofile.pill_review); P_PILL_LIC=$(kstr aiprofile.pill_license)
+    P_PILL_BASE="$(kstr aiprofile.pill_base) ${CONF_UP}"
+else
+    P_MD_TITLE="AI compliance profile — ${PROJECT}"
+    P_MD_GEN="- Generated: ${GEN_AT}"
+    P_MD_INTRO="- This profile re-aggregates the conformance and SBOM artifacts already produced."
+    P_H2_SUMMARY="Summary"
+    P_SUM_G7="- G7 minimum elements: **${P} / ${A} present** (of the automatically checkable), ${Gp} gap, ${Rv} need human review."
+    P_SUM_LIC="- Licenses flagged for review: **${LT}** (${LB} behavioral-use, ${LN} non-commercial)."
+    P_SUM_BASE="- Base conformance result: **${CONF_UP}** (the overall pass/fail comes from the required format checks, not from G7)."
+    P_H2_LIC="Licenses flagged for review"
+    P_TH_COMP="Component"; P_TH_VER="Version"; P_TH_LIC="License"; P_TH_FLAG="Flag"
+    P_LIC_NONE="_No components carry an AI behavioral-use or non-commercial license flag._"
+    P_H2_CLUSTERS="G7 minimum elements by cluster"
+    P_TH_CLUSTER="Cluster"; P_TH_PRESENT="Present"; P_TH_GAP="Gap"; P_TH_REVIEW="Review"; P_TH_TOTAL="Total"
+    P_H2_XWALK="Regulatory crosswalk"
+    P_TH_FRAMEWORK="Framework"; P_TH_MAPPED="Mapped"
+    P_XWALK_FULL="The full element-by-element mapping is in the conformance report (\`${OUT_PREFIX}_conformance.*\`)."
+    P_H2_CLOSE="How to close the gaps"
+    P_CLOSE_INTRO="These G7 elements have an automated source but are absent from the SBOM. The conformance report (\`${OUT_PREFIX}_conformance.md\`) carries the CycloneDX fragment that would satisfy each one."
+    P_H2_REVIEW="Elements a person still has to fill in"
+    P_REVIEW_INTRO="These G7 elements have no automated source; they are surfaced for human review, not guessed."
+    P_HTML_TITLE="AI compliance profile — ${PROJECT}"; P_KIND="AI compliance profile"
+    P_H1="AI compliance profile"; P_NOTE="This profile re-aggregates the conformance and SBOM artifacts already produced."
+    P_META="Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT}"
+    P_PILL_G7="G7 present"; P_PILL_GAP="G7 gap"; P_PILL_REVIEW="Needs review"; P_PILL_LIC="License flags"
+    P_PILL_BASE="Base result: ${CONF_UP}"
+    P_XWALK_FULL_H="The full element-by-element mapping is in the conformance report."
+    P_CLOSE_INTRO_H="These G7 elements have an automated source but are absent from the SBOM. The conformance report carries the CycloneDX fragment that would satisfy each one."
+    P_LIC_NONE_H="No components carry an AI behavioral-use or non-commercial license flag."
+fi
 
 # --------------------------------------------------------
 # Markdown
 # --------------------------------------------------------
 {
-    echo "# AI compliance profile — ${PROJECT}"
+    echo "# ${P_MD_TITLE}"
     echo ""
-    echo "- Generated: ${GEN_AT}"
-    echo "- This profile re-aggregates the conformance and SBOM artifacts already produced; it runs no scan and makes no compliance determination."
-    echo ""
-
-    echo "## Summary"
-    echo ""
-    A=$(echo "$G7" | jq -r '.auto'); P=$(echo "$G7" | jq -r '.present')
-    Gp=$(echo "$G7" | jq -r '.gap'); Rv=$(echo "$G7" | jq -r '.review')
-    LT=$(echo "$LIC" | jq -r '.total'); LB=$(echo "$LIC" | jq -r '.behavioral'); LN=$(echo "$LIC" | jq -r '.nonCommercial')
-    echo "- G7 minimum elements: **${P} / ${A} present** (of the automatically checkable), ${Gp} gap, ${Rv} need human review."
-    echo "- Licenses flagged for review: **${LT}** (${LB} behavioral-use, ${LN} non-commercial)."
-    echo "- Base conformance result: **$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')** (the overall pass/fail comes from the required format checks, not from G7)."
+    echo "${P_MD_GEN}"
+    echo "${P_MD_INTRO}"
     echo ""
 
-    echo "## Licenses flagged for review"
+    echo "## ${P_H2_SUMMARY}"
+    echo ""
+    echo "${P_SUM_G7}"
+    echo "${P_SUM_LIC}"
+    echo "${P_SUM_BASE}"
+    echo ""
+
+    echo "## ${P_H2_LIC}"
     echo ""
     if [ "$LT" -gt 0 ]; then
-        echo "| Component | Version | License | Flag |"
+        echo "| ${P_TH_COMP} | ${P_TH_VER} | ${P_TH_LIC} | ${P_TH_FLAG} |"
         echo "|-----------|---------|---------|------|"
-        echo "$LIC" | jq -r --argjson cap "$CAP" '.items[0:$cap][] |
+        echo "$LIC" | jq -r --argjson cap "$CAP" --arg fb "$FLAG_B" --arg fn "$FLAG_N" '.items[0:$cap][] |
             "| \(.name|gsub("[|\n]";" ")) | \(.version|gsub("[|\n]";" ")) | \(.license|gsub("[|\n]";" ")) | \(
-              if .flag=="behavioral-use" then "Behavioral-use restriction"
-              elif .flag=="non-commercial" then "Non-commercial" else .flag end) |"'
-        [ "$LT" -gt "$CAP" ] && echo "" && echo "_… and $((LT - CAP)) more (see the JSON profile)._"
+              if .flag=="behavioral-use" then $fb
+              elif .flag=="non-commercial" then $fn else .flag end) |"'
+        if [ "$LT" -gt "$CAP" ]; then
+            echo ""
+            if [ "$REPORT_LANG" = "ko" ]; then tfmt aiprofile.lic_more_md "$((LT - CAP))"; echo ""; else echo "_… and $((LT - CAP)) more (see the JSON profile)._"; fi
+        fi
     else
-        echo "_No components carry an AI behavioral-use or non-commercial license flag._"
+        echo "${P_LIC_NONE}"
     fi
     echo ""
 
-    echo "## G7 minimum elements by cluster"
+    echo "## ${P_H2_CLUSTERS}"
     echo ""
-    echo "| Cluster | Present | Gap | Review | Total |"
+    echo "| ${P_TH_CLUSTER} | ${P_TH_PRESENT} | ${P_TH_GAP} | ${P_TH_REVIEW} | ${P_TH_TOTAL} |"
     echo "|---------|--------:|----:|-------:|------:|"
-    echo "$G7" | jq -r '.clusters[] | "| \(.cluster) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
+    echo "$G7R" | jq -r '.clusters[] | "| \(.cluster) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
     echo ""
 
     if [ "$(echo "$XW" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "## Regulatory crosswalk"
+        echo "## ${P_H2_XWALK}"
         echo ""
         echo "$XW" | jq -r '.disclaimer'
         echo ""
-        echo "| Framework | Present | Gap | Review | Mapped |"
+        echo "| ${P_TH_FRAMEWORK} | ${P_TH_PRESENT} | ${P_TH_GAP} | ${P_TH_REVIEW} | ${P_TH_MAPPED} |"
         echo "|-----------|--------:|----:|-------:|-------:|"
         echo "$XW" | jq -r '.frameworks[] | "| \(.title|gsub("[|\n]";" ")) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
         echo ""
-        echo "The full element-by-element mapping is in the conformance report (\`${OUT_PREFIX}_conformance.*\`)."
+        echo "${P_XWALK_FULL}"
         echo ""
     fi
 
     if [ "$Gp" -gt 0 ]; then
-        echo "## How to close the gaps"
+        echo "## ${P_H2_CLOSE}"
         echo ""
-        echo "These G7 elements have an automated source but are absent from the SBOM. The conformance report (\`${OUT_PREFIX}_conformance.md\`) carries the CycloneDX fragment that would satisfy each one."
+        echo "${P_CLOSE_INTRO}"
         echo ""
-        echo "$G7" | jq -r '.gapItems[] | "- \(.label) (\(.cluster))" + (if (.docUrl // "") != "" then " — \(.docUrl)" else "" end)'
+        echo "$G7R" | jq -r '.gapItems[] | "- \(.label) (\(.cluster))" + (if (.docUrl // "") != "" then " — \(.docUrl)" else "" end)'
         echo ""
     fi
 
     if [ "$Rv" -gt 0 ]; then
-        echo "## Elements a person still has to fill in"
+        echo "## ${P_H2_REVIEW}"
         echo ""
-        echo "These G7 elements have no automated source; they are surfaced for human review, not guessed."
+        echo "${P_REVIEW_INTRO}"
         echo ""
-        echo "$G7" | jq -r '.reviewItems[] | "- \(.label) (\(.cluster))"'
+        echo "$G7R" | jq -r '.reviewItems[] | "- \(.label) (\(.cluster))"'
         echo ""
     fi
 } > "$MD"
@@ -187,15 +290,14 @@ flag_label() {
 # --------------------------------------------------------
 # HTML (cards/table/CSP/escape pattern shared with the other reports)
 # --------------------------------------------------------
-esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RESULT" = "fail" ] && conf_class="fail"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="${HTML_LANG}"><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>AI compliance profile — ${PROJECT}</title>
+<title>${P_HTML_TITLE}</title>
 <style>
  :root{
   --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
@@ -252,69 +354,71 @@ conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RE
 </style></head><body>
 <header class="report-header">
  <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">AI compliance profile</div>
+ <div class="report-kind">${P_KIND}</div>
 </header>
-<h1>AI compliance profile</h1>
-<p class="meta">Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT}</p>
-<div class="note">This profile re-aggregates the conformance and SBOM artifacts already produced. It runs no scan and makes no compliance determination.</div>
+<h1>${P_H1}</h1>
+<p class="meta">${P_META}</p>
+<div class="note">${P_NOTE}</div>
 <div class="cards">
- <span class="pill pill-pass">G7 present <span class="count">${P} / ${A}</span></span>
- <span class="pill pill-warn">G7 gap <span class="count">${Gp}</span></span>
- <span class="pill pill-info">Needs review <span class="count">${Rv}</span></span>
- <span class="pill pill-fail">License flags <span class="count">${LT}</span></span>
- <span class="pill pill-${conf_class}">Base result: $(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')</span>
+ <span class="pill pill-pass">${P_PILL_G7} <span class="count">${P} / ${A}</span></span>
+ <span class="pill pill-warn">${P_PILL_GAP} <span class="count">${Gp}</span></span>
+ <span class="pill pill-info">${P_PILL_REVIEW} <span class="count">${Rv}</span></span>
+ <span class="pill pill-fail">${P_PILL_LIC} <span class="count">${LT}</span></span>
+ <span class="pill pill-${conf_class}">${P_PILL_BASE}</span>
 </div>
 HTMLHEAD
 
-    echo "<h2>Licenses flagged for review</h2>"
+    echo "<h2>${P_H2_LIC}</h2>"
     if [ "$LT" -gt 0 ]; then
-        echo "<div class=\"table-wrap\"><table><tr><th>Component</th><th>Version</th><th>License</th><th>Flag</th></tr>"
-        echo "$LIC" | jq -r --argjson cap "$CAP" '.items[0:$cap][] |
+        echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_COMP}</th><th>${P_TH_VER}</th><th>${P_TH_LIC}</th><th>${P_TH_FLAG}</th></tr>"
+        echo "$LIC" | jq -r --argjson cap "$CAP" --arg fb "$FLAG_B" --arg fn "$FLAG_N" '.items[0:$cap][] |
             "<tr><td>" + (.name|@html) + "</td><td>" + (.version|@html) + "</td>" +
             "<td>" + (.license|@html) + "</td><td>" + ((
-              if .flag=="behavioral-use" then "Behavioral-use restriction"
-              elif .flag=="non-commercial" then "Non-commercial" else .flag end)|@html) + "</td></tr>"'
+              if .flag=="behavioral-use" then $fb
+              elif .flag=="non-commercial" then $fn else .flag end)|@html) + "</td></tr>"'
         echo "</table></div>"
-        [ "$LT" -gt "$CAP" ] && echo "<p class=\"meta\">… and $((LT - CAP)) more (see the JSON profile).</p>"
+        if [ "$LT" -gt "$CAP" ]; then
+            if [ "$REPORT_LANG" = "ko" ]; then echo "<p class=\"meta\">$(tfmt aiprofile.lic_more_html "$((LT - CAP))")</p>"; else echo "<p class=\"meta\">… and $((LT - CAP)) more (see the JSON profile).</p>"; fi
+        fi
     else
-        echo "<p>No components carry an AI behavioral-use or non-commercial license flag.</p>"
+        echo "<p>${P_LIC_NONE_H}</p>"
     fi
 
-    echo "<h2>G7 minimum elements by cluster</h2>"
-    echo "<div class=\"table-wrap\"><table><tr><th>Cluster</th><th>Present</th><th>Gap</th><th>Review</th><th>Total</th></tr>"
-    echo "$G7" | jq -r '.clusters[] |
+    echo "<h2>${P_H2_CLUSTERS}</h2>"
+    echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_CLUSTER}</th><th>${P_TH_PRESENT}</th><th>${P_TH_GAP}</th><th>${P_TH_REVIEW}</th><th>${P_TH_TOTAL}</th></tr>"
+    echo "$G7R" | jq -r '.clusters[] |
         "<tr><td>" + (.cluster|@html) + "</td><td class=\"num\">" + (.present|tostring) +
         "</td><td class=\"num\">" + (.gap|tostring) + "</td><td class=\"num\">" + (.review|tostring) +
         "</td><td class=\"num\">" + (.total|tostring) + "</td></tr>"'
     echo "</table></div>"
 
     if [ "$(echo "$XW" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "<h2>Regulatory crosswalk</h2>"
+        echo "<h2>${P_H2_XWALK}</h2>"
         echo "<p class=\"meta\">$(esc "$(echo "$XW" | jq -r '.disclaimer')")</p>"
-        echo "<div class=\"table-wrap\"><table><tr><th>Framework</th><th>Present</th><th>Gap</th><th>Review</th><th>Mapped</th></tr>"
+        echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_FRAMEWORK}</th><th>${P_TH_PRESENT}</th><th>${P_TH_GAP}</th><th>${P_TH_REVIEW}</th><th>${P_TH_MAPPED}</th></tr>"
         echo "$XW" | jq -r '.frameworks[] |
             "<tr><td>" + (.title|@html) + "</td><td class=\"num\">" + (.present|tostring) +
             "</td><td class=\"num\">" + (.gap|tostring) + "</td><td class=\"num\">" + (.review|tostring) +
             "</td><td class=\"num\">" + (.total|tostring) + "</td></tr>"'
         echo "</table></div>"
-        echo "<p class=\"meta\">The full element-by-element mapping is in the conformance report.</p>"
+        echo "<p class=\"meta\">${P_XWALK_FULL_H}</p>"
     fi
 
     if [ "$Gp" -gt 0 ]; then
-        echo "<h2>How to close the gaps</h2>"
-        echo "<p>These G7 elements have an automated source but are absent from the SBOM. The conformance report carries the CycloneDX fragment that would satisfy each one.</p>"
+        echo "<h2>${P_H2_CLOSE}</h2>"
+        echo "<p>${P_CLOSE_INTRO_H}</p>"
         echo "<ul>"
-        echo "$G7" | jq -r '.gapItems[] |
+        echo "$G7R" | jq -r '.gapItems[] |
             "<li>" + ((.label + " (" + .cluster + ")")|@html) +
             (if (.docUrl // "") != "" then " &mdash; " + (.docUrl|@html) else "" end) + "</li>"'
         echo "</ul>"
     fi
 
     if [ "$Rv" -gt 0 ]; then
-        echo "<h2>Elements a person still has to fill in</h2>"
-        echo "<p>These G7 elements have no automated source; they are surfaced for human review, not guessed.</p>"
+        echo "<h2>${P_H2_REVIEW}</h2>"
+        echo "<p>${P_REVIEW_INTRO}</p>"
         echo "<ul>"
-        echo "$G7" | jq -r '.reviewItems[] | "<li>" + ((.label + " (" + .cluster + ")")|@html) + "</li>"'
+        echo "$G7R" | jq -r '.reviewItems[] | "<li>" + ((.label + " (" + .cluster + ")")|@html) + "</li>"'
         echo "</ul>"
     fi
     echo "</body></html>"

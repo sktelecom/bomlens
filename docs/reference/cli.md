@@ -38,6 +38,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--spdx` | false | Also export the SBOM as SPDX 2.3 JSON (`_bom.spdx.json`), converted from the final CycloneDX output |
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
+| `--lang <en\|ko>` | `en` | Language for the human-facing conformance and AI-profile reports (`.md`/`.html`). The SBOM and the JSON reports stay English regardless |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |

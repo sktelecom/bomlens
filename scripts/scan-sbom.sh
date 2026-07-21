@@ -74,6 +74,9 @@ GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_
 # cannot produce the report.
 SECURITY_REQUESTED="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
+# Report language for the conformance + AI-profile reports: en (default) or ko.
+# Only these two are honored; anything else is normalized to en further down.
+REPORT_LANG="${REPORT_LANG:-en}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
 SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
@@ -124,6 +127,7 @@ while [[ "$#" -gt 0 ]]; do
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --lang) REPORT_LANG="$2"; shift ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -178,6 +182,9 @@ Options:
                          against the OSSKB service (opt-in image; sends hashes,
                          not source). See docs/guides/identify-vendored.md
   --byte-stable          Deterministic SBOM output
+  --lang <en|ko>         Language for the human-facing conformance and AI-profile
+                         reports (.md/.html). Default en. The SBOM and the JSON
+                         reports stay English regardless.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -353,12 +360,20 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # post-process container so SECURITY_ENRICH=false works for air-gapped runs.
 SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 
+# Normalize the report language: only en (default) or ko reach the container. An
+# unknown value is a user typo, so warn and fall back to English rather than
+# silently producing an English report the user did not expect.
+case "$REPORT_LANG" in
+    en|ko) ;;
+    *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
+esac
+
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private

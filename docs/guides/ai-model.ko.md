@@ -123,7 +123,7 @@ G7 블록의 머리에는 "N / 38 충족" 같은 수치가 옵니다. 분모는 
 
 형제 버전과 비교하면 뜻이 더 분명해집니다. 지시 튜닝 버전 `FINAL-Bench/Aether-7B-5Attn-it`을 스캔하면 38개 중 24개로 하나 적게 나옵니다. 모델 카드가 미세조정 데이터를 명시하지 않기 때문입니다. 학습 데이터 축은 `open-data`가 아니라 `undisclosed`로 읽히고, Dataset name 검사는 통과에서 경고로 내려갑니다. 베이스 모델은 사전학습 데이터를 공개했지만 튜닝 버전은 미세조정 데이터를 문서화하지 않았고, 보고서는 두 단계를 하나의 "열림" 표시로 뭉치지 않고 나눠서 보여 줍니다. 모델 개발자가 공개 전에 확인해야 할 지점이 바로 이것입니다.
 
-이 스캔이 낸 보고서를 그대로 열어 볼 수 있습니다. 베이스 모델의 [적합성 보고서](../samples/aether-7b-5attn_conformance.html)와 [AI 컴플라이언스 프로파일](../samples/aether-7b-5attn_ai-profile.html)입니다.
+이 스캔이 낸 보고서를 그대로 열어 볼 수 있습니다. 베이스 모델의 [적합성 보고서](../samples/aether-7b-5attn_conformance.ko.html)와 [AI 준수 개요](../samples/aether-7b-5attn_ai-profile.ko.html)입니다. 한국어 보고서는 `--lang ko`로 생성합니다.
 
 ## 다음 단계
 
