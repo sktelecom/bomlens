@@ -436,65 +436,186 @@ jq -n \
 ' > "$JSON"
 
 # --------------------------------------------------------
+# Localization (REPORT_LANG=ko). The JSON above is NEVER localized — it is an
+# English contract the web layer and CI consume. Only the human-facing Markdown
+# and HTML below are localized. English (the default) renders the exact inline
+# literals it always did (RCHECKS/RXW = the English CHECKS/XW_SUMMARY, every
+# chrome var = its English literal), so its output stays byte-identical. Korean
+# swaps the chrome strings from docker/lib/i18n/report-strings.ko.json and the
+# per-row label/detail text (element labels via g7-registry.json label_ko).
+# --------------------------------------------------------
+REPORT_LANG="${REPORT_LANG:-en}"; [ "$REPORT_LANG" = "ko" ] || REPORT_LANG="en"
+KO_CAT="$(dirname "$0")/i18n/report-strings.ko.json"
+if [ "$REPORT_LANG" = "ko" ] && [ ! -f "$KO_CAT" ]; then
+    echo "[validate] WARN: ko report catalog not found ($KO_CAT); using English." >&2
+    REPORT_LANG="en"
+fi
+# kstr KEY -> the ko string for KEY (or KEY itself if missing, so a gap is visible).
+kstr() { jq -r --arg k "$1" '.[$k] // $k' "$KO_CAT"; }
+# tfmt KEY ARGS... -> the ko template for KEY, filled with printf (%s placeholders).
+# shellcheck disable=SC2059  # the format is a trusted catalog template, not user input
+tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
+
+RESULT_UP=$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')
+PROJECT_ESC=$(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+HTML_LANG="en"
+RCHECKS="$CHECKS"
+RXW="$XW_SUMMARY"
+
+if [ "$REPORT_LANG" = "ko" ]; then
+    HTML_LANG="ko"
+    REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+    # Localize per-row label + detail into a render copy (status/missing/guidance/
+    # evidence/regulations untouched, so the render loops below are unchanged).
+    RCHECKS=$(printf '%s' "$CHECKS" | jq -c --slurpfile cat "$KO_CAT" --slurpfile reg "$REG" '
+      ($cat[0]) as $C
+      | ([ $reg[0].clusters[].elements[] | {(.id): .label_ko} ] | add) as $RK
+      | def llabel($id; $en):
+          if ($id|startswith("g7-")) then ($RK[$id] // $en)
+          elif ($en|test("^Spec version \\(CycloneDX ")) then ($C["conformance.label.spec_cdx"] | gsub("%v%"; ($en|capture("^Spec version \\(CycloneDX (?<v>.+)\\)$").v)))
+          elif ($en|test("^Spec version \\(")) then ($C["conformance.label.spec_other"] | gsub("%v%"; ($en|capture("^Spec version \\((?<v>.+)\\)$").v)))
+          elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          elif ($en|test("^License coverage ")) then ($C["conformance.label.license"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          elif ($en|test("^Hash coverage ")) then ($C["conformance.label.hash"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          else ($C["conformance.label_exact"][$en] // $en) end;
+        def ldetail($d):
+          if $d=="present" then $C["conformance.detail.present"]
+          elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
+          elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
+          elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]
+          elif $d=="not CycloneDX or SPDX" then $C["conformance.detail.not_cdx_spdx"]
+          elif $d=="could not evaluate" then $C["conformance.detail.could_not_eval"]
+          elif ($d|test("^[0-9]+/[0-9]+ model component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.model_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ tool\\(s\\)$")) then ($C["conformance.detail.tool"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ edge\\(s\\)$")) then ($C["conformance.detail.edge"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ untraceable$")) then ($C["conformance.detail.untraceable"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ malformed$")) then ($C["conformance.detail.malformed"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ found$")) then ($C["conformance.detail.found"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ accepted SPDXVersion line\\(s\\)$")) then ($C["conformance.detail.spdxver"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ package\\(s\\)$")) then ($C["conformance.detail.package"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^names=[0-9]+, versions=[0-9]+$")) then ($d|capture("names=(?<a>[0-9]+), versions=(?<b>[0-9]+)")) as $m | ($C["conformance.detail.names_versions"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ purl ref\\(s\\) for [0-9]+ package\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+) purl ref\\(s\\) for (?<b>[0-9]+)")) as $m | ($C["conformance.detail.purl_refs"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ relationship\\(s\\)$")) then ($C["conformance.detail.relationship"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          else $d end;
+      map(.label = llabel(.id; .label) | .detail = ldetail(.detail))
+    ') || RCHECKS="$CHECKS"
+    # Crosswalk element labels use the same registry label_ko (framework titles,
+    # article refs and the disclaimer stay verbatim — they are proper identifiers).
+    RXW=$(printf '%s' "$XW_SUMMARY" | jq -c --slurpfile reg "$REG" '
+      ([ $reg[0].clusters[].elements[] | {(.label): .label_ko} ] | add) as $RK
+      | .frameworks |= map(.elements |= map(.label = ($RK[.label] // .label)))') || RXW="$XW_SUMMARY"
+fi
+
+# Chrome strings: English literals by default (byte-identical), catalog for ko.
+if [ "$REPORT_LANG" = "ko" ]; then
+    C_MD_TITLE=$(tfmt conformance.md_title "$PROJECT")
+    C_MD_GEN=$(tfmt conformance.md_generated "$GEN_AT")
+    C_MD_FMT=$(tfmt conformance.md_format "$FORMAT")
+    C_MD_RESULT=$(tfmt conformance.md_result "$RESULT_UP" "$N_FAIL" "$N_WARN" "$N_REVIEW")
+    C_MD_UNTRACE=$(tfmt conformance.md_untraceable "$N_UNTRACEABLE")
+    C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
+    C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
+    C_TH_EVID=$(kstr conformance.th_evidence)
+    C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
+    C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
+    C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
+    C_REF=$(kstr conformance.reference); C_REF="${C_REF%% *}"   # "참고:" prefix
+    C_SOURCE=$(kstr conformance.source); C_SOURCE="${C_SOURCE%% *}"
+    C_MAPPED="대응 요소:"; C_MSUFFIX="개"; C_MPRESENT="충족"; C_MGAP="미충족"; C_MREVIEW="검토 필요"
+    C_TH_G7=$(kstr conformance.th_g7element); C_TH_XREF=$(kstr conformance.th_reference)
+    C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT")
+    C_KIND=$(kstr conformance.kind); C_H1=$(kstr conformance.h1)
+    C_META="$(kstr conformance.meta_project): ${PROJECT_ESC} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT}"
+    C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
+    C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
+    C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
+else
+    C_MD_TITLE="SBOM Conformance — ${PROJECT}"
+    C_MD_GEN="- Generated: ${GEN_AT}"
+    C_MD_FMT="- Format: ${FORMAT}"
+    C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
+    C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
+    C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"; C_TH_EVID="Evidence"
+    C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
+    C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
+    C_H2_XWALK="Regulatory crosswalk"
+    C_YES="yes"; C_NO="no"
+    C_REF="Reference:"; C_SOURCE="Source:"
+    C_MAPPED="Mapped elements:"; C_MSUFFIX=""; C_MPRESENT="present"; C_MGAP="gap"; C_MREVIEW="needs review"
+    C_TH_G7="G7 element"; C_TH_XREF="Reference"
+    C_HTML_TITLE="SBOM Conformance — ${PROJECT}"
+    C_KIND="Conformance"; C_H1="SBOM Conformance Report"
+    C_META="Project: ${PROJECT_ESC} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
+    C_PILL_RESULT="Result: ${RESULT_UP}"
+    C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
+    C_PILL_UNTRACE="Untraceable (pkg:generic):"
+fi
+
+# --------------------------------------------------------
 # Markdown report
 # --------------------------------------------------------
 {
-    echo "# SBOM Conformance — ${PROJECT}"
+    echo "# ${C_MD_TITLE}"
     echo ""
-    echo "- Generated: ${GEN_AT}"
-    echo "- Format: ${FORMAT}"
-    echo "- Result: **$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
-    [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
+    echo "${C_MD_GEN}"
+    echo "${C_MD_FMT}"
+    echo "${C_MD_RESULT}"
+    [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "${C_MD_UNTRACE}"
     echo ""
-    echo "| Status | Requirement | Required | Detail | Evidence |"
+    echo "| ${C_TH_STATUS} | ${C_TH_REQMT} | ${C_TH_REQD} | ${C_TH_DETAIL} | ${C_TH_EVID} |"
     echo "|--------|-------------|:--------:|--------|----------|"
-    echo "$CHECKS" | jq -r '.[] |
-        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | \(if .required then "yes" else "no" end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" '.[] |
+        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | \(if .required then $yes else $no end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
     echo ""
     # Missing-item detail for every non-passing check that names offenders —
     # mandatory failures AND advisory G7 warns (a reviewer needs to know WHICH
     # model components lack the license/hash, not just the count).
-    if echo "$CHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
-        echo "## Missing / non-conformant items"
+    if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
+        echo "## ${C_H2_MISSING}"
         echo ""
-        echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
+        echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
     fi
     # How to fill the gaps (AI SBOMs only): the CycloneDX fragment that would
     # satisfy each advisory element still missing. Scoped to real gaps — passing
     # elements need nothing, and the "na" ones have no fragment to show — so a
     # well-documented model adds no section at all.
-    if echo "$CHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
-        echo "## How to fill the gaps"
+    if echo "$RCHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
+        echo "## ${C_H2_FILL}"
         echo ""
-        echo "Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
+        echo "${C_FILL_INTRO}"
         echo ""
-        echo "$CHECKS" | jq -r '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
+        echo "$RCHECKS" | jq -r --arg ref "$C_REF" '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
             "### \(.label)",
             "",
             "```json",
             .guidance.snippet,
             "```",
             "",
-            "Reference: \(.guidance.docUrl)",
+            "\($ref) \(.guidance.docUrl)",
             ""'
     fi
     # Regulatory crosswalk (AI SBOMs only): which documentation obligation each
     # mapped G7 element touches. Visibility only — see the disclaimer; it does not
     # change the result above.
-    if [ "$(echo "$XW_SUMMARY" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "## Regulatory crosswalk"
+    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "## ${C_H2_XWALK}"
         echo ""
-        echo "$XW_SUMMARY" | jq -r '.disclaimer'
+        echo "$RXW" | jq -r '.disclaimer'
         echo ""
-        echo "$XW_SUMMARY" | jq -r '.frameworks[] |
+        echo "$RXW" | jq -r \
+            --arg src "$C_SOURCE" --arg mapped "$C_MAPPED" --arg sfx "$C_MSUFFIX" \
+            --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
+            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thr "$C_TH_XREF" '.frameworks[] |
             "### \(.title)",
             "",
-            "Source: \(.source)",
+            "\($src) \(.source)",
             "",
-            "Mapped elements: \(.total) — present \(.present), gap \(.gap), needs review \(.review)",
+            "\($mapped) \(.total)\($sfx) — \($pres) \(.present), \($gap) \(.gap), \($rev) \(.review)",
             "",
-            "| Status | G7 element | Reference |",
+            "| \($ths) | \($thg) | \($thr) |",
             "|--------|-----------|-----------|",
             (.elements[] | "| \(if .status=="pass" then "✅" elif (.source//"")=="na" then "🔍" else "⚠️" end) | \(.label | gsub("[|\n]";" ")) | \((.refs | join(", ")) | gsub("[|\n]";" ")) |"),
             ""'
@@ -507,10 +628,10 @@ jq -n \
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="${HTML_LANG}"><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>SBOM Conformance — ${PROJECT}</title>
+<title>${C_HTML_TITLE}</title>
 <style>
  :root{
   --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
@@ -573,51 +694,53 @@ jq -n \
 </style></head><body>
 <header class="report-header">
  <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">Conformance</div>
+ <div class="report-kind">${C_KIND}</div>
 </header>
-<h1>SBOM Conformance Report</h1>
-<p class="meta">Project: $(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g') &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}</p>
+<h1>${C_H1}</h1>
+<p class="meta">${C_META}</p>
 <div class="cards">
- <span class="pill pill-$( [ "$RESULT" = "pass" ] && echo pass || echo fail )">Result: $(echo "$RESULT" | tr '[:lower:]' '[:upper:]')</span>
- <span class="pill pill-fail">Mandatory failures: <span class="count">${N_FAIL}</span></span>
- <span class="pill pill-warn">Warnings: <span class="count">${N_WARN}</span></span>
- <span class="pill">Needs review: <span class="count">${N_REVIEW}</span></span>
-$( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">Untraceable (pkg:generic): <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
+ <span class="pill pill-$( [ "$RESULT" = "pass" ] && echo pass || echo fail )">${C_PILL_RESULT}</span>
+ <span class="pill pill-fail">${C_PILL_FAIL} <span class="count">${N_FAIL}</span></span>
+ <span class="pill pill-warn">${C_PILL_WARN} <span class="count">${N_WARN}</span></span>
+ <span class="pill">${C_PILL_REVIEW} <span class="count">${N_REVIEW}</span></span>
+$( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
-<div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
+<div class="table-wrap"><table><tr><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>
 HTMLHEAD
-    echo "$CHECKS" | jq -r '.[] |
+    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" '.[] |
         "<tr><td class=\"s-\(.status)\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
-        "<td>" + (.label|@html) + "</td><td>" + (if .required then "yes" else "no" end) + "</td>" +
+        "<td>" + (.label|@html) + "</td><td>" + (if .required then $yes else $no end) + "</td>" +
         "<td>" + ((.detail // "")|@html) + "</td>" +
         "<td>" + (((.evidence // []) | join(", "))|@html) + "</td></tr>"'
     echo "</table></div>"
-    if echo "$CHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
-        echo "<h2>Missing / non-conformant items</h2>"
-        echo "$CHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
+    if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
+        echo "<h2>${C_H2_MISSING}</h2>"
+        echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
     fi
     # How to fill the gaps (AI SBOMs only) — same scoping as the Markdown: only
     # advisory elements that are actually missing and have a fragment to show.
-    if echo "$CHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
-        echo "<h2>How to fill the gaps</h2>"
-        echo "<p class=\"meta\">Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it.</p>"
-        echo "$CHECKS" | jq -r '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
+    if echo "$RCHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
+        echo "<h2>${C_H2_FILL}</h2>"
+        echo "<p class=\"meta\">${C_FILL_INTRO}</p>"
+        echo "$RCHECKS" | jq -r --arg ref "$C_REF" '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
             "<h3>" + (.label|@html) + "</h3>" +
             "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>" +
-            "<p class=\"meta\">Reference: " + (.guidance.docUrl|@html) + "</p>"'
+            "<p class=\"meta\">" + ($ref|@html) + " " + (.guidance.docUrl|@html) + "</p>"'
     fi
     # Regulatory crosswalk (AI SBOMs only): documentation obligations each mapped
     # G7 element touches. Visibility only — the disclaimer states BomLens does not
     # certify compliance; this section never affects the result above.
-    if [ "$(echo "$XW_SUMMARY" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "<h2>Regulatory crosswalk</h2>"
-        echo "<p class=\"meta\">$(echo "$XW_SUMMARY" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
-        echo "$XW_SUMMARY" | jq -r '.frameworks[] |
+    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "<h2>${C_H2_XWALK}</h2>"
+        echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
+        echo "$RXW" | jq -r \
+            --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
+            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thr "$C_TH_XREF" '.frameworks[] |
             "<h3>" + (.title|@html) + "</h3>" +
-            "<p class=\"meta\">" + (.source|@html) + " &middot; present " + (.present|tostring)
-              + ", gap " + (.gap|tostring) + ", needs review " + (.review|tostring) + "</p>" +
-            "<div class=\"table-wrap\"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr>" +
+            "<p class=\"meta\">" + (.source|@html) + " &middot; " + ($pres|@html) + " " + (.present|tostring)
+              + ", " + ($gap|@html) + " " + (.gap|tostring) + ", " + ($rev|@html) + " " + (.review|tostring) + "</p>" +
+            "<div class=\"table-wrap\"><table><tr><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thr|@html) + "</th></tr>" +
             ([ .elements[] |
                "<tr><td class=\"s-" + (if .status=="pass" then "pass" else "warn" end) + "\">"
                + (if (.source//"")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>"

@@ -14,7 +14,7 @@ import { test, type Page } from "@playwright/test";
 const IMAGES = "../../../docs/images";
 
 type Lang = "en" | "ko";
-type Caps = { firmware: boolean; scanoss?: boolean; docker: boolean; aibom?: boolean };
+type Caps = { firmware: boolean; scanoss?: boolean; docker: boolean; aibom?: boolean; spdxExport?: boolean };
 
 // Disable fade-in/slide animations so screenshots are crisp and stable.
 async function killAnim(page: Page) {
@@ -299,6 +299,19 @@ test("@capture licenses section (content)", async ({ page }) => {
   await killAnim(page);
   await settleMain(page);
   await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-licenses.png` });
+});
+
+test("@capture artifacts section (content)", async ({ page }) => {
+  await seedLang(page, "en");
+  // spdxExport on and no `.spdx.json` in the results, so the SBOM card shows the
+  // "Export as SPDX 2.3" action the guide points UI users at.
+  await stub(page, { firmware: false, scanoss: false, docker: true, spdxExport: true }, { done: DONE });
+  await runScan(page, "demo", "1.0");
+  await NAV(page, "artifacts").click();
+  await page.getByRole("button", { name: /Export as SPDX/ }).waitFor();
+  await killAnim(page);
+  await settleMain(page);
+  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-artifacts.png` });
 });
 
 test("@capture models section (content)", async ({ page }) => {

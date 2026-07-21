@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>SBOM 적합성 — Aether-7B-5Attn</title>
+<style>
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+ table{border-collapse:collapse;width:100%;font-size:.85rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ .s-pass{color:#16a34a;font-weight:700;}
+ .s-fail{color:#dc2626;font-weight:700;}
+ .s-warn{color:#ca8a04;font-weight:700;}
+ .mono{list-style:none;padding-left:0;}
+ .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
+ pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
+     padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
+ pre code{font-family:var(--mono);font-size:.8rem;white-space:pre;}
+ ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
+</style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">적합성</div>
+</header>
+<h1>SBOM 적합성 보고서</h1>
+<p class="meta">프로젝트: Aether-7B-5Attn &middot; 생성 시각: 2026-07-21T02:31:20Z &middot; 형식: CycloneDX</p>
+<div class="cards">
+ <span class="pill pill-pass">결과: PASS</span>
+ <span class="pill pill-fail">필수 실패: <span class="count">0</span></span>
+ <span class="pill pill-warn">경고: <span class="count">13</span></span>
+ <span class="pill">검토 필요: <span class="count">13</span></span>
+
+</div>
+<div class="table-wrap"><table><tr><th>상태</th><th>요구사항</th><th>필수</th><th>세부 내용</th><th>근거</th></tr>
+<tr><td class="s-pass">PASS</td><td>사양 버전 (CycloneDX 1.3/1.4/1.5/1.6/1.7)</td><td>예</td><td>CycloneDX 1.7</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>타임스탬프 (metadata.timestamp)</td><td>예</td><td>2026-07-21T00:36:59+00:00</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>도구 정보 (metadata.tools)</td><td>예</td><td>도구 1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>최상위 구성요소 이름+버전</td><td>예</td><td>job-2026-07-21-00:36:59@1.0</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>구성요소 이름+버전 포함률 (100%)</td><td>예</td><td>1/1</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>PURL 포함률 (90% 이상)</td><td>예</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>추적 가능한 PURL (pkg:generic 없음, 권고)</td><td>아니오</td><td>추적 불가 0개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>PURL 형식 (pkg:type/name@version)</td><td>예</td><td>형식 오류 0개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>전이 의존성 (의존 그래프)</td><td>예</td><td>의존 관계 1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>라이선스 포함률 (80% 이상, 권장)</td><td>아니오</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>해시 포함률 (50% 이상, 권장)</td><td>아니오</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM 작성자</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 버전</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 데이터 형식 이름</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 데이터 형식 버전</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM 작성자 서명</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 생성 도구 이름</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 생성 도구 버전</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM 생성 맥락</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 타임스탬프</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM 의존성 관계</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>시스템 이름</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>시스템 구성요소</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>시스템 제작자</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>시스템 버전</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>시스템 타임스탬프</td><td>아니오</td><td>있음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>시스템 데이터 흐름</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>시스템 데이터 사용</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>시스템 입출력 속성</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>적용 대상 분야</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 이름</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 식별자</td><td>아니오</td><td>모델 구성요소 1/1개</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@613f399c</td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 버전</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 타임스탬프</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 제작자</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 설명</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 해시 값</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 해시 알고리즘</td><td>아니오</td><td>모델 구성요소 1/1개</td><td>SHA-256</td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 속성 (모델 카드)</td><td>아니오</td><td>모델 구성요소 1/1개</td><td>aether_v2_7way</td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 입출력 속성</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 학습 속성</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 라이선스</td><td>아니오</td><td>모델 구성요소 1/1개</td><td>Apache-2.0</td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 라이선스 — 공개성 (가중치/구조/데이터/학습)</td><td>아니오</td><td>있음</td><td>open-architecture, open-data, open-training, open-weight, openness:architecture=open-architecture, openness:training-data=open-data, openness:training=open-training, openness:weights=open-weight</td></tr>
+<tr><td class="s-pass">PASS</td><td>모델 외부 참조</td><td>아니오</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>데이터셋 이름</td><td>아니오</td><td>있음</td><td>HAERAE-HUB/KOREAN-SyntheticText-1.5B, HAERAE-HUB/KOREAN-WEBTEXT, HuggingFaceFW/fineweb-edu, HuggingFaceTB/finemath, HuggingFaceTB/smollm-corpus, OpenCoder-LLM/opc-fineweb-code-corpus, open-web-math/open-web-math</td></tr>
+<tr><td class="s-warn">WARN</td><td>데이터셋 설명</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>데이터셋 내용</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>데이터셋 식별자</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>데이터셋 해시</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>데이터셋 출처</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>데이터셋 통계 속성</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>데이터셋 민감도 (개인정보/저작권)</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>데이터셋 의존성 관계</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>데이터셋 라이선스</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>인프라 소프트웨어 (의존성)</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>인프라 하드웨어 (HBOM 연결)</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>보안 통제</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>보안 준수</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>사이버보안 정책 정보</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>취약점 참조</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>보안 지표</td><td>아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>운영 성능 지표(KPI)</td><td>아니오</td><td>SBOM에 없음</td><td></td></tr>
+</table></div>
+<h2>미충족 항목 채우는 방법</h2>
+<p class="meta">아래 항목은 모두 권고이며 결과에 영향을 주지 않습니다. 예시 조각은 해당 항목을 충족하는 형태를 보여줍니다.</p>
+<h3>SBOM 작성자 서명</h3><pre><code>&quot;signature&quot;: {
+  &quot;algorithm&quot;: &quot;ES256&quot;,
+  &quot;value&quot;: &quot;MEUCIQD…&quot;
+}</code></pre><p class="meta">참고: https://cyclonedx.org/docs/1.7/json/#signature</p>
+<h3>데이터셋 설명</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;name&quot;: &quot;wikipedia&quot;,
+  &quot;description&quot;: &quot;Cleaned Wikipedia article dumps.&quot;
+}</code></pre><p class="meta">참고: https://huggingface.co/docs/hub/datasets-cards</p>
+<h3>데이터셋 식별자</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;bom-ref&quot;: &quot;dataset:wikipedia&quot;,
+  &quot;purl&quot;: &quot;pkg:huggingface/datasets/wikipedia&quot;
+}</code></pre><p class="meta">참고: https://github.com/package-url/purl-spec</p>
+<h3>데이터셋 출처</h3><pre><code>&quot;componentData&quot;: {
+  &quot;governance&quot;: { &quot;custodians&quot;: [ { &quot;organization&quot;: { &quot;name&quot;: &quot;Wikimedia&quot; } } ] }
+}</code></pre><p class="meta">참고: https://cyclonedx.org/capabilities/mlbom/</p>
+<h3>데이터셋 라이선스</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;name&quot;: &quot;wikipedia&quot;,
+  &quot;licenses&quot;: [ { &quot;license&quot;: { &quot;id&quot;: &quot;CC-BY-SA-3.0&quot; } } ]
+}</code></pre><p class="meta">참고: https://huggingface.co/docs/hub/datasets-cards</p>
+<h3>인프라 하드웨어 (HBOM 연결)</h3><pre><code>&quot;externalReferences&quot;: [
+  { &quot;type&quot;: &quot;bom&quot;, &quot;url&quot;: &quot;https://example.com/hbom.json&quot; }
+]</code></pre><p class="meta">참고: https://cyclonedx.org/capabilities/hbom/</p>
+<h2>규제 대응표</h2>
+<p class="meta">BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.</p>
+<h3>EU AI Act — Annex IV technical documentation</h3><p class="meta">Regulation (EU) 2024/1689, Article 11(1) and Annex IV &middot; 충족 6, 미충족 7, 검토 필요 10</p><div class="table-wrap"><table><tr><th>상태</th><th>G7 요소</th><th>참조</th></tr><tr><td class="s-pass">PASS</td><td>시스템 이름</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>시스템 데이터 흐름</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>시스템 데이터 사용</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>시스템 입출력 속성</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>적용 대상 분야</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>모델 설명</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>모델 속성 (모델 카드)</td><td>Annex IV(2)(b)-(c)</td></tr><tr><td class="s-pass">PASS</td><td>모델 입출력 속성</td><td>Annex IV(3)</td></tr><tr><td class="s-pass">PASS</td><td>모델 학습 속성</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-pass">PASS</td><td>데이터셋 이름</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>데이터셋 설명</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>데이터셋 내용</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>데이터셋 출처</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>데이터셋 통계 속성</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>데이터셋 민감도 (개인정보/저작권)</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>데이터셋 라이선스</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>인프라 소프트웨어 (의존성)</td><td>Annex IV(2)(c)</td></tr><tr><td class="s-warn">WARN</td><td>인프라 하드웨어 (HBOM 연결)</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>보안 통제</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>사이버보안 정책 정보</td><td>Annex IV(5)</td></tr><tr><td class="s-warn">WARN</td><td>취약점 참조</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>보안 지표</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">WARN</td><td>운영 성능 지표(KPI)</td><td>Annex IV(2)(g)</td></tr></table></div>
+<h3>AI Framework Act (Korea)</h3><p class="meta">인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22) &middot; 충족 2, 미충족 1, 검토 필요 7</p><div class="table-wrap"><table><tr><th>상태</th><th>G7 요소</th><th>참조</th></tr><tr><td class="s-pass">PASS</td><td>시스템 이름</td><td>제31조</td></tr><tr><td class="s-warn">REVIEW</td><td>시스템 데이터 흐름</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>시스템 데이터 사용</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>적용 대상 분야</td><td>제33조</td></tr><tr><td class="s-pass">PASS</td><td>모델 학습 속성</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>데이터셋 민감도 (개인정보/저작권)</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>보안 통제</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>사이버보안 정책 정보</td><td>제32조</td></tr><tr><td class="s-warn">WARN</td><td>취약점 참조</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>보안 지표</td><td>제32조</td></tr></table></div>
+</body></html>

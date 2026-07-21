@@ -5,94 +5,471 @@
     {
       "id": "metadata",
       "title": "Metadata",
+      "name": "Metadata",
+      "name_ko": "메타데이터",
       "elements": [
-        { "id": "g7-meta-author",        "label": "SBOM author",                "role": "sbom-author", "source": "auto",     "cdxPath": "((.metadata.authors // []) | length > 0) or ((.metadata.supplier // null) != null) or ((.metadata.manufacturer // null) != null)" },
-        { "id": "g7-meta-version",        "label": "SBOM version",               "role": "sbom-author", "source": "auto",     "cdxPath": "(.version // null) != null" },
-        { "id": "g7-meta-format-name",    "label": "SBOM data format name",      "role": "sbom-author", "source": "auto",     "cdxPath": "(.bomFormat // \"\") != \"\"" },
-        { "id": "g7-meta-format-version", "label": "SBOM data format version",   "role": "sbom-author", "source": "auto",     "cdxPath": "(.specVersion // \"\") != \"\"" },
-        { "id": "g7-meta-signature",      "label": "SBOM author signature",      "role": "sbom-author", "source": "declared", "cdxPath": "(.signature // null) != null" },
-        { "id": "g7-meta-tool-name",      "label": "SBOM tool name",             "role": "sbom-author", "source": "auto",     "cdxPath": "[ (.metadata.tools.components? // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.name // \"\") != \"\") ] | length > 0" },
-        { "id": "g7-meta-tool-version",   "label": "SBOM tool version",          "role": "sbom-author", "source": "auto",     "cdxPath": "[ (.metadata.tools.components? // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.version // \"\") != \"\") ] | length > 0" },
-        { "id": "g7-meta-gen-context",    "label": "SBOM generation context",    "role": "sbom-author", "source": "inferred", "cdxPath": "[ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0" },
-        { "id": "g7-meta-timestamp",      "label": "SBOM timestamp",             "role": "sbom-author", "source": "auto",     "cdxPath": "(.metadata.timestamp // \"\") != \"\"" },
-        { "id": "g7-meta-dependency",     "label": "SBOM dependency relationship","role": "sbom-author","source": "auto",     "cdxPath": "((.dependencies // []) | length) > 0" }
+        {
+          "id": "g7-meta-author",
+          "label": "SBOM author",
+          "label_ko": "SBOM 작성자",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "((.metadata.authors // []) | length > 0) or ((.metadata.supplier // null) != null) or ((.metadata.manufacturer // null) != null)"
+        },
+        {
+          "id": "g7-meta-version",
+          "label": "SBOM version",
+          "label_ko": "SBOM 버전",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "(.version // null) != null"
+        },
+        {
+          "id": "g7-meta-format-name",
+          "label": "SBOM data format name",
+          "label_ko": "SBOM 데이터 형식 이름",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "(.bomFormat // \"\") != \"\""
+        },
+        {
+          "id": "g7-meta-format-version",
+          "label": "SBOM data format version",
+          "label_ko": "SBOM 데이터 형식 버전",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "(.specVersion // \"\") != \"\""
+        },
+        {
+          "id": "g7-meta-signature",
+          "label": "SBOM author signature",
+          "label_ko": "SBOM 작성자 서명",
+          "role": "sbom-author",
+          "source": "declared",
+          "cdxPath": "(.signature // null) != null"
+        },
+        {
+          "id": "g7-meta-tool-name",
+          "label": "SBOM tool name",
+          "label_ko": "SBOM 생성 도구 이름",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "[ (.metadata.tools.components? // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.name // \"\") != \"\") ] | length > 0"
+        },
+        {
+          "id": "g7-meta-tool-version",
+          "label": "SBOM tool version",
+          "label_ko": "SBOM 생성 도구 버전",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "[ (.metadata.tools.components? // .metadata.tools // []) | if type==\"array\" then .[] else empty end | select((.version // \"\") != \"\") ] | length > 0"
+        },
+        {
+          "id": "g7-meta-gen-context",
+          "label": "SBOM generation context",
+          "label_ko": "SBOM 생성 맥락",
+          "role": "sbom-author",
+          "source": "inferred",
+          "cdxPath": "[ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0"
+        },
+        {
+          "id": "g7-meta-timestamp",
+          "label": "SBOM timestamp",
+          "label_ko": "SBOM 타임스탬프",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "(.metadata.timestamp // \"\") != \"\""
+        },
+        {
+          "id": "g7-meta-dependency",
+          "label": "SBOM dependency relationship",
+          "label_ko": "SBOM 의존성 관계",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "((.dependencies // []) | length) > 0"
+        }
       ]
     },
     {
       "id": "slp",
       "title": "System Level Properties",
+      "name": "System Level Properties",
+      "name_ko": "시스템 수준 속성",
       "elements": [
-        { "id": "g7-slp-name",       "label": "System name",              "role": "system-producer", "source": "declared", "cdxPath": "((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))" },
-        { "id": "g7-slp-components", "label": "System components",        "role": "system-producer", "source": "inferred", "cdxPath": "((.components // []) | length) > 1" },
-        { "id": "g7-slp-producer",   "label": "System producer",         "role": "system-producer", "source": "declared", "cdxPath": "((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)" },
-        { "id": "g7-slp-version",    "label": "System version",          "role": "system-producer", "source": "inferred", "cdxPath": "((.metadata.component.version // \"\") != \"\")" },
-        { "id": "g7-slp-timestamp",  "label": "System timestamp",        "role": "system-producer", "source": "inferred", "cdxPath": "(.metadata.timestamp // \"\") != \"\"" },
-        { "id": "g7-slp-data-flow",  "label": "System data flow",        "role": "system-producer", "source": "na",       "cdxPath": null },
-        { "id": "g7-slp-data-usage", "label": "System data usage",       "role": "system-producer", "source": "na",       "cdxPath": null },
-        { "id": "g7-slp-io",         "label": "System input/output properties", "role": "system-producer", "source": "na", "cdxPath": null },
-        { "id": "g7-slp-app-area",   "label": "Intended application area","role": "system-producer", "source": "na",       "cdxPath": null }
+        {
+          "id": "g7-slp-name",
+          "label": "System name",
+          "label_ko": "시스템 이름",
+          "role": "system-producer",
+          "source": "declared",
+          "cdxPath": "((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))"
+        },
+        {
+          "id": "g7-slp-components",
+          "label": "System components",
+          "label_ko": "시스템 구성요소",
+          "role": "system-producer",
+          "source": "inferred",
+          "cdxPath": "((.components // []) | length) > 1"
+        },
+        {
+          "id": "g7-slp-producer",
+          "label": "System producer",
+          "label_ko": "시스템 제작자",
+          "role": "system-producer",
+          "source": "declared",
+          "cdxPath": "((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)"
+        },
+        {
+          "id": "g7-slp-version",
+          "label": "System version",
+          "label_ko": "시스템 버전",
+          "role": "system-producer",
+          "source": "inferred",
+          "cdxPath": "((.metadata.component.version // \"\") != \"\")"
+        },
+        {
+          "id": "g7-slp-timestamp",
+          "label": "System timestamp",
+          "label_ko": "시스템 타임스탬프",
+          "role": "system-producer",
+          "source": "inferred",
+          "cdxPath": "(.metadata.timestamp // \"\") != \"\""
+        },
+        {
+          "id": "g7-slp-data-flow",
+          "label": "System data flow",
+          "label_ko": "시스템 데이터 흐름",
+          "role": "system-producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-slp-data-usage",
+          "label": "System data usage",
+          "label_ko": "시스템 데이터 사용",
+          "role": "system-producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-slp-io",
+          "label": "System input/output properties",
+          "label_ko": "시스템 입출력 속성",
+          "role": "system-producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-slp-app-area",
+          "label": "Intended application area",
+          "label_ko": "적용 대상 분야",
+          "role": "system-producer",
+          "source": "na",
+          "cdxPath": null
+        }
       ]
     },
     {
       "id": "models",
       "title": "Models",
+      "name": "Models",
+      "name_ko": "모델",
       "elements": [
-        { "id": "g7-model-name",       "label": "Model name",              "role": "model-producer", "source": "auto",     "missingPath": "[ $models[] | select((.name // \"\") == \"\") | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-id",         "label": "Model identifier",        "role": "sbom-author",    "source": "auto",     "missingPath": "[ $models[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (.name // \"(unnamed)\") ]", "evidencePath": "[ $models[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique" },
-        { "id": "g7-model-version",    "label": "Model version",           "role": "model-producer", "source": "auto",     "missingPath": "[ $models[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-timestamp",  "label": "Model timestamp",         "role": "model-producer", "source": "inferred", "missingPath": "[ $models[] | select(((.properties // []) | map(.name // \"\") | any(test(\"timestamp|created\";\"i\"))) | not) | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-producer",   "label": "Model producer",          "role": "model-producer", "source": "inferred", "missingPath": "[ $models[] | select(((.publisher // \"\") == \"\") and ((.supplier // null) == null) and ((.manufacturer // null) == null)) | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-description","label": "Model description",        "role": "model-producer", "source": "auto",     "missingPath": "[ $models[] | select((.description // \"\") == \"\") | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-hash-value", "label": "Model hash value",        "role": "sbom-author",    "source": "auto",     "missingPath": "[ $models[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-hash-alg",   "label": "Model hash algorithm",    "role": "sbom-author",    "source": "auto",     "missingPath": "[ $models[] | select(([.hashes[]? | select((.alg // \"\") != \"\")] | length) == 0) | (.name // \"(unnamed)\") ]", "evidencePath": "[ $models[] | .hashes[]? | .alg | select(. != null and . != \"\") ] | unique" },
-        { "id": "g7-model-card",       "label": "Model properties (model card)", "role": "model-producer", "source": "auto", "missingPath": "[ $models[] | select((.modelCard.modelParameters // null) == null) | (.name // \"(unnamed)\") ]", "evidencePath": "[ $models[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique" },
-        { "id": "g7-model-io",         "label": "Model input-output properties", "role": "model-producer", "source": "inferred", "missingPath": "[ $models[] | select(((.modelCard.modelParameters.inputs // null) == null) and ((.modelCard.modelParameters.outputs // null) == null)) | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-training",   "label": "Model training properties","role": "model-producer", "source": "inferred", "missingPath": "[ $models[] | select(((.modelCard.modelParameters // {}) | (has(\"datasets\") or has(\"modelArchitecture\") or has(\"architectureFamily\"))) | not) | (.name // \"(unnamed)\") ]" },
-        { "id": "g7-model-license",    "label": "Model license",           "role": "model-producer", "source": "auto",     "missingPath": "[ $models[] | select(((.licenses // []) | length) == 0) | (.name // \"(unnamed)\") ]", "evidencePath": "[ $models[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique" },
-        { "id": "g7-model-openness",   "label": "Model license — openness (weight/architecture/data/training)", "role": "model-producer", "source": "inferred", "cdxPath": "(([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) ] | length) > 0) or (([ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ] | length) > 0)", "evidencePath": "([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) | \"\\(.name)=\\(.value)\" ] + [ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ]) | unique" },
-        { "id": "g7-model-extref",     "label": "Model external references","role": "model-producer", "source": "auto",     "missingPath": "[ $models[] | select(((.externalReferences // []) | length) == 0) | (.name // \"(unnamed)\") ]" }
+        {
+          "id": "g7-model-name",
+          "label": "Model name",
+          "label_ko": "모델 이름",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select((.name // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-id",
+          "label": "Model identifier",
+          "label_ko": "모델 식별자",
+          "role": "sbom-author",
+          "source": "auto",
+          "missingPath": "[ $models[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $models[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique"
+        },
+        {
+          "id": "g7-model-version",
+          "label": "Model version",
+          "label_ko": "모델 버전",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-timestamp",
+          "label": "Model timestamp",
+          "label_ko": "모델 타임스탬프",
+          "role": "model-producer",
+          "source": "inferred",
+          "missingPath": "[ $models[] | select(((.properties // []) | map(.name // \"\") | any(test(\"timestamp|created\";\"i\"))) | not) | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-producer",
+          "label": "Model producer",
+          "label_ko": "모델 제작자",
+          "role": "model-producer",
+          "source": "inferred",
+          "missingPath": "[ $models[] | select(((.publisher // \"\") == \"\") and ((.supplier // null) == null) and ((.manufacturer // null) == null)) | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-description",
+          "label": "Model description",
+          "label_ko": "모델 설명",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select((.description // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-hash-value",
+          "label": "Model hash value",
+          "label_ko": "모델 해시 값",
+          "role": "sbom-author",
+          "source": "auto",
+          "missingPath": "[ $models[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-hash-alg",
+          "label": "Model hash algorithm",
+          "label_ko": "모델 해시 알고리즘",
+          "role": "sbom-author",
+          "source": "auto",
+          "missingPath": "[ $models[] | select(([.hashes[]? | select((.alg // \"\") != \"\")] | length) == 0) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $models[] | .hashes[]? | .alg | select(. != null and . != \"\") ] | unique"
+        },
+        {
+          "id": "g7-model-card",
+          "label": "Model properties (model card)",
+          "label_ko": "모델 속성 (모델 카드)",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select((.modelCard.modelParameters // null) == null) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $models[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique"
+        },
+        {
+          "id": "g7-model-io",
+          "label": "Model input-output properties",
+          "label_ko": "모델 입출력 속성",
+          "role": "model-producer",
+          "source": "inferred",
+          "missingPath": "[ $models[] | select(((.modelCard.modelParameters.inputs // null) == null) and ((.modelCard.modelParameters.outputs // null) == null)) | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-training",
+          "label": "Model training properties",
+          "label_ko": "모델 학습 속성",
+          "role": "model-producer",
+          "source": "inferred",
+          "missingPath": "[ $models[] | select(((.modelCard.modelParameters // {}) | (has(\"datasets\") or has(\"modelArchitecture\") or has(\"architectureFamily\"))) | not) | (.name // \"(unnamed)\") ]"
+        },
+        {
+          "id": "g7-model-license",
+          "label": "Model license",
+          "label_ko": "모델 라이선스",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select(((.licenses // []) | length) == 0) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $models[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique"
+        },
+        {
+          "id": "g7-model-openness",
+          "label": "Model license — openness (weight/architecture/data/training)",
+          "label_ko": "모델 라이선스 — 공개성 (가중치/구조/데이터/학습)",
+          "role": "model-producer",
+          "source": "inferred",
+          "cdxPath": "(([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) ] | length) > 0) or (([ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ] | length) > 0)",
+          "evidencePath": "([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) | \"\\(.name)=\\(.value)\" ] + [ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ]) | unique"
+        },
+        {
+          "id": "g7-model-extref",
+          "label": "Model external references",
+          "label_ko": "모델 외부 참조",
+          "role": "model-producer",
+          "source": "auto",
+          "missingPath": "[ $models[] | select(((.externalReferences // []) | length) == 0) | (.name // \"(unnamed)\") ]"
+        }
       ]
     },
     {
       "id": "dp",
       "title": "Datasets Properties",
+      "name": "Datasets Properties",
+      "name_ko": "데이터셋 속성",
       "elements": [
-        { "id": "g7-ds-name",        "label": "Dataset name",                  "role": "dataset-creator", "source": "auto",     "cdxPath": "(([ .components[]? | select(.type==\"data\") ]) + ([ .. | objects | select(has(\"datasets\")) | .datasets[]? ])) | map(if type==\"string\" then . elif type==\"object\" then (.name // .ref // .componentData.name // \"\") else \"\" end) | map(select(. != \"\")) | length > 0", "evidencePath": "(([ .components[]? | select(.type==\"data\") ]) + ([ .. | objects | select(has(\"datasets\")) | .datasets[]? ])) | map(if type==\"string\" then . elif type==\"object\" then (.name // .ref // .componentData.name // \"\") else \"\" end) | map(select(. != \"\")) | unique" },
-        { "id": "g7-ds-description", "label": "Dataset description",           "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select((.description // \"\") != \"\") ] | length > 0" },
-        { "id": "g7-ds-content",     "label": "Dataset content",               "role": "dataset-creator", "source": "na",       "cdxPath": null },
-        { "id": "g7-ds-identifier",  "label": "Dataset identifier",            "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.[\"bom-ref\"] // \"\") != \"\") or ((.purl // \"\") != \"\")) ] | length > 0" },
-        { "id": "g7-ds-hash",        "label": "Dataset hash",                  "role": "dataset-creator", "source": "na",       "cdxPath": null },
-        { "id": "g7-ds-provenance",  "label": "Dataset provenance",            "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.componentData.governance // null) != null) or ((.properties // []) | map(.name // \"\") | any(test(\"provenance|source\";\"i\")))) ] | length > 0" },
-        { "id": "g7-ds-statistics",  "label": "Dataset statistical properties","role": "dataset-creator", "source": "na",       "cdxPath": null },
-        { "id": "g7-ds-sensitivity", "label": "Dataset sensitivity (PII/copyright)", "role": "dataset-creator", "source": "na", "cdxPath": null },
-        { "id": "g7-ds-dependency",  "label": "Dataset dependency relationship","role": "dataset-creator", "source": "na",       "cdxPath": null },
-        { "id": "g7-ds-license",     "label": "Dataset license",               "role": "dataset-creator", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.licenses // []) | length) > 0) ] | length > 0" }
+        {
+          "id": "g7-ds-name",
+          "label": "Dataset name",
+          "label_ko": "데이터셋 이름",
+          "role": "dataset-creator",
+          "source": "auto",
+          "cdxPath": "(([ .components[]? | select(.type==\"data\") ]) + ([ .. | objects | select(has(\"datasets\")) | .datasets[]? ])) | map(if type==\"string\" then . elif type==\"object\" then (.name // .ref // .componentData.name // \"\") else \"\" end) | map(select(. != \"\")) | length > 0",
+          "evidencePath": "(([ .components[]? | select(.type==\"data\") ]) + ([ .. | objects | select(has(\"datasets\")) | .datasets[]? ])) | map(if type==\"string\" then . elif type==\"object\" then (.name // .ref // .componentData.name // \"\") else \"\" end) | map(select(. != \"\")) | unique"
+        },
+        {
+          "id": "g7-ds-description",
+          "label": "Dataset description",
+          "label_ko": "데이터셋 설명",
+          "role": "dataset-creator",
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select((.description // \"\") != \"\") ] | length > 0"
+        },
+        {
+          "id": "g7-ds-content",
+          "label": "Dataset content",
+          "label_ko": "데이터셋 내용",
+          "role": "dataset-creator",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-ds-identifier",
+          "label": "Dataset identifier",
+          "label_ko": "데이터셋 식별자",
+          "role": "dataset-creator",
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.[\"bom-ref\"] // \"\") != \"\") or ((.purl // \"\") != \"\")) ] | length > 0"
+        },
+        {
+          "id": "g7-ds-hash",
+          "label": "Dataset hash",
+          "label_ko": "데이터셋 해시",
+          "role": "dataset-creator",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-ds-provenance",
+          "label": "Dataset provenance",
+          "label_ko": "데이터셋 출처",
+          "role": "dataset-creator",
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.componentData.governance // null) != null) or ((.properties // []) | map(.name // \"\") | any(test(\"provenance|source\";\"i\")))) ] | length > 0"
+        },
+        {
+          "id": "g7-ds-statistics",
+          "label": "Dataset statistical properties",
+          "label_ko": "데이터셋 통계 속성",
+          "role": "dataset-creator",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-ds-sensitivity",
+          "label": "Dataset sensitivity (PII/copyright)",
+          "label_ko": "데이터셋 민감도 (개인정보/저작권)",
+          "role": "dataset-creator",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-ds-dependency",
+          "label": "Dataset dependency relationship",
+          "label_ko": "데이터셋 의존성 관계",
+          "role": "dataset-creator",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-ds-license",
+          "label": "Dataset license",
+          "label_ko": "데이터셋 라이선스",
+          "role": "dataset-creator",
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.licenses // []) | length) > 0) ] | length > 0"
+        }
       ]
     },
     {
       "id": "infrastructure",
       "title": "Infrastructure",
+      "name": "Infrastructure",
+      "name_ko": "인프라",
       "elements": [
-        { "id": "g7-infra-software", "label": "Infrastructure software (dependencies)", "role": "system-producer", "source": "auto",     "cdxPath": "[ .components[]? | select(.type==\"library\" or .type==\"application\" or .type==\"framework\") ] | length > 0" },
-        { "id": "g7-infra-hardware", "label": "Infrastructure hardware (HBOM link)",    "role": "system-producer", "source": "declared", "cdxPath": "(([ .components[]? | select(.type==\"device\" or .type==\"hardware\") ] | length) > 0) or (([ .externalReferences[]? | select((.type // \"\") | test(\"bom|hardware\";\"i\")) ] | length) > 0)" }
+        {
+          "id": "g7-infra-software",
+          "label": "Infrastructure software (dependencies)",
+          "label_ko": "인프라 소프트웨어 (의존성)",
+          "role": "system-producer",
+          "source": "auto",
+          "cdxPath": "[ .components[]? | select(.type==\"library\" or .type==\"application\" or .type==\"framework\") ] | length > 0"
+        },
+        {
+          "id": "g7-infra-hardware",
+          "label": "Infrastructure hardware (HBOM link)",
+          "label_ko": "인프라 하드웨어 (HBOM 연결)",
+          "role": "system-producer",
+          "source": "declared",
+          "cdxPath": "(([ .components[]? | select(.type==\"device\" or .type==\"hardware\") ] | length) > 0) or (([ .externalReferences[]? | select((.type // \"\") | test(\"bom|hardware\";\"i\")) ] | length) > 0)"
+        }
       ]
     },
     {
       "id": "sp",
       "title": "Security Properties",
+      "name": "Security Properties",
+      "name_ko": "보안 속성",
       "elements": [
-        { "id": "g7-sec-controls",   "label": "Security controls",              "role": "producer",    "source": "na",   "cdxPath": null },
-        { "id": "g7-sec-compliance", "label": "Security compliance",            "role": "producer",    "source": "na",   "cdxPath": null },
-        { "id": "g7-sec-policy",     "label": "Cybersecurity policy information","role": "producer",    "source": "na",   "cdxPath": null },
-        { "id": "g7-sec-vulns",      "label": "Vulnerability referencing",      "role": "sbom-author", "source": "auto", "cdxPath": "((.vulnerabilities // []) | length) > 0" }
+        {
+          "id": "g7-sec-controls",
+          "label": "Security controls",
+          "label_ko": "보안 통제",
+          "role": "producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-sec-compliance",
+          "label": "Security compliance",
+          "label_ko": "보안 준수",
+          "role": "producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-sec-policy",
+          "label": "Cybersecurity policy information",
+          "label_ko": "사이버보안 정책 정보",
+          "role": "producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-sec-vulns",
+          "label": "Vulnerability referencing",
+          "label_ko": "취약점 참조",
+          "role": "sbom-author",
+          "source": "auto",
+          "cdxPath": "((.vulnerabilities // []) | length) > 0"
+        }
       ]
     },
     {
       "id": "kpi",
       "title": "Key Performance Indicators",
+      "name": "Key Performance Indicators",
+      "name_ko": "핵심 성과 지표",
       "elements": [
-        { "id": "g7-kpi-security",    "label": "Security metrics",            "role": "producer",       "source": "na",       "cdxPath": null },
-        { "id": "g7-kpi-operational", "label": "Operational performance KPIs","role": "model-producer", "source": "inferred", "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.modelCard.quantitativeAnalysis.performanceMetrics // .modelCard.modelParameters.performanceMetrics // null) != null)) ] | length > 0" }
+        {
+          "id": "g7-kpi-security",
+          "label": "Security metrics",
+          "label_ko": "보안 지표",
+          "role": "producer",
+          "source": "na",
+          "cdxPath": null
+        },
+        {
+          "id": "g7-kpi-operational",
+          "label": "Operational performance KPIs",
+          "label_ko": "운영 성능 지표(KPI)",
+          "role": "model-producer",
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.modelCard.quantitativeAnalysis.performanceMetrics // .modelCard.modelParameters.performanceMetrics // null) != null)) ] | length > 0"
+        }
       ]
     }
   ]
