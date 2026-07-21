@@ -7,6 +7,7 @@ import {
   describeUploadError,
   downloadAllUrl,
   fileUrl,
+  exportSpdx,
   getCapabilities,
   listScans,
   loadScan,
@@ -150,6 +151,23 @@ describe("network functions", () => {
     expect(await getCapabilities()).toEqual({ firmware: false, scanoss: false, docker: true });
   });
 
+  it("exportSpdx converts by id, and returns null on any failure", async () => {
+    const payload = {
+      name: "app_1.0_bom.spdx.json",
+      results: [{ name: "app_1.0_bom.spdx.json", size: 10 }],
+    };
+    fetchMock.mockResolvedValue(ok(payload));
+    expect(await exportSpdx("app_1.0")).toEqual(payload);
+    expect(fetchMock.mock.calls[0][0]).toBe("/spdx-export?id=app_1.0");
+
+    // 503 (no syft, no docker) and a network error both fall back to null so the
+    // caller can say "export unavailable" instead of throwing at the user.
+    fetchMock.mockResolvedValue(fail(503));
+    expect(await exportSpdx("app_1.0")).toBeNull();
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await exportSpdx("app_1.0")).toBeNull();
+  });
+
   it("listScans returns the array, or [] on any failure", async () => {
     const scans = [{ id: "s1", project: "p", version: "1" }];
     fetchMock.mockResolvedValue(ok(scans));
@@ -235,7 +253,6 @@ const PARAMS: ScanParams = {
   target: "https://example.com/r.git",
   notice: true,
   security: true,
-  spdx: false,
   deepLicense: false,
   identifyVendored: false,
   includeOsv: false,

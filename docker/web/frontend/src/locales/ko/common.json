@@ -50,6 +50,8 @@
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
     "aiModelHint": "HuggingFace 모델 ID를 '조직/모델' 형식으로 입력합니다(예: Qwen/Qwen2.5-0.5B). 컬렉션 이름이나 전체 URL이 아닙니다. 모델 카드 메타데이터를 네트워크로 가져와 CycloneDX ML-BOM을 생성합니다.",
     "aiModelUnavailable": "AI 모델 SBOM은 Docker가 실행 중이어야 사용할 수 있습니다(AIBOM 이미지를 sibling 컨테이너로 실행합니다).",
+    "hfAuthOn": "HuggingFace 인증 상태입니다. 비공개 저장소와 게이트 저장소도 해석됩니다.",
+    "hfAuthOff": "인증 없이 실행 중이라 공개 모델만 해석됩니다. 비공개·게이트 저장소를 스캔하려면(예: 공개 전 모델 검토) HF_TOKEN을 설정하고 UI를 다시 시작하세요.",
     "uploading": "업로드 중…",
     "uploadErrorTooLarge": "파일이 커서 서버가 받을 수 없습니다. 더 작은 압축본으로 다시 시도하거나, 압축을 푼 폴더를 스캔해 주세요.",
     "uploadErrorNetwork": "스캔 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하고 다시 시도해 주세요.",
@@ -62,8 +64,6 @@
     "aiNoticeHint": "AI 모델은 고지문이 모델과 데이터셋 라이선스를 정리하고, 사용 제한이 있는 라이선스(RAIL·비상업)를 검토 대상으로 표시합니다. 켜 두기를 권장합니다.",
     "security": "보안 보고서",
     "securityHint": "Trivy 취약점 보고서 생성",
-    "spdx": "SPDX 내보내기",
-    "spdxHint": "CycloneDX 결과를 변환한 SPDX 2.3 JSON 파일을 함께 생성",
     "deepLicense": "파일 단위 라이선스 스캔",
     "deepLicenseHint": "패키지가 선언한 라이선스에 더해, ScanCode로 내 소스 파일을 직접 스캔해 파일 단위 라이선스 텍스트와 헤더를 찾아냅니다 (느림).",
     "scanMethodHint": "패키지 매니저 없이 스캔하는 소스를 위한 고급 분석입니다. 프로젝트를 패키지 매니저(Maven, npm, pip, Go modules 등)로 빌드한다면 SBOM이 이미 충분하므로 꺼 둬도 됩니다.",
@@ -138,6 +138,9 @@
     "copied": "링크를 복사했습니다",
     "downloadStarted": "다운로드를 시작했습니다",
     "signed": "서명됨",
+    "spdxExport": "SPDX 2.3으로 내보내기",
+    "spdxExporting": "변환 중…",
+    "spdxExportFailed": "SPDX로 내보내지 못했습니다. CycloneDX SBOM은 그대로 사용할 수 있습니다.",
     "kind": {
       "riskReport": {
         "title": "오픈소스 위험분석 보고서",
@@ -145,7 +148,7 @@
       },
       "sbom": {
         "title": "SBOM (CycloneDX)",
-        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다. SPDX 내보내기를 켜면 SPDX 2.3 변환본이 함께 제공됩니다."
+        "desc": "정규화된 소프트웨어 구성 명세를 담은 CycloneDX JSON입니다. SPDX 2.3 사본이 필요하면 언제든 내보낼 수 있습니다."
       },
       "notice": {
         "title": "오픈소스 고지문",
@@ -635,7 +638,7 @@
     "review": "검토 필요"
   },
   "aiProfile": {
-    "title": "AI 규제 대응 요약",
+    "title": "AI 준수 개요",
     "note": "AI SBOM 분석 결과를 문서 검토용으로 한눈에 모은 요약입니다. 규정 준수 여부를 판정하지 않습니다.",
     "verdict": {
       "pass": "통과",

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>SBOM Conformance — Aether-7B-5Attn</title>
+<style>
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+ table{border-collapse:collapse;width:100%;font-size:.85rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ .s-pass{color:#16a34a;font-weight:700;}
+ .s-fail{color:#dc2626;font-weight:700;}
+ .s-warn{color:#ca8a04;font-weight:700;}
+ .mono{list-style:none;padding-left:0;}
+ .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
+ pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
+     padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
+ pre code{font-family:var(--mono);font-size:.8rem;white-space:pre;}
+ ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
+</style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">Conformance</div>
+</header>
+<h1>SBOM Conformance Report</h1>
+<p class="meta">Project: Aether-7B-5Attn &middot; Generated: 2026-07-21T00:37:02Z &middot; Format: CycloneDX</p>
+<div class="cards">
+ <span class="pill pill-pass">Result: PASS</span>
+ <span class="pill pill-fail">Mandatory failures: <span class="count">0</span></span>
+ <span class="pill pill-warn">Warnings: <span class="count">13</span></span>
+ <span class="pill">Needs review: <span class="count">13</span></span>
+
+</div>
+<div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
+<tr><td class="s-pass">PASS</td><td>Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)</td><td>yes</td><td>CycloneDX 1.7</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Timestamp (metadata.timestamp)</td><td>yes</td><td>2026-07-21T00:36:59+00:00</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Tool info (metadata.tools)</td><td>yes</td><td>1 tool(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Top-level component name+version</td><td>yes</td><td>job-2026-07-21-00:36:59@1.0</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Component name+version coverage (100%)</td><td>yes</td><td>1/1</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>PURL coverage (&gt;= 90%)</td><td>yes</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Traceable PURL (no pkg:generic, advisory)</td><td>no</td><td>0 untraceable</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>PURL syntax (pkg:type/name@version)</td><td>yes</td><td>0 malformed</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Transitive dependencies (graph edges)</td><td>yes</td><td>1 edge(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>License coverage (&gt;= 80%, recommended)</td><td>no</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Hash coverage (&gt;= 50%, recommended)</td><td>no</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM author</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM version</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM data format name</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM data format version</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM author signature</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM tool name</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM tool version</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>SBOM generation context</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM timestamp</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>SBOM dependency relationship</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>System name</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>System components</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>System producer</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>System version</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>System timestamp</td><td>no</td><td>present</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>System input/output properties</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model name</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model identifier</td><td>no</td><td>1/1 model component(s)</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@613f399c</td></tr>
+<tr><td class="s-pass">PASS</td><td>Model version</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model timestamp</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model producer</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model description</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model hash value</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model hash algorithm</td><td>no</td><td>1/1 model component(s)</td><td>SHA-256</td></tr>
+<tr><td class="s-pass">PASS</td><td>Model properties (model card)</td><td>no</td><td>1/1 model component(s)</td><td>aether_v2_7way</td></tr>
+<tr><td class="s-pass">PASS</td><td>Model input-output properties</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model training properties</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Model license</td><td>no</td><td>1/1 model component(s)</td><td>Apache-2.0</td></tr>
+<tr><td class="s-pass">PASS</td><td>Model license — openness (weight/architecture/data/training)</td><td>no</td><td>present</td><td>open-architecture, open-data, open-training, open-weight, openness:architecture=open-architecture, openness:training-data=open-data, openness:training=open-training, openness:weights=open-weight</td></tr>
+<tr><td class="s-pass">PASS</td><td>Model external references</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="s-pass">PASS</td><td>Dataset name</td><td>no</td><td>present</td><td>HAERAE-HUB/KOREAN-SyntheticText-1.5B, HAERAE-HUB/KOREAN-WEBTEXT, HuggingFaceFW/fineweb-edu, HuggingFaceTB/finemath, HuggingFaceTB/smollm-corpus, OpenCoder-LLM/opc-fineweb-code-corpus, open-web-math/open-web-math</td></tr>
+<tr><td class="s-warn">WARN</td><td>Dataset description</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Dataset content</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Dataset identifier</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Dataset hash</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Dataset provenance</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Dataset statistical properties</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Dataset dependency relationship</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Dataset license</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Security compliance</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
+</table></div>
+<h2>How to fill the gaps</h2>
+<p class="meta">Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it.</p>
+<h3>SBOM author signature</h3><pre><code>&quot;signature&quot;: {
+  &quot;algorithm&quot;: &quot;ES256&quot;,
+  &quot;value&quot;: &quot;MEUCIQD…&quot;
+}</code></pre><p class="meta">Reference: https://cyclonedx.org/docs/1.7/json/#signature</p>
+<h3>Dataset description</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;name&quot;: &quot;wikipedia&quot;,
+  &quot;description&quot;: &quot;Cleaned Wikipedia article dumps.&quot;
+}</code></pre><p class="meta">Reference: https://huggingface.co/docs/hub/datasets-cards</p>
+<h3>Dataset identifier</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;bom-ref&quot;: &quot;dataset:wikipedia&quot;,
+  &quot;purl&quot;: &quot;pkg:huggingface/datasets/wikipedia&quot;
+}</code></pre><p class="meta">Reference: https://github.com/package-url/purl-spec</p>
+<h3>Dataset provenance</h3><pre><code>&quot;componentData&quot;: {
+  &quot;governance&quot;: { &quot;custodians&quot;: [ { &quot;organization&quot;: { &quot;name&quot;: &quot;Wikimedia&quot; } } ] }
+}</code></pre><p class="meta">Reference: https://cyclonedx.org/capabilities/mlbom/</p>
+<h3>Dataset license</h3><pre><code>{
+  &quot;type&quot;: &quot;data&quot;,
+  &quot;name&quot;: &quot;wikipedia&quot;,
+  &quot;licenses&quot;: [ { &quot;license&quot;: { &quot;id&quot;: &quot;CC-BY-SA-3.0&quot; } } ]
+}</code></pre><p class="meta">Reference: https://huggingface.co/docs/hub/datasets-cards</p>
+<h3>Infrastructure hardware (HBOM link)</h3><pre><code>&quot;externalReferences&quot;: [
+  { &quot;type&quot;: &quot;bom&quot;, &quot;url&quot;: &quot;https://example.com/hbom.json&quot; }
+]</code></pre><p class="meta">Reference: https://cyclonedx.org/capabilities/hbom/</p>
+<h2>Regulatory crosswalk</h2>
+<p class="meta">BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.</p>
+<h3>EU AI Act — Annex IV technical documentation</h3><p class="meta">Regulation (EU) 2024/1689, Article 11(1) and Annex IV &middot; present 6, gap 7, needs review 10</p><div class="table-wrap"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="s-pass">PASS</td><td>System name</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>System input/output properties</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>Model description</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>Model properties (model card)</td><td>Annex IV(2)(b)-(c)</td></tr><tr><td class="s-pass">PASS</td><td>Model input-output properties</td><td>Annex IV(3)</td></tr><tr><td class="s-pass">PASS</td><td>Model training properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-pass">PASS</td><td>Dataset name</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset description</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset content</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset provenance</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset statistical properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset license</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td>Annex IV(2)(c)</td></tr><tr><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>Annex IV(5)</td></tr><tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td>Annex IV(2)(g)</td></tr></table></div>
+<h3>AI Framework Act (Korea)</h3><p class="meta">인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22) &middot; present 2, gap 1, needs review 7</p><div class="table-wrap"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="s-pass">PASS</td><td>System name</td><td>제31조</td></tr><tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>제33조</td></tr><tr><td class="s-pass">PASS</td><td>Model training properties</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>제32조</td></tr><tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>제32조</td></tr></table></div>
+</body></html>

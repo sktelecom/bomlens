@@ -93,6 +93,138 @@ else
     pass "scan-aibom.sh rejects a card-less stub and leaves no artifact"
 fi
 
+echo "== scan-aibom.sh forwards HF_TOKEN without leaking it =="
+# A private/gated model resolves only when huggingface_hub finds HF_TOKEN in the
+# environment, so the variable must reach the generator untouched. It must never
+# reach the logs: this mock records what it received, and the same run's combined
+# output is then searched for the value.
+HF_SENTINEL="hf_sentinel_do_not_leak_9f3a"
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+printf '%s' "\${HF_TOKEN:-<unset>}" > "$WORK/seen-token.txt"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cp "$FIX/aibom-owasp-1_7.json" "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+   bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/tok.json" "1.0.0" \
+   > "$WORK/tok.log" 2>&1; then
+    seen=$(cat "$WORK/seen-token.txt" 2>/dev/null)
+    [ "$seen" = "$HF_SENTINEL" ] \
+        && pass "HF_TOKEN reaches the generator unchanged" \
+        || fail "HF_TOKEN reaches the generator unchanged" "generator saw '$seen'"
+    if grep -qF "$HF_SENTINEL" "$WORK/tok.log"; then
+        fail "scan-aibom.sh keeps HF_TOKEN out of its output" "the token appears in the log"
+    else
+        pass "scan-aibom.sh keeps HF_TOKEN out of its output"
+    fi
+    grep -q "HuggingFace auth: enabled" "$WORK/tok.log" \
+        && pass "scan-aibom.sh reports the auth state without the value" \
+        || fail "scan-aibom.sh reports the auth state without the value" "no auth line in the log"
+else
+    fail "scan-aibom.sh runs with HF_TOKEN set" "exited non-zero against the mock generator"
+fi
+
+echo "== scan-aibom.sh refuses a fabricated card when the model could not be read =="
+# The real failure mode observed against HuggingFace: the generator's fetch gets a
+# 401, it logs a warning, returns empty metadata, and then fills the card with
+# generic defaults — "transformer", "text-generation", string in/out. The result
+# is a well-formed ML-BOM with a NON-empty modelCard describing nothing, which
+# sails past the card-present gate and yields a conformance report that reads as
+# a pass. This mock reproduces that shape exactly: warning on stderr, exit 0,
+# plausible card.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+mid=""
+for a in "\$@"; do case "\$a" in -*) ;; *) [ -z "\$mid" ] && mid="\$a" ;; esac; done
+echo "Error fetching model info for \$mid: 401 Client Error." >&2
+echo "Error fetching model card for \$mid: 401 Client Error." >&2
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cat > "\${out%.json}_1_7.json" <<'STUB'
+{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"machine-learning-model","name":"private-test-model","modelCard":{"modelParameters":{"modelArchitecture":"transformer","task":"text-generation"}}}]}
+STUB
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if PATH="$WORK/bin:$PATH" bash "$LIB/scan-aibom.sh" "my-org/private-test-model" "$WORK/fake.json" "1.0.0" \
+   > "$WORK/fake.log" 2>&1; then
+    fail "scan-aibom.sh refuses a fabricated model card" "exited 0 on an unreadable model"
+elif [ -f "$WORK/fake.json" ]; then
+    fail "scan-aibom.sh refuses a fabricated model card" "left the fabricated SBOM behind"
+else
+    pass "scan-aibom.sh refuses a fabricated model card and leaves no artifact"
+fi
+grep -q "placeholder values" "$WORK/fake.log" \
+    && pass "the refusal says the values were placeholders, not the model" \
+    || fail "the refusal explains itself" "no placeholder wording in the message"
+# 401 with no credential must point at HF_TOKEN; the same 401 with one must not.
+grep -q "no credential was supplied" "$WORK/fake.log" \
+    && pass "an unauthenticated 401 points at HF_TOKEN" \
+    || fail "an unauthenticated 401 points at HF_TOKEN" "hint missing"
+HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-test-model" "$WORK/fake2.json" "1.0.0" \
+    > "$WORK/fake2.log" 2>&1 || true
+if grep -q "despite a credential" "$WORK/fake2.log" && ! grep -qF "$HF_SENTINEL" "$WORK/fake2.log"; then
+    pass "an authenticated 401 says the token lacks access, without echoing it"
+else
+    fail "an authenticated 401 says the token lacks access" "wrong hint or the token leaked"
+fi
+# A model that IS readable must still pass: no warning line, real card kept.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+cp "$FIX/aibom-owasp-1_7.json" "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+if PATH="$WORK/bin:$PATH" bash "$LIB/scan-aibom.sh" "google-bert/bert-base-uncased" "$WORK/ok.json" "1.0.0" >/dev/null 2>&1; then
+    pass "a readable model is still accepted (the new gate does not over-reject)"
+else
+    fail "a readable model is still accepted" "the new gate rejected a good run"
+fi
+
+echo "== the card-less failure hint depends on whether a token was supplied =="
+# Same degraded stub as above. Anonymous and authenticated runs fail for
+# different reasons (no credential vs. no access), so they must say so — and
+# neither may echo the token.
+cat > "$WORK/bin/aibom" <<MOCK
+#!/bin/bash
+out=""; prev=""
+for a in "\$@"; do [ "\$prev" = "--output" ] && out="\$a"; prev="\$a"; done
+[ -n "\$out" ] || exit 1
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "\$out"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"machine-learning-model","name":"stub"}]}' > "\${out%.json}_1_7.json"
+exit 0
+MOCK
+chmod +x "$WORK/bin/aibom"
+env -u HF_TOKEN PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/anon.json" "1.0.0" \
+    > "$WORK/anon.log" 2>&1 || true
+HF_TOKEN="$HF_SENTINEL" PATH="$WORK/bin:$PATH" \
+    bash "$LIB/scan-aibom.sh" "my-org/private-llm" "$WORK/auth.json" "1.0.0" \
+    > "$WORK/auth.log" 2>&1 || true
+if grep -q "set HF_TOKEN" "$WORK/anon.log" && ! grep -q "set HF_TOKEN" "$WORK/auth.log"; then
+    pass "the anonymous failure names HF_TOKEN and the authenticated one does not"
+else
+    fail "the anonymous failure names HF_TOKEN and the authenticated one does not" \
+         "anon/auth hints did not differ as expected"
+fi
+if grep -qF "$HF_SENTINEL" "$WORK/auth.log"; then
+    fail "the authenticated failure hint hides the token" "the token appears in the log"
+else
+    pass "the authenticated failure hint hides the token"
+fi
+
 echo "== generate-notice.sh lists the model license =="
 bash "$LIB/generate-notice.sh" "$WORK/a.json" "$WORK/notice" "bert-base-uncased" >/dev/null 2>&1
 NOTICE="$WORK/notice_NOTICE.txt"
@@ -277,6 +409,44 @@ g7_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
 g7_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confx_conformance.json")
 [ "$g7_with" = "$g7_without" ] && pass "G7 check count unchanged by the crosswalk ($g7_with)" || fail "G7 count differs: with=$g7_with without=$g7_without"
 
+echo "== G7 fill-in guidance: registry integrity =="
+GD="$LIB/g7-guidance.json"
+jq empty "$GD" >/dev/null 2>&1 && pass "g7-guidance.json is valid JSON" || fail "g7-guidance.json is not valid JSON"
+# Same drift guard as the crosswalk: guidance keyed by an element id that no
+# longer exists would silently show nothing.
+gunknown=$(comm -23 <(jq -r '.map | keys[]' "$GD" | sort -u) \
+                    <(jq -r '.clusters[].elements[].id' "$LIB/g7-registry.json" | sort -u))
+[ -z "$gunknown" ] && pass "every guidance element id exists in g7-registry.json" || fail "guidance maps unknown G7 element id(s)" "$gunknown"
+badentry=$(jq -r '.map | to_entries[] | select((.value.snippet // "") == "" or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$GD")
+[ -z "$badentry" ] && pass "every guidance entry has a snippet and an https doc URL" || fail "guidance entries are incomplete" "$badentry"
+
+echo "== G7 fill-in guidance: surfaced in the AI conformance report =="
+gn=$(jq '[.checks[] | select((.guidance.snippet // "") != "")] | length' "$CONF")
+[ "$gn" -ge 1 ] && pass "G7 checks carry fill-in guidance ($gn tagged)" || fail "no G7 check carries guidance"
+grep -q "How to fill the gaps" "$WORK/conf_conformance.md" && pass "MD carries the fill-in section" || fail "MD lacks the fill-in section"
+grep -q "How to fill the gaps" "$WORK/conf_conformance.html" && pass "HTML carries the fill-in section" || fail "HTML lacks the fill-in section"
+# The fragment text itself must reach the reader, not just the heading.
+grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
+# Scope: the section covers gaps only. g7-model-license passes on this fixture,
+# so its guidance must NOT appear — a report that lists satisfied elements as
+# things to fix would be actively misleading.
+gapmd=$(sed -n '/## How to fill the gaps/,/^## Regulatory/p' "$WORK/conf_conformance.md")
+if printf '%s' "$gapmd" | grep -q "^### Model license$"; then
+    fail "the fill-in section is scoped to gaps" "a passing element (Model license) was listed"
+else
+    pass "the fill-in section is scoped to gaps (passing elements excluded)"
+fi
+
+echo "== G7 fill-in guidance: informational only (result + G7 count unchanged) =="
+G7_GUIDANCE="$WORK/nope.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/confg" "x" >/dev/null 2>&1
+rg_with=$(jq -r '.result' "$CONF"); rg_without=$(jq -r '.result' "$WORK/confg_conformance.json")
+[ "$rg_with" = "$rg_without" ] && pass "result identical with/without the guidance ($rg_with)" || fail "result changed: with=$rg_with without=$rg_without"
+gcount=$(jq '[.checks[] | select(has("guidance"))] | length' "$WORK/confg_conformance.json")
+[ "$gcount" = "0" ] && pass "no guidance file -> no guidance keys (graceful)" || fail "guidance present despite a disabled registry ($gcount)"
+g7g_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
+g7g_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confg_conformance.json")
+[ "$g7g_with" = "$g7g_without" ] && pass "G7 check count unchanged by the guidance ($g7g_with)" || fail "G7 count differs: with=$g7g_with without=$g7g_without"
+
 echo "== AI compliance profile re-aggregates conformance + license flags =="
 # Reuse the AI-fixture conformance from the G7 section ($WORK/conf_conformance.json);
 # give the profile a matching _bom.json carrying one behavioral-use license flag.
@@ -294,8 +464,18 @@ if [ -f "$PROF" ]; then
     { [ "$lf" -ge 1 ] && [ "$lb" -ge 1 ]; } && pass "license-review flag surfaced ($lf total, $lb behavioral-use)" || fail "license flag not surfaced (total=$lf, behavioral=$lb)"
     xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
-    grep -q "makes no compliance determination" "$WORK/conf_ai-profile.md" && pass "MD states it makes no compliance determination" || fail "MD lacks the no-determination note"
+    grep -q "re-aggregates the conformance and SBOM artifacts" "$WORK/conf_ai-profile.md" && pass "MD states it re-aggregates existing artifacts" || fail "MD lacks the re-aggregation note"
     grep -q "AI compliance profile" "$WORK/conf_ai-profile.html" && pass "HTML profile rendered" || fail "HTML profile missing"
+    # The profile lists the closable gaps and delegates the fragments to the
+    # conformance report, so the two artifacts stay complementary, not duplicated.
+    gi=$(jq -r '.g7.gapItems | length' "$PROF"); gc=$(jq -r '.g7.gap' "$PROF")
+    [ "$gi" = "$gc" ] && pass "profile gapItems match the gap count ($gc)" || fail "gapItems=$gi but gap=$gc"
+    grep -q "How to close the gaps" "$WORK/conf_ai-profile.md" && pass "MD carries the close-the-gaps section" || fail "MD lacks the close-the-gaps section"
+    if grep -q '```json' "$WORK/conf_ai-profile.md"; then
+        fail "the profile delegates fragments to the conformance report" "it embedded a fragment itself"
+    else
+        pass "the profile delegates fragments to the conformance report"
+    fi
 else
     fail "generate-ai-profile.sh produced no profile for an AI SBOM"
 fi
@@ -330,6 +510,55 @@ if grep -q "License review needed" "$WORK/norm_NOTICE.txt" 2>/dev/null; then
     fail "review section appeared for a normal software scan"
 else
     pass "no review section for a normal software scan"
+fi
+
+echo "== G7 registry: Korean labels/cluster names cover every element/cluster =="
+# Drift guard mirroring the crosswalk one: the ko reports look up label_ko by id
+# and name_ko by cluster id, so a new element/cluster without a Korean string
+# would silently render English. Fail here so ko strings cannot drift.
+REG="$LIB/g7-registry.json"
+miss_lk=$(jq -r '[.clusters[].elements[] | select(has("label") and ((.label_ko // "")==""))] | length' "$REG")
+[ "$miss_lk" = "0" ] && pass "every element with a label has a non-empty label_ko" || fail "$miss_lk G7 element(s) missing label_ko"
+miss_nk=$(jq -r '[.clusters[] | select(((.name // "")=="") or ((.name_ko // "")==""))] | length' "$REG")
+[ "$miss_nk" = "0" ] && pass "every cluster has a name and name_ko" || fail "$miss_nk cluster(s) missing name/name_ko"
+
+echo "== report string catalog is valid and has no unfilled placeholders in ko output =="
+CAT="$LIB/i18n/report-strings.ko.json"
+jq empty "$CAT" >/dev/null 2>&1 && pass "report-strings.ko.json is valid JSON" || fail "report-strings.ko.json is not valid JSON"
+
+echo "== ko conformance report renders Korean while the JSON stays English =="
+REPORT_LANG=ko bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/koconf" "bert-base-uncased" >/dev/null 2>&1
+# JSON is a contract: it must match the English JSON byte-for-byte (bar the timestamp).
+if diff <(jq 'del(.generatedAt)' "$CONF") <(jq 'del(.generatedAt)' "$WORK/koconf_conformance.json") >/dev/null 2>&1; then
+    pass "ko conformance JSON == en conformance JSON (contract stays English)"
+else
+    fail "ko conformance JSON diverged from the English JSON"
+fi
+grep -q '<html lang="ko">' "$WORK/koconf_conformance.html" && pass "ko conformance HTML sets lang=ko" || fail "ko conformance HTML lang is not ko"
+grep -q 'SBOM 적합성 보고서' "$WORK/koconf_conformance.html" && pass "ko conformance HTML h1 is Korean" || fail "ko conformance HTML h1 not localized"
+grep -q '모델 라이선스' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a G7 element label" || fail "ko conformance MD label not localized"
+grep -q '사람 검토 필요' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a review detail" || fail "ko conformance MD detail not localized"
+# Data/identifiers must survive verbatim in the ko report.
+grep -q 'Apache-2.0' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the license id verbatim" || fail "ko conformance dropped the license id"
+grep -q '✅' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the status emoji" || fail "ko conformance dropped the status emoji"
+# The English default must be untouched (same fixture, no REPORT_LANG).
+grep -q 'SBOM Conformance Report' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
+
+echo "== ko AI compliance profile renders Korean while the JSON stays English =="
+cp "$WORK/conf_bom.json" "$WORK/koconf_bom.json" 2>/dev/null
+REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koconf" "demo" >/dev/null 2>&1
+if [ -f "$WORK/koconf_ai-profile.json" ]; then
+    grep -q '<html lang="ko">' "$WORK/koconf_ai-profile.html" && pass "ko profile HTML sets lang=ko" || fail "ko profile HTML lang is not ko"
+    grep -q 'AI 준수 개요' "$WORK/koconf_ai-profile.html" && pass "ko profile HTML h1 is Korean" || fail "ko profile h1 not localized"
+    grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_ai-profile.md" && pass "ko profile cluster heading is Korean" || fail "ko profile heading not localized"
+    grep -qE '^\| (메타데이터|모델|인프라) ' "$WORK/koconf_ai-profile.md" && pass "ko profile localizes cluster display names (name_ko)" || fail "ko profile cluster names not localized"
+    if diff <(jq 'del(.generatedAt)' "$WORK/conf_ai-profile.json") <(jq 'del(.generatedAt)' "$WORK/koconf_ai-profile.json") >/dev/null 2>&1; then
+        pass "ko profile JSON == en profile JSON (contract stays English)"
+    else
+        fail "ko profile JSON diverged from the English JSON"
+    fi
+else
+    fail "ko profile produced no output"
 fi
 
 echo ""

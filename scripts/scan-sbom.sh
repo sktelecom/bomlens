@@ -74,9 +74,17 @@ GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_
 # cannot produce the report.
 SECURITY_REQUESTED="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
+# Report language for the conformance + AI-profile reports: en (default) or ko.
+# Only these two are honored; anything else is normalized to en further down.
+REPORT_LANG="${REPORT_LANG:-en}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
 SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
+# HuggingFace read credential for --model (private/gated repos). Absorb the older
+# huggingface_hub name here so the container boundary carries one name only.
+# Passed to docker as a bare `-e HF_TOKEN` (name, no value) so the secret never
+# lands in argv where `ps` could read it.
+HF_TOKEN="${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
@@ -119,6 +127,7 @@ while [[ "$#" -gt 0 ]]; do
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --lang) REPORT_LANG="$2"; shift ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -173,6 +182,9 @@ Options:
                          against the OSSKB service (opt-in image; sends hashes,
                          not source). See docs/guides/identify-vendored.md
   --byte-stable          Deterministic SBOM output
+  --lang <en|ko>         Language for the human-facing conformance and AI-profile
+                         reports (.md/.html). Default en. The SBOM and the JSON
+                         reports stay English regardless.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -202,6 +214,9 @@ Environment:
                          opt-in, makes one network call per package — not for
                          air-gapped runs; set true to enable)
   GIT_TOKEN              Token for cloning private --git repos
+  HF_TOKEN               HuggingFace read token for --model; required for a
+                         private or gated repo (e.g. reviewing a model before
+                         you publish it). HUGGING_FACE_HUB_TOKEN also accepted
   COSIGN_KEY             Signing key for --sign
   SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
                          (no per-run subfolder), matching the pre-isolation layout
@@ -273,9 +288,14 @@ if [ "$UI_MODE" = "true" ]; then
     # (CI, pipes), and Ctrl+C passthrough is moot there anyway.
     TTY_FLAGS=()
     if [ -t 0 ] && [ -t 1 ]; then TTY_FLAGS=(-it); fi
+    # Let the UI container inherit a HuggingFace credential so AI-model scans can
+    # reach private/gated repos. The UI never asks for it: the server has no place
+    # to keep a secret, so it comes from the environment that launched the tool.
+    HF_FLAGS=()
+    if [ -n "$HF_TOKEN" ]; then HF_FLAGS=(-e HF_TOKEN); fi
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" "$POSTPROCESS_IMAGE"
@@ -340,12 +360,20 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # post-process container so SECURITY_ENRICH=false works for air-gapped runs.
 SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 
+# Normalize the report language: only en (default) or ko reach the container. An
+# unknown value is a user typo, so warn and fall back to English rather than
+# silently producing an English report the user did not expect.
+case "$REPORT_LANG" in
+    en|ko) ;;
+    *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
+esac
+
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -673,7 +701,12 @@ else
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
-        AIBOM)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
+        AIBOM)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""
+                # Name only, no value: this line is built for `eval`, so an inline
+                # value would expose the token in `ps`. docker reads it from our
+                # own environment instead. AIBOM only — no other mode needs it.
+                [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN"
+                RUN_IMAGE="$AIBOM_IMAGE" ;;
         ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$(hostpath "$FD")\":/input:ro -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files

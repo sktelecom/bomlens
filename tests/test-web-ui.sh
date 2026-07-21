@@ -217,6 +217,40 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
 
+# HF_TOKEN: inherited from THIS container's environment (never posted to the UI)
+# and forwarded by name only, so the secret stays out of the docker-run argv.
+HF_SENTINEL = "hf_sentinel_do_not_leak_9f3a"
+os.environ["HF_TOKEN"] = HF_SENTINEL
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == 0, rc
+assert "HF_TOKEN" in captured["args"], captured["args"]
+assert captured["args"][captured["args"].index("HF_TOKEN") - 1] == "-e", captured["args"]
+# The value itself must appear nowhere in argv (bare -e, not -e NAME=VALUE).
+assert not any(HF_SENTINEL in a for a in captured["args"]), "HF_TOKEN value leaked into argv"
+
+# Firmware never carries it: only the AI-model path talks to HuggingFace.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
+)
+assert rc == 0, rc
+assert "HF_TOKEN" not in captured["args"], captured["args"]
+
+# No token in the environment -> no flag at all (anonymous, public models only).
+del os.environ["HF_TOKEN"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == 0, rc
+assert "HF_TOKEN" not in captured["args"], captured["args"]
+
 # A bogus mode is refused before any docker run is attempted.
 captured.clear()
 rc = server.run_sibling_scan(
@@ -267,6 +301,81 @@ fi
 echo "== path traversal is blocked =="
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?name=../../etc/passwd")
 [ "$code" = "404" ] && pass "/file blocks path traversal (404)" || fail "/file traversal returned $code (expected 404)"
+
+echo "== SPDX export is on demand (GET /spdx-export) =="
+# SPDX is no longer a pre-scan toggle: the results screen converts the finished
+# CycloneDX BOM when the user asks. Bad ids must be refused before any work, a
+# scan with no BOM is a 404, and an already-converted scan is idempotent — that
+# last one must hold even here, where there is no syft to convert with.
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx-export?id=../etc")
+[ "$code" = "400" ] && pass "/spdx-export rejects a traversal id (400)" || fail "/spdx-export bad id returned $code (expected 400)"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx-export?id=no_such_scan")
+[ "$code" = "404" ] && pass "/spdx-export 404s a scan with no CycloneDX BOM" || fail "/spdx-export missing scan returned $code (expected 404)"
+
+mkdir -p "$OUT/spdxrun_1.0"
+echo '{"bomFormat":"CycloneDX"}' > "$OUT/spdxrun_1.0/spdxrun_1.0_bom.json"
+echo '{"spdxVersion":"SPDX-2.3"}' > "$OUT/spdxrun_1.0/spdxrun_1.0_bom.spdx.json"
+spdx_body=$(curl -fsS "$BASE/spdx-export?id=spdxrun_1.0" 2>/dev/null)
+if echo "$spdx_body" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['name'] == 'spdxrun_1.0_bom.spdx.json', d
+# The refreshed listing is what the UI swaps in, so the file must be in it.
+assert any(f['name'].endswith('_bom.spdx.json') for f in d['results']), d
+" 2>/dev/null; then
+    pass "/spdx-export returns the existing SPDX without reconverting"
+else
+    fail "/spdx-export idempotent case failed" "$spdx_body"
+fi
+
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# Both paths cross into an argv, so containment is re-checked even though the
+# server derives them itself — a symlinked run folder must not export outside.
+assert server.convert_bom_to_spdx("/etc/passwd", server.OUTPUT_DIR + "/x.spdx.json",
+                                  False, lambda ln: None) == -1
+assert server.convert_bom_to_spdx(server.OUTPUT_DIR + "/x_bom.json", "/tmp/evil.spdx.json",
+                                  False, lambda ln: None) == -1
+
+# With no syft here, the work goes to a sibling scanner container. Capture the
+# argv: the converter script runs via --entrypoint bash with the two container
+# paths (shared by --volumes-from, not a host bind), and --stable rides along
+# when the original scan was byte-stable.
+captured = {}
+def fake_stream(args, on_log, **kw):
+    captured["args"] = args
+    return 0
+server._stream_cmd = fake_stream
+server._sibling_image_present = lambda image: True
+server._self_container_id = lambda: "selfcid000000"
+server.docker_cli_present = lambda: True
+server.docker_capable = lambda: True
+server.spdx_convert_capable = lambda: False
+
+bom = server.OUTPUT_DIR + "/run_1/run_1_bom.json"
+spdx = server.OUTPUT_DIR + "/run_1/run_1_bom.spdx.json"
+rc = server.convert_bom_to_spdx(bom, spdx, True, lambda ln: None)
+args = captured["args"]
+assert rc == 0, rc
+assert args[:3] == ["docker", "run", "--rm"], args
+assert "--volumes-from" in args and "selfcid000000" in args, args
+assert "-v" not in args, args              # no host bind mount (breaks on Windows)
+assert args[-4:] == ["/usr/local/lib/sbom/convert-to-spdx.sh", bom, spdx, "--stable"], args
+assert "--entrypoint" in args and args[args.index("--entrypoint") + 1] == "bash", args
+
+# Not byte-stable -> no --stable flag.
+captured.clear()
+server.convert_bom_to_spdx(bom, spdx, False, lambda ln: None)
+assert "--stable" not in captured["args"], captured["args"]
+PY
+then
+    pass "SPDX conversion guards paths and dispatches a sibling with a safe argv"
+else
+    fail "SPDX conversion guard failed (see assertion above)"
+fi
 
 echo "== rootfs scan-root boundary (safe_scan_dir with extra --mount roots) =="
 if SBOM_OUTPUT_DIR="$OUT" SBOM_UI_SCAN_ROOTS="$SCANROOT|/host/mounted" \
@@ -1198,6 +1307,7 @@ cleanup2() { [ -n "$SRV2_PID" ] && kill "$SRV2_PID" 2>/dev/null; }
 trap 'cleanup2; cleanup' EXIT
 SBOM_OUTPUT_DIR="$OUT2" UI_PORT="$PORT2" SBOM_UI_HOST_DIR="$WORK" \
     SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
+    SBOM_LIB_DIR="$WORK/no-such-lib" \
     STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
     STUB_ENV_FILE="$WORK/stub-env" \
     python3 "$SERVER" > "$WORK/server2.log" 2>&1 &
@@ -1412,6 +1522,28 @@ if [ -z "$(sed -n 's/^API_KEY=//p' "$WORK/stub-env")" ] \
 else
     fail "upload credId was reusable (token leaked to a second scan)" "$(cat "$WORK/stub-env")"
 fi
+
+# Conversion needs the pipeline helper + syft in this image, or a sibling scanner
+# container. This second server has neither: no docker socket, and SBOM_LIB_DIR
+# points at nothing so the helper is missing however the developer's machine is
+# equipped (a host syft would otherwise make the first server capable). The export
+# must then say so plainly instead of failing opaquely.
+echo "== SPDX export without a converter =="
+caps2=$(curl -fsS "$BASE2/capabilities" 2>/dev/null)
+if echo "$caps2" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)
+assert c.get('spdxExport') is False, c
+assert c.get('spdxSibling') is False, c
+" 2>/dev/null; then
+    pass "/capabilities reports spdxExport false with no syft and no docker"
+else
+    fail "/capabilities spdxExport wrong" "$caps2"
+fi
+mkdir -p "$OUT2/spdxnone_1.0"
+echo '{"bomFormat":"CycloneDX"}' > "$OUT2/spdxnone_1.0/spdxnone_1.0_bom.json"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/spdx-export?id=spdxnone_1.0")
+[ "$code" = "503" ] && pass "/spdx-export reports 503 when no converter is available" || fail "/spdx-export unavailable returned $code (expected 503)"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
