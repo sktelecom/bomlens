@@ -10,6 +10,12 @@
         }
       ],
       "name": "coverage",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        }
+      ],
       "type": "library",
       "version": "7.4.0"
     },
@@ -23,6 +29,12 @@
         }
       ],
       "name": "flask",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        }
+      ],
       "type": "library",
       "version": "3.0.0"
     },
@@ -35,6 +47,12 @@
         }
       ],
       "name": "mccabe",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        }
+      ],
       "type": "library",
       "version": "0.7.0"
     },
@@ -45,6 +63,12 @@
         }
       ],
       "name": "packaging",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
       "type": "library",
       "version": "23.0"
     },
@@ -55,6 +79,12 @@
         }
       ],
       "name": "python-dateutil",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
       "type": "library",
       "version": "2.9.0"
     },
@@ -67,6 +97,12 @@
         }
       ],
       "name": "requests",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        }
+      ],
       "type": "library",
       "version": "2.31.0"
     },
@@ -79,6 +115,12 @@
         }
       ],
       "name": "six",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        }
+      ],
       "type": "library",
       "version": "1.16.0"
     }

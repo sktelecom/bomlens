@@ -8,7 +8,7 @@ description: How to build an SBOM for a server — scan the OS rootfs, the appli
 
 A server is not a single source tree. It is an operating system, the application installed on top of it, and libraries that were linked into the binaries during the build. A scan of any one of these misses the others, which is the usual reason a server SBOM ends up incomplete.
 
-This guide treats a server as two layers — the OS and the application — and scans each with BomLens. Keep the layer SBOMs separate — that is the default, and it keeps each reviewable on its own. Merge them into one product SBOM only when an external system asks for a single file (see [Optional: merge into one SBOM](#optional-merge-into-one-sbom)).
+This guide treats a server as two layers — the OS and the application — and scans each with BomLens. Keep the layer SBOMs separate — that is the default, and it keeps each one reviewable on its own. Merge them into one product SBOM only when an external system asks for a single file (see [Optional: merge into one SBOM](#optional-merge-into-one-sbom)).
 
 | Layer | What it covers | Symptom if omitted |
 |-------|----------------|--------------------|

@@ -44,7 +44,11 @@ The New scan screen is two panes. On the left, pick a source — grouped into Co
 | Docker image | enter the image name | IMAGE |
 | AI model | enter a HuggingFace model id (`org/model`) | AIBOM |
 
-Generation options are the open-source notice and the security (vulnerability) report. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced: License scan (ScanCode), which scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies), and File-level identification (SCANOSS), which finds third-party open source copied into the tree (mainly C/C++), both for source-code scans (current folder, GitHub URL, ZIP upload), and OSV advisories for firmware. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
+Generation options are the open-source notice and the security (vulnerability) report. A scan always writes the SBOM in CycloneDX; an SPDX copy is exported afterwards from the results screen, so there is nothing to decide here. Separately, an **Advanced scan options** section gathers the toggles that change how the source is analyzed rather than which files are produced. License scan (ScanCode) scans the project's own source files for per-file license text (1st-party; it does not download the declared dependencies) and applies to source-code scans (current folder, GitHub URL, ZIP upload). File-level identification (SCANOSS) finds third-party open source copied into the tree (mainly C/C++), also for source-code scans. For firmware, the advanced option is OSV advisories. SCANOSS uses the free OSSKB service, which is rate-limited and may return nothing under frequent use, so add a token from scanoss.com for regular runs. Docker images, SBOM uploads and AI models have no advanced options. Choosing SBOM upload (ANALYZE) forces the notice and security reports on for the risk analysis, and an AI-model scan produces the notice only (it has no package CVEs, so the security report is skipped).
+
+A **Reproducible output** toggle produces byte-identical SBOMs across runs (the UI equivalent of `--byte-stable`); it is available for source, image and firmware scans, not for SBOM analysis or AI models.
+
+Below the outputs, an optional **Upload** step can send the finished SBOM to a server. Turn it on to pick the destination — Dependency-Track or TRUSCA — and enter the server URL and an access token; TRUSCA also asks for the target project id. The URL and token are used for that one run and are never saved. It is the UI equivalent of the CLI upload options; see [Upload to Dependency-Track / TRUSCA](../guides/upload.md).
 
 ## Scan running
 
@@ -54,7 +58,9 @@ During a run the screen shows the pipeline stages — generate, normalize, notic
 
 When the scan finishes, the left rail fills with the sections for that scan.
 
-**Overview** opens with the at-a-glance counts as cards that jump to each detail section, then what needs attention — a failed format conformance (for an analyzed supplier SBOM), critical or high vulnerabilities, and components flagged for license review. When the scan flags components past their upstream end-of-life, an "End of life" count tile joins the cards, with the ones that are also vulnerable shown in the risk colour (see [Component end-of-life](../concepts/reports-explained.md#component-end-of-life-eol)). A separate tile counts the components that have fallen behind their latest version (see [Version currency](../concepts/reports-explained.md#version-currency)). Below that, two risk axes sit side by side: the security severity distribution and the license classification. Click a band in either and you land in that section (Vulnerabilities or Licenses) with the filter already applied. If a scan finished with reduced analysis — for example cdxgen ran out of Docker disk space and the SBOM fell back to direct dependencies only — a banner here gives the reason and what to do. If a scan is still running, its live log appears here on the Overview, not under every section.
+**Overview** opens with the at-a-glance counts as cards that jump to each detail section, then what needs attention — a failed format conformance (for an analyzed supplier SBOM), critical or high vulnerabilities, and components flagged for license review. When the scan flags components past their upstream end-of-life, an "End of life" count tile joins the cards, with the ones that are also vulnerable shown in the risk colour (see [Component end-of-life](../concepts/reports-explained.md#component-end-of-life-eol)). A separate tile counts the components that have fallen behind their latest version (see [Version currency](../concepts/reports-explained.md#version-currency)). Below that, two risk axes sit side by side: the security severity distribution and the license classification. Click a band in either and you land in that section (Vulnerabilities or Licenses) with the filter already applied.
+
+If a scan finished with reduced analysis — for example cdxgen ran out of Docker disk space and the SBOM fell back to direct dependencies only — a banner here gives the reason and what to do. If a scan is still running, its live log appears here on the Overview, not under every section.
 
 ![Overview — needs-attention, counts, severity and jump cards](../images/app-results.png)
 
@@ -80,6 +86,12 @@ When the scan finishes, the left rail fills with the sections for that scan.
 
 **Artifacts** lists the generated files (SBOM, notice, risk report, security report, conformance) grouped by kind, downloadable per format or as a single ZIP. The Source tree section appears when ScanCode results are available — that is, from a source scan run with **License scan (ScanCode)** on — showing the source files with the license detected per file.
 
+![Artifacts — files grouped by kind, with the SPDX export button on the SBOM card](../images/web-ui-artifacts.png)
+
+The SBOM card in that section carries an **Export as SPDX 2.3** button. It converts the finished CycloneDX BOM into `{Project}_{Version}_bom.spdx.json` and starts the download at once, without rescanning. The converted file then joins the card as an ordinary download chip and is included in the ZIP, and the button is no longer offered for a scan that already has an SPDX file. CycloneDX stays the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties) is not carried over. Signing is available only in the CLI (`--spdx --sign`), so a file exported here is unsigned like every other artifact the UI produces.
+
+Conversion needs syft. The scanner image ships it, so the usual deployment converts on the spot. Where it is missing, such as the desktop app's base UI image, BomLens runs the scanner image as a separate container to do the conversion, which downloads that image once on first use. Where neither is possible, the button is not shown.
+
 ### AI surfaces
 
 For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), the rail adds:
@@ -89,6 +101,8 @@ For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), th
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
 The G7 AI minimum-element checks appear inside the **Conformance** section above — they are added only when the SBOM has a model component.
+
+That section also shows an AI compliance profile card: a one-glance rollup of the G7 result, the number of license-flagged components, and regulatory framework coverage (EU AI Act, Korea AI Basic Act). It is advisory, not a certification, and the same data is written to the `_ai-profile` files (see [Artifacts](artifacts.md)).
 
 ## Scan management
 

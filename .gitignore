@@ -25,6 +25,10 @@ bom.json
 *.wfp
 .scanmeta.json
 
+# Sample scanner reports shipped with the docs are tracked on purpose,
+# despite the generated-output patterns above.
+!docs/samples/*.html
+
 # Test Workspace
 tests/test-workspace/
 test-workspace/

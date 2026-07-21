@@ -69,10 +69,22 @@ TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
+# Tracks an EXPLICIT --security/--all, as opposed to the risk-report default
+# turning security on: only an explicit request is worth answering when a mode
+# cannot produce the report.
+SECURITY_REQUESTED="false"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
+# Report language for the conformance + AI-profile reports: en (default) or ko.
+# Only these two are honored; anything else is normalized to en further down.
+REPORT_LANG="${REPORT_LANG:-en}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""
 IDENTIFY_VENDORED="false"
 SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
+# HuggingFace read credential for --model (private/gated repos). Absorb the older
+# huggingface_hub name here so the container boundary carries one name only.
+# Passed to docker as a bare `-e HF_TOKEN` (name, no value) so the secret never
+# lands in argv where `ps` could read it.
+HF_TOKEN="${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
@@ -107,13 +119,15 @@ while [[ "$#" -gt 0 ]]; do
         --upload-target) UPLOAD_TARGET="$2"; shift ;;
         --trusca) UPLOAD_TARGET="trusca"; TRUSCA_PROJECT_ID="$2"; shift ;;
         --notice) GENERATE_NOTICE="true" ;;
-        --security) GENERATE_SECURITY="true" ;;
+        --security) GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
         --spdx) GENERATE_SPDX="true" ;;
-        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true" ;;
+        --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true"
+               SECURITY_REQUESTED="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --lang) REPORT_LANG="$2"; shift ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -168,6 +182,9 @@ Options:
                          against the OSSKB service (opt-in image; sends hashes,
                          not source). See docs/guides/identify-vendored.md
   --byte-stable          Deterministic SBOM output
+  --lang <en|ko>         Language for the human-facing conformance and AI-profile
+                         reports (.md/.html). Default en. The SBOM and the JSON
+                         reports stay English regardless.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -197,6 +214,9 @@ Environment:
                          opt-in, makes one network call per package — not for
                          air-gapped runs; set true to enable)
   GIT_TOKEN              Token for cloning private --git repos
+  HF_TOKEN               HuggingFace read token for --model; required for a
+                         private or gated repo (e.g. reviewing a model before
+                         you publish it). HUGGING_FACE_HUB_TOKEN also accepted
   COSIGN_KEY             Signing key for --sign
   SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
                          (no per-run subfolder), matching the pre-isolation layout
@@ -268,9 +288,14 @@ if [ "$UI_MODE" = "true" ]; then
     # (CI, pipes), and Ctrl+C passthrough is moot there anyway.
     TTY_FLAGS=()
     if [ -t 0 ] && [ -t 1 ]; then TTY_FLAGS=(-it); fi
+    # Let the UI container inherit a HuggingFace credential so AI-model scans can
+    # reach private/gated repos. The UI never asks for it: the server has no place
+    # to keep a secret, so it comes from the environment that launched the tool.
+    HF_FLAGS=()
+    if [ -n "$HF_TOKEN" ]; then HF_FLAGS=(-e HF_TOKEN); fi
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" "$POSTPROCESS_IMAGE"
@@ -335,12 +360,20 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # post-process container so SECURITY_ENRICH=false works for air-gapped runs.
 SECURITY_ENRICH="${SECURITY_ENRICH:-true}"
 
+# Normalize the report language: only en (default) or ko reach the container. An
+# unknown value is a user typo, so warn and fall back to English rather than
+# silently producing an English report the user did not expect.
+case "$REPORT_LANG" in
+    en|ko) ;;
+    *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
+esac
+
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
 pp_env() {
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY=%q -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY=%q -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e STALENESS_ENRICH=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SCANOSS_API_KEY" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$DEFAULT_API_KEY" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${STALENESS_ENRICH:-false}"
 }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -570,6 +603,20 @@ if [ "$NO_REPORT" != "true" ]; then
     GENERATE_REPORT="true"; GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
 fi
 
+# An AI model has no package dependencies, so Trivy has nothing to match and the
+# report comes back empty. The web UI already forces the toggle off for an
+# AI-model scan (useScanForm.ts) and both guides state the CLI skips it too —
+# only the CLI still ran it, shipping an empty _security.{json,md,html}. This
+# has to sit after the risk-report defaults above, which turn security on for
+# every mode; the risk report still renders from the notice, as it does in the
+# UI. Announce the skip only when the user actually asked (--security / --all),
+# so an ordinary --model run stays quiet instead of explaining a default.
+if [ "$MODE" = "AIBOM" ] && [ "$GENERATE_SECURITY" = "true" ]; then
+    [ "$SECURITY_REQUESTED" = "true" ] && \
+        echo "[INFO] Skipping the security report: an AI model has no package dependencies to scan."
+    GENERATE_SECURITY="false"
+fi
+
 echo "=========================================="
 echo "  SBOM Analysis — Mode: $MODE — $PROJECT_NAME ($PROJECT_VERSION)"
 [ -n "$TARGET" ] && echo "  Target: $TARGET"
@@ -654,7 +701,12 @@ else
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
-        AIBOM)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""; RUN_IMAGE="$AIBOM_IMAGE" ;;
+        AIBOM)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e MODEL_ID=\"$MODEL\""
+                # Name only, no value: this line is built for `eval`, so an inline
+                # value would expose the token in `ps`. docker reads it from our
+                # own environment instead. AIBOM only — no other mode needs it.
+                [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN"
+                RUN_IMAGE="$AIBOM_IMAGE" ;;
         ANALYZE) FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"; VOL="-v \"$(hostpath "$FD")\":/input:ro -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e ANALYZE_SBOM=\"/input/$FN\"" ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files
@@ -684,26 +736,71 @@ else
 fi
 
 # Verify artifacts actually reached the host. When the run folder is outside
-# Docker Desktop file sharing, the container runs and reports success but the
-# /host-output mount is silently empty, so nothing lands here. Catch that
-# instead of printing "Analysis Complete!" over a folder with no SBOM.
-if [ "$GENERATE_ONLY" = "true" ] && [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+# Docker Desktop file sharing (or Colima's home-only virtiofs mount), the
+# container runs and reports success but the /host-output mount is silently
+# empty, so nothing lands here. Every post-processing mode writes OUTPUT_FILE
+# (_bom.json) to /host-output, so its absence means the mount never reached the
+# host — catch that in ALL modes, not just --generate-only, instead of printing
+# "Analysis Complete!" over a folder with no SBOM.
+if [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
     echo "[ERROR] SBOM not found on host: $OUTPUT_HOST_DIR/$OUTPUT_FILE"
     echo "  The container ran but no artifact reached this folder."
-    echo "  Likely cause: this folder is outside Docker Desktop file sharing."
+    echo "  Likely cause: this folder is outside Docker Desktop file sharing"
+    echo "  (or Colima's home-only mount — /tmp is not shared to the VM)."
     echo "  Run from a shared path (e.g. under your home directory) and retry."
     exit 1
 fi
 
+# The summary must describe what is ON DISK, not what was requested: an older
+# scanner image, or a step that degraded, leaves a requested artifact
+# unproduced, and a summary driven by the request flags would announce a file
+# the user does not have. Print a line only when its first file exists, and
+# name anything requested but missing so the gap is visible rather than silent.
+summary_line() {  # <label> <file> [more files…] — prints iff the first exists
+    local label="$1"; shift
+    [ -f "$OUTPUT_HOST_DIR/$1" ] || return 1
+    local names=""
+    for f in "$@"; do names="${names:+$names, }$f"; done
+    printf '  %-12s %s\n' "$label" "$names"
+}
+missing=""
+note_missing() { missing="${missing:+$missing }$1"; }
+
 echo "=========================================="
 echo "  Analysis Complete!"
 if [ "$GENERATE_ONLY" = "true" ]; then
+    P="${SAFE_PROJECT}_${SAFE_VERSION}"
     echo "  Output dir: ${OUTPUT_HOST_DIR}"
     echo "  SBOM: ${OUTPUT_FILE}"
-    [ "$GENERATE_NOTICE" = "true" ]   && echo "  Notice:   ${SAFE_PROJECT}_${SAFE_VERSION}_NOTICE.{txt,html}"
-    [ "$GENERATE_SECURITY" = "true" ] && echo "  Security: ${SAFE_PROJECT}_${SAFE_VERSION}_security.{json,md,html}"
-    [ "$GENERATE_SPDX" = "true" ]     && echo "  SPDX:     ${SAFE_PROJECT}_${SAFE_VERSION}_bom.spdx.json"
-    [ "$MODE" = "ANALYZE" ] && echo "  Conformance: ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.{json,md,html}"
-    [ "$GENERATE_REPORT" = "true" ] && echo "  Risk report: ${SAFE_PROJECT}_${SAFE_VERSION}_risk-report.{md,html}"
+    if [ "$GENERATE_NOTICE" = "true" ]; then
+        summary_line "Notice:" "${P}_NOTICE.txt" "${P}_NOTICE.html" || note_missing "notice"
+    fi
+    if [ "$GENERATE_SECURITY" = "true" ]; then
+        summary_line "Security:" "${P}_security.json" "${P}_security.md" "${P}_security.html" \
+            || note_missing "security report"
+    fi
+    if [ "$GENERATE_SPDX" = "true" ]; then
+        summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"
+    fi
+    # Conformance comes from both modes that can validate a BOM: ANALYZE (format
+    # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
+    # It used to be announced for ANALYZE only, so an AI-model scan produced the
+    # G7 report and never mentioned it.
+    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ]; then
+        summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
+            || note_missing "conformance report"
+    fi
+    if [ "$GENERATE_REPORT" = "true" ]; then
+        summary_line "Risk report:" "${P}_risk-report.md" "${P}_risk-report.html" \
+            || note_missing "risk report"
+    fi
+    if [ -n "$missing" ]; then
+        echo ""
+        echo "[WARN] requested but not produced: ${missing}"
+        echo "  The scan finished, but these artifacts are not in the output folder."
+        echo "  If the scanner image predates the feature, refresh it:"
+        echo "    docker pull ${RUN_IMAGE}"
+        echo "  Otherwise the step degraded — check the log above for its warning."
+    fi
 fi
 echo "=========================================="

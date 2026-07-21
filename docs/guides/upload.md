@@ -27,3 +27,7 @@ API_URL="https://<TRUSCA host>" API_KEY="tos_..." \
 `--trusca <id>` is shorthand for `--upload-target trusca` plus `TRUSCA_PROJECT_ID`. Adjust the ref and release labels with `TRUSCA_REF` (default `main`) and `TRUSCA_RELEASE` (default the `--version` value). On acceptance it prints `202` and a scan id; track progress in the TRUSCA UI (`GET /v1/scans/{id}`).
 
 > TRUSCA ingest fills components, vulnerabilities, declared licenses, the dependency graph, and the build gate. It cannot fill scancode-detected licenses (`--deep-license`), the cosign signature (`--sign`), or source preservation, since there is no source tree. Generate those locally with `--generate-only` if you need them.
+
+## From the web UI
+
+You can upload without the CLI. On the New scan form, turn on the **Upload** step, choose Dependency-Track or TRUSCA, and enter the server URL and access token (plus the project id for TRUSCA). The scan runs and then uploads in one step, using the same endpoints and authentication described above. The URL and token are used for that run only and are not saved. See the [Web UI reference](../reference/ui.md).

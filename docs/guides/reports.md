@@ -4,9 +4,9 @@ description: How to generate the open-source notice (NOTICE), the security vulne
 
 # Generate notice, security & risk reports
 
-Beyond SBOM generation, BomLens produces an open-source notice (NOTICE) and a security vulnerability report in one run. This page covers how to generate those outputs. For how to read and interpret them, see [Reports explained](../concepts/reports-explained.md).
+Beyond SBOM generation, BomLens produces an open-source notice (NOTICE) and a security vulnerability report in one run. This page covers how to generate those outputs. For how to read and interpret them, see [What the reports mean](../concepts/reports-explained.md).
 
-## Quickstart (5 minutes)
+## Quick start (5 minutes)
 
 If this is your first time, this is all you need. With the Docker engine running, generate the SBOM, notice, and security report in one run — from the browser or the CLI.
 
@@ -49,7 +49,9 @@ When it finishes, open `MyApp_1.0.0_NOTICE.html` and `MyApp_1.0.0_security.html`
 
 ## Generate everything at once (`--all`)
 
-`--all` is shorthand for `--notice --security`. It produces the SBOM, the notice, and the security report in a single scan.
+`--all` is shorthand for `--notice --security --spdx`. It produces the SBOM, the notice, the security report, and an SPDX copy of the SBOM in a single scan.
+
+In the web UI and the desktop app the notice and the security report are generation options on the New scan screen, and the SPDX copy is exported from the results screen once the scan is done.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --all --generate-only
@@ -85,7 +87,7 @@ Gathers the `components[].licenses` information from the SBOM and generates a no
 - `_NOTICE.html` — a browser-friendly format. All package metadata is HTML-escaped and safe.
 - Components with no license information are classified as `NOASSERTION`.
 
-For license normalization and full-text bundling behavior, see [Reports explained](../concepts/reports-explained.md).
+For license normalization and full-text bundling behavior, see [What the reports mean](../concepts/reports-explained.md).
 
 Example (text):
 ```
@@ -110,13 +112,13 @@ Scans the generated SBOM with Trivy and reports known vulnerabilities (CVEs). (N
 
 The report does not fail the scan even when vulnerabilities exist (report-only). If you need a gate, post-process `_security.json`.
 
-For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation, see [Reports explained](../concepts/reports-explained.md).
+For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation, see [What the reports mean](../concepts/reports-explained.md).
 
 ---
 
 ## Deep license detection (`--deep-license`)
 
-The basic notice covers the licenses of dependencies (3rd-party). `--deep-license` uses scancode-toolkit to also detect license headers in the project's own source code (1st-party).
+The basic notice covers the licenses of dependencies (third-party). `--deep-license` uses scancode-toolkit to also detect license headers in the project's own source code (first-party).
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only

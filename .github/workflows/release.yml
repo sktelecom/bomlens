@@ -11,15 +11,18 @@ on:
         required: true
         type: string
 
+# Default to read-only; jobs that create or edit the release elevate to
+# contents: write themselves. Nothing in this workflow pushes packages.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     outputs:
       version: ${{ steps.version.outputs.version }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -104,7 +107,9 @@ jobs:
     name: Upload Release Assets
     needs: create-release
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

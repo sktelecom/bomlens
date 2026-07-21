@@ -50,6 +50,41 @@ bash "$LIB/normalize-sbom.sh" "$WORK/n.json" >/dev/null 2>&1
 ctype=$(jq -r '.components | type' "$WORK/n.json" 2>/dev/null)
 if [ "$ctype" = "array" ]; then pass "components is an array (was null)"; else fail "components type is '$ctype', expected array"; fi
 
+echo "== drop-empty-files: nameless/purl-less file components pruned, real ones kept =="
+# Regression for the convert-noise defect: syft's SPDX->CycloneDX conversion emits a
+# type:"file" component with NO name and NO purl for every SPDX file entry, so a
+# supplier rootfs SBOM balloons with thousands of unidentifiable noise rows that skew
+# the NOTICE count and UI inventory. normalize-sbom.sh must drop ONLY components that
+# are BOTH a file AND carry neither name nor purl; real packages and named/purl'd file
+# components survive. The fixture has 2 libraries, 1 named file, 1 purl-only file, and
+# 4 empty file variants (absent, empty-string name, empty purl, both empty).
+cp "$FIX/empty-file-components.json" "$WORK/ef.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/ef.json" >/dev/null 2>&1
+ef_total=$(jq '[.components[]?] | length' "$WORK/ef.json")
+[ "$ef_total" = "4" ] && pass "8 -> 4 components (4 empty file rows dropped)" || fail "component count=$ef_total, expected 4"
+ef_empty=$(jq '[.components[]? | select(.type=="file" and ((.name // "")=="") and ((.purl // "")==""))] | length' "$WORK/ef.json")
+[ "$ef_empty" = "0" ] && pass "no nameless/purl-less file component remains" || fail "$ef_empty empty file component(s) survived"
+if jq -e '[.components[]? | select(.name=="openssl" or .name=="zlib")] | length == 2' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "real packages (openssl, zlib) preserved"
+else
+    fail "a real package was wrongly dropped"
+fi
+if jq -e '[.components[]? | select(.type=="file" and .name=="usr/bin/openssl")] | length == 1' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "a named file component is preserved"
+else
+    fail "a named file component was wrongly dropped"
+fi
+if jq -e '[.components[]? | select(.type=="file" and .purl=="pkg:generic/config@1.0")] | length == 1' "$WORK/ef.json" >/dev/null 2>&1; then
+    pass "a purl-carrying file component is preserved"
+else
+    fail "a purl-carrying file component was wrongly dropped"
+fi
+# --stable mode runs the same filter; the empty rows must be gone there too.
+cp "$FIX/empty-file-components.json" "$WORK/efs.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/efs.json" --stable >/dev/null 2>&1
+efs_empty=$(jq '[.components[]? | select(.type=="file" and ((.name // "")=="") and ((.purl // "")==""))] | length' "$WORK/efs.json")
+[ "$efs_empty" = "0" ] && pass "--stable mode also drops empty file components" || fail "$efs_empty empty file component(s) survived --stable"
+
 echo "== B-2/B-3: metadata stamped from input, temp path gone =="
 cp "$FIX/null-components.json" "$WORK/m.json"
 bash "$LIB/stamp-metadata.sh" "$WORK/m.json" "MyProj" "2.0.0" >/dev/null 2>&1
@@ -201,6 +236,134 @@ date_expr=$(jq -r '.components[] | select(.name=="python-dateutil") | .licenses[
 [ "$date_expr" = "Dual License" ] && pass "unmappable free text (Dual License) left untouched" || fail "dateutil expression='$date_expr', expected Dual License"
 pkg_expr=$(jq -r '.components[] | select(.name=="packaging") | .licenses[0].expression // "ABSENT"' "$WORK/c.json")
 [ "$pkg_expr" = "Apache-2.0 OR BSD-2-Clause" ] && pass "compound expression left untouched" || fail "packaging expression='$pkg_expr'"
+
+echo "== license-class: bomlens:licenseClass copyleft-strength classification =="
+# normalize-sbom.sh stamps every component with exactly one copyleft-strength
+# class, using the license-flags.jq classifier that MIRRORS the web UI's
+# licenses.ts, so the submitted SBOM carries the same classification the UI
+# shows. Headline rule: an unrecognised license is never assumed permissive.
+cat > "$WORK/lc.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"agpl-lib","version":"1.0","licenses":[{"license":{"id":"AGPL-3.0-only"}}]},
+ {"type":"library","name":"gpl-lib","version":"1.0","licenses":[{"license":{"id":"GPL-3.0-only"}}]},
+ {"type":"library","name":"lgpl-lib","version":"1.0","licenses":[{"license":{"id":"LGPL-2.1-only"}}]},
+ {"type":"library","name":"mpl-lib","version":"1.0","licenses":[{"license":{"id":"MPL-2.0"}}]},
+ {"type":"library","name":"mit-lib","version":"1.0","licenses":[{"license":{"id":"MIT"}}]},
+ {"type":"library","name":"mystery-lib","version":"1.0","licenses":[{"license":{"name":"Custom Corp License"}}]},
+ {"type":"library","name":"bare-lib","version":"1.0"},
+ {"type":"library","name":"dual-lib","version":"1.0","licenses":[{"expression":"GPL-2.0-only OR MIT"}]},
+ {"type":"library","name":"mixed-lib","version":"1.0","licenses":[{"license":{"id":"MIT"}},{"license":{"name":"Custom Corp License"}}]},
+ {"type":"machine-learning-model","name":"llama-model","version":"3","licenses":[{"license":{"name":"Llama 3 Community License"}}]}
+]}
+JSON
+bash "$LIB/normalize-sbom.sh" "$WORK/lc.json" >/dev/null 2>&1
+lclass() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+    | [(.properties // [])[] | select(.name=="bomlens:licenseClass") | .value] | first // "ABSENT"' "$WORK/lc.json"; }
+[ "$(lclass agpl-lib)" = "network-copyleft" ] && pass "AGPL -> network-copyleft" || fail "agpl-lib class='$(lclass agpl-lib)', expected network-copyleft"
+[ "$(lclass gpl-lib)" = "strong-copyleft" ] && pass "GPL -> strong-copyleft" || fail "gpl-lib class='$(lclass gpl-lib)', expected strong-copyleft"
+[ "$(lclass lgpl-lib)" = "weak-copyleft" ] && pass "LGPL -> weak-copyleft (matched before the bare GPL test)" || fail "lgpl-lib class='$(lclass lgpl-lib)', expected weak-copyleft"
+[ "$(lclass mpl-lib)" = "weak-copyleft" ] && pass "MPL -> weak-copyleft" || fail "mpl-lib class='$(lclass mpl-lib)', expected weak-copyleft"
+[ "$(lclass mit-lib)" = "permissive" ] && pass "MIT -> permissive (allowlist match)" || fail "mit-lib class='$(lclass mit-lib)', expected permissive"
+[ "$(lclass mystery-lib)" = "uncategorized" ] && pass "unknown license -> uncategorized, never assumed permissive" || fail "mystery-lib class='$(lclass mystery-lib)', expected uncategorized"
+[ "$(lclass bare-lib)" = "uncategorized" ] && pass "no license info -> uncategorized" || fail "bare-lib class='$(lclass bare-lib)', expected uncategorized"
+[ "$(lclass dual-lib)" = "strong-copyleft" ] && pass "dual license (GPL-2.0-only OR MIT) -> strongest wins" || fail "dual-lib class='$(lclass dual-lib)', expected strong-copyleft"
+[ "$(lclass mixed-lib)" = "uncategorized" ] && pass "MIT + unknown -> uncategorized (unknown outranks confirmed-permissive)" || fail "mixed-lib class='$(lclass mixed-lib)', expected uncategorized"
+# A licenseReview-flagged component still gets a class: the two properties coexist.
+lr=$(jq -r '.components[] | select(.name=="llama-model")
+    | [(.properties // [])[] | select(.name=="bomlens:licenseReview") | .value] | first // "ABSENT"' "$WORK/lc.json")
+[ "$lr" = "behavioral-use" ] && [ "$(lclass llama-model)" = "uncategorized" ] \
+    && pass "bomlens:licenseReview and bomlens:licenseClass coexist on one component" \
+    || fail "llama-model review='$lr' class='$(lclass llama-model)', expected behavioral-use + uncategorized"
+# Every component carries exactly ONE class property (idempotent re-run included).
+bash "$LIB/normalize-sbom.sh" "$WORK/lc.json" >/dev/null 2>&1
+lc_bad=$(jq '[.components[] | [(.properties // [])[] | select(.name=="bomlens:licenseClass")] | length | select(. != 1)] | length' "$WORK/lc.json")
+[ "$lc_bad" = "0" ] && pass "every component has exactly one licenseClass after a re-run (idempotent)" || fail "$lc_bad component(s) with != 1 licenseClass property"
+# --byte-stable determinism: two --stable runs over the same input are identical.
+cat > "$WORK/lcs1.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"library","name":"agpl-lib","version":"1.0","licenses":[{"license":{"id":"AGPL-3.0-only"}}]}]}
+JSON
+cp "$WORK/lcs1.json" "$WORK/lcs2.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/lcs1.json" --stable >/dev/null 2>&1
+bash "$LIB/normalize-sbom.sh" "$WORK/lcs2.json" --stable >/dev/null 2>&1
+diff -q "$WORK/lcs1.json" "$WORK/lcs2.json" >/dev/null 2>&1 \
+    && pass "--stable output with licenseClass is byte-identical across runs" \
+    || fail "licenseClass stamping broke --byte-stable determinism"
+
+echo "== license-class drift guard: license-flags.jq and licenses.ts share one classifier =="
+# The jq classifier is a hand-written mirror of the frontend's licenses.ts. This
+# gate extracts both sides' permissive id sets, tier regex patterns (in match
+# order) and tier results, and fails naming the divergence — so neither file can
+# gain or lose a license id without the same change on the other side.
+LTS="$ROOT_DIR/docker/web/frontend/src/lib/licenses.ts"
+LFJ="$LIB/license-flags.jq"
+ts_perm=$(sed -n '/const PERMISSIVE = new Set(\[/,/\]);/p' "$LTS" | grep -oE '"[A-Za-z0-9.+-]+"' | tr -d '"' | sort)
+jq_perm=$(grep '^def permissive_ids:' "$LFJ" | grep -oE '"[A-Za-z0-9.+-]+"' | tr -d '"' | tr ',' '\n' | sort)
+if [ -z "$ts_perm" ] || [ -z "$jq_perm" ]; then
+    fail "could not extract the permissive id sets (licenses.ts / license-flags.jq changed shape?)"
+elif [ "$ts_perm" = "$jq_perm" ]; then
+    pass "permissive allowlists are identical ($(printf '%s\n' "$ts_perm" | wc -l | tr -d ' ') ids)"
+else
+    fail "permissive allowlists diverged between licenses.ts and license-flags.jq" \
+         "$(diff <(printf '%s\n' "$ts_perm") <(printf '%s\n' "$jq_perm") | grep '^[<>]' | sed 's/^</only in licenses.ts:/; s/^>/only in license-flags.jq:/')"
+fi
+# Tier regex patterns, in match order (order decides AGPL/LGPL vs bare GPL).
+ts_pat=$(sed -n '/^export function licenseRiskTier/,/^}/p' "$LTS" | grep -oE '/\\b[^/]+/i' | sed 's:^/::; s:/i$::')
+jq_pat=$(sed -n '/^def license_class/,/^def class_rank/p' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g')
+if [ -z "$ts_pat" ] || [ -z "$jq_pat" ]; then
+    fail "could not extract the tier patterns (licenses.ts / license-flags.jq changed shape?)"
+elif [ "$ts_pat" = "$jq_pat" ]; then
+    pass "tier patterns match in content and order"
+else
+    fail "tier patterns diverged between licenses.ts and license-flags.jq" \
+         "$(diff <(printf '%s\n' "$ts_pat") <(printf '%s\n' "$jq_pat") | grep '^[<>]' | sed 's/^</licenses.ts:/; s/^>/license-flags.jq:/')"
+fi
+# Tier results per pattern, in the same order.
+ts_tier=$(sed -n '/^export function licenseRiskTier/,/^}/p' "$LTS" | grep -oE 'return "[a-z-]+-copyleft"' | sed 's/return //; s/"//g')
+jq_tier=$(sed -n '/^def license_class/,/^def class_rank/p' "$LFJ" | grep -oE 'then "[a-z-]+-copyleft"' | sed 's/then //; s/"//g')
+if [ "$ts_tier" = "$jq_tier" ] && [ -n "$ts_tier" ]; then
+    pass "tier results per pattern match"
+else
+    fail "tier results diverged" "licenses.ts: $(echo "$ts_tier" | tr '\n' ' ') / license-flags.jq: $(echo "$jq_tier" | tr '\n' ' ')"
+fi
+
+echo "== risk-report: license classification summary drives from the SBOM =="
+# generate-risk-report.sh must add the per-class table and the copyleft driver
+# list (network/strong, up to 10) when the BOM artifact exists, and skip the
+# block gracefully when it does not.
+mkdir -p "$WORK/risk"
+cp "$WORK/lc.json" "$WORK/risk/proj_1.0_bom.json"
+printf 'License: MIT\nLicense: AGPL-3.0-only\n' > "$WORK/risk/proj_1.0_NOTICE.txt"
+( cd "$WORK/risk" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj >/dev/null 2>&1 )
+RMD="$WORK/risk/proj_1.0_risk-report.md"; RHTML="$WORK/risk/proj_1.0_risk-report.html"
+if [ -f "$RMD" ] && [ -f "$RHTML" ]; then
+    grep -q '^| 1 | 2 | 2 | 1 | 4 |$' "$RMD" \
+        && pass "md counts row matches the fixture (1 network, 2 strong, 2 weak, 1 permissive, 4 uncategorized)" \
+        || fail "md classification counts wrong" "$(grep -A2 'Network copyleft' "$RMD")"
+    grep -q '`agpl-lib@1.0` (network-copyleft)' "$RMD" \
+        && pass "md lists the network-copyleft driver by name@version" \
+        || fail "md copyleft driver list missing agpl-lib@1.0"
+    grep -q 'dual-lib@1.0' "$RMD" && grep -q 'gpl-lib@1.0' "$RMD" \
+        && pass "md lists the strong-copyleft drivers" \
+        || fail "md copyleft driver list missing a strong-copyleft component"
+    grep -q 'Network copyleft <span class="count">1</span>' "$RHTML" \
+        && pass "html classification pills carry the same counts" \
+        || fail "html classification pills missing/wrong"
+    grep -q '<li>agpl-lib@1.0 (network-copyleft)</li>' "$RHTML" \
+        && pass "html lists the copyleft drivers" \
+        || fail "html copyleft driver list missing"
+else
+    fail "generate-risk-report.sh produced no md/html with a BOM present"
+fi
+# Without a BOM artifact the classification block is skipped, not an error.
+mkdir -p "$WORK/risk2"
+printf 'License: MIT\n' > "$WORK/risk2/proj_1.0_NOTICE.txt"
+( cd "$WORK/risk2" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj >/dev/null 2>&1 ) \
+    || fail "generate-risk-report.sh failed without a BOM artifact"
+if [ -f "$WORK/risk2/proj_1.0_risk-report.md" ] && ! grep -q '라이선스 분류' "$WORK/risk2/proj_1.0_risk-report.md"; then
+    pass "no BOM artifact -> classification block skipped gracefully"
+else
+    fail "classification block present (or report missing) without a BOM"
+fi
 
 echo "== vendored: identify-vendored.sh promotes file matches, drops snippets =="
 # Mock scanoss-py (no network/image needed): write the raw SCANOSS fixture to the
@@ -470,6 +633,30 @@ sed 's/^SPDXVersion: SPDX-2.3$/SPDXVersion: SPDX-2.1/' "$FIX/supplier-clean-tagv
 bash "$LIB/validate-sbom.sh" "$WORK/tv-old.spdx" "$WORK/tvo" "supplier" >/dev/null 2>&1
 tvo=$(jq -r '"\(.checks[] | select(.id=="spec-version") | .status)/\(.result)"' "$WORK/tvo_conformance.json")
 [ "$tvo" = "fail/fail" ] && pass "Tag-Value SPDX-2.1 fails the spec-version check" || fail "Tag-Value spec-version: '$tvo', expected fail/fail"
+
+echo "== conformance: SPDX transitive check counts DEPENDENCY_OF (Syft's reverse-direction edge) =="
+# Syft writes OS-package dependency edges in SPDX as the reverse relationship
+# DEPENDENCY_OF (e.g. NetworkManager-libnm DEPENDENCY_OF NetworkManager), never
+# DEPENDS_ON, while the same scan's CycloneDX carries dependsOn. The transitive
+# check only asks whether dependency edges EXIST, so both directions must count —
+# otherwise every Syft SPDX submission gets a false transitive FAIL.
+# SPDX JSON: flip the sole DEPENDS_ON edge to DEPENDENCY_OF; nothing else changes.
+jq '(.relationships[] | select(.relationshipType=="DEPENDS_ON") | .relationshipType) = "DEPENDENCY_OF"' \
+    "$FIX/good-spdx.json" > "$WORK/spdx-depof.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-depof.json" "$WORK/sdd" "supplier" >/dev/null 2>&1
+sdd=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)|\(.detail)"' "$WORK/sdd_conformance.json")
+[ "$sdd" = "pass|1 edge(s)" ] && pass "SPDX JSON DEPENDENCY_OF counts as a transitive edge" || fail "SPDX transitive (DEPENDENCY_OF): '$sdd', expected pass|1 edge(s)"
+# An SPDX with only structural relationships (DESCRIBES/CONTAINS, no dependency
+# graph) must still FAIL — the fix widens the direction, it must not weaken the check.
+jq '.relationships = [.relationships[] | select(.relationshipType=="DESCRIBES")]' "$FIX/good-spdx.json" > "$WORK/spdx-nodeps.json"
+bash "$LIB/validate-sbom.sh" "$WORK/spdx-nodeps.json" "$WORK/sdn" "supplier" >/dev/null 2>&1
+sdn=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/sdn_conformance.json")
+[ "$sdn" = "fail" ] && pass "SPDX JSON with no dependency edges still fails transitive" || fail "SPDX transitive (no edges): '$sdn', expected fail"
+# Tag-Value: the same reverse-direction relationship must be matched by grep.
+sed 's/DEPENDS_ON/DEPENDENCY_OF/g' "$FIX/supplier-clean-tagvalue.spdx" > "$WORK/tv-depof.spdx"
+bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/null 2>&1
+tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
+[ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
 
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's

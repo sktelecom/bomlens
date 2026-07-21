@@ -23,6 +23,11 @@
 # it honestly as "not present" rather than fabricated. Non-LFS files carry only a
 # git SHA-1 (not a content SHA-256), so only LFS weight files get a hash here.
 #
+# Auth contract: HF_TOKEN, when present in the environment, is read implicitly by
+# huggingface_hub, which is what lets a private or gated repo enrich. We pass no
+# explicit token argument — keeping it out of argv and out of exception text is
+# the point. Never print the value.
+#
 # Usage: enrich-aibom.sh <sbom.json> <hf_model_id>
 set -e
 
@@ -71,8 +76,10 @@ hf_info = None
 try:
     from huggingface_hub import HfApi
     hf_info = HfApi().model_info(model_id, files_metadata=True)
-except Exception as e:  # network down, private/gated, or lib absent
-    print(f"[enrich] HuggingFace metadata unavailable: {e}", file=sys.stderr)
+except Exception as e:  # network down, no read access, or lib absent
+    # Report only whether a token was in play, never the token itself.
+    auth = "authenticated" if os.environ.get("HF_TOKEN") else "anonymous"
+    print(f"[enrich] HuggingFace metadata unavailable ({auth}): {e}", file=sys.stderr)
 
 def card_get(info, key):
     cd = getattr(info, "card_data", None)

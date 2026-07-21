@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   absoluteFileUrl,
+  ApiError,
   deleteScan,
+  describeUploadError,
   downloadAllUrl,
   fileUrl,
+  exportSpdx,
   getCapabilities,
   listScans,
   loadScan,
@@ -48,6 +51,48 @@ describe("URL builders", () => {
 // ---------------------------------------------------------------------------
 // fetch-backed network functions
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Upload-error mapping (pure): raw error text never becomes the headline
+// ---------------------------------------------------------------------------
+describe("describeUploadError", () => {
+  it("maps 413 to the too-large message with no raw detail", () => {
+    expect(describeUploadError(new ApiError("file too large for zip", 413))).toEqual({
+      key: "source.uploadErrorTooLarge",
+    });
+  });
+
+  it("maps 5xx to the server message, keeping the detail as fine print", () => {
+    expect(describeUploadError(new ApiError("upload failed (500)", 500))).toEqual({
+      key: "source.uploadErrorServer",
+      detail: "upload failed (500)",
+    });
+  });
+
+  it("maps other 4xx to the rejected message with the server detail", () => {
+    expect(describeUploadError(new ApiError("unsupported kind", 400))).toEqual({
+      key: "source.uploadErrorRejected",
+      detail: "unsupported kind",
+    });
+  });
+
+  it("maps a fetch network failure (TypeError) to the unreachable message", () => {
+    expect(describeUploadError(new TypeError("Failed to fetch"))).toEqual({
+      key: "source.uploadErrorNetwork",
+    });
+  });
+
+  it("falls back to the server message for unknown errors", () => {
+    expect(describeUploadError(new Error("boom"))).toEqual({
+      key: "source.uploadErrorServer",
+      detail: "boom",
+    });
+    expect(describeUploadError("weird")).toEqual({
+      key: "source.uploadErrorServer",
+      detail: undefined,
+    });
+  });
+});
+
 describe("network functions", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -76,9 +121,12 @@ describe("network functions", () => {
     expect((init.body as FormData).get("kind")).toBe("zip");
   });
 
-  it("uploadFile throws the server error message on failure", async () => {
+  it("uploadFile throws an ApiError carrying the status and server message", async () => {
     fetchMock.mockResolvedValue(fail(413, { error: "too big" }));
-    await expect(uploadFile(new File([""], "a"), "zip")).rejects.toThrow("too big");
+    const err = await uploadFile(new File([""], "a"), "zip").catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(413);
+    expect(err.message).toBe("too big");
   });
 
   it("stashGitCred POSTs a JSON token and returns the credId", async () => {
@@ -101,6 +149,23 @@ describe("network functions", () => {
 
     fetchMock.mockRejectedValue(new Error("network"));
     expect(await getCapabilities()).toEqual({ firmware: false, scanoss: false, docker: true });
+  });
+
+  it("exportSpdx converts by id, and returns null on any failure", async () => {
+    const payload = {
+      name: "app_1.0_bom.spdx.json",
+      results: [{ name: "app_1.0_bom.spdx.json", size: 10 }],
+    };
+    fetchMock.mockResolvedValue(ok(payload));
+    expect(await exportSpdx("app_1.0")).toEqual(payload);
+    expect(fetchMock.mock.calls[0][0]).toBe("/spdx-export?id=app_1.0");
+
+    // 503 (no syft, no docker) and a network error both fall back to null so the
+    // caller can say "export unavailable" instead of throwing at the user.
+    fetchMock.mockResolvedValue(fail(503));
+    expect(await exportSpdx("app_1.0")).toBeNull();
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await exportSpdx("app_1.0")).toBeNull();
   });
 
   it("listScans returns the array, or [] on any failure", async () => {
@@ -188,7 +253,6 @@ const PARAMS: ScanParams = {
   target: "https://example.com/r.git",
   notice: true,
   security: true,
-  spdx: false,
   deepLicense: false,
   identifyVendored: false,
   includeOsv: false,

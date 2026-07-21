@@ -42,7 +42,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      
+
+      - name: Free up disk space
+        run: |
+          # The heavier examples (dotnet, swift, rust) pull an extra language
+          # SDK image on top of the scanner image and can exhaust the runner's
+          # ~14 GB of free space. Drop preinstalled toolchains we never use to
+          # reclaim ~25 GB before any image is built or pulled.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       

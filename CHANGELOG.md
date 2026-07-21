@@ -25,6 +25,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No timeouts existed on the desktop app's Docker calls, so a wedged daemon or a firewalled registry hung on a live-looking window forever. Status checks are now bounded and the pull aborts when it genuinely stops making progress (a stall timeout, not an absolute one, so a slow but healthy download is not killed).
 - The desktop app falls back to known Docker install paths when `docker` is missing from `PATH`. Installing Rancher Desktop without restarting Explorer left the app reporting "Docker isn't installed" while the engine ran visibly in the tray.
 - `check-setup.bat` and `bomlens.settings.example.txt` now ship in the Windows release zip. The launchers' own error messages tell users to double-click `check-setup.bat`, which was not in the archive.
+## [v1.8.3] - 2026-07-20
+
+### Added
+
+- AI-model scans can now read a private or gated HuggingFace repository. Set `HF_TOKEN` (read scope; `HUGGING_FACE_HUB_TOKEN` is accepted as an alias) and `--model` resolves repositories that are not public yet — the case that matters when you are checking your own model before publishing it. The value is passed to the container by name only, so it never appears in the process list, the SBOM, or any report. The web UI inherits the variable from the environment that launched it rather than accepting a token over HTTP, and `/capabilities` exposes only a boolean saying whether one is present. (#434)
+- The conformance report now says how to close each G7 gap, not just which elements are missing. For every advisory element that has an automated source and is absent, `_conformance.md` and `.html` print the CycloneDX fragment that would satisfy it plus a link to the authoritative documentation, and `_conformance.json` carries the same under an optional `guidance` key. The guidance registry lives in `docker/lib/g7-guidance.json` (override with `G7_GUIDANCE`), keyed by element id like the regulatory crosswalk, and is the single source the web UI now reads too. Passing and review-only elements are excluded, so a well-documented model adds no section at all. The AI compliance profile lists the same gaps with their reference links and points at the conformance report for the fragments. (#435)
+- Every component in the generated SBOM now carries a `bomlens:licenseClass` property with its copyleft-strength class (`network-copyleft`, `strong-copyleft`, `weak-copyleft`, `permissive`, `uncategorized`), mirroring the classification the web UI shows, and the risk report gains a per-class count table plus the network/strong-copyleft components driving the exposure. Unknown licenses are never assumed permissive. A test guard keeps the UI and scanner classifications from silently diverging. (#420)
+
+### Fixed
+
+- An AI-model scan whose model could not be read no longer reports success. The OWASP generator swallows a failed HuggingFace fetch, logs a warning, and fills the model card with generic defaults (`transformer`, `text-generation`, string in and out), so a `401` — or an id that does not exist at all — produced exit 0, a full artifact set, and a conformance report reading `result=pass` with 19 G7 checks satisfied, for a model nobody could open. Since that fabricated card is not empty, the existing card-present gate let it through. BomLens now inspects the generator's own log, refuses the run, deletes the output, and says the values were placeholders rather than the model; a `401` or `403` gets a hint that differs by whether a credential was supplied. A pending organizational token produces exactly this case. (#438)
+- The CLI completion summary now lists the artifacts actually on disk instead of one line per requested flag, so a step that failed to deliver no longer announces a file the user does not have. Running `--spdx` or `--all` against a pre-v1.8.0 scanner image was the common case: no SPDX step exists, none runs, and the summary still named an SPDX artifact. (#425)
+- `--model` no longer ships an empty security report. Both guides and the web UI state that an AI-model scan skips it because a model has no package dependencies to match CVEs against, but the CLI's risk-report defaults re-enabled security for every mode, so Trivy ran against an ML-BOM and wrote a `_security.*` set containing nothing. (#426)
+
+### Changed
+
+- SPDX export moved out of the New scan form and into the results. The toggle asked users to decide, before any scan ran, whether they would need SPDX later, and answering wrong meant a full rescan. A scan now always writes CycloneDX, and the SBOM card in the Artifacts section offers "Export as SPDX 2.3", which converts the finished BOM and starts the download right away; the converted file joins the artifact list and the ZIP bundle. Both paths run the same conversion helper, so the result is identical to the CLI's `--spdx`, which is unchanged along with `--all`. Signing remains CLI-only, and the button is hidden where no converter is reachable. (#439)
+- The New scan form now seeds the version field with `1.0.0` when the source states no version of its own, so a first-time user who accepts the autofilled project name and presses Run no longer bounces off version validation. A version the source does carry — a docker tag, a `name-1.2.3` file, SBOM metadata — still wins, and an edit is never overwritten. (#429)
+- The New scan validation summary no longer tells you to enter a project name that is already filled. Since the inline messages identify the offending fields, the line by the Run button became a neutral pointer to them, and the Korean copy lost a translationese parenthetical. (#428)
+- The components table now renders large SBOMs with recycled row chunks: the whole filtered set (up to the 2,000-row server cap) is reachable by plain scrolling, offscreen rows are replaced by measured spacers so the DOM stays small, and the "Show more" button is gone. (#421)
+- A failed upload or token stash on the New scan form now shows a situation-specific message (file too large, server unreachable, server error, rejected input) in both languages instead of the raw exception text; the technical detail moves to fine print. (#414)
+- The nightly "macOS real scan (Colima)" job was retired: its last 19 runs all failed deterministically at Colima startup (the hosted arm64 runner boots neither the vz nor the qemu backend), so the scan never actually ran. The evidence and the re-add condition are recorded in the workflow; macOS coverage remains a maintainer-run local check. (#422)
+
+### CI
+
+- Example scan jobs reclaim about 25 GB of runner disk before any image work, dropping preinstalled toolchains the project never uses. The dotnet, swift and rust examples pull a language SDK image on top of the scanner image and were intermittently exhausting the runner's free space, failing with "no space left on device" before an SBOM was written. (#430)
+- The Dockerfile lint (hadolint) is now blocking at error level, and the external-link check's advisory status is documented inline. (#413)
+- A Korean prose style gate now lints the public docs on every PR (`scripts/ko-style/`): translation-ese patterns and the repository's terminology decisions (디렉터리/배지 spellings, 컬럼→열, 리포트→보고서, no coined words), with a self-test proving the linter still detects violations. Applying it fixed six live violations. (#417)
+- The SPDX checks the Windows verification round left to a human eye — the SPDX chip and the chip addressing the `.spdx.json` artifact — are now Playwright specs, now covering the on-demand export flow that replaced the scan-form toggle. (#419)
+
+### Documentation
+
+- The AI-model path is now visible from the entry points. The landing intro listed inputs as source, container, binary or a received SBOM — omitting firmware and AI models entirely — so a visitor looking for a G7 or EU AI Act SBOM tool found nothing on the front page. (#427)
+- The AI model guide now says where `scan-sbom.sh` comes from. It opened with `docker pull` and then invoked the script without linking any installation page, which left a reader arriving from an external guide unable to run the first command. (#440)
+- Documented the SPDX export toggle in the web UI reference pages. (#436)
+- The README demo GIF is now reproducible: a tagged Playwright spec drives a stubbed scan through the walkthrough and the recording is made in the same pinned container as the guide screenshots. The previous hand recording predated the regulatory crosswalk, license classification and current New scan form, and rotted silently whenever the UI moved. (#424)
+- Synced the docs site and README with features shipped across v1.5–v1.8 that were undocumented, thin, or inaccurate: the web UI upload step (Dependency-Track/TRUSCA), the Maven/Node full-graph opt-outs (`BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_NODE_FULL_GRAPH`), the conformance spec-version overrides (`CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS`, `SPDX_SPEC_VERSIONS`), the `ENRICH_EOL` and `STALENESS_ENRICH` variables, the AI compliance profile card and `_ai-profile.*` artifacts, and the `--ui --mount` host-folder option. Corrected the `--all` description, which omitted the `--spdx` it also implies, and the "(CLI only)" note on `--byte-stable`, which has a web UI toggle as well. (#409)
+- Added a CI gate (`scripts/check-doc-env-coverage.sh`) that fails when a user-facing environment variable in `scan-sbom.sh --help` is documented in neither the CLI nor the Docker-image reference — the code-to-docs counterpart of the existing docs-to-code drift check. Applying it documented the previously missing `SBOM_AIBOM_IMAGE` override. (#410)
+- Korean pages: fixed translationese and coined terms concentrated in the web UI reference and the vendored-OSS guide, unified three drifting notations (디렉터리, 배지, 보고서), and recorded the terminology decisions in the style guide. (#415)
+- English pages: a native-quality pass fixed two real defects — firmware-guide links mislabeled "(Korean)" and stale tool version pins in the architecture page — plus literal collocations, run-on passages, and naming consistency. (#418)
+- Guide screenshots were regenerated in the pinned Playwright container, so the conformance section and New scan form images match the shipped UI (regulatory crosswalk, AI compliance card, SPDX toggle). (#416)
+
+## [v1.8.2] - 2026-07-15
+
+### Changed
+
+- Supplier-SBOM conformance no longer fails outright on `pkg:generic` or custom PURLs. These were a mandatory check, so a single untraceable component failed the whole verdict even when every other requirement was met — common for embedded and firmware supplier SBOMs. The `no-generic` check is now advisory (a warning, not folded into the recommended-coverage warnings), the count stays visible through a new `untraceableComponents` field and a report line, and the overall pass/fail is left to the remaining mandatory checks.
+
+### Fixed
+
+- The SPDX conformance transitive-dependency check now counts `DEPENDENCY_OF` relationships as well as `DEPENDS_ON`. Syft writes OS-package dependency edges in SPDX as the reverse relationship `DEPENDENCY_OF` (for example `NetworkManager-libnm DEPENDENCY_OF NetworkManager`), never `DEPENDS_ON`, while the same scan's CycloneDX carries `dependsOn`. The check only asks whether dependency edges exist, so it now accepts both directions; previously every Syft-generated SPDX submission received a false transitive failure despite a fully populated dependency graph. Both the SPDX JSON and Tag-Value paths are covered; the CycloneDX path is unchanged.
+- Post-processing modes now fail closed when the finished SBOM never reaches the host. The host-output verification was gated on `--generate-only`, so the default path — including ANALYZE — printed "Analysis Complete!" over an empty folder when the `/host-output` mount did not reach the host (an output directory outside Docker Desktop file sharing, or under `/tmp` on Colima, where only the home directory is shared to the VM). Every post-processing mode writes the output file, so its absence now reports the failure in all modes.
+- Source-tree enrichment is confined to source-scan modes. The vendored-OSS (SCANOSS) and CocoaPods steps read the mounted source root with no mode guard, and the web UI mounts its host directory for every mode, so an ANALYZE of a supplier SBOM could discover a stray `Podfile.lock` in that tree and merge unrelated components into the result. Both steps are now gated on the scan mode, so ANALYZE, MERGE, IMAGE, BINARY, ROOTFS, FIRMWARE, and AIBOM no longer scan a mounted source tree.
+- Empty file components from SPDX conversion are dropped. Syft's SPDX-to-CycloneDX conversion turns each SPDX file entry into a `file` component with no name and no PURL — an unidentifiable row with no CVE match, license, or attribution. A supplier SPDX with a large file section added thousands of these, skewing the notice count and the UI inventory. A normalize filter now drops only components that are both a file and carry neither name nor PURL; real packages and named or PURL-bearing file components are untouched.
+
+## [v1.8.1] - 2026-07-15
+
+### Added
+
+- Regulatory crosswalk on the AI SBOM conformance report: each G7 minimum element that maps to a regulation is linked to the documentation obligation it touches, so a reviewer can see which regulatory requirement a missing element concerns. Two frameworks are mapped — the EU AI Act's Annex IV technical documentation (Regulation (EU) 2024/1689, Article 11(1)) and the Korean AI Framework Act (제31/32/33·34/35조). It is informational only: it never changes a check's status or the overall result, and the report states that BomLens does not certify compliance with any regulation. The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by G7 element id and validated against the registry so it cannot drift silently.
+- AI compliance profile: for an AI SBOM, a one-page profile (`{prefix}_ai-profile.{json,md,html}`) re-aggregates the G7 status by cluster, the regulatory crosswalk, and the components whose license is flagged for review (AI behavioral-use or non-commercial). It runs no scan, makes no compliance determination, and is a no-op for a non-AI SBOM.
+- Web UI: the Conformance section now shows the regulatory crosswalk as a sub-block (per-framework present/gap/review with the no-certification disclaimer) and a compact AI compliance summary card, and the AI profile reports are listed and downloadable.
+
+### Changed
+
+- The repository and tool identifiers were renamed from sbom-tools to bomlens; references across the docs, configuration, and image names were updated.
 
 ## [v1.8.0] - 2026-07-13
 
@@ -382,7 +448,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.8.2...HEAD
+[v1.8.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.2
+[v1.8.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.1
 [v1.8.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.0
 [v1.7.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.7.0
 [v1.6.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.6.0

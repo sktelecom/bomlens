@@ -122,11 +122,18 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | 오픈소스 고지문 생성 (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Trivy 보안 보고서 생성 (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
+| `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
+| `STALENESS_ENRICH` | — | `false` | deps.dev 버전 최신성(최신 대비 몇 릴리스 뒤처졌는지) 추가. 네트워크 접근 필요 |
 | `API_KEY`, `API_URL` | 업로드 시 | — | 업로드 자격과 서버 주소. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰입니다 |
 | `UPLOAD_TARGET` | — | `dependency-track` | 업로드 대상. `dependency-track`(DT 호환) 또는 `trusca`(네이티브 ingest, DT 비호환) |
 | `TRUSCA_PROJECT_ID` | `trusca`일 때 | — | 업로드할 TRUSCA 프로젝트 id(UUID). 사전에 존재해야 합니다(자동 생성 없음) |
 | `TRUSCA_REF` | — | `main` | ingest ref 라벨 |
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | ingest release 라벨 |
+| `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
+| `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
+| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
+| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. 1.7을 추가로 허용 |
+| `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | 적합성 검사가 허용하는 SPDX spec 버전 |
 
 > TRUSCA(구 TrustedOSS Portal)의 네이티브 ingest 엔드포인트(`POST /v1/projects/{id}/sbom-ingest`, Bearer 인증)는 Dependency-Track와 호환되지 않습니다. 일반 Dependency-Track 서버로 올릴 때는 `UPLOAD_TARGET=dependency-track`(기본값)을 그대로 두세요.
 

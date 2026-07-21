@@ -27,3 +27,7 @@ API_URL="https://<TRUSCA 주소>" API_KEY="tos_..." \
 `--trusca <id>`는 `--upload-target trusca`와 `TRUSCA_PROJECT_ID` 설정을 합친 단축형입니다. ref와 release 라벨은 `TRUSCA_REF`(기본 `main`)와 `TRUSCA_RELEASE`(기본 `--version` 값)로 조정합니다. 업로드가 접수되면 `202`와 스캔 id를 출력하며, 진행 상태는 TRUSCA UI(`GET /v1/scans/{id}`)에서 확인합니다.
 
 > TRUSCA ingest는 컴포넌트, 취약점, 선언 라이선스, 의존성 그래프, 빌드 게이트를 채웁니다. scancode 정밀 라이선스(`--deep-license`), cosign 서명(`--sign`), 소스 보존은 소스 트리가 없어 채우지 못합니다. 이 산출물이 필요하면 `--generate-only`로 로컬에 함께 생성하세요.
+
+## 웹 UI에서
+
+CLI 없이도 업로드할 수 있습니다. 새 스캔 화면에서 **업로드** 단계를 켜고 Dependency-Track 또는 TRUSCA를 고른 뒤 서버 주소와 접근 토큰을 입력합니다(TRUSCA는 프로젝트 id도 입력). 스캔이 실행된 뒤 위에서 설명한 것과 같은 엔드포인트와 인증으로 한 번에 업로드합니다. 주소와 토큰은 그 실행에만 쓰이고 저장되지 않습니다. 자세한 내용은 [웹 UI 레퍼런스](../reference/ui.md)를 참고하세요.

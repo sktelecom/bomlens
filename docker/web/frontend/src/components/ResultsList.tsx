@@ -1,5 +1,5 @@
-import { Download, Eye, FileSignature, Link2, Package } from "lucide-react";
-import { useState } from "react";
+import { Download, Eye, FileSignature, Link2, Loader2, Package } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import {
   absoluteFileUrl,
   downloadAllUrl,
+  exportSpdx,
   fileUrl,
+  getCapabilities,
   type ResultFile,
 } from "@/lib/api";
 import {
@@ -56,14 +58,69 @@ function DownloadChip({
   );
 }
 
+/**
+ * Convert this scan's CycloneDX BOM to SPDX 2.3, then download it.
+ *
+ * SPDX is not a scan option: the BOM already exists, so the format choice
+ * belongs here rather than in a toggle the user had to predict before scanning.
+ * One click covers the whole intent — convert, then hand over the file — and the
+ * new artifact also joins the card as an ordinary download chip.
+ */
+function SpdxExportButton({
+  scanId,
+  onExported,
+}: {
+  scanId: string | null;
+  onExported?: (files: ResultFile[]) => void;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [pending, setPending] = useState(false);
+
+  const run = async () => {
+    if (!scanId || pending) return;
+    setPending(true);
+    const res = await exportSpdx(scanId);
+    setPending(false);
+    if (!res) {
+      toast(t("result.spdxExportFailed"));
+      return;
+    }
+    onExported?.(res.results);
+    // Hand the file over straight away: the click meant "I want the SPDX file",
+    // not "prepare it and wait for me to ask again".
+    const a = document.createElement("a");
+    a.href = fileUrl(scanId, res.name);
+    a.download = res.name;
+    a.click();
+    toast(t("result.downloadStarted"));
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={run} disabled={pending}>
+      {pending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Download className="h-3.5 w-3.5" />
+      )}
+      {pending ? t("result.spdxExporting") : t("result.spdxExport")}
+    </Button>
+  );
+}
+
 function ArtifactCard({
   artifact,
   scanId,
   onView,
+  spdxAvailable,
+  onExported,
 }: {
   artifact: LogicalArtifact;
   scanId: string | null;
   onView: (name: string) => void;
+  /** This image can convert to SPDX (syft here or a sibling scanner container). */
+  spdxAvailable: boolean;
+  onExported?: (files: ResultFile[]) => void;
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -137,6 +194,9 @@ function ArtifactCard({
             onDownload={() => toast(t("result.downloadStarted"))}
           />
         )}
+        {artifact.spdxExportable && spdxAvailable && (
+          <SpdxExportButton scanId={scanId} onExported={onExported} />
+        )}
         <div className="flex-1" />
         {view && (
           <Button variant="ghost" size="sm" onClick={() => onView(view)}>
@@ -161,14 +221,30 @@ function ArtifactCard({
 export function ResultsList({
   results,
   scanId,
+  onResultsChange,
 }: {
   results: ResultFile[];
   /** The scan's run_id, scoping artifact URLs to its run folder. */
   scanId: string | null;
+  /** Called with the refreshed listing after an on-demand export. The owner
+   *  holds the result, so routing the new artifact up keeps every count (this
+   *  header, the sidebar badge) in agreement. */
+  onResultsChange?: (files: ResultFile[]) => void;
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [view, setView] = useState<string | null>(null);
+  const [spdxAvailable, setSpdxAvailable] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getCapabilities().then((c) => {
+      if (alive) setSpdxAvailable(c.spdxExport !== false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (results.length === 0) {
     return (
@@ -204,7 +280,14 @@ export function ResultsList({
 
       <div className="space-y-3">
         {artifacts.map((a) => (
-          <ArtifactCard key={a.key} artifact={a} scanId={scanId} onView={setView} />
+          <ArtifactCard
+            key={a.key}
+            artifact={a}
+            scanId={scanId}
+            onView={setView}
+            spdxAvailable={spdxAvailable}
+            onExported={onResultsChange}
+          />
         ))}
       </div>
 

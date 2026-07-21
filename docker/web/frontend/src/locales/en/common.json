@@ -50,8 +50,13 @@
     "aiModelPlaceholder": "google-bert/bert-base-uncased",
     "aiModelHint": "Enter a HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B) — not a collection name or a full URL. Fetches model-card metadata over the network to build a CycloneDX ML-BOM.",
     "aiModelUnavailable": "AI-model SBOMs need Docker running (the AIBOM image runs as a sibling container).",
+    "hfAuthOn": "Authenticated to HuggingFace: private and gated model repositories resolve.",
+    "hfAuthOff": "Running anonymously, so only public models resolve. To scan a private or gated repository — for example to review a model before you publish it — restart the UI with HF_TOKEN set.",
     "uploading": "Uploading…",
-    "uploadFailed": "Upload failed: {{msg}}"
+    "uploadErrorTooLarge": "The file is too large for the server to accept. Try a smaller archive, or scan the unpacked folder instead.",
+    "uploadErrorNetwork": "Could not reach the scan server. Check that it is still running, then try again.",
+    "uploadErrorServer": "The server could not process the request. Try again; if it keeps failing, restart the scanner.",
+    "uploadErrorRejected": "The server did not accept the upload. Check the file and try again."
   },
   "options": {
     "notice": "Notice",
@@ -59,8 +64,6 @@
     "aiNoticeHint": "For an AI model the notice lists the model and dataset licenses and flags use-restricted ones (RAIL, non-commercial) for review — worth keeping on.",
     "security": "Security report",
     "securityHint": "Generate a Trivy vulnerability report",
-    "spdx": "SPDX export",
-    "spdxHint": "Also export the SBOM as SPDX 2.3 JSON, converted from the CycloneDX output",
     "deepLicense": "Per-file license scan",
     "deepLicenseHint": "Scans your own source files with ScanCode for per-file license text and headers, in addition to the licenses each package declares (slow).",
     "scanMethodHint": "Advanced analysis for source scanned without a package manager. If your project builds with one (Maven, npm, pip, Go modules…), the SBOM is already complete and these can stay off.",
@@ -135,6 +138,9 @@
     "copied": "Link copied",
     "downloadStarted": "Download started",
     "signed": "Signed",
+    "spdxExport": "Export as SPDX 2.3",
+    "spdxExporting": "Converting…",
+    "spdxExportFailed": "Could not export SPDX. The CycloneDX SBOM is unaffected.",
     "kind": {
       "riskReport": {
         "title": "Open-source risk report",
@@ -142,7 +148,7 @@
       },
       "sbom": {
         "title": "SBOM (CycloneDX)",
-        "desc": "The normalized software bill of materials in CycloneDX JSON, plus an SPDX 2.3 conversion when enabled."
+        "desc": "The normalized software bill of materials in CycloneDX JSON. Export an SPDX 2.3 copy whenever you need one."
       },
       "notice": {
         "title": "Open-source notice",
@@ -189,7 +195,6 @@
     "truncated": "list truncated",
     "noMatch": "No matching rows.",
     "licenseNone": "Unknown",
-    "showMore": "Show {{count}} more",
     "filterHasVulns": "Has vulnerabilities",
     "filterDirectOnly": "Direct only",
     "filterNeedsReview": "Needs review",
@@ -622,6 +627,35 @@
       }
     }
   },
+  "crosswalk": {
+    "title": "Regulatory crosswalk",
+    "disclaimer": "A documentation-preparation aid, not a compliance verdict. BomLens does not certify regulatory compliance; it only shows which documentation obligation each G7 element touches.",
+    "totals": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}} mapped",
+    "frameworkSummary": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}}",
+    "refs": "References:",
+    "present": "Present",
+    "gap": "Gap",
+    "review": "Review needed"
+  },
+  "aiProfile": {
+    "title": "AI compliance profile",
+    "note": "A one-glance rollup of the AI SBOM findings for documentation review — it makes no compliance determination.",
+    "verdict": {
+      "pass": "Pass",
+      "warn": "Advisory",
+      "fail": "Fail",
+      "unknown": "Unknown"
+    },
+    "g7Label": "G7 minimum elements",
+    "g7Value": "{{present}} of {{auto}} present",
+    "g7Detail": "{{gap}} gap, {{review}} to review",
+    "licenseLabel": "License review flags",
+    "licenseValue": "{{count}} flagged",
+    "licenseDetail": "{{behavioral}} behavioral-use, {{nonCommercial}} non-commercial",
+    "crosswalkLabel": "Regulatory coverage",
+    "crosswalkValue": "{{count}} frameworks",
+    "crosswalkDetail": "{{present}}/{{total}} elements mapped present"
+  },
   "licenses": {
     "empty": "No licenses were detected.",
     "reviewTitle": "License review needed",
@@ -668,7 +702,7 @@
     "source": "Delete a file and it leaves this list too."
   },
   "validation": {
-    "required": "Enter a project name and version (and any required input).",
+    "required": "Fill in the required fields marked above.",
     "file": "Choose a file to analyze.",
     "project": "Enter a project name.",
     "version": "Enter a version.",

@@ -49,6 +49,13 @@ OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 LIBDIR="/usr/local/lib/sbom"
 
+# Report language for the human-facing conformance + AI-profile reports. Only
+# en (default) or ko; the report generators read REPORT_LANG directly, so export
+# a normalized value here for both of them. Anything else falls back to English
+# and never aborts the run.
+case "${REPORT_LANG:-en}" in ko) REPORT_LANG="ko" ;; *) REPORT_LANG="en" ;; esac
+export REPORT_LANG
+
 # Shared language detection + cdxgen image selection (also used by the CLI).
 # shellcheck source=docker/lib/source-detect.sh
 . "$LIBDIR/source-detect.sh"
@@ -290,6 +297,11 @@ EOF
         # post-processing runs on it unchanged (normalize keeps the 1.7 specVersion
         # and the modelCard; notice/risk cover the model & dataset licenses). It
         # sets its own metadata.component, so no stamp pass is needed below.
+        #
+        # MODEL_ID is the only variable read here by name. HF_TOKEN, when the
+        # caller passes one in, is consumed implicitly by huggingface_hub inside
+        # the generator and the enrich step — it looks unused from this file, but
+        # removing it from the environment would break private/gated models.
         if [ -z "$MODEL_ID" ]; then echo "[ERROR] MODEL_ID required for AIBOM mode."; exit 1; fi
         echo "[1/2] aibom: generate AI SBOM for $MODEL_ID"
         bash "$LIBDIR/scan-aibom.sh" "$MODEL_ID" "$OUTPUT_FILE" "$PROJECT_VERSION"
@@ -360,6 +372,20 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 # ========================================================
+# Source-tree enrichment (vendored OSS, CocoaPods) below only applies to a real
+# source scan: the CLI source scan (MODE=POSTPROCESS, tree at /src) or the web-UI
+# source scan (MODE=SOURCE, SOURCE_ROOT). Every other mode (ANALYZE/MERGE/IMAGE/
+# BINARY/ROOTFS/FIRMWARE/AIBOM) may still have an unrelated tree mounted at /src —
+# the web UI mounts its host dir there for EVERY mode, so an ANALYZE of a supplier
+# SBOM would otherwise scan the server's own working tree and merge stray
+# components into the result. Gate both steps on the source-scan modes, mirroring
+# the source-file-tree gate below (case "$SCAN_MODE").
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS) SOURCE_SCAN=true ;;
+    *) SOURCE_SCAN=false ;;
+esac
+
+# ========================================================
 # Vendored open source (opt-in, SCANOSS) — only meaningful for a source tree.
 # Runs for both the CLI source scan (MODE=POSTPROCESS, tree mounted at /src) and
 # the web-UI source scan (SOURCE mode, SOURCE_ROOT). When enabled, identify the
@@ -369,7 +395,7 @@ fi
 # no package manager, near-empty scan) — off-by-default discovery.
 # ========================================================
 VENDORED_SRC="${SOURCE_ROOT:-/src}"
-if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
+if [ "$SOURCE_SCAN" = "true" ] && [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
     echo "[INFO] Identifying vendored open source (SCANOSS)..."
     VEND_SBOM="${OUT_PREFIX}_vendored.cdx.json"
     if bash "$LIBDIR/identify-vendored.sh" "$VENDORED_SRC" "$VEND_SBOM" "$PROJECT_VERSION"; then
@@ -395,7 +421,7 @@ if [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
             echo "[INFO] no new vendored open source to add (after reconciliation)."
         fi
     fi
-elif [ -d "$VENDORED_SRC" ]; then
+elif [ "$SOURCE_SCAN" = "true" ] && [ -d "$VENDORED_SRC" ]; then
     run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
 fi
 
@@ -408,7 +434,7 @@ fi
 # future pod-capable image), so this never double-counts.
 # ========================================================
 COCOA_SRC="${SOURCE_ROOT:-/src}"
-if [ -d "$COCOA_SRC" ] \
+if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
    && find "$COCOA_SRC" -type f -name Podfile.lock -not -path '*/Pods/*' 2>/dev/null | grep -q .; then
     HAS_COCOA=$(jq '[.components[]? | select((.purl // "") | startswith("pkg:cocoapods/"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${HAS_COCOA:-0}" -eq 0 ]; then
@@ -588,6 +614,19 @@ if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; the
     done
     if bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME"; then
         ARTIFACTS+=("${OUT_PREFIX}_risk-report.md" "${OUT_PREFIX}_risk-report.html")
+    fi
+fi
+
+# AI compliance profile (AI SBOMs only): a governance one-pager that re-aggregates
+# the G7 conformance status, the regulatory crosswalk and the license-review flags
+# — no new scan. generate-ai-profile.sh self-gates on the presence of G7 checks in
+# the conformance report, so it is a clean no-op for a plain (non-AI) SBOM; we wire
+# it only for the two modes that can carry a machine-learning-model component.
+if [ "$SCAN_MODE" = "AIBOM" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
+    if bash "$LIBDIR/generate-ai-profile.sh" "$OUT_PREFIX" "$PROJECT_NAME"; then
+        for ext in json md html; do
+            [ -f "${OUT_PREFIX}_ai-profile.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_ai-profile.${ext}")
+        done
     fi
 fi
 

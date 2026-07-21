@@ -71,7 +71,10 @@ case "${1:-}" in
       esac
       prev="$a"
     done
-    if [ -n "$pn" ] && [ -n "$pv" ]; then
+    # DOCKER_STUB_NOWRITE=1 models a container that ran and reported success but
+    # whose /host-output mount never reached the host (folder outside Docker
+    # Desktop file sharing / Colima's home-only mount) — nothing lands on disk.
+    if [ -n "$pn" ] && [ -n "$pv" ] && [ "${DOCKER_STUB_NOWRITE:-0}" != "1" ]; then
       dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
       printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"}},"components":[]}\n' \
         "$pn" "$pv" > "$dest/${pn}_${pv}_bom.json"
@@ -187,6 +190,43 @@ scan_in "$d" --project Done --version 2.0.0 --generate-only
     && [ -f "$d/Done_2.0.0/Done_2.0.0_bom.json" ] && [ ! -f "$d/Done_2.0.0_bom.json" ]; } \
   && pass "source scan completes and writes <proj>_<ver>/<proj>_<ver>_bom.json" \
   || { fail "source scan completes and writes SBOM" "rc=$RC"; show; }
+
+# Fail-closed on an empty host mount, in the DEFAULT (non --generate-only) path.
+# Regression: the "did the artifact reach the host?" guard used to run ONLY under
+# --generate-only, so a full scan whose /host-output mount silently landed nothing
+# on the host still printed "Analysis Complete!" over an empty folder. The stub's
+# DOCKER_STUB_NOWRITE=1 models exactly that (container succeeds, writes nothing);
+# the script must now exit non-zero with a "not found on host" diagnostic.
+d="$(new_proj nowrite)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_NOWRITE=1
+scan_in "$d" --project Empty --version 3.0.0
+unset DOCKER_STUB_NOWRITE
+{ [ "$RC" -ne 0 ] && in_out "not found on host" && ! in_out "Analysis Complete"; } \
+  && pass "empty host mount (no --generate-only) fails closed with 'not found on host'" \
+  || { fail "empty host mount not caught in the default path" "rc=$RC"; show; }
+
+# The completion summary must describe what is ON DISK, not what was requested.
+# Regression: it printed a line per request flag, so a scanner image that predates
+# a feature (or a step that degraded) still produced "SPDX: <proj>_<ver>_bom.spdx.json"
+# for a file the user did not have — the exact symptom of running --spdx/--all on a
+# pre-v1.8.0 image. The stub writes only _bom.json, so every other requested
+# artifact is missing and must be reported as such instead of announced.
+d="$(new_proj summary)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project Sum --version 4.0.0 --all --generate-only
+{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+    && ! in_out "_bom.spdx.json" \
+    && in_out "requested but not produced" \
+    && in_out "SPDX export" && in_out "notice" && in_out "security report"; } \
+  && pass "summary reports only artifacts on disk and names the missing ones" \
+  || { fail "summary announced artifacts that were never produced" "rc=$RC"; show; }
+
+# The mirror case: artifacts that DID land are listed, with no false warning.
+d="$(new_proj summary_ok)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project SumOk --version 4.1.0 --generate-only --no-report
+{ [ "$RC" -eq 0 ] && in_out "SBOM: SumOk_4.1.0_bom.json" \
+    && ! in_out "requested but not produced"; } \
+  && pass "summary lists the delivered SBOM without a spurious missing-artifact warning" \
+  || { fail "summary warned about artifacts that were not requested" "rc=$RC"; show; }
 
 # --------------------------------------------------------
 section "Target-mode routing"

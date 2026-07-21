@@ -189,7 +189,7 @@ sequenceDiagram
 
 이미지 안에서의 두 단계:
 
-1. **`build-prep.sh`** (`docker/lib/build-prep.sh`) — cdxgen **직전** 의존성 보강. cdxgen이 자동 해석하지 못하는 생태계(특히 Rust·Go)의 lockfile을 만들어 전이 의존성까지 노출시킵니다. POSIX `sh`, best-effort(스캔을 절대 실패시키지 않음).
+1. **`build-prep.sh`** (`docker/lib/build-prep.sh`) — cdxgen **직전** 의존성 보강. cdxgen이 자동 해석하지 못하는 생태계(특히 Rust·Go)의 lockfile을 만들어 전이 의존성까지 노출시킵니다. POSIX `sh`, 실패해도 스캔을 중단시키지 않습니다.
 
    | 생태계 | 동작 | 비고 |
    |--------|------|------|
@@ -316,7 +316,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | `--firmware` | `MODE=FIRMWARE` (펌웨어 이미지) | 언팩 → syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom 이미지) | HuggingFace 모델로 ML-BOM 생성 + G7 검사 |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
-| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (CLI 전용) |
+| `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (웹 UI의 Reproducible output 토글도 동일) |
 | `--sign` | `SIGN_SBOM=true` (+ `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ 서명 |
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ 업로드 생략 |
 | `--ui` | `MODE=UI` | 웹 UI |
@@ -363,14 +363,14 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 - **책임 분리** — 생성(Stage 1)과 후처리(Stage 2)를 분리해 후처리 이미지를 경량화.
 - **재현성** — 도구 버전을 `ARG`로 고정, `--byte-stable`로 바이트 동일 출력.
 - **표준 준수** — CycloneDX 1.6 스펙 준수.
-- **견고성** — 후처리 단계는 best-effort로 전체 스캔을 쉽게 중단시키지 않음.
+- **견고성** — 후처리 단계는 실패해도 전체 스캔을 중단시키지 않음.
 - **단일 인터페이스** — 모든 언어·모드를 `scan-sbom.sh` 하나로 호출.
 
 ---
 
 ## 역할 분담 (TRUSCA)
 
-BomLens는 **생성(generation)** 전문 도구입니다. 전사(全社) 프로젝트 관리·취약점 triage·라이선스 정책 게이트 같은 **거버넌스**는 자매 프로젝트 [TRUSCA](https://github.com/trustedoss/trusca)(구 TrustedOSS Portal)에 위임합니다. 두 도구 모두 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환됩니다.
+BomLens는 **생성(generation)** 전문 도구입니다. 전사(全社) 프로젝트 관리, 취약점 분류, 라이선스 정책 게이트 같은 **거버넌스**는 자매 프로젝트 [TRUSCA](https://github.com/trustedoss/trusca)(구 TrustedOSS Portal)에 위임합니다. 두 도구 모두 cdxgen/Trivy를 공유하므로 산출물(CycloneDX)이 그대로 호환됩니다.
 
 ```mermaid
 flowchart TB

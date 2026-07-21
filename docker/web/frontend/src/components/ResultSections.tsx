@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { EmptyState } from "@/components/ui/state";
-import type { DoneEvent, RecentScan, Severity } from "@/lib/api";
+import type { DoneEvent, RecentScan, ResultFile, Severity } from "@/lib/api";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/results";
@@ -29,6 +29,7 @@ export function ResultSection({
   seedSeverity,
   seedTier,
   onPick,
+  onResultsChange,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -47,6 +48,9 @@ export function ResultSection({
     section: SectionId,
     seed: { severity?: Severity; tier?: LicenseRiskTier },
   ) => void;
+  /** An artifact was produced after the scan (the on-demand SPDX export), so
+   *  the owner can refresh the result it holds. */
+  onResultsChange?: (files: ResultFile[]) => void;
 }) {
   const { t } = useTranslation();
 
@@ -112,7 +116,13 @@ export function ResultSection({
     }
 
     case "artifacts":
-      return <ArtifactsSection result={result} scanId={scanId} />;
+      return (
+        <ArtifactsSection
+          result={result}
+          scanId={scanId}
+          onResultsChange={onResultsChange}
+        />
+      );
 
     case "models": {
       const sbomFile = sbomFileName(result);
@@ -123,7 +133,10 @@ export function ResultSection({
 
     case "conformance":
       return result.conformance ? (
-        <ConformancePanel conformance={result.conformance} />
+        <ConformancePanel
+          conformance={result.conformance}
+          aiProfile={result.aiProfile ?? null}
+        />
       ) : null;
 
     default:

@@ -163,17 +163,24 @@ stream() {
     [ -s "$WORK/done.json" ]
 }
 
-# assert_done <case> <expected_mode> <prefix> <min_components>
+# assert_done <case> <expected_mode> <prefix> <min_components> [exact_components] [forbid_purl_prefix]
 # Parses $WORK/done.json and checks ok=true, mode, prefix-only results
 # (regression #2), no leaked oldscan, and a minimum component count.
+#   exact_components   (optional) require EXACTLY this many components, not just a
+#                      minimum — used to prove a mode did not merge stray rows in.
+#   forbid_purl_prefix (optional) assert no component in the sbom componentList has
+#                      a purl starting with this prefix (e.g. pkg:cocoapods/), which
+#                      would betray a non-source mode scanning the mounted /src tree.
 # strict=False on json.loads: vuln descriptions carry raw newlines in the payload.
 assert_done() {
-    local label="$1" want_mode="$2" prefix="$3" min="$4"
+    local label="$1" want_mode="$2" prefix="$3" min="$4" exact="${5:-}" forbid="${6:-}"
     PREFIX="$prefix" WANT_MODE="$want_mode" MIN="$min" LABEL="$label" \
+    EXACT="$exact" FORBID_PURL="$forbid" \
     python3 - "$WORK/done.json" <<'PY'
 import sys, os, json
 label = os.environ["LABEL"]; want_mode = os.environ["WANT_MODE"]
 prefix = os.environ["PREFIX"]; min_c = int(os.environ["MIN"])
+exact = os.environ.get("EXACT", ""); forbid = os.environ.get("FORBID_PURL", "")
 try:
     d = json.loads(open(sys.argv[1]).read(), strict=False)
 except Exception as exc:
@@ -189,9 +196,18 @@ if leaked:
     errs.append("results NOT prefix-scoped (regression #2): %s" % leaked[:5])
 if any(n.startswith("oldscan_9.9_") for n in names):
     errs.append("a pre-existing scan's artifact leaked into results (regression #2)")
-comps = (d.get("sbom") or {}).get("components")
+sbom = d.get("sbom") or {}
+comps = sbom.get("components")
 if comps is None or comps < min_c:
     errs.append("components=%r (expected >= %d)" % (comps, min_c))
+if exact != "" and comps != int(exact):
+    errs.append("components=%r (expected EXACTLY %s — stray rows merged in?)" % (comps, exact))
+if forbid:
+    clist = sbom.get("componentList") or []
+    stray = [(r.get("purl") or "") for r in clist if (r.get("purl") or "").startswith(forbid)]
+    if stray:
+        errs.append("stray %s component(s) merged into a non-source scan "
+                    "(source-isolation regression): %s" % (forbid, stray[:5]))
 if errs:
     print("CHECK_FAIL " + " | ".join(errs)); sys.exit(1)
 print("OK mode=%s components=%s results=%d" % (d["mode"], comps, len(names)))
@@ -199,14 +215,33 @@ PY
 }
 
 echo "== [1/3] sbom-upload (MODE=ANALYZE) — no network, most stable =="
+# Source-isolation regression: the web UI mounts its host dir at /src for EVERY
+# mode, so an ANALYZE of a supplier SBOM would previously run the entrypoint's
+# CocoaPods/vendored enrichment over the server's own /src tree and MERGE stray
+# components into the delivered SBOM. Plant a CocoaPods trigger (Podfile.lock) in
+# /src: a fixed entrypoint gates enrichment on the source-scan modes and leaves the
+# ANALYZE result at EXACTLY the uploaded SBOM's 2 components with no pkg:cocoapods/
+# rows; the pre-fix entrypoint merges the pods and this case fails.
+cat > "$SRC/Podfile.lock" <<'LOCK'
+PODS:
+  - Alamofire (5.8.0)
+
+DEPENDENCIES:
+  - Alamofire
+
+SPEC CHECKSUMS:
+  Alamofire: 0123456789abcdef0123456789abcdef01234567
+
+COCOAPODS: 1.12.1
+LOCK
 tok="$(upload sbom "$SRC/sample_bom.json")"
 if [ -z "$tok" ]; then
     fail "SBOM upload returned no token"
 elif stream "project=analyzeproj&version=3.1&source=sbom-upload&token=$tok&security=true"; then
-    out="$(assert_done "sbom-upload" ANALYZE analyzeproj_3.1 2)"
+    out="$(assert_done "sbom-upload" ANALYZE analyzeproj_3.1 2 2 pkg:cocoapods/)"
     case "$out" in
-        OK*) pass "sbom-upload -> done.ok, ANALYZE, 2 components, prefix-scoped results ($out)" ;;
-        *)   fail "sbom-upload done event wrong" "$out" ;;
+        OK*) pass "sbom-upload -> done.ok, ANALYZE, EXACTLY 2 components, no stray pods, prefix-scoped ($out)" ;;
+        *)   fail "sbom-upload done event wrong (source isolation?)" "$out" ;;
     esac
 else
     fail "sbom-upload produced no done event" "$(docker logs "$CID" 2>&1 | tail -5)"

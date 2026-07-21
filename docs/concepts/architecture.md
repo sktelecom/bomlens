@@ -15,7 +15,7 @@ For the per-input tool flow — source code (with the ScanCode and SCANOSS optio
 BomLens is a 2-stage pipeline in which two kinds of Docker images work together.
 
 - **Stage 1 — Generation**: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6); for container images, binaries, and directories, syft does.
-- **Stage 2 — Post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, (deep license detection), notice generation, the security report, signing, and upload in order.
+- **Stage 2 — Post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.
 
 ```mermaid
 flowchart TB
@@ -59,7 +59,7 @@ Previously, every language runtime plus every analysis tool lived in a single hu
 | **Acquisition** | Pulled **on demand** after detecting the project language | Pulled once and reused |
 | **Benefit** | cdxgen maintains up-to-date per-language toolchains | Small image; pinned tool versions ensure reproducibility |
 
-> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is decisively better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen).
+> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is markedly better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen).
 
 ---
 
@@ -73,10 +73,10 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 | **build-prep.sh** | — | Stage 1 | Dependency preparation right before cdxgen (cargo, go, bundle, mvn, pip) | `MODE=SOURCE` |
 | **syft** | `v1.46.0` | Stage 1 | Scans images, binaries, and root filesystems | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | Normalizes and sorts the SBOM | Always |
-| **ScanCode Toolkit** | `32.3.0` | Stage 2 | Precise license detection on first-party source | `--deep-license` (opt-in build) |
+| **ScanCode Toolkit** | `32.5.0` | Stage 2 | Precise license detection on first-party source | `--deep-license` (opt-in build) |
 | **SCANOSS** | `1.25.2` | Stage 2 | Identify vendored open source in C/C++ source with no package manager | `--identify-vendored` |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | Generates the open source notice (NOTICE) | `--notice` / `--all` |
-| **Trivy** | `v0.70.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
+| **Trivy** | `v0.72.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
 | **Cosign** | `v2.4.1` | Stage 2 | Detached SBOM signature | `--sign` |
 | **curl** | — | Stage 2 | Upload to Dependency-Track | Default (unless `--generate-only`) |
 
@@ -316,7 +316,7 @@ How CLI flags translate into environment variables and which steps they enable (
 | `--firmware` | `MODE=FIRMWARE` (firmware image) | Unpack, then syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom image) | Generate an ML-BOM from a HuggingFace model, plus a G7 check |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
-| `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (CLI only) |
+| `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (also the UI's Reproducible output toggle) |
 | `--sign` | `SIGN_SBOM=true` (plus `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ signing |
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ skips the upload |
 | `--ui` | `MODE=UI` | Web UI |
@@ -363,7 +363,7 @@ Add a helper script under `docker/lib/`, call it from the shared pipeline sectio
 - **Separation of concerns** — generation (Stage 1) and post-processing (Stage 2) are split, keeping the post-processing image small.
 - **Reproducibility** — tool versions are pinned via `ARG`; `--byte-stable` produces byte-identical output.
 - **Standards compliance** — conforms to the CycloneDX 1.6 specification.
-- **Robustness** — post-processing steps are best-effort and do not easily abort the whole scan.
+- **Robustness** — post-processing steps are best-effort and do not abort the whole scan.
 - **Single interface** — every language and mode is invoked through the one `scan-sbom.sh`.
 
 ---

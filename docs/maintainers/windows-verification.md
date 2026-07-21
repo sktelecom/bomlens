@@ -9,8 +9,9 @@
 
 - PR #378: opt-in `--spdx` 플래그가 추가되어, 최종 CycloneDX SBOM을 변환한
   SPDX 2.3 JSON(`{프로젝트}_{버전}_bom.spdx.json`)을 추가 산출물로 생성한다.
-  `--all`에도 포함되며, 웹 UI에는 Outputs 아래 "SPDX export"(한국어: "SPDX 내보내기")
-  토글로 노출된다. 정본은 CycloneDX이고 SPDX는 변환본이다.
+  `--all`에도 포함된다. 정본은 CycloneDX이고 SPDX는 변환본이다.
+  웹 UI에서는 스캔 전 토글이 아니라 결과 화면 SBOM 카드의 "SPDX 2.3으로 내보내기"
+  버튼으로 노출된다. 스캔은 언제나 CycloneDX만 만들고, 필요할 때 변환한다.
 - 이미 검증된 것: macOS에서 CLI/웹 UI end-to-end, CI의 ubuntu 통합 테스트·Playwright·
   시각 회귀, windows-latest 러너의 No-Docker 계약 테스트.
 - 이번 회차의 목적: **실제 Windows에서 Docker를 띄운 전체 스캔 흐름** 검증.
@@ -146,11 +147,17 @@ scripts\scan-sbom.bat --ui
 
 http://localhost:8080 에서:
 
-- Outputs 그룹에 "SPDX export" 토글이 보이는지(언어를 한국어로 바꾸면 "SPDX 내보내기")
-- current-dir 소스 스캔을 SPDX 토글 켜고 실행하면 결과 화면 SBOM 카드에 "SPDX" 칩이
-  붙고 다운로드가 되는지
-- 완료된 스캔에서 "같은 설정으로 재스캔"을 열면 SPDX 토글이 켜진 상태로 복원되는지
+- current-dir 소스 스캔을 실행하면 결과 화면 SBOM 카드에 "SPDX 2.3으로 내보내기"
+  버튼이 보이는지(언어를 영어로 바꾸면 "Export as SPDX 2.3")
+- 그 버튼을 누르면 몇 초 뒤 `_bom.spdx.json` 다운로드가 시작되고, 카드에 "SPDX" 칩이
+  새로 붙는지. 칩이 붙은 뒤에는 버튼이 사라져야 한다
 - (회귀 감시) 소스 스캔이 cdxgen 형제 컨테이너로 도는지 스캔 로그 스트림에서 확인
+
+SPDX 화면 확인(내보내기 버튼, 변환 후 칩 생성, 칩이 spdx.json을 가리키는지)은
+`docker/web/frontend/tests/ui/spdx.spec.ts`가 CI에서 자동 검증하므로, Windows 회차에서는
+실제 브라우저 감각 확인이 필요할 때만 반복하면 된다. 다만 Windows에서는 변환이 형제
+컨테이너로 넘어갈 수 있어(기본 UI 이미지에 syft가 없는 경우) 첫 내보내기에서 이미지를
+내려받느라 오래 걸릴 수 있다. 이 대기는 자동 검증 범위 밖이므로 한 번은 눈으로 보는 편이 좋다.
 
 브라우저 조작이 안 되는 환경이면 사람이 화면을 확인하도록 SKIP으로 남기고,
 서버 응답만이라도 curl로 확인한다:

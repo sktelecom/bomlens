@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, ArrowUpDown, Package, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,16 @@ interface Props {
 
 type Sort = { key: ComponentSortKey; dir: SortDir };
 
-/** How many rows to render at once; "Show more" reveals the next batch. Sorting
- *  and filtering run over the full set — only the DOM is capped (large SBOMs). */
-const RENDER_STEP = 200;
+/** Rows are rendered in chunks of this size, one <tbody> per chunk. Chunks far
+ *  from the viewport are recycled into a single spacer row of their measured
+ *  height, so a large SBOM scrolls the full list while the DOM stays small.
+ *  Row heights may vary (wrapping license badges, the expanded detail row), so
+ *  spacers use per-chunk measurements, not a global fixed row height. */
+const CHUNK = 100;
+/** Height estimate for a chunk that has never been rendered (single-line row). */
+const ROW_ESTIMATE = 37;
+/** Chunks live from the start, before the observer has seen anything. */
+const INITIAL_LIVE: ReadonlySet<number> = new Set([0, 1, 2]);
 
 const SEV_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -121,8 +128,12 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
     }
   }, [initialQuery]);
   const [sort, setSort] = useState<Sort | null>(null);
-  const [limit, setLimit] = useState(RENDER_STEP);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // Chunk recycling state: which chunks render real rows, and the measured
+  // pixel height of chunks currently recycled into spacers.
+  const [liveChunks, setLiveChunks] = useState<ReadonlySet<number>>(INITIAL_LIVE);
+  const chunkHeights = useRef(new Map<number, number>());
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const types = useMemo(() => distinct(items.map((c) => c.type)), [items]);
   const licenses = useMemo(() => distinct(items.flatMap((c) => c.licenses)), [items]);
@@ -139,8 +150,43 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
     [items, filters, sort],
   );
 
-  // Reveal from the top again whenever the visible set changes.
-  useEffect(() => setLimit(RENDER_STEP), [filters, sort]);
+  // A new visible set invalidates every measurement and starts from the top.
+  useEffect(() => {
+    setLiveChunks(INITIAL_LIVE);
+    chunkHeights.current.clear();
+  }, [filters, sort, items]);
+
+  // One observer over the per-chunk <tbody> elements (stable nodes — React
+  // keeps them keyed by chunk index across live/spacer swaps). A chunk near
+  // the viewport goes live; one leaving it is measured, then recycled.
+  const chunkCount = Math.ceil(filtered.length / CHUNK);
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        setLiveChunks((prev) => {
+          const next = new Set(prev);
+          for (const e of entries) {
+            const idx = Number((e.target as HTMLElement).dataset.chunk);
+            if (Number.isNaN(idx)) continue;
+            if (e.isIntersecting) {
+              next.add(idx);
+            } else {
+              if (prev.has(idx)) {
+                chunkHeights.current.set(idx, e.boundingClientRect.height);
+              }
+              next.delete(idx);
+            }
+          }
+          return next;
+        });
+      },
+      { root, rootMargin: "600px 0px" },
+    );
+    for (const el of root.querySelectorAll("tbody[data-chunk]")) io.observe(el);
+    return () => io.disconnect();
+  }, [chunkCount]);
 
   if (total === 0) {
     return <EmptyState icon={Package}>{t("result.componentsEmpty")}</EmptyState>;
@@ -152,8 +198,18 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
     );
   const patch = (p: Partial<ComponentFilters>) => setFilters((f) => ({ ...f, ...p }));
 
-  const visible = filtered.slice(0, limit);
   const colCount = 4 + (anyScope ? 1 : 0) + (anyVulns ? 1 : 0);
+
+  // Row keys are purl-or-name based (stable across chunk boundaries); the
+  // chunk holding the expanded row is pinned live so it can never be recycled
+  // out from under the open detail panel.
+  const rowKey = (c: ComponentItem, gi: number) => c.purl || `${c.name}-${gi}`;
+  const openChunk =
+    openKey === null
+      ? -1
+      : Math.floor(filtered.findIndex((c, gi) => rowKey(c, gi) === openKey) / CHUNK);
+  const chunks: ComponentItem[][] = [];
+  for (let i = 0; i < filtered.length; i += CHUNK) chunks.push(filtered.slice(i, i + CHUNK));
 
   return (
     <div className="space-y-3">
@@ -247,7 +303,7 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
         {truncated ? ` · ${t("result.truncated")}` : ""}
       </div>
 
-      <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
+      <div ref={scrollRef} className="max-h-[44rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">
@@ -263,9 +319,11 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
               <th className="px-3 py-2 font-medium">{t("result.colLicense")}</th>
             </tr>
           </thead>
-          <tbody>
-            {visible.map((c, i) => {
-              const key = c.purl || `${c.name}-${i}`;
+          {chunks.map((chunkItems, ci) =>
+            liveChunks.has(ci) || ci === openChunk ? (
+              <tbody key={ci} data-chunk={ci}>
+            {chunkItems.map((c, i) => {
+              const key = rowKey(c, ci * CHUNK + i);
               const isOpen = openKey === key;
               const toggle = () => setOpenKey(isOpen ? null : key);
               return (
@@ -450,32 +508,37 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
               </Fragment>
               );
             })}
-            {filtered.length === 0 && (
+              </tbody>
+            ) : (
+              // Recycled chunk: one spacer row holding the chunk's measured
+              // height (or an estimate before its first paint), so the
+              // scrollbar geometry stays correct without the row DOM.
+              <tbody key={ci} data-chunk={ci} aria-hidden>
+                <tr>
+                  <td
+                    colSpan={colCount}
+                    style={{
+                      height:
+                        chunkHeights.current.get(ci) ??
+                        chunkItems.length * ROW_ESTIMATE,
+                      padding: 0,
+                    }}
+                  />
+                </tr>
+              </tbody>
+            ),
+          )}
+          {filtered.length === 0 && (
+            <tbody>
               <tr>
                 <td colSpan={colCount} className="px-3 py-6 text-center text-muted-foreground">
                   {t("result.noMatch")}
                 </td>
               </tr>
-            )}
-          </tbody>
+            </tbody>
+          )}
         </table>
       </div>
-
-      {filtered.length > limit && (
-        <button
-          type="button"
-          onClick={() => setLimit((n) => n + RENDER_STEP)}
-          className={cn(
-            "w-full rounded-md border border-dashed py-2 text-xs font-medium text-muted-foreground",
-            "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-          )}
-        >
-          {t("result.showMore", {
-            count: Math.min(RENDER_STEP, filtered.length - limit),
-          })}
-        </button>
-      )}
     </div>
   );
 }

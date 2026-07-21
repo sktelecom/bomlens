@@ -122,11 +122,18 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | Generate the open-source notice (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Generate the Trivy security report (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
+| `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
+| `STALENESS_ENRICH` | — | `false` | Add deps.dev version currency (how many releases behind latest); needs network access |
 | `API_KEY`, `API_URL` | For uploads | — | Upload credential and server URL. DT uses `X-Api-Key`; TRUSCA uses a Bearer token |
 | `UPLOAD_TARGET` | — | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest, not DT-compatible) |
 | `TRUSCA_PROJECT_ID` | When `trusca` | — | Target TRUSCA project id (UUID). Must already exist (no auto-create) |
 | `TRUSCA_REF` | — | `main` | Ingest ref label |
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | Ingest release label |
+| `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven source scans: set `1` to keep the full resolved graph instead of filtering to compile/runtime scope |
+| `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js source scans: set `1` to keep the full dev-plus-production graph instead of the production-only set |
+| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
+| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM), which additionally allow 1.7 |
+| `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | Accepted SPDX spec versions for the conformance check |
 
 > TRUSCA's (formerly TrustedOSS Portal) native ingest endpoint (`POST /v1/projects/{id}/sbom-ingest`, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep `UPLOAD_TARGET=dependency-track` (the default).
 

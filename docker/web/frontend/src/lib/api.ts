@@ -154,6 +154,66 @@ export interface ConformanceCheck {
    *  manifest supplied it), "na" (no automated source — human review needed).
    *  Empty/absent for base format checks. */
   source?: string;
+  /** Regulatory documentation obligations this G7 element maps to (validate-sbom.sh
+   *  joins docker/lib/regulation-crosswalk.json, keyed by check id). Present only on
+   *  the ~half of G7 checks with a defensible correspondence; absent otherwise.
+   *  Informational — it never changes a check status or the overall result. */
+  regulations?: RegulationRef[];
+  /** How to satisfy this element: a CycloneDX fragment plus a reference link
+   *  (validate-sbom.sh joins docker/lib/g7-guidance.json by check id, so the CLI
+   *  reports show the same text). Present on the subset of G7 elements with a
+   *  mapping; absent on base format checks and on runs generated before the
+   *  guidance registry existed. Informational — never changes a status. */
+  guidance?: G7GuidanceRef;
+}
+
+/** Fill-in guidance for one G7 element. */
+export interface G7GuidanceRef {
+  /** A CycloneDX fragment showing the shape that would satisfy the element. */
+  snippet?: string;
+  /** Authoritative documentation for providing it (absolute https URL). */
+  docUrl?: string;
+}
+
+/** One regulatory-framework reference mapped onto a G7 element check. */
+export interface RegulationRef {
+  /** Framework id (e.g. "eu-ai-act", "kr-ai-framework-act"). */
+  framework: string;
+  /** The specific article / annex reference (e.g. "Annex IV(1)"). */
+  ref: string;
+  /** The interpretive basis for treating this element as touching that reference. */
+  basis: string;
+}
+
+/** One crosswalk element: a G7 element with its status and regulation refs, in
+ *  the detailed per-framework view under `conformance.regulatoryCrosswalk`. */
+export interface CrosswalkElement {
+  label: string;
+  status: "pass" | "warn" | "fail";
+  source: string;
+  refs: string[];
+}
+
+/** One framework in the detailed crosswalk under `conformance.regulatoryCrosswalk`
+ *  — carries `source` and the full `elements[]` (unlike the aiProfile card view). */
+export interface CrosswalkFramework {
+  id: string;
+  title: string;
+  source: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+  elements: CrosswalkElement[];
+}
+
+/** The detailed regulatory crosswalk under `conformance.regulatoryCrosswalk`.
+ *  Present only for AI SBOMs (validate-sbom.sh omits the key otherwise). A
+ *  documentation-preparation aid, never a certification/compliance verdict. */
+export interface RegulatoryCrosswalk {
+  /** The no-certification / visibility disclaimer shown above the sub-block. */
+  disclaimer: string;
+  frameworks: CrosswalkFramework[];
 }
 
 export interface ConformanceSummary {
@@ -161,6 +221,62 @@ export interface ConformanceSummary {
   format?: string;
   /** Per-check results; G7 checks have ids prefixed "g7-". */
   checks?: ConformanceCheck[];
+  /** Regulatory crosswalk rollup with the full per-framework element detail.
+   *  Present only on AI SBOMs; the key is omitted for non-AI SBOMs. Drives the
+   *  "Regulatory crosswalk" sub-block inside the conformance panel. */
+  regulatoryCrosswalk?: RegulatoryCrosswalk;
+}
+
+/** One G7 cluster's coverage counts in the aiProfile card. */
+export interface AiProfileCluster {
+  cluster: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+/** One framework's coverage in the aiProfile card's crosswalk (card view: no
+ *  `source`, no `elements[]` — the light rollup for the compliance card). */
+export interface AiProfileCrosswalkFramework {
+  id: string;
+  title: string;
+  total: number;
+  present: number;
+  gap: number;
+  review: number;
+}
+
+/**
+ * AI compliance profile — a card-sized rollup gathered from a run's
+ * `_ai-profile.json` (generate-ai-profile.sh re-aggregates the conformance + SBOM
+ * artifacts; no new scan). Present only on AI SBOMs; null otherwise. The big
+ * arrays (per-element detail) are dropped server-side — this card consumes only
+ * the summary counts. Documentation-preparation, not a compliance verdict.
+ */
+export interface AiProfile {
+  /** Overall conformance verdict: "pass" | "warn" | "fail" | "unknown". */
+  conformanceResult: string;
+  g7: {
+    total: number;
+    /** G7 elements with an automated source (the coverage base). */
+    auto: number;
+    present: number;
+    gap: number;
+    review: number;
+    clusters: AiProfileCluster[];
+  };
+  /** Components whose license is flagged for human review (from the SBOM). */
+  licenseReview: {
+    total: number;
+    behavioral: number;
+    nonCommercial: number;
+  };
+  /** Card-view crosswalk coverage (no per-element detail). */
+  regulatoryCrosswalk: {
+    disclaimer: string;
+    frameworks: AiProfileCrosswalkFramework[];
+  };
 }
 
 /**
@@ -178,7 +294,8 @@ export interface ScanConfig {
   version: string;
   notice: boolean;
   security: boolean;
-  /** SPDX 2.3 export (opt-in extra artifact). Absent on older sidecars. */
+  /** Recorded by scans run before SPDX became an on-demand export. Kept so an
+   *  older sidecar still parses; the form no longer reads it. */
   spdx?: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
@@ -199,6 +316,10 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** AI compliance profile card rollup (AI SBOMs only; null otherwise). Present on
+   *  both the SSE `done` event and the `/scan` detail (loadScan), kept in sync
+   *  server-side. Drives the AI compliance summary card. */
+  aiProfile?: AiProfile | null;
   /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
    *  status: "unavailable" (search blocked) | "no-match" | "matched". */
   scanoss?: { status: string | null; count: number } | null;
@@ -241,8 +362,6 @@ export interface ScanParams {
   scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
-  /** Also export the SBOM as SPDX 2.3 JSON (converted from the CycloneDX BOM). */
-  spdx: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
   /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
@@ -286,6 +405,16 @@ export interface Capabilities {
   firmwareSibling?: boolean;
   /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
   aibomSibling?: boolean;
+  /** The results screen can convert a finished BOM to SPDX 2.3 (syft here, or a
+   *  sibling scanner container). False hides the export action. */
+  spdxExport?: boolean;
+  /** SPDX export goes through a sibling container, so the first export may pull
+   *  the scanner image — worth saying before the wait. */
+  spdxSibling?: boolean;
+  /** A HuggingFace credential was present in the environment that launched the
+   *  UI, so private and gated model repos resolve. Never the token itself — the
+   *  UI has no token field, and the server keeps no credentials. */
+  hfAuth?: boolean;
   firmwareImage?: string;
   aibomImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
@@ -303,6 +432,42 @@ export async function getCapabilities(): Promise<Capabilities> {
   } catch {
     return { firmware: false, scanoss: false, docker: true };
   }
+}
+
+/** Error from a pre-scan POST (/upload, /git-cred): carries the HTTP status so
+ *  the form can pick a human message; `message` keeps the server's raw detail. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/** What the scan form shows when a pre-scan POST fails: `key` is an i18n
+ *  message key (the headline the user reads), `detail` the raw server/browser
+ *  text kept as secondary fine print for bug reports. */
+export interface UploadErrorInfo {
+  key: string;
+  detail?: string;
+}
+
+/** Map an upload/stash failure to a user-facing message key. Raw error text
+ *  (HTTP statuses, "Failed to fetch") never becomes the headline. */
+export function describeUploadError(e: unknown): UploadErrorInfo {
+  if (e instanceof ApiError) {
+    if (e.status === 413) return { key: "source.uploadErrorTooLarge" };
+    if (e.status >= 500)
+      return { key: "source.uploadErrorServer", detail: e.message };
+    return { key: "source.uploadErrorRejected", detail: e.message };
+  }
+  // fetch() rejects with a TypeError when the server is unreachable.
+  if (e instanceof TypeError) return { key: "source.uploadErrorNetwork" };
+  return {
+    key: "source.uploadErrorServer",
+    detail: e instanceof Error ? e.message : undefined,
+  };
 }
 
 /** Upload a file (zip/sbom/firmware) and get back a server-side token. */
@@ -325,7 +490,7 @@ export async function uploadFile(
     } catch {
       /* keep default */
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status);
   }
   return (await res.json()) as { token: string; filename: string };
 }
@@ -345,7 +510,7 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
     } catch {
       /* keep default */
     }
-    throw new Error(msg);
+    throw new ApiError(msg, res.status);
   }
   return (await res.json()) as { credId: string };
 }
@@ -358,6 +523,26 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
 export function fileUrl(id: string | null | undefined, name: string): string {
   const idPart = id ? `id=${encodeURIComponent(id)}&` : "";
   return `/file?${idPart}name=${encodeURIComponent(name)}`;
+}
+
+/**
+ * Export a finished scan's SBOM as SPDX 2.3 JSON (server-side conversion of the
+ * CycloneDX BOM the scan already wrote). The scan form has no SPDX toggle — the
+ * choice belongs here, after the results exist, so nobody has to re-scan for a
+ * format. Idempotent: an already-converted scan returns its existing file.
+ * Resolves to the new artifact's name plus the refreshed listing, or null on
+ * failure (the caller surfaces a toast).
+ */
+export async function exportSpdx(
+  id: string,
+): Promise<{ name: string; results: ResultFile[] } | null> {
+  try {
+    const res = await fetch(`/spdx-export?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as { name: string; results: ResultFile[] };
+  } catch {
+    return null;
+  }
 }
 
 /** A past scan in the local output dir (history; no account / DB). */
@@ -449,7 +634,6 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
-    spdx: String(params.spdx),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),

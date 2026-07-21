@@ -7,15 +7,17 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
+  describeUploadError,
   stashGitCred,
   uploadFile,
   type Capabilities,
   type ScanConfig,
   type ScanParams,
   type SourceType,
+  type UploadErrorInfo,
   type UploadKind,
 } from "@/lib/api";
-import { parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
+import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -113,8 +115,6 @@ export function useScanForm({
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
-  // SPDX 2.3 export (opt-in): an extra artifact converted from the CycloneDX BOM.
-  const [spdx, setSpdx] = useState(() => initialConfig?.spdx ?? false);
   const [deepLicense, setDeepLicense] = useState(
     () => initialConfig?.deepLicense ?? false,
   );
@@ -142,7 +142,7 @@ export function useScanForm({
   );
   const [scanossToken, setScanossToken] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<UploadErrorInfo | null>(null);
   const [uploading, setUploading] = useState(false);
 
   /** Typing into a field resolves its inline error immediately. */
@@ -238,7 +238,11 @@ export function useScanForm({
     const apply = (s: { project?: string; version?: string }) => {
       if (cancelled) return;
       if (!projectDirty) setProjectRaw(s.project ?? "");
-      if (!versionDirty) setVersionRaw(s.version ?? "");
+      // Prefer a version the source states; otherwise seed the placeholder
+      // default so the required field is satisfied on a first run — but only
+      // once a target is actually identified (a suggested project). With no
+      // target yet, both fields stay empty rather than showing a lone version.
+      if (!versionDirty) setVersionRaw(s.version || (s.project ? DEFAULT_VERSION : ""));
     };
     if (source === "sbom-upload" && file) {
       // The SBOM's own metadata beats filename guessing; fall back to the
@@ -306,7 +310,7 @@ export function useScanForm({
         setUploading(true);
         token = (await uploadFile(file, uploadKind)).token;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -318,7 +322,7 @@ export function useScanForm({
         setUploading(true);
         cred = (await stashGitCred(gitToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -332,7 +336,7 @@ export function useScanForm({
         setUploading(true);
         scanossCred = (await stashGitCred(scanossToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -346,7 +350,7 @@ export function useScanForm({
         setUploading(true);
         uploadCred = (await stashGitCred(uploadToken.trim())).credId;
       } catch (e) {
-        setUploadError((e as Error).message);
+        setUploadError(describeUploadError(e));
         setUploading(false);
         return;
       }
@@ -367,7 +371,6 @@ export function useScanForm({
       // scans have no package CVEs, so security is off there.
       notice: isAnalyze ? true : notice,
       security: isAiModel ? false : isAnalyze ? true : security,
-      spdx,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
@@ -384,14 +387,15 @@ export function useScanForm({
   };
 
   // "Outputs" = what gets generated. Scan-method options (deep license / vendored
-  // identification) are surfaced separately, not as outputs.
+  // identification) are surfaced separately, not as outputs. SPDX is NOT here: it
+  // is a format conversion of the BOM the scan always writes, so the results
+  // screen exports it on demand instead of making the user decide up front.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
     // AI-model scans skip the (empty) security report.
     ...(isAiModel
       ? []
       : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
-    { key: "spdx", value: spdx, set: setSpdx },
   ];
 
   return {

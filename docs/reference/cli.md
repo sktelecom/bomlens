@@ -38,6 +38,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--spdx` | false | Also export the SBOM as SPDX 2.3 JSON (`_bom.spdx.json`), converted from the final CycloneDX output |
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
+| `--lang <en\|ko>` | `en` | Language for the human-facing conformance and AI-profile reports (`.md`/`.html`). The SBOM and the JSON reports stay English regardless |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
@@ -54,6 +55,7 @@ Environment variables adjust the behavior.
 |----------|---------|-------------|
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | Override the scanner image |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
+| `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | Image used for AI model (ML-BOM) generation |
 | `SBOM_OUTPUT_FLAT` | — | Set to `1` to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | Output base for the desktop app and web UI (the CLI uses `--output-dir` instead). Each scan still lands in a `{Project}_{Version}/` subfolder under it |
 | `SBOM_UI_MOUNT_DIR` | — | For the Windows launcher `sbom-ui.bat`, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of `--ui --mount`). Use a path without `& ^ | < >` — the launcher rejects those rather than passing a mangled mount to Docker |
@@ -67,6 +69,7 @@ Environment variables adjust the behavior.
 | `SCANOSS_API_KEY` | — | Credential for `SCANOSS_API_URL`, if the endpoint requires one |
 | `SCANOSS_MIN_FILES` | `2` | Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set `1` to keep every single-file match |
 | `GIT_TOKEN` | — | Token for cloning private git repositories |
+| `HF_TOKEN` | — | HuggingFace read token for `--model`. Required for a private or gated model repository, which is how you review a model before publishing it. `HUGGING_FACE_HUB_TOKEN` is accepted as an alias |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
 | `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |

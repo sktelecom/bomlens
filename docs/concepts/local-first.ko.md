@@ -22,7 +22,7 @@ BomLens는 폐쇄망과 오프라인 환경에서 동작합니다. 외부 조회
 
 ## 생성은 BomLens, 거버넌스는 TRUSCA
 
-BomLens는 생성에 집중합니다. 전사 프로젝트 관리, 취약점 triage, 라이선스 정책 게이트 같은 거버넌스는 자매 프로젝트 TRUSCA(구 TrustedOSS Portal, <https://github.com/trustedoss/trusca>)에 위임합니다. 두 도구는 CycloneDX 산출물을 그대로 주고받습니다.
+BomLens는 생성에 집중합니다. 전사 프로젝트 관리, 취약점 분류, 라이선스 정책 게이트 같은 거버넌스는 자매 프로젝트 TRUSCA(구 TrustedOSS Portal, <https://github.com/trustedoss/trusca>)에 위임합니다. 두 도구는 CycloneDX 산출물을 그대로 주고받습니다.
 
 ## 관련 문서
 

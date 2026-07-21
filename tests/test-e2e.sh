@@ -296,10 +296,20 @@ check_bad() {
         fail "validate: $label -> fail ($expect_id)" "result=$res fails=$fails"
     fi
 }
-check_bad bad-generic-cyclonedx.json no-generic  "pkg:generic"
 check_bad bad-nopurl-cyclonedx.json  purl        "missing PURL"
 check_bad bad-notools-cyclonedx.json tools       "no tools"
 check_bad bad-nodeps-cyclonedx.json  transitive  "no dependencies"
+
+# pkg:generic is advisory (eff9a9a): it no longer fails conformance, but is
+# surfaced as an untraceable-component warning carrying a count.
+bash "$LIB/validate-sbom.sh" "$FIX/bad-generic-cyclonedx.json" "$atmp/bg" "demo" >/dev/null 2>&1
+bg_gen=$(jq -r '.checks[]|select(.id=="no-generic")|.status' "$atmp/bg_conformance.json" 2>/dev/null)
+bg_unt=$(jq -r '.untraceableComponents // 0' "$atmp/bg_conformance.json" 2>/dev/null)
+if [ "$bg_gen" = "warn" ] && [ "${bg_unt:-0}" -gt 0 ]; then
+    pass "validate: pkg:generic -> advisory warn + untraceable count"
+else
+    fail "validate: pkg:generic -> advisory warn" "no-generic=$bg_gen untraceable=$bg_unt"
+fi
 
 # Missing list populated for the no-PURL case
 bash "$LIB/validate-sbom.sh" "$FIX/bad-nopurl-cyclonedx.json" "$atmp/mp" "demo" >/dev/null 2>&1
@@ -309,8 +319,10 @@ else
     fail "validate: missing-PURL report lists the offending component"
 fi
 
-# Risk report: re-aggregate a fail-conformance + synthetic Trivy findings
-bash "$LIB/validate-sbom.sh" "$FIX/bad-generic-cyclonedx.json" "$atmp/rr" "demo" >/dev/null 2>&1
+# Risk report: re-aggregate a fail-conformance + synthetic Trivy findings.
+# Use a fixture with a real mandatory failure (missing PURL) so the report has
+# an unmet conformance item to surface — pkg:generic alone is advisory now.
+bash "$LIB/validate-sbom.sh" "$FIX/bad-nopurl-cyclonedx.json" "$atmp/rr" "demo" >/dev/null 2>&1
 cat > "$atmp/rr_security.json" <<'EOF'
 {"Results":[{"Vulnerabilities":[
  {"VulnerabilityID":"CVE-2024-0001","PkgName":"express","InstalledVersion":"4.18.2","Severity":"CRITICAL","FixedVersion":"4.19.0"},

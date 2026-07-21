@@ -1,0 +1,366 @@
+{
+  "$schema-note": "Korean translation-ese (번역투) pattern catalog for ko-style lint. Each rule is a per-line regex applied AFTER code fences, inline code, URLs, HTML comments, and front-matter are stripped (see lint.mjs). severity: S1 = clear error / S2 = strong recommendation (blocks the CI gate) / S3 = advisory only. Inspired by im-not-ai's 10-category taxonomy (https://github.com/epoko77-ai/im-not-ai), adapted to prose docs. Covers A(번역투)·C·J(시각장식) and single-pattern rules for D(AI 관용구)·F(수식 남용)·G(흐리기/hedging)·I(형식명사). Intentionally NOT covered: B(영어 괄호 병기, 오탐 위험), E(리듬·문장길이 통계, 줄별 정규식 불가), and frequency-based S2 escalation(3회+) — these need sentence/stat analysis beyond this line-regex engine, so leave them to doc-reviewer or human. Extend by adding rules here; the engine never changes.",
+  "rules": [
+    {
+      "id": "passive-eui-hae",
+      "category": "피동태 남용",
+      "severity": "S2",
+      "pattern": "에\\s*의해(서)?",
+      "message": "'~에 의해'는 영어 수동태(by)의 직역입니다.",
+      "suggestion": "능동태로 바꾸세요. 예: 'X에 의해 결정됨' → 'X가 결정함' 또는 'X에 따라 결정됨'.",
+      "example_bad": "프로젝트의 라이선스 티어 혼합에 의해 결정.",
+      "example_ok": "프로젝트의 라이선스 티어 구성에 따라 결정됩니다."
+    },
+    {
+      "id": "double-passive",
+      "category": "피동태 남용",
+      "severity": "S2",
+      "pattern": "되어\\s*지|[어아워]지게\\s*(되|됩|된|됐)",
+      "message": "이중 피동입니다(피동 + 피동).",
+      "suggestion": "피동을 한 번만 쓰세요. 예: '만들어지게 됩니다' → '만들어집니다'.",
+      "example_bad": "설정 파일이 자동으로 만들어지게 됩니다.",
+      "example_ok": "설정 파일이 자동으로 만들어집니다."
+    },
+    {
+      "id": "have-possession",
+      "category": "명사형 과다",
+      "severity": "S2",
+      "pattern": "[을를]\\s*(가지고|갖고)\\s*있",
+      "message": "'~을 가지고 있다'는 영어 have의 직역입니다.",
+      "suggestion": "'X를 가지고 있다' → 'X가 있다'.",
+      "example_bad": "프로젝트가 이미 실행 중인 스캔을 가지고 있으면",
+      "example_ok": "프로젝트에 이미 실행 중인 스캔이 있으면"
+    },
+    {
+      "id": "possible-nominal",
+      "category": "명사형 과다",
+      "severity": "S2",
+      "pattern": "것[이은]\\s*가능",
+      "message": "'~하는 것이 가능하다'는 영어 it is possible to의 직역입니다.",
+      "suggestion": "'~하는 것이 가능합니다' → '~할 수 있습니다'.",
+      "example_bad": "에어갭 환경에서 미러를 사용하는 것이 가능합니다.",
+      "example_ok": "에어갭 환경에서 미러를 사용할 수 있습니다."
+    },
+    {
+      "id": "enable-literal",
+      "category": "명사형 과다",
+      "severity": "S3",
+      "pattern": "가능하게\\s*(한다|합니다|하는|하여|해|함)",
+      "message": "'~을 가능하게 하다'는 영어 enable의 직역일 수 있습니다.",
+      "suggestion": "'~을 가능하게 합니다' → '~할 수 있게 합니다' 또는 능동 표현.",
+      "example_bad": "이 옵션은 재스캔을 가능하게 합니다.",
+      "example_ok": "이 옵션을 켜면 재스캔할 수 있습니다."
+    },
+    {
+      "id": "need-to",
+      "category": "군더더기",
+      "severity": "S3",
+      "pattern": "필요가\\s*있",
+      "message": "'~할 필요가 있다'는 맥락에 따라 장황할 수 있습니다.",
+      "suggestion": "흐름에 맞으면 '~해야 합니다'가 간결합니다.",
+      "example_bad": "토큰을 갱신할 필요가 있습니다.",
+      "example_ok": "토큰을 갱신해야 합니다."
+    },
+    {
+      "id": "in-respect-of",
+      "category": "군더더기",
+      "severity": "S2",
+      "pattern": "에\\s*있어서",
+      "message": "'~에 있어서'는 일본어/영어 투의 군더더기입니다.",
+      "suggestion": "'~에서', '~의 경우', '~할 때'로 바꾸세요.",
+      "example_bad": "운영 환경에 있어서 CORS는 화이트리스트로 강제합니다.",
+      "example_ok": "운영 환경에서 CORS는 화이트리스트로 강제합니다."
+    },
+    {
+      "id": "through-overuse",
+      "category": "군더더기",
+      "severity": "S3",
+      "pattern": "[을를]\\s*통해서",
+      "message": "'~을 통해서'의 '서'는 군더더기인 경우가 많습니다.",
+      "suggestion": "'통해서' → '통해' 또는 '(으)로'.",
+      "example_bad": "API를 통해서 스캔을 시작합니다.",
+      "example_ok": "API로 스캔을 시작합니다."
+    },
+    {
+      "id": "about-overuse",
+      "category": "군더더기",
+      "severity": "S3",
+      "pattern": "에\\s*대(해서|하여)",
+      "message": "'~에 대해서/대하여'는 장황할 수 있습니다.",
+      "suggestion": "'에 대해서' → '에 대해' 또는 목적어 '~을'로 직접.",
+      "example_bad": "AI 규제에 대해서 논의할 필요가 있습니다.",
+      "example_ok": "AI 규제를 논의해야 합니다."
+    },
+    {
+      "id": "geurigo-naseo",
+      "category": "직역 접속",
+      "severity": "S1",
+      "pattern": "그리고\\s*나서",
+      "message": "'그리고 나서'는 비표준입니다.",
+      "suggestion": "'그런 다음' 또는 '그러고 나서'로 바꾸세요.",
+      "example_bad": "스캔을 실행하고 그리고 나서 결과를 확인합니다.",
+      "example_ok": "스캔을 실행한 다음 결과를 확인합니다."
+    },
+    {
+      "id": "located-at",
+      "category": "직역 접속",
+      "severity": "S2",
+      "pattern": "에\\s*위치(하|합|함|해)",
+      "message": "'~에 위치하다'는 영어 be located의 직역입니다.",
+      "suggestion": "'~에 있다'로 바꾸세요.",
+      "example_bad": "설정 파일은 프로젝트 루트에 위치합니다.",
+      "example_ok": "설정 파일은 프로젝트 루트에 있습니다."
+    },
+    {
+      "id": "register-haeyo",
+      "category": "합쇼체 혼용",
+      "severity": "S2",
+      "pattern": "(해요|예요|이에요|거예요)(?=[\\s.,!?\"')\\]]|$)",
+      "message": "문서는 합쇼체(-습니다)로 통일합니다. 해요체가 섞였습니다.",
+      "suggestion": "'~해요' → '~합니다', '~예요' → '~입니다'.",
+      "example_bad": "이 화면에서 스캔을 관리해요.",
+      "example_ok": "이 화면에서 스캔을 관리합니다."
+    },
+    {
+      "id": "litotes-double-negative",
+      "category": "영문 어순 잔재",
+      "severity": "S3",
+      "pattern": "지\\s*않을\\s*수\\s*없",
+      "message": "이중부정은 영문 투입니다.",
+      "suggestion": "긍정으로 직접 표현하세요.",
+      "example_bad": "이 단계는 건너뛰지 않을 수 없습니다.",
+      "example_ok": "이 단계는 반드시 거쳐야 합니다."
+    },
+    {
+      "id": "uncountable-plural",
+      "category": "복수 직역",
+      "severity": "S3",
+      "pattern": "(정보|데이터|소프트웨어|콘텐츠|트래픽|코드)들",
+      "message": "불가산 명사에 영어 복수 '-들'을 붙였습니다.",
+      "suggestion": "'데이터들' → '데이터'. 한국어는 불가산 명사를 복수화하지 않습니다.",
+      "example_bad": "스캔이 수집한 데이터들을 저장합니다.",
+      "example_ok": "스캔이 수집한 데이터를 저장합니다."
+    },
+    {
+      "id": "term-license",
+      "category": "용어 비일관",
+      "severity": "S1",
+      "pattern": "라이센스",
+      "message": "용어집 정규형이 아닙니다.",
+      "suggestion": "'라이센스' → '라이선스' (docs/glossary.md).",
+      "example_bad": "금지 라이센스가 발견되면 빌드를 차단합니다.",
+      "example_ok": "금지 라이선스가 발견되면 빌드를 차단합니다."
+    },
+    {
+      "id": "term-component-misspell",
+      "category": "용어 비일관",
+      "severity": "S1",
+      "pattern": "콤포넌트|컴퍼넌트|컴포년트",
+      "message": "용어집 정규형이 아닙니다.",
+      "suggestion": "'컴포넌트'로 통일하세요 (docs/glossary.md).",
+      "example_bad": "콤포넌트 목록을 확인합니다.",
+      "example_ok": "컴포넌트 목록을 확인합니다."
+    },
+    {
+      "id": "decorative-emoji",
+      "category": "AI 글투",
+      "severity": "S2",
+      "pattern": "(?![\\u{2605}\\u{2606}\\u{2705}\\u{274C}\\u{26A0}\\u{2610}])[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}\\u{1F900}-\\u{1F9FF}\\u{2728}\\u{1F4A1}]",
+      "flags": "gu",
+      "message": "장식용 이모지는 AI 글투의 전형입니다.",
+      "suggestion": "이모지를 빼고, 강조가 필요하면 admonition(:::note 등)이나 문장을 쓰세요.",
+      "example_bad": "릴리스를 완료했습니다 🎉",
+      "example_ok": "릴리스를 완료했습니다. ★ 전용 항목, ✅ 충족, ❌ 누락, ⚠ 주의, ☐ 체크는 기능적 기호입니다."
+    },
+    {
+      "id": "mechanical-step-label",
+      "category": "AI 글투",
+      "severity": "S3",
+      "pattern": "(\\*\\*\\s*)?([0-9]+\\s*단계|단계\\s*[0-9]+|Step\\s*[0-9]+)\\s*[:：]",
+      "message": "'1단계:' 같은 기계적 단계 라벨은 AI 글투입니다.",
+      "suggestion": "번호 매기기 목록(1. 2. 3.)이나 task 제목으로 대체하세요.",
+      "example_bad": "1단계: 프로젝트를 추가합니다.",
+      "example_ok": "먼저 프로젝트를 추가합니다."
+    },
+    {
+      "id": "decorative-bold-excess",
+      "category": "시각 장식",
+      "severity": "S2",
+      "pattern": "(\\*\\*[^*]+\\*\\*[^*]*){3,}",
+      "message": "한 줄에 볼드가 과도합니다(3개 이상). 강조가 흩어집니다.",
+      "suggestion": "정말 핵심인 한두 곳만 남기고 푸세요.",
+      "example_bad": "**프로젝트 이름**과 **버전**을 입력하고 **스캔 대상**을 고릅니다.",
+      "example_ok": "프로젝트 이름과 버전을 입력하고 스캔 대상을 고릅니다."
+    },
+    {
+      "id": "decorative-interpunct",
+      "category": "시각 장식",
+      "severity": "S2",
+      "pattern": "(·[ \\t]*[^\\s·][^·\\n]*){3,}",
+      "message": "가운뎃점(·) 나열이 깁니다(3개 이상).",
+      "suggestion": "쉼표나 문장, 목록으로 푸세요.",
+      "example_bad": "고지문·SBOM·보안 보고서·위험 보고서를 만듭니다.",
+      "example_ok": "고지문과 SBOM, 위험 보고서를 만듭니다."
+    },
+    {
+      "id": "decorative-arrow",
+      "category": "시각 장식",
+      "severity": "S3",
+      "pattern": "→",
+      "message": "본문 산문의 화살표(→) 장식입니다.",
+      "suggestion": "문장으로 푸세요. 코드 흐름은 백틱, 다이어그램은 코드블록 안에 두면 예외입니다.",
+      "example_bad": "실행 → 스캔 → 다운로드 순서입니다.",
+      "example_ok": "실행한 뒤 스캔하고 내려받습니다."
+    },
+    {
+      "id": "cliche-suggest",
+      "category": "AI 관용구",
+      "severity": "S2",
+      "pattern": "시사하는\\s*바가\\s*크",
+      "message": "'시사하는 바가 크다'는 AI 글에서 흔한 상투 표현입니다.",
+      "suggestion": "무엇을 시사하는지 구체적으로 쓰세요. 예: '이 결과는 캐시 설정이 지연을 좌우함을 보여준다'.",
+      "example_bad": "이 결과는 시사하는 바가 크다.",
+      "example_ok": "이 결과는 캐시 설정이 지연을 좌우함을 보여준다."
+    },
+    {
+      "id": "cliche-conclusion",
+      "category": "AI 관용구",
+      "severity": "S3",
+      "pattern": "결론적으로",
+      "message": "'결론적으로'는 AI 요약문의 상투적 도입입니다.",
+      "suggestion": "군더더기 도입을 빼고 결론을 바로 쓰세요.",
+      "example_bad": "결론적으로, 캐시를 켜는 것이 낫다.",
+      "example_ok": "캐시를 켜는 편이 낫다."
+    },
+    {
+      "id": "cliche-important-role",
+      "category": "AI 관용구",
+      "severity": "S3",
+      "pattern": "중요한\\s*역할을\\s*(한|합|수행|해)",
+      "message": "'중요한 역할을 한다'는 막연한 AI 상투 표현입니다.",
+      "suggestion": "어떤 역할인지 구체적으로 쓰세요. 예: '캐시는 응답 지연을 줄인다'.",
+      "example_bad": "캐시는 성능에 중요한 역할을 한다.",
+      "example_ok": "캐시는 응답 지연을 줄인다."
+    },
+    {
+      "id": "excess-adverb",
+      "category": "수식 남용",
+      "severity": "S3",
+      "pattern": "매우|굉장히|대단히|정말로",
+      "message": "강조 부사('매우/굉장히/대단히/정말로')는 AI 글에서 남용되며 정보를 더하지 않습니다.",
+      "suggestion": "부사를 빼거나 수치·근거로 대체하세요. 예: '매우 빠르다' → 'p95 50ms로 빠르다'.",
+      "example_bad": "이 기능은 매우 빠르다.",
+      "example_ok": "이 기능은 p95 50ms로 빠르다."
+    },
+    {
+      "id": "hedging-seem",
+      "category": "흐리기",
+      "severity": "S2",
+      "pattern": "수\\s*있을\\s*것으로\\s*(보|판단|생각|예상)",
+      "message": "'~할 수 있을 것으로 보인다'는 다중 완곡(hedging)입니다.",
+      "suggestion": "근거가 있으면 단정하고, 불확실하면 조건을 명시하세요. 예: '개선될 수 있을 것으로 보인다' → '캐시 적중률이 오르면 개선된다'.",
+      "example_bad": "성능이 개선될 수 있을 것으로 보인다.",
+      "example_ok": "캐시 적중률이 오르면 성능이 개선된다."
+    },
+    {
+      "id": "hedging-passive-judge",
+      "category": "흐리기",
+      "severity": "S3",
+      "pattern": "것으로\\s*(보인다|판단된다|사료된다)",
+      "message": "'~것으로 판단된다/보인다'는 책임을 흐리는 완곡 표현입니다.",
+      "suggestion": "근거로 단정하거나 주체를 밝히세요. 예: '타당한 것으로 판단된다' → '벤치마크상 타당하다'.",
+      "example_bad": "이 방식이 타당한 것으로 판단된다.",
+      "example_ok": "벤치마크상 이 방식이 타당하다."
+    },
+    {
+      "id": "formal-point",
+      "category": "형식명사",
+      "severity": "S3",
+      "pattern": "[다라]는\\s*점에서",
+      "message": "'~라는 점에서'는 형식명사로 문장을 늘리는 AI 글투입니다.",
+      "suggestion": "원인·이유를 직접 잇세요. 예: '빠르다는 점에서 유리하다' → '빨라서 유리하다'.",
+      "example_bad": "캐시가 빠르다는 점에서 유리하다.",
+      "example_ok": "캐시가 빨라서 유리하다."
+    },
+    {
+      "id": "create-obligation",
+      "category": "직역 동사",
+      "severity": "S2",
+      "pattern": "(의무|요건|규정|규제)[를을이가는도]?\\s*만들",
+      "message": "'의무/요건을 만들다'는 영어 'create an obligation/requirement'의 직역입니다.",
+      "suggestion": "'부과하다', '신설하다', '두다'로 바꾸세요. 예: '의무를 만들지 않는다' → '의무를 부과하지 않는다'.",
+      "example_bad": "이 행정명령은 새로운 의무를 만들지 않는다.",
+      "example_ok": "이 행정명령은 새로운 의무를 부과하지 않는다."
+    },
+    {
+      "id": "consistently-copula",
+      "category": "직역 동사",
+      "severity": "S2",
+      "pattern": "일관되게\\s*[가-힣]{2,10}이다",
+      "message": "'일관되게 ~이다'는 영어 'consistently ~'의 직역입니다.",
+      "suggestion": "서술을 풀어 쓰세요. 예: '성격은 일관되게 자발적이다' → '모든 조항이 자발적 협력을 전제로 한다'.",
+      "example_bad": "이 명령의 성격은 일관되게 자발적이다.",
+      "example_ok": "이 명령은 모든 조항이 자발적 협력을 전제로 한다."
+    },
+    {
+      "id": "metaphor-kkalda",
+      "category": "비유 남용",
+      "severity": "S2",
+      "pattern": "깔(려|아|린)\\s*(있|둔|둠|놓|준)?|깐\\s*(궤도|판|기반|토대|바탕|길|장)",
+      "message": "'깔려 있다/깔아 둔/먼저 깐' 같은 '깔다' 계열 비유는 저급한 표현입니다.",
+      "suggestion": "직설적으로 바꾸세요. 예: '이미 깔려 있던 제도' → '이미 갖춰진 제도', '먼저 깐 궤도' → '먼저 마련한 제도'.",
+      "example_bad": "국내에 이미 깔려 있던 제도 위에 새 과제를 얹습니다.",
+      "example_ok": "국내에 이미 갖춰진 제도에 새 과제를 더합니다."
+    },
+    {
+      "id": "term-directory",
+      "category": "용어 비일관",
+      "severity": "S1",
+      "pattern": "디렉토리",
+      "message": "외래어 표기 표준과 이 저장소의 표준 표기는 '디렉터리'입니다.",
+      "suggestion": "'디렉토리' → '디렉터리'.",
+      "example_bad": "examples 디렉토리에 예제를 추가합니다.",
+      "example_ok": "examples 디렉터리에 예제를 추가합니다."
+    },
+    {
+      "id": "term-badge",
+      "category": "용어 비일관",
+      "severity": "S1",
+      "pattern": "뱃지",
+      "message": "외래어 표기 표준과 이 저장소의 표준 표기는 '배지'입니다.",
+      "suggestion": "'뱃지' → '배지'.",
+      "example_bad": "지원 종료 뱃지가 붙습니다.",
+      "example_ok": "지원 종료 배지가 붙습니다."
+    },
+    {
+      "id": "term-column-loan",
+      "category": "용어 비일관",
+      "severity": "S2",
+      "pattern": "컬럼",
+      "message": "표의 세로줄은 '열'이라고 씁니다('컬럼'은 음차).",
+      "suggestion": "'컬럼' → '열'. 예: 'CVSS 컬럼' → 'CVSS 열'.",
+      "example_bad": "위험 컬럼을 둡니다.",
+      "example_ok": "위험 열을 둡니다."
+    },
+    {
+      "id": "term-report-loan",
+      "category": "용어 비일관",
+      "severity": "S2",
+      "pattern": "리포트",
+      "message": "산출물 문서는 '보고서'로 통일합니다('리포트'는 음차). 동사로 쓴 '리포트하다'는 '제보하다'로 바꿉니다.",
+      "suggestion": "'적합성 리포트' → '적합성 보고서', '리포트해 주세요' → '제보해 주세요'. 파일명(_risk-report 등)은 코드 표기이므로 백틱으로 감쌉니다.",
+      "example_bad": "로그를 첨부해 리포트해 주세요.",
+      "example_ok": "로그를 첨부해 제보해 주세요."
+    },
+    {
+      "id": "coined-jeonghaphwa",
+      "category": "조어",
+      "severity": "S2",
+      "pattern": "정합화",
+      "message": "'정합화'는 통용되지 않는 조어입니다(reconcile의 어색한 번역).",
+      "suggestion": "'결과를 정리해 중복을 없앤다', '하나로 맞춘다' 등 뜻을 풀어 쓰세요.",
+      "example_bad": "여러 결과를 정합화합니다.",
+      "example_ok": "여러 결과를 정리해 하나로 맞춥니다."
+    }
+  ]
+}

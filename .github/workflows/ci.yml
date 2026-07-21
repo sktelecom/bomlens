@@ -96,12 +96,13 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
           echo "✅ Shellcheck passed (warning severity and above)"
       
+      # Blocking at error level (warnings stay advisory); the Dockerfile passes
+      # this threshold today, so a new error-level finding should fail the build.
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
           dockerfile: docker/Dockerfile
           failure-threshold: error
-        continue-on-error: true
 
   contract:
     name: No-Docker Contract Tests
@@ -326,6 +327,10 @@ jobs:
           echo ""
           echo "✅ Documentation check completed"
       
+      # Advisory by design: this step checks EXTERNAL links, which fail for
+      # reasons outside the repo (rate limits, transient outages), so it must
+      # not block merges. Internal links are hard-gated separately by
+      # scripts/check-doc-links.sh (doc-coverage job) and `mkdocs build --strict`.
       - name: Check Markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@5c5dfc0ac2e225883c0e5f03a85311ec2830d368 # v1
         with:
@@ -561,6 +566,27 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check input-form documentation coverage
         run: bash scripts/check-doc-coverage.sh
+
+      # Code->docs gate: every user-facing env var in scan-sbom.sh --help must be
+      # documented in the reference pages (the reverse of check-docs-drift.sh).
+      - name: Check environment-variable documentation coverage
+        run: bash scripts/check-doc-env-coverage.sh
+
+      # Korean prose gate: translation-ese and terminology rules over the
+      # public docs surface (scripts/ko-style; decisions recorded in
+      # docs/korean-style-guide.md). S1/S2 findings fail the job. The
+      # generated fixture proves the linter actually detects violations,
+      # so a broken rule catalog cannot pass silently.
+      - name: Check Korean documentation style
+        run: |
+          node scripts/ko-style/lint.mjs --all --no-baseline
+          fixture="$RUNNER_TEMP/ko-style-selftest.md"
+          printf '%s\n' "스캐너에 의해 생성된 결과가 되어지게 됩니다." "examples 디렉토리에 예제를 추가하고, 지원 종료 뱃지를 확인하세요." > "$fixture"
+          if node scripts/ko-style/lint.mjs --files "$fixture" --no-baseline >/dev/null 2>&1; then
+            echo "FAIL: the ko-style self-test fixture did not trip the linter."
+            exit 1
+          fi
+          echo "Self-test OK: the fixture trips the linter as expected."
 
       # Deterministic internal-link gate for the getting-started pages.
       - name: Check onboarding internal links

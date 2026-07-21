@@ -15,7 +15,13 @@ import { useTranslation } from "react-i18next";
 
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
-import type { ComponentItem, DoneEvent, RecentScan, Severity } from "@/lib/api";
+import type {
+  ComponentItem,
+  DoneEvent,
+  RecentScan,
+  ResultFile,
+  Severity,
+} from "@/lib/api";
 import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
@@ -392,9 +398,18 @@ function JumpCards({
 export function ArtifactsSection({
   result,
   scanId,
+  onResultsChange,
 }: {
   result: DoneEvent;
   scanId: string | null;
+  /** Passed through so an on-demand SPDX export updates the owning result. */
+  onResultsChange?: (files: ResultFile[]) => void;
 }) {
-  return <ResultsList results={result.results} scanId={scanId} />;
+  return (
+    <ResultsList
+      results={result.results}
+      scanId={scanId}
+      onResultsChange={onResultsChange}
+    />
+  );
 }

@@ -1,10 +1,10 @@
 ---
-description: Validate that an SBOM (CycloneDX/SPDX) you received meets your quality requirements with BomLens, then analyze licenses and vulnerabilities into a risk report.
+description: Validate that an SBOM (CycloneDX/SPDX) you received meets your quality criteria with BomLens, then analyze licenses and vulnerabilities into a risk report.
 ---
 
 # Supplier SBOM validation guide
 
-How to validate that an SBOM (JSON) received from a supplier or another team meets your quality requirements. After validation, it analyzes the licenses and vulnerabilities and produces a risk report. You only need the SBOM file — no source code required.
+How to validate that an SBOM (JSON) received from a supplier or another team meets your quality criteria. After validation, BomLens analyzes the licenses and vulnerabilities and produces a risk report. You only need the SBOM file — no source code required.
 
 For the design background and the internal validation logic, see the maintainer doc [Supplier SBOM validation and analysis](https://github.com/sktelecom/bomlens/blob/main/docs/maintainers/supplier-sbom-analysis.md) (Korean).
 
@@ -21,6 +21,8 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 | Required component fields | name, version, PURL in standard `pkg:type/name@version` form (`pkg:generic` not allowed) |
 | Completeness | both direct and transitive dependencies included |
 | Recommended | supplier, license (SPDX ID), hash |
+
+> The accepted format ranges above are the SK Telecom submission defaults. If your organization accepts a different range, override them with the `CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS` (AI SBOMs), and `SPDX_SPEC_VERSIONS` environment variables (space-separated lists). They are listed in the [Docker image environment variables](../reference/docker-image.md).
 
 ## Running it all at once
 

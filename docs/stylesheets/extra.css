@@ -6,6 +6,23 @@
  *   SK Orange #F47725  흰 배경 대비 약 2.8:1 (본문 텍스트 불가) — hover/보조 강조만
  */
 
+/* ---- 루트 글자 크기 고정 ----
+ * Material은 html { font-size: 125% }를 기본으로 두고, 넓은 화면에서 137.5%(100em↑)와
+ * 150%(125em↑)로 키운다. 사이트 크기가 대부분 rem이라 창 폭만 바꿔도 본문 전체가
+ * 확대·축소되어 보이므로, 넓은 화면에서도 기본값 125%를 유지한다.
+ * 선택자는 Material과 같은 html을 쓴다(:root는 특이성이 더 높아 기본값까지 덮는다).
+ */
+@media screen and (min-width: 100em) {
+  html {
+    font-size: 125%;
+  }
+}
+@media screen and (min-width: 125em) {
+  html {
+    font-size: 125%;
+  }
+}
+
 /* ---- 강조색 토큰 (primary가 custom일 때 Material이 data 속성을 붙인다) ---- */
 [data-md-color-primary="custom"] {
   --md-primary-fg-color: #ea002c;

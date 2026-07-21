@@ -17,8 +17,9 @@
 # pods up.
 #
 # Completeness: Podfile.lock's PODS section is the resolved graph — every pod, direct and
-# transitive, with a pinned version. syft returns that full set (verified). It does not
-# emit dependency edges; edge reconstruction from the nested PODS lists is a follow-up.
+# transitive, with a pinned version. syft returns that full set (verified) but no edges;
+# the dependency edges are rebuilt below from the nested PODS lists (parse-podfile-lock.py)
+# and merged into the final graph alongside the components.
 #
 # Best-effort: a missing tool, no Podfile.lock, or a syft failure degrades to an empty
 # components array rather than aborting — the caller always gets a valid SBOM.
