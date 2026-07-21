@@ -39,7 +39,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Dependabot cannot see these ARG-pinned, curl/pip-installed tools. See
 # docs/internal/dependency-upgrade-policy.md.
 # renovate: datasource=github-releases depName=anchore/syft
-ARG SYFT_VERSION=v1.46.0
+ARG SYFT_VERSION=v1.48.0
 # renovate: datasource=github-releases depName=aquasecurity/trivy
 ARG TRIVY_VERSION=v0.72.0
 # renovate: datasource=github-releases depName=sigstore/cosign
