@@ -52,6 +52,32 @@ powershell -ExecutionPolicy Bypass -File tests\windows-smoke.ps1
 - 후자는 명명 파이프 마운트, 파일 공유 경로의 산출물 생성, UI 컨테이너 HTTP 200을
   검증한다. SKIP은 실패가 아니다. 종료 코드 0이면 통과.
 
+### 0.5 릴리스 exe 전 여정 검증 (설치→기동→스캔→언인스톨)
+
+위 두 게이트는 `.bat` 런처 계층만 본다. 이 단계는 **최종 사용자에게 배포되는 릴리스
+산출물 `BomLens-Setup.exe` 그 자체**를 대상으로, `docs/start/no-cli.md` Path A(데스크톱 앱)
+가이드 순서를 그대로 따라간다.
+
+```
+powershell -ExecutionPolicy Bypass -File tests\windows-installer-e2e.ps1
+```
+
+- 기본은 **latest 릴리스**를 내려받아 검증한다. 사설 저장소라 익명 다운로드가 막히면
+  `gh auth login` 후 재실행하거나, 이미 받은 파일을 `-ExePath` 로 지정한다.
+  특정 버전은 `-Version v1.8.3`, 버전 스탬프 기대값은 `-ExpectedVersion 1.8.3`.
+- 검증 항목: exe 획득 → 사일런트 설치(`/S`)와 설치 위치·언인스톨러·바로가기 →
+  설치본 버전 메타데이터가 릴리스 태그와 일치(태그→`extraMetadata.version` 주입) →
+  부팅 스모크(`SBOM_SMOKE=1`, Docker 불필요) → **전 여정**(앱 실제 기동 → 이미지 풀 →
+  `MODE=UI` 컨테이너 → ZIP 업로드 스캔으로 CycloneDX/SPDX/NOTICE 산출물 → 앱 종료 시
+  컨테이너 정리) → 언인스톨(`/S`). 첫 풀(약 3~4GB)로 수 분~십수 분 걸릴 수 있고,
+  대기 한도는 `-PullTimeoutMin`(기본 20)으로 조정한다.
+- **Docker가 없으면** 5단계 이후는 명시적 SKIP이다(부팅 스모크까지는 검증됨).
+  SKIP은 실패가 아니며, 종료 코드 0이면 통과.
+- **자동화 불가한 GUI 단계**(SmartScreen "실행" 클릭, ZIP 파일 드래그드롭)는 이 스크립트가
+  SKIP으로 남긴다. 그 화면은 `windows-verify.ps1 -Capture smartscreen -Window` 등으로
+  별도 캡처해 근거로 남긴다.
+- 결과 로그는 기존 `windows-verification-*-results.md` 포맷을 따라 기록한다.
+
 ### 1. CLI 기본 소스 스캔 (examples/nodejs)
 
 ```
