@@ -26,9 +26,9 @@ function secs(ms) {
 const MAIN = {
   ko: {
     dockerChecking: "Docker 상태를 확인하는 중...",
-    firstPull: "처음 실행이라 스캐너 이미지를 내려받습니다 (약 3~4GB).",
+    firstPull: "처음 실행이라 스캐너 이미지를 내려받습니다 (약 250MB).",
     image: (img) => `이미지: ${img}`,
-    network: "네트워크 상황에 따라 수 분 걸릴 수 있어요...",
+    network: "프로젝트를 처음 스캔할 때 언어별 이미지(0.6~1.7GB)를 한 번 더 내려받습니다...",
     // 화면에는 "다시 시도" 버튼이 있다. 문구가 "앱을 다시 실행"이라고 하면 서로 어긋난다.
     pullFailed: "이미지 다운로드에 실패했습니다. 아래 안내를 확인한 뒤 다시 시도를 눌러 주세요.",
     // non-TTY docker pull에는 바이트/퍼센트가 없어 레이어 개수로만 셀 수 있다(pullprogress.mjs).
@@ -60,9 +60,9 @@ const MAIN = {
   },
   en: {
     dockerChecking: "Checking Docker status...",
-    firstPull: "First run: downloading the scanner image (about 3-4 GB).",
+    firstPull: "First run: downloading the scanner image (about 250 MB).",
     image: (img) => `Image: ${img}`,
-    network: "This can take a few minutes depending on your network...",
+    network: "The first scan of a project also fetches a language image (0.6-1.7 GB)...",
     pullFailed: "Image download failed. Check the guidance below, then press Try again.",
     pullProgress: (complete, total, secs) =>
       total === 0

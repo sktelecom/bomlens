@@ -70,7 +70,8 @@ powershell -ExecutionPolicy Bypass -File tests\windows-installer-e2e.ps1
   설치본 버전 메타데이터가 릴리스 태그와 일치(태그→`extraMetadata.version` 주입) →
   부팅 스모크(`SBOM_SMOKE=1`, Docker 불필요) → **전 여정**(앱 실제 기동 → 이미지 풀 →
   `MODE=UI` 컨테이너 → ZIP 업로드 스캔으로 CycloneDX/SPDX/NOTICE 산출물 → 앱 종료 시
-  컨테이너 정리) → 언인스톨(`/S`). 첫 풀(약 3~4GB)로 수 분~십수 분 걸릴 수 있고,
+  컨테이너 정리) → 언인스톨(`/S`). 첫 풀(약 250MB)에 더해 스캔 단계에서 언어별 이미지를
+  받으므로 수 분~십수 분 걸릴 수 있고,
   대기 한도는 `-PullTimeoutMin`(기본 20)으로 조정한다.
 - **Docker가 없으면** 5단계 이후는 명시적 SKIP이다(부팅 스모크까지는 검증됨).
   SKIP은 실패가 아니며, 종료 코드 0이면 통과.

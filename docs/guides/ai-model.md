@@ -23,7 +23,7 @@ You need two things.
 docker pull ghcr.io/sktelecom/bomlens-aibom:latest
 ```
 
-That image is about 11 GB, larger than the base scanner image (3–4 GB). The first pull can take tens of minutes depending on your connection, so start it with time to spare. It is downloaded once.
+That image is about 3.5 GB to download, far larger than the base scanner image (about 250 MB). The first pull can take tens of minutes depending on your connection, so start it with time to spare. It is downloaded once.
 
 Pulling ahead of time is optional. `--model` uses this image by default and fetches it when missing, and the web UI and desktop app fetch it on the first AI-model scan while showing progress. To use a different tag, set `SBOM_AIBOM_IMAGE`.
 

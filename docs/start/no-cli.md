@@ -24,7 +24,8 @@ All you need is a Docker engine. On Windows, for a first install, **Rancher Desk
 The first time, install and download take a while. Roughly:
 
 - Installing and first launch of Rancher Desktop: about 5–10 minutes
-- First download of the scanner image (about 3–4 GB): about 5–15 minutes (varies by network, only the first time)
+- First download of the scanner image (about 250 MB): usually a minute or two (varies by network, only the first time)
+- First scan of a project, which fetches a language image (0.6–1.7 GB): a few more minutes, also once per language
 
 Once set up, opening the app and scanning afterward takes 1–2 minutes.
 
@@ -36,7 +37,7 @@ There are two paths. The desktop app is the simplest, so it is recommended. The 
 flowchart TD
     A["Install Docker engine<br/>(Rancher Desktop)"] --> B["Get the desktop app<br/>.exe from releases/latest"]
     B --> C["Double-click<br/>(if SmartScreen: More info, Run)"]
-    C --> D["First-run image download<br/>about 3-4 GB, once"]
+    C --> D["First-run image download<br/>about 250 MB, once"]
     D --> E["Enter project name and version"]
     E --> F["Upload source ZIP and scan"]
     F --> G["Download NOTICE.txt / NOTICE.html"]
@@ -64,9 +65,9 @@ If you prefer a script over the desktop app, this path works too.
 
 1. **Install a Docker engine**. Same as step 1 of Path A.
 2. **Download the tool**. On the GitHub repository page, click the green Code button, choose Download ZIP, and unzip it. You should see a `scripts` folder inside the unzipped folder.
-3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 3–4 GB)", and once done a browser opens `http://localhost:8080`. Each scan's results are saved to a `{Project}_{Version}\` subfolder under `C:\Users\<your-name>\sbom-output`.
+3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 250 MB)", and once done a browser opens `http://localhost:8080`. Each scan's results are saved to a `{Project}_{Version}\` subfolder under `C:\Users\<your-name>\sbom-output`.
 
-To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in Korean.
+To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in your Windows display language.
 
 ![The console window on the first run of sbom-ui.bat, showing the image download notice](../images/bat-console.png)
 

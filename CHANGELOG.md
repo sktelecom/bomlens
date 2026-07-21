@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The first-run download figure is now the measured one. Every surface said the scanner image is "about 3-4 GB", which is its uncompressed size on disk rather than what is transferred: the registry manifest puts the actual download at about 250 MB. The launchers, the desktop app and the docs now say 250 MB, and they add the part that was missing — the first scan of a project fetches a language image as well (0.6-1.7 GB, once per language). The AI model guide's comparison figure was corrected the same way (3.5 GB to download).
 - Container start failures no longer leak Korean strings into the English UI. `lib/container.mjs` threw hardcoded Korean text that bypassed i18n, so an ordinary port conflict or start timeout produced `Startup failed: docker run 실패: ...` for a non-Korean user. Errors now carry a code that `i18n.mjs` translates, and a test asserts no Hangul in the English dictionary.
 - `sbom-ui.bat` no longer closes its window silently. Any failure after the Docker check — port conflict, bad mount, container crash — used to vanish instantly with no message; every path now explains itself and holds the window, and the container exit code is reported.
 - A stopped Docker engine is no longer reported as "Docker is not installed" by the Windows launchers, which sent users off to reinstall Docker they already had.
