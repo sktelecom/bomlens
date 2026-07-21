@@ -56,7 +56,7 @@ if docker image inspect "$DOCKER_IMAGE" >/dev/null 2>&1; then
     echo "${OK} 스캐너 이미지 보유: $DOCKER_IMAGE"
 else
     echo "${NG} 스캐너 이미지가 아직 없습니다: $DOCKER_IMAGE"
-    note "처음 실행할 때 약 3~4GB를 자동으로 내려받습니다. 지금 미리 받으려면:"
+    note "처음 실행할 때 약 250MB를 자동으로 내려받습니다. 지금 미리 받으려면:"
     note "  docker pull $DOCKER_IMAGE"
     problems=$((problems + 1))
 fi
