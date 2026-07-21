@@ -128,8 +128,12 @@ jobs:
           # source scans (docker/lib/build-prep.sh). Paths are preserved so the
           # scan-sbom.bat -> scan-sbom.sh -> REPO_DIR/docker/lib resolution works
           # after unzip. sbom-ui.bat is self-contained (double-click web UI).
+          # check-setup.bat must ship too: the launchers' own error messages tell
+          # users to double-click it, and the settings example is how a non-CLI
+          # user reaches UI_PORT / SBOM_IMAGE_TAR (env vars die on a double-click).
           zip -r release-assets/bomlens-cli-windows.zip \
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
+            scripts/check-setup.bat scripts/bomlens.settings.example.txt \
             docker/lib/build-prep.sh
 
           # Examples

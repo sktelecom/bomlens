@@ -15,6 +15,13 @@ export function resolveLang(envLang, sysLocale) {
   return pickLang(envLang || sysLocale || "en");
 }
 
+// ContainerError의 not-ready detail(밀리초 문자열)을 사람이 읽는 초로. 값이 없거나
+// 숫자가 아니면 "?" — 문구가 "NaN초"로 깨지는 것보다 낫다.
+function secs(ms) {
+  const n = Math.round(Number(ms) / 1000);
+  return Number.isFinite(n) && n > 0 ? String(n) : "?";
+}
+
 // 메인 프로세스(main.mjs)가 status()로 흘리는 문구. 일부는 값이 끼어들어 함수로 둔다.
 const MAIN = {
   ko: {
@@ -22,11 +29,27 @@ const MAIN = {
     firstPull: "처음 실행이라 스캐너 이미지를 내려받습니다 (약 3~4GB).",
     image: (img) => `이미지: ${img}`,
     network: "네트워크 상황에 따라 수 분 걸릴 수 있어요...",
-    pullFailed: "이미지 다운로드에 실패했습니다. 인터넷 연결을 확인하고 앱을 다시 실행하세요.",
+    // 화면에는 "다시 시도" 버튼이 있다. 문구가 "앱을 다시 실행"이라고 하면 서로 어긋난다.
+    pullFailed: "이미지 다운로드에 실패했습니다. 아래 안내를 확인한 뒤 다시 시도를 눌러 주세요.",
+    // non-TTY docker pull에는 바이트/퍼센트가 없어 레이어 개수로만 셀 수 있다(pullprogress.mjs).
+    pullProgress: (complete, total, secs) =>
+      total === 0
+        ? `레지스트리에 접속하는 중... (${secs}초 경과)`
+        : `이미지 레이어 내려받는 중: ${total}개 중 ${complete}개 완료 (${secs}초 경과)`,
     cleanedOrphans: (n) => `이전 실행에서 남은 컨테이너 ${n}개를 정리했습니다.`,
     startingUi: "UI 컨테이너를 시작하는 중...",
     ready: "준비 완료. UI를 엽니다.",
     startFailed: (msg) => `시작에 실패했습니다: ${msg}`,
+    // container.mjs가 던지는 ContainerError.code를 사용자 문구로 옮긴다. detail은 docker
+    // 원문 등 번역 대상이 아닌 부가 정보.
+    containerError: (code, detail) => {
+      if (code === "run-failed")
+        return `Docker가 스캐너 컨테이너를 시작하지 못했습니다.${detail ? ` 원인: ${detail}` : ""}`;
+      if (code === "exited-early") return "스캐너 컨테이너가 기동 도중 종료되었습니다.";
+      if (code === "not-ready")
+        return `스캐너가 ${secs(detail)}초 안에 준비되지 않았습니다. 다시 시도를 눌러 주세요.`;
+      return String(code);
+    },
     containerDied: "UI 컨테이너가 종료되었습니다. 다시 시도를 눌러 재시작하세요.",
     updateTitle: "업데이트 알림",
     updateMessage: (current, latest) =>
@@ -40,7 +63,11 @@ const MAIN = {
     firstPull: "First run: downloading the scanner image (about 3-4 GB).",
     image: (img) => `Image: ${img}`,
     network: "This can take a few minutes depending on your network...",
-    pullFailed: "Image download failed. Check your internet connection and restart the app.",
+    pullFailed: "Image download failed. Check the guidance below, then press Try again.",
+    pullProgress: (complete, total, secs) =>
+      total === 0
+        ? `Contacting the registry... (${secs}s elapsed)`
+        : `Downloading image layers: ${complete}/${total} done (${secs}s elapsed)`,
     cleanedOrphans: (n) =>
       n === 1
         ? "Cleaned up 1 leftover container from a previous run."
@@ -48,6 +75,14 @@ const MAIN = {
     startingUi: "Starting the UI container...",
     ready: "Ready. Opening the UI.",
     startFailed: (msg) => `Startup failed: ${msg}`,
+    containerError: (code, detail) => {
+      if (code === "run-failed")
+        return `Docker could not start the scanner container.${detail ? ` Details: ${detail}` : ""}`;
+      if (code === "exited-early") return "The scanner container stopped while starting up.";
+      if (code === "not-ready")
+        return `The scanner did not finish starting within ${secs(detail)} seconds. Press Try again.`;
+      return String(code);
+    },
     containerDied: "The UI container stopped. Press Try again to restart it.",
     updateTitle: "Update available",
     updateMessage: (current, latest) =>

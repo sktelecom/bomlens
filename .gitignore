@@ -29,6 +29,10 @@ bom.json
 # despite the generated-output patterns above.
 !docs/samples/*.html
 
+# Windows launcher settings. The example file is tracked; the real one is a
+# local override, and tests/test-bat-contract.ps1 writes one here while it runs.
+scripts/bomlens.settings.txt
+
 # Test Workspace
 tests/test-workspace/
 test-workspace/

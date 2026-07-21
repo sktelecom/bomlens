@@ -222,6 +222,92 @@ try {
     } finally {
         Remove-Item Env:UI_PORT -ErrorAction SilentlyContinue
     }
+
+    # -----------------------------------------------------------------------
+    # 5) 언어: 도쿄 데모처럼 한국어가 아닌 로캘에서는 영어로 떠야 한다.
+    #    한글 글리프가 없는 콘솔 폰트(일본어 Windows)에서 네모로 깨지는 것을
+    #    막는 것이 목적이므로, 영어 경로에 한글이 한 글자도 없어야 한다.
+    #    (리다이렉트 캡처는 인코딩이 러너마다 달라 한국어 "출력"은 단언하지 않는다.
+    #     여기서 보는 것은 ASCII 마커와 한글 부재뿐이다.)
+    # -----------------------------------------------------------------------
+    Section '5. SBOM_LANG=en 이면 영어로 출력'
+    $env:SBOM_LANG = 'en'
+    $env:UI_PORT = '18095'
+    try {
+        $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\check-setup.bat') -TimeoutSec 60
+        if ($r.TimedOut) { Failed 'check-setup.bat(en) 이 끝나지 않았습니다.' }
+        elseif ("$($r.Output)" -match '[가-힣]') {
+            Failed "SBOM_LANG=en 인데 한글이 출력되었습니다:`n$($r.Output)"
+        } elseif ("$($r.Output)" -match 'BomLens setup check') {
+            Pass '비한국어 로캘에서 영어 문구로 출력되었습니다.'
+        } else {
+            Failed "영어 제목을 찾지 못했습니다:`n$($r.Output)"
+        }
+    } finally {
+        Remove-Item Env:SBOM_LANG, Env:UI_PORT -ErrorAction SilentlyContinue
+    }
+
+    # -----------------------------------------------------------------------
+    # 6) 설정 파일: 더블클릭 사용자가 유일하게 쓸 수 있는 설정 통로다.
+    #    실제 환경변수가 파일보다 우선한다는 규칙도 함께 고정한다
+    #    (뒤집히면 위 3)번 케이스처럼 환경변수로 구성하는 테스트가 깨진다).
+    # -----------------------------------------------------------------------
+    Section '6. bomlens.settings.txt (파일 읽기 + 환경변수 우선)'
+    $cfg = Join-Path $script:RepoRoot 'scripts\bomlens.settings.txt'
+    $cfgOut = Join-Path $script:Work 'cfg-out'
+    Set-Content -Path $cfg -Encoding UTF8 -Value @(
+        '# contract test',
+        'SBOM_LANG=en',
+        'UI_PORT=18096',
+        "SBOM_OUTPUT_DIR=$cfgOut"
+    )
+    try {
+        $env:SBOM_SCANNER_IMAGE = 'ghcr.io/example/stub-image:test'
+        $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\sbom-ui.bat')
+        if ($r.StubLog -match '-p 18096:8080') {
+            Pass '설정 파일의 UI_PORT 가 적용되었습니다.'
+        } else {
+            Failed "설정 파일 UI_PORT 가 무시되었습니다:`n$($r.StubLog)"
+        }
+
+        # 같은 파일이 있는 상태에서 환경변수를 주면 환경변수가 이겨야 한다.
+        $env:UI_PORT = '18097'
+        $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\sbom-ui.bat')
+        if ($r.StubLog -match '-p 18097:8080') {
+            Pass '실제 환경변수가 설정 파일을 덮어썼습니다.'
+        } else {
+            Failed "환경변수 우선순위가 깨졌습니다:`n$($r.StubLog)"
+        }
+    } finally {
+        Remove-Item $cfg -Force -ErrorAction SilentlyContinue
+        Remove-Item Env:UI_PORT, Env:SBOM_SCANNER_IMAGE -ErrorAction SilentlyContinue
+    }
+
+    # -----------------------------------------------------------------------
+    # 7) 메시지 테이블 정합성 — ko/en 키 집합이 같아야 하고, 어떤 메시지도 "!" 를
+    #    포함하면 안 된다(:say 의 지연 확장이 "!" 를 먹어 문구가 잘린다).
+    #    두 블록이 따로 자라 한쪽만 갱신되는 드리프트를 막는 정적 검사다.
+    # -----------------------------------------------------------------------
+    Section '7. ko/en 메시지 테이블 정합성'
+    foreach ($name in @('sbom-ui.bat', 'check-setup.bat')) {
+        # -Encoding UTF8 은 필수다. .bat 은 BOM 없는 UTF-8 인데 PS5.1 의 Get-Content 는
+        # 기본적으로 ANSI(cp949/cp932)로 읽어 한국어 줄이 깨지고, 그러면 정규식이 빗나가
+        # ko 블록의 키가 통째로 사라진 것처럼 보인다.
+        $lines = Get-Content (Join-Path $script:RepoRoot "scripts\$name") -Encoding UTF8
+        $koAt = ($lines | Select-String -SimpleMatch ':msgs_ko' | Select-Object -Last 1).LineNumber
+        if (-not $koAt) { Failed "$name 에서 :msgs_ko 블록을 찾지 못했습니다."; continue }
+        $en = @(); $ko = @(); $bang = @()
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -notmatch '^\s*set "(M_[A-Z0-9_]+)=(.*)"\s*$') { continue }
+            $key = $Matches[1]; $val = $Matches[2]
+            if ($val.Contains('!')) { $bang += "$name/$key" }
+            if (($i + 1) -lt $koAt) { $en += $key } else { $ko += $key }
+        }
+        $diff = (Compare-Object $en $ko)
+        if ($bang.Count -gt 0) { Failed "메시지에 '!' 가 있습니다(:say 가 먹습니다): $($bang -join ', ')" }
+        elseif ($diff) { Failed "$name 의 ko/en 키가 다릅니다: $(($diff | ForEach-Object { $_.InputObject }) -join ', ')" }
+        else { Pass "$name : ko/en 키 $($en.Count) 개가 일치하고 '!' 도 없습니다." }
+    }
 } finally {
     Remove-Item -Path $script:Work -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -90,6 +90,19 @@
         opacity: 0.5;
         cursor: default;
       }
+      /* 보조 동작: 진단정보를 건네줄 통로이므로 항상 보이되 약하게. */
+      #open-logs {
+        margin-top: 12px;
+        margin-left: 8px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
       #feedback {
         min-height: 1.4em;
         margin: 10px 0 0;
@@ -141,6 +154,7 @@
       <ul id="options"></ul>
       <p class="hint" id="hint"></p>
       <button id="check-again" type="button"></button>
+      <button id="open-logs" type="button"></button>
       <p id="feedback" role="status"></p>
     </main>
     <footer id="version"></footer>
@@ -188,6 +202,7 @@
           },
           hint: "설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
           checkAgain: "다시 확인",
+          openLogs: "로그 폴더 열기",
           stillMissing: "아직 Docker를 찾을 수 없어요. 엔진이 켜졌는지 확인해 주세요.",
         },
         en: {
@@ -205,6 +220,7 @@
           },
           hint: "Install it, start the engine, then relaunch this app.",
           checkAgain: "Check again",
+          openLogs: "Open log folder",
           stillMissing: "Still can't find Docker. Make sure the engine is running.",
         },
       };
@@ -313,6 +329,11 @@
       const checkAgain = document.getElementById("check-again");
       const feedback = document.getElementById("feedback");
       checkAgain.textContent = s.checkAgain;
+      const openLogs = document.getElementById("open-logs");
+      openLogs.textContent = s.openLogs;
+      openLogs.addEventListener("click", () => {
+        if (window.sbomDesktop && window.sbomDesktop.openLogs) window.sbomDesktop.openLogs();
+      });
       let feedbackTimer = null;
       checkAgain.addEventListener("click", async () => {
         checkAgain.disabled = true;

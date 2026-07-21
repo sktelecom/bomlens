@@ -70,7 +70,31 @@
       .line.latest {
         color: var(--line-latest);
       }
-      #retry {
+      /* pull 진행 요약: 로그 위에 고정된 한 줄. 비어 있으면 자리를 차지하지 않는다. */
+      #progress {
+        margin: 0 32px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--fg);
+        min-height: 0;
+      }
+      #progress:not(:empty) {
+        margin-bottom: 6px;
+      }
+      /* 실패 사유별 조치 안내. 로그와 구분되게 본문 서체로 둔다. */
+      #help {
+        margin: 0 32px 20px;
+        padding: 14px 16px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-left: 3px solid #ea002c;
+        border-radius: 6px;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--fg);
+      }
+      #retry,
+      #open-logs {
         display: none;
         margin: 0 32px 24px;
         align-self: flex-start;
@@ -86,6 +110,13 @@
       #retry:disabled {
         opacity: 0.5;
         cursor: default;
+      }
+      /* 보조 동작이므로 재시도보다 약하게. */
+      #open-logs {
+        margin-top: -12px;
+        color: var(--fg);
+        background: none;
+        border: 1px solid var(--border);
       }
       #version {
         margin: 0;
@@ -124,8 +155,11 @@
       <img src="logo.svg" alt="BomLens — SBOM Generator" style="height: 40px; width: auto; display: block" />
       <p id="subtitle"></p>
     </header>
+    <div id="progress" aria-live="polite"></div>
     <div id="log" aria-live="polite"></div>
+    <div id="help" hidden></div>
     <button id="retry" type="button"></button>
+    <button id="open-logs" type="button"></button>
     <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
@@ -154,11 +188,34 @@
         ko: {
           subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
           retry: "다시 시도",
+          openLogs: "로그 폴더 열기",
+          help: {
+            // 사내 프록시는 데모 현장에서 가장 흔한 실패다. 핵심은 "앱이 아니라 데몬이 받는다".
+            proxy:
+              "회사 프록시에 막힌 것으로 보입니다. 이미지는 BomLens가 아니라 Docker 데몬이 내려받으므로, 앱에 프록시 설정을 넣어도 효과가 없습니다. Docker Desktop → Settings → Resources → Proxies, 또는 Rancher Desktop → Preferences → WSL → Proxy 에서 프록시를 설정한 뒤 다시 시도를 눌러 주세요.",
+            dns: "레지스트리 주소를 찾지 못했습니다(DNS). 네트워크 연결과 사내 DNS/VPN 설정을 확인해 주세요.",
+            auth: "레지스트리 접근이 거부되었습니다. 이미지 이름이 맞는지, 비공개 이미지라면 docker login이 되어 있는지 확인해 주세요.",
+            disk: "디스크 공간이 부족합니다. 이미지에는 약 4GB의 여유 공간이 필요합니다.",
+            timeout:
+              "다운로드가 진행되지 않아 중단했습니다. 네트워크가 매우 느리거나 방화벽에 막혔을 수 있습니다. 오프라인 이미지 파일(tar)로 설치하는 방법은 관리자에게 문의해 주세요.",
+            unknown: "아래 로그의 마지막 줄에 원인이 적혀 있습니다.",
+          },
         },
         en: {
           subtitle:
             "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
           retry: "Try again",
+          openLogs: "Open log folder",
+          help: {
+            proxy:
+              "This looks like a corporate proxy blocking the download. The image is fetched by the Docker daemon, not by BomLens, so setting proxy variables for this app has no effect. Configure the proxy in Docker Desktop -> Settings -> Resources -> Proxies, or Rancher Desktop -> Preferences -> WSL -> Proxy, then press Try again.",
+            dns: "The registry hostname could not be resolved (DNS). Check your network connection and any corporate DNS/VPN settings.",
+            auth: "The registry refused access. Check that the image name is correct, and run docker login if it is a private image.",
+            disk: "Not enough disk space. The scanner image needs roughly 4 GB free.",
+            timeout:
+              "The download stopped making progress and was cancelled. Your network may be very slow or blocked by a firewall. Ask your organiser about installing from the offline image file (tar) instead.",
+            unknown: "The last lines of the log below show what went wrong.",
+          },
         },
       };
       const s = STR[lang];
@@ -178,20 +235,46 @@
         window.sbomDesktop.onStatus(add);
       }
 
+      // 진행 요약은 append가 아니라 제자리 갱신이다(로그는 흐르고 요약은 고정된 자리에 남는다).
+      const progress = document.getElementById("progress");
+      if (window.sbomDesktop && window.sbomDesktop.onStatusProgress) {
+        window.sbomDesktop.onStatusProgress((line) => {
+          progress.textContent = line;
+        });
+      }
+
       // 실패 종착 상태(failed-*)면 재시도 버튼을 보여준다. 재시도가 시작되면(checking)
       // main이 상태를 브로드캐스트하므로 그때 다시 숨긴다.
       const retry = document.getElementById("retry");
+      const help = document.getElementById("help");
+      const openLogs = document.getElementById("open-logs");
       retry.textContent = s.retry;
+      openLogs.textContent = s.openLogs;
       if (window.sbomDesktop && window.sbomDesktop.onStartupState) {
-        window.sbomDesktop.onStartupState(({ state }) => {
-          if (String(state).startsWith("failed-")) {
-            retry.style.display = "block";
-            retry.disabled = false;
+        window.sbomDesktop.onStartupState(({ state, reason }) => {
+          const failed = String(state).startsWith("failed-");
+          retry.style.display = failed ? "block" : "none";
+          // 재시도 이후에도 실패 화면이 그대로면 진단정보를 건네줄 수단이 필요하다.
+          openLogs.style.display = failed ? "block" : "none";
+          if (failed) retry.disabled = false;
+
+          // 진행 요약은 상태가 바뀌는 순간 반드시 비운다. 남겨두면 실패 화면에 직전
+          // 퍼센트가 그대로 붙어 있어 아직 받는 중인 것처럼 보인다.
+          progress.textContent = "";
+
+          // pull 실패는 사유별로 조치가 완전히 다르다(프록시/DNS/인증/디스크).
+          if (state === "failed-pull") {
+            help.textContent = s.help[reason] || s.help.unknown;
+            help.hidden = false;
           } else {
-            retry.style.display = "none";
+            help.textContent = "";
+            help.hidden = true;
           }
         });
       }
+      openLogs.addEventListener("click", () => {
+        if (window.sbomDesktop && window.sbomDesktop.openLogs) window.sbomDesktop.openLogs();
+      });
       retry.addEventListener("click", async () => {
         retry.disabled = true;
         const result = await window.sbomDesktop.retryStartup();

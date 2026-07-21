@@ -8,11 +8,17 @@ contextBridge.exposeInMainWorld("sbomDesktop", {
     if (typeof cb !== "function") return;
     ipcRenderer.on("status", (_event, line) => cb(line));
   },
+  // pull 진행 요약: onStatus와 달리 한 줄을 제자리에서 갱신하는 용도.
+  onStatusProgress: (cb) => {
+    if (typeof cb !== "function") return;
+    ipcRenderer.on("status-progress", (_event, line) => cb(line));
+  },
   onStartupState: (cb) => {
     if (typeof cb !== "function") return;
     ipcRenderer.on("startup-state", (_event, payload) => cb(payload));
   },
   retryStartup: () => ipcRenderer.invoke("startup:retry"),
+  openLogs: () => ipcRenderer.invoke("app:open-logs"),
   // 스캔 폴더 추가/제거(SPA의 "디렉터리 경로" 입력에서 사용). 폴더 선택과 목록
   // 저장, 컨테이너 재시작은 main이 수행하고 검증한다. 성공하면 앱이 상태 화면을
   // 거쳐 UI를 다시 로드하므로, 렌더러는 응답 후 상태를 정리할 필요가 없다.

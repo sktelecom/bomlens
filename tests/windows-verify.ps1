@@ -16,6 +16,10 @@
 .PARAMETER Smoke
     tests/windows-smoke.ps1 자동 스모크를 실행한다.
 
+.PARAMETER Installer
+    tests/windows-installer-e2e.ps1 을 실행한다 — 릴리스 exe 설치→기동→스캔 전 여정 검증.
+    뒤따르는 인자는 그대로 하위 스크립트에 전달된다(예: -ExePath, -KeepInstalled).
+
 .PARAMETER Capture
     캡처할 화면 이름. 결과는 docs/images/<이름>.png 로 저장된다.
     추천 이름: smartscreen, rancher-install, app-running, app-results, bat-console
@@ -34,6 +38,10 @@
     powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Smoke
 
 .EXAMPLE
+    # 릴리스 exe 전 여정 검증(latest 다운로드→설치→기동→스캔→언인스톨)
+    powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Installer
+
+.EXAMPLE
     # SmartScreen 경고를 띄운 뒤, 5초 안에 그 창을 맨 앞으로 두면 캡처된다
     powershell -ExecutionPolicy Bypass -File tests\windows-verify.ps1 -Capture smartscreen -Window
 
@@ -44,10 +52,14 @@
 [CmdletBinding()]
 param(
     [switch]$Smoke,
+    [switch]$Installer,
     [string]$Capture,
     [switch]$Window,
     [int]$Delay = 5,
-    [string]$OutDir
+    [string]$OutDir,
+    # -Installer 뒤에 남은 인자를 그대로 windows-installer-e2e.ps1로 넘긴다.
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,6 +78,18 @@ function Invoke-Smoke {
     Write-Host "=== 자동 스모크 실행 (windows-smoke.ps1) ===" -ForegroundColor Cyan
     & $smoke
     Write-Host "스모크 종료 코드: $LASTEXITCODE"
+}
+
+function Invoke-Installer {
+    param([string[]]$PassThru)
+    $script = Join-Path $PSScriptRoot "windows-installer-e2e.ps1"
+    if (-not (Test-Path $script)) {
+        Write-Host "[오류] windows-installer-e2e.ps1을 찾을 수 없습니다: $script" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "=== 릴리스 exe 전 여정 검증 (windows-installer-e2e.ps1) ===" -ForegroundColor Cyan
+    & $script @PassThru
+    Write-Host "설치 e2e 종료 코드: $LASTEXITCODE"
 }
 
 function Save-Screenshot {
@@ -135,6 +159,11 @@ if ($Smoke) {
     $didSomething = $true
 }
 
+if ($Installer) {
+    Invoke-Installer -PassThru $Rest
+    $didSomething = $true
+}
+
 if ($Capture) {
     $dir = if ($OutDir) { $OutDir } else { Join-Path $repoRoot "docs\images" }
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
@@ -148,6 +177,7 @@ if ($Capture) {
 if (-not $didSomething) {
     Write-Host "할 일을 지정하세요. 예:" -ForegroundColor Yellow
     Write-Host "  -Smoke                         자동 스모크 실행"
+    Write-Host "  -Installer                     릴리스 exe 설치→기동→스캔 전 여정 검증"
     Write-Host "  -Capture smartscreen -Window   맨 앞 창을 docs/images/smartscreen.png 로 캡처"
     Write-Host "자세한 사용법: Get-Help tests\windows-verify.ps1 -Full"
 }

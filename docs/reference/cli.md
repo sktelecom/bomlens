@@ -58,7 +58,10 @@ Environment variables adjust the behavior.
 | `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | Image used for AI model (ML-BOM) generation |
 | `SBOM_OUTPUT_FLAT` | — | Set to `1` to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | Output base for the desktop app and web UI (the CLI uses `--output-dir` instead). Each scan still lands in a `{Project}_{Version}/` subfolder under it |
-| `SBOM_UI_MOUNT_DIR` | — | For the Windows launcher `sbom-ui.bat`, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of `--ui --mount`) |
+| `SBOM_UI_MOUNT_DIR` | — | For the Windows launcher `sbom-ui.bat`, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of `--ui --mount`). Use a path without `& ^ | < >` — the launcher rejects those rather than passing a mangled mount to Docker |
+| `SBOM_LANG` | system locale | `en` or `ko`, for the Windows launchers and the desktop app. Anything that is not Korean gets English |
+| `SBOM_PULL` | `missing` | Windows launcher download behavior. `missing` downloads only when the image is absent, `always` re-checks the registry every run (picks up a newer `:latest`), `never` never touches the network |
+| `SBOM_IMAGE_TAR` | — | Path to an image tar from `docker save`. The Windows launcher loads it instead of pulling; a file named `bomlens-image.tar` next to the scripts is picked up automatically. Combined with `SBOM_PULL=never` this gives a fully offline install |
 | `CVE_BIN_TOOL_MODE` | `auto` | Firmware CVE matching. `auto` uses the bundled CVE database if present, otherwise downloads from NVD when the network is reachable. `offline` matches only against the bundled database. `online` always updates from the network. `components-only` skips CVE matching and emits a component-only SBOM |
 | `CVE_BIN_TOOL_HOME` | `/opt/cve-bin-tool-home` | Location of the bundled cve-bin-tool CVE database. cve-bin-tool reads `$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db` (it keys the cache off `HOME`) |
 | `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD` | cve-bin-tool data sources to disable during a firmware scan. `GAD` (GitLab Advisory) is disabled by default because it crashes the bundled cve-bin-tool on fetch |
@@ -76,6 +79,13 @@ Environment variables adjust the behavior.
 | `TRUSCA_PROJECT_ID` | — | TRUSCA project id (UUID). Required when `trusca` |
 | `TRUSCA_REF` | `main` | Ingest ref label |
 | `TRUSCA_RELEASE` | `--version` value | Ingest release label |
+
+On Windows, environment variables set in a command prompt do not survive a
+double-click. The launchers therefore also read `UI_PORT`, `SBOM_LANG`,
+`SBOM_PULL`, `SBOM_IMAGE_TAR`, `SBOM_SCANNER_IMAGE`, `SBOM_OUTPUT_DIR` and
+`SBOM_UI_MOUNT_DIR` from a plain text file: copy `scripts/bomlens.settings.example.txt`
+to `bomlens.settings.txt` beside the scripts (or to `%USERPROFILE%\.bomlens\settings.txt`).
+A real environment variable always wins over the file.
 
 Output flags are detailed in the [reports guide](../guides/reports.md); validating a received supplier SBOM is covered in the [supplier SBOM validation](../guides/supplier-sbom.md).
 

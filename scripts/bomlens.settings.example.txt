@@ -1,0 +1,56 @@
+# BomLens settings / BomLens 설정
+#
+# Rename this file to  bomlens.settings.txt  (in this same folder) and edit it.
+# 이 파일을 같은 폴더에  bomlens.settings.txt  로 복사한 뒤 편집하세요.
+#
+# Why this file exists: environment variables you type in a command prompt do not
+# survive a double-click, so these are the same knobs in a form a non-CLI user can
+# actually use. A real environment variable always wins over this file.
+# 더블클릭 실행에는 명령 프롬프트에서 설정한 환경변수가 적용되지 않아서 이 파일이 있습니다.
+# 실제 환경변수가 설정되어 있으면 그쪽이 우선합니다.
+#
+# Format: KEY=VALUE, one per line. Lines starting with # are ignored.
+# Do not put quotes around values.
+
+# --- Language / 언어 -------------------------------------------------------
+# en or ko. If unset, the Windows display language decides (anything that is not
+# Korean gets English).
+# 지정하지 않으면 Windows 표시 언어를 따릅니다(한국어가 아니면 영어).
+#SBOM_LANG=en
+
+# --- Web UI port / 웹 UI 포트 ----------------------------------------------
+# Default 8080. If it is busy or reserved, sbom-ui.bat moves to the next free
+# port automatically, so set this only when you need a fixed one.
+# 기본값 8080. 사용 중이면 자동으로 다음 빈 포트로 옮기므로, 고정이 필요할 때만 지정하세요.
+#UI_PORT=8080
+
+# --- Results folder / 결과 저장 폴더 ---------------------------------------
+# Default is %USERPROFILE%\sbom-output.
+# Use a path without & ^ | < > characters.
+#SBOM_OUTPUT_DIR=C:\Users\me\sbom-output
+
+# --- Extra scan folder / 추가 스캔 대상 폴더 --------------------------------
+# Mounted read-only and offered in the web UI as a scan target
+# (e.g. an extracted Linux rootfs).
+#SBOM_UI_MOUNT_DIR=D:\rootfs
+
+# --- Scanner image / 스캐너 이미지 ------------------------------------------
+# Point this at a mirror or a locally loaded tag if you are behind a registry proxy.
+# 사내 미러 레지스트리를 쓴다면 여기에 지정하세요.
+#SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:latest
+
+# --- Download behaviour / 다운로드 동작 -------------------------------------
+# missing (default) = download only when the image is absent
+# always            = re-check the registry every run (picks up a newer :latest)
+# never             = never touch the network; fail instead (air-gapped rooms)
+# missing(기본) = 없을 때만 받음 / always = 매번 최신 확인 / never = 네트워크 사용 안 함
+#SBOM_PULL=missing
+
+# --- Offline install / 오프라인 설치 ----------------------------------------
+# Path to an image tar produced by:  docker save -o bomlens-image.tar <image>
+# If a file named bomlens-image.tar sits next to these scripts it is used
+# automatically, so a USB stick with the .bat plus the .tar needs no network,
+# no command line and no proxy configuration at all.
+# 스크립트 옆에 bomlens-image.tar 가 있으면 자동으로 사용합니다. USB에 .bat 과 .tar 을
+# 같이 담아 두면 네트워크·명령줄·프록시 설정 없이 실행할 수 있습니다.
+#SBOM_IMAGE_TAR=D:\bomlens-image.tar
