@@ -426,6 +426,44 @@ if [ -f "$XWALK" ]; then
 fi
 
 # --------------------------------------------------------
+# AI coverage rollup (AI SBOMs only). Same numbers the AI compliance profile
+# reports, computed here so the reader gets the overview and the per-check detail
+# in one page instead of two. Empty for a plain dependency SBOM.
+# --------------------------------------------------------
+G7_CLUSTERS='[]'
+if echo "$CHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null 2>&1; then
+    REG_FILE="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+    G7_CLUSTERS=$(echo "$CHECKS" | jq -c --slurpfile reg "$REG_FILE" '
+      ([ $reg[0].clusters[] | {(.id): {name: .name, name_ko: (.name_ko // .name)}} ] | add) as $names
+      | ([ $reg[0].clusters[].id ]) as $order
+      | [ .[] | select(.id|startswith("g7-")) ]
+      | group_by(.cluster)
+      | sort_by((.[0].cluster // "") as $c | ($order | index($c)) // 99)
+      | map({ cluster: (.[0].cluster // "other"),
+              name:    ($names[(.[0].cluster // "")].name // (.[0].cluster // "other")),
+              name_ko: ($names[(.[0].cluster // "")].name_ko // (.[0].cluster // "other")),
+              total:   length,
+              present: (map(select(.status=="pass"))|length),
+              gap:     (map(select(.status=="warn" and ((.source//"")!="na")))|length),
+              review:  (map(select((.source//"")=="na"))|length) })' 2>/dev/null || echo '[]')
+fi
+
+# Components whose declared license restricts use — the same classifier the NOTICE
+# and the web UI share. Read straight from the SBOM, so it does not depend on
+# normalize-sbom.sh having tagged the components first.
+LIC_REVIEW='[]'
+if [ "$G7_CLUSTERS" != "[]" ] && [ -f "$(dirname "$0")/license-flags.jq" ]; then
+    LIC_FLAGS_DEF="$(cat "$(dirname "$0")/license-flags.jq")"
+    LIC_REVIEW=$(jq -c "$LIC_FLAGS_DEF"'
+      [ .components[]?
+        | { name: (.name // "(unnamed)"), version: (.version // ""),
+            license: ([ (.licenses // [])[] | (.license.id // .license.name // .expression) ]
+                       | map(select(. != null and . != "")) | (.[0] // "")) }
+        | . + {flag: license_flag(.license)}
+        | select(.flag != "") ]' "$SBOM" 2>/dev/null || echo '[]')
+fi
+
+# --------------------------------------------------------
 # JSON report
 # --------------------------------------------------------
 jq -n \
@@ -533,6 +571,12 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_EVID=$(kstr conformance.th_evidence); C_FIX_SUMMARY=$(kstr conformance.fix_summary)
     C_CHECK_SUMMARY=$(kstr conformance.check_summary)
     C_H2_SUBMIT=$(kstr conformance.h2_submission); C_SUBMIT_INTRO=$(kstr conformance.submission_intro)
+    C_H2_CLUSTERS=$(kstr aiprofile.h2_clusters); C_TH_CLUSTER=$(kstr aiprofile.th_cluster)
+    C_TH_PRESENT=$(kstr aiprofile.th_present); C_TH_GAP=$(kstr aiprofile.th_gap)
+    C_TH_REVIEWCNT=$(kstr aiprofile.th_review); C_TH_TOTAL=$(kstr aiprofile.th_total)
+    C_H2_LIC=$(kstr aiprofile.h2_lic); C_TH_COMP=$(kstr aiprofile.th_component)
+    C_TH_VER=$(kstr aiprofile.th_version); C_TH_LIC=$(kstr aiprofile.th_license)
+    C_TH_FLAG=$(kstr aiprofile.th_flag); C_LIC_NONE=$(kstr aiprofile.lic_none_html)
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
@@ -556,6 +600,11 @@ else
     C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
     C_TH_EVID="Evidence / how"; C_FIX_SUMMARY="How to fill this"; C_CHECK_SUMMARY="What to establish"
     C_H2_SUBMIT="SBOM format requirements"
+    C_H2_CLUSTERS="G7 minimum elements by cluster"
+    C_TH_CLUSTER="Cluster"; C_TH_PRESENT="Present"; C_TH_GAP="Gap"; C_TH_REVIEWCNT="Review"; C_TH_TOTAL="Total"
+    C_H2_LIC="Licenses flagged for review"
+    C_TH_COMP="Component"; C_TH_VER="Version"; C_TH_LIC="License"; C_TH_FLAG="Flag"
+    C_LIC_NONE="No components carry an AI behavioral-use or non-commercial license flag."
     C_SUBMIT_INTRO="What the SBOM itself has to carry. The same bar applies however the SBOM was produced, and a single mandatory failure makes the overall result a failure."
     C_H2_G7CHK="G7 minimum elements"
     C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
@@ -798,6 +847,31 @@ HTMLHEAD
              else "" end) +
             "</td></tr>"'
     }
+    # AI SBOMs lead with the rollup: coverage per cluster and the licenses that
+    # need a human decision. Everything below is the per-check detail behind it.
+    if [ "$G7_CLUSTERS" != "[]" ]; then
+        echo "<h2>${C_H2_CLUSTERS}</h2>"
+        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_CLUSTER}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
+        echo "$G7_CLUSTERS" | jq -r --arg lang "$REPORT_LANG" '.[] |
+            "<tr><td>" + ((if $lang=="ko" then .name_ko else .name end)|@html) + "</td>"
+            + "<td>" + (.present|tostring) + "</td><td>" + (.gap|tostring) + "</td>"
+            + "<td>" + (.review|tostring) + "</td><td>" + (.total|tostring) + "</td></tr>"'
+        echo "$G7_CLUSTERS" | jq -r --arg total "$C_TH_TOTAL" '
+            "<tr><td><b>" + ($total|@html) + "</b></td><td><b>" + (map(.present)|add|tostring)
+            + "</b></td><td><b>" + (map(.gap)|add|tostring) + "</b></td><td><b>"
+            + (map(.review)|add|tostring) + "</b></td><td><b>" + (map(.total)|add|tostring) + "</b></td></tr>"'
+        echo "</table></div>"
+        echo "<h2>${C_H2_LIC}</h2>"
+        if [ "$(echo "$LIC_REVIEW" | jq 'length')" -gt 0 ]; then
+            echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr>"
+            echo "$LIC_REVIEW" | jq -r '.[] |
+                "<tr><td>" + (.name|@html) + "</td><td>" + (.version|@html) + "</td>"
+                + "<td>" + (.license|@html) + "</td><td>" + (.flag|@html) + "</td></tr>"'
+            echo "</table></div>"
+        else
+            echo "<p class=\"meta\">${C_LIC_NONE}</p>"
+        fi
+    fi
     echo "<h2>${C_H2_SUBMIT}</h2>"
     echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p>"
     echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"

@@ -31,7 +31,6 @@ CONF="${OUT_PREFIX}_conformance.json"
 BOM="${OUT_PREFIX}_bom.json"
 JSON="${OUT_PREFIX}_ai-profile.json"
 MD="${OUT_PREFIX}_ai-profile.md"
-HTML="${OUT_PREFIX}_ai-profile.html"
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 CAP=100   # cap license-review rows shown in the MD/HTML (JSON keeps them all)
 
@@ -122,12 +121,10 @@ tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
 # HTML-escape helper (defined here so the chrome block below can build the meta line).
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 
-HTML_LANG="en"
 G7R="$G7"        # render copy of the G7 rollup (cluster names + item labels)
 FLAG_B="Behavioral-use restriction"
 FLAG_N="Non-commercial"
 if [ "$REPORT_LANG" = "ko" ]; then
-    HTML_LANG="ko"
     FLAG_B=$(kstr aiprofile.flag_behavioral); FLAG_N=$(kstr aiprofile.flag_noncommercial)
     REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
     # Localize element labels (by id) and cluster display names (by cluster id).
@@ -173,16 +170,9 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_TH_GAP=$(kstr aiprofile.th_gap); P_TH_REVIEW=$(kstr aiprofile.th_review); P_TH_TOTAL=$(kstr aiprofile.th_total)
     P_H2_XWALK=$(kstr aiprofile.h2_crosswalk)
     P_TH_FRAMEWORK=$(kstr aiprofile.th_framework); P_TH_MAPPED=$(kstr aiprofile.th_mapped)
-    P_XWALK_FULL=$(tfmt aiprofile.crosswalk_full "$OUT_PREFIX"); P_XWALK_FULL_H=$(kstr aiprofile.crosswalk_full_html)
-    P_H2_CLOSE=$(kstr aiprofile.h2_close); P_CLOSE_INTRO=$(tfmt aiprofile.close_intro "$OUT_PREFIX"); P_CLOSE_INTRO_H=$(kstr aiprofile.close_intro_html)
+    P_XWALK_FULL=$(tfmt aiprofile.crosswalk_full "$OUT_PREFIX")
+    P_H2_CLOSE=$(kstr aiprofile.h2_close); P_CLOSE_INTRO=$(tfmt aiprofile.close_intro "$OUT_PREFIX")
     P_H2_REVIEW=$(kstr aiprofile.h2_review); P_REVIEW_INTRO=$(kstr aiprofile.review_intro)
-    P_LIC_NONE_H=$(kstr aiprofile.lic_none_html)
-    P_HTML_TITLE=$(tfmt aiprofile.html_title "$PROJECT"); P_KIND=$(kstr aiprofile.kind)
-    P_H1=$(kstr aiprofile.h1); P_NOTE=$(kstr aiprofile.note)
-    P_META="$(kstr aiprofile.meta_project): $(esc "$PROJECT") &middot; $(kstr aiprofile.meta_generated): ${GEN_AT}"
-    P_PILL_G7=$(kstr aiprofile.pill_g7_present); P_PILL_GAP=$(kstr aiprofile.pill_g7_gap)
-    P_PILL_REVIEW=$(kstr aiprofile.pill_review); P_PILL_LIC=$(kstr aiprofile.pill_license)
-    P_PILL_BASE="$(kstr aiprofile.pill_base) ${CONF_UP}"
 else
     P_MD_TITLE="AI compliance profile — ${PROJECT}"
     P_MD_GEN="- Generated: ${GEN_AT}"
@@ -203,14 +193,6 @@ else
     P_CLOSE_INTRO="These G7 elements have an automated source but are absent from the SBOM. The conformance report (\`${OUT_PREFIX}_conformance.md\`) carries the CycloneDX fragment that would satisfy each one."
     P_H2_REVIEW="Elements a person still has to fill in"
     P_REVIEW_INTRO="These G7 elements have no automated source; they are surfaced for human review, not guessed."
-    P_HTML_TITLE="AI compliance profile — ${PROJECT}"; P_KIND="AI compliance profile"
-    P_H1="AI compliance profile"; P_NOTE="This profile re-aggregates the conformance and SBOM artifacts already produced."
-    P_META="Project: $(esc "$PROJECT") &middot; Generated: ${GEN_AT}"
-    P_PILL_G7="G7 present"; P_PILL_GAP="G7 gap"; P_PILL_REVIEW="Needs review"; P_PILL_LIC="License flags"
-    P_PILL_BASE="Base result: ${CONF_UP}"
-    P_XWALK_FULL_H="The full element-by-element mapping is in the conformance report."
-    P_CLOSE_INTRO_H="These G7 elements have an automated source but are absent from the SBOM. The conformance report carries the CycloneDX fragment that would satisfy each one."
-    P_LIC_NONE_H="No components carry an AI behavioral-use or non-commercial license flag."
 fi
 
 # --------------------------------------------------------
@@ -288,140 +270,10 @@ fi
 } > "$MD"
 
 # --------------------------------------------------------
-# HTML (cards/table/CSP/escape pattern shared with the other reports)
+# No HTML here any more. The conformance report renders the same rollup — per-
+# cluster coverage and the licenses flagged for review — above its per-check
+# tables, so a second page repeated it one file away. The JSON stays (the web UI
+# and CI read it) and so does the Markdown digest.
 # --------------------------------------------------------
-conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RESULT" = "fail" ] && conf_class="fail"
-{
-    cat <<HTMLHEAD
-<!DOCTYPE html>
-<html lang="${HTML_LANG}"><head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>${P_HTML_TITLE}</title>
-<style>
- :root{
-  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
-  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
-  --radius:.375rem;--radius-card:.5rem;
-  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
- }
- @media (prefers-color-scheme:dark){:root{
-  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
-  --th-bg:#1f1f23;--row-hover:#202024;
-  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
- }}
- *{box-sizing:border-box;}
- body{font-family:var(--font);background:var(--bg);color:var(--text);
-  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
-  -webkit-font-smoothing:antialiased;}
- a{color:var(--brand);}
- .report-header{display:flex;align-items:flex-end;justify-content:space-between;
-  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
-  margin-bottom:1.5rem;}
- .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
-  letter-spacing:-.02em;color:var(--brand);}
- .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
-  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
- .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.07em;}
- h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
- h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
- .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
- .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
- .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
-  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
- .pill .count{font-variant-numeric:tabular-nums;}
- .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
- .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
- .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
- .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
- .note{background:rgba(244,119,37,.09);border-left:3px solid var(--brand-2);
-  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:.875rem;}
- .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
-  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
- table{border-collapse:collapse;width:100%;font-size:.85rem;}
- th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
- td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
- td.num{text-align:right;font-variant-numeric:tabular-nums;}
- tr:last-child td{border-bottom:none;}
- tr:hover td{background:var(--row-hover);}
- ul{margin:.5rem 0 0;padding-left:1.3rem;}
- li{margin:.3rem 0;}
-</style></head><body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">${P_KIND}</div>
-</header>
-<h1>${P_H1}</h1>
-<p class="meta">${P_META}</p>
-<div class="note">${P_NOTE}</div>
-<div class="cards">
- <span class="pill pill-pass">${P_PILL_G7} <span class="count">${P} / ${A}</span></span>
- <span class="pill pill-warn">${P_PILL_GAP} <span class="count">${Gp}</span></span>
- <span class="pill pill-info">${P_PILL_REVIEW} <span class="count">${Rv}</span></span>
- <span class="pill pill-fail">${P_PILL_LIC} <span class="count">${LT}</span></span>
- <span class="pill pill-${conf_class}">${P_PILL_BASE}</span>
-</div>
-HTMLHEAD
 
-    echo "<h2>${P_H2_LIC}</h2>"
-    if [ "$LT" -gt 0 ]; then
-        echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_COMP}</th><th>${P_TH_VER}</th><th>${P_TH_LIC}</th><th>${P_TH_FLAG}</th></tr>"
-        echo "$LIC" | jq -r --argjson cap "$CAP" --arg fb "$FLAG_B" --arg fn "$FLAG_N" '.items[0:$cap][] |
-            "<tr><td>" + (.name|@html) + "</td><td>" + (.version|@html) + "</td>" +
-            "<td>" + (.license|@html) + "</td><td>" + ((
-              if .flag=="behavioral-use" then $fb
-              elif .flag=="non-commercial" then $fn else .flag end)|@html) + "</td></tr>"'
-        echo "</table></div>"
-        if [ "$LT" -gt "$CAP" ]; then
-            if [ "$REPORT_LANG" = "ko" ]; then echo "<p class=\"meta\">$(tfmt aiprofile.lic_more_html "$((LT - CAP))")</p>"; else echo "<p class=\"meta\">… and $((LT - CAP)) more (see the JSON profile).</p>"; fi
-        fi
-    else
-        echo "<p>${P_LIC_NONE_H}</p>"
-    fi
-
-    echo "<h2>${P_H2_CLUSTERS}</h2>"
-    echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_CLUSTER}</th><th>${P_TH_PRESENT}</th><th>${P_TH_GAP}</th><th>${P_TH_REVIEW}</th><th>${P_TH_TOTAL}</th></tr>"
-    echo "$G7R" | jq -r '.clusters[] |
-        "<tr><td>" + (.cluster|@html) + "</td><td class=\"num\">" + (.present|tostring) +
-        "</td><td class=\"num\">" + (.gap|tostring) + "</td><td class=\"num\">" + (.review|tostring) +
-        "</td><td class=\"num\">" + (.total|tostring) + "</td></tr>"'
-    echo "</table></div>"
-
-    if [ "$(echo "$XW" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "<h2>${P_H2_XWALK}</h2>"
-        echo "<p class=\"meta\">$(esc "$(echo "$XW" | jq -r '.disclaimer')")</p>"
-        echo "<div class=\"table-wrap\"><table><tr><th>${P_TH_FRAMEWORK}</th><th>${P_TH_PRESENT}</th><th>${P_TH_GAP}</th><th>${P_TH_REVIEW}</th><th>${P_TH_MAPPED}</th></tr>"
-        echo "$XW" | jq -r '.frameworks[] |
-            "<tr><td>" + (.title|@html) + "</td><td class=\"num\">" + (.present|tostring) +
-            "</td><td class=\"num\">" + (.gap|tostring) + "</td><td class=\"num\">" + (.review|tostring) +
-            "</td><td class=\"num\">" + (.total|tostring) + "</td></tr>"'
-        echo "</table></div>"
-        echo "<p class=\"meta\">${P_XWALK_FULL_H}</p>"
-    fi
-
-    if [ "$Gp" -gt 0 ]; then
-        echo "<h2>${P_H2_CLOSE}</h2>"
-        echo "<p>${P_CLOSE_INTRO_H}</p>"
-        echo "<ul>"
-        echo "$G7R" | jq -r '.gapItems[] |
-            "<li>" + ((.label + " (" + .cluster + ")")|@html) +
-            (if (.docUrl // "") != "" then " &mdash; " + (.docUrl|@html) else "" end) + "</li>"'
-        echo "</ul>"
-    fi
-
-    if [ "$Rv" -gt 0 ]; then
-        echo "<h2>${P_H2_REVIEW}</h2>"
-        echo "<p>${P_REVIEW_INTRO}</p>"
-        echo "<ul>"
-        echo "$G7R" | jq -r '.reviewItems[] | "<li>" + ((.label + " (" + .cluster + ")")|@html) + "</li>"'
-        echo "</ul>"
-    fi
-    echo "</body></html>"
-} > "$HTML"
-
-echo "[ai-profile] generated: $JSON, $MD, $HTML (G7 present=${P}/${A}, license flags=${LT})"
+echo "[ai-profile] generated: $JSON, $MD (G7 present=${P}/${A}, license flags=${LT})"

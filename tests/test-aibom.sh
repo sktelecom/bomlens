@@ -512,7 +512,17 @@ if [ -f "$PROF" ]; then
     xf=$(jq -r '.regulatoryCrosswalk.frameworks | length' "$PROF")
     [ "$xf" -ge 1 ] && pass "profile carries the regulatory crosswalk ($xf framework(s))" || fail "profile lacks the crosswalk"
     grep -q "re-aggregates the conformance and SBOM artifacts" "$WORK/conf_ai-profile.md" && pass "MD states it re-aggregates existing artifacts" || fail "MD lacks the re-aggregation note"
-    grep -q "AI compliance profile" "$WORK/conf_ai-profile.html" && pass "HTML profile rendered" || fail "HTML profile missing"
+    [ -f "$WORK/conf_ai-profile.html" ] && fail "a separate HTML profile is still written" || pass "no separate HTML profile (the rollup opens the conformance report)"
+    grep -q "G7 minimum elements by cluster" "$WORK/conf_conformance.html" && pass "conformance HTML opens with the cluster rollup" || fail "conformance HTML lacks the cluster rollup"
+    grep -q "Licenses flagged for review" "$WORK/conf_conformance.html" && pass "conformance HTML carries the license review section" || fail "conformance HTML lacks the license review section"
+    # The rollup is built by a jq expression that silently yields [] on error, so
+    # assert the table is actually populated and ordered like the G7 registry.
+    rollup=$(sed -n '/G7 minimum elements by cluster/,/SBOM format requirements/p' "$WORK/conf_conformance.html")
+    rows=$(printf '%s' "$rollup" | grep -c '<tr><td>')
+    [ "$rows" -ge 7 ] && pass "the cluster rollup lists every cluster ($rows rows)" || fail "the cluster rollup is empty or short" "$rows"
+    want=$(jq -r '[.clusters[].name] | join("|")' "$LIB/g7-registry.json")
+    got=$(printf '%s' "$rollup" | grep -o '<tr><td>[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
+    [ "$got" = "$want" ] && pass "the cluster rollup follows the registry order" || fail "the cluster rollup order drifted" "$got"
     # The profile lists the closable gaps and delegates the fragments to the
     # conformance report, so the two artifacts stay complementary, not duplicated.
     gi=$(jq -r '.g7.gapItems | length' "$PROF"); gc=$(jq -r '.g7.gap' "$PROF")
@@ -595,8 +605,8 @@ echo "== ko AI compliance profile renders Korean while the JSON stays English ==
 cp "$WORK/conf_bom.json" "$WORK/koconf_bom.json" 2>/dev/null
 REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koconf" "demo" >/dev/null 2>&1
 if [ -f "$WORK/koconf_ai-profile.json" ]; then
-    grep -q '<html lang="ko">' "$WORK/koconf_ai-profile.html" && pass "ko profile HTML sets lang=ko" || fail "ko profile HTML lang is not ko"
-    grep -q 'AI 준수 개요' "$WORK/koconf_ai-profile.html" && pass "ko profile HTML h1 is Korean" || fail "ko profile h1 not localized"
+    grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the cluster rollup" || fail "ko cluster rollup not localized"
+    grep -q '검토 대상 라이선스' "$WORK/koconf_conformance.html" && pass "ko conformance HTML localizes the license section" || fail "ko license section not localized"
     grep -q '클러스터별 G7 최소 요소' "$WORK/koconf_ai-profile.md" && pass "ko profile cluster heading is Korean" || fail "ko profile heading not localized"
     grep -qE '^\| (메타데이터|모델|인프라) ' "$WORK/koconf_ai-profile.md" && pass "ko profile localizes cluster display names (name_ko)" || fail "ko profile cluster names not localized"
     if diff <(jq 'del(.generatedAt)' "$WORK/conf_ai-profile.json") <(jq 'del(.generatedAt)' "$WORK/koconf_ai-profile.json") >/dev/null 2>&1; then
