@@ -1,9 +1,7 @@
 {
   "_note": "Korean (ko) strings for the human-facing conformance and AI-profile reports. Loaded by validate-sbom.sh and generate-ai-profile.sh only when REPORT_LANG=ko; the English default reads nothing here and stays byte-identical. The machine-readable _conformance.json / _ai-profile.json stay English regardless. Do NOT translate data/identifiers: status codes and emoji (pass/warn/fail/review, PASS/FAIL/WARN/REVIEW), openness values, G7 element ids, PURLs, licenses, CycloneDX field paths, URLs, framework/article identifiers. Chrome keys use %s placeholders (shell printf). label/detail template keys use named tokens (%n% %a% %b% %v%) filled by jq.",
-
   "common.yes": "예",
   "common.no": "아니오",
-
   "conformance.kind": "적합성",
   "conformance.md_title": "SBOM 적합성 — %s",
   "conformance.html_title": "SBOM 적합성 — %s",
@@ -19,7 +17,8 @@
   "conformance.th_requirement": "요구사항",
   "conformance.th_required": "필수",
   "conformance.th_detail": "세부 내용",
-  "conformance.th_evidence": "근거",
+  "conformance.th_evidence": "근거 · 채우는 방법",
+  "conformance.fix_summary": "채우는 방법 보기",
   "conformance.h2_missing": "누락 / 미준수 항목",
   "conformance.h2_fill": "미충족 항목 채우는 방법",
   "conformance.fill_intro": "아래 항목은 모두 권고이며 결과에 영향을 주지 않습니다. 예시 조각은 해당 항목을 충족하는 형태를 보여줍니다.",
@@ -34,7 +33,6 @@
   "conformance.pill_warnings": "경고:",
   "conformance.pill_review": "검토 필요:",
   "conformance.pill_untraceable": "추적 불가 (pkg:generic):",
-
   "conformance.label.spec_cdx": "사양 버전 (CycloneDX %v%)",
   "conformance.label.spec_other": "사양 버전 (%v%)",
   "conformance.label.purl": "PURL 포함률 (%n%% 이상)",
@@ -63,7 +61,6 @@
     "Recognized SBOM format": "인식된 SBOM 형식",
     "Parseable SBOM": "파싱 가능한 SBOM"
   },
-
   "conformance.detail.present": "있음",
   "conformance.detail.not_present": "SBOM에 없음",
   "conformance.detail.review": "사람 검토 필요 (자동 확인 불가)",
@@ -83,7 +80,6 @@
   "conformance.detail.relationship": "관계 %n%개",
   "conformance.detail.license_field": "라이선스 필드 %n%개",
   "conformance.detail.checksum": "체크섬 %n%개",
-
   "aiprofile.kind": "AI 준수 개요",
   "aiprofile.md_title": "AI 준수 개요 — %s",
   "aiprofile.html_title": "AI 준수 개요 — %s",

@@ -6,7 +6,7 @@
 <style>
  :root{
   --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
-  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;--review:#2563eb;
   --radius:.375rem;--radius-card:.5rem;
   --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -14,7 +14,7 @@
  }
  @media (prefers-color-scheme:dark){:root{
   --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
-  --th-bg:#1f1f23;--row-hover:#202024;
+  --th-bg:#1f1f23;--row-hover:#202024;--review:#60a5fa;
   --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
  }}
  *{box-sizing:border-box;}
@@ -55,6 +55,14 @@
  .s-pass{color:#16a34a;font-weight:700;}
  .s-fail{color:#dc2626;font-weight:700;}
  .s-warn{color:#ca8a04;font-weight:700;}
+ .s-review{color:var(--review);font-weight:700;}
+ td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+ th.num{text-align:right;}
+ td.req{white-space:nowrap;}
+ details.fix{margin:.4rem 0 0;}
+ details.fix summary{cursor:pointer;color:var(--brand);font-size:.8rem;font-weight:600;}
+ details.fix pre{margin:.4rem 0 .2rem;}
+ details.fix .meta{font-size:.8rem;}
  .mono{list-style:none;padding-left:0;}
  .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
  pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
@@ -68,7 +76,7 @@
  <div class="report-kind">Conformance</div>
 </header>
 <h1>SBOM Conformance Report</h1>
-<p class="meta">Project: Aether-7B-5Attn &middot; Generated: 2026-07-21T00:37:02Z &middot; Format: CycloneDX</p>
+<p class="meta">Project: <a href="https://huggingface.co/FINAL-Bench/Aether-7B-5Attn" rel="noreferrer">Aether-7B-5Attn</a> &middot; Generated: 2026-07-22T00:05:31Z &middot; Format: CycloneDX</p>
 <div class="cards">
  <span class="pill pill-pass">Result: PASS</span>
  <span class="pill pill-fail">Mandatory failures: <span class="count">0</span></span>
@@ -76,99 +84,91 @@
  <span class="pill">Needs review: <span class="count">13</span></span>
 
 </div>
-<div class="table-wrap"><table><tr><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence</th></tr>
-<tr><td class="s-pass">PASS</td><td>Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)</td><td>yes</td><td>CycloneDX 1.7</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Timestamp (metadata.timestamp)</td><td>yes</td><td>2026-07-21T00:36:59+00:00</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Tool info (metadata.tools)</td><td>yes</td><td>1 tool(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Top-level component name+version</td><td>yes</td><td>job-2026-07-21-00:36:59@1.0</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Component name+version coverage (100%)</td><td>yes</td><td>1/1</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>PURL coverage (&gt;= 90%)</td><td>yes</td><td>100% (1/1)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Traceable PURL (no pkg:generic, advisory)</td><td>no</td><td>0 untraceable</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>PURL syntax (pkg:type/name@version)</td><td>yes</td><td>0 malformed</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Transitive dependencies (graph edges)</td><td>yes</td><td>1 edge(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>License coverage (&gt;= 80%, recommended)</td><td>no</td><td>100% (1/1)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Hash coverage (&gt;= 50%, recommended)</td><td>no</td><td>100% (1/1)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>SBOM author</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM version</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM data format name</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM data format version</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>SBOM author signature</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM tool name</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM tool version</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>SBOM generation context</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM timestamp</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>SBOM dependency relationship</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>System name</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>System components</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>System producer</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>System version</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>System timestamp</td><td>no</td><td>present</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>System input/output properties</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model name</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model identifier</td><td>no</td><td>1/1 model component(s)</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@613f399c</td></tr>
-<tr><td class="s-pass">PASS</td><td>Model version</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model timestamp</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model producer</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model description</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model hash value</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model hash algorithm</td><td>no</td><td>1/1 model component(s)</td><td>SHA-256</td></tr>
-<tr><td class="s-pass">PASS</td><td>Model properties (model card)</td><td>no</td><td>1/1 model component(s)</td><td>aether_v2_7way</td></tr>
-<tr><td class="s-pass">PASS</td><td>Model input-output properties</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model training properties</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Model license</td><td>no</td><td>1/1 model component(s)</td><td>Apache-2.0</td></tr>
-<tr><td class="s-pass">PASS</td><td>Model license — openness (weight/architecture/data/training)</td><td>no</td><td>present</td><td>open-architecture, open-data, open-training, open-weight, openness:architecture=open-architecture, openness:training-data=open-data, openness:training=open-training, openness:weights=open-weight</td></tr>
-<tr><td class="s-pass">PASS</td><td>Model external references</td><td>no</td><td>1/1 model component(s)</td><td></td></tr>
-<tr><td class="s-pass">PASS</td><td>Dataset name</td><td>no</td><td>present</td><td>HAERAE-HUB/KOREAN-SyntheticText-1.5B, HAERAE-HUB/KOREAN-WEBTEXT, HuggingFaceFW/fineweb-edu, HuggingFaceTB/finemath, HuggingFaceTB/smollm-corpus, OpenCoder-LLM/opc-fineweb-code-corpus, open-web-math/open-web-math</td></tr>
-<tr><td class="s-warn">WARN</td><td>Dataset description</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Dataset content</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Dataset identifier</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Dataset hash</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Dataset provenance</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Dataset statistical properties</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Dataset dependency relationship</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Dataset license</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Security compliance</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-<tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>no</td><td>requires human review (no automated source)</td><td></td></tr>
-<tr><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td>no</td><td>not present in the SBOM</td><td></td></tr>
-</table></div>
-<h2>How to fill the gaps</h2>
-<p class="meta">Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it.</p>
-<h3>SBOM author signature</h3><pre><code>&quot;signature&quot;: {
+<div class="table-wrap"><table><tr><th class="num">#</th><th>Status</th><th>Requirement</th><th>Required</th><th>Detail</th><th>Evidence / how to fill</th></tr>
+<tr><td class="num">1</td><td class="s-pass">PASS</td><td>Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)</td><td class="req">yes</td><td>CycloneDX 1.7</td><td></td></tr>
+<tr><td class="num">2</td><td class="s-pass">PASS</td><td>Timestamp (metadata.timestamp)</td><td class="req">yes</td><td>2026-07-22T00:04:48+00:00</td><td></td></tr>
+<tr><td class="num">3</td><td class="s-pass">PASS</td><td>Tool info (metadata.tools)</td><td class="req">yes</td><td>1 tool(s)</td><td></td></tr>
+<tr><td class="num">4</td><td class="s-pass">PASS</td><td>Top-level component name+version</td><td class="req">yes</td><td>job-2026-07-22-00:04:48@1.0</td><td></td></tr>
+<tr><td class="num">5</td><td class="s-pass">PASS</td><td>Component name+version coverage (100%)</td><td class="req">yes</td><td>1/1</td><td></td></tr>
+<tr><td class="num">6</td><td class="s-pass">PASS</td><td>PURL coverage (&gt;= 90%)</td><td class="req">yes</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="num">7</td><td class="s-pass">PASS</td><td>Traceable PURL (no pkg:generic, advisory)</td><td class="req">no</td><td>0 untraceable</td><td></td></tr>
+<tr><td class="num">8</td><td class="s-pass">PASS</td><td>PURL syntax (pkg:type/name@version)</td><td class="req">yes</td><td>0 malformed</td><td></td></tr>
+<tr><td class="num">9</td><td class="s-pass">PASS</td><td>Transitive dependencies (graph edges)</td><td class="req">yes</td><td>1 edge(s)</td><td></td></tr>
+<tr><td class="num">10</td><td class="s-pass">PASS</td><td>License coverage (&gt;= 80%, recommended)</td><td class="req">no</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="num">11</td><td class="s-pass">PASS</td><td>Hash coverage (&gt;= 50%, recommended)</td><td class="req">no</td><td>100% (1/1)</td><td></td></tr>
+<tr><td class="num">12</td><td class="s-warn">WARN</td><td>SBOM author</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">13</td><td class="s-pass">PASS</td><td>SBOM version</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">14</td><td class="s-pass">PASS</td><td>SBOM data format name</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">15</td><td class="s-pass">PASS</td><td>SBOM data format version</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">16</td><td class="s-warn">WARN</td><td>SBOM author signature</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>&quot;signature&quot;: {
   &quot;algorithm&quot;: &quot;ES256&quot;,
   &quot;value&quot;: &quot;MEUCIQD…&quot;
-}</code></pre><p class="meta">Reference: https://cyclonedx.org/docs/1.7/json/#signature</p>
-<h3>Dataset description</h3><pre><code>{
+}</code></pre><p class="meta">Reference: <a href="https://cyclonedx.org/docs/1.7/json/#signature" rel="noreferrer">https://cyclonedx.org/docs/1.7/json/#signature</a></p></details></td></tr>
+<tr><td class="num">17</td><td class="s-pass">PASS</td><td>SBOM tool name</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">18</td><td class="s-pass">PASS</td><td>SBOM tool version</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">19</td><td class="s-warn">WARN</td><td>SBOM generation context</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">20</td><td class="s-pass">PASS</td><td>SBOM timestamp</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">21</td><td class="s-pass">PASS</td><td>SBOM dependency relationship</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">22</td><td class="s-pass">PASS</td><td>System name</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">23</td><td class="s-warn">WARN</td><td>System components</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">24</td><td class="s-warn">WARN</td><td>System producer</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">25</td><td class="s-pass">PASS</td><td>System version</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">26</td><td class="s-pass">PASS</td><td>System timestamp</td><td class="req">no</td><td>present</td><td></td></tr>
+<tr><td class="num">27</td><td class="s-review">REVIEW</td><td>System data flow</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">28</td><td class="s-review">REVIEW</td><td>System data usage</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">29</td><td class="s-review">REVIEW</td><td>System input/output properties</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">30</td><td class="s-review">REVIEW</td><td>Intended application area</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">31</td><td class="s-pass">PASS</td><td>Model name</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">32</td><td class="s-pass">PASS</td><td>Model identifier</td><td class="req">no</td><td>1/1 model component(s)</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@fd30c6d6</td></tr>
+<tr><td class="num">33</td><td class="s-pass">PASS</td><td>Model version</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">34</td><td class="s-pass">PASS</td><td>Model timestamp</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">35</td><td class="s-pass">PASS</td><td>Model producer</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">36</td><td class="s-pass">PASS</td><td>Model description</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">37</td><td class="s-pass">PASS</td><td>Model hash value</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">38</td><td class="s-pass">PASS</td><td>Model hash algorithm</td><td class="req">no</td><td>1/1 model component(s)</td><td>SHA-256</td></tr>
+<tr><td class="num">39</td><td class="s-pass">PASS</td><td>Model properties (model card)</td><td class="req">no</td><td>1/1 model component(s)</td><td>aether_v2_7way</td></tr>
+<tr><td class="num">40</td><td class="s-pass">PASS</td><td>Model input-output properties</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">41</td><td class="s-pass">PASS</td><td>Model training properties</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">42</td><td class="s-pass">PASS</td><td>Model license</td><td class="req">no</td><td>1/1 model component(s)</td><td>Apache-2.0</td></tr>
+<tr><td class="num">43</td><td class="s-pass">PASS</td><td>Model license — openness (weight/architecture/data/training)</td><td class="req">no</td><td>present</td><td>open-architecture, open-data, open-training, open-weight, openness:architecture=open-architecture, openness:training-data=open-data, openness:training=open-training, openness:weights=open-weight</td></tr>
+<tr><td class="num">44</td><td class="s-pass">PASS</td><td>Model external references</td><td class="req">no</td><td>1/1 model component(s)</td><td></td></tr>
+<tr><td class="num">45</td><td class="s-pass">PASS</td><td>Dataset name</td><td class="req">no</td><td>present</td><td>HAERAE-HUB/KOREAN-SyntheticText-1.5B, HAERAE-HUB/KOREAN-WEBTEXT, HuggingFaceFW/fineweb-edu, HuggingFaceTB/finemath, HuggingFaceTB/smollm-corpus, OpenCoder-LLM/opc-fineweb-code-corpus, open-web-math/open-web-math</td></tr>
+<tr><td class="num">46</td><td class="s-warn">WARN</td><td>Dataset description</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>{
   &quot;type&quot;: &quot;data&quot;,
   &quot;name&quot;: &quot;wikipedia&quot;,
   &quot;description&quot;: &quot;Cleaned Wikipedia article dumps.&quot;
-}</code></pre><p class="meta">Reference: https://huggingface.co/docs/hub/datasets-cards</p>
-<h3>Dataset identifier</h3><pre><code>{
+}</code></pre><p class="meta">Reference: <a href="https://huggingface.co/docs/hub/datasets-cards" rel="noreferrer">https://huggingface.co/docs/hub/datasets-cards</a></p></details></td></tr>
+<tr><td class="num">47</td><td class="s-review">REVIEW</td><td>Dataset content</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">48</td><td class="s-warn">WARN</td><td>Dataset identifier</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>{
   &quot;type&quot;: &quot;data&quot;,
   &quot;bom-ref&quot;: &quot;dataset:wikipedia&quot;,
   &quot;purl&quot;: &quot;pkg:huggingface/datasets/wikipedia&quot;
-}</code></pre><p class="meta">Reference: https://github.com/package-url/purl-spec</p>
-<h3>Dataset provenance</h3><pre><code>&quot;componentData&quot;: {
+}</code></pre><p class="meta">Reference: <a href="https://github.com/package-url/purl-spec" rel="noreferrer">https://github.com/package-url/purl-spec</a></p></details></td></tr>
+<tr><td class="num">49</td><td class="s-review">REVIEW</td><td>Dataset hash</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">50</td><td class="s-warn">WARN</td><td>Dataset provenance</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>&quot;componentData&quot;: {
   &quot;governance&quot;: { &quot;custodians&quot;: [ { &quot;organization&quot;: { &quot;name&quot;: &quot;Wikimedia&quot; } } ] }
-}</code></pre><p class="meta">Reference: https://cyclonedx.org/capabilities/mlbom/</p>
-<h3>Dataset license</h3><pre><code>{
+}</code></pre><p class="meta">Reference: <a href="https://cyclonedx.org/capabilities/mlbom/" rel="noreferrer">https://cyclonedx.org/capabilities/mlbom/</a></p></details></td></tr>
+<tr><td class="num">51</td><td class="s-review">REVIEW</td><td>Dataset statistical properties</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">52</td><td class="s-review">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">53</td><td class="s-review">REVIEW</td><td>Dataset dependency relationship</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">54</td><td class="s-warn">WARN</td><td>Dataset license</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>{
   &quot;type&quot;: &quot;data&quot;,
   &quot;name&quot;: &quot;wikipedia&quot;,
   &quot;licenses&quot;: [ { &quot;license&quot;: { &quot;id&quot;: &quot;CC-BY-SA-3.0&quot; } } ]
-}</code></pre><p class="meta">Reference: https://huggingface.co/docs/hub/datasets-cards</p>
-<h3>Infrastructure hardware (HBOM link)</h3><pre><code>&quot;externalReferences&quot;: [
+}</code></pre><p class="meta">Reference: <a href="https://huggingface.co/docs/hub/datasets-cards" rel="noreferrer">https://huggingface.co/docs/hub/datasets-cards</a></p></details></td></tr>
+<tr><td class="num">55</td><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">56</td><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td class="req">no</td><td>not present in the SBOM</td><td><details class="fix"><summary>How to fill this</summary><pre><code>&quot;externalReferences&quot;: [
   { &quot;type&quot;: &quot;bom&quot;, &quot;url&quot;: &quot;https://example.com/hbom.json&quot; }
-]</code></pre><p class="meta">Reference: https://cyclonedx.org/capabilities/hbom/</p>
+]</code></pre><p class="meta">Reference: <a href="https://cyclonedx.org/capabilities/hbom/" rel="noreferrer">https://cyclonedx.org/capabilities/hbom/</a></p></details></td></tr>
+<tr><td class="num">57</td><td class="s-review">REVIEW</td><td>Security controls</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">58</td><td class="s-review">REVIEW</td><td>Security compliance</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">59</td><td class="s-review">REVIEW</td><td>Cybersecurity policy information</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">60</td><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+<tr><td class="num">61</td><td class="s-review">REVIEW</td><td>Security metrics</td><td class="req">no</td><td>requires human review (no automated source)</td><td></td></tr>
+<tr><td class="num">62</td><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td class="req">no</td><td>not present in the SBOM</td><td></td></tr>
+</table></div>
 <h2>Regulatory crosswalk</h2>
 <p class="meta">BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.</p>
-<h3>EU AI Act — Annex IV technical documentation</h3><p class="meta">Regulation (EU) 2024/1689, Article 11(1) and Annex IV &middot; present 6, gap 7, needs review 10</p><div class="table-wrap"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="s-pass">PASS</td><td>System name</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>System input/output properties</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>Model description</td><td>Annex IV(1)</td></tr><tr><td class="s-pass">PASS</td><td>Model properties (model card)</td><td>Annex IV(2)(b)-(c)</td></tr><tr><td class="s-pass">PASS</td><td>Model input-output properties</td><td>Annex IV(3)</td></tr><tr><td class="s-pass">PASS</td><td>Model training properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-pass">PASS</td><td>Dataset name</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset description</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset content</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset provenance</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset statistical properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Dataset license</td><td>Annex IV(2)(d)</td></tr><tr><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td>Annex IV(2)(c)</td></tr><tr><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td>Annex IV(1)</td></tr><tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>Annex IV(5)</td></tr><tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>Annex IV(2)(h)</td></tr><tr><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td>Annex IV(2)(g)</td></tr></table></div>
-<h3>AI Framework Act (Korea)</h3><p class="meta">인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22) &middot; present 2, gap 1, needs review 7</p><div class="table-wrap"><table><tr><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="s-pass">PASS</td><td>System name</td><td>제31조</td></tr><tr><td class="s-warn">REVIEW</td><td>System data flow</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>System data usage</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>Intended application area</td><td>제33조</td></tr><tr><td class="s-pass">PASS</td><td>Model training properties</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>제35조</td></tr><tr><td class="s-warn">REVIEW</td><td>Security controls</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Cybersecurity policy information</td><td>제32조</td></tr><tr><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>제32조</td></tr><tr><td class="s-warn">REVIEW</td><td>Security metrics</td><td>제32조</td></tr></table></div>
+<h3>EU AI Act — Annex IV technical documentation</h3><p class="meta">Regulation (EU) 2024/1689, Article 11(1) and Annex IV &middot; present 6, gap 7, needs review 10</p><div class="table-wrap"><table><tr><th class="num">#</th><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="num">1</td><td class="s-pass">PASS</td><td>System name</td><td>Annex IV(1)</td></tr><tr><td class="num">2</td><td class="s-review">REVIEW</td><td>System data flow</td><td>Annex IV(1)</td></tr><tr><td class="num">3</td><td class="s-review">REVIEW</td><td>System data usage</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">4</td><td class="s-review">REVIEW</td><td>System input/output properties</td><td>Annex IV(1)</td></tr><tr><td class="num">5</td><td class="s-review">REVIEW</td><td>Intended application area</td><td>Annex IV(1)</td></tr><tr><td class="num">6</td><td class="s-pass">PASS</td><td>Model description</td><td>Annex IV(1)</td></tr><tr><td class="num">7</td><td class="s-pass">PASS</td><td>Model properties (model card)</td><td>Annex IV(2)(b)-(c)</td></tr><tr><td class="num">8</td><td class="s-pass">PASS</td><td>Model input-output properties</td><td>Annex IV(3)</td></tr><tr><td class="num">9</td><td class="s-pass">PASS</td><td>Model training properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">10</td><td class="s-pass">PASS</td><td>Dataset name</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">11</td><td class="s-warn">WARN</td><td>Dataset description</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">12</td><td class="s-review">REVIEW</td><td>Dataset content</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">13</td><td class="s-warn">WARN</td><td>Dataset provenance</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">14</td><td class="s-review">REVIEW</td><td>Dataset statistical properties</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">15</td><td class="s-review">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">16</td><td class="s-warn">WARN</td><td>Dataset license</td><td>Annex IV(2)(d)</td></tr><tr><td class="num">17</td><td class="s-warn">WARN</td><td>Infrastructure software (dependencies)</td><td>Annex IV(2)(c)</td></tr><tr><td class="num">18</td><td class="s-warn">WARN</td><td>Infrastructure hardware (HBOM link)</td><td>Annex IV(1)</td></tr><tr><td class="num">19</td><td class="s-review">REVIEW</td><td>Security controls</td><td>Annex IV(2)(h)</td></tr><tr><td class="num">20</td><td class="s-review">REVIEW</td><td>Cybersecurity policy information</td><td>Annex IV(5)</td></tr><tr><td class="num">21</td><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>Annex IV(2)(h)</td></tr><tr><td class="num">22</td><td class="s-review">REVIEW</td><td>Security metrics</td><td>Annex IV(2)(h)</td></tr><tr><td class="num">23</td><td class="s-warn">WARN</td><td>Operational performance KPIs</td><td>Annex IV(2)(g)</td></tr></table></div>
+<h3>AI Framework Act (Korea)</h3><p class="meta">인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22) &middot; present 2, gap 1, needs review 7</p><div class="table-wrap"><table><tr><th class="num">#</th><th>Status</th><th>G7 element</th><th>Reference</th></tr><tr><td class="num">1</td><td class="s-pass">PASS</td><td>System name</td><td>제31조</td></tr><tr><td class="num">2</td><td class="s-review">REVIEW</td><td>System data flow</td><td>제35조</td></tr><tr><td class="num">3</td><td class="s-review">REVIEW</td><td>System data usage</td><td>제35조</td></tr><tr><td class="num">4</td><td class="s-review">REVIEW</td><td>Intended application area</td><td>제33조</td></tr><tr><td class="num">5</td><td class="s-pass">PASS</td><td>Model training properties</td><td>제32조</td></tr><tr><td class="num">6</td><td class="s-review">REVIEW</td><td>Dataset sensitivity (PII/copyright)</td><td>제35조</td></tr><tr><td class="num">7</td><td class="s-review">REVIEW</td><td>Security controls</td><td>제32조</td></tr><tr><td class="num">8</td><td class="s-review">REVIEW</td><td>Cybersecurity policy information</td><td>제32조</td></tr><tr><td class="num">9</td><td class="s-warn">WARN</td><td>Vulnerability referencing</td><td>제32조</td></tr><tr><td class="num">10</td><td class="s-review">REVIEW</td><td>Security metrics</td><td>제32조</td></tr></table></div>
 </body></html>

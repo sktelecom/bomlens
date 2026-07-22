@@ -424,7 +424,18 @@ echo "== G7 fill-in guidance: surfaced in the AI conformance report =="
 gn=$(jq '[.checks[] | select((.guidance.snippet // "") != "")] | length' "$CONF")
 [ "$gn" -ge 1 ] && pass "G7 checks carry fill-in guidance ($gn tagged)" || fail "no G7 check carries guidance"
 grep -q "How to fill the gaps" "$WORK/conf_conformance.md" && pass "MD carries the fill-in section" || fail "MD lacks the fill-in section"
-grep -q "How to fill the gaps" "$WORK/conf_conformance.html" && pass "HTML carries the fill-in section" || fail "HTML lacks the fill-in section"
+# HTML carries the same guidance inline, in the evidence column of the row it
+# belongs to, rather than as a section of its own.
+grep -q 'details class="fix"' "$WORK/conf_conformance.html" && pass "HTML carries the fill-in fragment inline" || fail "HTML lacks the inline fill-in fragment"
+grep -q "How to fill this" "$WORK/conf_conformance.html" && pass "HTML labels the inline fragment" || fail "HTML lacks the inline fragment label"
+grep -q '<a href="https://cyclonedx.org/' "$WORK/conf_conformance.html" && pass "HTML links the reference doc" || fail "HTML leaves the reference URL as text"
+grep -q 'How to fill the gaps' "$WORK/conf_conformance.html" && fail "HTML still carries the standalone fill-in section" || pass "HTML has no standalone fill-in section"
+
+echo "== conformance HTML: table legibility =="
+grep -q '<td class="num">1</td>' "$WORK/conf_conformance.html" && pass "rows are numbered" || fail "rows carry no number column"
+grep -q 'class="s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
+grep -q 'td.req{white-space:nowrap' "$WORK/conf_conformance.html" && pass "the required cell does not wrap" || fail "the required cell can wrap one glyph per line"
+grep -q 'href="https://huggingface.co/' "$WORK/conf_conformance.html" && pass "the project name links to the model repository" || fail "the project name is not linked"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,
