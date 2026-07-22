@@ -463,6 +463,15 @@ rvids=$(jq -r '[.review | keys[]] | sort | join(" ")' "$gd")
 badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.value.how_ko // "") == "") or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$gd")
 [ -z "$badrv" ] && pass "every review entry carries how / how_ko / an https link" || fail "review entries are incomplete" "$badrv"
 grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
+
+echo "== crosswalk tables line up with the G7 table =="
+xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,$p' "$WORK/conf_conformance.html" | head -c 4000)
+printf '%s' "$xwtb" | grep -q "<th>Detail</th>" && pass "crosswalk carries the detail column" || fail "crosswalk lacks the detail column"
+printf '%s' "$xwtb" | grep -q "<th>Evidence / how</th>" && pass "crosswalk carries the evidence column" || fail "crosswalk lacks the evidence column"
+printf '%s' "$xwtb" | grep -q 'details class="fix"' && pass "crosswalk rows carry their guidance" || fail "crosswalk rows lost the guidance"
+# The provisions each element maps to are what the crosswalk is for — they ride
+# with the requirement name rather than getting dropped for the new columns.
+printf '%s' "$xwtb" | grep -q '<br><span class="meta">Annex' && pass "crosswalk keeps the provision refs" || fail "crosswalk dropped the provision refs"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,

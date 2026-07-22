@@ -420,7 +420,7 @@ if [ -f "$XWALK" ]; then
                 present: ($frows | map(select(.status=="pass")) | length),
                 gap:     ($frows | map(select(.status=="warn" and ((.source//"")!="na"))) | length),
                 review:  ($frows | map(select((.source//"")=="na")) | length),
-                elements:($frows | map({label, status, source,
+                elements:($frows | map({id, label, status, source, detail,
                             refs: [ (.regulations // [])[] | select(.framework==$fid) | .ref ]})) }
           ] }' 2>/dev/null) || XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
 fi
@@ -824,19 +824,45 @@ HTMLHEAD
     if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
         echo "<h2>${C_H2_XWALK}</h2>"
         echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
-        echo "$RXW" | jq -r \
+        echo "$RXW" | jq -r --argjson checks "$RCHECKS" \
             --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
-            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thr "$C_TH_XREF" '.frameworks[] |
+            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thd "$C_TH_DETAIL" --arg the "$C_TH_EVID" \
+            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" '
+            ( $checks | map({key: .id, value: .}) | from_entries ) as $byid
+            | .frameworks[] |
             "<h3>" + (.title|@html) + "</h3>" +
             "<p class=\"meta\">" + (.source|@html) + " &middot; " + ($pres|@html) + " " + (.present|tostring)
               + ", " + ($gap|@html) + " " + (.gap|tostring) + ", " + ($rev|@html) + " " + (.review|tostring) + "</p>" +
-            "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thr|@html) + "</th></tr>" +
-            ([ .elements | to_entries[] | .key as $i | .value |
+            "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thd|@html) + "</th><th>" + ($the|@html) + "</th></tr>" +
+            ([ .elements | to_entries[] | .key as $i | .value | . as $e | ($byid[$e.id] // {}) as $c |
                "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>"
                + "<td class=\"" + (if (.source//"")=="na" then "s-review" elif .status=="pass" then "s-pass" else "s-warn" end) + "\">"
                + (if (.source//"")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>"
-               + "<td>" + (.label|@html) + "</td>"
-               + "<td>" + ((.refs|join(", "))|@html) + "</td></tr>" ] | join(""))
+               + "<td>" + (.label|@html)
+               + (if ((.refs|length) > 0) then "<br><span class=\"meta\">" + ((.refs|join(", "))|@html) + "</span>" else "" end)
+               + "</td>"
+               + "<td>" + ((($c.detail // .detail) // "")|@html) + "</td>"
+               + "<td>"
+               + (if (($c.guidance // null) != null and $c.status=="warn" and (($c.source // "") != "na"))
+                  then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
+                       + "<pre><code>" + ($c.guidance.snippet|@html) + "</code></pre>"
+                       + (if (($c.guidance.docUrl // "")|startswith("http"))
+                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.guidance.docUrl|@html)
+                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                               + (($c.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                          else "" end)
+                       + "</details>"
+                  elif (($c.reviewGuide // null) != null and ($c.source // "")=="na")
+                  then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
+                       + "<p>" + ($c.reviewGuide.how|@html) + "</p>"
+                       + (if (($c.reviewGuide.docUrl // "")|startswith("http"))
+                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.reviewGuide.docUrl|@html)
+                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                               + (($c.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                          else "" end)
+                       + "</details>"
+                  else "" end)
+               + "</td></tr>" ] | join(""))
             + "</table></div>"'
     fi
     echo "</body></html>"
