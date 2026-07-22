@@ -435,8 +435,10 @@ if echo "$CHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null 2>&1; the
     REG_FILE="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
     G7_CLUSTERS=$(echo "$CHECKS" | jq -c --slurpfile reg "$REG_FILE" '
       ([ $reg[0].clusters[] | {(.id): {name: .name, name_ko: (.name_ko // .name)}} ] | add) as $names
+      | ([ $reg[0].clusters[].id ]) as $order
       | [ .[] | select(.id|startswith("g7-")) ]
       | group_by(.cluster)
+      | sort_by((.[0].cluster // "") as $c | ($order | index($c)) // 99)
       | map({ cluster: (.[0].cluster // "other"),
               name:    ($names[(.[0].cluster // "")].name // (.[0].cluster // "other")),
               name_ko: ($names[(.[0].cluster // "")].name_ko // (.[0].cluster // "other")),

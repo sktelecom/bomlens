@@ -515,6 +515,14 @@ if [ -f "$PROF" ]; then
     [ -f "$WORK/conf_ai-profile.html" ] && fail "a separate HTML profile is still written" || pass "no separate HTML profile (the rollup opens the conformance report)"
     grep -q "G7 minimum elements by cluster" "$WORK/conf_conformance.html" && pass "conformance HTML opens with the cluster rollup" || fail "conformance HTML lacks the cluster rollup"
     grep -q "Licenses flagged for review" "$WORK/conf_conformance.html" && pass "conformance HTML carries the license review section" || fail "conformance HTML lacks the license review section"
+    # The rollup is built by a jq expression that silently yields [] on error, so
+    # assert the table is actually populated and ordered like the G7 registry.
+    rollup=$(sed -n '/G7 minimum elements by cluster/,/SBOM format requirements/p' "$WORK/conf_conformance.html")
+    rows=$(printf '%s' "$rollup" | grep -c '<tr><td>')
+    [ "$rows" -ge 7 ] && pass "the cluster rollup lists every cluster ($rows rows)" || fail "the cluster rollup is empty or short" "$rows"
+    want=$(jq -r '[.clusters[].name] | join("|")' "$LIB/g7-registry.json")
+    got=$(printf '%s' "$rollup" | grep -o '<tr><td>[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
+    [ "$got" = "$want" ] && pass "the cluster rollup follows the registry order" || fail "the cluster rollup order drifted" "$got"
     # The profile lists the closable gaps and delegates the fragments to the
     # conformance report, so the two artifacts stay complementary, not duplicated.
     gi=$(jq -r '.g7.gapItems | length' "$PROF"); gc=$(jq -r '.g7.gap' "$PROF")
