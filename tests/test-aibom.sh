@@ -314,7 +314,7 @@ sed 's/length > 0/length >(BROKEN/' "$LIB/g7-registry.json" > "$WORK/broken-reg.
 BRLOG=$(G7_REGISTRY="$WORK/broken-reg.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf4" "broken" 2>&1)
 grep -q "G7 registry evaluation failed" <<<"$BRLOG" && pass "broken registry warns on stderr" || fail "no loud warning for a broken registry"
 bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) base=\([.checks[]|select(.id|startswith("g7-")|not)]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
-[ "$bshape" = "g7=0 base=11 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
+[ "$bshape" = "g7=0 base=16 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
 
 echo "== legacy CycloneDX tools array does not false-negative the tool checks =="
 # metadata.tools as a bare array (pre-1.5 shape) used to hard-error inside the
@@ -510,12 +510,16 @@ infra=$(jq -r '.checks[] | select(.id=="g7-infra-software") | .status' "$WORK/mc
 echo "== regulation crosswalk: registry integrity =="
 XW="$LIB/regulation-crosswalk.json"
 jq empty "$XW" >/dev/null 2>&1 && pass "regulation-crosswalk.json is valid JSON" || fail "regulation-crosswalk.json is not valid JSON"
-# Drift guard: every mapped element id must exist in the G7 registry, else the
-# crosswalk has rotted against a renamed/removed element and would silently map
-# nothing.
-unknown=$(comm -23 <(jq -r '.map | keys[]' "$XW" | sort -u) \
+# Drift guard: every mapped id must resolve to something real, else the crosswalk
+# has rotted against a renamed/removed requirement and would silently map nothing.
+# The map is keyed by check id, which comes from two places — G7 element ids from
+# the registry, and the plain check ids validate-sbom.sh emits for every SBOM.
+unknown=$(comm -23 <(jq -r '.map | keys[] | select(startswith("g7-"))' "$XW" | sort -u) \
                    <(jq -r '.clusters[].elements[].id' "$LIB/g7-registry.json" | sort -u))
-[ -z "$unknown" ] && pass "every crosswalk element id exists in g7-registry.json" || fail "crosswalk maps unknown G7 element id(s)" "$unknown"
+[ -z "$unknown" ] && pass "every crosswalk G7 element id exists in g7-registry.json" || fail "crosswalk maps unknown G7 element id(s)" "$unknown"
+unknown_chk=$(comm -23 <(jq -r '.map | keys[] | select(startswith("g7-") | not)' "$XW" | sort -u) \
+                       <(jq -r '.checks[].id' "$CONF" | sort -u))
+[ -z "$unknown_chk" ] && pass "every non-G7 crosswalk id is a check validate-sbom.sh emits" || fail "crosswalk maps unknown check id(s)" "$unknown_chk"
 undecl=$(comm -23 <(jq -r '.map[][].framework' "$XW" | sort -u) \
                   <(jq -r '.frameworks | keys[]' "$XW" | sort -u))
 [ -z "$undecl" ] && pass "every crosswalk framework is declared" || fail "crosswalk references undeclared framework(s)" "$undecl"
@@ -597,20 +601,28 @@ badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.
 [ -z "$badrv" ] && pass "every review entry carries how / how_ko / an https link" || fail "review entries are incomplete" "$badrv"
 grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
 
-echo "== crosswalk tables line up with the G7 table =="
-xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,$p' "$WORK/conf_conformance.html" | head -c 4000)
-printf '%s' "$xwtb" | grep -q "<th>Detail</th>" && pass "crosswalk carries the detail column" || fail "crosswalk lacks the detail column"
-printf '%s' "$xwtb" | grep -q "<th>Evidence / how</th>" && pass "crosswalk carries the evidence column" || fail "crosswalk lacks the evidence column"
-printf '%s' "$xwtb" | grep -q 'details class="fix"' && pass "crosswalk rows carry their guidance" || fail "crosswalk rows lost the guidance"
-# The provisions each element maps to are what the crosswalk is for — they ride
-# with the requirement name rather than getting dropped for the new columns.
-printf '%s' "$xwtb" | grep -q '<br><span class="meta">Annex' && pass "crosswalk keeps the provision refs" || fail "crosswalk dropped the provision refs"
+echo "== the crosswalk is a roll-up, not a second copy of the requirement tables =="
+xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,/<\/table>/p' "$WORK/conf_conformance.html")
+printf '%s' "$xwtb" | grep -q "<th>Framework</th>" && pass "crosswalk is keyed by framework" || fail "crosswalk lacks the framework column"
+printf '%s' "$xwtb" | grep -q "EU AI Act" && pass "crosswalk names the frameworks it covers" || fail "crosswalk lists no framework"
+# Regression guard for the duplication this section used to carry: it reprinted
+# every mapped requirement with the same label, status, detail and evidence as the
+# table one screen up — 33 rows restating 23 that were already on the page.
+if printf '%s' "$xwtb" | grep -q "<th>Detail</th>"; then
+    fail "crosswalk reprints the requirement rows" "the roll-up grew a Detail column again"
+else
+    pass "crosswalk does not reprint the requirement rows"
+fi
+# The provisions each requirement maps to now ride with the requirement itself,
+# in both the G7 table and the plain SBOM-format table.
+grep -q '<br><span class="meta">EU AI Act Annex' "$WORK/conf_conformance.html" && pass "G7 rows carry their provision refs" || fail "G7 rows lost the provision refs"
+grep -q '<br><span class="meta">BSI TR-03183-2 ' "$WORK/conf_conformance.html" && pass "SBOM-format rows carry their CRA/BSI refs" || fail "SBOM-format rows lack the CRA/BSI refs"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,
 # so its guidance must NOT appear — a report that lists satisfied elements as
 # things to fix would be actively misleading.
-gapmd=$(sed -n '/## How to fill the gaps/,/^## Regulatory/p' "$WORK/conf_conformance.md")
+gapmd=$(sed -n '/## How to fill the gaps/,$p' "$WORK/conf_conformance.md")
 if printf '%s' "$gapmd" | grep -q "^### Model license$"; then
     fail "the fill-in section is scoped to gaps" "a passing element (Model license) was listed"
 else

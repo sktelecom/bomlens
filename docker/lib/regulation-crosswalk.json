@@ -1,21 +1,98 @@
 {
-  "note": "Interpretive crosswalk from G7 SBOM-for-AI minimum elements (docker/lib/g7-registry.json) to the documentation requirements of named AI regulations. It answers one question for a reviewer: when a G7 element is missing from an AI SBOM, which regulatory documentation obligation does that gap touch? Keyed by G7 element id so one element can map to several frameworks without bloating the registry. This is a documentation-preparation aid, NOT legal advice and NOT a compliance determination — each entry states the interpretive 'basis' for the link so a person can judge it. The mapping is deliberately conservative: only elements with a defensible correspondence are listed; an absent element id simply has no crosswalk entry.",
-  "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific system's legal obligations is a person's job.",
+  "note": "Interpretive crosswalk from the conformance checks BomLens runs to the documentation requirements of named regulations. It answers one question for a reviewer: when a check does not pass, which regulatory obligation does that gap touch? Keyed by check id — the G7 AI element ids from docker/lib/g7-registry.json for AI SBOMs, and the plain CycloneDX check ids emitted by validate-sbom.sh for every SBOM — so one check can map to several frameworks without bloating either registry. This is a documentation-preparation aid, NOT legal advice and NOT a compliance determination — each entry states the interpretive 'basis' for the link so a person can judge it. The mapping is deliberately conservative: only checks with a defensible correspondence are listed; an absent id simply has no crosswalk entry.",
+  "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
+  "disclaimer_ko": "BomLens는 EU 인공지능법, AI 기본법, EU 사이버복원력법을 비롯한 어떤 규제에 대해서도 준수 여부를 인증하거나 판정하지 않습니다. 이 대응표는 문서로 남기지 못한 부분을 눈에 보이게 해 준비를 돕기 위한 것이며, 특정 제품의 법적 의무에 비추어 해석하는 일은 사람이 해야 합니다.",
   "frameworks": {
     "eu-ai-act": {
       "title": "EU AI Act — Annex IV technical documentation",
+      "title_ko": "EU 인공지능법 — 부속서 IV 기술문서",
+      "short": "EU AI Act",
+      "short_ko": "EU 인공지능법",
       "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
       "granularity": "element",
       "note": "Annex IV lists the technical documentation a provider of a high-risk AI system must prepare. References below point at Annex IV sections (e.g. IV(2)(d) = the data-requirements point of the development-process section)."
     },
     "kr-ai-framework-act": {
       "title": "AI Framework Act (Korea)",
+      "title_ko": "AI 기본법 (대한민국)",
+      "short": "AI Framework Act",
+      "short_ko": "AI 기본법",
       "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
       "granularity": "article",
       "note": "The Act sets framework-level duties; the granular documentation requirements live in its 시행령 (enforcement decree). References point at the Act's articles (제31조 transparency, 제32조 safety/risk management, 제33·34조 high-impact AI, 제35조 impact assessment). Links are coarser than the EU Annex IV mapping by design. Scope caveat: 제32조 (safety) applies only to systems trained above a compute threshold set by the enforcement decree, so a 제32조 link points at the duty's subject, not a determination that the duty applies to this system — that judgment is the user's."
+    },
+    "bsi-tr-03183-2": {
+      "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
+      "title_ko": "BSI TR-03183-2 — SBOM 데이터 필드 (EU 사이버복원력법)",
+      "short": "BSI TR-03183-2",
+      "short_ko": "BSI TR-03183-2",
+      "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
+      "granularity": "data field",
+      "note": "The CRA itself states only that a manufacturer must draw up an SBOM in a commonly used, machine-readable format covering at least the top-level dependencies; it names no data fields, and the Commission has not yet adopted the act that would specify the format and elements. The field-level requirements referenced here therefore come from BSI TR-03183-2, the German technical guideline written for CRA compliance and the most detailed public specification available. References point at its sections (5.2.1 SBOM-level required fields, 5.2.2 per-component required fields, 5.2.4 additional fields). Two caveats a reader should carry: TR-03183-2 is a national guideline, not EU law, and the CEN/CENELEC horizontal standard that will carry the binding wording (prEN 40000-1-3, due 2026-08-30) is still a draft. TR-03183-2 also requires recursive dependency resolution within the scope of delivery, which is stricter than the CRA's top-level minimum."
+    },
+    "us-sbom-minimum-elements": {
+      "title": "US SBOM minimum elements",
+      "title_ko": "미국 SBOM 최소 요소",
+      "short": "NTIA",
+      "short_ko": "NTIA",
+      "source": "Executive Order 14028 §4; NTIA \"The Minimum Elements For a Software Bill of Materials\" (2021-07-12)",
+      "granularity": "data field",
+      "note": "Executive Order 14028 directed the Department of Commerce to publish the minimum elements of an SBOM; NTIA did so in July 2021, and the seven data fields below come from that report. Status caveat: federal procurement no longer mandates SBOM collection across the board. Executive Order 14306 (June 2025) removed the vendor SBOM-submission provisions added by EO 14144, and OMB memorandum M-26-05 (January 2026) rescinded the self-attestation and SBOM-collection requirements in favour of agency-level, risk-based decisions. Individual agencies still require SBOMs in procurement, so the fields remain the practical baseline. CISA published a draft update in August 2025 (comment period closed 2025-10-03) that adds component hash, license, tool name and generation context; this mapping tracks the 2021 elements until that revision is final."
     }
   },
   "map": {
+    "spec-version": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 4", "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Automation Support", "basis": "the SBOM must use an automation-capable format (SPDX, CycloneDX or SWID)" }
+    ],
+    "timestamp": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.1", "basis": "required SBOM-level field: date and time of the SBOM data compilation" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Timestamp", "basis": "the date and time the SBOM was assembled" }
+    ],
+    "tools": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.1", "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Author of SBOM Data", "basis": "the entity that created the SBOM data for this component" }
+    ],
+    "top-component": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.1", "basis": "the primary component the SBOM describes has to be identifiable" }
+    ],
+    "name-version": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: component name and component version" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Component Name / Version", "basis": "the name and version assigned to each unit of software" }
+    ],
+    "purl": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.4", "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Other Unique Identifiers", "basis": "identifiers that serve as a look-up key for relevant databases" }
+    ],
+    "purl-syntax": [
+      { "framework": "us-sbom-minimum-elements", "ref": "Other Unique Identifiers", "basis": "an identifier only serves as a database look-up key if it parses" }
+    ],
+    "transitive": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.1; 5.2.2", "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Dependency Relationship", "basis": "the relationship between an upstream component and its dependencies" }
+    ],
+    "license": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the distribution licence under which the component may be used" }
+    ],
+    "hash": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: a cryptographic checksum of the deployable component" }
+    ],
+    "hash-algorithm": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the deployable-component checksum is specified as SHA-512" }
+    ],
+    "component-creator": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL" },
+      { "framework": "us-sbom-minimum-elements", "ref": "Supplier Name", "basis": "the name of the entity that creates, defines and identifies the component" }
+    ],
+    "component-filename": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the actual filename of the component" }
+    ],
+    "artifact-uri": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.4", "basis": "additional fields: the source code URI and the URI of the deployable form, required where they exist" }
+    ],
+    "file-properties": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file" }
+    ],
     "g7-slp-name": [
       { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "general description: what the AI system is and its intended purpose" },
       { "framework": "kr-ai-framework-act", "ref": "제31조", "basis": "transparency: the system must be identifiable as AI-operated to users" }

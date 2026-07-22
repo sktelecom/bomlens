@@ -34,6 +34,7 @@ PROJECT="${3:-project}"
 PURL_MIN_PCT="${PURL_MIN_PCT:-90}"      # mandatory
 LICENSE_MIN_PCT="${LICENSE_MIN_PCT:-80}" # recommended (warn)
 HASH_MIN_PCT="${HASH_MIN_PCT:-50}"       # recommended (warn)
+FIELD_MIN_PCT="${FIELD_MIN_PCT:-80}"     # advisory: regulatory per-component fields
 MISSING_CAP=50                            # cap missing-item lists in the report
 
 # Accepted spec versions (space-separated), per the SKT submission
@@ -93,6 +94,7 @@ cdx_checks() {
        --argjson purlmin "$PURL_MIN_PCT" \
        --argjson licmin "$LICENSE_MIN_PCT" \
        --argjson hashmin "$HASH_MIN_PCT" \
+       --argjson fieldmin "$FIELD_MIN_PCT" \
        --argjson cap "$MISSING_CAP" \
        --arg okvers "${1:-$CYCLONEDX_SPEC_VERSIONS}" \
        --arg purlre "$PURL_SYNTAX_REGEX" "
@@ -123,6 +125,21 @@ cdx_checks() {
     | (.metadata.timestamp // \"\") as \$ts
     | (.metadata.component // {}) as \$top
     | (\$ptot - (\$miss_purl|length)) as \$purl_ok
+    # Per-component fields named by the regulatory crosswalk (BSI TR-03183-2 /
+    # NTIA). All advisory: they describe how well the SBOM would answer a
+    # regulator, and never move the submission verdict. Measured over \$pkg for
+    # the same reason name+version is — a data component carries no filename,
+    # creator or artifact URI — except the SHA-512 tally, which counts every
+    # component because a dataset can carry a checksum.
+    | ([ \$pkg[] | select(((.authors // []) | length > 0) or ((.publisher // \"\") != \"\")
+                          or (((.supplier // {}) | length) > 0) or (((.manufacturer // {}) | length) > 0)) ] | length) as \$creator_ok
+    | ([ \$pkg[] | select((.properties // []) | any(.name == \"bsi:component:filename\")) ] | length) as \$fname_ok
+    | ([ \$c[] | select((.hashes // []) | any(.alg == \"SHA-512\")) ] | length) as \$sha512_ok
+    | ([ \$pkg[] | select((.externalReferences // []) | any(.type == \"vcs\" or .type == \"distribution\")) ] | length) as \$uri_ok
+    | ([ \$pkg[] | select((.properties // []) as \$props
+                          | (\$props | any(.name == \"bsi:component:executable\"))
+                            and (\$props | any(.name == \"bsi:component:archive\"))
+                            and (\$props | any(.name == \"bsi:component:structured\"))) ] | length) as \$fprops_ok
     | [
        {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|join(\"/\")) + \")\"), required:true,
         status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),
@@ -156,7 +173,29 @@ cdx_checks() {
         detail:\"\(pct(\$lic_ok;\$tot))% (\(\$lic_ok)/\(\$tot))\", missing:[]},
        {id:\"hash\", label:\"Hash coverage (>= \(\$hashmin)%, recommended)\", required:false,
         status:(if pct(\$hash_ok;\$tot) >= \$hashmin then \"pass\" else \"warn\" end),
-        detail:\"\(pct(\$hash_ok;\$tot))% (\(\$hash_ok)/\(\$tot))\", missing:[]}
+        detail:\"\(pct(\$hash_ok;\$tot))% (\(\$hash_ok)/\(\$tot))\", missing:[]},
+       {id:\"hash-algorithm\", label:\"SHA-512 checksum coverage (>= \(\$fieldmin)%, recommended)\", required:false,
+        status:(if \$tot==0 or pct(\$sha512_ok;\$tot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$tot==0 then \"nothing to measure\"
+                else \"\(pct(\$sha512_ok;\$tot))% (\(\$sha512_ok)/\(\$tot))\" end), missing:[]},
+       {id:\"component-creator\", label:\"Component creator coverage (>= \(\$fieldmin)%, recommended)\", required:false,
+        status:(if \$ptot==0 or pct(\$creator_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$ptot==0 then \"no packages to measure\"
+                else \"\(pct(\$creator_ok;\$ptot))% (\(\$creator_ok)/\(\$ptot))\" end), missing:[]},
+       {id:\"component-filename\", label:\"Component filename coverage (>= \(\$fieldmin)%, recommended)\", required:false,
+        status:(if \$ptot==0 or pct(\$fname_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$ptot==0 then \"no packages to measure\"
+                else \"\(pct(\$fname_ok;\$ptot))% (\(\$fname_ok)/\(\$ptot))\" end), missing:[]},
+       {id:\"artifact-uri\", label:\"Source or distribution URI coverage (>= \(\$fieldmin)%, recommended)\", required:false,
+        status:(if \$ptot==0 or pct(\$uri_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$ptot==0 then \"no packages to measure\"
+                else \"\(pct(\$uri_ok;\$ptot))% (\(\$uri_ok)/\(\$ptot))\" end), missing:[]},
+       {id:\"file-properties\", label:\"Delivered-file properties (executable/archive/structured)\", required:false,
+        source:(if \$ptot==0 or \$fprops_ok>0 then \"auto\" else \"na\" end),
+        status:(if \$ptot==0 or pct(\$fprops_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$ptot==0 then \"no packages to measure\"
+                elif \$fprops_ok==0 then \"requires inspecting the delivered files (no automated source in this scan)\"
+                else \"\(pct(\$fprops_ok;\$ptot))% (\(\$fprops_ok)/\(\$ptot))\" end), missing:[]}
       ]" "$SBOM"
 }
 
@@ -235,22 +274,11 @@ g7_ai_checks() {
         echo "[]"
         return
     fi
-    # Join the regulatory crosswalk (best-effort): tag each G7 element with the
-    # documentation obligations it maps to (docker/lib/regulation-crosswalk.json,
-    # keyed by element id). Purely informational — it never changes a pass/warn
-    # status or the overall result. A missing or invalid crosswalk leaves each
-    # element with regulations:[] and the run continues.
-    local xwalk="${REGULATION_CROSSWALK:-$(dirname "$0")/regulation-crosswalk.json}"
-    if [ -f "$xwalk" ]; then
-        local joined
-        if joined=$(printf '%s' "$out" | jq -c --slurpfile x "$xwalk" '
-            (($x[0].map) // {}) as $m | map(. + {regulations: ($m[.id] // [])})' 2>/dev/null); then
-            out="$joined"
-        else
-            echo "[validate] WARN: regulation crosswalk join failed; continuing without it." >&2
-        fi
-    fi
-    # Join the fill-in guidance the same way (best-effort): the CycloneDX fragment
+    # The regulatory crosswalk used to be joined here, over the G7 elements only.
+    # It now runs once over the whole check array (see join_crosswalk below) so the
+    # plain CycloneDX checks carry their CRA / NTIA references too.
+    #
+    # Join the fill-in guidance (best-effort): the CycloneDX fragment
     # that would satisfy each element, so the report can answer "how do I close
     # this gap" and not just "this is missing". Attached only where a mapping
     # exists, and like the crosswalk it never changes a status or the result.
@@ -399,6 +427,28 @@ case "$FORMAT" in
 esac
 [ -n "$CHECKS" ] || CHECKS='[{"id":"parse","label":"Parseable SBOM","required":true,"status":"fail","detail":"could not evaluate","missing":[]}]'
 
+# --------------------------------------------------------
+# Join the regulatory crosswalk (best-effort) over EVERY check, not just the G7
+# elements: docker/lib/regulation-crosswalk.json is keyed by check id, so a plain
+# CycloneDX check picks up its CRA / BSI / NTIA references the same way a G7
+# element picks up its EU AI Act reference. Purely informational — it never
+# changes a status or the overall result. A missing or invalid crosswalk leaves
+# every check with regulations:[] and the run continues.
+# --------------------------------------------------------
+XWALK_FILE="${REGULATION_CROSSWALK:-$(dirname "$0")/regulation-crosswalk.json}"
+if [ -f "$XWALK_FILE" ]; then
+    if XW_JOINED=$(printf '%s' "$CHECKS" | jq -c --slurpfile x "$XWALK_FILE" '
+        (($x[0].map) // {}) as $m
+        | (($x[0].frameworks) // {}) as $fw
+        | map(. + {regulations: (($m[.id] // []) | map(
+            . + {short:    ($fw[.framework].short // .framework),
+                 short_ko: ($fw[.framework].short_ko // $fw[.framework].short // .framework)}))})' 2>/dev/null); then
+        CHECKS="$XW_JOINED"
+    else
+        echo "[validate] WARN: regulation crosswalk join failed; continuing without it." >&2
+    fi
+fi
+
 # Overall result: fail if any mandatory check failed. G7 elements with no
 # automated source (source "na") are counted separately as review items — a
 # well-formed AIBOM should not read as "30 warnings" just because a dozen G7
@@ -415,17 +465,17 @@ N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na")] | length
 N_UNTRACEABLE=$(echo "$CHECKS" | jq -r '([.[] | select(.id=="no-generic")][0].detail // "0") | split(" ")[0] | (tonumber? // 0)')
 
 # --------------------------------------------------------
-# Regulatory crosswalk summary (AI SBOMs only, informational). Groups the G7
-# checks that carry crosswalk mappings by regulation framework and, per
-# framework, counts how many mapped elements are present / a gap / review-only
-# and lists them. Never affects RESULT — it is a documentation-preparation view,
-# not a compliance verdict. Empty (frameworks:[]) for non-AI SBOMs or when the
-# crosswalk file is absent.
+# Regulatory crosswalk summary (informational). Groups the checks that carry
+# crosswalk mappings by regulation framework and, per framework, counts how many
+# mapped requirements are present / a gap / review-only and lists them. Never
+# affects RESULT — it is a documentation-preparation view, not a compliance
+# verdict. An AI SBOM picks up the AI frameworks on top of the SBOM-field ones
+# every CycloneDX SBOM gets. Empty (frameworks:[]) when the crosswalk file is
+# absent or nothing maps.
 # --------------------------------------------------------
-XWALK="${REGULATION_CROSSWALK:-$(dirname "$0")/regulation-crosswalk.json}"
 XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
-if [ -f "$XWALK" ]; then
-    XW_SUMMARY=$(echo "$CHECKS" | jq -c --slurpfile x "$XWALK" '
+if [ -f "$XWALK_FILE" ]; then
+    XW_SUMMARY=$(echo "$CHECKS" | jq -c --slurpfile x "$XWALK_FILE" '
       ($x[0].frameworks // {}) as $fw
       | [ .[] | select((.regulations // []) | length > 0) ] as $rows
       | { disclaimer: ($x[0].disclaimer // ""),
@@ -545,11 +595,20 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
           elif ($en|test("^License coverage ")) then ($C["conformance.label.license"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
           elif ($en|test("^Hash coverage ")) then ($C["conformance.label.hash"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          # These four capture the threshold from ">= N%" rather than the first
+          # run of digits: "SHA-512 checksum coverage" would otherwise report 512.
+          elif ($en|test("^SHA-512 checksum coverage ")) then ($C["conformance.label.sha512"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Component creator coverage ")) then ($C["conformance.label.creator"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Component filename coverage ")) then ($C["conformance.label.filename"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Source or distribution URI coverage ")) then ($C["conformance.label.artifact_uri"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           else ($C["conformance.label_exact"][$en] // $en) end;
         def ldetail($d):
           if $d=="present" then $C["conformance.detail.present"]
           elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
           elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
+          elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
+          elif $d=="nothing to measure" then $C["conformance.detail.nothing"]
+          elif $d=="requires inspecting the delivered files (no automated source in this scan)" then $C["conformance.detail.file_props_review"]
           elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]
           elif $d=="not CycloneDX or SPDX" then $C["conformance.detail.not_cdx_spdx"]
           elif $d=="could not evaluate" then $C["conformance.detail.could_not_eval"]
@@ -570,11 +629,15 @@ if [ "$REPORT_LANG" = "ko" ]; then
       map(.label = llabel(.id; .label) | .detail = ldetail(.detail)
           | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end))
     ') || RCHECKS="$CHECKS"
-    # Crosswalk element labels use the same registry label_ko (framework titles,
-    # article refs and the disclaimer stay verbatim — they are proper identifiers).
-    RXW=$(printf '%s' "$XW_SUMMARY" | jq -c --slurpfile reg "$REG" '
-      ([ $reg[0].clusters[].elements[] | {(.label): .label_ko} ] | add) as $RK
-      | .frameworks |= map(.elements |= map(.label = ($RK[.label] // .label)))') || RXW="$XW_SUMMARY"
+    # Crosswalk: swap the framework display titles and the disclaimer for their
+    # Korean wording from the crosswalk file itself (same convention as the G7
+    # registry's label_ko). The `source` line stays verbatim — a regulation's
+    # citation is an identifier, not prose. The JSON contract keeps the English
+    # title, so this touches the render copy only.
+    RXW=$(printf '%s' "$XW_SUMMARY" | jq -c --slurpfile x "$XWALK_FILE" '
+      (($x[0].frameworks) // {}) as $F
+      | .disclaimer = ($x[0].disclaimer_ko // .disclaimer)
+      | .frameworks |= map(.title = ($F[.id].title_ko // .title))') || RXW="$XW_SUMMARY"
 fi
 
 # Chrome strings: English literals by default (byte-identical), catalog for ko.
@@ -600,9 +663,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
     C_REF=$(kstr conformance.reference); C_REF="${C_REF%% *}"   # "참고:" prefix
-    C_SOURCE=$(kstr conformance.source); C_SOURCE="${C_SOURCE%% *}"
-    C_MAPPED="대응 요소:"; C_MSUFFIX="개"; C_MPRESENT="충족"; C_MGAP="미충족"; C_MREVIEW="검토 필요"
-    C_TH_G7=$(kstr conformance.th_g7element); C_TH_XREF=$(kstr conformance.th_reference)
+    C_TH_FRAMEWORK=$(kstr aiprofile.th_framework)
     C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT")
     C_KIND=$(kstr conformance.kind); C_H1=$(kstr conformance.h1)
     C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT}"
@@ -630,9 +691,8 @@ else
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
     C_YES="yes"; C_NO="no"
-    C_REF="Reference:"; C_SOURCE="Source:"
-    C_MAPPED="Mapped elements:"; C_MSUFFIX=""; C_MPRESENT="present"; C_MGAP="gap"; C_MREVIEW="needs review"
-    C_TH_G7="Requirement"; C_TH_XREF="Related provisions"
+    C_REF="Reference:"
+    C_TH_FRAMEWORK="Framework"
     C_HTML_TITLE="SBOM Conformance — ${PROJECT}"
     C_KIND="Conformance"; C_H1="SBOM Conformance Report"
     C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
@@ -655,12 +715,32 @@ fi
     # Same split as the HTML: verdict-bearing submission requirements first, the
     # advisory G7 elements after, each under its own heading and reason.
     md_rows() {   # $1: "submission" | "g7"
-        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" --arg kind "$1" '
+        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" --arg kind "$1" \
+            --arg lang "$REPORT_LANG" '
             [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ][] |
-            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | "
+            # Same idea as the HTML: the regulatory references sit with the
+            # requirement instead of being reprinted as their own table.
+            (((.regulations // []) | map((if $lang=="ko" then .short_ko else .short end) + " " + .ref)) as $refs
+             | if ($refs|length) > 0 then " — " + ($refs|join(" · ")) else "" end) as $reftext |
+            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \((.label + $reftext) | gsub("[|\n]"; " ")) | "
             + (if $kind=="g7" then "" else "\(if .required then $yes else $no end) | " end)
             + "\(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
     }
+    # Crosswalk roll-up leads the Markdown too, for the same reason it leads the
+    # HTML: the reader gets the per-framework picture before the row-by-row detail.
+    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "## ${C_H2_XWALK}"
+        echo ""
+        echo "| ${C_TH_FRAMEWORK} | ${C_TH_PRESENT} | ${C_TH_GAP} | ${C_TH_REVIEWCNT} | ${C_TH_TOTAL} |"
+        echo "|-----------|:-------:|:---:|:------:|:-----:|"
+        echo "$RXW" | jq -r '.frameworks[] |
+            "| \(.title | gsub("[|\n]";" ")) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
+        echo ""
+        echo "$RXW" | jq -r '.frameworks[] | "- \(.title | gsub("[|\n]";" ")) — \(.source | gsub("[|\n]";" "))"'
+        echo ""
+        echo "$RXW" | jq -r '.disclaimer'
+        echo ""
+    fi
     echo "## ${C_H2_SUBMIT}"
     echo ""
     echo "${C_SUBMIT_INTRO}"
@@ -705,29 +785,6 @@ fi
             "```",
             "",
             "\($ref) \(.guidance.docUrl)",
-            ""'
-    fi
-    # Regulatory crosswalk (AI SBOMs only): which documentation obligation each
-    # mapped G7 element touches. Visibility only — see the disclaimer; it does not
-    # change the result above.
-    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "## ${C_H2_XWALK}"
-        echo ""
-        echo "$RXW" | jq -r '.disclaimer'
-        echo ""
-        echo "$RXW" | jq -r \
-            --arg src "$C_SOURCE" --arg mapped "$C_MAPPED" --arg sfx "$C_MSUFFIX" \
-            --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
-            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thr "$C_TH_XREF" '.frameworks[] |
-            "### \(.title)",
-            "",
-            "\($src) \(.source)",
-            "",
-            "\($mapped) \(.total)\($sfx) — \($pres) \(.present), \($gap) \(.gap), \($rev) \(.review)",
-            "",
-            "| \($ths) | \($thg) | \($thr) |",
-            "|--------|-----------|-----------|",
-            (.elements[] | "| \(if .status=="pass" then "✅" elif (.source//"")=="na" then "🔍" else "⚠️" end) | \(.label | gsub("[|\n]";" ")) | \((.refs | join(", ")) | gsub("[|\n]";" ")) |"),
             ""'
     fi
 } > "$MD"
@@ -834,13 +891,22 @@ HTMLHEAD
     # has to match a row against a separate section further down the page.
     html_rows() {   # $1: "submission" | "g7"
         echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
-            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" --arg kind "$1" '
+            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" --arg kind "$1" \
+            --arg lang "$REPORT_LANG" '
             [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
             | to_entries[] | .key as $i | .value |
             (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
             "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
             "<td class=\"" + $cls + "\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
-            "<td>" + (.label|@html) + "</td>" +
+            # The regulatory references ride under the requirement they belong to.
+            # They used to be their own table further down, which reprinted every
+            # mapped row verbatim; here they cost one line and stay next to the
+            # status the reader is already looking at.
+            "<td>" + (.label|@html) +
+            (((.regulations // []) | map((if $lang=="ko" then .short_ko else .short end) + " " + .ref)) as $refs
+             | if ($refs|length) > 0
+               then "<br><span class=\"meta\">" + (($refs|join(" · "))|@html) + "</span>"
+               else "" end) + "</td>" +
             (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
             "<td>" + ((.detail // "")|@html) + "</td>" +
             "<td>" + (((.evidence // []) | join(", "))|@html) +
@@ -890,6 +956,23 @@ HTMLHEAD
             echo "<p class=\"meta\">${C_LIC_NONE}</p>"
         fi
     fi
+    # Regulatory crosswalk: one row per framework, and it leads rather than
+    # trails. Each mapped requirement carries its own reference down in the check
+    # tables, so this answers only "how much of each framework does this SBOM
+    # document" — the question a reader wants answered before reading 50 rows,
+    # not after. It replaces a section that reprinted every mapped row with the
+    # same labels, statuses and details as the table one screen up.
+    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
+        echo "<h2>${C_H2_XWALK}</h2>"
+        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_FRAMEWORK}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
+        echo "$RXW" | jq -r '.frameworks[] |
+            "<tr><td>" + (.title|@html)
+            + "<br><span class=\"meta\">" + (.source|@html) + "</span></td>"
+            + "<td>" + (.present|tostring) + "</td><td>" + (.gap|tostring) + "</td>"
+            + "<td>" + (.review|tostring) + "</td><td>" + (.total|tostring) + "</td></tr>"'
+        echo "</table></div>"
+        echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
+    fi
     echo "<h2>${C_H2_SUBMIT}</h2>"
     echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p>"
     echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
@@ -910,53 +993,6 @@ HTMLHEAD
     # The fill-in fragments used to live here as their own section; they now ride
     # in the evidence column of the row they belong to (see above). The Markdown
     # report keeps the section — a table cell cannot hold a code block there.
-    # Regulatory crosswalk (AI SBOMs only): documentation obligations each mapped
-    # G7 element touches. Visibility only — the disclaimer states BomLens does not
-    # certify compliance; this section never affects the result above.
-    if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
-        echo "<h2>${C_H2_XWALK}</h2>"
-        echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
-        echo "$RXW" | jq -r --argjson checks "$RCHECKS" \
-            --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
-            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thd "$C_TH_DETAIL" --arg the "$C_TH_EVID" \
-            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" '
-            ( $checks | map({key: .id, value: .}) | from_entries ) as $byid
-            | .frameworks[] |
-            "<h3>" + (.title|@html) + "</h3>" +
-            "<p class=\"meta\">" + (.source|@html) + " &middot; " + ($pres|@html) + " " + (.present|tostring)
-              + ", " + ($gap|@html) + " " + (.gap|tostring) + ", " + ($rev|@html) + " " + (.review|tostring) + "</p>" +
-            "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thd|@html) + "</th><th>" + ($the|@html) + "</th></tr>" +
-            ([ .elements | to_entries[] | .key as $i | .value | . as $e | ($byid[$e.id] // {}) as $c |
-               "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>"
-               + "<td class=\"" + (if (.source//"")=="na" then "s-review" elif .status=="pass" then "s-pass" else "s-warn" end) + "\">"
-               + (if (.source//"")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>"
-               + "<td>" + (.label|@html)
-               + (if ((.refs|length) > 0) then "<br><span class=\"meta\">" + ((.refs|join(", "))|@html) + "</span>" else "" end)
-               + "</td>"
-               + "<td>" + ((($c.detail // .detail) // "")|@html) + "</td>"
-               + "<td>"
-               + (if (($c.guidance // null) != null and $c.status=="warn" and (($c.source // "") != "na"))
-                  then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
-                       + "<pre><code>" + ($c.guidance.snippet|@html) + "</code></pre>"
-                       + (if (($c.guidance.docUrl // "")|startswith("http"))
-                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.guidance.docUrl|@html)
-                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
-                               + (($c.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
-                          else "" end)
-                       + "</details>"
-                  elif (($c.reviewGuide // null) != null and ($c.source // "")=="na")
-                  then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
-                       + "<p>" + ($c.reviewGuide.how|@html) + "</p>"
-                       + (if (($c.reviewGuide.docUrl // "")|startswith("http"))
-                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.reviewGuide.docUrl|@html)
-                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
-                               + (($c.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
-                          else "" end)
-                       + "</details>"
-                  else "" end)
-               + "</td></tr>" ] | join(""))
-            + "</table></div>"'
-    fi
     echo "</body></html>"
 } > "$HTML"
 
