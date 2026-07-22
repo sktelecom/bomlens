@@ -466,7 +466,7 @@ MODEL_URL=$(jq -r '[.components[]? | select(.type=="machine-learning-model")
 PROJECT_HTML="$PROJECT_ESC"
 if [ -n "$MODEL_URL" ]; then
     MODEL_URL_ESC=$(printf '%s' "$MODEL_URL" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-    PROJECT_HTML="<a href=\"${MODEL_URL_ESC}\" rel=\"noreferrer\">${PROJECT_ESC}</a>"
+    PROJECT_HTML="<a href=\"${MODEL_URL_ESC}\" target=\"_blank\" rel=\"noopener noreferrer\">${PROJECT_ESC}</a>"
 fi
 HTML_LANG="en"
 RCHECKS="$CHECKS"
@@ -778,7 +778,7 @@ HTMLHEAD
                   + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
                   + (if ((.guidance.docUrl // "")|startswith("http"))
                      then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
-                          + "\" rel=\"noreferrer\">" + (.guidance.docUrl|@html) + "</a></p>"
+                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + (.guidance.docUrl|@html) + "</a></p>"
                      else "" end)
                   + "</details>"
              else "" end) +

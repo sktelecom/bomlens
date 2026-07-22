@@ -429,6 +429,9 @@ grep -q "How to fill the gaps" "$WORK/conf_conformance.md" && pass "MD carries t
 grep -q 'details class="fix"' "$WORK/conf_conformance.html" && pass "HTML carries the fill-in fragment inline" || fail "HTML lacks the inline fill-in fragment"
 grep -q "How to fill this" "$WORK/conf_conformance.html" && pass "HTML labels the inline fragment" || fail "HTML lacks the inline fragment label"
 grep -q '<a href="https://cyclonedx.org/' "$WORK/conf_conformance.html" && pass "HTML links the reference doc" || fail "HTML leaves the reference URL as text"
+# Every link leaves for a new tab: the report is a local file a reviewer keeps open.
+bare=$(grep -o '<a href="[^"]*"[^>]*>' "$WORK/conf_conformance.html" | grep -vc 'target="_blank"' || true)
+[ "$bare" -eq 0 ] && pass "every report link opens in a new tab" || fail "some report links replace the report" "$bare"
 grep -q 'How to fill the gaps' "$WORK/conf_conformance.html" && fail "HTML still carries the standalone fill-in section" || pass "HTML has no standalone fill-in section"
 
 echo "== conformance HTML: table legibility =="
@@ -442,7 +445,7 @@ for ext in md html; do
     f="$WORK/conf_conformance.$ext"
     grep -q "SBOM format requirements" "$f" && pass "$ext names the format-requirement section" || fail "$ext lacks the format-requirement section"
     grep -q "G7 minimum elements" "$f" && pass "$ext names the G7 section" || fail "$ext lacks the G7 section"
-    grep -q "A single mandatory failure" "$f" && pass "$ext says why the format checks matter" || fail "$ext states no reason for the format checks"
+    grep -qi "a single mandatory failure" "$f" && pass "$ext says why the format checks matter" || fail "$ext states no reason for the format checks"
     grep -q "never move the result" "$f" && pass "$ext says the G7 checks are advisory" || fail "$ext does not mark the G7 checks advisory"
 done
 # The G7 table drops the required column — every row in it would read "no".
