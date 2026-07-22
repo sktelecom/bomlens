@@ -440,16 +440,16 @@ grep -q 'href="https://huggingface.co/' "$WORK/conf_conformance.html" && pass "t
 echo "== conformance report: verdict-bearing checks are separated from advisory ones =="
 for ext in md html; do
     f="$WORK/conf_conformance.$ext"
-    grep -q "Submission requirements" "$f" && pass "$ext names the submission-requirement section" || fail "$ext lacks the submission section"
+    grep -q "SBOM format requirements" "$f" && pass "$ext names the format-requirement section" || fail "$ext lacks the format-requirement section"
     grep -q "G7 minimum elements" "$f" && pass "$ext names the G7 section" || fail "$ext lacks the G7 section"
-    grep -q "A single mandatory failure" "$f" && pass "$ext says why the submission checks matter" || fail "$ext states no reason for the submission checks"
+    grep -q "A single mandatory failure" "$f" && pass "$ext says why the format checks matter" || fail "$ext states no reason for the format checks"
     grep -q "never move the result" "$f" && pass "$ext says the G7 checks are advisory" || fail "$ext does not mark the G7 checks advisory"
 done
 # The G7 table drops the required column — every row in it would read "no".
 g7hdr=$(sed -n '/G7 minimum elements/,/^$/p' "$WORK/conf_conformance.md" | grep '^| Status')
 printf '%s' "$g7hdr" | grep -q "Required" && fail "the G7 table still carries the required column" || pass "the G7 table drops the required column"
-sub_rows=$(sed -n '/## Submission requirements/,/## G7 minimum elements/p' "$WORK/conf_conformance.md" | grep -c '^| [^S|-]')
-[ "$sub_rows" -ge 8 ] && pass "the submission table carries the format checks ($sub_rows rows)" || fail "the submission table is short" "$sub_rows"
+sub_rows=$(sed -n '/## SBOM format requirements/,/## G7 minimum elements/p' "$WORK/conf_conformance.md" | grep -c '^| [^S|-]')
+[ "$sub_rows" -ge 8 ] && pass "the format-requirement table carries the checks ($sub_rows rows)" || fail "the format-requirement table is short" "$sub_rows"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,
