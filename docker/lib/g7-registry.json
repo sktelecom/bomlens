@@ -323,8 +323,8 @@
           "label": "Dataset content",
           "label_ko": "데이터셋 내용",
           "role": "dataset-creator",
-          "source": "na",
-          "cdxPath": null
+          "source": "inferred",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | (.data // [])[]? | select((((.contents.properties // []) | length) > 0) or ((.description // \"\") != \"\")) ] | length > 0"
         },
         {
           "id": "g7-ds-identifier",
@@ -339,8 +339,8 @@
           "label": "Dataset hash",
           "label_ko": "데이터셋 해시",
           "role": "dataset-creator",
-          "source": "na",
-          "cdxPath": null
+          "source": "auto",
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.hashes // []) | length) > 0) ] | length > 0"
         },
         {
           "id": "g7-ds-provenance",
@@ -348,7 +348,7 @@
           "label_ko": "데이터셋 출처",
           "role": "dataset-creator",
           "source": "inferred",
-          "cdxPath": "[ .components[]? | select(.type==\"data\") | select(((.componentData.governance // null) != null) or ((.properties // []) | map(.name // \"\") | any(test(\"provenance|source\";\"i\")))) ] | length > 0"
+          "cdxPath": "[ .components[]? | select(.type==\"data\") | select((([ (.data // [])[]? | select((.governance // null) != null) ] | length) > 0) or ((.properties // []) | map(.name // \"\") | any(test(\"provenance|source\";\"i\")))) ] | length > 0"
         },
         {
           "id": "g7-ds-statistics",
@@ -371,8 +371,8 @@
           "label": "Dataset dependency relationship",
           "label_ko": "데이터셋 의존성 관계",
           "role": "dataset-creator",
-          "source": "na",
-          "cdxPath": null
+          "source": "auto",
+          "cdxPath": "([ .components[]? | select(.type==\"data\") | .[\"bom-ref\"] // empty ]) as $ds | ($ds | length) > 0 and ([ .dependencies[]? | (.dependsOn // [])[] | select(. as $r | $ds | index($r) != null) ] | length) > 0"
         },
         {
           "id": "g7-ds-license",

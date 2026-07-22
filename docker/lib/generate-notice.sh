@@ -121,10 +121,17 @@ def src($c):
 
 # Build groups keyed by normalized license id. Each component carries comp (name@ver),
 # copyright (attribution) and src (source/download location).
+#
+# A training dataset reaches the notice as a CycloneDX "data" component and its
+# license genuinely belongs here — CC-BY-SA and friends carry attribution and
+# share-alike duties on redistribution just as a code license does. It is tagged
+# so a reader can tell data from code: the obligations attach to different things
+# (the corpus, not the binary), and the rest of this file is written for software.
 LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
   [ .components[]?
     | . as $c
-    | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)),
+    | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)
+               + (if ($c.type // "") == "data" then " [dataset]" else "" end)),
         copyright: ($c.copyright // null),
         src: (src($c)),
         lic: (

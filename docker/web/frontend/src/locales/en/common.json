@@ -385,7 +385,15 @@
     "notDocumented": "Not documented",
     "references": "References",
     "limitations": "Limitations",
-    "datasets": "Datasets"
+    "datasets": "Datasets",
+    "dsName": "Dataset",
+    "dsLicense": "License",
+    "dsIntegrity": "Integrity",
+    "dsSource": "Derived from",
+    "dsUnresolved": "Not readable",
+    "dsNoLicense": "None declared",
+    "dsHashed": "Content digest recorded",
+    "dsNotHashed": "No content digest"
   },
   "g7": {
     "empty": "No conformance checks were recorded.",

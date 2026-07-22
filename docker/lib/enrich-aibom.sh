@@ -13,7 +13,12 @@
 #                                 files, declared datasets, training docs) and
 #                                 written as openness:* properties. Grounded in the
 #                                 Model Openness Framework (arXiv 2403.13784).
-#   3. Pedigree / performance   — harvested from `cdxgen -t ai` when that tool is
+#   3. Referenced datasets      — the model card names its training datasets and
+#                                 says nothing else about them. Each id is resolved
+#                                 against the datasets API into a CycloneDX `data`
+#                                 component (license, upstream, content digests)
+#                                 linked to the model through dependencies[].
+#   4. Pedigree / performance   — harvested from `cdxgen -t ai` when that tool is
 #                                 present (it fills model ancestors, performance
 #                                 metrics, and cdx:huggingface:* properties the
 #                                 OWASP tool omits), merged into the model component.
@@ -72,10 +77,14 @@ if not models:
     sys.exit(0)
 
 # ---- HuggingFace API: hashes + openness signals -----------------------------
+# The client is kept around: the dataset step below reuses it, so one failed
+# import or one dead network disables both rather than half-enriching.
 hf_info = None
+hf_api = None
 try:
     from huggingface_hub import HfApi
-    hf_info = HfApi().model_info(model_id, files_metadata=True)
+    hf_api = HfApi()
+    hf_info = hf_api.model_info(model_id, files_metadata=True)
 except Exception as e:  # network down, no read access, or lib absent
     # Report only whether a token was in play, never the token itself.
     auth = "authenticated" if os.environ.get("HF_TOKEN") else "anonymous"
@@ -91,6 +100,159 @@ def card_get(info, key):
         except Exception:
             pass
     return getattr(cd, key, None)
+
+
+# ---- Referenced training datasets -------------------------------------------
+# A model card names the datasets it trained on and stops there: no license, no
+# upstream, no integrity value. Resolving each id against the datasets API turns
+# the bare name into a real component, which is what the G7 dataset cluster asks
+# for and what a provider writes an EU AI Act training-content summary from.
+#
+# A dataset that cannot be opened (private, gated, renamed, withdrawn) still
+# gets a component carrying its name and an explicit unresolved marker. Leaving
+# the gap visible is the point — a fabricated license would read as a reviewed
+# dataset. Same contract as the rest of this file.
+
+# Marks the components this step wrote, so a re-run can drop its own previous
+# output instead of appending a second copy of every dataset.
+DATASET_MARK = "bomlens:dataset:collectedBy"
+# A dataset repo can hold thousands of shards. The component hash list is
+# evidence that content digests exist and are recorded, not a manifest, so it is
+# capped and the true file count is recorded alongside it.
+DATASET_HASH_CAP = 64
+
+
+def dataset_ref(ds_id):
+    return "dataset:huggingface/" + ds_id
+
+
+def build_dataset_component(api, ds_id):
+    """CycloneDX `data` component for one HuggingFace dataset id.
+
+    Returns (component, resolved). `resolved` is False when the repository could
+    not be read, in which case the component holds the name and nothing else.
+    """
+    url = "https://huggingface.co/datasets/" + ds_id
+    props = [{"name": DATASET_MARK, "value": "huggingface"}]
+    comp = {
+        "type": "data",
+        "bom-ref": dataset_ref(ds_id),
+        "name": ds_id,
+        "externalReferences": [
+            {"type": "distribution", "url": url, "comment": "Dataset repository"}
+        ],
+        "properties": props,
+    }
+    # componentData (spec: component.data[]) is where CycloneDX describes what a
+    # data component actually holds.
+    cdata = {"type": "dataset", "name": ds_id, "contents": {"url": url}}
+
+    if api is None:
+        props.append({"name": "bomlens:dataset:unresolved", "value": "huggingface-unavailable"})
+        comp["data"] = [cdata]
+        return comp, False
+
+    try:
+        info = api.dataset_info(ds_id, files_metadata=True)
+    except Exception as e:
+        # Never put the exception text in the SBOM: it can carry request detail.
+        # The reason goes to the log, the fact goes to the BOM.
+        print(f"[enrich] dataset {ds_id} could not be read: {e}", file=sys.stderr)
+        props.append({"name": "bomlens:dataset:unresolved", "value": "not-readable"})
+        comp["data"] = [cdata]
+        return comp, False
+
+    # A dataset repo has no release version, only a commit. Recording it pins the
+    # snapshot that was read, which is what makes the hashes below meaningful.
+    # Short form in `version` to match the model component the generator writes;
+    # the full revision rides along as a property.
+    rev = getattr(info, "sha", None)
+    if rev:
+        comp["version"] = str(rev)[:8]
+        props.append({"name": "bomlens:dataset:revision", "value": str(rev)})
+
+    lic = card_get(info, "license")
+    if isinstance(lic, list):
+        lic = lic[0] if lic else None
+    if lic:
+        # Raw HuggingFace spelling ("cc-by-sa-4.0"). normalize-sbom.sh maps it to
+        # an SPDX id downstream, so it is recorded as a name rather than guessed
+        # into an id here.
+        comp["licenses"] = [{"license": {"name": str(lic)}}]
+
+    desc = getattr(info, "description", None) or card_get(info, "pretty_name")
+    if desc:
+        comp["description"] = str(desc)[:500]
+        cdata["description"] = comp["description"]
+
+    # Content digests: LFS-tracked files are the only ones exposing a SHA-256.
+    shas, total_files = [], 0
+    for s in (getattr(info, "siblings", None) or []):
+        total_files += 1
+        lfs = getattr(s, "lfs", None) or (s.get("lfs") if isinstance(s, dict) else None)
+        if lfs is None:
+            continue
+        sha = getattr(lfs, "sha256", None) or (lfs.get("sha256") if isinstance(lfs, dict) else None)
+        if sha and sha not in shas:
+            shas.append(sha)
+    if shas:
+        comp["hashes"] = [{"alg": "SHA-256", "content": s} for s in shas[:DATASET_HASH_CAP]]
+        props.append({"name": "bomlens:dataset:hashedFiles",
+                      "value": f"{min(len(shas), DATASET_HASH_CAP)} of {len(shas)}"})
+    if total_files:
+        props.append({"name": "bomlens:dataset:fileCount", "value": str(total_files)})
+
+    # What the dataset holds — the card's declared facets, recorded as-is.
+    facets = []
+    for key in ("task_categories", "size_categories", "language", "annotations_creators",
+                "multilinguality", "configs"):
+        val = card_get(info, key)
+        if not val:
+            continue
+        if isinstance(val, list):
+            val = ", ".join(str(v) for v in val if v is not None)
+        facets.append({"name": "hf:" + key, "value": str(val)[:200]})
+    if facets:
+        cdata["contents"]["properties"] = facets
+
+    # Provenance: the upstream this dataset derives from. HuggingFace allows both
+    # a bare marker ("original") and a reference ("extended|other/name"), so the
+    # values are carried verbatim rather than reinterpreted as ids.
+    for src in (card_get(info, "source_datasets") or []):
+        props.append({"name": "bomlens:dataset:sourceDataset", "value": str(src)[:200]})
+
+    owner = ds_id.split("/")[0] if "/" in ds_id else None
+    if owner:
+        cdata["governance"] = {"owners": [{"organization": {"name": owner}}]}
+
+    if getattr(info, "private", False):
+        props.append({"name": "bomlens:dataset:visibility", "value": "private"})
+    elif getattr(info, "gated", None):
+        props.append({"name": "bomlens:dataset:visibility", "value": "gated"})
+
+    comp["data"] = [cdata]
+    return comp, True
+
+
+def collect_datasets(api, declared):
+    """Resolve every dataset the model card declares.
+
+    Returns (components, bom-refs, resolved_count).
+    """
+    if not declared:
+        return [], [], 0
+    ids = declared if isinstance(declared, list) else [declared]
+    seen, comps, refs, resolved = set(), [], [], 0
+    for raw in ids:
+        ds_id = str(raw).strip()
+        if not ds_id or ds_id in seen:
+            continue
+        seen.add(ds_id)
+        comp, ok = build_dataset_component(api, ds_id)
+        comps.append(comp)
+        refs.append(comp["bom-ref"])
+        resolved += 1 if ok else 0
+    return comps, refs, resolved
 
 if hf_info is not None:
     siblings = getattr(hf_info, "siblings", None) or []
@@ -121,6 +283,7 @@ if hf_info is not None:
     has_config = any(n.lower() == "config.json" for n in filenames)
     datasets = card_get(hf_info, "datasets")
     has_datasets = bool(datasets)
+    dataset_comps, dataset_refs, resolved_datasets = collect_datasets(hf_api, datasets)
     # Training reproducibility is the weakest signal from metadata alone: treat a
     # declared base_model or an explicit training/library hint as "open training".
     library = card_get(hf_info, "library_name")
@@ -130,10 +293,21 @@ if hf_info is not None:
 
     is_open_weight = (gated in (False, None)) and (not private) and has_weight
 
+    # Training data: a name in the card is a claim, not open data. The axis reads
+    # open-data only when at least one declared dataset actually opened; a card
+    # that names datasets nobody can retrieve is reported as declared-unverified
+    # so the distinction survives into the SBOM instead of being flattened.
+    if resolved_datasets > 0:
+        training_data = "open-data"
+    elif has_datasets:
+        training_data = "declared-unverified"
+    else:
+        training_data = "undisclosed"
+
     openness = {
         "openness:weights": "open-weight" if is_open_weight else ("gated" if gated else "closed"),
         "openness:architecture": "open-architecture" if (has_config or any((m.get("modelCard", {}) or {}).get("modelParameters") for m in models)) else "undisclosed",
-        "openness:training-data": "open-data" if has_datasets else "undisclosed",
+        "openness:training-data": training_data,
         "openness:training": "open-training" if has_training else "undisclosed",
     }
 
@@ -153,6 +327,47 @@ if hf_info is not None:
         m["properties"] = props
     print(f"[enrich] HuggingFace: {len(weight_hashes)} weight hash(es), openness assessed "
           f"(weights={openness['openness:weights']}).", file=sys.stderr)
+
+    # Attach the dataset components and link each model to them. A previous run's
+    # output is dropped first (matched on DATASET_MARK) so enriching twice does
+    # not leave two copies of every dataset behind.
+    if dataset_comps:
+        def ours(c):
+            return isinstance(c, dict) and any(
+                p.get("name") == DATASET_MARK for p in (c.get("properties") or [])
+            )
+
+        comps[:] = [c for c in comps if not ours(c)]
+        comps.extend(dataset_comps)
+        sbom["components"] = comps
+
+        # dependencies[]: the model depends on the data it was trained on. This
+        # is the relationship the G7 dataset cluster names, and what makes the
+        # dependency graph in the UI show the training data.
+        deps = sbom.get("dependencies") or []
+        stale = set(dataset_refs)
+        deps = [d for d in deps if not (isinstance(d, dict) and d.get("ref") in stale)]
+        by_ref = {d.get("ref"): d for d in deps if isinstance(d, dict)}
+        for m in models:
+            mref = m.get("bom-ref")
+            if not mref:
+                continue
+            entry = by_ref.get(mref)
+            if entry is None:
+                entry = {"ref": mref, "dependsOn": []}
+                deps.append(entry)
+                by_ref[mref] = entry
+            on = entry.get("dependsOn") or []
+            for r in dataset_refs:
+                if r not in on:
+                    on.append(r)
+            entry["dependsOn"] = on
+        # Every referenced ref needs its own node, even a leaf one.
+        for r in dataset_refs:
+            deps.append({"ref": r, "dependsOn": []})
+        sbom["dependencies"] = deps
+        print(f"[enrich] datasets: {len(dataset_comps)} referenced, {resolved_datasets} resolved "
+              f"(training-data={training_data}).", file=sys.stderr)
 
 # ---- cdxgen -t ai: pedigree / performance metrics ---------------------------
 # Gated on the HuggingFace fetch having succeeded: cdxgen hits the same API over

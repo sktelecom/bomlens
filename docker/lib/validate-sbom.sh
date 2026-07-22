@@ -97,8 +97,16 @@ cdx_checks() {
     | (if (\$t|type)==\"array\" then (\$t|length)
        elif (\$t|type)==\"object\" then (((\$t.components//[])+(\$t.services//[]))|length)
        else 0 end) as \$tools
-    | ([ \$c[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
-    | ([ \$c[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
+    | ([ \$c[] | select(.type != \"data\") ]) as \$pkg
+    | (\$pkg|length) as \$ptot
+    # name+version and purl coverage are package questions, so they are measured
+    # over \$pkg (everything except type \"data\") rather than every component. A
+    # data component — a training dataset, say — has no package version and no
+    # purl type to carry: purl defines none for a dataset. Counting them would
+    # fail an otherwise complete SBOM for a field that cannot exist. License and
+    # checksum coverage below still count them, because those they can carry.
+    | ([ \$pkg[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
+    | ([ \$pkg[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
     | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
     | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
     | (\$okvers | split(\" \")) as \$vers
@@ -108,7 +116,7 @@ cdx_checks() {
     | ([ .dependencies[]? | .dependsOn[]? ] | length) as \$dep_edges
     | (.metadata.timestamp // \"\") as \$ts
     | (.metadata.component // {}) as \$top
-    | (\$tot - (\$miss_purl|length)) as \$purl_ok
+    | (\$ptot - (\$miss_purl|length)) as \$purl_ok
     | [
        {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|join(\"/\")) + \")\"), required:true,
         status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),
@@ -122,10 +130,10 @@ cdx_checks() {
         detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")), missing:[]},
        {id:\"name-version\", label:\"Component name+version coverage (100%)\", required:true,
         status:(if (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$tot - (\$miss_nv|length))/\(\$tot)\", missing:(\$miss_nv[0:\$cap])},
+        detail:\"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\", missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
-        detail:\"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\", missing:(\$miss_purl[0:\$cap])},
+        status:(if pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
+        detail:\"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\", missing:(\$miss_purl[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},

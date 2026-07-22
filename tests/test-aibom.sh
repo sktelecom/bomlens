@@ -341,6 +341,139 @@ case "$ds" in
     *) fail "g7-ds-name on ref-only datasets = '$ds', expected pass with dataset-a evidence" ;;
 esac
 
+echo "== enrich-aibom.sh resolves the declared datasets (stubbed HuggingFace) =="
+# The collector talks to the datasets API, so the API is stubbed on PYTHONPATH
+# rather than skipped: the shape it writes is the contract every check below
+# depends on, and a network test would not run in CI anyway.
+mkdir -p "$WORK/hfstub"
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64), _S("config.json")],
+    gated=False, private=False, tags=["fill-mask"],
+    card_data={"datasets": ["org/open-ds", "org/gone-ds"], "license": "apache-2.0"},
+)
+OPEN_DS = _Info(
+    siblings=[_S("data/train.parquet", "b" * 64), _S("README.md")],
+    private=False, gated=False, sha="deadbeef1234567890",
+    description="A stub corpus.",
+    card_data={"license": "cc-by-sa-4.0", "task_categories": ["text-classification"],
+               "size_categories": ["10K<n<100K"], "source_datasets": ["extended|org/upstream"]},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        if did != "org/open-ds":
+            raise RuntimeError("404 not found")
+        return OPEN_DS
+STUB
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/enrich-ds.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/enrich-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
+edn=$(jq '[.components[] | select(.type=="data")] | length' "$WORK/enrich-ds.json")
+[ "$edn" -eq 2 ] && pass "both declared datasets become data components" || fail "data components=$edn, expected 2"
+edlic=$(jq -r '[.components[] | select(.name=="org/open-ds") | .licenses[]?.license.name] | join(",")' "$WORK/enrich-ds.json")
+[ "$edlic" = "cc-by-sa-4.0" ] && pass "the resolved dataset carries its declared license" || fail "resolved dataset license='$edlic'"
+edhash=$(jq '[.components[] | select(.name=="org/open-ds") | .hashes[]?] | length' "$WORK/enrich-ds.json")
+[ "$edhash" -eq 1 ] && pass "LFS content digests reach the dataset component" || fail "dataset hashes=$edhash, expected 1"
+edopen=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-ds.json")
+[ "$edopen" = "open-data" ] && pass "one resolvable dataset makes the training-data axis open-data" || fail "openness:training-data='$edopen'"
+# Re-running must not append a second copy of anything.
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/enrich-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
+edn2=$(jq '[.components[] | select(.type=="data")] | length' "$WORK/enrich-ds.json")
+eddep2=$(jq '[.dependencies[] | select(.ref|startswith("pkg:huggingface")) | .dependsOn[]] | length' "$WORK/enrich-ds.json")
+{ [ "$edn2" -eq 2 ] && [ "$eddep2" -eq 2 ]; } && pass "enriching twice is idempotent" || fail "after re-run: components=$edn2 edges=$eddep2, expected 2/2"
+
+echo "== a card that names only unreachable datasets is not called open data =="
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64)], gated=False, private=False, tags=[],
+    card_data={"datasets": ["org/gone-ds"], "license": "apache-2.0"},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+STUB
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/enrich-gone.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/enrich-gone.json" google-bert/bert-base-uncased >/dev/null 2>&1
+goneval=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-gone.json")
+[ "$goneval" = "declared-unverified" ] && pass "named-but-unreachable datasets read as declared-unverified" || fail "openness:training-data='$goneval', expected declared-unverified"
+
+echo "== resolved dataset components carry the dataset cluster =="
+# enrich-aibom.sh resolves every dataset the model card names into a CycloneDX
+# `data` component (license, digests, upstream) linked through dependencies[].
+# The fixture is that output. Without it the cluster can only report the name;
+# with it, all but the two human-review elements have an automated source.
+DSFIX="$FIX/aibom-datasets-1_7.json"
+bash "$LIB/validate-sbom.sh" "$DSFIX" "$WORK/confds" "bert-base-uncased" >/dev/null 2>&1
+CONFDS="$WORK/confds_conformance.json"
+dspass=$(jq '[.checks[] | select((.id|startswith("g7-ds-")) and .status=="pass")] | length' "$CONFDS")
+[ "$dspass" -eq 8 ] && pass "8 of the 10 dataset elements pass on resolved datasets" || fail "dataset cluster passes=$dspass, expected 8"
+dsrev=$(jq -r '[.checks[] | select((.id|startswith("g7-ds-")) and .source=="na") | .id] | sort | join(" ")' "$CONFDS")
+[ "$dsrev" = "g7-ds-sensitivity g7-ds-statistics" ] && pass "only sensitivity and statistics stay human-review" || fail "review-only dataset elements='$dsrev'"
+# The same file before enrichment must NOT pass them, or the checks are vacuous.
+basepass=$(jq '[.checks[] | select((.id|startswith("g7-ds-")) and .status=="pass")] | length' "$CONF")
+[ "$basepass" -eq 1 ] && pass "an unenriched ML-BOM still passes only the dataset name" || fail "unenriched dataset passes=$basepass, expected 1"
+
+echo "== dataset components do not break the package-shaped format checks =="
+# A `data` component has no package version and no purl type to carry, so the
+# name-version / purl coverage checks must measure packages only. Counting the
+# datasets would fail an otherwise complete SBOM for fields that cannot exist.
+nvst=$(jq -r '.checks[] | select(.id=="name-version") | .status' "$CONFDS")
+purlst=$(jq -r '.checks[] | select(.id=="purl") | .status' "$CONFDS")
+{ [ "$nvst" = "pass" ] && [ "$purlst" = "pass" ]; } && pass "datasets excluded from name-version/purl coverage" || fail "name-version='$nvst' purl='$purlst', expected pass"
+dsres=$(jq -r '.result' "$CONFDS")
+[ "$dsres" = "pass" ] && pass "an enriched AI SBOM still validates overall" || fail "overall result='$dsres', expected pass"
+
+echo "== an unreadable dataset is recorded as unreadable, not as unlicensed =="
+unres=$(jq -r '[.components[] | select(.type=="data") | select((.properties // []) | any(.name=="bomlens:dataset:unresolved"))] | length' "$DSFIX")
+[ "$unres" -eq 1 ] && pass "the unresolved dataset is marked" || fail "unresolved dataset markers=$unres, expected 1"
+fabricated=$(jq '[.components[] | select(.type=="data") | select((.properties // []) | any(.name=="bomlens:dataset:unresolved")) | select(((.licenses // []) | length) > 0)] | length' "$DSFIX")
+[ "$fabricated" -eq 0 ] && pass "no license is invented for a dataset that could not be read" || fail "$fabricated unreadable dataset(s) carry a license"
+
+echo "== the model depends on the datasets it was trained on =="
+edge=$(jq -r '[.dependencies[] | select(.ref | startswith("pkg:huggingface")) | .dependsOn[]] | map(select(startswith("dataset:"))) | length' "$DSFIX")
+[ "$edge" -eq 2 ] && pass "the model links to both datasets in dependencies[]" || fail "model->dataset edges=$edge, expected 2"
+orphan=$(jq -r '[.components[] | select(.type=="data") | .["bom-ref"]] - [.dependencies[].ref] | length' "$DSFIX")
+[ "$orphan" -eq 0 ] && pass "every dataset ref has its own dependency node" || fail "$orphan dataset ref(s) missing a node"
+
+echo "== the NOTICE tells a dataset license apart from a code license =="
+bash "$LIB/generate-notice.sh" "$DSFIX" "$WORK/dsnotice" "bert-base-uncased" >/dev/null 2>&1
+grep -q "org/open-ds.*\[dataset\]" "$WORK/dsnotice_NOTICE.txt" && pass "dataset entries are tagged in the NOTICE" || fail "the NOTICE does not distinguish dataset components"
+grep -q "bert-base-uncased@86b5e093$" "$WORK/dsnotice_NOTICE.txt" && pass "software components keep their plain entry" || fail "the dataset tag leaked onto a software component"
+
 echo "== human reports separate review items from warnings =="
 # na (no automated source) elements must not inflate the warning count; the MD
 # headline carries a distinct "needs review" figure.

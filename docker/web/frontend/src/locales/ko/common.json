@@ -385,7 +385,15 @@
     "notDocumented": "미문서화",
     "references": "참조",
     "limitations": "한계",
-    "datasets": "데이터셋"
+    "datasets": "데이터셋",
+    "dsName": "데이터셋",
+    "dsLicense": "라이선스",
+    "dsIntegrity": "무결성",
+    "dsSource": "파생 출처",
+    "dsUnresolved": "읽을 수 없음",
+    "dsNoLicense": "표기 없음",
+    "dsHashed": "콘텐츠 해시 기록됨",
+    "dsNotHashed": "콘텐츠 해시 없음"
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
