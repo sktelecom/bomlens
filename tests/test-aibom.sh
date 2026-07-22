@@ -453,6 +453,16 @@ g7hdr=$(sed -n '/G7 minimum elements/,/^$/p' "$WORK/conf_conformance.md" | grep 
 printf '%s' "$g7hdr" | grep -q "Required" && fail "the G7 table still carries the required column" || pass "the G7 table drops the required column"
 sub_rows=$(sed -n '/## SBOM format requirements/,/## G7 minimum elements/p' "$WORK/conf_conformance.md" | grep -c '^| [^S|-]')
 [ "$sub_rows" -ge 8 ] && pass "the format-requirement table carries the checks ($sub_rows rows)" || fail "the format-requirement table is short" "$sub_rows"
+
+echo "== review-only elements say what a person has to establish =="
+gd="$GD"
+reg="$LIB/g7-registry.json"
+naids=$(jq -r '[.clusters[].elements[] | select(.source=="na") | .id] | sort | join(" ")' "$reg")
+rvids=$(jq -r '[.review | keys[]] | sort | join(" ")' "$gd")
+[ "$naids" = "$rvids" ] && pass "every review-only element has review guidance" || fail "review guidance does not cover the review-only elements" "$naids != $rvids"
+badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.value.how_ko // "") == "") or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$gd")
+[ -z "$badrv" ] && pass "every review entry carries how / how_ko / an https link" || fail "review entries are incomplete" "$badrv"
+grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,

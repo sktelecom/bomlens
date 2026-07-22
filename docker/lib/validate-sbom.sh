@@ -243,7 +243,9 @@ g7_ai_checks() {
         local gjoined
         if gjoined=$(printf '%s' "$out" | jq -c --slurpfile g "$guide" '
             (($g[0].map) // {}) as $m
-            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)' 2>/dev/null); then
+            | (($g[0].review) // {}) as $r
+            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)
+            | map(if $r[.id] then . + {reviewGuide: $r[.id]} else . end)' 2>/dev/null); then
             out="$gjoined"
         else
             echo "[validate] WARN: G7 guidance join failed; continuing without it." >&2
@@ -509,7 +511,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           else $d end;
-      map(.label = llabel(.id; .label) | .detail = ldetail(.detail))
+      map(.label = llabel(.id; .label) | .detail = ldetail(.detail)
+          | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end))
     ') || RCHECKS="$CHECKS"
     # Crosswalk element labels use the same registry label_ko (framework titles,
     # article refs and the disclaimer stay verbatim — they are proper identifiers).
@@ -528,6 +531,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
     C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
     C_TH_EVID=$(kstr conformance.th_evidence); C_FIX_SUMMARY=$(kstr conformance.fix_summary)
+    C_CHECK_SUMMARY=$(kstr conformance.check_summary)
     C_H2_SUBMIT=$(kstr conformance.h2_submission); C_SUBMIT_INTRO=$(kstr conformance.submission_intro)
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
@@ -550,7 +554,7 @@ else
     C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
     C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
     C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
-    C_TH_EVID="Evidence / how to fill"; C_FIX_SUMMARY="How to fill this"
+    C_TH_EVID="Evidence / how"; C_FIX_SUMMARY="How to fill this"; C_CHECK_SUMMARY="What to establish"
     C_H2_SUBMIT="SBOM format requirements"
     C_SUBMIT_INTRO="What the SBOM itself has to carry. The same bar applies however the SBOM was produced, and a single mandatory failure makes the overall result a failure."
     C_H2_G7CHK="G7 minimum elements"
@@ -561,7 +565,7 @@ else
     C_YES="yes"; C_NO="no"
     C_REF="Reference:"; C_SOURCE="Source:"
     C_MAPPED="Mapped elements:"; C_MSUFFIX=""; C_MPRESENT="present"; C_MGAP="gap"; C_MREVIEW="needs review"
-    C_TH_G7="G7 element"; C_TH_XREF="Reference"
+    C_TH_G7="Requirement"; C_TH_XREF="Related provisions"
     C_HTML_TITLE="SBOM Conformance — ${PROJECT}"
     C_KIND="Conformance"; C_H1="SBOM Conformance Report"
     C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
@@ -763,7 +767,7 @@ HTMLHEAD
     # has to match a row against a separate section further down the page.
     html_rows() {   # $1: "submission" | "g7"
         echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
-            --arg fix "$C_FIX_SUMMARY" --arg ref "$C_REF" --arg kind "$1" '
+            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" --arg kind "$1" '
             [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
             | to_entries[] | .key as $i | .value |
             (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
@@ -778,7 +782,17 @@ HTMLHEAD
                   + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
                   + (if ((.guidance.docUrl // "")|startswith("http"))
                      then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
-                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + (.guidance.docUrl|@html) + "</a></p>"
+                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                          + ((.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                     else "" end)
+                  + "</details>"
+             elif ((.reviewGuide // null) != null and (.source // "")=="na")
+             then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
+                  + "<p>" + (.reviewGuide.how|@html) + "</p>"
+                  + (if ((.reviewGuide.docUrl // "")|startswith("http"))
+                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.reviewGuide.docUrl|@html)
+                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                          + ((.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
                      else "" end)
                   + "</details>"
              else "" end) +
