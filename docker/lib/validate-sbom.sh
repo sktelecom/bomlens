@@ -528,6 +528,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
     C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
     C_TH_EVID=$(kstr conformance.th_evidence); C_FIX_SUMMARY=$(kstr conformance.fix_summary)
+    C_H2_SUBMIT=$(kstr conformance.h2_submission); C_SUBMIT_INTRO=$(kstr conformance.submission_intro)
+    C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
@@ -549,6 +551,10 @@ else
     C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
     C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
     C_TH_EVID="Evidence / how to fill"; C_FIX_SUMMARY="How to fill this"
+    C_H2_SUBMIT="Submission requirements"
+    C_SUBMIT_INTRO="The format requirements a submitted SBOM has to meet. A single mandatory failure makes the overall result a failure."
+    C_H2_G7CHK="G7 minimum elements"
+    C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
     C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
@@ -575,11 +581,33 @@ fi
     echo "${C_MD_RESULT}"
     [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "${C_MD_UNTRACE}"
     echo ""
+    # Same split as the HTML: verdict-bearing submission requirements first, the
+    # advisory G7 elements after, each under its own heading and reason.
+    md_rows() {   # $1: "submission" | "g7"
+        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" --arg kind "$1" '
+            [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ][] |
+            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | "
+            + (if $kind=="g7" then "" else "\(if .required then $yes else $no end) | " end)
+            + "\(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+    }
+    echo "## ${C_H2_SUBMIT}"
+    echo ""
+    echo "${C_SUBMIT_INTRO}"
+    echo ""
     echo "| ${C_TH_STATUS} | ${C_TH_REQMT} | ${C_TH_REQD} | ${C_TH_DETAIL} | ${C_TH_EVID} |"
     echo "|--------|-------------|:--------:|--------|----------|"
-    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" '.[] |
-        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | \(if .required then $yes else $no end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+    md_rows submission
     echo ""
+    if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
+        echo "## ${C_H2_G7CHK}"
+        echo ""
+        echo "${C_G7CHK_INTRO}"
+        echo ""
+        echo "| ${C_TH_STATUS} | ${C_TH_REQMT} | ${C_TH_DETAIL} | ${C_TH_EVID} |"
+        echo "|--------|-------------|--------|----------|"
+        md_rows g7
+        echo ""
+    fi
     # Missing-item detail for every non-passing check that names offenders —
     # mandatory failures AND advisory G7 warns (a reviewer needs to know WHICH
     # model components lack the license/hash, not just the count).
@@ -724,30 +752,50 @@ fi
  <span class="pill">${C_PILL_REVIEW} <span class="count">${N_REVIEW}</span></span>
 $( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
-<div class="table-wrap"><table><tr><th class="num">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>
 HTMLHEAD
+    # Two tables, not one. The submission requirements decide the verdict; the G7
+    # elements are advisory and never do. Mixed into a single 60-row table the
+    # reader cannot tell which is which, or why a given row is there. The G7 table
+    # also drops the "required" column — every value in it would read "no".
+    #
     # Evidence column doubles as the fix column: an advisory element that is
     # missing carries its fill-in fragment inline (collapsed), so the reader never
     # has to match a row against a separate section further down the page.
-    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
-        --arg fix "$C_FIX_SUMMARY" --arg ref "$C_REF" 'to_entries[] | .key as $i | .value |
-        (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
-        "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
-        "<td class=\"" + $cls + "\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
-        "<td>" + (.label|@html) + "</td><td class=\"req\">" + (if .required then $yes else $no end) + "</td>" +
-        "<td>" + ((.detail // "")|@html) + "</td>" +
-        "<td>" + (((.evidence // []) | join(", "))|@html) +
-        (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
-         then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
-              + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
-              + (if ((.guidance.docUrl // "")|startswith("http"))
-                 then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
-                      + "\" rel=\"noreferrer\">" + (.guidance.docUrl|@html) + "</a></p>"
-                 else "" end)
-              + "</details>"
-         else "" end) +
-        "</td></tr>"'
+    html_rows() {   # $1: "submission" | "g7"
+        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
+            --arg fix "$C_FIX_SUMMARY" --arg ref "$C_REF" --arg kind "$1" '
+            [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
+            | to_entries[] | .key as $i | .value |
+            (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
+            "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
+            "<td class=\"" + $cls + "\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
+            "<td>" + (.label|@html) + "</td>" +
+            (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
+            "<td>" + ((.detail // "")|@html) + "</td>" +
+            "<td>" + (((.evidence // []) | join(", "))|@html) +
+            (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
+             then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
+                  + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
+                  + (if ((.guidance.docUrl // "")|startswith("http"))
+                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
+                          + "\" rel=\"noreferrer\">" + (.guidance.docUrl|@html) + "</a></p>"
+                     else "" end)
+                  + "</details>"
+             else "" end) +
+            "</td></tr>"'
+    }
+    echo "<h2>${C_H2_SUBMIT}</h2>"
+    echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p>"
+    echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+    html_rows submission
     echo "</table></div>"
+    if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
+        echo "<h2>${C_H2_G7CHK}</h2>"
+        echo "<p class=\"meta\">${C_G7CHK_INTRO}</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+        html_rows g7
+        echo "</table></div>"
+    fi
     if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "<h2>${C_H2_MISSING}</h2>"
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
