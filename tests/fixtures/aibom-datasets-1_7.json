@@ -1,0 +1,297 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "authors": [
+        {
+          "name": "google-bert"
+        }
+      ],
+      "bom-ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "description": "No description available",
+      "externalReferences": [
+        {
+          "comment": "Model repository",
+          "type": "website",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased"
+        },
+        {
+          "comment": "Model files",
+          "type": "distribution",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/tree/main"
+        },
+        {
+          "comment": "Specific commit",
+          "type": "vcs",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/commit/86b5e0934494bd15c9632b12f734a8a67f723594"
+        },
+        {
+          "comment": "Training dataset: bookcorpus",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/bookcorpus"
+        },
+        {
+          "comment": "Training dataset: wikipedia",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/wikipedia"
+        },
+        {
+          "comment": "ArXiv Paper",
+          "type": "documentation",
+          "url": "https://arxiv.org/abs/1810.04805"
+        }
+      ],
+      "group": "google-bert",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "manufacturer": {
+        "name": "google-bert",
+        "url": [
+          "https://huggingface.co/google-bert"
+        ]
+      },
+      "modelCard": {
+        "considerations": {
+          "technicalLimitations": [
+            "You can use the raw model for either masked language modeling or next sentence prediction, but it's mostly intended to be fine-tuned on a downstream task"
+          ]
+        },
+        "modelParameters": {
+          "datasets": [
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/bookcorpus"
+              },
+              "name": "bookcorpus",
+              "type": "dataset"
+            },
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/wikipedia"
+              },
+              "name": "wikipedia",
+              "type": "dataset"
+            }
+          ],
+          "modelArchitecture": "bert",
+          "task": "fill-mask"
+        },
+        "properties": [
+          {
+            "name": "genai:aibom:modelcard:vocabSize",
+            "value": "30522"
+          },
+          {
+            "name": "serialNumber",
+            "value": "urn:uuid:google-bert-bert-base-uncased"
+          },
+          {
+            "name": "safetyRiskAssessment",
+            "value": "Even if the training data used for this model could be characterized as fairly neutral, this model can have biased predictions: ```python >>> from transformers import pipeline >>> unmasker = pipeline('fill-mask', model='bert-base-uncased') >>> unmasker(\"The man worked as a [MASK]"
+          }
+        ]
+      },
+      "name": "bert-base-uncased",
+      "properties": [
+        {
+          "name": "openness:weights",
+          "value": "open-weight"
+        },
+        {
+          "name": "openness:architecture",
+          "value": "open-architecture"
+        },
+        {
+          "name": "openness:training-data",
+          "value": "open-data"
+        },
+        {
+          "name": "openness:training",
+          "value": "open-training"
+        }
+      ],
+      "purl": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "supplier": {
+        "name": "google-bert"
+      },
+      "type": "machine-learning-model",
+      "version": "86b5e093"
+    },
+    {
+      "bom-ref": "dataset:huggingface/org/open-ds",
+      "data": [
+        {
+          "contents": {
+            "properties": [
+              {
+                "name": "hf:task_categories",
+                "value": "text-classification"
+              },
+              {
+                "name": "hf:size_categories",
+                "value": "10K<n<100K"
+              }
+            ],
+            "url": "https://huggingface.co/datasets/org/open-ds"
+          },
+          "description": "A stub corpus.",
+          "governance": {
+            "owners": [
+              {
+                "organization": {
+                  "name": "org"
+                }
+              }
+            ]
+          },
+          "name": "org/open-ds",
+          "type": "dataset"
+        }
+      ],
+      "description": "A stub corpus.",
+      "externalReferences": [
+        {
+          "comment": "Dataset repository",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/org/open-ds"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "name": "cc-by-sa-4.0"
+          }
+        }
+      ],
+      "name": "org/open-ds",
+      "properties": [
+        {
+          "name": "bomlens:dataset:collectedBy",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:dataset:revision",
+          "value": "deadbeef1234567890"
+        },
+        {
+          "name": "bomlens:dataset:hashedFiles",
+          "value": "1 of 1"
+        },
+        {
+          "name": "bomlens:dataset:fileCount",
+          "value": "2"
+        },
+        {
+          "name": "bomlens:dataset:sourceDataset",
+          "value": "extended|org/upstream"
+        }
+      ],
+      "type": "data",
+      "version": "deadbeef"
+    },
+    {
+      "bom-ref": "dataset:huggingface/org/gone-ds",
+      "data": [
+        {
+          "contents": {
+            "url": "https://huggingface.co/datasets/org/gone-ds"
+          },
+          "name": "org/gone-ds",
+          "type": "dataset"
+        }
+      ],
+      "externalReferences": [
+        {
+          "comment": "Dataset repository",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/org/gone-ds"
+        }
+      ],
+      "name": "org/gone-ds",
+      "properties": [
+        {
+          "name": "bomlens:dataset:collectedBy",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:dataset:unresolved",
+          "value": "not-readable"
+        }
+      ],
+      "type": "data"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ],
+      "ref": "pkg:generic/google-bert/bert-base-uncased@86b5e093"
+    },
+    {
+      "dependsOn": [
+        "dataset:huggingface/org/open-ds",
+        "dataset:huggingface/org/gone-ds"
+      ],
+      "ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+    },
+    {
+      "dependsOn": [],
+      "ref": "dataset:huggingface/org/open-ds"
+    },
+    {
+      "dependsOn": [],
+      "ref": "dataset:huggingface/org/gone-ds"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-06-23-22:18:25@1782220705",
+      "description": "Generating SBOM for google-bert/bert-base-uncased",
+      "manufacturer": {
+        "name": "OWASP AIBOM Generator"
+      },
+      "name": "job-2026-06-23-22:18:25",
+      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-06-23-22:18:25@1782220705",
+      "supplier": {
+        "name": "OWASP AIBOM Generator"
+      },
+      "type": "application",
+      "version": "1782220705"
+    },
+    "timestamp": "2026-06-23T13:18:25+00:00",
+    "tools": {
+      "components": [
+        {
+          "bom-ref": "pkg:generic/owasp-genai/owasp-aibom-generator@1.0.2",
+          "manufacturer": {
+            "name": "OWASP GenAI Security Project"
+          },
+          "name": "owasp-aibom-generator",
+          "type": "application",
+          "version": "1.0.2"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:f8c747e7-e4dd-4a6b-9962-711df2a6542f",
+  "specVersion": "1.7",
+  "version": 1
+}
