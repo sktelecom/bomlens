@@ -73,23 +73,68 @@ export function ModelsDatasets({
             {t("models.datasets")}
             <span className="tabular-nums text-muted-foreground">{data.datasets.length}</span>
           </div>
-          <div className="overflow-hidden rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-left text-xs">
+              <thead className="border-b bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {t("models.dsName")}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {t("models.dsLicense")}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {t("models.dsIntegrity")}
+                  </th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    {t("models.dsSource")}
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 {data.datasets.map((d) => (
                   <tr key={d.name} className="border-b last:border-0">
-                    <td className="px-3 py-2 font-mono">{d.name}</td>
-                    <td className="px-3 py-2">
-                      {d.url ? (
+                    <td className="px-3 py-2 align-top">
+                      <span className="font-mono">{d.name}</span>
+                      {d.version && (
+                        <span className="text-muted-foreground">@{d.version}</span>
+                      )}
+                      {d.url && (
                         <a
                           href={d.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
+                          className="mt-0.5 flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
                         >
                           <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                           {d.url}
                         </a>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      {/* An unreadable repository is said so, rather than shown as
+                          a dataset with no license — the two mean different things. */}
+                      {d.unresolved ? (
+                        <Badge variant="outline">{t("models.dsUnresolved")}</Badge>
+                      ) : d.licenses.length > 0 ? (
+                        <span className="font-mono">{d.licenses.join(", ")}</span>
+                      ) : (
+                        <span className="text-muted-foreground">{t("models.dsNoLicense")}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      {d.hasIntegrity ? (
+                        <CircleCheck className="h-4 w-4 text-emerald-600" aria-hidden />
+                      ) : (
+                        <CircleDashed className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      )}
+                      <span className="sr-only">
+                        {d.hasIntegrity ? t("models.dsHashed") : t("models.dsNotHashed")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      {d.sources.length > 0 ? (
+                        <span className="break-all">{d.sources.join(", ")}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
