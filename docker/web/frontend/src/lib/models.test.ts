@@ -69,6 +69,69 @@ describe("parseModelCards", () => {
     expect(d.trainingProcess).toBe(true); // technicalLimitations present
   });
 
+  // enrich-aibom.sh resolves each declared dataset into a standalone `data`
+  // component. It carries the license, digests and upstream the card lacks, so
+  // it must supersede the card's bare name rather than be discarded as a dupe.
+  const RESOLVED = {
+    ...ML_BOM,
+    components: [
+      ...ML_BOM.components,
+      {
+        type: "data",
+        "bom-ref": "dataset:huggingface/wikipedia",
+        name: "wikipedia",
+        version: "deadbeef",
+        licenses: [{ license: { id: "CC-BY-SA-4.0" } }],
+        hashes: [{ alg: "SHA-256", content: "ab".repeat(32) }],
+        properties: [
+          { name: "bomlens:dataset:collectedBy", value: "huggingface" },
+          { name: "bomlens:dataset:sourceDataset", value: "extended|org/upstream" },
+        ],
+        data: [{ type: "dataset", name: "wikipedia", contents: { url: "https://huggingface.co/datasets/wikipedia" } }],
+      },
+      {
+        type: "data",
+        "bom-ref": "dataset:huggingface/bookcorpus",
+        name: "bookcorpus",
+        properties: [
+          { name: "bomlens:dataset:collectedBy", value: "huggingface" },
+          { name: "bomlens:dataset:unresolved", value: "not-readable" },
+        ],
+        data: [{ type: "dataset", name: "bookcorpus", contents: { url: "https://huggingface.co/datasets/bookcorpus" } }],
+      },
+    ],
+  };
+
+  it("lets a resolved data component supersede the card's bare dataset name", () => {
+    const { datasets } = parseModelCards(RESOLVED);
+    expect(datasets).toHaveLength(2); // not four — merged by name
+    const wiki = datasets.find((d) => d.name === "wikipedia")!;
+    expect(wiki.licenses).toEqual(["CC-BY-SA-4.0"]);
+    expect(wiki.hasIntegrity).toBe(true);
+    expect(wiki.version).toBe("deadbeef");
+    expect(wiki.sources).toEqual(["extended|org/upstream"]);
+    expect(wiki.unresolved).toBe(false);
+  });
+
+  it("keeps an unreadable dataset distinct from one with no license", () => {
+    const book = parseModelCards(RESOLVED).datasets.find((d) => d.name === "bookcorpus")!;
+    expect(book.unresolved).toBe(true);
+    expect(book.licenses).toEqual([]);
+    expect(book.hasIntegrity).toBe(false);
+    expect(book.url).toContain("bookcorpus");
+  });
+
+  it("prefers the recorded openness verdict over counting dataset names", () => {
+    const withProp = {
+      ...ML_BOM,
+      components: [
+        { ...ML_BOM.components[0], properties: [{ name: "openness:training-data", value: "declared-unverified" }] },
+      ],
+    };
+    // The card still names two datasets, but none of them resolved.
+    expect(parseModelCards(withProp).models[0].disclosure.trainingData).toBe(false);
+  });
+
   it("is defensive about partial / non-AI input", () => {
     expect(parseModelCards({}).models).toEqual([]);
     expect(parseModelCards({ components: [{ type: "library", name: "x" }] }).models).toEqual([]);
