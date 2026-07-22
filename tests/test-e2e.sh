@@ -300,6 +300,34 @@ check_bad bad-nopurl-cyclonedx.json  purl        "missing PURL"
 check_bad bad-notools-cyclonedx.json tools       "no tools"
 check_bad bad-nodeps-cyclonedx.json  transitive  "no dependencies"
 
+# Nothing to measure is not a coverage failure. pct() returns 0 on an empty
+# denominator to avoid dividing by zero, and comparing that placeholder against
+# the minimum used to fail the purl check for a field that had no subject —
+# while its sibling name-version passed the same input, because it asks whether
+# the missing list is empty rather than whether a percentage clears a bar. The
+# two must agree. Covered for both JSON formats and for a BOM whose only
+# components are data (a training dataset carries no purl: purl defines no type
+# for one).
+empty_denominator() {
+    local label="$1" src="$2" filter="$3"
+    jq "$filter" "$src" > "$atmp/empty-src.json"
+    bash "$LIB/validate-sbom.sh" "$atmp/empty-src.json" "$atmp/ed" "demo" >/dev/null 2>&1
+    local nv purl
+    nv=$(jq -r '.checks[]|select(.id=="name-version")|.status' "$atmp/ed_conformance.json" 2>/dev/null)
+    purl=$(jq -r '.checks[]|select(.id=="purl")|.status' "$atmp/ed_conformance.json" 2>/dev/null)
+    if [ "$nv" = "pass" ] && [ "$purl" = "pass" ]; then
+        pass "validate: $label -> coverage checks agree (both pass)"
+    else
+        fail "validate: $label -> coverage checks agree" "name-version=$nv purl=$purl"
+    fi
+}
+empty_denominator "CycloneDX with no components" "$FIX/good-cyclonedx.json" '.components = []'
+empty_denominator "CycloneDX with only data components" "$FIX/aibom-datasets-1_7.json" \
+    '.components = [.components[] | select(.type=="data")]'
+empty_denominator "SPDX with no packages" "$FIX/good-spdx.json" '.packages = []'
+# The guard must not soften a real gap: a BOM that HAS packages and is missing
+# their purls still fails (check_bad above pins this for bad-nopurl).
+
 # pkg:generic is advisory (eff9a9a): it no longer fails conformance, but is
 # surfaced as an untraceable-component warning carrying a count.
 bash "$LIB/validate-sbom.sh" "$FIX/bad-generic-cyclonedx.json" "$atmp/bg" "demo" >/dev/null 2>&1

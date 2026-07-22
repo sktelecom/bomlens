@@ -74,6 +74,12 @@ fi
 echo "[validate] detected format: $FORMAT"
 
 # Shared jq helper: percentage with zero-guard (jq source, not shell — vars are intentional).
+#
+# The 0 an empty denominator returns is a placeholder that keeps jq from dividing
+# by zero — it is not a measurement. Any caller comparing the result against a
+# minimum must rule out an empty denominator FIRST, or "nothing to measure" reads
+# as "0%, the worst possible score" and fails the SBOM for a field that had no
+# subject. The coverage checks below do exactly that.
 # shellcheck disable=SC2016
 PCT_DEF='def pct($n;$d): if $d==0 then 0 else (($n*100/$d)|floor) end;'
 
@@ -132,8 +138,10 @@ cdx_checks() {
         status:(if (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\", missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
-        detail:\"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\", missing:(\$miss_purl[0:\$cap])},
+        status:(if \$ptot==0 or pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
+        detail:(if \$ptot==0 then \"no packages to measure\"
+                else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\" end),
+        missing:(\$miss_purl[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
@@ -302,8 +310,10 @@ spdx_json_checks() {
         status:(if (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$tot - (\$miss_nv|length))/\(\$tot)\", missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
-        detail:\"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\", missing:(\$miss_purl[0:\$cap])},
+        status:(if \$tot==0 or pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
+        detail:(if \$tot==0 then \"no packages to measure\"
+                else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\" end),
+        missing:(\$miss_purl[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
