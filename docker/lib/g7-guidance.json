@@ -77,5 +77,73 @@
       "snippet": "\"externalReferences\": [\n  { \"type\": \"bom\", \"url\": \"https://example.com/hbom.json\" }\n]",
       "docUrl": "https://cyclonedx.org/capabilities/hbom/"
     }
+  },
+  "reviewNote": "Per-element review guidance for the G7 elements with no automated source (source \"na\"): what a person has to establish, and where to look. Keyed by G7 element id (docker/lib/g7-registry.json).",
+  "review": {
+    "g7-slp-data-flow": {
+      "how": "Write down how data moves through the system: where an input comes from, what the model receives, and where its output goes. Confirm the description matches how the system is actually deployed.",
+      "how_ko": "데이터가 시스템 안에서 어떻게 흐르는지 적습니다. 입력이 어디서 오고, 모델이 무엇을 받고, 출력이 어디로 가는지입니다. 적어 둔 내용이 실제 배포 구성과 맞는지 확인합니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-slp-data-usage": {
+      "how": "State what the system does with the data it receives — whether it is stored, passed to another component, or used for further training. Check this against the privacy notice you publish.",
+      "how_ko": "시스템이 받은 데이터를 어떻게 쓰는지 밝힙니다. 저장하는지, 다른 구성요소로 넘기는지, 추가 학습에 쓰는지입니다. 공개하는 개인정보 처리방침과 어긋나지 않는지 확인합니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-slp-io": {
+      "how": "Describe the input and output the system accepts and produces — formats, size limits, and anything it refuses. A person confirms this because a model card lists modalities, not the system's actual interface.",
+      "how_ko": "시스템이 받는 입력과 내놓는 출력을 적습니다. 형식과 크기 제한, 받지 않는 입력까지 포함합니다. 모델 카드에는 처리 방식만 적히고 시스템의 실제 인터페이스는 드러나지 않아 사람이 확인해야 합니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-slp-app-area": {
+      "how": "State the field the system is intended for and the uses that are out of scope. This is a decision, not a fact a tool can read, and regulators ask for it directly.",
+      "how_ko": "시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-ds-content": {
+      "how": "Describe what the training data actually contains — its subject matter, languages, time span, and how it was collected. Record it on the dataset card or alongside the model card.",
+      "how_ko": "학습 데이터에 무엇이 들어 있는지 적습니다. 주제와 언어, 수집 시기, 수집 방법입니다. 데이터셋 카드나 모델 카드 옆에 기록합니다.",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
+    "g7-ds-hash": {
+      "how": "Record a checksum for each training dataset as you used it, so a later reader can tell whether they hold the same data. Compute it from the copy you trained on, not from the upstream page.",
+      "how_ko": "학습에 쓴 데이터셋 각각의 체크섬을 기록합니다. 나중에 보는 사람이 같은 데이터인지 판단할 수 있게 하기 위함입니다. 원본 페이지가 아니라 실제로 학습에 쓴 사본에서 계산합니다.",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-ds-statistics": {
+      "how": "Give the size and shape of the training data — record counts, class balance, and any known skew. These numbers explain the model's limits, so state them even when they are unflattering.",
+      "how_ko": "학습 데이터의 규모와 구성을 적습니다. 건수, 분류별 비율, 알고 있는 치우침입니다. 이 수치가 모델의 한계를 설명하므로 불리한 내용이라도 밝힙니다.",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
+    "g7-ds-sensitivity": {
+      "how": "Judge whether the training data holds personal information or third-party copyrighted work, and record what you filtered out and how. Where the answer is unclear, take it to your privacy and legal contacts before release.",
+      "how_ko": "학습 데이터에 개인정보나 타인의 저작물이 섞였는지 판단하고, 무엇을 어떻게 걸러냈는지 기록합니다. 판단이 서지 않으면 공개 전에 개인정보 담당 부서와 법무에 확인합니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-ds-dependency": {
+      "how": "Say which dataset came from which — a filtered subset, a merge, or a translation of another set. The relationship carries the upstream licence and restrictions with it.",
+      "how_ko": "어떤 데이터셋이 어디서 나왔는지 밝힙니다. 걸러낸 부분집합인지, 여러 개를 합친 것인지, 다른 데이터셋을 번역한 것인지입니다. 이 관계를 따라 원본의 라이선스와 제한이 함께 따라옵니다.",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-sec-controls": {
+      "how": "List the controls that protect the model and its data — who can reach the weights, how the training environment is isolated, how artefacts are signed. These live in your operations, not in the SBOM.",
+      "how_ko": "모델과 데이터를 보호하는 통제 수단을 적습니다. 가중치에 누가 접근할 수 있는지, 학습 환경을 어떻게 분리하는지, 산출물에 어떻게 서명하는지입니다. SBOM이 아니라 운영 쪽에 있는 정보입니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-sec-compliance": {
+      "how": "Name the security standard or internal policy this model was built under, and who signed off. Point at the assessment record rather than restating it here.",
+      "how_ko": "이 모델이 어떤 보안 표준이나 사내 정책을 따라 만들어졌는지, 누가 승인했는지 밝힙니다. 내용을 옮겨 적기보다 점검 기록을 가리키는 편이 낫습니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-sec-policy": {
+      "how": "Give the route for reporting a vulnerability in this model and who answers it. A published model needs a contact that outlives the person who trained it.",
+      "how_ko": "이 모델의 취약점을 어디로 신고하고 누가 답하는지 적습니다. 공개한 모델에는 학습한 사람이 자리를 옮겨도 유지되는 연락처가 필요합니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    },
+    "g7-kpi-security": {
+      "how": "Record what you measured on the security side — adversarial or jailbreak testing, refusal rates, red-team results — with the method and the date. If nothing was measured, say so plainly.",
+      "how_ko": "보안 쪽에서 무엇을 측정했는지 기록합니다. 적대적 입력이나 우회 시도 시험, 거부율, 모의 공격 결과를 방법·시점과 함께 적습니다. 측정하지 않았다면 하지 않았다고 그대로 밝힙니다.",
+      "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+    }
   }
 }

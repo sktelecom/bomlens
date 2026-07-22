@@ -424,7 +424,54 @@ echo "== G7 fill-in guidance: surfaced in the AI conformance report =="
 gn=$(jq '[.checks[] | select((.guidance.snippet // "") != "")] | length' "$CONF")
 [ "$gn" -ge 1 ] && pass "G7 checks carry fill-in guidance ($gn tagged)" || fail "no G7 check carries guidance"
 grep -q "How to fill the gaps" "$WORK/conf_conformance.md" && pass "MD carries the fill-in section" || fail "MD lacks the fill-in section"
-grep -q "How to fill the gaps" "$WORK/conf_conformance.html" && pass "HTML carries the fill-in section" || fail "HTML lacks the fill-in section"
+# HTML carries the same guidance inline, in the evidence column of the row it
+# belongs to, rather than as a section of its own.
+grep -q 'details class="fix"' "$WORK/conf_conformance.html" && pass "HTML carries the fill-in fragment inline" || fail "HTML lacks the inline fill-in fragment"
+grep -q "How to fill this" "$WORK/conf_conformance.html" && pass "HTML labels the inline fragment" || fail "HTML lacks the inline fragment label"
+grep -q '<a href="https://cyclonedx.org/' "$WORK/conf_conformance.html" && pass "HTML links the reference doc" || fail "HTML leaves the reference URL as text"
+# Every link leaves for a new tab: the report is a local file a reviewer keeps open.
+bare=$(grep -o '<a href="[^"]*"[^>]*>' "$WORK/conf_conformance.html" | grep -vc 'target="_blank"' || true)
+[ "$bare" -eq 0 ] && pass "every report link opens in a new tab" || fail "some report links replace the report" "$bare"
+grep -q 'How to fill the gaps' "$WORK/conf_conformance.html" && fail "HTML still carries the standalone fill-in section" || pass "HTML has no standalone fill-in section"
+
+echo "== conformance HTML: table legibility =="
+grep -q '<td class="num">1</td>' "$WORK/conf_conformance.html" && pass "rows are numbered" || fail "rows carry no number column"
+grep -q 'class="s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
+grep -q 'td.req{white-space:nowrap' "$WORK/conf_conformance.html" && pass "the required cell does not wrap" || fail "the required cell can wrap one glyph per line"
+grep -q 'href="https://huggingface.co/' "$WORK/conf_conformance.html" && pass "the project name links to the model repository" || fail "the project name is not linked"
+
+echo "== conformance report: verdict-bearing checks are separated from advisory ones =="
+for ext in md html; do
+    f="$WORK/conf_conformance.$ext"
+    grep -q "SBOM format requirements" "$f" && pass "$ext names the format-requirement section" || fail "$ext lacks the format-requirement section"
+    grep -q "G7 minimum elements" "$f" && pass "$ext names the G7 section" || fail "$ext lacks the G7 section"
+    grep -qi "a single mandatory failure" "$f" && pass "$ext says why the format checks matter" || fail "$ext states no reason for the format checks"
+    grep -q "never move the result" "$f" && pass "$ext says the G7 checks are advisory" || fail "$ext does not mark the G7 checks advisory"
+done
+# The G7 table drops the required column — every row in it would read "no".
+g7hdr=$(sed -n '/G7 minimum elements/,/^$/p' "$WORK/conf_conformance.md" | grep '^| Status')
+printf '%s' "$g7hdr" | grep -q "Required" && fail "the G7 table still carries the required column" || pass "the G7 table drops the required column"
+sub_rows=$(sed -n '/## SBOM format requirements/,/## G7 minimum elements/p' "$WORK/conf_conformance.md" | grep -c '^| [^S|-]')
+[ "$sub_rows" -ge 8 ] && pass "the format-requirement table carries the checks ($sub_rows rows)" || fail "the format-requirement table is short" "$sub_rows"
+
+echo "== review-only elements say what a person has to establish =="
+gd="$GD"
+reg="$LIB/g7-registry.json"
+naids=$(jq -r '[.clusters[].elements[] | select(.source=="na") | .id] | sort | join(" ")' "$reg")
+rvids=$(jq -r '[.review | keys[]] | sort | join(" ")' "$gd")
+[ "$naids" = "$rvids" ] && pass "every review-only element has review guidance" || fail "review guidance does not cover the review-only elements" "$naids != $rvids"
+badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.value.how_ko // "") == "") or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$gd")
+[ -z "$badrv" ] && pass "every review entry carries how / how_ko / an https link" || fail "review entries are incomplete" "$badrv"
+grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
+
+echo "== crosswalk tables line up with the G7 table =="
+xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,$p' "$WORK/conf_conformance.html" | head -c 4000)
+printf '%s' "$xwtb" | grep -q "<th>Detail</th>" && pass "crosswalk carries the detail column" || fail "crosswalk lacks the detail column"
+printf '%s' "$xwtb" | grep -q "<th>Evidence / how</th>" && pass "crosswalk carries the evidence column" || fail "crosswalk lacks the evidence column"
+printf '%s' "$xwtb" | grep -q 'details class="fix"' && pass "crosswalk rows carry their guidance" || fail "crosswalk rows lost the guidance"
+# The provisions each element maps to are what the crosswalk is for — they ride
+# with the requirement name rather than getting dropped for the new columns.
+printf '%s' "$xwtb" | grep -q '<br><span class="meta">Annex' && pass "crosswalk keeps the provision refs" || fail "crosswalk dropped the provision refs"
 # The fragment text itself must reach the reader, not just the heading.
 grep -q '"alg": "SHA-256"' "$WORK/conf_conformance.md" && pass "MD prints the CycloneDX fragment" || fail "MD lacks the fragment body"
 # Scope: the section covers gaps only. g7-model-license passes on this fixture,

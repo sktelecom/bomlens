@@ -243,7 +243,9 @@ g7_ai_checks() {
         local gjoined
         if gjoined=$(printf '%s' "$out" | jq -c --slurpfile g "$guide" '
             (($g[0].map) // {}) as $m
-            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)' 2>/dev/null); then
+            | (($g[0].review) // {}) as $r
+            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)
+            | map(if $r[.id] then . + {reviewGuide: $r[.id]} else . end)' 2>/dev/null); then
             out="$gjoined"
         else
             echo "[validate] WARN: G7 guidance join failed; continuing without it." >&2
@@ -418,7 +420,7 @@ if [ -f "$XWALK" ]; then
                 present: ($frows | map(select(.status=="pass")) | length),
                 gap:     ($frows | map(select(.status=="warn" and ((.source//"")!="na"))) | length),
                 review:  ($frows | map(select((.source//"")=="na")) | length),
-                elements:($frows | map({label, status, source,
+                elements:($frows | map({id, label, status, source, detail,
                             refs: [ (.regulations // [])[] | select(.framework==$fid) | .ref ]})) }
           ] }' 2>/dev/null) || XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
 fi
@@ -458,6 +460,16 @@ tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
 
 RESULT_UP=$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')
 PROJECT_ESC=$(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+# Header link: an AI SBOM carries the model's own page as an external reference, so
+# the project name can point at it. A plain dependency SBOM has none — stays text.
+MODEL_URL=$(jq -r '[.components[]? | select(.type=="machine-learning-model")
+    | .externalReferences[]? | select(.type=="website") | .url
+    | select(type=="string" and startswith("https://"))] | .[0] // empty' "$SBOM" 2>/dev/null || true)
+PROJECT_HTML="$PROJECT_ESC"
+if [ -n "$MODEL_URL" ]; then
+    MODEL_URL_ESC=$(printf '%s' "$MODEL_URL" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+    PROJECT_HTML="<a href=\"${MODEL_URL_ESC}\" target=\"_blank\" rel=\"noopener noreferrer\">${PROJECT_ESC}</a>"
+fi
 HTML_LANG="en"
 RCHECKS="$CHECKS"
 RXW="$XW_SUMMARY"
@@ -499,7 +511,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           else $d end;
-      map(.label = llabel(.id; .label) | .detail = ldetail(.detail))
+      map(.label = llabel(.id; .label) | .detail = ldetail(.detail)
+          | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end))
     ') || RCHECKS="$CHECKS"
     # Crosswalk element labels use the same registry label_ko (framework titles,
     # article refs and the disclaimer stay verbatim — they are proper identifiers).
@@ -517,7 +530,10 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_MD_UNTRACE=$(tfmt conformance.md_untraceable "$N_UNTRACEABLE")
     C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
     C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
-    C_TH_EVID=$(kstr conformance.th_evidence)
+    C_TH_EVID=$(kstr conformance.th_evidence); C_FIX_SUMMARY=$(kstr conformance.fix_summary)
+    C_CHECK_SUMMARY=$(kstr conformance.check_summary)
+    C_H2_SUBMIT=$(kstr conformance.h2_submission); C_SUBMIT_INTRO=$(kstr conformance.submission_intro)
+    C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
@@ -527,7 +543,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_G7=$(kstr conformance.th_g7element); C_TH_XREF=$(kstr conformance.th_reference)
     C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT")
     C_KIND=$(kstr conformance.kind); C_H1=$(kstr conformance.h1)
-    C_META="$(kstr conformance.meta_project): ${PROJECT_ESC} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT}"
+    C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT}"
     C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
     C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
     C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
@@ -537,17 +553,22 @@ else
     C_MD_FMT="- Format: ${FORMAT}"
     C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
     C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
-    C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"; C_TH_EVID="Evidence"
+    C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
+    C_TH_EVID="Evidence / how"; C_FIX_SUMMARY="How to fill this"; C_CHECK_SUMMARY="What to establish"
+    C_H2_SUBMIT="SBOM format requirements"
+    C_SUBMIT_INTRO="What the SBOM itself has to carry. The same bar applies however the SBOM was produced, and a single mandatory failure makes the overall result a failure."
+    C_H2_G7CHK="G7 minimum elements"
+    C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
     C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
     C_YES="yes"; C_NO="no"
     C_REF="Reference:"; C_SOURCE="Source:"
     C_MAPPED="Mapped elements:"; C_MSUFFIX=""; C_MPRESENT="present"; C_MGAP="gap"; C_MREVIEW="needs review"
-    C_TH_G7="G7 element"; C_TH_XREF="Reference"
+    C_TH_G7="Requirement"; C_TH_XREF="Related provisions"
     C_HTML_TITLE="SBOM Conformance — ${PROJECT}"
     C_KIND="Conformance"; C_H1="SBOM Conformance Report"
-    C_META="Project: ${PROJECT_ESC} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
+    C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
     C_PILL_RESULT="Result: ${RESULT_UP}"
     C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
     C_PILL_UNTRACE="Untraceable (pkg:generic):"
@@ -564,11 +585,33 @@ fi
     echo "${C_MD_RESULT}"
     [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "${C_MD_UNTRACE}"
     echo ""
+    # Same split as the HTML: verdict-bearing submission requirements first, the
+    # advisory G7 elements after, each under its own heading and reason.
+    md_rows() {   # $1: "submission" | "g7"
+        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" --arg kind "$1" '
+            [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ][] |
+            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | "
+            + (if $kind=="g7" then "" else "\(if .required then $yes else $no end) | " end)
+            + "\(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+    }
+    echo "## ${C_H2_SUBMIT}"
+    echo ""
+    echo "${C_SUBMIT_INTRO}"
+    echo ""
     echo "| ${C_TH_STATUS} | ${C_TH_REQMT} | ${C_TH_REQD} | ${C_TH_DETAIL} | ${C_TH_EVID} |"
     echo "|--------|-------------|:--------:|--------|----------|"
-    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" '.[] |
-        "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \(.label) | \(if .required then $yes else $no end) | \(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
+    md_rows submission
     echo ""
+    if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
+        echo "## ${C_H2_G7CHK}"
+        echo ""
+        echo "${C_G7CHK_INTRO}"
+        echo ""
+        echo "| ${C_TH_STATUS} | ${C_TH_REQMT} | ${C_TH_DETAIL} | ${C_TH_EVID} |"
+        echo "|--------|-------------|--------|----------|"
+        md_rows g7
+        echo ""
+    fi
     # Missing-item detail for every non-passing check that names offenders —
     # mandatory failures AND advisory G7 warns (a reviewer needs to know WHICH
     # model components lack the license/hash, not just the count).
@@ -635,7 +678,7 @@ fi
 <style>
  :root{
   --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
-  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;--review:#2563eb;
   --radius:.375rem;--radius-card:.5rem;
   --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -643,7 +686,7 @@ fi
  }
  @media (prefers-color-scheme:dark){:root{
   --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
-  --th-bg:#1f1f23;--row-hover:#202024;
+  --th-bg:#1f1f23;--row-hover:#202024;--review:#60a5fa;
   --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
  }}
  *{box-sizing:border-box;}
@@ -684,6 +727,14 @@ fi
  .s-pass{color:#16a34a;font-weight:700;}
  .s-fail{color:#dc2626;font-weight:700;}
  .s-warn{color:#ca8a04;font-weight:700;}
+ .s-review{color:var(--review);font-weight:700;}
+ td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+ th.num{text-align:right;}
+ td.req{white-space:nowrap;}
+ details.fix{margin:.4rem 0 0;}
+ details.fix summary{cursor:pointer;color:var(--brand);font-size:.8rem;font-weight:600;}
+ details.fix pre{margin:.4rem 0 .2rem;}
+ details.fix .meta{font-size:.8rem;}
  .mono{list-style:none;padding-left:0;}
  .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
  pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
@@ -705,47 +756,113 @@ fi
  <span class="pill">${C_PILL_REVIEW} <span class="count">${N_REVIEW}</span></span>
 $( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
-<div class="table-wrap"><table><tr><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>
 HTMLHEAD
-    echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" '.[] |
-        "<tr><td class=\"s-\(.status)\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
-        "<td>" + (.label|@html) + "</td><td>" + (if .required then $yes else $no end) + "</td>" +
-        "<td>" + ((.detail // "")|@html) + "</td>" +
-        "<td>" + (((.evidence // []) | join(", "))|@html) + "</td></tr>"'
+    # Two tables, not one. The submission requirements decide the verdict; the G7
+    # elements are advisory and never do. Mixed into a single 60-row table the
+    # reader cannot tell which is which, or why a given row is there. The G7 table
+    # also drops the "required" column — every value in it would read "no".
+    #
+    # Evidence column doubles as the fix column: an advisory element that is
+    # missing carries its fill-in fragment inline (collapsed), so the reader never
+    # has to match a row against a separate section further down the page.
+    html_rows() {   # $1: "submission" | "g7"
+        echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
+            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" --arg kind "$1" '
+            [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
+            | to_entries[] | .key as $i | .value |
+            (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
+            "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
+            "<td class=\"" + $cls + "\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
+            "<td>" + (.label|@html) + "</td>" +
+            (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
+            "<td>" + ((.detail // "")|@html) + "</td>" +
+            "<td>" + (((.evidence // []) | join(", "))|@html) +
+            (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
+             then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
+                  + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
+                  + (if ((.guidance.docUrl // "")|startswith("http"))
+                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
+                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                          + ((.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                     else "" end)
+                  + "</details>"
+             elif ((.reviewGuide // null) != null and (.source // "")=="na")
+             then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
+                  + "<p>" + (.reviewGuide.how|@html) + "</p>"
+                  + (if ((.reviewGuide.docUrl // "")|startswith("http"))
+                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.reviewGuide.docUrl|@html)
+                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                          + ((.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                     else "" end)
+                  + "</details>"
+             else "" end) +
+            "</td></tr>"'
+    }
+    echo "<h2>${C_H2_SUBMIT}</h2>"
+    echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p>"
+    echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+    html_rows submission
     echo "</table></div>"
+    if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
+        echo "<h2>${C_H2_G7CHK}</h2>"
+        echo "<p class=\"meta\">${C_G7CHK_INTRO}</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+        html_rows g7
+        echo "</table></div>"
+    fi
     if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "<h2>${C_H2_MISSING}</h2>"
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
     fi
-    # How to fill the gaps (AI SBOMs only) — same scoping as the Markdown: only
-    # advisory elements that are actually missing and have a fragment to show.
-    if echo "$RCHECKS" | jq -e 'any(.[]; (.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))' >/dev/null; then
-        echo "<h2>${C_H2_FILL}</h2>"
-        echo "<p class=\"meta\">${C_FILL_INTRO}</p>"
-        echo "$RCHECKS" | jq -r --arg ref "$C_REF" '.[] | select((.guidance // null) != null and .status=="warn" and ((.source // "") != "na")) |
-            "<h3>" + (.label|@html) + "</h3>" +
-            "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>" +
-            "<p class=\"meta\">" + ($ref|@html) + " " + (.guidance.docUrl|@html) + "</p>"'
-    fi
+    # The fill-in fragments used to live here as their own section; they now ride
+    # in the evidence column of the row they belong to (see above). The Markdown
+    # report keeps the section — a table cell cannot hold a code block there.
     # Regulatory crosswalk (AI SBOMs only): documentation obligations each mapped
     # G7 element touches. Visibility only — the disclaimer states BomLens does not
     # certify compliance; this section never affects the result above.
     if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
         echo "<h2>${C_H2_XWALK}</h2>"
         echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
-        echo "$RXW" | jq -r \
+        echo "$RXW" | jq -r --argjson checks "$RCHECKS" \
             --arg pres "$C_MPRESENT" --arg gap "$C_MGAP" --arg rev "$C_MREVIEW" \
-            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thr "$C_TH_XREF" '.frameworks[] |
+            --arg ths "$C_TH_STATUS" --arg thg "$C_TH_G7" --arg thd "$C_TH_DETAIL" --arg the "$C_TH_EVID" \
+            --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" '
+            ( $checks | map({key: .id, value: .}) | from_entries ) as $byid
+            | .frameworks[] |
             "<h3>" + (.title|@html) + "</h3>" +
             "<p class=\"meta\">" + (.source|@html) + " &middot; " + ($pres|@html) + " " + (.present|tostring)
               + ", " + ($gap|@html) + " " + (.gap|tostring) + ", " + ($rev|@html) + " " + (.review|tostring) + "</p>" +
-            "<div class=\"table-wrap\"><table><tr><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thr|@html) + "</th></tr>" +
-            ([ .elements[] |
-               "<tr><td class=\"s-" + (if .status=="pass" then "pass" else "warn" end) + "\">"
+            "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>" + ($ths|@html) + "</th><th>" + ($thg|@html) + "</th><th>" + ($thd|@html) + "</th><th>" + ($the|@html) + "</th></tr>" +
+            ([ .elements | to_entries[] | .key as $i | .value | . as $e | ($byid[$e.id] // {}) as $c |
+               "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>"
+               + "<td class=\"" + (if (.source//"")=="na" then "s-review" elif .status=="pass" then "s-pass" else "s-warn" end) + "\">"
                + (if (.source//"")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>"
-               + "<td>" + (.label|@html) + "</td>"
-               + "<td>" + ((.refs|join(", "))|@html) + "</td></tr>" ] | join(""))
+               + "<td>" + (.label|@html)
+               + (if ((.refs|length) > 0) then "<br><span class=\"meta\">" + ((.refs|join(", "))|@html) + "</span>" else "" end)
+               + "</td>"
+               + "<td>" + ((($c.detail // .detail) // "")|@html) + "</td>"
+               + "<td>"
+               + (if (($c.guidance // null) != null and $c.status=="warn" and (($c.source // "") != "na"))
+                  then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
+                       + "<pre><code>" + ($c.guidance.snippet|@html) + "</code></pre>"
+                       + (if (($c.guidance.docUrl // "")|startswith("http"))
+                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.guidance.docUrl|@html)
+                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                               + (($c.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                          else "" end)
+                       + "</details>"
+                  elif (($c.reviewGuide // null) != null and ($c.source // "")=="na")
+                  then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
+                       + "<p>" + ($c.reviewGuide.how|@html) + "</p>"
+                       + (if (($c.reviewGuide.docUrl // "")|startswith("http"))
+                          then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($c.reviewGuide.docUrl|@html)
+                               + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                               + (($c.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                          else "" end)
+                       + "</details>"
+                  else "" end)
+               + "</td></tr>" ] | join(""))
             + "</table></div>"'
     fi
     echo "</body></html>"

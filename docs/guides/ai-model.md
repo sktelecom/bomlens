@@ -99,7 +99,7 @@ A source badge on each row says where a satisfied value comes from:
 - Declared (4) — present only when a person or a manifest supplied the value.
 - Review needed (13) — no automated source exists; a person has to confirm it. The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. For an AI SBOM each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped element was checked.
 
-The report shows how to close a gap, not only that one exists. For each advisory element with an automated source that is still absent, a "How to fill the gaps" section prints a CycloneDX fragment and a link to the authoritative documentation. Passing and review-only elements are left out, so a well-documented model adds no section at all.
+The report shows how to close a gap, not only that one exists. Every advisory element with an automated source that is still absent carries a CycloneDX fragment and a link to the authoritative documentation — in the HTML, behind the "Evidence / how to fill" cell on that row; in the Markdown, gathered under "How to fill the gaps". Passing and review-only elements are left out, so a well-documented model shows none of this.
 
 ## A worked example
 
@@ -129,7 +129,7 @@ The reports this run produced are here to open as-is: the [conformance report](.
 
 A report is not a finished review. Some elements a tool can fill; others only a person can.
 
-1. Fill the elements that have an automated source but came back empty, then scan again. The shape that satisfies each one is in the report's "How to fill the gaps" section.
+1. Fill the elements that have an automated source but came back empty, then scan again. The shape that satisfies each one sits on its own row in the report.
 2. Answer the 13 review-only elements yourself — things like training-data sensitivity or the intended application area, which no model card field can prove.
 3. Check separately what this tool does not look at, such as training dataset licensing and personal data.
 

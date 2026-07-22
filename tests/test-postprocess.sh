@@ -189,9 +189,9 @@ if [ -f "$STXT" ] && [ -f "$SHTML" ]; then
     else
         fail "missing attribution fallback for a component without copyright"
     fi
-    grep -q '<a href="https://github.com/qos-ch/logback">' "$SHTML" \
-        && pass "http(s) source rendered as a link in HTML" \
-        || fail "HTML source link missing"
+    grep -q '<a href="https://github.com/qos-ch/logback" target="_blank"' "$SHTML" \
+        && pass "http(s) source rendered as a link that opens in a new tab" \
+        || fail "HTML source link missing or opens in place"
 else
     fail "generate-notice.sh did not produce source/attribution NOTICE"
 fi

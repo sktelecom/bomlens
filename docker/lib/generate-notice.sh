@@ -302,7 +302,7 @@ HTMLHEAD
         def srchtml($s):
           if $s == null then ""
           elif ($s | test("^https?://"))
-          then "<span class=\"src\">Source: <a href=\"" + ($s|@html) + "\">" + ($s|@html) + "</a></span>"
+          then "<span class=\"src\">Source: <a href=\"" + ($s|@html) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + ($s|@html) + "</a></span>"
           else "<span class=\"src\">Source: " + ($s|@html) + "</span>" end;
         def attrhtml($c):
           if $c.copyright
