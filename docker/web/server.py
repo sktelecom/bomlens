@@ -122,7 +122,7 @@ ARTIFACT_SUFFIXES = (
     # AI compliance profile (generate-ai-profile.sh, AI SBOMs only): a governance
     # page that re-aggregates the G7 status, regulatory crosswalk and flagged
     # licenses. User-facing report in three formats, so list/download it.
-    "_ai-profile.json", "_ai-profile.md", "_ai-profile.html",
+    "_ai-profile.json", "_ai-profile.md",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
