@@ -1,0 +1,61 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "metadata": {
+    "component": { "type": "application", "name": "demo", "version": "1.0" }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "openssl",
+      "version": "3.0.2",
+      "purl": "pkg:deb/debian/openssl@3.0.2",
+      "properties": [
+        { "name": "syft:location:0:path", "value": "/usr/lib/x86_64-linux-gnu/libssl.so.3" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "log4j-core",
+      "version": "2.17.1",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.17.1",
+      "properties": [
+        { "name": "syft:location:0:path", "value": "/app/lib/log4j-core-2.17.1.jar" }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "actions/checkout",
+      "version": "4",
+      "purl": "pkg:github/actions/checkout@4",
+      "properties": [
+        { "name": "syft:location:0:path", "value": "/.github/workflows/ci.yml" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "left-pad",
+      "version": "1.3.0",
+      "purl": "pkg:npm/left-pad@1.3.0",
+      "properties": [
+        { "name": "syft:location:0:path", "value": "/project/package-lock.json" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "already-named",
+      "version": "1.0",
+      "purl": "pkg:generic/already-named@1.0",
+      "properties": [
+        { "name": "syft:location:0:path", "value": "/opt/already-named.so" },
+        { "name": "bsi:component:filename", "value": "custom-name.so" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "no-location",
+      "version": "2.0",
+      "purl": "pkg:maven/com.example/no-location@2.0"
+    }
+  ]
+}

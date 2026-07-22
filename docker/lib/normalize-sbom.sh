@@ -46,6 +46,44 @@ DROP_EMPTY_FILES='(.components) |= (if type=="array" then map(select((.type != "
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
+# Always: surface the delivered filename as bsi:component:filename. BSI TR-03183-2
+# section 5.2.2 (the CRA field guideline) makes the actual filename a required
+# per-component field, and the conformance report scores it. syft already records
+# where each component was found, in a syft:location:N:path property, but at a
+# tool-specific key the conformance check does not read. Copy the basename of the
+# first such path to the BSI-conventional key so a value we ALREADY have counts
+# toward the field, instead of asking the user to add it by hand.
+#
+# The catch: syft's location path is where a component was FOUND, which equals the
+# component's own file only for a real artifact (a scanned .so / .jar / .deb), not
+# for a manifest-declared one — a GitHub Action found in ci.yml, an npm dep found
+# in package-lock.json. Writing "ci.yml" as actions/checkout's filename would be a
+# wrong value, not a measurement. So the basename is taken ONLY when it looks like
+# a distributable artifact: it must end in a known artifact extension (optionally
+# followed by a numeric soversion, e.g. libssl.so.3). A manifest path (.yml,
+# package-lock.json, requirements.txt, pom.xml, …) has no such extension and is
+# skipped, staying a review item rather than being filled with a guess. Scoped:
+#   - only when no bsi:component:filename already exists (never overwrite);
+#   - basename via the last "/"-segment (rindex), matching how syft writes paths;
+#   - only when that basename matches ARTIFACT_EXT_RE.
+# cdxgen has no location property at all, so this is a no-op there.
+ARTIFACT_EXT_RE='\\.(jar|war|ear|aar|so|a|dll|dylib|deb|rpm|apk|whl|egg|gem|nupkg|tgz|crate|ko|node|pyd|exe|bin)(\\.[0-9]+)*$'
+FILENAME_FILTER='(.components) |= (if type=="array" then map(
+    if (.properties? // []) | any(.name == "bsi:component:filename") then .
+    else ( [ (.properties? // [])[]
+             | select((.name | type=="string") and (.name | test("^syft:location:[0-9]+:path$")))
+             | .value ]
+           | map(select(type=="string" and (. != "")))
+           | (.[0] // "") ) as $p
+      | if $p == "" then .
+        else ($p | (if test("/") then .[(rindex("/")+1):] else . end)) as $base
+          | if ($base != "") and ($base | test("'"$ARTIFACT_EXT_RE"'"))
+            then .properties = ((.properties // []) + [{name:"bsi:component:filename", value:$base}])
+            else .
+            end
+        end
+    end) else . end)'
+
 # Python range-lower-bound de-duplication. For a requirements.txt range dep like
 # `flask>=2.0`, cdxgen (after build-prep runs `pip install`) emits TWO components:
 # the manifest range LOWER BOUND (Flask@2.0, evidence technique=manifest-analysis,
@@ -248,6 +286,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
         | ${LICENSE_CLASS_FIX}
+        | ${FILENAME_FILTER}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
         | walk(if type==\"string\" then gsub(\"cdxgen-venv-[A-Za-z0-9]+\"; \"cdxgen-venv\") else . end)
@@ -259,7 +298,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
