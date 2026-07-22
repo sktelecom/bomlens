@@ -61,17 +61,29 @@
       "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"description\": \"Cleaned Wikipedia article dumps.\"\n}",
       "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
     },
+    "g7-ds-content": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"data\": [ {\n    \"type\": \"dataset\",\n    \"description\": \"English Wikipedia, article text only.\",\n    \"contents\": { \"url\": \"https://huggingface.co/datasets/wikipedia\" }\n  } ]\n}",
+      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+    },
     "g7-ds-identifier": {
       "snippet": "{\n  \"type\": \"data\",\n  \"bom-ref\": \"dataset:wikipedia\",\n  \"purl\": \"pkg:huggingface/datasets/wikipedia\"\n}",
       "docUrl": "https://github.com/package-url/purl-spec"
     },
+    "g7-ds-hash": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"hashes\": [ { \"alg\": \"SHA-256\", \"content\": \"3b7a…c19f\" } ]\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-ds-provenance": {
+      "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"data\": [ {\n    \"type\": \"dataset\",\n    \"governance\": { \"custodians\": [ { \"organization\": { \"name\": \"Wikimedia\" } } ] }\n  } ]\n}",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
+    "g7-ds-dependency": {
+      "snippet": "\"dependencies\": [ {\n  \"ref\": \"pkg:huggingface/google-bert/bert-base-uncased\",\n  \"dependsOn\": [ \"dataset:huggingface/wikipedia\" ]\n} ]",
+      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+    },
     "g7-ds-license": {
       "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"licenses\": [ { \"license\": { \"id\": \"CC-BY-SA-3.0\" } } ]\n}",
       "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
-    },
-    "g7-ds-provenance": {
-      "snippet": "\"componentData\": {\n  \"governance\": { \"custodians\": [ { \"organization\": { \"name\": \"Wikimedia\" } } ] }\n}",
-      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
     },
     "g7-infra-hardware": {
       "snippet": "\"externalReferences\": [\n  { \"type\": \"bom\", \"url\": \"https://example.com/hbom.json\" }\n]",
@@ -100,16 +112,6 @@
       "how_ko": "시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다.",
       "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
     },
-    "g7-ds-content": {
-      "how": "Describe what the training data actually contains — its subject matter, languages, time span, and how it was collected. Record it on the dataset card or alongside the model card.",
-      "how_ko": "학습 데이터에 무엇이 들어 있는지 적습니다. 주제와 언어, 수집 시기, 수집 방법입니다. 데이터셋 카드나 모델 카드 옆에 기록합니다.",
-      "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
-    },
-    "g7-ds-hash": {
-      "how": "Record a checksum for each training dataset as you used it, so a later reader can tell whether they hold the same data. Compute it from the copy you trained on, not from the upstream page.",
-      "how_ko": "학습에 쓴 데이터셋 각각의 체크섬을 기록합니다. 나중에 보는 사람이 같은 데이터인지 판단할 수 있게 하기 위함입니다. 원본 페이지가 아니라 실제로 학습에 쓴 사본에서 계산합니다.",
-      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
-    },
     "g7-ds-statistics": {
       "how": "Give the size and shape of the training data — record counts, class balance, and any known skew. These numbers explain the model's limits, so state them even when they are unflattering.",
       "how_ko": "학습 데이터의 규모와 구성을 적습니다. 건수, 분류별 비율, 알고 있는 치우침입니다. 이 수치가 모델의 한계를 설명하므로 불리한 내용이라도 밝힙니다.",
@@ -119,11 +121,6 @@
       "how": "Judge whether the training data holds personal information or third-party copyrighted work, and record what you filtered out and how. Where the answer is unclear, take it to your privacy and legal contacts before release.",
       "how_ko": "학습 데이터에 개인정보나 타인의 저작물이 섞였는지 판단하고, 무엇을 어떻게 걸러냈는지 기록합니다. 판단이 서지 않으면 공개 전에 개인정보 담당 부서와 법무에 확인합니다.",
       "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
-    },
-    "g7-ds-dependency": {
-      "how": "Say which dataset came from which — a filtered subset, a merge, or a translation of another set. The relationship carries the upstream licence and restrictions with it.",
-      "how_ko": "어떤 데이터셋이 어디서 나왔는지 밝힙니다. 걸러낸 부분집합인지, 여러 개를 합친 것인지, 다른 데이터셋을 번역한 것인지입니다. 이 관계를 따라 원본의 라이선스와 제한이 함께 따라옵니다.",
-      "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
     },
     "g7-sec-controls": {
       "how": "List the controls that protect the model and its data — who can reach the weights, how the training environment is isolated, how artefacts are signed. These live in your operations, not in the SBOM.",
