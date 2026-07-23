@@ -79,6 +79,28 @@ if jq -e '[.components[]? | select(.type=="file" and .purl=="pkg:generic/config@
 else
     fail "a purl-carrying file component was wrongly dropped"
 fi
+# normalize-sbom.sh surfaces the delivered filename as bsi:component:filename from
+# syft's location path, but ONLY when that path is a real artifact (known artifact
+# extension), so a manifest-declared component is never labelled with the manifest
+# it was found in. The fixture has: a .so (basename kept), a .jar (kept), a GitHub
+# Action found in ci.yml (skipped — .yml is not an artifact), an npm dep found in
+# package-lock.json (skipped), a component that already has the field (untouched),
+# and one with no location property (nothing to take).
+fnf() { jq -r --arg n "$1" '[.components[]|select(.name==$n)][0] | ([.properties[]?|select(.name=="bsi:component:filename").value] | .[0] // "")' "$WORK/fn.json"; }
+cp "$FIX/syft-location-filenames.json" "$WORK/fn.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/fn.json" >/dev/null 2>&1
+[ "$(fnf openssl)" = "libssl.so.3" ] && pass "a .so artifact path yields its basename (soversion kept)" || fail "openssl filename='$(fnf openssl)', expected libssl.so.3"
+[ "$(fnf log4j-core)" = "log4j-core-2.17.1.jar" ] && pass "a .jar artifact path yields its basename" || fail "log4j-core filename='$(fnf log4j-core)'"
+[ -z "$(fnf actions/checkout)" ] && pass "a manifest path (ci.yml) is NOT taken as a filename" || fail "actions/checkout wrongly filled with '$(fnf actions/checkout)'"
+[ -z "$(fnf left-pad)" ] && pass "a lockfile path (package-lock.json) is NOT taken as a filename" || fail "left-pad wrongly filled with '$(fnf left-pad)'"
+[ "$(fnf already-named)" = "custom-name.so" ] && pass "an existing bsi:component:filename is never overwritten" || fail "already-named filename='$(fnf already-named)', expected custom-name.so"
+[ -z "$(fnf no-location)" ] && pass "no location property -> no filename invented" || fail "no-location wrongly filled with '$(fnf no-location)'"
+# The property the field rides on must be singular — a second run must not append a
+# duplicate bsi:component:filename (idempotence, like enrich-staleness).
+bash "$LIB/normalize-sbom.sh" "$WORK/fn.json" >/dev/null 2>&1
+dupfn=$(jq '[.components[]|select(.name=="openssl")][0] | [.properties[]|select(.name=="bsi:component:filename")] | length' "$WORK/fn.json")
+[ "$dupfn" = "1" ] && pass "re-normalizing does not duplicate the filename property" || fail "openssl has $dupfn filename properties after a second run"
+
 # --stable mode runs the same filter; the empty rows must be gone there too.
 cp "$FIX/empty-file-components.json" "$WORK/efs.json"
 bash "$LIB/normalize-sbom.sh" "$WORK/efs.json" --stable >/dev/null 2>&1

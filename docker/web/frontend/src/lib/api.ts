@@ -175,14 +175,18 @@ export interface G7GuidanceRef {
   docUrl?: string;
 }
 
-/** One regulatory-framework reference mapped onto a G7 element check. */
+/** One regulatory-framework reference mapped onto a conformance check. */
 export interface RegulationRef {
-  /** Framework id (e.g. "eu-ai-act", "kr-ai-framework-act"). */
+  /** Framework id (e.g. "eu-ai-act", "bsi-tr-03183-2"). */
   framework: string;
-  /** The specific article / annex reference (e.g. "Annex IV(1)"). */
+  /** The specific article / annex / section reference (e.g. "Annex IV(1)", "Section 5.2.2"). */
   ref: string;
-  /** The interpretive basis for treating this element as touching that reference. */
+  /** The interpretive basis for treating this check as touching that reference. */
   basis: string;
+  /** Short framework name for badging a check row (e.g. "BSI TR-03183-2", "NTIA"). */
+  short?: string;
+  /** Korean short framework name; falls back to `short` when absent. */
+  short_ko?: string;
 }
 
 /** One crosswalk element: a G7 element with its status and regulation refs, in

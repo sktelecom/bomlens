@@ -637,9 +637,10 @@
   },
   "crosswalk": {
     "title": "Regulatory crosswalk",
-    "disclaimer": "A documentation-preparation aid, not a compliance verdict. BomLens does not certify regulatory compliance; it only shows which documentation obligation each G7 element touches.",
+    "disclaimer": "A documentation-preparation aid, not a compliance verdict. This crosswalk covers only the documentation elements an SBOM can carry; obligations it cannot express — bias and fairness assessment, risk management — must be met through separate documents.",
     "totals": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}} mapped",
-    "frameworkSummary": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}}",
+    "thFramework": "Framework",
+    "thTotal": "Total",
     "refs": "References:",
     "present": "Present",
     "gap": "Gap",

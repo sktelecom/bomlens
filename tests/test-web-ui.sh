@@ -688,8 +688,13 @@ mapped = [x for x in g7 if x.get("regulations")]
 assert len(mapped) >= 1, "no per-check regulations passed through"
 reg = mapped[0]["regulations"][0]
 assert {"framework", "ref", "basis"} <= set(reg), reg
-# Base (non-G7) format checks carry no crosswalk mapping.
-assert all("regulations" not in x for x in base), "base checks should not carry regulations"
+# Base (non-G7) format checks carry crosswalk mappings too: the CRA/NTIA SBOM
+# baselines apply to every SBOM, not just AI ones, so the plain CycloneDX checks
+# pick up their references the same way a G7 element does. At least one base check
+# is mapped (spec-version, name-version, …), and any that are use the same shape.
+base_mapped = [x for x in base if x.get("regulations")]
+assert len(base_mapped) >= 1, "base format checks should carry crosswalk mappings"
+assert {"framework", "ref", "basis"} <= set(base_mapped[0]["regulations"][0]), base_mapped[0]
 PY
     then
         pass "conformance_summary exposes the full G7 checklist with cluster/source/crosswalk"
