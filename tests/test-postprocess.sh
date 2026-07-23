@@ -569,6 +569,52 @@ cp "$WORK/fw.json" "$WORK/fw2.json"
 bash "$LIB/enrich-cpe.sh" "$WORK/fw2.json" >/dev/null 2>&1
 if diff -q "$WORK/fw.json" "$WORK/fw2.json" >/dev/null 2>&1; then pass "enrich-cpe.sh is idempotent"; else fail "second enrich-cpe run changed the SBOM"; fi
 
+echo "== F-1b: OS-context enrichment — synthesize/normalize operating-system for distro matching =="
+OSCTX="$LIB/enrich-os-context.py"
+# (a) rpm/centos SBOM with NO operating-system component: one is synthesized from
+# the dominant namespace + .elN suffix so Trivy can match distro CVEs.
+cat > "$WORK/osc-centos.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"acl","version":"2.2.51-15.el7","purl":"pkg:rpm/centos/acl@2.2.51-15.el7?arch=x86_64"},
+ {"type":"library","name":"bash","version":"4.2.46-35.el7","purl":"pkg:rpm/centos/bash@4.2.46-35.el7?arch=x86_64"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-centos.json" >/dev/null 2>&1
+osc_os=$(jq -r '[.components[]|select(.type=="operating-system")]|.[0]|"\(.name) \(.version)"' "$WORK/osc-centos.json")
+[ "$osc_os" = "centos 7" ] && pass "synthesized operating-system centos 7 from rpm .el7 PURLs" || fail "synthesized OS='$osc_os', expected 'centos 7'"
+osc_ref=$(jq -r '[.components[]|select(.type=="operating-system")]|.[0]."bom-ref"' "$WORK/osc-centos.json")
+[ "$osc_ref" = "bomlens-os-context" ] && pass "synthesized OS carries bomlens-os-context bom-ref" || fail "OS bom-ref='$osc_ref'"
+# (b) idempotent: a second run adds no second OS component.
+python3 "$OSCTX" "$WORK/osc-centos.json" >/dev/null 2>&1
+osc_n=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-centos.json")
+[ "$osc_n" = "1" ] && pass "enrich-os-context is idempotent (exactly one OS component)" || fail "OS component count=$osc_n after second run, expected 1"
+# (c) existing RHEL-like OS with a minor version is normalized to major (Trivy
+# matches rpm distros by major; "rocky 8.10" matches nothing, must become "8").
+cat > "$WORK/osc-rocky.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"operating-system","name":"rocky","version":"8.10"},
+ {"type":"library","name":"bash","version":"4.4.20-6.el8","purl":"pkg:rpm/rocky/bash@4.4.20-6.el8?arch=x86_64"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-rocky.json" >/dev/null 2>&1
+osc_rv=$(jq -r '[.components[]|select(.type=="operating-system")]|.[0].version' "$WORK/osc-rocky.json")
+[ "$osc_rv" = "8" ] && pass "existing 'rocky 8.10' normalized to major '8'" || fail "rocky version='$osc_rv', expected '8'"
+# (d) no-op guards: a maven-only SBOM and a deb-only SBOM get NO synthesized OS
+# (deb is recovered by the OSV engine, not by an OS component; unknown distros are
+# never guessed).
+cat > "$WORK/osc-maven.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"guava","version":"22.0","purl":"pkg:maven/com.google.guava/guava@22.0"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-maven.json" >/dev/null 2>&1
+osc_mn=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-maven.json")
+[ "$osc_mn" = "0" ] && pass "maven-only SBOM gets no synthesized OS (no false OS)" || fail "maven SBOM gained $osc_mn OS component(s)"
+cat > "$WORK/osc-deb.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"acpid","version":"2.0.32","purl":"pkg:deb/ubuntu/acpid@2.0.32-1ubuntu1?arch=amd64"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-deb.json" >/dev/null 2>&1
+osc_dn=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-deb.json")
+[ "$osc_dn" = "0" ] && pass "deb-only SBOM gets no synthesized OS (OSV engine handles deb)" || fail "deb SBOM gained $osc_dn OS component(s)"
+
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
 # file without breaking the contract server.py security_summary reads.
