@@ -15,6 +15,7 @@ set -e
 SBOM="$1"
 OUT_PREFIX="$2"
 PROJECT="${3:-project}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[security] SBOM file not found: $SBOM" >&2
@@ -69,27 +70,49 @@ if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
 fi
 
-# Merge a Trivy-shaped CVE sidecar from another engine, if present. Firmware
-# scans drop ${OUT_PREFIX}_security_cvebintool.json: cve-bin-tool matches CVEs on
-# stripped binaries by version signature (no purl/CPE), which Trivy cannot do, so
-# without this merge the firmware security report is empty. The sidecar already
-# carries the .Results[].Vulnerabilities[] contract, so we just append its
-# Results to Trivy's — the web layer and the renderer below read one unified file.
-SIDECAR="${OUT_PREFIX}_security_cvebintool.json"
-if [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1; then
-    SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
-    if [ "${SIDE_N:-0}" -gt 0 ]; then
-        tmp_m="$(mktemp)"
-        if jq -s '{ Results: ((.[0].Results // []) + (.[1].Results // [])) }
-                  + (.[0] | del(.Results))' "$JSON" "$SIDECAR" > "$tmp_m" 2>/dev/null; then
-            mv "$tmp_m" "$JSON"
-            echo "[security] merged ${SIDE_N} cve-bin-tool CVE(s) from $(basename "$SIDECAR")."
-        else
-            rm -f "$tmp_m"
-            echo "[security] WARN: failed to merge cve-bin-tool sidecar; reporting Trivy results only." >&2
-        fi
-    fi
+# Deep-CVE (opt-in image): run grype's CPE matcher for the NVD-only maven CVEs
+# Trivy misses (older Apache libs whose CVEs live in NVD keyed by CPE, absent from
+# the GitHub Security Advisory data Trivy uses for maven). scan-nvd-cpe.py drops a
+# ${OUT_PREFIX}_security_grype.json sidecar in the same .Results[].Vulnerabilities[]
+# shape. grype is only in the deep-cve image, so this is a no-op elsewhere; the
+# script also self-skips when grype is absent. Disable with DEEP_CVE=false.
+if command -v grype >/dev/null 2>&1 && [ "${DEEP_CVE:-true}" != "false" ]; then
+    python3 "$SCRIPT_DIR/scan-nvd-cpe.py" "$SBOM" "$OUT_PREFIX" \
+        || echo "[security] WARN: grype CPE (deep-cve) scan failed; reporting Trivy results only." >&2
 fi
+
+# Merge Trivy-shaped CVE sidecars from other engines, if present:
+#   _security_cvebintool.json — firmware binaries (cve-bin-tool, no purl/CPE)
+#   _security_grype.json       — deep-cve maven NVD-CPE findings (grype)
+# Each already carries the .Results[].Vulnerabilities[] contract, so we append its
+# Results to Trivy's; the FINDINGS dedup above collapses any (purl, cve) overlap so
+# the report and its counts read one unified, non-double-counted file.
+for engine in cvebintool grype; do
+    SIDECAR="${OUT_PREFIX}_security_${engine}.json"
+    [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1 || continue
+    SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
+    [ "${SIDE_N:-0}" -gt 0 ] || continue
+    tmp_m="$(mktemp)"
+    # Append the sidecar's Results but drop any (purl-or-name, cve) already present
+    # in the accumulated report, so the raw _security.json is de-duplicated at the
+    # source — the web layer reads it directly and must not double-count grype/Trivy
+    # overlap. (The FINDINGS dedup above independently protects the rendered report.)
+    if jq -s '
+        def key: (((.PkgIdentifier // {}).PURL // .PkgName) // "") + "|" + (.VulnerabilityID // "");
+        (.[0].Results // []) as $base
+        | ([ $base[].Vulnerabilities[]? | key ] | unique) as $seen
+        | { Results: ($base + [ .[1].Results[]
+              | .Vulnerabilities = [ (.Vulnerabilities // [])[] | select((. | key) as $k | ($seen | index($k)) | not) ] ]) }
+          + (.[0] | del(.Results))' "$JSON" "$SIDECAR" > "$tmp_m" 2>/dev/null; then
+        KEPT_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$tmp_m" 2>/dev/null || echo 0)
+        PREV_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$JSON" 2>/dev/null || echo 0)
+        mv "$tmp_m" "$JSON"
+        echo "[security] merged $((KEPT_N - PREV_N)) new ${engine} CVE(s) (of ${SIDE_N}; overlap deduped) from $(basename "$SIDECAR")."
+    else
+        rm -f "$tmp_m"
+        echo "[security] WARN: failed to merge ${engine} sidecar; reporting prior results only." >&2
+    fi
+done
 
 # Flatten findings: id, pkg, version, severity, fixed, cvss, title.
 # cvss = highest V3 (fallback V2) score across Trivy's CVSS sources.
@@ -97,13 +120,22 @@ FINDINGS=$(jq -r '
   [ .Results[]?.Vulnerabilities[]? | {
       id: .VulnerabilityID,
       pkg: .PkgName,
+      purl: ((.PkgIdentifier // {}).PURL // ""),
       version: .InstalledVersion,
       severity: (.Severity // "UNKNOWN"),
       fixed: (.FixedVersion // ""),
       cvss: ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ]
               | map(select(. != null)) | (max // null)),
-      title: (.Title // .Description // "" | .[0:120])
+      title: (.Title // .Description // "" | .[0:120]),
+      # deep-cve: a grype CPE match whose NVD version range was not verified
+      # (SECURITY_NVD_VERIFY off / NVD unreachable). Surfaced so the reader sees
+      # which findings may be loose-version false positives.
+      unverified: (.["bomlens:cpeVersionUnverified"] // false)
     } ]
+  # Dedup by (purl-or-name, CVE): when the deep-CVE grype pass and Trivy both
+  # report the same finding they must count once. purl is the stable key across
+  # engines; fall back to the package name when a finding carries no purl.
+  | unique_by([ (if .purl != "" then .purl else .pkg end), .id ])
 ' "$JSON" 2>/dev/null || echo '[]')
 
 # --- Priority enrichment (best-effort, network) -------------------------------
@@ -184,7 +216,12 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             " | \(if .kev then "⚠️ KEV" else "" end)" +
             " | \(.cvss // "")" +
             " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
-            " | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
+            " | \(.id)\(if .unverified then " †" else "" end) | \(.pkg) | \(.version) | \(.fixed) |"'
+        # Footnote only when at least one finding is version-unverified.
+        if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
+            echo ""
+            echo "† CPE-matched against NVD but the version range was not verified (deep-cve; set \`SECURITY_NVD_VERIFY=true\` with network + \`NVD_API_KEY\` to drop loose-version false positives)."
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "_Scan failed — no results were produced._"
     else
@@ -297,10 +334,13 @@ HTMLHEAD
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
-            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.id|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + "</td><td>" + (.pkg|@html) + "</td>" +
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + (.title|@html) + "</td></tr>"'
         echo "</table></div>"
+        if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
+            echo "<p class=\"meta\">&dagger; CPE-matched against NVD but the version range was not verified (deep-cve; set <code>SECURITY_NVD_VERIFY=true</code> with network + <code>NVD_API_KEY</code> to drop loose-version false positives).</p>"
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "<p>Scan failed &mdash; no results were produced.</p>"
     else

@@ -122,6 +122,9 @@ docker run --rm \
 | `GENERATE_NOTICE` | — | `false` | Generate the open-source notice (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Generate the Trivy security report (CLI `--security`) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
+| `ENRICH_MAVEN_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs) |
+| `SECURITY_NVD_VERIFY` | — | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` + network; adds minutes). Off by default — findings are kept and flagged version-unverified |
+| `NVD_API_KEY` | For `SECURITY_NVD_VERIFY` | — | NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined) |
 | `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
 | `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro (rpm) package PURLs so the scanner can match OS CVEs; no-op when the SBOM has no recognizable distro packages (skipped for AI SBOMs) |
 | `STALENESS_ENRICH` | — | `false` | Add deps.dev version currency (how many releases behind latest); needs network access |

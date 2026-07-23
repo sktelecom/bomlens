@@ -614,6 +614,76 @@ JSON
 python3 "$OSCTX" "$WORK/osc-deb.json" >/dev/null 2>&1
 osc_dn=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-deb.json")
 [ "$osc_dn" = "0" ] && pass "deb-only SBOM gets no synthesized OS (OSV engine handles deb)" || fail "deb SBOM gained $osc_dn OS component(s)"
+echo "== F-1c: maven CPE enrichment — groupId-derived NVD cpe:2.3 =="
+MVNCPE="$LIB/enrich-maven-cpe.py"
+cat > "$WORK/mvn.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"pdfbox-app","version":"1.8.7","purl":"pkg:maven/org.apache.pdfbox/pdfbox-app@1.8.7"},
+ {"type":"library","name":"jackson-databind","version":"2.10.2","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.10.2"},
+ {"type":"library","name":"spring-web","version":"5.0.0","purl":"pkg:maven/org.springframework/spring-web@5.0.0"},
+ {"type":"library","name":"guava","version":"22.0","purl":"pkg:maven/com.google.guava/guava@22.0"},
+ {"type":"library","name":"netty-common","version":"4.1.44","purl":"pkg:maven/io.netty/netty-common@4.1.44"},
+ {"type":"library","name":"single-seg","version":"1.0","purl":"pkg:maven/commons-single/single-seg@1.0"},
+ {"type":"library","name":"has-cpe","version":"1.0","purl":"pkg:maven/org.apache.foo/has-cpe@1.0","cpe":"cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn.json" >/dev/null 2>&1
+cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn.json"; }
+# (a) org.apache.* derived mechanically.
+[ "$(cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "org.apache.pdfbox -> apache:pdfbox cpe" || fail "pdfbox cpe='$(cpe_of pdfbox-app)'"
+# (b) curated map: Jackson product = artifact, not group tail.
+[ "$(cpe_of jackson-databind)" = "cpe:2.3:a:fasterxml:jackson-databind:2.10.2:*:*:*:*:*:*:*" ] && pass "jackson product taken from artifact (fasterxml:jackson-databind)" || fail "jackson cpe='$(cpe_of jackson-databind)'"
+# (c) curated map: spring is vmware:spring_framework (not derivable).
+[ "$(cpe_of spring-web)" = "cpe:2.3:a:vmware:spring_framework:5.0.0:*:*:*:*:*:*:*" ] && pass "org.springframework -> vmware:spring_framework (curated)" || fail "spring cpe='$(cpe_of spring-web)'"
+# (d) generic reverse-domain rule, 3-segment: com.google.guava -> google:guava.
+[ "$(cpe_of guava)" = "cpe:2.3:a:google:guava:22.0:*:*:*:*:*:*:*" ] && pass "3-seg group derived generically (google:guava)" || fail "guava cpe='$(cpe_of guava)'"
+# (d2) 2-segment group derived too (io.netty -> netty:netty; a real NVD product).
+[ "$(cpe_of netty-common)" = "cpe:2.3:a:netty:netty:4.1.44:*:*:*:*:*:*:*" ] && pass "2-seg group derived (io.netty -> netty:netty)" || fail "netty cpe='$(cpe_of netty-common)'"
+# (d3) a single-segment groupId (no domain to split) is left without a cpe.
+[ "$(cpe_of single-seg)" = "NONE" ] && pass "single-segment groupId left without a cpe (map-only)" || fail "single-seg wrongly got cpe='$(cpe_of single-seg)'"
+# (e) a pre-existing cpe is never overwritten.
+[ "$(cpe_of has-cpe)" = "cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*" ] && pass "pre-existing cpe preserved (no overwrite)" || fail "has-cpe cpe changed to '$(cpe_of has-cpe)'"
+# (f) non-maven component untouched.
+[ "$(cpe_of lodash)" = "NONE" ] && pass "non-maven (npm) component left without a cpe" || fail "lodash wrongly got a cpe"
+# (g) provenance marker on a derived cpe.
+mvn_src=$(jq -r '[.components[]|select(.name=="pdfbox-app")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/mvn.json")
+[ "$mvn_src" = "maven-groupid" ] && pass "derived cpe carries bomlens:cpeSource=maven-groupid" || fail "pdfbox cpeSource='$mvn_src'"
+# (h) idempotent.
+cp "$WORK/mvn.json" "$WORK/mvn2.json"; python3 "$MVNCPE" "$WORK/mvn2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn.json" "$WORK/mvn2.json" >/dev/null 2>&1 && pass "enrich-maven-cpe is idempotent" || fail "second run changed the SBOM"
+
+echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
+# The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
+# Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
+# bound). Test the version-range predicate directly against NVD cpeMatch shapes.
+python3 - "$LIB/scan-nvd-cpe.py" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snc", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+fails = []
+def check(name, cond):
+    print(("  PASS: " if cond else "  FAIL: ") + name)
+    if not cond: fails.append(name)
+# lower+upper bound: 7.0.50 is below the 9.0.0 start -> OUT (the real FP case).
+check("7.0.50 outside [9.0.0, 9.0.104) -> dropped",
+      not m._in_range("7.0.50", {"criteria":"cpe:2.3:a:apache:tomcat:*", "versionStartIncluding":"9.0.0", "versionEndExcluding":"9.0.104"}))
+# in-range stays.
+check("9.0.50 inside [9.0.0, 9.0.104) -> kept",
+      m._in_range("9.0.50", {"criteria":"cpe:2.3:a:apache:tomcat:*", "versionStartIncluding":"9.0.0", "versionEndExcluding":"9.0.104"}))
+# upper-only bound (no lower) keeps an older version -> that is the grype behavior
+# we DON'T reproduce; with the NVD lower bound present the FP is caught above.
+check("upper-only < 1.8.12 keeps 1.8.7 (pdfbox true positive)",
+      m._in_range("1.8.7", {"criteria":"cpe:2.3:a:apache:pdfbox:*", "versionEndExcluding":"1.8.12"}))
+# exact-version CPE (no range) matches only that version.
+check("exact 3.6 matches 3.6",
+      m._in_range("3.6", {"criteria":"cpe:2.3:a:apache:poi:3.6:*:*:*:*:*:*:*"}))
+check("exact 3.6 does not match 3.17",
+      not m._in_range("3.17", {"criteria":"cpe:2.3:a:apache:poi:3.6:*:*:*:*:*:*:*"}))
+# version comparator handles non-numeric tails (5.0.0.RELEASE ~ 5.0.0).
+check("comparator: 5.0.0.RELEASE == 5.0.0", m._cmp("5.0.0.RELEASE", "5.0.0") == 0)
+sys.exit(1 if fails else 0)
+PY
+if [ $? -eq 0 ]; then pass "NVD version-filter predicate: all range cases correct"; else fail "NVD version-filter predicate has a wrong case"; fi
 
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]

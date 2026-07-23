@@ -503,6 +503,18 @@ if [ "${ENRICH_OS_CONTEXT:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; t
     run_optional_step enrich-os-context python3 "$LIBDIR/enrich-os-context.py" "$OUTPUT_FILE"
 fi
 
+# Maven CPE enrichment: maven libraries carry a PURL but no CPE, so a CPE-aware
+# engine cannot reach their NVD-only CVEs (older Apache libs like pdfbox 1.8.7 /
+# tomcat 7.0.50, matched in NVD by cpe:2.3:a:apache:pdfbox, absent from the GitHub
+# Security Advisory data Trivy/OSV use for maven). enrich-maven-cpe.py derives an
+# NVD-matchable cpe:2.3 from the groupId — a curated map for well-known groups
+# (spring, jackson, ...) plus a conservative org.apache.* rule; anything it cannot
+# map safely gets no CPE (no guessing). Skipped for AI SBOMs and with
+# ENRICH_MAVEN_CPE=false; a no-op when the SBOM has no maven components.
+if [ "${ENRICH_MAVEN_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    run_optional_step enrich-maven-cpe python3 "$LIBDIR/enrich-maven-cpe.py" "$OUTPUT_FILE"
+fi
+
 # EOL enrichment: flag components whose release cycle is past its published
 # end-of-life, fully OFFLINE from a bundled endoflife.date snapshot (no network,
 # works air-gapped). Answers "is this still maintained?" — a supply-chain risk
