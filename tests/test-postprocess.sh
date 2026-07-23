@@ -614,6 +614,37 @@ JSON
 python3 "$OSCTX" "$WORK/osc-deb.json" >/dev/null 2>&1
 osc_dn=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-deb.json")
 [ "$osc_dn" = "0" ] && pass "deb-only SBOM gets no synthesized OS (OSV engine handles deb)" || fail "deb SBOM gained $osc_dn OS component(s)"
+echo "== F-1c: maven CPE enrichment — groupId-derived NVD cpe:2.3 =="
+MVNCPE="$LIB/enrich-maven-cpe.py"
+cat > "$WORK/mvn.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"pdfbox-app","version":"1.8.7","purl":"pkg:maven/org.apache.pdfbox/pdfbox-app@1.8.7"},
+ {"type":"library","name":"jackson-databind","version":"2.10.2","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.10.2"},
+ {"type":"library","name":"spring-web","version":"5.0.0","purl":"pkg:maven/org.springframework/spring-web@5.0.0"},
+ {"type":"library","name":"guava","version":"22.0","purl":"pkg:maven/com.google.guava/guava@22.0"},
+ {"type":"library","name":"has-cpe","version":"1.0","purl":"pkg:maven/org.apache.foo/has-cpe@1.0","cpe":"cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn.json" >/dev/null 2>&1
+cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn.json"; }
+# (a) org.apache.* derived mechanically.
+[ "$(cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "org.apache.pdfbox -> apache:pdfbox cpe" || fail "pdfbox cpe='$(cpe_of pdfbox-app)'"
+# (b) curated map: Jackson product = artifact, not group tail.
+[ "$(cpe_of jackson-databind)" = "cpe:2.3:a:fasterxml:jackson-databind:2.10.2:*:*:*:*:*:*:*" ] && pass "jackson product taken from artifact (fasterxml:jackson-databind)" || fail "jackson cpe='$(cpe_of jackson-databind)'"
+# (c) curated map: spring is vmware:spring_framework (not derivable).
+[ "$(cpe_of spring-web)" = "cpe:2.3:a:vmware:spring_framework:5.0.0:*:*:*:*:*:*:*" ] && pass "org.springframework -> vmware:spring_framework (curated)" || fail "spring cpe='$(cpe_of spring-web)'"
+# (d) unmapped group gets NO cpe (conservative, no wrong-CVE guessing).
+[ "$(cpe_of guava)" = "NONE" ] && pass "unmapped maven group left without a cpe (no guessing)" || fail "guava wrongly got cpe='$(cpe_of guava)'"
+# (e) a pre-existing cpe is never overwritten.
+[ "$(cpe_of has-cpe)" = "cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*" ] && pass "pre-existing cpe preserved (no overwrite)" || fail "has-cpe cpe changed to '$(cpe_of has-cpe)'"
+# (f) non-maven component untouched.
+[ "$(cpe_of lodash)" = "NONE" ] && pass "non-maven (npm) component left without a cpe" || fail "lodash wrongly got a cpe"
+# (g) provenance marker on a derived cpe.
+mvn_src=$(jq -r '[.components[]|select(.name=="pdfbox-app")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/mvn.json")
+[ "$mvn_src" = "maven-groupid" ] && pass "derived cpe carries bomlens:cpeSource=maven-groupid" || fail "pdfbox cpeSource='$mvn_src'"
+# (h) idempotent.
+cp "$WORK/mvn.json" "$WORK/mvn2.json"; python3 "$MVNCPE" "$WORK/mvn2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn.json" "$WORK/mvn2.json" >/dev/null 2>&1 && pass "enrich-maven-cpe is idempotent" || fail "second run changed the SBOM"
 
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
