@@ -491,6 +491,18 @@ if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
 fi
 
+# OS-context enrichment: a supplier SBOM can list every rpm/deb package yet omit
+# the operating-system component Trivy needs to pick a distro advisory DB. Without
+# it an SBOM full of pkg:rpm/centos/... returns ZERO findings despite valid PURLs.
+# enrich-os-context.py infers (distro, major version) from the dominant rpm PURL
+# and appends one operating-system component (or normalizes an existing "8.10" ->
+# "8" so RHEL-like matching works). Skipped for AI SBOMs and with
+# ENRICH_OS_CONTEXT=false; a no-op when the SBOM has no recognizable distro
+# packages. Runs before the security scan; best-effort, never aborts.
+if [ "${ENRICH_OS_CONTEXT:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
+    run_optional_step enrich-os-context python3 "$LIBDIR/enrich-os-context.py" "$OUTPUT_FILE"
+fi
+
 # EOL enrichment: flag components whose release cycle is past its published
 # end-of-life, fully OFFLINE from a bundled endoflife.date snapshot (no network,
 # works air-gapped). Answers "is this still maintained?" — a supply-chain risk
