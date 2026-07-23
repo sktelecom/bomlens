@@ -1,7 +1,7 @@
 {
   "note": "Interpretive crosswalk from the conformance checks BomLens runs to the documentation requirements of named regulations. It answers one question for a reviewer: when a check does not pass, which regulatory obligation does that gap touch? Keyed by check id — the G7 AI element ids from docker/lib/g7-registry.json for AI SBOMs, and the plain CycloneDX check ids emitted by validate-sbom.sh for every SBOM — so one check can map to several frameworks without bloating either registry. This is a documentation-preparation aid, NOT legal advice and NOT a compliance determination — each entry states the interpretive 'basis' for the link so a person can judge it. The mapping is deliberately conservative: only checks with a defensible correspondence are listed; an absent id simply has no crosswalk entry.",
-  "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
-  "disclaimer_ko": "BomLens는 EU 인공지능법, AI 기본법, EU 사이버복원력법을 비롯한 어떤 규제에 대해서도 준수 여부를 인증하거나 판정하지 않습니다. 이 대응표는 문서로 남기지 못한 부분을 눈에 보이게 해 준비를 돕기 위한 것이며, 특정 제품의 법적 의무에 비추어 해석하는 일은 사람이 해야 합니다.",
+  "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk covers only the documentation elements an SBOM can carry; obligations that an SBOM cannot express — bias and fairness assessment, risk management, human oversight — are out of its scope and must be met through separate documents. It makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
+  "disclaimer_ko": "BomLens는 EU 인공지능법, AI 기본법, EU 사이버복원력법을 비롯한 어떤 규제에 대해서도 준수 여부를 인증하거나 판정하지 않습니다. 이 대응표는 SBOM이 담을 수 있는 문서화 항목만 다룹니다. 공정성·편향 평가, 위험관리, 인간 감독처럼 SBOM으로 표현할 수 없는 의무는 이 대응표 범위 밖이며, 별도 문서로 이행해야 합니다. 이 표는 문서로 남기지 못한 부분을 눈에 보이게 해 준비를 돕기 위한 것이며, 특정 제품의 법적 의무에 비추어 해석하는 일은 사람이 해야 합니다.",
   "frameworks": {
     "eu-ai-act": {
       "title": "EU AI Act — Annex IV technical documentation",
@@ -10,7 +10,7 @@
       "short_ko": "EU 인공지능법",
       "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
       "granularity": "element",
-      "note": "Annex IV lists the technical documentation a provider of a high-risk AI system must prepare. References below point at Annex IV sections (e.g. IV(2)(d) = the data-requirements point of the development-process section)."
+      "note": "Annex IV lists the technical documentation a provider of a high-risk AI system must prepare. References below point at Annex IV sections (e.g. IV(2)(d) = the data-requirements point of the development-process section). Scope caveat: only the Annex IV elements an SBOM can carry (model and dataset identity, provenance, licensing) are mapped here. The Act's fairness and non-discrimination duties — bias examination and mitigation (Article 10), non-discrimination in accuracy/robustness (Article 15), the fundamental-rights impact assessment (Article 27) — have no SBOM-expressible element and are not covered by this crosswalk."
     },
     "kr-ai-framework-act": {
       "title": "AI Framework Act (Korea)",
