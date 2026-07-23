@@ -637,9 +637,10 @@
   },
   "crosswalk": {
     "title": "규제 대응표",
-    "disclaimer": "규정 준수 판정이 아니라 문서 준비를 돕는 자료입니다. BomLens는 규제 적합성을 인증하지 않으며, 각 G7 요소가 어떤 문서화 의무와 연결되는지만 보여 줍니다.",
+    "disclaimer": "규정 준수 판정이 아니라 문서 준비를 돕는 자료입니다. 이 대응표는 SBOM이 담을 수 있는 문서화 항목만 다루며, 공정성·편향 평가나 위험관리처럼 SBOM으로 표현할 수 없는 의무는 별도 문서로 이행해야 합니다.",
     "totals": "매핑된 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 검토 필요 {{review}}개",
-    "frameworkSummary": "전체 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 검토 필요 {{review}}개",
+    "thFramework": "프레임워크",
+    "thTotal": "합계",
     "refs": "참조:",
     "present": "충족",
     "gap": "미비",

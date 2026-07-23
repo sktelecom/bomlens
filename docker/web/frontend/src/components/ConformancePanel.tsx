@@ -8,12 +8,10 @@ import type {
   AiProfile,
   ConformanceCheck,
   ConformanceSummary,
-  CrosswalkFramework,
 } from "@/lib/api";
 import {
   baseTally,
   crosswalkTotals,
-  elementCoverage,
   g7Tally,
   groupG7ByCluster,
   profileCard,
@@ -30,14 +28,6 @@ const STATUS = {
 function statusOf(s: ConformanceCheck["status"]) {
   return STATUS[s] ?? STATUS.warn;
 }
-
-// Crosswalk element coverage: present / gap / review. Colour only backs the word
-// (each carries its own label), reusing the existing risk tones — no new colours.
-const COVERAGE = {
-  present: { Icon: CircleCheck, color: "text-risk-low", key: "crosswalk.present" },
-  gap: { Icon: CircleAlert, color: "text-risk-medium", key: "crosswalk.gap" },
-  review: { Icon: CircleAlert, color: "text-muted-foreground", key: "crosswalk.review" },
-} as const;
 
 /** AI compliance summary card — a compact one-glance rollup shown at the top of
  *  the Conformance section when an AI profile exists. Consumes only the profile
@@ -111,60 +101,12 @@ function AiProfileCard({ profile }: { profile: AiProfile }) {
   );
 }
 
-/** One framework's mapped elements, in the detailed crosswalk sub-block. */
-function CrosswalkFrameworkBlock({ framework }: { framework: CrosswalkFramework }) {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <div className="text-xs font-semibold text-foreground">{framework.title}</div>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {t("crosswalk.frameworkSummary", {
-            present: framework.present,
-            gap: framework.gap,
-            review: framework.review,
-            total: framework.total,
-          })}
-        </span>
-      </div>
-      <div className="overflow-x-auto">
-        <ul className="min-w-full divide-y rounded-md border">
-          {framework.elements.map((el, i) => {
-            const cov = COVERAGE[elementCoverage(el)];
-            return (
-              <li key={`${el.label}-${i}`} className="flex items-start gap-2.5 px-3 py-2.5">
-                <cov.Icon className={cn("mt-0.5 h-4 w-4 shrink-0", cov.color)} aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-foreground">{el.label}</span>
-                    <Badge variant="muted">{t(cov.key)}</Badge>
-                  </div>
-                  {el.refs.length > 0 ? (
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                      <span className="font-medium">{t("crosswalk.refs")}</span>
-                      {el.refs.map((r, j) => (
-                        <code
-                          key={`${r}-${j}`}
-                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
-                        >
-                          {r}
-                        </code>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-/** "Regulatory crosswalk" sub-block inside the conformance panel — shown only for
- *  AI SBOMs that carry `conformance.regulatoryCrosswalk`. Maps each mapped G7
- *  element to the documentation obligation it touches. Not a certification. */
+/** "Regulatory crosswalk" sub-block inside the conformance panel — one row per
+ *  framework, present for any SBOM that carries `conformance.regulatoryCrosswalk`.
+ *  It answers only "how much of each framework does this SBOM document"; each
+ *  mapped requirement carries its own reference down in the check tables, so this
+ *  stays a roll-up instead of reprinting those requirement rows. Not a
+ *  certification — see the disclaimer. */
 function CrosswalkBlock({
   crosswalk,
 }: {
@@ -186,12 +128,34 @@ function CrosswalkBlock({
             })}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">{t("crosswalk.disclaimer")}</p>
-        <div className="space-y-4">
-          {crosswalk.frameworks.map((fw) => (
-            <CrosswalkFrameworkBlock key={fw.id} framework={fw} />
-          ))}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
+                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
+                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
+                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.review")}</th>
+                <th className="py-1.5 pl-2 text-right font-medium tabular-nums">{t("crosswalk.thTotal")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {crosswalk.frameworks.map((fw) => (
+                <tr key={fw.id} className="border-b last:border-0 align-top">
+                  <td className="py-1.5 pr-3">
+                    <div className="text-foreground">{fw.title}</div>
+                    <div className="text-xs text-muted-foreground">{fw.source}</div>
+                  </td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.gap}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.review}</td>
+                  <td className="py-1.5 pl-2 text-right tabular-nums text-foreground">{fw.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+        <p className="text-xs text-muted-foreground">{t("crosswalk.disclaimer")}</p>
       </CardContent>
     </Card>
   );
@@ -219,13 +183,20 @@ function SourceBadge({ source }: { source?: string }) {
 }
 
 function CheckRow({ check }: { check: ConformanceCheck }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { Icon, color, key } = statusOf(check.status);
   // G7 checks carry a plain-language "what this is" line, a "how to satisfy"
   // hint when not yet met, and (on the pass side) the actual SBOM values that
   // satisfied it. Base format checks have none of these (defaultValue "").
   const isG7 = check.id.startsWith("g7-");
   const what = isG7 ? t(`g7.help.${check.id}.what`, { defaultValue: "" }) : "";
+  // Regulatory references ride with the requirement they belong to (both G7 and
+  // base checks): "BSI TR-03183-2 Section 5.2.2 · NTIA Supplier Name". The
+  // crosswalk section stays a per-framework roll-up rather than reprinting these.
+  const isKo = (i18n.language ?? "").startsWith("ko");
+  const regText = (check.regulations ?? [])
+    .map((r) => `${(isKo ? r.short_ko : r.short) || r.framework} ${r.ref}`)
+    .join(" · ");
   const notMet = check.status !== "pass";
   const fix =
     isG7 && notMet ? t(`g7.help.${check.id}.fix`, { defaultValue: "" }) : "";
@@ -248,6 +219,11 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           {isG7 ? <SourceBadge source={check.source} /> : null}
           <span className="sr-only">{t(key)}</span>
         </div>
+        {regText ? (
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            <span className="font-medium">{t("crosswalk.refs")}</span> {regText}
+          </div>
+        ) : null}
         {check.detail ? (
           <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{check.detail}</div>
         ) : null}

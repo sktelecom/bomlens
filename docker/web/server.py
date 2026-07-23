@@ -895,6 +895,11 @@ def conformance_summary(run_id):
                 "framework": str(r.get("framework") or ""),
                 "ref": str(r.get("ref") or ""),
                 "basis": str(r.get("basis") or ""),
+                # Short display names (validate-sbom.sh joins them from the
+                # crosswalk frameworks) so the UI can badge a check row with
+                # "BSI TR-03183-2 Section 5.2.2" instead of the framework id.
+                "short": str(r.get("short") or r.get("framework") or ""),
+                "short_ko": str(r.get("short_ko") or r.get("short") or r.get("framework") or ""),
             }
             for r in (c.get("regulations") or [])
             if isinstance(r, dict)
