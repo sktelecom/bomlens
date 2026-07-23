@@ -126,7 +126,11 @@ FINDINGS=$(jq -r '
       fixed: (.FixedVersion // ""),
       cvss: ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ]
               | map(select(. != null)) | (max // null)),
-      title: (.Title // .Description // "" | .[0:120])
+      title: (.Title // .Description // "" | .[0:120]),
+      # deep-cve: a grype CPE match whose NVD version range was not verified
+      # (SECURITY_NVD_VERIFY off / NVD unreachable). Surfaced so the reader sees
+      # which findings may be loose-version false positives.
+      unverified: (.["bomlens:cpeVersionUnverified"] // false)
     } ]
   # Dedup by (purl-or-name, CVE): when the deep-CVE grype pass and Trivy both
   # report the same finding they must count once. purl is the stable key across
@@ -212,7 +216,12 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             " | \(if .kev then "⚠️ KEV" else "" end)" +
             " | \(.cvss // "")" +
             " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
-            " | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
+            " | \(.id)\(if .unverified then " †" else "" end) | \(.pkg) | \(.version) | \(.fixed) |"'
+        # Footnote only when at least one finding is version-unverified.
+        if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
+            echo ""
+            echo "† CPE-matched against NVD but the version range was not verified (deep-cve; set \`SECURITY_NVD_VERIFY=true\` with network + \`NVD_API_KEY\` to drop loose-version false positives)."
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "_Scan failed — no results were produced._"
     else
@@ -325,10 +334,13 @@ HTMLHEAD
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
-            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.id|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + "</td><td>" + (.pkg|@html) + "</td>" +
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + (.title|@html) + "</td></tr>"'
         echo "</table></div>"
+        if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
+            echo "<p class=\"meta\">&dagger; CPE-matched against NVD but the version range was not verified (deep-cve; set <code>SECURITY_NVD_VERIFY=true</code> with network + <code>NVD_API_KEY</code> to drop loose-version false positives).</p>"
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "<p>Scan failed &mdash; no results were produced.</p>"
     else
