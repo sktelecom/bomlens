@@ -153,7 +153,10 @@ def build_sidecar(sbom_path, out_prefix):
     g = run_grype(sbom_path)
     if g is None:
         return
-    verify = os.environ.get("SECURITY_NVD_VERIFY", "true") != "false"
+    # Default off: the base behavior stays offline (air-gap safe). When on it needs
+    # network + NVD_API_KEY and adds minutes per scan, so it is opt-in; without it
+    # nvd:cpe findings are kept and flagged bomlens:cpeVersionUnverified.
+    verify = os.environ.get("SECURITY_NVD_VERIFY", "false") == "true"
     nvd_key = os.environ.get("NVD_API_KEY", "")
     cache = {}
 
