@@ -354,10 +354,72 @@ jobs:
           cosign sign --yes "${REGISTRY}/${OWNER}/bomlens-aibom@${DIGEST}"
           cosign sign --yes "${REGISTRY}/${OWNER}/sbom-scanner-aibom@${DIGEST}"
 
+  # (5) Deep-CVE image — base + grype and its bundled vulnerability DB for maven
+  #     CPE matching against NVD (opt-in build). Separate image so the base stays
+  #     lean; the DB is ~1.8 GB.
+  build-deep-cve:
+    name: Build deep-cve image
+    runs-on: ubuntu-latest
+    # `grype db update` downloads a ~1.8 GB DB at build time; give it headroom.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # keyless cosign signing
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Resolve publish flag
+        id: flags
+        run: echo "push=${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true || github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-deep-cve
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+      # grype targets amd64; build amd64 only (the DB download dominates anyway).
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64
+          push: ${{ steps.flags.outputs.push == 'true' }}
+          build-args: |
+            SBOM_DEEP_CVE=true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=deep-cve
+          cache-to: type=gha,mode=max,scope=deep-cve
+      - name: Install cosign
+        if: steps.flags.outputs.push == 'true'
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      - name: Sign deep-cve image
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${REGISTRY}/${OWNER}/bomlens-deep-cve@${DIGEST}"
+
   summary:
     name: Build summary
     runs-on: ubuntu-latest
-    needs: [ build-postprocess, build-android, build-firmware, build-aibom ]
+    needs: [ build-postprocess, build-android, build-firmware, build-aibom, build-deep-cve ]
     # always(): build-android is skipped on main pushes — still summarize.
     if: ${{ always() && github.event_name != 'pull_request' && needs.build-postprocess.result == 'success' }}
     steps:
@@ -369,5 +431,6 @@ jobs:
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-android-sdk{30..35}\` (legacy alias: sbom-scanner-android-sdk{30..35})" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-firmware\` (firmware unpack/ID, GPL tools; legacy alias: sbom-scanner-firmware)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-aibom\` (AI-model SBOM, OWASP AIBOM Generator; legacy alias: sbom-scanner-aibom)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ github.repository_owner }}/bomlens-deep-cve\` (maven CPE matching against NVD via grype; ~1.8 GB DB)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Language SBOM generation uses cdxgen official images (pulled on-demand by scan-sbom.sh)." >> $GITHUB_STEP_SUMMARY
