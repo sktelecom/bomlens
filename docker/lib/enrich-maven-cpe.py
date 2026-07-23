@@ -76,17 +76,28 @@ def derive_cpe(purl):
         return None
 
     vendor = product = None
-    # 1. Curated map (longest groupId prefix wins, so *.security beats *).
+    # 1. Curated map (longest groupId prefix wins, so *.security beats *). These
+    # override the generic rule where it is known wrong (spring -> vmware, Jackson
+    # product = artifact, org.json -> stleary:json-java).
     for prefix in sorted(MAVEN_CPE_MAP, key=len, reverse=True):
         if group == prefix or group.startswith(prefix + "."):
             vendor, src = MAVEN_CPE_MAP[prefix]
             product = artifact if src == "@artifact" else src
             break
     else:
-        # 2. Conservative rule: org.apache.<product> -> apache:<product>.
+        # 2. Generic reverse-domain rule for 2+ segment groups (parts[1]:parts[-1]):
+        # org.apache.pdfbox -> apache:pdfbox, com.google.guava -> google:guava,
+        # io.netty -> netty:netty (2-segment, where parts[1] == parts[-1]). A wrong
+        # guess is self-correcting: grype produces an nvd:cpe finding only when the
+        # vendor:product actually exists in NVD, so a mis-derived product (e.g.
+        # org.springframework -> springframework:springframework) simply matches
+        # nothing — and the curated map above already overrides the ones we know
+        # (spring -> vmware). The residual risk (right product, loose version range)
+        # is handled by the NVD version filter in scan-nvd-cpe.py. A single-segment
+        # group (commons-fileupload) has no domain to split, so it is map-only.
         parts = group.split(".")
-        if len(parts) >= 3 and parts[0] == "org" and parts[1] == "apache":
-            vendor, product = "apache", parts[2]
+        if len(parts) >= 2:
+            vendor, product = parts[1], parts[-1]
 
     if not vendor or not product:
         return None
