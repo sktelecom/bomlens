@@ -45,7 +45,7 @@ jobs:
       id-token: write   # keyless cosign signing (Sigstore OIDC)
       packages: write
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       # Resolve the publish flag once and reuse it for push, signing, and attest.
       - name: Resolve publish flag
@@ -151,7 +151,7 @@ jobs:
         run: trivy config --quiet --format sarif --output trivy-config.sarif --exit-code 0 ./docker
       - name: Upload Dockerfile scan results
         if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:
           sarif_file: 'trivy-config.sarif'
           category: trivy-config
@@ -166,7 +166,7 @@ jobs:
         run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
       - name: Upload image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
+        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:
           sarif_file: 'trivy-image.sarif'
           category: trivy-image
@@ -188,7 +188,7 @@ jobs:
       matrix:
         api: [ 30, 31, 32, 33, 34, 35 ]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
@@ -239,7 +239,7 @@ jobs:
       packages: write
       id-token: write   # keyless cosign signing
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Resolve publish flag
         id: flags
@@ -302,7 +302,7 @@ jobs:
       packages: write
       id-token: write   # keyless cosign signing
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Resolve publish flag
         id: flags
@@ -367,7 +367,7 @@ jobs:
       packages: write
       id-token: write   # keyless cosign signing
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Resolve publish flag
         id: flags
