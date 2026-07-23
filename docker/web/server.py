@@ -883,11 +883,13 @@ def conformance_summary(run_id):
             "cluster": str(c.get("cluster") or ""),
             "source": str(c.get("source") or ""),
         }
-        # G7 elements can carry a regulatory-crosswalk mapping (validate-sbom.sh
-        # joins docker/lib/regulation-crosswalk.json by element id): the named
-        # documentation obligations a gap in this element touches. Informational
-        # only — it never changes a status. Preserved per check so the UI can show
-        # "which regulation does this element map to"; omitted when absent.
+        # Any check can carry a regulatory-crosswalk mapping (validate-sbom.sh
+        # joins docker/lib/regulation-crosswalk.json by check id): the named
+        # documentation obligations a gap in this check touches. G7 elements map to
+        # the AI frameworks; the plain SBOM-format checks map to the CRA/NTIA SBOM
+        # baselines. Informational only — it never changes a status. Preserved per
+        # check so the UI can show "which regulation does this map to"; omitted when
+        # absent.
         regs = [
             {
                 "framework": str(r.get("framework") or ""),
