@@ -308,7 +308,7 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "licenses": "라이선스",
-    "conformance": "적합성",
+    "conformance": "SBOM 적합성",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물"
   },
@@ -397,6 +397,7 @@
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
+    "panelIntro": "이 SBOM이 형식·제출 요건을 얼마나 갖췄는지 검증합니다. 규제 대응표는 참고용이며, 규정 준수를 판정하지 않습니다.",
     "subtitle": "AI G7 최소 요소",
     "present": "{{present}}/{{total}} 충족",
     "advisory": "권고 {{count}}건",

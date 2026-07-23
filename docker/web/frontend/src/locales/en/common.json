@@ -308,7 +308,7 @@
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
     "licenses": "Licenses",
-    "conformance": "Conformance",
+    "conformance": "SBOM conformance",
     "models": "Models & datasets",
     "artifacts": "Artifacts"
   },
@@ -397,6 +397,7 @@
   },
   "g7": {
     "empty": "No conformance checks were recorded.",
+    "panelIntro": "Checks how well this SBOM meets the format and submission requirements. The regulatory crosswalk is for reference and makes no compliance determination.",
     "subtitle": "G7 minimum elements for AI",
     "present": "{{present}}/{{total}} present",
     "advisory": "{{count}} advisory",

@@ -314,13 +314,19 @@ export function ConformancePanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {conformance.format ? (
-          <span className="font-medium text-foreground">{conformance.format}</span>
-        ) : null}
-        <Badge tone={pass ? "success" : "critical"}>
-          {pass ? t("result.verdictPass") : t("result.verdictFail")}
-        </Badge>
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {conformance.format ? (
+            <span className="font-medium text-foreground">{conformance.format}</span>
+          ) : null}
+          <Badge tone={pass ? "success" : "critical"}>
+            {pass ? t("result.verdictPass") : t("result.verdictFail")}
+          </Badge>
+        </div>
+        {/* Says what "conformance" here measures — SBOM format/submission
+            requirements, not regulatory compliance — so the section title is not
+            read as a compliance verdict. */}
+        <p className="max-w-3xl text-sm text-muted-foreground">{t("g7.panelIntro")}</p>
       </div>
 
       {aiProfile ? <AiProfileCard profile={aiProfile} /> : null}

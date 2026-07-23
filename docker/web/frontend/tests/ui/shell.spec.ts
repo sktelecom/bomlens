@@ -474,7 +474,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toHaveCount(0);
+  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toHaveCount(0);
 
   // Overview leads; switching to Components shows the table content.
   await page.getByRole("link", { name: /^Components/ }).first().click();
@@ -797,9 +797,9 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await stubAiAndRun(page);
   // The coverage figure surfaces before entering the section: as the rail badge
   // and as the overview jump-card value (both from conformanceCount).
-  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance/ })).toContainText("6/8");
+  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toContainText("6/8");
   await expect(page.locator("main").getByText("6/8")).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
 
   // Headline tally comes straight from the check statuses: 6 of 8 auto-covered,
   // 2 advisory and 1 needing human review (the source:"na" element).
@@ -820,8 +820,10 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByText("License review flags")).toBeVisible();
   await expect(page.getByText("Regulatory coverage")).toBeVisible();
 
-  // Regulatory crosswalk sub-block (from conformance.regulatoryCrosswalk).
-  await expect(page.getByText("Regulatory crosswalk")).toBeVisible();
+  // Regulatory crosswalk sub-block (from conformance.regulatoryCrosswalk). Exact,
+  // so it matches the block heading and not the panel intro, which also mentions
+  // the regulatory crosswalk.
+  await expect(page.getByText("Regulatory crosswalk", { exact: true })).toBeVisible();
   await expect(page.getByText("EU AI Act — Annex IV").first()).toBeVisible();
   await expect(page.getByText("Korean AI Framework Act").first()).toBeVisible();
   await expect(page.getByText("Annex IV(1)")).toBeVisible(); // a mapped regulation ref
@@ -854,13 +856,15 @@ test("conformance without a profile or crosswalk omits the AI card and crosswalk
   await page.fill("#project", "model");
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
-  await page.getByRole("navigation").getByRole("link", { name: /Conformance/ }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
 
   // The G7 section still renders (proves we reached the conformance panel)…
   await expect(page.getByText("6/8 present")).toBeVisible();
   // …but neither the AI card nor the crosswalk sub-block is present.
   await expect(page.getByText("AI compliance profile")).toHaveCount(0);
-  await expect(page.getByText("Regulatory crosswalk")).toHaveCount(0);
+  // Exact — the panel intro mentions the regulatory crosswalk, so a substring
+  // match would find it even when the crosswalk block itself is absent.
+  await expect(page.getByText("Regulatory crosswalk", { exact: true })).toHaveCount(0);
 });
 
 for (const { theme, lang } of COMBOS) {
