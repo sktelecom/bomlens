@@ -70,6 +70,14 @@ ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
 ARG UBI_READER_VERSION=0.8.14
 
+# Deep-CVE matching (opt-in image `bomlens-deep-cve`). grype adds a CPE matcher
+# that reaches the NVD-only maven CVEs Trivy misses (older Apache libs keyed in
+# NVD by CPE, absent from GitHub Security Advisory). Its vulnerability DB is large
+# (~1.8 GB), so it is kept out of the base image. Apache-2.0.
+ARG SBOM_DEEP_CVE=false
+# renovate: datasource=github-releases depName=anchore/grype
+ARG GRYPE_VERSION=v0.112.0
+
 # AI SBOM generation (opt-in image `bomlens-aibom`). owasp-aibom-generator is
 # Apache-2.0 and fetches HuggingFace model-card metadata over the network at scan
 # time. Kept opt-in (network + extra deps) like SCANOSS so the base image stays
@@ -210,6 +218,35 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       && unblob --version && cve-bin-tool --version; \
     else \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
+    fi
+
+# Deep-CVE: grype + its vulnerability DB, baked in for offline use (opt-in image
+# bomlens-deep-cve). scan-nvd-cpe.py runs grype's CPE matcher over the maven CPEs
+# enrich-maven-cpe attaches, recovering the NVD-only maven CVEs Trivy misses.
+# `grype db update` caches the DB under GRYPE_DB_CACHE_DIR at build time so the
+# image needs no network at scan time; auto-update is disabled at runtime. The
+# build FAILS if the DB is not valid, so a broken cache cannot ship a silent 0-CVE
+# deep-cve image.
+ENV GRYPE_DB_CACHE_DIR=/opt/grype-db \
+    GRYPE_DB_AUTO_UPDATE=false
+RUN if [ "$SBOM_DEEP_CVE" = "true" ]; then \
+      set -e; \
+      GRYPE_VER_NUM="${GRYPE_VERSION#v}"; \
+      case "$(uname -m)" in \
+        x86_64)  GRYPE_ARCH="amd64" ;; \
+        aarch64) GRYPE_ARCH="arm64" ;; \
+        *)       GRYPE_ARCH="amd64" ;; \
+      esac; \
+      curl -sSfL "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VER_NUM}_linux_${GRYPE_ARCH}.tar.gz" -o /tmp/grype.tgz; \
+      tar -C /usr/local/bin -xzf /tmp/grype.tgz grype; \
+      rm /tmp/grype.tgz; \
+      grype version; \
+      mkdir -p "$GRYPE_DB_CACHE_DIR"; \
+      GRYPE_DB_AUTO_UPDATE=true grype db update; \
+      grype db status; \
+      grype db status -o json | grep -q '"valid": *true' || { echo "[build] ERROR: grype DB not valid; deep-cve build aborted."; exit 1; }; \
+    else \
+      echo "[build] deep-cve tools skipped (SBOM_DEEP_CVE=false)"; \
     fi
 
 # Firmware CVE matching data (Plan 2, rebuilt). cve-bin-tool identifies binaries
