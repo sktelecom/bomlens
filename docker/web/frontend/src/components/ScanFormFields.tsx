@@ -308,6 +308,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setIdentifyVendored,
     includeOsv,
     setIncludeOsv,
+    deepCve,
+    setDeepCve,
     byteStable,
     setByteStable,
     scanossToken,
@@ -315,7 +317,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showVendored,
     showDeepLicense,
     showIncludeOsv,
+    showDeepCve,
     showByteStable,
+    capabilities,
     busy,
   } = state;
   return (
@@ -366,6 +370,23 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setIncludeOsv}
           disabled={busy}
         />
+      )}
+      {showDeepCve && (
+        <div className="space-y-2">
+          <ToggleRow
+            labelKey="deepCve"
+            checked={deepCve}
+            onChange={setDeepCve}
+            disabled={busy}
+          />
+          {/* Deep CVE runs via a sibling container here, so the first run pulls
+              the (large) deep-cve image — say so only once the toggle is on. */}
+          {deepCve && capabilities.deepCveSibling && (
+            <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
+              {t("source.siblingPullNotice")}
+            </div>
+          )}
+        </div>
       )}
       {showByteStable && (
         <ToggleRow

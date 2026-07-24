@@ -305,6 +305,9 @@ export interface ScanConfig {
   identifyVendored: boolean;
   includeOsv: boolean;
   byteStable: boolean;
+  /** SBOM-upload only: match components against NVD-only (CPE) advisories too —
+   *  catches vulnerabilities in older Java (Maven) libraries other sources miss. */
+  deepCve: boolean;
 }
 
 export interface DoneEvent {
@@ -374,6 +377,10 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** SBOM-upload only: also match against NVD-only (CPE) advisories, catching
+   *  vulnerabilities in older Java (Maven) libraries other sources miss. Read
+   *  server-side as the exact `deep_cve` flag. Ignored for every other source. */
+  deepCve: boolean;
   /** Optional upload of the generated SBOM. "" leaves the scan generate-only. */
   uploadTarget?: "" | "dependency-track" | "trusca";
   uploadUrl?: string; // upload server base URL (API_URL)
@@ -409,6 +416,13 @@ export interface Capabilities {
   firmwareSibling?: boolean;
   /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
   aibomSibling?: boolean;
+  /** Deep CVE matching (NVD-only advisories for uploaded SBOMs) offerable here —
+   *  grype built into this image OR reachable by running the deep-cve image as a
+   *  sibling container. False hides the toggle. */
+  deepCve?: boolean;
+  /** Deep CVE is satisfied by a sibling container, so the first run pulls the
+   *  (large) deep-cve image — show the one-time notice. */
+  deepCveSibling?: boolean;
   /** The results screen can convert a finished BOM to SPDX 2.3 (syft here, or a
    *  sibling scanner container). False hides the export action. */
   spdxExport?: boolean;
@@ -421,6 +435,7 @@ export interface Capabilities {
   hfAuth?: boolean;
   firmwareImage?: string;
   aibomImage?: string;
+  deepCveImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
   /** Extra read-only scan targets from `--ui --mount <dir>`: container path
    *  (sent as the rootfs-dir scan target) + host path (shown to the user). */
@@ -642,6 +657,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    deep_cve: String(params.deepCve),
     upload_target: params.uploadTarget ?? "",
     upload_url: params.uploadUrl ?? "",
     upload_cred: params.uploadCred ?? "",

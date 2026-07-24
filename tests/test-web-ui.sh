@@ -56,8 +56,8 @@ done
 
 echo "== capabilities + results contract =="
 caps=$(curl -fsS "$BASE/capabilities" 2>/dev/null)
-if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling'))" 2>/dev/null; then
-    pass "/capabilities reports firmware, docker, scanoss, aibom (+ sibling) flags"
+if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling','deepCve','deepCveSibling'))" 2>/dev/null; then
+    pass "/capabilities reports firmware, docker, scanoss, aibom, deepCve (+ sibling) flags"
 else
     fail "/capabilities missing expected keys" "$caps"
 fi
@@ -183,6 +183,33 @@ rc = server.run_sibling_scan(
 )
 assert rc == 0, rc
 assert ("TARGET_FILE=%s" % up_file) in captured["args"], captured["args"]
+
+# Deep CVE matching (maven NVD-CPE via grype) on an uploaded SBOM: ANALYZE runs
+# as a sibling in the deep-cve image. The upload is read as ANALYZE_SBOM (not the
+# firmware TARGET_FILE), and DEEP_CVE=true is forwarded so scan-security.sh runs
+# the grype sidecar. deep_cve capability helpers exist for the frontend gate.
+assert "ANALYZE" in server._SIBLING_MODES, server._SIBLING_MODES
+assert callable(server.deep_cve_capable) and callable(server.deep_cve_usable)
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODE=ANALYZE" in _a, _a
+assert ("ANALYZE_SBOM=%s" % up_file) in _a, _a
+assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
+assert "DEEP_CVE=true" in _a, _a
+assert "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0" in _a, _a
+# DEEP_CVE is NOT forwarded when off (kept out of the argv entirely).
+captured.clear()
+server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file, extra_env={"GENERATE_SECURITY": "true"},
+)
+assert not any(x == "DEEP_CVE=true" for x in captured["args"]), captured["args"]
 assert not any("/input/" in a for a in captured["args"]), captured["args"]
 
 # Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
