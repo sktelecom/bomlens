@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="330" viewBox="0 0 1040 330">
+<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#9aa4af"/>
+  </marker>
+  <filter id="sh" x="-20%" y="-20%" width="140%" height="160%">
+    <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1c2228" flood-opacity="0.10"/>
+  </filter>
+</defs>
+<rect width="1040" height="330" fill="#ffffff"/>
+<rect x="40" y="36" width="180" height="46" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="130.0" y="62.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Source code</text>
+<rect x="40" y="102" width="180" height="46" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="130.0" y="128.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Firmware</text>
+<rect x="40" y="168" width="180" height="46" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="130.0" y="194.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Received SBOM</text>
+<rect x="40" y="234" width="180" height="46" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="130.0" y="260.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">AI model</text>
+<rect x="330" y="108" width="220" height="88" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="440.0" y="148.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Per-input generation</text>
+<text x="440.0" y="166.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="11" fill="#5c6773">(this page)</text>
+<path d="M220,59 L280,59 L280,132 L330,132" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M220,125 L280,125 L280,145 L330,145" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M220,191 L280,191 L280,159 L330,159" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+<path d="M220,257 L280,257 L280,172 L330,172" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="630" y="118" width="200" height="68" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="730.0" y="155.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Shared post-processing</text>
+<path d="M550,152 L630,152" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="890" y="100" width="120" height="104" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
+<text x="950.0" y="125.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" fill="#1c2228">Outputs</text>
+<text x="950.0" y="143.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="11" fill="#5c6773">SBOM</text>
+<text x="950.0" y="158.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="11" fill="#5c6773">notice</text>
+<text x="950.0" y="173.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="11" fill="#5c6773">security</text>
+<text x="950.0" y="188.5" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="11" fill="#5c6773">risk report</text>
+<path d="M830,152 L890,152" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>
