@@ -46,6 +46,9 @@ PORT = int(os.environ.get("UI_PORT", "8080"))
 FIRMWARE_IMAGE = os.environ.get(
     "SBOM_FIRMWARE_IMAGE", "ghcr.io/sktelecom/bomlens-firmware:latest"
 )
+DEEP_CVE_IMAGE = os.environ.get(
+    "SBOM_DEEP_CVE_IMAGE", "ghcr.io/sktelecom/bomlens-deep-cve:latest"
+)
 AIBOM_IMAGE = os.environ.get(
     "SBOM_AIBOM_IMAGE", "ghcr.io/sktelecom/bomlens-aibom:latest"
 )
@@ -326,6 +329,19 @@ def aibom_usable():
     """AI-model SBOMs are offered when the generator is in THIS image OR we can
     launch the aibom image as a sibling container (docker CLI + host socket)."""
     return aibom_capable() or (docker_cli_present() and docker_capable())
+
+
+def deep_cve_capable():
+    """Deep CVE matching (grype + a bundled NVD DB for maven CPE matching) is
+    only built into the bomlens-deep-cve image."""
+    return shutil.which("grype") is not None
+
+
+def deep_cve_usable():
+    """Deep CVE matching is offered on an uploaded SBOM when grype is in THIS
+    image (run in-process) OR we can launch the deep-cve image as a sibling
+    container (docker CLI + host socket). Mirrors aibom_usable()."""
+    return deep_cve_capable() or (docker_cli_present() and docker_capable())
 
 
 def spdx_convert_capable():
@@ -1321,7 +1337,7 @@ def _emit_or_log(line, on_log, on_progress=None):
 # Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
 # caller string) is interpolated into the docker-run command line, so the MODE
 # argument can only ever be one of these literals.
-_SIBLING_MODES = ("FIRMWARE", "AIBOM")
+_SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE")
 
 
 def _valid_image_ref(ref):
@@ -1500,7 +1516,17 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # already exposes it at this same container path — read it in place, no extra
         # mount. Contained in UPLOAD_DIR (checked above) and passed as a single argv
         # value, so an odd upload filename cannot inject a flag or split a mount.
-        args += ["-e", "TARGET_FILE=%s" % upload_file]
+        # FIRMWARE reads it as TARGET_FILE; ANALYZE (deep-cve on an uploaded SBOM)
+        # reads it as ANALYZE_SBOM.
+        if mode == "ANALYZE":
+            args += ["-e", "ANALYZE_SBOM=%s" % upload_file]
+        else:
+            args += ["-e", "TARGET_FILE=%s" % upload_file]
+    # Deep CVE matching: forward the opt-in flag on the ANALYZE path only, from a
+    # fixed literal (never the env string), so the deep-cve image's scan-security.sh
+    # runs the grype maven NVD-CPE sidecar. The image swap itself is the caller's.
+    if mode == "ANALYZE" and env.get("DEEP_CVE") == "true":
+        args += ["-e", "DEEP_CVE=true"]
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
@@ -1660,11 +1686,15 @@ class Handler(BaseHTTPRequestHandler):
                 "scanoss": scanoss_capable(),
                 "docker": docker_capable(),
                 "aibom": aibom_usable(),
+                # Deep CVE matching (maven NVD-CPE via grype) offered on uploaded
+                # SBOMs: grype in THIS image, or reachable via the deep-cve sibling.
+                "deepCve": deep_cve_usable(),
                 # Whether the offer is satisfied by a sibling container (the desktop
                 # app's permissive-only base UI image) — the frontend shows a
                 # one-time "pulling the image" notice for the first sibling run.
                 "firmwareSibling": not firmware_capable() and docker_cli_present() and docker_capable(),
                 "aibomSibling": not aibom_capable() and docker_cli_present() and docker_capable(),
+                "deepCveSibling": not deep_cve_capable() and docker_cli_present() and docker_capable(),
                 # SPDX is exported on demand from the results screen (GET
                 # /spdx-export), not chosen before a scan, so the frontend gates
                 # the export button on this rather than on a scan-form toggle.
@@ -1676,6 +1706,7 @@ class Handler(BaseHTTPRequestHandler):
                 "hfAuth": bool(os.environ.get("HF_TOKEN")),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
+                "deepCveImage": DEEP_CVE_IMAGE,
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
                 # Extra --mount scan targets the rootfs-dir input can pick
                 # from: container path (what the scan request sends) + host
@@ -1994,6 +2025,7 @@ class Handler(BaseHTTPRequestHandler):
             "identifyVendored": g("identify_vendored") == "true",
             "includeOsv": g("includeOsv") == "true",
             "byteStable": g("byte_stable") == "true",
+            "deepCve": g("deep_cve") == "true",
         }
         write_scanmeta(run_out, scan_config)
 
@@ -2035,6 +2067,10 @@ class Handler(BaseHTTPRequestHandler):
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
+            # Opt-in deep CVE matching (maven NVD-CPE via grype). Consumed by
+            # scan-security.sh in the deep-cve image; a plain boolean from a fixed
+            # literal, no user text. SECURITY_NVD_VERIFY stays off (network/NVD key).
+            "DEEP_CVE": "true" if g("deep_cve") == "true" else "false",
         })
         # Optional SCANOSS token (single-use, stashed via POST /git-cred). Lets a
         # web-UI user supply their own OSSKB key, since the free anonymous endpoint
@@ -2164,6 +2200,17 @@ class Handler(BaseHTTPRequestHandler):
                 # ANALYZE needs license + vulnerability data for the risk report.
                 env["GENERATE_NOTICE"] = "true"
                 env["GENERATE_SECURITY"] = "true"
+                # Opt-in deep CVE matching: the base UI image has no grype, so run
+                # the analysis in the deep-cve image (in-process only if this image
+                # already has grype). DEEP_CVE is forwarded via env (set above).
+                if g("deep_cve") == "true":
+                    if deep_cve_capable():
+                        pass  # in-process (UI launched from the deep-cve image)
+                    elif docker_cli_present() and docker_capable():
+                        sibling = {"image": DEEP_CVE_IMAGE, "upload_file": up}
+                    else:
+                        fail("Deep CVE matching requires Docker (to run the deep-cve "
+                             "image) or relaunching the UI from the deep-cve image."); return
 
             elif source == "firmware-upload":
                 up = resolve_upload(token)

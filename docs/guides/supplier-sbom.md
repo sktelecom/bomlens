@@ -30,6 +30,8 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 
 Open the web UI, choose **SBOM upload**, and upload the file you received; enter a project name and version, then run.
 
+For a Java (Maven) heavy SBOM, turn on **Deep CVE matching (maven, NVD)** in the scan options. It also checks older Maven libraries against NVD-only vulnerabilities that other advisory sources miss, at the cost of a longer scan. The option appears only for SBOM upload, and the first run downloads the deep-cve image once. It is the same matching as the CLI's `--deep-cve`.
+
 ```bash
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080
 #   Windows: double-click scripts\sbom-ui.bat
