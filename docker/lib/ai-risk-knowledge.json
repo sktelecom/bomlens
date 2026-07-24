@@ -1,0 +1,463 @@
+{
+  "_note": "Curated AI model/dataset license-terms registry read by assess-ai-risk.sh and generate-ai-profile.sh. Closed whitelist in the same spirit as g7-registry.json: an id that matches nothing here is NEVER guessed — it falls to the review verdict. hfLicenseTags mirrors the official Hugging Face license tag list (huggingface.co/docs/hub/repositories-licenses); the lint in tests/test-aibom.sh fails when a tag is not covered by a licenseTerms entry. Entry order matters: ids are matched exactly first, then the match regexes are tried IN FILE ORDER against the normalized license string (lowercase, [ ._/-]+ collapsed to one space), so specific families (cc-nc before cc-sa, agpl/lgpl before gpl, llama before the generic community entry) must come first. Verdicts: ok | conditional | caution | review; worst-of rank caution > review > conditional > ok. summary/summary_ko are guidance, not legal advice — the disclaimer below must reach every report that prints them.",
+  "version": 1,
+  "disclaimer": {
+    "en": "This assessment is guidance, not legal advice. It summarizes license terms and recorded signals; the final use decision needs human review.",
+    "ko": "이 판정은 법적 자문이 아닌 안내입니다. 라이선스 조건과 수집된 신호를 요약한 것이며, 최종 사용 판단은 사람의 검토가 필요합니다."
+  },
+  "hfLicenseTags": [
+    "apache-2.0", "mit", "openrail", "bigscience-openrail-m", "creativeml-openrail-m",
+    "bigscience-bloom-rail-1.0", "bigcode-openrail-m", "afl-3.0", "artistic-2.0", "bsl-1.0",
+    "bsd", "bsd-2-clause", "bsd-3-clause", "bsd-3-clause-clear", "c-uda", "cc", "cc0-1.0",
+    "cc-by-2.0", "cc-by-2.5", "cc-by-3.0", "cc-by-4.0", "cc-by-sa-3.0", "cc-by-sa-4.0",
+    "cc-by-nc-2.0", "cc-by-nc-3.0", "cc-by-nc-4.0", "cc-by-nd-4.0", "cc-by-nc-nd-3.0",
+    "cc-by-nc-nd-4.0", "cc-by-nc-sa-2.0", "cc-by-nc-sa-3.0", "cc-by-nc-sa-4.0",
+    "cdla-sharing-1.0", "cdla-permissive-1.0", "cdla-permissive-2.0", "wtfpl", "ecl-2.0",
+    "epl-1.0", "epl-2.0", "etalab-2.0", "eupl-1.1", "eupl-1.2", "agpl-3.0", "gfdl", "gpl",
+    "gpl-2.0", "gpl-3.0", "lgpl", "lgpl-2.1", "lgpl-3.0", "isc", "h-research",
+    "intel-research", "lppl-1.3c", "ms-pl", "apple-ascl", "apple-amlr", "mpl-2.0", "odc-by",
+    "odbl", "openmdw-1.0", "openmdw-1.1", "openrail++", "osl-3.0", "postgresql", "ofl-1.1",
+    "ncsa", "unlicense", "zlib", "pddl", "lgpl-lr", "deepfloyd-if-license",
+    "fair-noncommercial-research-license", "llama2", "llama3", "llama3.1", "llama3.2",
+    "llama3.3", "llama4", "grok2-community", "gemma", "unknown", "other"
+  ],
+  "licenseTerms": [
+    {
+      "key": "cc-non-commercial",
+      "name": "Creative Commons NonCommercial",
+      "ids": ["cc-by-nc-2.0", "cc-by-nc-3.0", "cc-by-nc-4.0", "cc-by-nc-sa-2.0", "cc-by-nc-sa-3.0", "cc-by-nc-sa-4.0", "cc-by-nc-nd-3.0", "cc-by-nc-nd-4.0"],
+      "match": "cc by nc|non ?commercial",
+      "verdict": "caution",
+      "commercial": "no",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "scenarioVerdicts": { "internal": "conditional" },
+      "conditions": [
+        { "id": "non-commercial-only", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Commercial use is not permitted. Whether in-company use counts as commercial depends on the purpose, so even internal use needs a check.",
+      "summary_ko": "상업적 이용이 금지됩니다. 사내 이용도 목적에 따라 상업적 이용으로 볼 수 있어 내부 사용 시에도 확인이 필요합니다.",
+      "sourceUrl": "https://creativecommons.org/licenses/by-nc/4.0/"
+    },
+    {
+      "key": "research-only",
+      "name": "Research-only license",
+      "ids": ["deepfloyd-if-license", "fair-noncommercial-research-license", "intel-research", "h-research", "apple-amlr"],
+      "match": "research (use|purposes?) only|noncommercial research|research license",
+      "verdict": "caution",
+      "commercial": "no",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "scenarioVerdicts": { "internal": "conditional" },
+      "conditions": [
+        { "id": "research-only", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] }
+      ],
+      "summary": "Licensed for research or evaluation use only; product use is not permitted.",
+      "summary_ko": "연구·평가 목적 사용만 허용되며 제품 사용은 허용되지 않습니다.",
+      "sourceUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    },
+    {
+      "key": "llama-community",
+      "name": "Llama Community License",
+      "ids": ["llama2", "llama3", "llama3.1", "llama3.2", "llama3.3", "llama4"],
+      "match": "\\bllama\\b",
+      "verdict": "conditional",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "mau-threshold", "appliesTo": ["product", "redistribute"] },
+        { "id": "naming-rule", "appliesTo": ["redistribute"] },
+        { "id": "acceptable-use-policy", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "pass-through-terms", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Commercial use is allowed below the monthly-active-user threshold in the agreement (700M MAU). Derived model names must include the required prefix, and the Acceptable Use Policy applies.",
+      "summary_ko": "약정된 월 활성 사용자 수(7억 명) 미만이면 상업 이용이 가능합니다. 파생 모델 이름에 지정 명칭을 포함해야 하고, 허용 사용 정책이 적용됩니다.",
+      "outputsNote": "The agreement also reaches model derivatives and, for some versions, the use of outputs to improve other models — check the version-specific terms.",
+      "outputsNote_ko": "파생 모델과, 버전에 따라 산출물을 다른 모델 개선에 쓰는 경우에도 조건이 적용됩니다. 버전별 조항 확인이 필요합니다.",
+      "sourceUrl": "https://www.llama.com/license/"
+    },
+    {
+      "key": "gemma-terms",
+      "name": "Gemma Terms of Use",
+      "ids": ["gemma"],
+      "match": "\\bgemma\\b",
+      "verdict": "conditional",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "behavioral-use-restrictions", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "acceptable-use-policy", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "pass-through-terms", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Commercial use is allowed, subject to the Gemma Prohibited Use Policy; the use restrictions must be passed on with any derivative.",
+      "summary_ko": "상업 이용이 가능하지만 Gemma 금지 사용 정책이 적용되며, 파생물 배포 시 사용 제한 조건을 함께 전달해야 합니다.",
+      "sourceUrl": "https://ai.google.dev/gemma/terms"
+    },
+    {
+      "key": "grok2-community",
+      "name": "Grok 2 Community License",
+      "ids": ["grok2-community"],
+      "verdict": "conditional",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "behavioral-use-restrictions", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "acceptable-use-policy", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] }
+      ],
+      "summary": "A community license with use restrictions and commercial conditions; read the agreement before product use.",
+      "summary_ko": "사용 제한과 상업 이용 조건이 있는 커뮤니티 라이선스입니다. 제품 사용 전 약관 원문 확인이 필요합니다.",
+      "sourceUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    },
+    {
+      "key": "openrail",
+      "name": "OpenRAIL / RAIL family",
+      "ids": ["openrail", "openrail++", "bigscience-openrail-m", "creativeml-openrail-m", "bigscience-bloom-rail-1.0", "bigcode-openrail-m"],
+      "match": "openrail|\\brail\\b|responsible ai",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "behavioral-use-restrictions", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "pass-through-terms", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Commercial use is allowed, but the license lists prohibited uses (behavioral-use restrictions) that also bind derivatives and downstream users.",
+      "summary_ko": "상업 이용은 가능하지만 라이선스에 금지 용도 목록(행위 사용 제한)이 있고, 파생물과 다운스트림 사용자에게도 같은 제한이 적용됩니다.",
+      "outputsNote": "RAIL use restrictions must be carried into any redistribution or derivative.",
+      "outputsNote_ko": "RAIL 사용 제한은 재배포·파생물에도 그대로 전달해야 합니다.",
+      "sourceUrl": "https://www.licenses.ai/"
+    },
+    {
+      "key": "falcon-llm",
+      "name": "Falcon LLM License",
+      "ids": [],
+      "match": "falcon (llm|license)|tii falcon",
+      "verdict": "conditional",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "behavioral-use-restrictions", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "acceptable-use-policy", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] }
+      ],
+      "summary": "A community license with an acceptable-use policy and conditions on hosted commercial offerings; read the agreement before product use.",
+      "summary_ko": "허용 사용 정책과 호스팅 상용 서비스 조건이 있는 커뮤니티 라이선스입니다. 제품 사용 전 약관 원문 확인이 필요합니다.",
+      "sourceUrl": "https://falconllm.tii.ae/"
+    },
+    {
+      "key": "community-license",
+      "name": "Model community license",
+      "ids": [],
+      "match": "community license",
+      "verdict": "conditional",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "behavioral-use-restrictions", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] },
+        { "id": "acceptable-use-policy", "appliesTo": ["internal", "product", "redistribute", "outputs-only"] }
+      ],
+      "summary": "A vendor community license: usually commercial-friendly with use restrictions, but the terms vary — read the agreement.",
+      "summary_ko": "제공사 커뮤니티 라이선스입니다. 대체로 상업 이용이 가능하나 사용 제한이 있고 조건이 제각각이므로 약관 원문 확인이 필요합니다.",
+      "sourceUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    },
+    {
+      "key": "agpl",
+      "name": "GNU AGPL",
+      "ids": ["agpl-3.0"],
+      "match": "\\bagpl",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "network-source-disclosure", "appliesTo": ["product", "redistribute"] },
+        { "id": "source-disclosure", "appliesTo": ["product", "redistribute"] },
+        { "id": "notice-file", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Network copyleft: offering the work as a network service already triggers the duty to provide the corresponding source under the same license.",
+      "summary_ko": "네트워크 카피레프트입니다. 네트워크 서비스로 제공하기만 해도 해당 소스를 같은 라이선스로 제공할 의무가 생깁니다.",
+      "sourceUrl": "https://www.gnu.org/licenses/agpl-3.0.html"
+    },
+    {
+      "key": "weak-copyleft",
+      "name": "Weak copyleft (LGPL/MPL/EPL/EUPL/OSL)",
+      "ids": ["lgpl", "lgpl-2.1", "lgpl-3.0", "lgpl-lr", "mpl-2.0", "epl-1.0", "epl-2.0", "eupl-1.1", "eupl-1.2", "osl-3.0"],
+      "match": "\\blgpl|\\bmpl\\b|\\bepl\\b|\\beupl\\b|\\bosl\\b",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": false,
+      "conditions": [
+        { "id": "weak-copyleft-scope", "appliesTo": ["product", "redistribute"] },
+        { "id": "notice-file", "appliesTo": ["product", "redistribute"] },
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Commercial use is allowed; modifications to the licensed files or library itself must be released under the same license, with notices kept.",
+      "summary_ko": "상업 이용이 가능합니다. 라이선스 대상 파일이나 라이브러리 자체를 수정한 부분은 같은 라이선스로 공개해야 하며 고지를 유지해야 합니다.",
+      "sourceUrl": "https://spdx.org/licenses/"
+    },
+    {
+      "key": "strong-copyleft",
+      "name": "GNU GPL",
+      "ids": ["gpl", "gpl-2.0", "gpl-3.0"],
+      "match": "\\bgpl",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "source-disclosure", "appliesTo": ["product", "redistribute"] },
+        { "id": "share-alike", "appliesTo": ["redistribute"] },
+        { "id": "notice-file", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Commercial use is allowed; distributing the work or a derivative requires providing the corresponding source under the same license.",
+      "summary_ko": "상업 이용이 가능합니다. 저작물이나 파생물을 배포하면 해당 소스를 같은 라이선스로 제공해야 합니다.",
+      "sourceUrl": "https://www.gnu.org/licenses/"
+    },
+    {
+      "key": "gfdl",
+      "name": "GNU Free Documentation License",
+      "ids": ["gfdl"],
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "share-alike", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "A documentation license: redistribution and derivatives must stay under the same license with the required notices.",
+      "summary_ko": "문서용 라이선스입니다. 재배포와 파생물은 같은 라이선스와 요구된 고지를 유지해야 합니다.",
+      "sourceUrl": "https://www.gnu.org/licenses/fdl-1.3.html"
+    },
+    {
+      "key": "cc-share-alike",
+      "name": "Share-alike data/content license",
+      "ids": ["cc-by-sa-3.0", "cc-by-sa-4.0", "cdla-sharing-1.0", "odbl"],
+      "match": "cc by sa|share ?alike",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": true,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "share-alike", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Commercial use is allowed with attribution; adapted material must be shared under the same license.",
+      "summary_ko": "저작자 표시 조건으로 상업 이용이 가능합니다. 변경물은 같은 라이선스로 공유해야 합니다.",
+      "sourceUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "key": "cc-no-derivatives",
+      "name": "Creative Commons NoDerivatives",
+      "ids": ["cc-by-nd-4.0"],
+      "match": "cc by nd",
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "no",
+      "inheritable": true,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "no-derivatives", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Commercial use of the unmodified work is allowed, but distributing modified versions (a fine-tuned model included) is not.",
+      "summary_ko": "원본 그대로의 상업 이용은 가능하지만, 수정본(파인튜닝 모델 포함) 배포는 허용되지 않습니다.",
+      "sourceUrl": "https://creativecommons.org/licenses/by-nd/4.0/"
+    },
+    {
+      "key": "cc-attribution",
+      "name": "Creative Commons Attribution",
+      "ids": ["cc-by-2.0", "cc-by-2.5", "cc-by-3.0", "cc-by-4.0"],
+      "match": "\\bcc by\\b",
+      "verdict": "ok",
+      "commercial": "yes",
+      "redistribution": "yes",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Commercial use, redistribution and derivatives are allowed with attribution.",
+      "summary_ko": "저작자 표시 조건으로 상업 이용·재배포·파생이 모두 가능합니다.",
+      "sourceUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "key": "cc-family-unspecified",
+      "name": "Creative Commons (unspecified)",
+      "ids": ["cc"],
+      "verdict": "review",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": false,
+      "conditions": [],
+      "summary": "The tag names the Creative Commons family without saying which license; identify the exact CC license before use.",
+      "summary_ko": "구체적 라이선스 없이 Creative Commons 계열이라고만 표시되어 있습니다. 사용 전에 정확한 CC 라이선스를 확인해야 합니다.",
+      "sourceUrl": "https://creativecommons.org/licenses/"
+    },
+    {
+      "key": "c-uda",
+      "name": "Computational Use of Data Agreement",
+      "ids": ["c-uda"],
+      "verdict": "conditional",
+      "commercial": "yes",
+      "redistribution": "conditional",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [
+        { "id": "pass-through-terms", "appliesTo": ["redistribute"] }
+      ],
+      "summary": "Data may be used for computation (training included); redistributing the data itself requires passing the agreement through. Results of computation are not restricted.",
+      "summary_ko": "데이터를 계산 목적(학습 포함)으로 쓸 수 있습니다. 데이터 자체를 재배포하려면 약정을 함께 전달해야 하며, 계산 결과물에는 제한이 없습니다.",
+      "sourceUrl": "https://cdla.dev/computational-use-of-data-agreement-v1-0/"
+    },
+    {
+      "key": "open-data-permissive",
+      "name": "Permissive data license",
+      "ids": ["cdla-permissive-1.0", "cdla-permissive-2.0", "odc-by", "etalab-2.0"],
+      "verdict": "ok",
+      "commercial": "yes",
+      "redistribution": "yes",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Permissive data license: commercial use, redistribution and derived works are allowed; keep the attribution.",
+      "summary_ko": "허용적 데이터 라이선스입니다. 상업 이용·재배포·파생이 가능하며 저작자 표시를 유지해야 합니다.",
+      "sourceUrl": "https://cdla.dev/"
+    },
+    {
+      "key": "openmdw",
+      "name": "Open Model, Data & Weights License",
+      "ids": ["openmdw-1.0", "openmdw-1.1"],
+      "verdict": "ok",
+      "commercial": "yes",
+      "redistribution": "yes",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "notice-file", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "A permissive license written for model artifacts (weights, data, code): commercial use, redistribution and derivatives are allowed with notices kept.",
+      "summary_ko": "모델 산출물(가중치·데이터·코드)을 위한 허용적 라이선스입니다. 고지를 유지하면 상업 이용·재배포·파생이 가능합니다.",
+      "sourceUrl": "https://openmdw.ai/"
+    },
+    {
+      "key": "public-domain",
+      "name": "Public domain / no conditions",
+      "ids": ["cc0-1.0", "pddl", "unlicense", "wtfpl"],
+      "verdict": "ok",
+      "commercial": "yes",
+      "redistribution": "yes",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [],
+      "summary": "Public-domain style: no license conditions on use, redistribution or derivatives.",
+      "summary_ko": "퍼블릭 도메인 성격으로, 사용·재배포·파생에 라이선스 조건이 없습니다.",
+      "sourceUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "key": "permissive",
+      "name": "Permissive open-source license",
+      "ids": ["apache-2.0", "mit", "mit-0", "bsd", "bsd-2-clause", "bsd-3-clause", "bsd-3-clause-clear", "0bsd", "isc", "ncsa", "zlib", "bsl-1.0", "ms-pl", "postgresql", "artistic-2.0", "afl-3.0", "ecl-2.0", "lppl-1.3c", "ofl-1.1", "apple-ascl", "x11"],
+      "verdict": "ok",
+      "commercial": "yes",
+      "redistribution": "yes",
+      "derivatives": "yes",
+      "inheritable": false,
+      "conditions": [
+        { "id": "attribution", "appliesTo": ["product", "redistribute"] },
+        { "id": "notice-file", "appliesTo": ["product", "redistribute"] }
+      ],
+      "summary": "Permissive license: commercial use, modification and redistribution are allowed; keep the copyright and license notices.",
+      "summary_ko": "허용적 라이선스입니다. 상업 이용·수정·재배포가 가능하며 저작권과 라이선스 고지를 유지해야 합니다.",
+      "sourceUrl": "https://spdx.org/licenses/"
+    },
+    {
+      "key": "unknown-declared",
+      "name": "License declared unknown",
+      "ids": ["unknown"],
+      "verdict": "review",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": false,
+      "conditions": [],
+      "summary": "The repository declares its license as unknown; the terms cannot be assessed without identifying the actual license.",
+      "summary_ko": "저장소가 라이선스를 unknown으로 표시했습니다. 실제 라이선스를 확인하기 전에는 조건을 판정할 수 없습니다.",
+      "sourceUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    },
+    {
+      "key": "custom-other",
+      "name": "Custom license (other)",
+      "ids": ["other"],
+      "verdict": "review",
+      "commercial": "conditional",
+      "redistribution": "conditional",
+      "derivatives": "conditional",
+      "inheritable": false,
+      "conditions": [],
+      "summary": "A custom license (license: other) — the terms live in the repository's LICENSE file and need human review.",
+      "summary_ko": "커스텀 라이선스(license: other)입니다. 조건이 저장소의 LICENSE 파일에 있으므로 사람이 검토해야 합니다.",
+      "sourceUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+    }
+  ],
+  "conditionLabels": {
+    "attribution": { "en": "Keep the copyright notice and credit the source", "ko": "저작권 고지 유지와 출처 표시" },
+    "notice-file": { "en": "Include the license text and NOTICE when distributing", "ko": "배포 시 라이선스 원문과 NOTICE 포함" },
+    "share-alike": { "en": "Distribute adapted material under the same license", "ko": "변경물은 같은 라이선스로 배포" },
+    "source-disclosure": { "en": "Provide the corresponding source when distributing", "ko": "배포 시 해당 소스 제공 의무" },
+    "network-source-disclosure": { "en": "Offering the work as a network service also triggers the source-provision duty", "ko": "네트워크 서비스 제공만으로도 소스 제공 의무 발생" },
+    "weak-copyleft-scope": { "en": "Release changes to the licensed files/library itself under the same license", "ko": "라이선스 대상 파일·라이브러리 자체의 수정분은 같은 라이선스로 공개" },
+    "behavioral-use-restrictions": { "en": "Comply with the prohibited-use list in the license", "ko": "라이선스에 명시된 금지 용도 준수" },
+    "mau-threshold": { "en": "Commercial use is conditioned on the monthly-active-user threshold", "ko": "월 활성 사용자 수 조건 충족 시에만 상업 이용 가능" },
+    "naming-rule": { "en": "Derived model names must include the required prefix", "ko": "파생 모델 이름에 지정 명칭 포함 의무" },
+    "acceptable-use-policy": { "en": "The provider's acceptable-use policy applies to every use", "ko": "제공사의 허용 사용 정책 준수" },
+    "non-commercial-only": { "en": "Commercial use is not permitted", "ko": "상업적 이용 불가" },
+    "research-only": { "en": "Research or evaluation use only", "ko": "연구·평가 목적 사용만 허용" },
+    "no-derivatives": { "en": "Distributing modified versions is not permitted", "ko": "수정본 배포 불가" },
+    "pass-through-terms": { "en": "Pass the same terms on to downstream recipients", "ko": "다운스트림에 동일 약관 전달 의무" }
+  },
+  "customLicensePatterns": [
+    { "pattern": "non[- ]?commercial", "verdict": "caution", "label": "Non-commercial clause", "label_ko": "비상업 조항" },
+    { "pattern": "research (purposes?|use) only", "verdict": "caution", "label": "Research-only clause", "label_ko": "연구 목적 한정 조항" },
+    { "pattern": "evaluation (purposes?|use) only", "verdict": "caution", "label": "Evaluation-only clause", "label_ko": "평가 목적 한정 조항" },
+    { "pattern": "internal use only", "verdict": "caution", "label": "Internal-use-only clause", "label_ko": "내부 사용 한정 조항" },
+    { "pattern": "no derivative", "verdict": "caution", "label": "No-derivatives clause", "label_ko": "파생 금지 조항" },
+    { "pattern": "may not .{0,40}(commercial|redistribut|sublicens)", "verdict": "caution", "label": "Use/redistribution prohibition", "label_ko": "사용·재배포 금지 조항" },
+    { "pattern": "acceptable use policy|prohibited use", "verdict": "review", "label": "Use-policy reference", "label_ko": "사용 정책 참조 조항" }
+  ],
+  "datasetTagSignals": [
+    { "tag": "not-for-all-audiences", "signal": "content-warning", "verdict": "caution" },
+    { "tag": "pii", "signal": "pii", "verdict": "caution" },
+    { "tag": "medical", "signal": "sensitive-domain", "verdict": "review" },
+    { "tag": "legal", "signal": "copyright-sensitive", "verdict": "review" }
+  ],
+  "weightFormats": {
+    "pickleExts": [".bin", ".pt", ".pth", ".ckpt"],
+    "safeExts": [".safetensors", ".gguf", ".onnx", ".msgpack", ".h5"]
+  }
+}

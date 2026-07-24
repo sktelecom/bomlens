@@ -689,6 +689,115 @@ echo '{"bomFormat":"CycloneDX","components":[]}' > "$WORK/plain_bom.json"
 bash "$LIB/generate-ai-profile.sh" "$WORK/plain" "x" >/dev/null 2>&1
 [ ! -f "$WORK/plain_ai-profile.json" ] && pass "no profile written for a non-AI SBOM (self-gated)" || fail "profile wrongly written for a non-AI SBOM"
 
+echo "== ai-risk-knowledge.json: registry integrity =="
+KBJ="$LIB/ai-risk-knowledge.json"
+jq empty "$KBJ" >/dev/null 2>&1 && pass "ai-risk-knowledge.json is valid JSON" || fail "ai-risk-knowledge.json is not valid JSON"
+# The registry claims full coverage of the official HF license tag list; a tag
+# without a licenseTerms entry would silently fall to review, so fail loudly.
+uncov=$(jq -r '
+  def norm($s): ($s | ascii_downcase | gsub("[ ._/-]+"; " "));
+  [ .licenseTerms[].ids[]? | norm(.) ] as $ids
+  | [ .hfLicenseTags[] | select((norm(.)) as $n | ($ids | index($n)) == null) ] | join(" ")' "$KBJ")
+[ -z "$uncov" ] && pass "every HF license tag has a licenseTerms entry" || fail "uncovered HF license tag(s)" "$uncov"
+badv=$(jq -r '[ (.licenseTerms[].verdict, .datasetTagSignals[].verdict, .customLicensePatterns[].verdict)
+                | select(IN("ok","conditional","caution","review") | not) ] | join(" ")' "$KBJ")
+[ -z "$badv" ] && pass "every verdict is in the 4-tier enum" || fail "out-of-enum verdict(s)" "$badv"
+badc=$(jq -r '(.conditionLabels | keys) as $L
+  | [ .licenseTerms[].conditions[]?.id | select(IN($L[]) | not) ] | unique | join(" ")' "$KBJ")
+[ -z "$badc" ] && pass "every condition id has a conditionLabels entry" || fail "unlabeled condition id(s)" "$badc"
+bada=$(jq -r '[ .licenseTerms[].conditions[]?.appliesTo[]?
+                | select(IN("internal","product","redistribute","outputs-only") | not) ] | unique | join(" ")' "$KBJ")
+[ -z "$bada" ] && pass "every appliesTo value is a known usage scenario" || fail "unknown appliesTo value(s)" "$bada"
+badm=$(jq -r '[ (.licenseTerms[].match // empty), .customLicensePatterns[].pattern ]
+  | map(select((try ("probe" | test(.)) catch null) == null)) | join(" ")' "$KBJ")
+[ -z "$badm" ] && pass "every match/pattern regex compiles" || fail "broken regex(es)" "$badm"
+badsum=$(jq -r '[ .licenseTerms[]
+  | select(((.summary // "") == "") or ((.summary_ko // "") == "")
+           or ((.sourceUrl // "") | startswith("https://") | not)) | .key ] | join(" ")' "$KBJ")
+[ -z "$badsum" ] && pass "every entry carries summary, summary_ko and an https source" || fail "incomplete entries" "$badsum"
+# Every license family license-flags.jq flags for review must also be judged
+# here, or the badge and the verdict would disagree about the same license.
+famcov=$(jq -r '
+  def norm($s): ($s | ascii_downcase | gsub("[ ._/-]+"; " "));
+  ["openrail", "llama 3 community license", "gemma", "cc by nc 4 0", "falcon llm license"] as $probes
+  | [ .licenseTerms[] ] as $T
+  | [ $probes[] | . as $n
+      | select(([ $T[] | select((any(.ids[]?; norm(.) == $n))
+                                or (((.match // "") != "") and (($n | test(.match)) // false))) ] | length) == 0) ]
+  | join(" ")' "$KBJ")
+[ -z "$famcov" ] && pass "every license_flag family resolves to a registry entry" || fail "flagged family without a registry entry" "$famcov"
+
+echo "== assess-ai-risk.sh stamps verdicts from the license-terms registry =="
+for spec in "Apache-2.0:ok" "llama3.1:conditional" "CC-BY-NC-4.0:caution" "Custom-Weird-License-1.0:review"; do
+    lic="${spec%%:*}"; want="${spec##*:}"
+    jq --arg l "$lic" '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":$l}}]' \
+        "$FIX/aibom-owasp-1_7.json" > "$WORK/as.json"
+    bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
+    got=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/as.json")
+    [ "$got" = "$want" ] && pass "license $lic assessed $want" || fail "license $lic assessed '$got', expected $want"
+done
+# Worst-of: a known blocker (caution) outranks an unknown license (review).
+jq '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":"CC-BY-NC-4.0"}},{"license":{"name":"Custom-Weird-License-1.0"}}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/as.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
+worst=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/as.json")
+[ "$worst" = "caution" ] && pass "worst-of ranks a known blocker above an unknown license" || fail "worst-of verdict='$worst', expected caution"
+# No declared license is review — with the reason saying so.
+jq '(.components[] | select(.type=="machine-learning-model")) |= del(.licenses)' "$FIX/aibom-owasp-1_7.json" > "$WORK/as.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
+noli=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as.json")
+case "$noli" in *"no license declared"*) pass "a model without a license falls to review with the reason recorded" ;; *) fail "no-license reason='$noli'" ;; esac
+# Dataset (data) components are assessed too; an unresolved dataset without a
+# license reads review, never a guessed verdict.
+cp "$FIX/aibom-datasets-1_7.json" "$WORK/asds.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/asds.json" >/dev/null 2>&1
+dsv=$(jq -r '.components[] | select(.type=="data" and .name=="org/open-ds") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/asds.json")
+[ "$dsv" = "conditional" ] && pass "a cc-by-sa dataset assesses conditional (share-alike)" || fail "dataset verdict='$dsv', expected conditional"
+unv=$(jq -r '.components[] | select(.type=="data") | select((.properties // []) | any(.name=="bomlens:dataset:unresolved")) | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/asds.json")
+[ "$unv" = "review" ] && pass "an unresolved dataset assesses review" || fail "unresolved dataset verdict='$unv', expected review"
+# Idempotent: a second run leaves exactly one property set.
+bash "$LIB/assess-ai-risk.sh" "$WORK/asds.json" >/dev/null 2>&1
+ncnt=$(jq '[.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall")] | length' "$WORK/asds.json")
+[ "$ncnt" = "1" ] && pass "assessing twice is idempotent" || fail "after re-run: $ncnt overall properties, expected 1"
+# A plain SBOM is untouched (self-gate), so ANALYZE of a non-AI SBOM is a no-op.
+printf '{"bomFormat":"CycloneDX","components":[{"type":"library","name":"x","licenses":[{"license":{"id":"MIT"}}]}]}' > "$WORK/asplain.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/asplain.json" >/dev/null 2>&1
+pl=$(jq '[.components[].properties[]? | select(.name | startswith("bomlens:assessment:"))] | length' "$WORK/asplain.json")
+[ "$pl" = "0" ] && pass "a plain SBOM gets no assessment properties (self-gated)" || fail "plain SBOM gained $pl assessment properties"
+
+echo "== AI profile carries the model risk assessment =="
+cp "$WORK/conf_conformance.json" "$WORK/assessprof_conformance.json"
+jq '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":"llama3.1"}}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/assessprof_bom.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/assessprof_bom.json" >/dev/null 2>&1
+bash "$LIB/generate-ai-profile.sh" "$WORK/assessprof" "demo" >/dev/null 2>&1
+APROF="$WORK/assessprof_ai-profile.json"
+am=$(jq -r '.riskAssessment.models | length' "$APROF" 2>/dev/null)
+[ "$am" = "1" ] && pass "profile JSON carries the assessed model" || fail "riskAssessment.models=$am, expected 1"
+ac=$(jq -r '.riskAssessment.counts.conditional' "$APROF")
+[ "$ac" = "1" ] && pass "profile counts the conditional verdict" || fail "counts.conditional=$ac, expected 1"
+asum=$(jq -r '(.riskAssessment.counts | .ok + .conditional + .caution + .review)' "$APROF")
+[ "$asum" = "$am" ] && pass "verdict counts add up to the model count" || fail "counts sum=$asum, models=$am"
+grep -q "## Model risk assessment" "$WORK/assessprof_ai-profile.md" && pass "MD carries the assessment section" || fail "MD lacks the assessment section"
+grep -q "not legal advice" "$WORK/assessprof_ai-profile.md" && pass "MD opens the section with the disclaimer" || fail "MD lacks the disclaimer"
+grep -q "conditions:" "$WORK/assessprof_ai-profile.md" && pass "a non-ok model lists its conditions" || fail "MD lacks the condition list"
+grep -q "https://www.llama.com/license/" "$WORK/assessprof_ai-profile.md" && pass "the verdict links its license source" || fail "MD lacks the license source link"
+# An SBOM that was never assessed (no bomlens:assessment:*) yields no section.
+grep -q "## Model risk assessment" "$WORK/conf_ai-profile.md" && fail "an unassessed SBOM still grew an assessment section" || pass "no assessment section without assessment properties"
+
+echo "== ko AI profile localizes the assessment while the JSON stays English =="
+cp "$WORK/assessprof_conformance.json" "$WORK/koassess_conformance.json"
+cp "$WORK/assessprof_bom.json" "$WORK/koassess_bom.json"
+REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koassess" "demo" >/dev/null 2>&1
+grep -q "## 모델 위험 판정" "$WORK/koassess_ai-profile.md" && pass "ko assessment heading is Korean" || fail "ko assessment heading not localized"
+grep -q "법적 자문이 아닌 안내" "$WORK/koassess_ai-profile.md" && pass "ko disclaimer is Korean" || fail "ko disclaimer not localized"
+grep -q "조건부 사용" "$WORK/koassess_ai-profile.md" && pass "ko verdict labels are Korean" || fail "ko verdict labels not localized"
+if diff <(jq 'del(.generatedAt)' "$APROF") <(jq 'del(.generatedAt)' "$WORK/koassess_ai-profile.json") >/dev/null 2>&1; then
+    pass "ko assessment JSON == en assessment JSON (contract stays English)"
+else
+    fail "ko assessment JSON diverged from the English JSON"
+fi
+
 echo "== generate-notice.sh flags AI restrictive licenses for review =="
 bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
 RTXT="$WORK/rev_NOTICE.txt"

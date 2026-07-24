@@ -93,12 +93,60 @@ if [ -f "$BOM" ]; then
 fi
 
 # --------------------------------------------------------
+# Model risk assessment from the finished SBOM. assess-ai-risk.sh stamps every
+# model component with bomlens:assessment:* verdicts; here they are joined back
+# to the license-terms registry (ai-risk-knowledge.json) for the human-readable
+# summaries, condition labels and source links. Re-aggregation only — and the
+# registry's disclaimer (guidance, not legal advice) rides along so every
+# rendering of the verdicts can print it.
+# --------------------------------------------------------
+KBJ="$(dirname "$0")/ai-risk-knowledge.json"
+ASSESS='{"disclaimer":"","disclaimer_ko":"","counts":{"ok":0,"conditional":0,"caution":0,"review":0},"models":[]}'
+if [ -f "$BOM" ] && [ -f "$KBJ" ]; then
+    ASSESS=$(jq -c --slurpfile kb "$KBJ" '
+      ($kb[0]) as $K
+      | [ .components[]?
+          | select(.type == "machine-learning-model")
+          | (.properties // []) as $p
+          | ($p | map(select(.name == "bomlens:assessment:overall")) | (.[0].value // null)) as $ov
+          | select($ov != null)
+          | { name: (.name // "(unnamed)"),
+              version: (.version // ""),
+              license: ([ (.licenses // [])[] | (.license.id // .license.name // .expression) ]
+                         | map(select(. != null and . != "")) | (.[0] // "")),
+              axes: { license:  ($p | map(select(.name == "bomlens:assessment:license"))  | (.[0].value // "")),
+                      security: ($p | map(select(.name == "bomlens:assessment:security")) | (.[0].value // "")),
+                      datasets: ($p | map(select(.name == "bomlens:assessment:datasets")) | (.[0].value // "")) },
+              overall: $ov,
+              keys: (($p | map(select(.name == "bomlens:assessment:license:keys")) | (.[0].value // ""))
+                      | split(",") | map(select(. != ""))),
+              reasons: (($p | map(select(.name == "bomlens:assessment:reasons")) | (.[0].value // ""))
+                      | split("; ") | map(select(. != ""))) }
+          | . + { terms: [ .keys[] as $k | ($K.licenseTerms[] | select(.key == $k)) ] }
+          | . + { summary:    ([ .terms[].summary ]    | join(" ")),
+                  summary_ko: ([ .terms[].summary_ko ] | join(" ")),
+                  conditions: ([ .terms[].conditions[]?.id ] | unique
+                               | map({ id: ., label: ($K.conditionLabels[.].en // .),
+                                       label_ko: ($K.conditionLabels[.].ko // .) })),
+                  sourceUrls: ([ .terms[].sourceUrl ] | unique) }
+          | del(.terms)
+        ] as $models
+      | { disclaimer: $K.disclaimer.en, disclaimer_ko: $K.disclaimer.ko,
+          counts: { ok:          ($models | map(select(.overall == "ok"))          | length),
+                    conditional: ($models | map(select(.overall == "conditional")) | length),
+                    caution:     ($models | map(select(.overall == "caution"))     | length),
+                    review:      ($models | map(select(.overall == "review"))      | length) },
+          models: $models }' "$BOM" 2>/dev/null) \
+        || ASSESS='{"disclaimer":"","disclaimer_ko":"","counts":{"ok":0,"conditional":0,"caution":0,"review":0},"models":[]}'
+fi
+
+# --------------------------------------------------------
 # JSON profile
 # --------------------------------------------------------
 jq -n --arg project "$PROJECT" --arg ts "$GEN_AT" --arg confResult "$CONF_RESULT" \
-   --argjson g7 "$G7" --argjson xwalk "$XW" --argjson lic "$LIC" '
+   --argjson g7 "$G7" --argjson xwalk "$XW" --argjson lic "$LIC" --argjson assess "$ASSESS" '
 { project: $project, generatedAt: $ts, conformanceResult: $confResult,
-  g7: $g7, regulatoryCrosswalk: $xwalk, licenseReview: $lic }' > "$JSON"
+  g7: $g7, regulatoryCrosswalk: $xwalk, licenseReview: $lic, riskAssessment: $assess }' > "$JSON"
 
 # --------------------------------------------------------
 # Localization (REPORT_LANG=ko). The JSON above stays English (a contract). Only
@@ -151,6 +199,9 @@ A=$(echo "$G7" | jq -r '.auto'); P=$(echo "$G7" | jq -r '.present')
 Gp=$(echo "$G7" | jq -r '.gap'); Rv=$(echo "$G7" | jq -r '.review')
 LT=$(echo "$LIC" | jq -r '.total'); LB=$(echo "$LIC" | jq -r '.behavioral'); LN=$(echo "$LIC" | jq -r '.nonCommercial')
 CONF_UP=$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')
+AT=$(echo "$ASSESS" | jq -r '.models | length')
+AOK=$(echo "$ASSESS" | jq -r '.counts.ok'); ACOND=$(echo "$ASSESS" | jq -r '.counts.conditional')
+ACAU=$(echo "$ASSESS" | jq -r '.counts.caution'); AREV=$(echo "$ASSESS" | jq -r '.counts.review')
 
 # Chrome strings: English literals by default (byte-identical), catalog for ko.
 if [ "$REPORT_LANG" = "ko" ]; then
@@ -173,6 +224,14 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_XWALK_FULL=$(tfmt aiprofile.crosswalk_full "$OUT_PREFIX")
     P_H2_CLOSE=$(kstr aiprofile.h2_close); P_CLOSE_INTRO=$(tfmt aiprofile.close_intro "$OUT_PREFIX")
     P_H2_REVIEW=$(kstr aiprofile.h2_review); P_REVIEW_INTRO=$(kstr aiprofile.review_intro)
+    P_H2_ASSESS=$(kstr aiprofile.h2_assessment)
+    P_SUM_ASSESS=$(tfmt aiprofile.sum_assess "$AOK" "$ACOND" "$ACAU" "$AREV")
+    P_ASSESS_DISC=$(echo "$ASSESS" | jq -r '.disclaimer_ko // .disclaimer')
+    P_TH_LICV=$(kstr aiprofile.th_lic_verdict); P_TH_SEC=$(kstr aiprofile.th_security)
+    P_TH_DS=$(kstr aiprofile.th_datasets); P_TH_OVERALL=$(kstr aiprofile.th_overall)
+    P_ASSESS_COND=$(kstr aiprofile.assess_conditions); P_ASSESS_SRC=$(kstr aiprofile.assess_source)
+    L_OK=$(kstr aiprofile.v_ok); L_COND=$(kstr aiprofile.v_conditional)
+    L_CAU=$(kstr aiprofile.v_caution); L_REV=$(kstr aiprofile.v_review)
 else
     P_MD_TITLE="AI compliance profile — ${PROJECT}"
     P_MD_GEN="- Generated: ${GEN_AT}"
@@ -193,6 +252,12 @@ else
     P_CLOSE_INTRO="These G7 elements have an automated source but are absent from the SBOM. The conformance report (\`${OUT_PREFIX}_conformance.md\`) carries the CycloneDX fragment that would satisfy each one."
     P_H2_REVIEW="Elements a person still has to fill in"
     P_REVIEW_INTRO="These G7 elements have no automated source; they are surfaced for human review, not guessed."
+    P_H2_ASSESS="Model risk assessment"
+    P_SUM_ASSESS="- Model risk assessment: ok ${AOK}, conditional ${ACOND}, caution ${ACAU}, review ${AREV}."
+    P_ASSESS_DISC=$(echo "$ASSESS" | jq -r '.disclaimer')
+    P_TH_LICV="License verdict"; P_TH_SEC="File security"; P_TH_DS="Datasets"; P_TH_OVERALL="Overall"
+    P_ASSESS_COND="conditions"; P_ASSESS_SRC="source"
+    L_OK="ok"; L_COND="conditional"; L_CAU="caution"; L_REV="review"
 fi
 
 # --------------------------------------------------------
@@ -210,7 +275,38 @@ fi
     echo "${P_SUM_G7}"
     echo "${P_SUM_LIC}"
     echo "${P_SUM_BASE}"
+    [ "$AT" -gt 0 ] && echo "${P_SUM_ASSESS}"
     echo ""
+
+    # Model risk assessment: one verdict row per model, then the terms behind
+    # every non-ok verdict. Axes that no pipeline stage evaluated render "—",
+    # never a guessed verdict, and the registry disclaimer opens the section.
+    if [ "$AT" -gt 0 ]; then
+        echo "## ${P_H2_ASSESS}"
+        echo ""
+        echo "_${P_ASSESS_DISC}_"
+        echo ""
+        echo "| ${P_TH_COMP} | ${P_TH_VER} | ${P_TH_LIC} | ${P_TH_LICV} | ${P_TH_SEC} | ${P_TH_DS} | ${P_TH_OVERALL} |"
+        echo "|-----------|---------|---------|------|------|------|------|"
+        echo "$ASSESS" | jq -r --arg lok "$L_OK" --arg lcond "$L_COND" --arg lcau "$L_CAU" --arg lrev "$L_REV" '
+            def vl($v): if $v == "ok" then $lok elif $v == "conditional" then $lcond
+                        elif $v == "caution" then $lcau elif $v == "review" then $lrev
+                        elif $v == "" then "—" else $v end;
+            .models[] |
+            "| \(.name|gsub("[|\n]";" ")) | \(.version|gsub("[|\n]";" ")) | \(.license|gsub("[|\n]";" ")) | \(vl(.axes.license)) | \(vl(.axes.security)) | \(vl(.axes.datasets)) | \(vl(.overall)) |"'
+        echo ""
+        echo "$ASSESS" | jq -r --arg lang "$REPORT_LANG" --arg condlbl "$P_ASSESS_COND" --arg srclbl "$P_ASSESS_SRC" '
+            .models[] | select(.overall != "ok")
+            | (if $lang == "ko" and ((.summary_ko // "") != "") then .summary_ko
+               elif (.summary // "") != "" then .summary
+               else (.reasons | join("; ")) end) as $body
+            | ((if $lang == "ko" then [ .conditions[]?.label_ko ] else [ .conditions[]?.label ] end)
+               | join("; ")) as $conds
+            | "- **\(.name|gsub("[|\n]";" "))** — \($body)"
+              + (if $conds != "" then " (\($condlbl): \($conds))" else "" end)
+              + (if (.sourceUrls | length) > 0 then " — \($srclbl): \(.sourceUrls | join(", "))" else "" end)'
+        echo ""
+    fi
 
     echo "## ${P_H2_LIC}"
     echo ""
@@ -276,4 +372,4 @@ fi
 # and CI read it) and so does the Markdown digest.
 # --------------------------------------------------------
 
-echo "[ai-profile] generated: $JSON, $MD (G7 present=${P}/${A}, license flags=${LT})"
+echo "[ai-profile] generated: $JSON, $MD (G7 present=${P}/${A}, license flags=${LT}, models assessed=${AT})"
