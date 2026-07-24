@@ -1,0 +1,2533 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order.">
+      
+      
+        <meta name="author" content="SK Telecom">
+      
+      
+        <link rel="canonical" href="https://sktelecom.github.io/bomlens/concepts/architecture/">
+      
+      
+        <link rel="prev" href="../../reference/ecosystems/">
+      
+      
+        <link rel="next" href="../pipeline-by-input/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../ko/concepts/architecture/" hreflang="ko">
+        
+      
+      
+      <link rel="icon" href="../../images/logo-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Architecture - BomLens</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  
+    
+  
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BomLens">
+  <meta property="og:title" content="Architecture - BomLens">
+  <meta property="og:description" content="How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order.">
+  <meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+  <meta property="og:url" content="https://sktelecom.github.io/bomlens/concepts/architecture/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Architecture - BomLens">
+  <meta name="twitter:description" content="How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order.">
+  <meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+
+  <!--
+    방문 분석(GoatCounter): 쿠키도 개인정보도 수집하지 않는다. config.extra.goatcounter에
+    사이트 코드가 있을 때만 켜진다(없으면 출력하지 않으므로 등록 전에는 비활성).
+  -->
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BomLens" class="md-header__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BomLens
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../ko/concepts/architecture/" hreflang="ko" class="md-select__link">
+              한국어
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BomLens" class="md-nav__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    BomLens
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../what-is-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is an SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/first-scan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/no-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    No-CLI quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI & app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    By input type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/supplier-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supplier SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ai-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/identify-vendored/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identify bundled OSS (C/C++)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/server-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Outputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/docker-image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-two-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why two stages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-pipeline-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full pipeline flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stage-1--sbom-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1 — SBOM generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stage 1 — SBOM generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-code-modesource--cdxgen-language-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source code (MODE=SOURCE) — cdxgen language image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image--binary--directory--syft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image / binary / directory — syft
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stage-2--post-processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2 — post-processing pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branching-by-input-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branching by input type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flag-to-step-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flag-to-step mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extension points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-support-for-a-new-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding support for a new language
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-post-processing-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new post-processing step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#division-of-roles-trusca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Division of roles (TRUSCA)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline-by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline by input
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local-first
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/package-managers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package managers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/sktelecom/bomlens/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-two-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why two stages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool inventory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-pipeline-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full pipeline flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stage-1--sbom-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1 — SBOM generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stage 1 — SBOM generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#source-code-modesource--cdxgen-language-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source code (MODE=SOURCE) — cdxgen language image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image--binary--directory--syft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image / binary / directory — syft
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stage-2--post-processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2 — post-processing pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#branching-by-input-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branching by input type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flag-to-step-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flag-to-step mapping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extension points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-support-for-a-new-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding support for a new language
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-post-processing-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new post-processing step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#division-of-roles-trusca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Division of roles (TRUSCA)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    About
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>This document describes the overall system structure of BomLens and explains which tool runs at which step of the scan pipeline, and in what order.</p>
+<p>For the per-input tool flow — source code (with the ScanCode and SCANOSS options), firmware, a received SBOM, and an AI model — see <a href="../pipeline-by-input/">Pipeline by input type</a>.</p>
+<blockquote>
+<p>This document reflects the 2-stage architecture as currently implemented. The Stage 1 routing in the source code (detect the language, then run the official cdxgen language image) is implemented and working in <code>scripts/scan-sbom.sh</code>.</p>
+</blockquote>
+<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<p>BomLens is a 2-stage pipeline in which two kinds of Docker images work together.</p>
+<ul>
+<li><strong>Stage 1 — Generation</strong>: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6); for container images, binaries, and directories, syft does.</li>
+<li><strong>Stage 2 — Post-processing</strong>: the lightweight <code>bomlens</code> image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.</li>
+</ul>
+<p><img alt="BomLens two-stage pipeline: per-language cdxgen images or syft build bom.json, and the bomlens image post-processes it" src="../../images/diagrams/architecture-overview.png" /></p>
+<p>The single entry point for orchestration is <code>scripts/scan-sbom.sh</code> (<code>scan-sbom.bat</code> on Windows); this is the only script users invoke.</p>
+<hr />
+<h2 id="why-two-stages">Why two stages<a class="headerlink" href="#why-two-stages" title="Permanent link">&para;</a></h2>
+<p>Previously, every language runtime plus every analysis tool lived in a single huge image. The redesigned pipeline splits the responsibilities in two.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Stage 1 image</th>
+<th>Stage 2 image (<code>bomlens</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Role</strong></td>
+<td><strong>Generates</strong> the SBOM from source</td>
+<td>SBOM <strong>post-processing</strong> (normalization, notice, security, signing, upload) plus syft scans</td>
+</tr>
+<tr>
+<td><strong>Contents</strong></td>
+<td>Official <strong>per-language</strong> cdxgen images (java, python, node, ...)</td>
+<td><strong>No</strong> language toolchain — lightweight <code>debian:12-slim</code></td>
+</tr>
+<tr>
+<td><strong>Acquisition</strong></td>
+<td>Pulled <strong>on demand</strong> after detecting the project language</td>
+<td>Pulled once and reused</td>
+</tr>
+<tr>
+<td><strong>Benefit</strong></td>
+<td>cdxgen maintains up-to-date per-language toolchains</td>
+<td>Small image; pinned tool versions ensure reproducibility</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (<code>build-prep.sh</code>) is markedly better. For the measurement data, see <a href="https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen">README "Why a Docker image?"</a>.</p>
+</blockquote>
+<hr />
+<h2 id="tool-inventory">Tool inventory<a class="headerlink" href="#tool-inventory" title="Permanent link">&para;</a></h2>
+<p>The tools invoked by the pipeline and their <strong>version pinning</strong> status (supply chain hygiene).</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Version</th>
+<th>Stage</th>
+<th>Role</th>
+<th>Enabled when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>cdxgen</strong></td>
+<td>bundled in the language image</td>
+<td>Stage 1</td>
+<td>Generates the SBOM from source code (<code>--spec-version 1.6</code>)</td>
+<td><code>MODE=SOURCE</code></td>
+</tr>
+<tr>
+<td><strong>build-prep.sh</strong></td>
+<td>—</td>
+<td>Stage 1</td>
+<td>Dependency preparation right before cdxgen (cargo, go, bundle, mvn, pip)</td>
+<td><code>MODE=SOURCE</code></td>
+</tr>
+<tr>
+<td><strong>syft</strong></td>
+<td><code>v1.46.0</code></td>
+<td>Stage 1</td>
+<td>Scans images, binaries, and root filesystems</td>
+<td><code>MODE=IMAGE/BINARY/ROOTFS</code></td>
+</tr>
+<tr>
+<td><strong>jq</strong> (<code>normalize-sbom.sh</code>)</td>
+<td>—</td>
+<td>Stage 2</td>
+<td>Normalizes and sorts the SBOM</td>
+<td>Always</td>
+</tr>
+<tr>
+<td><strong>ScanCode Toolkit</strong></td>
+<td><code>32.5.0</code></td>
+<td>Stage 2</td>
+<td>Precise license detection on first-party source</td>
+<td><code>--deep-license</code> (opt-in build)</td>
+</tr>
+<tr>
+<td><strong>SCANOSS</strong></td>
+<td><code>1.25.2</code></td>
+<td>Stage 2</td>
+<td>Identify vendored open source in C/C++ source with no package manager</td>
+<td><code>--identify-vendored</code></td>
+</tr>
+<tr>
+<td><strong>jq</strong> (<code>generate-notice.sh</code>)</td>
+<td>—</td>
+<td>Stage 2</td>
+<td>Generates the open source notice (NOTICE)</td>
+<td><code>--notice</code> / <code>--all</code></td>
+</tr>
+<tr>
+<td><strong>Trivy</strong></td>
+<td><code>v0.72.0</code></td>
+<td>Stage 2</td>
+<td>Vulnerability (CVE) security report</td>
+<td><code>--security</code> / <code>--all</code></td>
+</tr>
+<tr>
+<td><strong>Cosign</strong></td>
+<td><code>v2.4.1</code></td>
+<td>Stage 2</td>
+<td>Detached SBOM signature</td>
+<td><code>--sign</code></td>
+</tr>
+<tr>
+<td><strong>curl</strong></td>
+<td>—</td>
+<td>Stage 2</td>
+<td>Upload to Dependency-Track</td>
+<td>Default (unless <code>--generate-only</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Versions are pinned as <code>ARG</code>s in <code>docker/Dockerfile</code>. To keep the image lean, ScanCode is an <strong>opt-in</strong> build arg (<code>--build-arg SBOM_DEEP_LICENSE=true</code>). The SCANOSS client is included by default; build with <code>--build-arg SBOM_SCANOSS=false</code> to drop it. Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in <code>bomlens-firmware</code> image, and AI-model SBOM generation (OWASP AIBOM Generator) in <code>bomlens-aibom</code>. For the per-input tool flow, see <a href="../pipeline-by-input/">Pipeline by input type</a>.</p>
+</blockquote>
+<hr />
+<h2 id="full-pipeline-flow">Full pipeline flow<a class="headerlink" href="#full-pipeline-flow" title="Permanent link">&para;</a></h2>
+<p>The <strong>order</strong> in which tools are invoked, in one diagram. Dashed boxes are optional steps enabled by flags.</p>
+<p><img alt="Full tool order: build-prep and cdxgen, or syft, produce bom.json, then the numbered post-processing steps run through upload" src="../../images/diagrams/architecture-full-pipeline.png" /></p>
+<p>The sequence from the user's invocation through post-processing:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    autonumber
+    actor U as User
+    participant S as scan-sbom.sh
+    participant D as Docker
+    participant L as Stage 1 language image
+    participant P as bomlens (run-scan)
+
+    U-&gt;&gt;S: scan-sbom.sh --project App --version 1.0 --all
+    S-&gt;&gt;S: Parse arguments, detect target type
+    rect rgb(227,242,253)
+    note over S,L: Stage 1 — Generation
+    S-&gt;&gt;D: (source) docker run the language image
+    D-&gt;&gt;L: build-prep.sh → cdxgen
+    L--&gt;&gt;S: bom.json
+    end
+    rect rgb(241,248,233)
+    note over S,P: Stage 2 — Post-processing
+    S-&gt;&gt;D: bomlens docker run (MODE=POSTPROCESS)
+    D-&gt;&gt;P: run-scan (entrypoint)
+    P-&gt;&gt;P: normalize → scancode → notice → Trivy → cosign
+    P-&gt;&gt;P: Copy artifacts to host
+    P--&gt;&gt;U: (optional) upload to Dependency-Track
+    end</code></pre>
+<hr />
+<h2 id="stage-1--sbom-generation">Stage 1 — SBOM generation<a class="headerlink" href="#stage-1--sbom-generation" title="Permanent link">&para;</a></h2>
+<p>The generation tool depends on the target type.</p>
+<h3 id="source-code-modesource--cdxgen-language-image">Source code (<code>MODE=SOURCE</code>) — cdxgen language image<a class="headerlink" href="#source-code-modesource--cdxgen-language-image" title="Permanent link">&para;</a></h3>
+<p><code>scan-sbom.sh</code> detects the project language with <code>detect_lang()</code>, picks the matching <strong>official cdxgen language image</strong> with <code>img_for_lang()</code>, pulls it, and runs <code>build-prep.sh</code> inside that image (<code>scripts/scan-sbom.sh:138-208</code>). The lightweight post-processing image has no language toolchain, so generation is handled entirely by the language image.</p>
+<p>The per-language cdxgen image mapping is as follows (<code>scan-sbom.sh:158-177</code>; the tag is pinned via <code>CDXGEN_TAG</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Detected language</th>
+<th>Image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rust</td>
+<td><code>cdxgen-debian-rust</code></td>
+</tr>
+<tr>
+<td>go</td>
+<td><code>cdxgen-debian-golang124</code></td>
+</tr>
+<tr>
+<td>ruby</td>
+<td><code>cdxgen-debian-ruby34</code></td>
+</tr>
+<tr>
+<td>java</td>
+<td><code>cdxgen-temurin-java21</code></td>
+</tr>
+<tr>
+<td>python</td>
+<td><code>cdxgen-python312</code></td>
+</tr>
+<tr>
+<td>node</td>
+<td><code>cdxgen-node20</code></td>
+</tr>
+<tr>
+<td>php</td>
+<td><code>cdxgen-debian-php84</code></td>
+</tr>
+<tr>
+<td>dotnet</td>
+<td><code>cdxgen-debian-dotnet9</code></td>
+</tr>
+<tr>
+<td>android</td>
+<td>self-built <code>bomlens-android-sdk&lt;API&gt;</code> (compileSdk extracted automatically)</td>
+</tr>
+<tr>
+<td>mixed / unknown</td>
+<td>cdxgen all-in-one (<code>CDXGEN_ALLINONE</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Two steps run inside the image:</p>
+<ol>
+<li><strong><code>build-prep.sh</code></strong> (<code>docker/lib/build-prep.sh</code>) — dependency preparation <strong>right before</strong> cdxgen. It creates lockfiles for ecosystems cdxgen cannot resolve on its own (notably Rust and Go), exposing transitive dependencies. POSIX <code>sh</code>, best-effort (it never fails the scan).</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Ecosystem</th>
+<th>Action</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rust</td>
+<td><code>cargo generate-lockfile</code></td>
+<td>cdxgen does not run cargo automatically — <strong>required</strong></td>
+</tr>
+<tr>
+<td>Go</td>
+<td><code>go mod download</code> (<code>-mod=mod</code>)</td>
+<td>Resolves the module graph</td>
+</tr>
+<tr>
+<td>Ruby</td>
+<td><code>bundle lock</code> / <code>install</code></td>
+<td>Only when no lockfile exists</td>
+</tr>
+<tr>
+<td>Maven</td>
+<td><code>mvn dependency:resolve</code></td>
+<td>Lightweight safety net</td>
+</tr>
+<tr>
+<td>Python</td>
+<td><code>pip install -r requirements.txt</code></td>
+<td>Exposes transitive dependencies when no lockfile exists</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><strong>Run cdxgen</strong> — <code>build-prep.sh</code> auto-detects the cdxgen binary path, which differs per image, and runs <code>cdxgen -r --spec-version 1.6 -o bom.json</code> (<code>build-prep.sh:60-73</code>). The generated SBOM is then handed to the Stage 2 (<code>MODE=POSTPROCESS</code>) post-processing image.</li>
+</ol>
+<h3 id="image--binary--directory--syft">Image / binary / directory — syft<a class="headerlink" href="#image--binary--directory--syft" title="Permanent link">&para;</a></h3>
+<p><strong>syft</strong>, included in the <code>bomlens</code> image, generates the SBOM directly. (<code>docker/entrypoint.sh</code>)</p>
+<table>
+<thead>
+<tr>
+<th>MODE</th>
+<th>Input</th>
+<th>syft invocation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IMAGE</code></td>
+<td>Docker image</td>
+<td><code>syft &lt;image&gt; -o cyclonedx-json</code> (requires the docker.sock mount)</td>
+</tr>
+<tr>
+<td><code>BINARY</code></td>
+<td>Single file</td>
+<td><code>syft file:&lt;path&gt; -o cyclonedx-json</code> (falls back to a minimal SBOM on failure)</td>
+</tr>
+<tr>
+<td><code>ROOTFS</code></td>
+<td>Directory</td>
+<td><code>syft dir:&lt;path&gt; -o cyclonedx-json</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="stage-2--post-processing-pipeline">Stage 2 — post-processing pipeline<a class="headerlink" href="#stage-2--post-processing-pipeline" title="Permanent link">&para;</a></h2>
+<p>The <code>bomlens</code> image's entry point <code>run-scan</code> (<code>docker/entrypoint.sh</code>) takes the SBOM and runs the steps in a <strong>fixed order</strong>. Each step is enabled by an environment variable (equivalent to a CLI flag), and outputs accumulate in the <code>ARTIFACTS</code> list.</p>
+<p><img alt="Stage 2 post-processing: eight fixed steps from normalize to upload, each gated by its environment variable" src="../../images/diagrams/architecture-stage2-steps.png" /></p>
+<p>Step details:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Script / tool</th>
+<th>Condition</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①</td>
+<td><strong>Normalize</strong></td>
+<td><code>normalize-sbom.sh</code> (jq)</td>
+<td>Always (deterministic mode with <code>--byte-stable</code>)</td>
+<td>Updates <code>bom.json</code></td>
+</tr>
+<tr>
+<td>②</td>
+<td><strong>Deep license</strong></td>
+<td><code>scancode</code></td>
+<td><code>--deep-license</code> and <code>/src</code> exists</td>
+<td><code>_scancode.json</code></td>
+</tr>
+<tr>
+<td>③</td>
+<td><strong>Notice</strong></td>
+<td><code>generate-notice.sh</code> (jq)</td>
+<td><code>--notice</code> / <code>--all</code></td>
+<td><code>_NOTICE.txt</code>, <code>_NOTICE.html</code></td>
+</tr>
+<tr>
+<td>④</td>
+<td><strong>Security report</strong></td>
+<td><code>scan-security.sh</code> (Trivy)</td>
+<td><code>--security</code> / <code>--all</code></td>
+<td><code>_security.{json,md,html}</code></td>
+</tr>
+<tr>
+<td>⑤</td>
+<td><strong>Signing</strong></td>
+<td><code>cosign sign-blob</code></td>
+<td><code>--sign</code> and <code>COSIGN_KEY</code></td>
+<td><code>bom.json.sig</code></td>
+</tr>
+<tr>
+<td>⑥</td>
+<td><strong>Risk report</strong></td>
+<td><code>generate-risk-report.sh</code></td>
+<td>Default (skip with <code>--no-report</code>)</td>
+<td><code>_risk-report.{md,html}</code> (plus <code>_conformance.*</code> in ANALYZE mode)</td>
+</tr>
+<tr>
+<td>⑦</td>
+<td><strong>Copy to host</strong></td>
+<td><code>cp</code></td>
+<td>Always</td>
+<td>Copied to <code>HOST_OUTPUT_DIR</code></td>
+</tr>
+<tr>
+<td>⑧</td>
+<td><strong>Upload</strong></td>
+<td><code>curl</code></td>
+<td>Default (skipped with <code>--generate-only</code>)</td>
+<td>Upload to a Dependency-Track server or TRUSCA's native ingest (select with <code>UPLOAD_TARGET</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Why the order is fixed</strong>: normalization stabilizes the input for every later step, so it runs first; signing must target the final <code>bom.json</code>, so it runs last. Each step is best-effort — failures are handled with <code>|| true</code> or a warning and do not abort the whole scan (signing and upload excepted).</p>
+</blockquote>
+<hr />
+<h2 id="branching-by-input-type">Branching by input type<a class="headerlink" href="#branching-by-input-type" title="Permanent link">&para;</a></h2>
+<p><code>scan-sbom.sh</code> determines the mode automatically from <code>--git</code>/<code>--analyze</code>/<code>--firmware</code> and the <code>--target</code> value.</p>
+<p>The checks run top to bottom; the first matching branch wins.</p>
+<pre class="mermaid"><code>flowchart TD
+    D1{"--git URL&lt;br/&gt;or URL-like target?"} --&gt;|yes| R1["clone → MODE=SOURCE"]
+    D1 --&gt;|no| D2{"--target&lt;br/&gt;*.zip / *.tar.gz?"}
+    D2 --&gt;|yes| R2["extract → MODE=SOURCE"]
+    D2 --&gt;|no| D3{"--analyze sbom?"}
+    D3 --&gt;|yes| R3["MODE=ANALYZE&lt;br/&gt;validate + convert to CDX"]
+    D3 --&gt;|no| D4{"target omitted?"}
+    D4 --&gt;|yes| R4["MODE=SOURCE&lt;br/&gt;current directory → cdxgen"]
+    D4 --&gt;|no| D5{"existing file?"}
+    D5 --&gt;|"yes · --firmware/extension"| R5["MODE=FIRMWARE&lt;br/&gt;opt-in firmware image"]
+    D5 --&gt;|"yes · otherwise"| R6["MODE=BINARY → syft"]
+    D5 --&gt;|no| D6{"existing directory?"}
+    D6 --&gt;|yes| R7["MODE=ROOTFS → syft"]
+    D6 --&gt;|no| R8["MODE=IMAGE → syft"]</code></pre>
+<blockquote>
+<p>Independently of the branching above, <code>--ui</code> starts <code>MODE=UI</code> (the web server <code>server.py</code>) and runs subsequent scans through the form or file upload.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Trigger</th>
+<th>Generation tool</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SOURCE</code></td>
+<td>No target, <code>--git &lt;url&gt;</code>, or <code>--target *.zip/*.tar.gz</code></td>
+<td>cdxgen</td>
+<td>Language detection selects the per-language image. Git targets are cloned; archives are extracted and treated as source. (The web UI's SOURCE uses <code>syft dir:</code> inside the container)</td>
+</tr>
+<tr>
+<td><code>ANALYZE</code></td>
+<td><code>--analyze &lt;sbom&gt;</code> (alias <code>--sbom</code>)</td>
+<td>—</td>
+<td>Validates a supplier SBOM (CycloneDX/SPDX), converts it to CDX, and re-aggregates. Produces <code>_conformance.*</code></td>
+</tr>
+<tr>
+<td><code>FIRMWARE</code></td>
+<td><code>--target &lt;file&gt; --firmware</code>, or a firmware file extension</td>
+<td>unblob + syft + cve-bin-tool</td>
+<td><strong>Opt-in image</strong> <code>bomlens-firmware</code>. Details in the <a href="../../guides/firmware/">firmware analysis guide</a></td>
+</tr>
+<tr>
+<td><code>BINARY</code></td>
+<td><code>--target &lt;file&gt;</code></td>
+<td>syft</td>
+<td><code>file:</code> scheme</td>
+</tr>
+<tr>
+<td><code>ROOTFS</code></td>
+<td><code>--target &lt;directory&gt;</code></td>
+<td>syft</td>
+<td><code>dir:</code> scheme</td>
+</tr>
+<tr>
+<td><code>IMAGE</code></td>
+<td><code>--target &lt;image name&gt;</code></td>
+<td>syft</td>
+<td>docker.sock mount</td>
+</tr>
+<tr>
+<td><code>AIBOM</code></td>
+<td><code>--model &lt;owner/name&gt;</code></td>
+<td>OWASP AIBOM Generator</td>
+<td><strong>Opt-in image</strong> <code>bomlens-aibom</code>. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check</td>
+</tr>
+<tr>
+<td><code>UI</code></td>
+<td><code>--ui</code></td>
+<td>—</td>
+<td>Browser UI; runs every scan target type through the form or file upload</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="flag-to-step-mapping">Flag-to-step mapping<a class="headerlink" href="#flag-to-step-mapping" title="Permanent link">&para;</a></h2>
+<p>How CLI flags translate into environment variables and which steps they enable (<code>scan-sbom.sh</code> converts them and passes them to <code>entrypoint.sh</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Steps enabled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(default)</td>
+<td><code>GENERATE_REPORT=true</code> (plus notice and security)</td>
+<td>normalize + <strong>risk report</strong> + upload</td>
+</tr>
+<tr>
+<td><code>--no-report</code></td>
+<td><code>GENERATE_REPORT=false</code></td>
+<td>Does not force-enable the risk report, notice, or security steps</td>
+</tr>
+<tr>
+<td><code>--notice</code></td>
+<td><code>GENERATE_NOTICE=true</code></td>
+<td>③ notice</td>
+</tr>
+<tr>
+<td><code>--security</code></td>
+<td><code>GENERATE_SECURITY=true</code></td>
+<td>④ security report</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td>Both of the above</td>
+<td>③ + ④</td>
+</tr>
+<tr>
+<td><code>--git &lt;url&gt;</code> / <code>--branch</code></td>
+<td>(cloned on the host)</td>
+<td>SOURCE input collection</td>
+</tr>
+<tr>
+<td><code>--analyze &lt;sbom&gt;</code></td>
+<td><code>MODE=ANALYZE</code></td>
+<td>Supplier SBOM validation, conversion, and report</td>
+</tr>
+<tr>
+<td><code>--firmware</code></td>
+<td><code>MODE=FIRMWARE</code> (firmware image)</td>
+<td>Unpack, then syft + cve-bin-tool</td>
+</tr>
+<tr>
+<td><code>--model &lt;owner/name&gt;</code></td>
+<td><code>MODE=AIBOM</code> (aibom image)</td>
+<td>Generate an ML-BOM from a HuggingFace model, plus a G7 check</td>
+</tr>
+<tr>
+<td><code>--deep-license</code></td>
+<td><code>DEEP_LICENSE=true</code></td>
+<td>② scancode</td>
+</tr>
+<tr>
+<td><code>--byte-stable</code></td>
+<td><code>BYTE_STABLE=true</code></td>
+<td>① deterministic normalization (also the UI's Reproducible output toggle)</td>
+</tr>
+<tr>
+<td><code>--sign</code></td>
+<td><code>SIGN_SBOM=true</code> (plus <code>COSIGN_KEY</code>/<code>COSIGN_PASSWORD</code>)</td>
+<td>⑤ signing</td>
+</tr>
+<tr>
+<td><code>--generate-only</code></td>
+<td><code>UPLOAD_ENABLED=false</code></td>
+<td>⑦ skips the upload</td>
+</tr>
+<tr>
+<td><code>--ui</code></td>
+<td><code>MODE=UI</code></td>
+<td>Web UI</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The <strong>risk report</strong> (<code>_risk-report.{md,html}</code>) is generated <strong>by default</strong> in every mode (it aggregates licenses and vulnerabilities). To support it, the notice and security scans are turned on automatically alongside it; disable with <code>--no-report</code>.</p>
+</blockquote>
+<p>For how to use each feature, see the <a href="../../guides/reports/">notice and security report guide</a>.</p>
+<hr />
+<h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link">&para;</a></h2>
+<p><code>{P}</code> is the project name, <code>{V}</code> the version (special characters are normalized to <code>_</code>).</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Generated when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{Project}_{Version}_bom.json</code></td>
+<td>Always (CycloneDX 1.6; a 1.7 ML-BOM for AI models)</td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_NOTICE.txt</code> / <code>.html</code> / <code>.pdf</code></td>
+<td><code>--notice</code> / <code>--all</code> / default risk report generation (PDF only in an <code>SBOM_PDF</code> build)</td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_security.json</code> / <code>.md</code> / <code>.html</code></td>
+<td><code>--security</code> / <code>--all</code> / default risk report generation</td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_risk-report.md</code> / <code>.html</code></td>
+<td>Default (all modes) — skip with <code>--no-report</code></td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_conformance.json</code> / <code>.md</code> / <code>.html</code></td>
+<td><code>--analyze</code> (supplier SBOM validation)</td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_scancode.json</code></td>
+<td><code>--deep-license</code></td>
+</tr>
+<tr>
+<td><code>{Project}_{Version}_bom.json.sig</code></td>
+<td><code>--sign</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="extension-points">Extension points<a class="headerlink" href="#extension-points" title="Permanent link">&para;</a></h2>
+<h3 id="adding-support-for-a-new-language">Adding support for a new language<a class="headerlink" href="#adding-support-for-a-new-language" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Check whether an official cdxgen image exists for the language — if so, add it to the routing table.</li>
+<li>If cdxgen cannot resolve transitive dependencies automatically, add preparation logic to <code>docker/lib/build-prep.sh</code>.</li>
+<li>Add an example project under <code>examples/{language}/</code> and a test case in <code>tests/cases/test-{language}.sh</code>.</li>
+</ol>
+<p>For the full procedure, see the <a href="../../contribute/package-managers/">package manager guide</a>.</p>
+<h3 id="adding-a-new-post-processing-step">Adding a new post-processing step<a class="headerlink" href="#adding-a-new-post-processing-step" title="Permanent link">&para;</a></h3>
+<p>Add a helper script under <code>docker/lib/</code>, call it from the shared pipeline section of <code>entrypoint.sh</code> (after normalization) behind an environment variable guard, and append its outputs to <code>ARTIFACTS</code>. Place it <strong>before</strong> the signing step so its outputs are covered by the signature.</p>
+<hr />
+<h2 id="design-principles">Design principles<a class="headerlink" href="#design-principles" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Isolation</strong> — all analysis runs in Docker containers; the host environment stays untouched.</li>
+<li><strong>Separation of concerns</strong> — generation (Stage 1) and post-processing (Stage 2) are split, keeping the post-processing image small.</li>
+<li><strong>Reproducibility</strong> — tool versions are pinned via <code>ARG</code>; <code>--byte-stable</code> produces byte-identical output.</li>
+<li><strong>Standards compliance</strong> — conforms to the CycloneDX 1.6 specification.</li>
+<li><strong>Robustness</strong> — post-processing steps are best-effort and do not abort the whole scan.</li>
+<li><strong>Single interface</strong> — every language and mode is invoked through the one <code>scan-sbom.sh</code>.</li>
+</ul>
+<hr />
+<h2 id="division-of-roles-trusca">Division of roles (TRUSCA)<a class="headerlink" href="#division-of-roles-trusca" title="Permanent link">&para;</a></h2>
+<p>BomLens specializes in <strong>generation</strong>. <strong>Governance</strong> — company-wide project management, vulnerability triage, and license policy gates — is delegated to the sister project <a href="https://github.com/trustedoss/trusca">TRUSCA</a> (formerly TrustedOSS Portal). Both tools share cdxgen and Trivy, so the artifacts (CycloneDX) are directly compatible.</p>
+<pre class="mermaid"><code>flowchart TB
+    subgraph dev["Developer · single project"]
+        direction LR
+        A["Source / image / binary"] --&gt; B["BomLens"]
+        B --&gt; C["SBOM"]
+        B --&gt; D["Notice"]
+        B --&gt; E["Security report"]
+    end
+    subgraph org["Organization · central management"]
+        direction LR
+        F["TRUSCA"] --&gt; G["Vulnerability triage"]
+        F --&gt; H["License policy gate"]
+        F --&gt; I["Project dashboard"]
+    end
+    C -. upload .-&gt; F</code></pre>
+<hr />
+<blockquote>
+<p><strong>Related</strong>: <a href="../pipeline-by-input/">Pipeline by input type</a> | <a href="../../start/first-scan/">Getting started</a> | <a href="../../reference/cli/">CLI reference</a> | <a href="../../reference/docker-image/">Use the Docker image directly</a></p>
+</blockquote>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      SK Telecom
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.tracking", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/extra.js"></script>
+      
+    
+  </body>
+</html>

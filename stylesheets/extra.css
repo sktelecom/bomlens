@@ -1,0 +1,329 @@
+/*
+ * Gemini API 문서(Google DevSite) 인상에 맞춘 테마 보정.
+ * 헤더는 밝게 두고, SK 브랜드 색은 링크/버튼/강조에만 절제해서 쓴다.
+ * 색 값은 [[skt-brand-colors]] 기준.
+ *   SK Red    #EA002C  흰 배경 대비 약 4.63:1 (본문 텍스트 AA 충족) — 1차 강조
+ *   SK Orange #F47725  흰 배경 대비 약 2.8:1 (본문 텍스트 불가) — hover/보조 강조만
+ */
+
+/* ---- 루트 글자 크기 고정 ----
+ * Material은 html { font-size: 125% }를 기본으로 두고, 넓은 화면에서 137.5%(100em↑)와
+ * 150%(125em↑)로 키운다. 사이트 크기가 대부분 rem이라 창 폭만 바꿔도 본문 전체가
+ * 확대·축소되어 보이므로, 넓은 화면에서도 기본값 125%를 유지한다.
+ * 선택자는 Material과 같은 html을 쓴다(:root는 특이성이 더 높아 기본값까지 덮는다).
+ */
+@media screen and (min-width: 100em) {
+  html {
+    font-size: 125%;
+  }
+}
+@media screen and (min-width: 125em) {
+  html {
+    font-size: 125%;
+  }
+}
+
+/* ---- 강조색 토큰 (primary가 custom일 때 Material이 data 속성을 붙인다) ---- */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #ea002c;
+  --md-primary-fg-color--light: #ff3355;
+  --md-primary-fg-color--dark: #b0001f;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #f47725;
+  --md-accent-fg-color--transparent: rgba(244, 119, 37, 0.1);
+}
+
+/* ---- 밝은 헤더 (레드 블록 대신 흰 배경 + 어두운 글자) ---- */
+.md-header {
+  background-color: #ffffff;
+  color: #1f1f1f;
+  box-shadow: none;
+  border-bottom: 1px solid #e8eaed;
+}
+.md-header--shadow {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+.md-header__title,
+.md-header__topic,
+.md-header__button {
+  color: #1f1f1f;
+}
+/* 로고 마크는 SK 레드 악센트로 브랜드감 유지 */
+.md-header .md-logo img,
+.md-header .md-logo svg {
+  color: #ea002c;
+}
+/* 헤더 브랜드: 락업 로고(아이콘+워드마크+부제)를 키워서 쓰고, 데스크톱에서는
+   중복되는 사이트명 텍스트를 숨긴다. 모바일에서는 Material이 로고를 숨기므로
+   텍스트 제목을 그대로 둔다. */
+.md-header .md-logo img {
+  height: 1.9rem;
+  width: auto;
+}
+@media screen and (min-width: 76.25em) {
+  .md-header__title {
+    display: none;
+  }
+}
+/* 저장소 통계(버전/스타/포크)는 밝은 헤더에서 번잡해 숨긴다(저장소 링크는 유지) */
+.md-source__facts {
+  display: none;
+}
+
+/* 검색: 밝은 헤더용 옅은 회색 필드 */
+.md-search__form {
+  background-color: #f1f3f4;
+  box-shadow: none;
+}
+.md-search__form:hover {
+  background-color: #e8eaed;
+}
+.md-search__input {
+  color: #1f1f1f;
+}
+.md-search__input::placeholder {
+  color: #5f6368;
+}
+.md-search__icon {
+  color: #5f6368;
+}
+
+/* ---- 다크 모드 헤더: 어두운 표면 + 밝은 글자 ---- */
+[data-md-color-scheme="slate"] .md-header {
+  background-color: #1f1f23;
+  color: #e8eaed;
+  border-bottom-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-header__title,
+[data-md-color-scheme="slate"] .md-header__topic,
+[data-md-color-scheme="slate"] .md-header__button {
+  color: #e8eaed;
+}
+[data-md-color-scheme="slate"] .md-search__form {
+  background-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-search__input {
+  color: #e8eaed;
+}
+
+/* ---- 본문 링크: 1차 강조(SK Red), hover는 보조 강조(SK Orange) ---- */
+.md-typeset a {
+  color: #ea002c;
+}
+.md-typeset a:hover {
+  color: #f47725;
+}
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: #ff4d6a;
+}
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: #f9914f;
+}
+
+/* ---- 타이포그래피와 여백 (Gemini의 여유로운 느낌) ---- */
+.md-grid {
+  max-width: 64rem;
+}
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.75;
+}
+/* 제목: Material 기본은 옅은 회색 + 두꺼움이라 둔탁하다. 어둡게, 조금 가볍게. */
+.md-typeset h1 {
+  color: #202124;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.md-typeset h2 {
+  color: #202124;
+  margin-top: 2.2em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.md-typeset h3 {
+  color: #202124;
+  font-weight: 600;
+}
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #e8eaed;
+}
+
+/* ---- 좌측 사이드바: 상위(섹션)와 하위(페이지) 구분 ---- */
+/* 사이드바 상단의 사이트명 반복은 헤더와 겹쳐 데스크톱에서 숨긴다 */
+@media screen and (min-width: 76.25em) {
+  .md-nav--primary > .md-nav__title {
+    display: none;
+  }
+}
+/* 사이드바의 "홈" 항목은 숨긴다(헤더 로고가 홈으로 가므로 중복). index.md는
+   i18n 홈페이지 인식을 위해 nav에 남겨두되, 사이드바 첫 항목만 가린다. */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-child {
+  display: none;
+}
+
+/* 섹션(상위) 헤더: 하위보다 크고 굵고 어둡게 — 상위가 더 두드러진다 */
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: #202124;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  margin: 1.6em 0 0.5em;
+  opacity: 1;
+}
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: #e8eaed;
+}
+/* 하위 페이지 링크: 일반 무게, 약간 작게, 차분한 색 */
+.md-nav--primary .md-nav__link {
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: #3c4043;
+}
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link {
+  color: #c4c7ca;
+}
+/* 활성 페이지: SK 레드 강조 */
+.md-nav--primary .md-nav__link--active {
+  color: #ea002c;
+  font-weight: 600;
+}
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
+  color: #ff4d6a;
+}
+
+/* ---- 코드 블록: 옅은 배경 + 보더 + 라운드로 정제 ---- */
+[data-md-color-scheme="default"] {
+  --md-code-bg-color: #f6f8fa;
+}
+[data-md-color-scheme="slate"] {
+  --md-code-bg-color: #1a1a1f;
+}
+.md-typeset pre {
+  border-radius: 0.5rem;
+}
+.md-typeset pre > code {
+  border: 1px solid #e8eaed;
+  border-radius: 0.5rem;
+  padding: 0.9em 1em;
+}
+[data-md-color-scheme="slate"] .md-typeset pre > code {
+  border-color: #2d2d31;
+}
+.md-typeset code {
+  border-radius: 0.25rem;
+}
+
+/* ---- 표: DevSite 톤 (헤더 음영, 여백, 옅은 구분선, 행 hover) ---- */
+.md-typeset table:not([class]) {
+  border: 1px solid #e8eaed;
+  border-radius: 0.4rem;
+  font-size: 0.74rem;
+}
+.md-typeset table:not([class]) th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #202124;
+}
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+  padding: 0.7em 0.9em;
+  border-bottom: 1px solid #eef0f2;
+}
+.md-typeset table:not([class]) tr:hover {
+  background-color: #fafbfc;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
+  border-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: #26262b;
+  color: #e8eaed;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th,
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-bottom-color: #2d2d31;
+}
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover {
+  background-color: #1f1f23;
+}
+
+/* ---- 블록쿼트: 평범한 인용 대신 차분한 콜아웃 박스 ---- */
+.md-typeset blockquote {
+  color: inherit;
+  border-left: 3px solid #f47725;
+  background-color: #faf7f4;
+  border-radius: 0 0.3rem 0.3rem 0;
+  padding: 0.5em 0.9em;
+}
+.md-typeset blockquote > :first-child {
+  margin-top: 0;
+}
+.md-typeset blockquote > :last-child {
+  margin-bottom: 0;
+}
+[data-md-color-scheme="slate"] .md-typeset blockquote {
+  background-color: #26221f;
+  border-left-color: #f47725;
+}
+
+/* ---- 1차 다운로드 버튼: SK Red 채움 + 흰 글자, hover는 약간 어둡게 ---- */
+.md-typeset .md-button--primary {
+  background-color: #ea002c;
+  border-color: #ea002c;
+  color: #ffffff;
+}
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: #b0001f;
+  border-color: #b0001f;
+  color: #ffffff;
+}
+
+/* ---- grid cards: DevSite 카드 느낌 ---- */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 0.5rem;
+  padding: 1em 1.1em;
+  transition: box-shadow 200ms, border-color 200ms;
+}
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: #f47725;
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.18);
+}
+/* 카드 하단 링크: 기본은 본문색으로 차분하게, hover에서만 브랜드색.
+   화면 전체에 빨강이 반복되는 것을 줄인다. */
+.md-typeset .grid.cards a {
+  color: #3c4043;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a {
+  color: #c4c7ca;
+}
+.md-typeset .grid.cards a:hover,
+.md-typeset .grid.cards > ul > li:hover a {
+  color: #ea002c;
+}
+[data-md-color-scheme="slate"] .md-typeset .grid.cards a:hover,
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover a {
+  color: #ff4d6a;
+}
+
+/* ---- 홈 히어로 스크린샷: 카드형 테두리와 옅은 그림자 ---- */
+.md-typeset img.home-shot {
+  margin-top: 1.2em;
+  border: 1px solid #e8eaed;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.22);
+}
+[data-md-color-scheme="slate"] .md-typeset img.home-shot {
+  border-color: #2d2d31;
+}
+
+/* ---- 개념 다이어그램: 항상 본문 폭을 가득 채워 라벨이 읽히게 (2x PNG라 선명) ---- */
+.md-typeset img[src*="images/diagrams/"] {
+  width: 100%;
+}

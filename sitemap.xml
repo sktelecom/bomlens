@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/concepts/architecture/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/architecture/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/architecture/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/concepts/local-first/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/local-first/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/local-first/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/concepts/pipeline-by-input/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/pipeline-by-input/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/pipeline-by-input/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/concepts/reports-explained/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/reports-explained/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/reports-explained/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/concepts/what-is-sbom/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/what-is-sbom/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/what-is-sbom/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/contribute/package-managers/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/contribute/package-managers/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/contribute/package-managers/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/contribute/testing/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/contribute/testing/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/contribute/testing/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/ai-model/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/ai-model/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/ai-model/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/by-input/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/by-input/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/by-input/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/ci-cd/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/ci-cd/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/ci-cd/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/firmware/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/firmware/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/firmware/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/identify-vendored/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/identify-vendored/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/identify-vendored/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/reports/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/reports/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/reports/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/server-delivery/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/server-delivery/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/server-delivery/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/supplier-sbom/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/supplier-sbom/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/supplier-sbom/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/guides/upload/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/upload/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/upload/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/reference/artifacts/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/reference/cli/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/cli/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/cli/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/reference/docker-image/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/reference/ecosystems/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/ecosystems/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/ecosystems/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/reference/ui/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/ui/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/ui/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/start/first-scan/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/start/first-scan/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/start/first-scan/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/start/no-cli/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/start/no-cli/"/>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/start/no-cli/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/concepts/architecture/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/architecture/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/architecture/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/concepts/local-first/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/local-first/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/local-first/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/concepts/pipeline-by-input/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/pipeline-by-input/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/pipeline-by-input/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/concepts/reports-explained/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/reports-explained/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/reports-explained/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/concepts/what-is-sbom/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/what-is-sbom/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/what-is-sbom/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/contribute/package-managers/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/contribute/package-managers/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/contribute/package-managers/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/contribute/testing/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/contribute/testing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/contribute/testing/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/ai-model/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/ai-model/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/ai-model/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/by-input/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/by-input/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/by-input/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/ci-cd/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/ci-cd/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/ci-cd/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/firmware/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/firmware/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/firmware/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/identify-vendored/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/identify-vendored/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/identify-vendored/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/reports/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/reports/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/reports/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/server-delivery/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/server-delivery/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/server-delivery/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/supplier-sbom/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/supplier-sbom/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/supplier-sbom/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/guides/upload/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/guides/upload/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/guides/upload/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/reference/artifacts/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/reference/cli/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/cli/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/cli/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/reference/docker-image/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/reference/ecosystems/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/ecosystems/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/ecosystems/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/reference/ui/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/ui/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/ui/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/start/first-scan/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/start/first-scan/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/start/first-scan/"/>
+    </url>
+    <url>
+        <loc>https://sktelecom.github.io/bomlens/ko/start/no-cli/</loc>
+        <lastmod>2026-07-24</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/start/no-cli/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/start/no-cli/"/>
+    </url>
+</urlset>

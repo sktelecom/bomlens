@@ -1,0 +1,2089 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Every CLI option and environment variable for BomLens, with output locations, image pinning, and troubleshooting.">
+      
+      
+        <meta name="author" content="SK Telecom">
+      
+      
+        <link rel="canonical" href="https://sktelecom.github.io/bomlens/reference/cli/">
+      
+      
+        <link rel="prev" href="../../concepts/reports-explained/">
+      
+      
+        <link rel="next" href="../docker-image/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../ko/reference/cli/" hreflang="ko">
+        
+      
+      
+      <link rel="icon" href="../../images/logo-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>CLI reference - BomLens</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  
+    
+  
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BomLens">
+  <meta property="og:title" content="CLI reference - BomLens">
+  <meta property="og:description" content="Every CLI option and environment variable for BomLens, with output locations, image pinning, and troubleshooting.">
+  <meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+  <meta property="og:url" content="https://sktelecom.github.io/bomlens/reference/cli/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CLI reference - BomLens">
+  <meta name="twitter:description" content="Every CLI option and environment variable for BomLens, with output locations, image pinning, and troubleshooting.">
+  <meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+
+  <!--
+    방문 분석(GoatCounter): 쿠키도 개인정보도 수집하지 않는다. config.extra.goatcounter에
+    사이트 코드가 있을 때만 켜진다(없으면 출력하지 않으므로 등록 전에는 비활성).
+  -->
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cli-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BomLens" class="md-header__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BomLens
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CLI reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../ko/reference/cli/" hreflang="ko" class="md-select__link">
+              한국어
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BomLens" class="md-nav__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    BomLens
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/what-is-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is an SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/first-scan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/no-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    No-CLI quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI & app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    By input type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/supplier-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supplier SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ai-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/identify-vendored/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identify bundled OSS (C/C++)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/server-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Outputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/reports-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#options-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-outputs-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where outputs go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-the-scanner-image-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin the scanner image version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows-no-outputs-appear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows: no outputs appear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-permission-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker permission error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of disk space
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anything-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anything else
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docker-image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/pipeline-by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline by input
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/local-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local-first
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/package-managers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package managers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/sktelecom/bomlens/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#options-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-outputs-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where outputs go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-the-scanner-image-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin the scanner image version
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows-no-outputs-appear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows: no outputs appear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docker-permission-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker permission error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-disk-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out of disk space
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anything-else" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anything else
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Advanced
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cli-reference">CLI reference<a class="headerlink" href="#cli-reference" title="Permanent link">&para;</a></h1>
+<p>Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens.</p>
+<h2 id="options-reference">Options reference<a class="headerlink" href="#options-reference" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./scripts/scan-sbom.sh<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</code></pre></div>
+<blockquote>
+<p><strong>Windows</strong>: the commands here are for macOS/Linux. Pick one of the following. See <a href="../../start/first-scan/">Getting started</a> for installation.</p>
+<ul>
+<li>Replace <code>./scripts/scan-sbom.sh</code> with <code>scripts\scan-sbom.bat</code> (needs Git Bash).</li>
+<li>Under WSL2, run the commands as-is.</li>
+<li>To work without a command line, double-click <code>scripts\sbom-ui.bat</code>, or download the desktop app.</li>
+</ul>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--project &lt;name&gt;</code></td>
+<td>—</td>
+<td><strong>(required)</strong> Project name</td>
+</tr>
+<tr>
+<td><code>--version &lt;version&gt;</code></td>
+<td>—</td>
+<td><strong>(required)</strong> Project version</td>
+</tr>
+<tr>
+<td><code>--target &lt;target&gt;</code></td>
+<td>current directory</td>
+<td>What to analyze: a directory (source tree, or an OS rootfs / staging build output), a Docker image, a binary file, or a <code>.zip</code>/<code>.tar.gz</code> archive</td>
+</tr>
+<tr>
+<td><code>--git &lt;url&gt;</code></td>
+<td>—</td>
+<td>Shallow-clone a git/GitHub URL and analyze it as source (private repos: <code>GIT_TOKEN</code> env var)</td>
+</tr>
+<tr>
+<td><code>--branch &lt;ref&gt;</code></td>
+<td>default branch</td>
+<td>Branch, tag, or commit of the <code>--git</code> target (alias <code>--ref</code>)</td>
+</tr>
+<tr>
+<td><code>--firmware</code></td>
+<td>false</td>
+<td>Force firmware mode on the <code>--target</code> file (opt-in firmware image)</td>
+</tr>
+<tr>
+<td><code>--analyze &lt;sbom&gt;</code></td>
+<td>—</td>
+<td>Validate and analyze a supplier SBOM (alias <code>--sbom</code>). CycloneDX/SPDX. Mutually exclusive with <code>--target</code></td>
+</tr>
+<tr>
+<td><code>--model &lt;owner/name&gt;</code></td>
+<td>—</td>
+<td>Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace model via the OWASP AIBOM Generator (opt-in <code>bomlens-aibom</code> image; fetches model-card metadata over the network). Mutually exclusive with <code>--target</code>/<code>--analyze</code>/<code>--git</code>/<code>--merge</code></td>
+</tr>
+<tr>
+<td><code>--merge &lt;a.json&gt; &lt;b.json&gt; …</code></td>
+<td>—</td>
+<td>Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with <code>--project</code>/<code>--version</code>. Optional — for a server SBOM when an external system needs a single product BOM; otherwise keep the layers separate (see the <a href="../../guides/server-delivery/">server SBOM guide</a>). Mutually exclusive with <code>--target</code>/<code>--analyze</code>/<code>--git</code></td>
+</tr>
+<tr>
+<td><code>--merge-root &lt;file&gt;</code></td>
+<td>—</td>
+<td>With <code>--merge</code>: keep this input's <code>specVersion</code> and root component (for example an ML-BOM's CycloneDX 1.7 root with its model card) instead of writing a fresh 1.6 root. Must be one of the <code>--merge</code> files; the preserved root is renamed to <code>--project</code>/<code>--version</code></td>
+</tr>
+<tr>
+<td><code>--generate-only</code></td>
+<td>false</td>
+<td>Save locally only, without uploading</td>
+</tr>
+<tr>
+<td><code>--upload-target &lt;target&gt;</code></td>
+<td><code>dependency-track</code></td>
+<td>Upload destination: <code>dependency-track</code> (DT-compatible) or <code>trusca</code> (native ingest)</td>
+</tr>
+<tr>
+<td><code>--trusca &lt;project_id&gt;</code></td>
+<td>—</td>
+<td>Upload to TRUSCA (= <code>--upload-target trusca</code> + project id). Needs <code>API_URL</code> and a Bearer <code>API_KEY</code></td>
+</tr>
+<tr>
+<td><code>--notice</code></td>
+<td>(on by default)</td>
+<td>Generate the open-source notice (NOTICE, txt+html)</td>
+</tr>
+<tr>
+<td><code>--security</code></td>
+<td>(on by default)</td>
+<td>Generate the Trivy security report (json+md+html), including CVSS, EPSS, and CISA KEV priority signals</td>
+</tr>
+<tr>
+<td><code>--spdx</code></td>
+<td>false</td>
+<td>Also export the SBOM as SPDX 2.3 JSON (<code>_bom.spdx.json</code>), converted from the final CycloneDX output</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td>—</td>
+<td><code>--notice --security --spdx</code></td>
+</tr>
+<tr>
+<td><code>--no-report</code></td>
+<td>false</td>
+<td>Skip the open-source risk report (see below)</td>
+</tr>
+<tr>
+<td><code>--lang &lt;en\|ko&gt;</code></td>
+<td><code>en</code></td>
+<td>Language for the human-facing conformance and AI-profile reports (<code>.md</code>/<code>.html</code>). The SBOM and the JSON reports stay English regardless</td>
+</tr>
+<tr>
+<td><code>--deep-license</code></td>
+<td>false</td>
+<td>Precise license detection with scancode (opt-in image)</td>
+</tr>
+<tr>
+<td><code>--deep-cve</code></td>
+<td>false</td>
+<td>Also match Maven components against the NVD by CPE via grype (opt-in <code>bomlens-deep-cve</code> image, pulled automatically). Recovers NVD-only CVEs that Trivy misses for older Java libraries; implies <code>--security</code>. Findings not verified against the live NVD version range are flagged version-unverified in the report — see the <a href="../../guides/reports/">deep CVE matching guide</a></td>
+</tr>
+<tr>
+<td><code>--identify-vendored</code></td>
+<td>false</td>
+<td>Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the <a href="../../guides/identify-vendored/">identify bundled OSS guide</a></td>
+</tr>
+<tr>
+<td><code>--byte-stable</code></td>
+<td>false</td>
+<td>Deterministic (reproducible) SBOM output</td>
+</tr>
+<tr>
+<td><code>--sign</code></td>
+<td>false</td>
+<td>cosign signature (<code>COSIGN_KEY</code> required)</td>
+</tr>
+<tr>
+<td><code>--output-dir &lt;dir&gt;</code></td>
+<td>current directory</td>
+<td>Base directory for outputs (alias <code>-o</code>). Each scan lands in a <code>{Project}_{Version}/</code> subfolder under it, keeping the bundle together and out of the source tree</td>
+</tr>
+<tr>
+<td><code>--timestamp</code></td>
+<td>false</td>
+<td>Append <code>_YYYYMMDD-HHMMSS</code> to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged</td>
+</tr>
+<tr>
+<td><code>--ui</code></td>
+<td>—</td>
+<td>Launch the local web UI</td>
+</tr>
+<tr>
+<td><code>--mount &lt;dir&gt;</code></td>
+<td>—</td>
+<td>With <code>--ui</code>: expose an extra host directory to the web UI as a read-only target for the <strong>Directory path</strong> input (repeatable). Lets the UI scan an OS tree outside the launch folder — including the running host OS with <code>--mount /</code>. Results still save under the launch folder</td>
+</tr>
+<tr>
+<td><code>--help</code></td>
+<td>—</td>
+<td>Print help</td>
+</tr>
+</tbody>
+</table>
+<p>Environment variables adjust the behavior.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SBOM_SCANNER_IMAGE</code></td>
+<td><code>ghcr.io/sktelecom/bomlens:latest</code></td>
+<td>Override the scanner image</td>
+</tr>
+<tr>
+<td><code>SBOM_FIRMWARE_IMAGE</code></td>
+<td><code>ghcr.io/sktelecom/bomlens-firmware:latest</code></td>
+<td>Image used for firmware analysis</td>
+</tr>
+<tr>
+<td><code>SBOM_AIBOM_IMAGE</code></td>
+<td><code>ghcr.io/sktelecom/bomlens-aibom:latest</code></td>
+<td>Image used for AI model (ML-BOM) generation</td>
+</tr>
+<tr>
+<td><code>SBOM_DEEP_CVE_IMAGE</code></td>
+<td><code>ghcr.io/sktelecom/bomlens-deep-cve:latest</code></td>
+<td>Image used for <code>--deep-cve</code> (grype maven CPE matching)</td>
+</tr>
+<tr>
+<td><code>SBOM_OUTPUT_FLAT</code></td>
+<td>—</td>
+<td>Set to <code>1</code> to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths)</td>
+</tr>
+<tr>
+<td><code>SBOM_OUTPUT_DIR</code></td>
+<td><code>~/sbom-output</code></td>
+<td>Output base for the desktop app and web UI (the CLI uses <code>--output-dir</code> instead). Each scan still lands in a <code>{Project}_{Version}/</code> subfolder under it</td>
+</tr>
+<tr>
+<td><code>SBOM_UI_MOUNT_DIR</code></td>
+<td>—</td>
+<td>For the Windows launcher <code>sbom-ui.bat</code>, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of <code>--ui --mount</code>). Use a path without <code>&amp; ^ | &lt; &gt;</code> — the launcher rejects those rather than passing a mangled mount to Docker</td>
+</tr>
+<tr>
+<td><code>SBOM_LANG</code></td>
+<td>system locale</td>
+<td><code>en</code> or <code>ko</code>, for the Windows launchers and the desktop app. Anything that is not Korean gets English</td>
+</tr>
+<tr>
+<td><code>SBOM_PULL</code></td>
+<td><code>missing</code></td>
+<td>Windows launcher download behavior. <code>missing</code> downloads only when the image is absent, <code>always</code> re-checks the registry every run (picks up a newer <code>:latest</code>), <code>never</code> never touches the network</td>
+</tr>
+<tr>
+<td><code>SBOM_IMAGE_TAR</code></td>
+<td>—</td>
+<td>Path to an image tar from <code>docker save</code>. The Windows launcher loads it instead of pulling; a file named <code>bomlens-image.tar</code> next to the scripts is picked up automatically. Combined with <code>SBOM_PULL=never</code> this gives a fully offline install</td>
+</tr>
+<tr>
+<td><code>CVE_BIN_TOOL_MODE</code></td>
+<td><code>auto</code></td>
+<td>Firmware CVE matching. <code>auto</code> uses the bundled CVE database if present, otherwise downloads from NVD when the network is reachable. <code>offline</code> matches only against the bundled database. <code>online</code> always updates from the network. <code>components-only</code> skips CVE matching and emits a component-only SBOM</td>
+</tr>
+<tr>
+<td><code>CVE_BIN_TOOL_HOME</code></td>
+<td><code>/opt/cve-bin-tool-home</code></td>
+<td>Location of the bundled cve-bin-tool CVE database. cve-bin-tool reads <code>$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db</code> (it keys the cache off <code>HOME</code>)</td>
+</tr>
+<tr>
+<td><code>CVE_BIN_TOOL_DISABLE_SOURCES</code></td>
+<td><code>GAD</code></td>
+<td>cve-bin-tool data sources to disable during a firmware scan. <code>GAD</code> (GitLab Advisory) is disabled by default because it crashes the bundled cve-bin-tool on fetch</td>
+</tr>
+<tr>
+<td><code>SCANOSS_API_URL</code></td>
+<td>OSSKB free API</td>
+<td>Endpoint for <code>--identify-vendored</code>. Point at a SCANOSS commercial or self-hosted endpoint for air-gapped or high-volume use</td>
+</tr>
+<tr>
+<td><code>SCANOSS_API_KEY</code></td>
+<td>—</td>
+<td>Credential for <code>SCANOSS_API_URL</code>, if the endpoint requires one</td>
+</tr>
+<tr>
+<td><code>SCANOSS_MIN_FILES</code></td>
+<td><code>2</code></td>
+<td>Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set <code>1</code> to keep every single-file match</td>
+</tr>
+<tr>
+<td><code>GIT_TOKEN</code></td>
+<td>—</td>
+<td>Token for cloning private git repositories</td>
+</tr>
+<tr>
+<td><code>HF_TOKEN</code></td>
+<td>—</td>
+<td>HuggingFace read token for <code>--model</code> and for the dataset metadata lookups during AI SBOM analysis. Required for a private or gated repository, which is how you review a model before publishing it. <code>HUGGING_FACE_HUB_TOKEN</code> is accepted as an alias</td>
+</tr>
+<tr>
+<td><code>COSIGN_KEY</code></td>
+<td>—</td>
+<td>Path to the signing key used by <code>--sign</code></td>
+</tr>
+<tr>
+<td><code>FETCH_LICENSE</code></td>
+<td><code>true</code></td>
+<td>Resolve dependency licenses during source scans. Set <code>false</code> to skip the lookup and run faster</td>
+</tr>
+<tr>
+<td><code>SECURITY_ENRICH</code></td>
+<td><code>true</code></td>
+<td>Enrich the security report with EPSS and CISA KEV signals. Set <code>false</code> on air-gapped networks to skip the external lookups</td>
+</tr>
+<tr>
+<td><code>SECURITY_NVD_VERIFY</code></td>
+<td><code>false</code></td>
+<td>With <code>--deep-cve</code>: verify each grype <code>nvd:cpe</code> finding against the live NVD version range and drop out-of-range false positives (needs <code>NVD_API_KEY</code> and network access; adds minutes). Off by default — findings are kept and flagged version-unverified</td>
+</tr>
+<tr>
+<td><code>NVD_API_KEY</code></td>
+<td>—</td>
+<td>NVD API key for <code>SECURITY_NVD_VERIFY</code>. Passed to the container by name only, never inlined into the command</td>
+</tr>
+<tr>
+<td><code>API_URL</code></td>
+<td>—</td>
+<td>Upload server URL (a DT server, or the TRUSCA base)</td>
+</tr>
+<tr>
+<td><code>API_KEY</code></td>
+<td>—</td>
+<td>Upload credential. Used as <code>X-Api-Key</code> for DT, as a Bearer token for TRUSCA</td>
+</tr>
+<tr>
+<td><code>UPLOAD_TARGET</code></td>
+<td><code>dependency-track</code></td>
+<td>Upload destination: <code>dependency-track</code> or <code>trusca</code></td>
+</tr>
+<tr>
+<td><code>TRUSCA_PROJECT_ID</code></td>
+<td>—</td>
+<td>TRUSCA project id (UUID). Required when <code>trusca</code></td>
+</tr>
+<tr>
+<td><code>TRUSCA_REF</code></td>
+<td><code>main</code></td>
+<td>Ingest ref label</td>
+</tr>
+<tr>
+<td><code>TRUSCA_RELEASE</code></td>
+<td><code>--version</code> value</td>
+<td>Ingest release label</td>
+</tr>
+</tbody>
+</table>
+<p>On Windows, environment variables set in a command prompt do not survive a
+double-click. The launchers therefore also read <code>UI_PORT</code>, <code>SBOM_LANG</code>,
+<code>SBOM_PULL</code>, <code>SBOM_IMAGE_TAR</code>, <code>SBOM_SCANNER_IMAGE</code>, <code>SBOM_OUTPUT_DIR</code> and
+<code>SBOM_UI_MOUNT_DIR</code> from a plain text file: copy <code>scripts/bomlens.settings.example.txt</code>
+to <code>bomlens.settings.txt</code> beside the scripts (or to <code>%USERPROFILE%\.bomlens\settings.txt</code>).
+A real environment variable always wins over the file.</p>
+<p>Output flags are detailed in the <a href="../../guides/reports/">reports guide</a>; validating a received supplier SBOM is covered in the <a href="../../guides/supplier-sbom/">supplier SBOM validation</a>.</p>
+<h2 id="where-outputs-go">Where outputs go<a class="headerlink" href="#where-outputs-go" title="Permanent link">&para;</a></h2>
+<p>Each scan is isolated in its own <code>{Project}_{Version}/</code> subfolder, so the files from one run stay together and the CLI never litters the source tree it scans. That subfolder is created under a base directory:</p>
+<ul>
+<li><strong>CLI</strong> (<code>scan-sbom.sh</code>): the base is the directory you ran the command in. Override it with <code>--output-dir &lt;dir&gt;</code> (alias <code>-o</code>).</li>
+<li><strong>Desktop app and web UI</strong>: the base is <code>~/sbom-output</code> (<code>C:\Users\&lt;you&gt;\sbom-output</code> on Windows). Override it with the <code>SBOM_OUTPUT_DIR</code> environment variable.</li>
+</ul>
+<p>For <code>--git</code> or archive ingestion the clone or extract happens in a temp directory that is cleaned up on exit, and only the output subfolder remains.</p>
+<p>A re-scan of the same project and version overwrites its subfolder by default, keeping just the latest result. Add <code>--timestamp</code> to keep each run instead: it appends <code>_YYYYMMDD-HHMMSS</code> to the folder name, for example <code>MyApp_1.0.0_20260626-143000/</code>. The flag changes the folder name only, not the SBOM file names or bytes, so it works together with <code>--byte-stable</code>.</p>
+<p>To restore the previous flat layout, where every file is written directly in the base with no per-run subfolder, set <code>SBOM_OUTPUT_FLAT=1</code>. This is meant for CI that expects the old paths.</p>
+<h2 id="pin-the-scanner-image-version">Pin the scanner image version<a class="headerlink" href="#pin-the-scanner-image-version" title="Permanent link">&para;</a></h2>
+<p>Override the scanner image with <code>SBOM_SCANNER_IMAGE</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">SBOM_SCANNER_IMAGE</span><span class="o">=</span><span class="s2">&quot;ghcr.io/sktelecom/bomlens:1.8.0&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>./scripts/scan-sbom.sh<span class="w"> </span>--project<span class="w"> </span><span class="s2">&quot;MyApp&quot;</span><span class="w"> </span>--version<span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="w"> </span>--generate-only
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="windows-no-outputs-appear">Windows: no outputs appear<a class="headerlink" href="#windows-no-outputs-appear" title="Permanent link">&para;</a></h3>
+<p>If the scan finishes but no output files show up, check that the folder you ran from is inside a Docker file-sharing path. Anything under your home directory (<code>C:\Users\...</code>) is shared by default in both Rancher Desktop and Docker Desktop. From an unshared location the container cannot write results to the host.</p>
+<h3 id="docker-permission-error">Docker permission error<a class="headerlink" href="#docker-permission-error" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Got permission denied while trying to connect to the Docker daemon
+</code></pre></div>
+<p>Add your user to the <code>docker</code> group.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>newgrp<span class="w"> </span>docker
+</code></pre></div>
+<h3 id="out-of-disk-space">Out of disk space<a class="headerlink" href="#out-of-disk-space" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>no space left on device
+</code></pre></div>
+<p>Prune the Docker cache.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>system<span class="w"> </span>prune<span class="w"> </span>-f
+</code></pre></div>
+<h3 id="anything-else">Anything else<a class="headerlink" href="#anything-else" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Check verbose logs with <code>VERBOSE=true ./tests/test-scan.sh</code>.</li>
+<li>Update the Docker image: <code>docker pull ghcr.io/sktelecom/bomlens:latest</code>.</li>
+<li>If it still fails, open a <a href="https://github.com/sktelecom/bomlens/issues">GitHub Issue</a> with your environment info and logs.</li>
+</ol>
+<p>For how to use each mode, see the <a href="../../guides/by-input/">input scenarios guide</a>; for the kinds of outputs, see the <a href="../artifacts/">artifacts reference</a>; for language detection, see <a href="../ecosystems/">supported ecosystems</a>.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      SK Telecom
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.tracking", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/extra.js"></script>
+      
+    
+  </body>
+</html>

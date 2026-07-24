@@ -1,0 +1,2031 @@
+
+<!doctype html>
+<html lang="ko" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="BomLens로 HuggingFace 모델의 AI SBOM(CycloneDX ML-BOM)을 모델 id만으로 생성하고 G7 최소 요소 — EU 인공지능법(AI Act) Annex IV 기술문서와 클러스터가 겹치는 50개 체크리스트 — 적합성을 확인하는 방법. 소스 코드나 모델 다운로드가 필요 없습니다.">
+      
+      
+        <meta name="author" content="SK Telecom">
+      
+      
+        <link rel="canonical" href="https://sktelecom.github.io/bomlens/ko/guides/ai-model/">
+      
+      
+        <link rel="prev" href="../firmware/">
+      
+      
+        <link rel="next" href="../identify-vendored/">
+      
+      
+        
+          <link rel="alternate" href="../../../guides/ai-model/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="ko">
+        
+      
+      
+      <link rel="icon" href="../../../images/logo-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>AI 모델 - BomLens</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  
+    
+  
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BomLens">
+  <meta property="og:title" content="AI 모델 - BomLens">
+  <meta property="og:description" content="BomLens로 HuggingFace 모델의 AI SBOM(CycloneDX ML-BOM)을 모델 id만으로 생성하고 G7 최소 요소 — EU 인공지능법(AI Act) Annex IV 기술문서와 클러스터가 겹치는 50개 체크리스트 — 적합성을 확인하는 방법. 소스 코드나 모델 다운로드가 필요 없습니다.">
+  <meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+  <meta property="og:url" content="https://sktelecom.github.io/bomlens/ko/guides/ai-model/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI 모델 - BomLens">
+  <meta name="twitter:description" content="BomLens로 HuggingFace 모델의 AI SBOM(CycloneDX ML-BOM)을 모델 id만으로 생성하고 G7 최소 요소 — EU 인공지능법(AI Act) Annex IV 기술문서와 클러스터가 겹치는 50개 체크리스트 — 적합성을 확인하는 방법. 소스 코드나 모델 다운로드가 필요 없습니다.">
+  <meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+
+  <!--
+    방문 분석(GoatCounter): 쿠키도 개인정보도 수집하지 않는다. config.extra.goatcounter에
+    사이트 코드가 있을 때만 켜진다(없으면 출력하지 않으므로 등록 전에는 비활성).
+  -->
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ai-모델-sbom-가이드" class="md-skip">
+          콘텐츠로 이동
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="상단/헤더">
+    <a href="../../" title="BomLens" class="md-header__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../../images/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BomLens
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              AI 모델
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="언어설정">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../guides/ai-model/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="ko" class="md-select__link">
+              한국어
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="검색" placeholder="검색" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="검색">
+        
+        <button type="reset" class="md-search__icon md-icon" title="지우기" aria-label="지우기" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            검색 초기화
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sktelecom/bomlens" title="저장소로 이동" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="네비게이션" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../" title="BomLens" class="md-nav__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../../images/logo.svg" alt="logo">
+
+    </a>
+    BomLens
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sktelecom/bomlens" title="저장소로 이동" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    홈
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    빠른 시작
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    빠른 시작
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/what-is-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SBOM이란
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/first-scan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    시작하기
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/no-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    비개발자 빠른 시작
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    웹 UI·데스크톱
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    가이드
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    가이드
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    입력 시나리오
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    보고서 생성
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../supplier-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    공급사 SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    펌웨어 분석
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI 모델
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI 모델
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="목차">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      목차
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#동작-방식" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        동작 방식
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#시작하기-전에" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        시작하기 전에
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#실행하기" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        실행하기
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="실행하기">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#웹-ui에서" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        웹 UI에서
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli에서" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI에서
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#비공개-모델과-게이트-모델" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        비공개 모델과 게이트 모델
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#결과-읽기" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        결과 읽기
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#적합성-보고서-읽는-법" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        적합성 보고서 읽는 법
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#실제-사례" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        실제 사례
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#다음-단계" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        다음 단계
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#g7-체크리스트란" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G7 체크리스트란
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#규제-크로스워크" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        규제 크로스워크
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai-준수-개요" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI 준수 개요
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#한계" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        한계
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../identify-vendored/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    번들 OSS 식별 (C/C++)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../server-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    서버 SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    업로드
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD 연동
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    산출물
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    산출물
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    산출물 종류
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/reports-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    보고서 읽는 법
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    고급
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    고급
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI 레퍼런스
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/docker-image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 이미지
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    지원 생태계
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    프로젝트 정보
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    프로젝트 정보
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    아키텍처
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/pipeline-by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    입력 형태별 파이프라인
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/local-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    로컬 우선 설계
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/package-managers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    패키지 매니저
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    테스트
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/sktelecom/bomlens/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    릴리스 노트
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="목차">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      목차
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#동작-방식" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        동작 방식
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#시작하기-전에" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        시작하기 전에
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#실행하기" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        실행하기
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="실행하기">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#웹-ui에서" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        웹 UI에서
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli에서" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI에서
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#비공개-모델과-게이트-모델" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        비공개 모델과 게이트 모델
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#결과-읽기" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        결과 읽기
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#적합성-보고서-읽는-법" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        적합성 보고서 읽는 법
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#실제-사례" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        실제 사례
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#다음-단계" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        다음 단계
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#g7-체크리스트란" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G7 체크리스트란
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#규제-크로스워크" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        규제 크로스워크
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ai-준수-개요" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI 준수 개요
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#한계" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        한계
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="네비게이션" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../" class="md-path__link">
+        
+  <span class="md-ellipsis">
+    홈
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../by-input/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    가이드
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="ai-모델-sbom-가이드">AI 모델 SBOM 가이드<a class="headerlink" href="#ai-모델-sbom-가이드" title="Permanent link">&para;</a></h1>
+<p>HuggingFace 모델의 CycloneDX ML-BOM(머신러닝 SBOM)을 생성하고 결과를 읽는 방법입니다. 모델 id만 주면 BomLens가 모델 카드 메타데이터를 네트워크로 가져옵니다. 소스 코드도, 모델 가중치 다운로드도 필요 없습니다.</p>
+<h2 id="동작-방식">동작 방식<a class="headerlink" href="#동작-방식" title="Permanent link">&para;</a></h2>
+<p>AI 모델의 "구성요소 명세"는 모델 카드입니다. 식별자, 아키텍처, 태스크, 라이선스, 공급자, 데이터셋, 파일 무결성 등이 담깁니다. BomLens는 <a href="https://github.com/GenAI-Security-Project/aibom-generator">OWASP AIBOM Generator</a>로 HuggingFace 모델 카드를 읽어 모델과 참조 데이터셋 중심의 <strong>CycloneDX 1.7 ML-BOM</strong>을 만들고, <strong>G7 최소 요소 적합성</strong> 검사(권고)를 더합니다. 모델에는 패키지 의존성이 없으므로 보안(CVE) 보고서는 생성하지 않습니다.</p>
+<p>모델 카드는 학습 데이터셋의 이름만 적고 끝납니다. BomLens는 각 데이터셋을 HuggingFace에서 조회해 표기된 라이선스, 파생 출처, 콘텐츠 해시를 SBOM에 별도 항목으로 담고 모델과 의존 관계로 연결합니다. 읽을 수 없는 데이터셋(삭제·개명되었거나 다른 사람의 비공개 저장소)은 이름만 남기고 읽을 수 없음으로 표시하며, 라이선스를 임의로 채우지 않습니다. 학습 데이터 공개 축도 이 결과로 정해집니다. <code>open-data</code>가 되려면 실제로 열린 데이터셋이 하나 이상 있어야 하고, 이름만 적혀 있고 아무도 받을 수 없으면 <code>declared-unverified</code>로 표시됩니다.</p>
+<p>전체 도구 흐름은 <a href="../../concepts/pipeline-by-input/">입력 형태별 파이프라인</a>에 있습니다.</p>
+<h2 id="시작하기-전에">시작하기 전에<a class="headerlink" href="#시작하기-전에" title="Permanent link">&para;</a></h2>
+<p>필요한 것은 두 가지입니다.</p>
+<ul>
+<li><strong>Docker 엔진이 설치되어 실행 중일 것.</strong> 없다면 <a href="../../start/first-scan/">시작하기</a>의 요구 사항을 먼저 보세요.</li>
+<li><strong>실행 방법 하나.</strong> 데스크톱 앱을 쓰면 명령어가 필요 없고, 명령줄로 쓰려면 <a href="../../start/first-scan/">시작하기</a>에서 저장소를 내려받습니다. AI 모델 스캔에는 OWASP AIBOM Generator가 들어 있는 별도 이미지가 필요합니다. opt-in이고 네트워크(HuggingFace)에 접근하므로 기본 이미지와 분리했습니다.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>ghcr.io/sktelecom/bomlens-aibom:latest
+</code></pre></div>
+<p>이 이미지는 다운로드 기준 약 3.5GB로 기본 스캐너 이미지(약 250MB)보다 훨씬 큽니다. 회선에 따라 처음 받는 데 수십 분이 걸릴 수 있으니 시간을 두고 시작하세요. 한 번 받으면 다시 받지 않습니다.</p>
+<p>미리 받지 않아도 됩니다. <code>--model</code>을 쓰면 이 이미지가 기본값이라 없을 때 알아서 받고, 웹 UI와 데스크톱 앱도 첫 AI 모델 스캔에서 받으면서 진행 상황을 보여 줍니다. 다른 태그를 쓰려면 환경변수 <code>SBOM_AIBOM_IMAGE</code>로 지정합니다.</p>
+<h2 id="실행하기">실행하기<a class="headerlink" href="#실행하기" title="Permanent link">&para;</a></h2>
+<h3 id="웹-ui에서">웹 UI에서<a class="headerlink" href="#웹-ui에서" title="Permanent link">&para;</a></h3>
+<p>데스크톱 앱이나 평소 쓰던 웹 UI를 그대로 쓰면 됩니다. Docker에 접근할 수 있으면 AI 모델 타일이 활성화되고, aibom 이미지는 첫 스캔에서 별도 컨테이너로 받아 실행합니다. 처음 한 번은 이미지를 받느라 시작이 느립니다.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>./scripts/scan-sbom.sh<span class="w"> </span>--ui
+</code></pre></div>
+<p>aibom 이미지로 UI 자체를 띄우면 별도 컨테이너 없이 UI 안에서 바로 처리합니다. Docker 소켓을 쓸 수 없는 환경에서 필요합니다.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">SBOM_SCANNER_IMAGE</span><span class="o">=</span>ghcr.io/sktelecom/bomlens-aibom:latest<span class="w"> </span>./scripts/scan-sbom.sh<span class="w"> </span>--ui
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1">#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_SCANNER_IMAGE를 지정</span>
+</code></pre></div>
+<p>새 스캔의 소스 타일에서 <strong>AI 모델</strong>을 고르고, HuggingFace 모델 id를 <code>org/model</code> 형식으로 입력한 뒤(예: <code>google-bert/bert-base-uncased</code>, <code>Qwen/Qwen2.5-0.5B</code> — 컬렉션 이름이나 전체 URL이 아닌) 스캔을 실행합니다.</p>
+<h3 id="cli에서">CLI에서<a class="headerlink" href="#cli에서" title="Permanent link">&para;</a></h3>
+<p>모델 id를 <code>--model</code>에 넘깁니다.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>./scripts/scan-sbom.sh<span class="w"> </span>--project<span class="w"> </span>bert-base<span class="w"> </span>--version<span class="w"> </span><span class="m">1</span>.0.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--model<span class="w"> </span><span class="s2">&quot;google-bert/bert-base-uncased&quot;</span><span class="w"> </span>--generate-only
+</code></pre></div>
+<p><code>--model</code>은 <code>--target</code>, <code>--analyze</code>, <code>--git</code>, <code>--merge</code>와 함께 쓸 수 없습니다. <code>bomlens-aibom</code> 이미지를 자동으로 받고, 고지문과 위험 보고서를 만들며, 보안 보고서는 건너뜁니다(모델에는 패키지 CVE가 없음).</p>
+<h3 id="비공개-모델과-게이트-모델">비공개 모델과 게이트 모델<a class="headerlink" href="#비공개-모델과-게이트-모델" title="Permanent link">&para;</a></h3>
+<p>공개 모델 id는 인증 없이 해석됩니다. 비공개 저장소나 접근 승인을 받은 게이트 저장소는 read 권한을 가진 HuggingFace 액세스 토큰을 <code>HF_TOKEN</code>에 넣어야 합니다.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">HF_TOKEN</span><span class="o">=</span>hf_...<span class="w"> </span>./scripts/scan-sbom.sh<span class="w"> </span>--project<span class="w"> </span>my-llm<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.9.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--model<span class="w"> </span><span class="s2">&quot;my-org/my-llm&quot;</span><span class="w"> </span>--generate-only
+</code></pre></div>
+<p><code>HUGGING_FACE_HUB_TOKEN</code>도 받습니다. 토큰 값은 이름만으로 컨테이너에 전달되고 명령줄 인자로는 넘어가지 않으므로 프로세스 목록에 노출되지 않으며, SBOM이나 보고서에도 기록되지 않습니다.</p>
+<p>모델을 공개하기 전에 검토할 수 있는 방법이 여기에 있습니다. 비공개 저장소에 먼저 올려 ML-BOM을 만들고, 적합성 보고서가 알려주는 공백을 메운 다음 저장소를 공개하면 됩니다. 게이트 저장소는 토큰만으로는 부족하고 해당 계정의 접근 요청이 승인되어 있어야 합니다. 모델의 학습 데이터셋을 조회할 때도 같은 토큰을 쓰므로, 데이터가 비공개 저장소에 있는 모델도 토큰이 필요합니다.</p>
+<p>웹 UI는 자신을 실행한 환경에서 같은 변수를 물려받으므로 <code>HF_TOKEN=hf_... ./scripts/scan-sbom.sh --ui</code> 형태로 시작하면 됩니다. 화면에는 토큰 입력란이 없습니다. 서버는 자격 증명을 보관하지 않으며, HTTP로 받은 토큰은 서버 로그에 남기 때문입니다.</p>
+<h2 id="결과-읽기">결과 읽기<a class="headerlink" href="#결과-읽기" title="Permanent link">&para;</a></h2>
+<p>웹 UI에서 AI/ML SBOM은 좌측 레일에 두 섹션을 추가합니다.</p>
+<p><strong>모델·데이터셋</strong> — 각 모델 카드의 식별자, 아키텍처, 태스크, 라이선스, 공급자, 무결성과 공개 4축 패널(가중치 / 아키텍처 / 학습 데이터 / 학습 과정 — 모델 카드에 문서화된 범위), 그리고 모델이 참조하는 데이터셋을 표로 보여 줍니다. 표에는 각 데이터셋의 라이선스와 콘텐츠 해시, 파생 출처가 함께 나옵니다.</p>
+<p><img alt="모델·데이터셋 — 모델 카드와 공개 4축" src="../../../images/web-ui-models.png" /></p>
+<p><strong>적합성</strong> — AI 모델 SBOM에서는 이 섹션에 G7 최소 요소 검사(모두 권고)가 기본 형식 적합성 검사와 함께 더해지고, G7 7개 클러스터별로 묶입니다. 각 항목은 무엇인지와 어떻게 충족하는지를 안내합니다. 숫자와 배지가 뜻하는 바는 다음 절에서 설명합니다.</p>
+<p><img alt="적합성 — AI SBOM의 G7 권고 하위 블록" src="../../../images/web-ui-g7.png" /></p>
+<p>같은 데이터는 산출물에도 있습니다. ML-BOM(<code>_bom.json</code>, CycloneDX 1.7)과 적합성 보고서(<code>_conformance.*</code>)입니다.</p>
+<h2 id="적합성-보고서-읽는-법">적합성 보고서 읽는 법<a class="headerlink" href="#적합성-보고서-읽는-법" title="Permanent link">&para;</a></h2>
+<p>G7 블록의 머리에는 "N / 41 충족" 같은 수치가 옵니다. 분모는 자동 출처가 있는 검사만 셉니다. 51개 중 41개이므로, 이 숫자는 도구가 스스로 확인할 수 있었던 범위를 말합니다. 사람 검토 전용 10개는 그 옆에 "검토 필요" 건수로 따로 표시되고, 자동 검사 중 채워지지 않은 것은 권고 건수로 잡힙니다.</p>
+<p>각 검사의 상태는 세 가지입니다. 충족(pass)은 해당 요소가 ML-BOM에 있다는 뜻입니다. 권고(warn)는 없거나 확인하지 못했다는 뜻이고, 검토 전용 10개 요소는 항상 이 상태로 사람 검토가 필요하다는 표시와 함께 나타납니다. 실패(fail)는 G7 검사에서는 사실상 나오지 않습니다. G7 요소는 전부 권고라서 하나가 비어도 SBOM 전체 판정을 실패로 만들지 않으며, 전체 실패 판정은 기본 형식 검사(필수 CycloneDX 검사)에서만 나옵니다.</p>
+<p>각 행의 출처 배지는 충족된 값이 어디서 오는지를 말합니다.</p>
+<ul>
+<li>자동 확인(22건) — ML-BOM 필드에서 직접 읽습니다.</li>
+<li>신호 추정(15건) — 전용 필드 하나가 아니라 BOM 안의 신호로 도출합니다.</li>
+<li>선언 필요(4건) — 사람이나 매니페스트가 값을 제공했을 때만 채워집니다.</li>
+<li>검토 필요(10건) — 자동 출처가 없어 사람이 직접 확인해야 합니다. 같은 결과가 세 가지 형식으로 나옵니다. 기계용 <code>{Project}_{Version}_conformance.json</code>(CI 게이트, 비교용), 표 형태의 <code>_conformance.md</code>, 시각화한 <code>_conformance.html</code>입니다. 각 형식에는 <a href="#규제-크로스워크">규제 크로스워크</a>도 함께 담기며, JSON에서는 매핑된 검사가 하나 이상 평가됐을 때만 <code>regulatoryCrosswalk</code> 객체로 나타납니다.</li>
+</ul>
+<p>보고서는 무엇이 비었는지에 더해 어떻게 채우는지도 보여 줍니다. 자동 출처가 있는데 비어 있는 요소마다 CycloneDX 조각과 공식 문서 링크가 따라붙습니다. HTML에서는 해당 행의 "근거 · 채우는 방법" 칸을 펼치면 나오고, Markdown에서는 "How to fill the gaps" 절에 모여 나옵니다. 이미 통과한 요소와 검토 전용 요소는 제외되므로, 문서화가 충실한 모델에서는 아무것도 나오지 않습니다.</p>
+<h2 id="실제-사례">실제 사례<a class="headerlink" href="#실제-사례" title="Permanent link">&para;</a></h2>
+<p>한 번 돌려 보면 나머지를 읽기가 쉬워집니다. <code>FINAL-Bench/Aether-7B-5Attn</code>은 허깅페이스에 Apache-2.0으로 공개된 파운데이션 모델로, 가중치와 구조, 학습 데이터, 학습 과정을 모두 공개했습니다. 문서화가 충실한 모델 카드가 어떤 결과를 내는지 보여 주는 예입니다.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>./scripts/scan-sbom.sh<span class="w"> </span>--project<span class="w"> </span>Aether-7B-5Attn<span class="w"> </span>--version<span class="w"> </span><span class="m">1</span>.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--model<span class="w"> </span><span class="s2">&quot;FINAL-Bench/Aether-7B-5Attn&quot;</span><span class="w"> </span>--generate-only
+</code></pre></div>
+<p>이 스캔은 <code>result=pass</code>에 G7 요소 41개 중 33개 충족으로 나옵니다. Models 클러스터 14개 항목이 모두 통과하고, 공개성 패널은 네 축 전부 열림으로 표시됩니다.</p>
+<table>
+<thead>
+<tr>
+<th>축</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>가중치</td>
+<td>open-weight</td>
+</tr>
+<tr>
+<td>구조</td>
+<td>open-architecture</td>
+</tr>
+<tr>
+<td>학습 데이터</td>
+<td>open-data</td>
+</tr>
+<tr>
+<td>학습 과정</td>
+<td>open-training</td>
+</tr>
+</tbody>
+</table>
+<p>모델 카드가 데이터셋을 명시하므로, BomLens는 학습에 쓰인 7종(FineWeb-Edu, SmolLM 코퍼스, FineMath, open-web-math, OpenCoder 코드 코퍼스, HAERAE-HUB의 한국어 두 종)을 하나씩 조회해 각 데이터셋이 밝힌 내용을 기록합니다. 데이터셋 속성 10개 중 8개가 충족으로 나옵니다. 남는 두 개는 데이터의 통계 속성과 개인정보·저작물 포함 여부인데, 저장소를 읽어서는 알 수 없는 항목이라 보고서는 추측하지 않고 사람에게 확인을 요청합니다.</p>
+<p>조회를 하기 때문에 드러나는 것이 다음 대목입니다. 7종 중 세 종만 라이선스를 밝히고 있습니다. FineWeb-Edu 계열은 <code>odc-by</code>, OpenCoder 코퍼스는 MIT입니다. 나머지 세 종(HAERAE-HUB 두 종과 open-web-math)은 라이선스 표기가 없습니다. 데이터셋 이름만 세었다면 이 모델의 학습 데이터는 완전히 공개된 것으로 읽혔을 것입니다. 실제로 조회해 보면, Apache-2.0으로 공개된 모델의 학습 자료 일부가 라이선스 미표기 상태라는 사실이 드러납니다. 도구가 판단할 일은 아니지만 공개 전에 검토자가 알아야 할 사실이며, 데이터셋을 하나씩 열어 봐야만 보입니다.</p>
+<p>이 스캔이 낸 보고서를 그대로 열어 볼 수 있습니다. 베이스 모델의 <a href="../../samples/aether-7b-5attn_conformance.html">적합성 보고서</a>이며, AI 준수 개요가 담던 클러스터별 충족 현황과 검토 대상 라이선스가 이 보고서 맨 위에 함께 나옵니다. 한국어 보고서는 <code>--lang ko</code>로 생성합니다.</p>
+<h2 id="다음-단계">다음 단계<a class="headerlink" href="#다음-단계" title="Permanent link">&para;</a></h2>
+<p>보고서가 나왔다고 검토가 끝난 것은 아닙니다. 도구가 채울 수 있는 항목과 사람이 판단해야 하는 항목이 나뉩니다.</p>
+<ol>
+<li>자동 출처가 있는데 비어 있는 항목을 모델 카드에 채우고 다시 스캔합니다. 채우는 형태는 보고서의 해당 행에서 확인할 수 있습니다.</li>
+<li>검토 전용 10개 요소를 사람이 확인합니다. 학습 데이터의 민감도나 의도한 적용 분야처럼 모델 카드의 어떤 필드로도 증명되지 않는 것들입니다.</li>
+<li>학습 데이터셋 라이선스와 개인정보처럼 이 도구가 보지 않는 사안을 별도로 확인합니다.</li>
+</ol>
+<p>사내에서 AI 모델을 공개하기 위해 쓰신다면, 승인 절차와 공개 전 점검 항목은 <a href="https://sktelecom.github.io/guide/release/ai-model/">SK텔레콤 오픈소스 가이드의 AI 모델 공개</a>에 있습니다.</p>
+<h2 id="g7-체크리스트란">G7 체크리스트란<a class="headerlink" href="#g7-체크리스트란" title="Permanent link">&para;</a></h2>
+<p>"G7 Software Bill of Materials for AI — Minimum Elements"는 2026년 5월 G7 차원에서 발행된 지침으로, 독일 BSI와 이탈리아 ACN이 주도했습니다. AI 모델의 SBOM이 갖춰야 할 최소 요소 50개를 7개 클러스터로 정의합니다. 누가 만든 모델인지, 무엇인지, 어떤 데이터로 학습했는지, 어떻게 보호되는지, 성능은 어떤지를 다룹니다. 법적 구속력이 있는 규정이 아니라 권고입니다.</p>
+<p>그래도 규제와 무관하지 않습니다. EU 인공지능법(AI Act)의 고위험·투명성 의무가 2026년 8월 2일부터 적용되고, Annex IV가 요구하는 기술 문서는 G7 클러스터와 상당 부분 겹칩니다. BomLens가 어느 쪽의 준수를 보증하는 것은 아닙니다. 적합성 보고서가 주는 것은 가시성입니다. 모델 문서가 이미 다루는 요소와 사람이 채워야 할 요소를 항목별로 보여주므로, 준수 판정이 아니라 준비를 돕는 구체적인 방법이 됩니다.</p>
+<p>BomLens는 50개 요소를 51개 검사로 보여줍니다. 모델 개방성(가중치, 아키텍처, 학습 데이터, 학습 과정의 공개 여부)은 G7 원문에서 Model license 요소의 한 측면이지만, 따로 볼 가치가 있어 별도 행으로 노출합니다.</p>
+<table>
+<thead>
+<tr>
+<th>클러스터</th>
+<th>검사 수</th>
+<th>그중 사람 검토</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>메타데이터</td>
+<td>10</td>
+<td>0</td>
+</tr>
+<tr>
+<td>시스템 속성</td>
+<td>9</td>
+<td>4</td>
+</tr>
+<tr>
+<td>모델</td>
+<td>14</td>
+<td>0</td>
+</tr>
+<tr>
+<td>데이터셋 속성</td>
+<td>10</td>
+<td>2</td>
+</tr>
+<tr>
+<td>인프라</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>보안 속성</td>
+<td>4</td>
+<td>3</td>
+</tr>
+<tr>
+<td>핵심 성과 지표</td>
+<td>2</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>10개 요소는 자동으로 확인할 출처가 없습니다. 의도된 적용 분야나 데이터셋 민감도처럼 모델 카드의 어떤 필드로도 증명할 수 없는 것들입니다. BomLens는 이를 추측하는 대신 사람 검토가 필요하다고 표시합니다.</p>
+<h2 id="규제-크로스워크">규제 크로스워크<a class="headerlink" href="#규제-크로스워크" title="Permanent link">&para;</a></h2>
+<p>적합성 보고서는 규제와 대응되는 검사마다 그 검사가 어느 문서화 의무와 닿는지를 연결해 줍니다. 검토자가 던지는 질문에 답하기 위한 것입니다. 어떤 검사가 미달일 때, 그 공백이 어느 규제 요구와 관련되는가? 참고 규정은 검사 표에서 해당 요구사항 행 아래에 붙고, 상세 위의 크로스워크 절이 프레임워크마다 한 행씩, 매핑된 검사 중 충족, 공백, 검토 필요가 몇 건인지 집계해 보여 줍니다.</p>
+<p>AI 여부와 관계없이 분석하는 모든 SBOM에는 두 가지 프레임워크가 매핑됩니다.</p>
+<ul>
+<li>EU 사이버복원력법(CRA) — CRA 준수를 위해 작성된 독일 기술지침이자 공개된 것 중 가장 상세한 SBOM 필드 명세인 BSI TR-03183-2를 통해 연결합니다(CRA 본문은 데이터 필드를 지정하지 않습니다). TR-03183-2는 국가 지침이며, 구속력 있는 문구를 담을 유럽 조화 표준은 아직 초안 단계입니다.</li>
+<li>NTIA 최소 요소 — 미국 행정명령 14028(2021)에 따라 발표된 SBOM 데이터 필드 7가지. 이후 연방 차원의 SBOM 수집 의무는 기관별 위험 기반 판단으로 축소되었지만, 개별 기관이 요구하는 실무 기준으로는 여전히 유효합니다.</li>
+</ul>
+<p>AI SBOM에는 G7 요소에 대응하는 두 가지 프레임워크가 더해집니다.</p>
+<ul>
+<li>EU 인공지능법(AI Act) — Annex IV 기술문서 항목(Regulation (EU) 2024/1689, Article 11(1)).</li>
+<li>AI 기본법(한국) — 투명성(제31조), 안전성과 위험관리(제32조), 고영향 인공지능(제33·34조), 영향평가(제35조) 조항. 이 법은 기본법 성격이라 매핑이 EU 쪽보다 성깁니다.</li>
+</ul>
+<p>크로스워크는 준수 판정이 아니라 준비를 돕는 자료입니다. BomLens는 어느 규제의 준수도 인증하지 않으며, 보고서 안에도 그 문구를 명시합니다. 각 매핑에는 그 연결의 해석 근거를 함께 담아 사람이 판단할 수 있게 했고, 크로스워크가 검사 상태나 전체 판정을 바꾸지는 않습니다. 검사가 이미 낸 결과를 규제별로 다시 묶을 뿐입니다.</p>
+<p>매핑은 검사 id를 키로 삼아 <code>docker/lib/regulation-crosswalk.json</code>에 있습니다. AI 검사는 G7 요소 id, 기본 형식 검사는 일반 CycloneDX 검사 id를 씁니다. 의도적으로 보수적으로 잡아, 근거가 분명한 검사만 매핑합니다(현재 38개). 검사 이름이 바뀌어도 크로스워크가 조용히 어긋나지 않도록, 매핑된 모든 id를 레지스트리와 대조하는 테스트를 둡니다.</p>
+<h2 id="ai-준수-개요">AI 준수 개요<a class="headerlink" href="#ai-준수-개요" title="Permanent link">&para;</a></h2>
+<p>AI SBOM에서는 BomLens가 한 장짜리 AI 준수 개요(<code>_ai-profile.{json,md,html}</code>)도 만듭니다. 원래는 여러 산출물에 흩어져 있던 것을 한곳에 모읍니다. 클러스터별 G7 상태, 규제 크로스워크, 그리고 라이선스가 검토 대상으로 표시된 컴포넌트(AI 행동제약이나 비상업 라이선스)입니다. 스캔을 새로 돌리지 않고 준수 판정도 하지 않습니다. 파이프라인이 이미 만든 결과를 다시 묶어, 검토자가 전체 그림을 한눈에 읽게 할 뿐입니다. AI 모델(<code>--model</code>)과 공급사 SBOM(<code>--analyze</code>) 경로에서 생성되며, 일반(비AI) SBOM에서는 아무것도 만들지 않습니다.</p>
+<h2 id="한계">한계<a class="headerlink" href="#한계" title="Permanent link">&para;</a></h2>
+<ul>
+<li>읽을 수 없는 모델은 SBOM을 아예 만들지 않습니다. 조회에 실패하면 생성기가 카드를 일반적인 기본값으로 채우기 때문에, BomLens는 생성기 로그를 확인해 실행을 중단합니다. 통과처럼 읽히는 껍데기 명세를 돌려주지 않기 위해서입니다.</li>
+<li>결과는 HuggingFace 모델 카드만큼만 충실합니다. 카드가 빈약하면 ML-BOM도 빈약하고, G7 검사도 카드에 문서화된 범위를 반영할 뿐 모델 자체를 감사하지는 않습니다.</li>
+<li>데이터셋 항목은 그 데이터셋이 스스로 밝힌 내용을 기록합니다. 표기된 라이선스가 타당한지, 파생 데이터셋이 원본 라이선스와 양립하는지는 보고서가 판단하지 않고 검토자에게 남깁니다.</li>
+<li>적합성 보고서는 EU 인공지능법을 비롯한 어떤 규제의 준수도 인증하지 않습니다. 문서화 공백을 드러내 사람이 메울 수 있게 할 뿐입니다.</li>
+<li>메타데이터를 네트워크로 가져오므로 오프라인 사용은 지원하지 않습니다. 비공개 모델과 게이트 모델에는 <code>HF_TOKEN</code>이 필요합니다(<a href="#비공개-모델과-게이트-모델">비공개 모델과 게이트 모델</a> 참고).</li>
+<li>모델 id는 <code>org/model</code> 형식이어야 합니다. 컬렉션 이름이나 전체 URL은 해석되지 않습니다. ---</li>
+</ul>
+<blockquote>
+<p><strong>관련 문서</strong>: <a href="../../concepts/pipeline-by-input/">입력 형태별 파이프라인</a> | <a href="../../reference/ui/">웹 UI 레퍼런스</a> | <a href="../../reference/cli/">CLI 레퍼런스</a></p>
+</blockquote>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  맨위로
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      SK Telecom
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.tracking", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\ud074\ub9bd\ubcf4\ub4dc\uc5d0 \ubcf5\uc0ac\ub428", "clipboard.copy": "\ud074\ub9bd\ubcf4\ub4dc\ub85c \ubcf5\uc0ac", "search.result.more.one": "\uc774 \ubb38\uc11c\uc5d0\uc11c 1\uac1c\uc758 \uac80\uc0c9 \uacb0\uacfc \ub354 \ubcf4\uae30", "search.result.more.other": "\uc774 \ubb38\uc11c\uc5d0\uc11c #\uac1c\uc758 \uac80\uc0c9 \uacb0\uacfc \ub354 \ubcf4\uae30", "search.result.none": "\uac80\uc0c9\uc5b4\uc640 \uc77c\uce58\ud558\ub294 \ubb38\uc11c\uac00 \uc5c6\uc2b5\ub2c8\ub2e4", "search.result.one": "1\uac1c\uc758 \uc77c\uce58\ud558\ub294 \ubb38\uc11c", "search.result.other": "#\uac1c\uc758 \uc77c\uce58\ud558\ub294 \ubb38\uc11c", "search.result.placeholder": "\uac80\uc0c9\uc5b4\ub97c \uc785\ub825\ud558\uc138\uc694", "search.result.term.missing": "\ud3ec\ud568\ub418\uc9c0 \uc54a\uc740 \uac80\uc0c9\uc5b4", "select.version": "\ubc84\uc804 \uc120\ud0dd"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/extra.js"></script>
+      
+    
+  </body>
+</html>
