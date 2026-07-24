@@ -217,6 +217,34 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
 
+# AI usage scenario (usage= -> AI_USAGE_CONTEXT): forwarded to the AIBOM sibling
+# only as one of the fixed allowlist literals; an out-of-allowlist value is
+# dropped (never smuggled into the argv), and FIRMWARE never carries it.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"AI_USAGE_CONTEXT": "redistribute"},
+)
+assert rc == 0, rc
+assert "AI_USAGE_CONTEXT=redistribute" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+    extra_env={"AI_USAGE_CONTEXT": "commercial; rm -rf /"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("AI_USAGE_CONTEXT") for a in captured["args"]), captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"AI_USAGE_CONTEXT": "redistribute"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("AI_USAGE_CONTEXT") for a in captured["args"]), captured["args"]
+
 # HF_TOKEN: inherited from THIS container's environment (never posted to the UI)
 # and forwarded by name only, so the secret stays out of the docker-run argv.
 HF_SENTINEL = "hf_sentinel_do_not_leak_9f3a"
@@ -714,8 +742,15 @@ if command -v jq >/dev/null 2>&1; then
     PROJECT=aip GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
         "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" "$OUT/aip_1.0" >/dev/null 2>&1
     # A matching _bom.json carrying one behavioral-use license flag (test-aibom.sh
-    # pattern) so licenseReview is non-empty.
-    jq '.components[0].properties = ((.components[0].properties // []) + [{name:"bomlens:licenseReview",value:"behavioral-use"}])' \
+    # pattern) so licenseReview is non-empty, plus the bomlens:assessment:* verdict
+    # assess-ai-risk.sh would stamp so riskAssessment is populated.
+    jq '.components[0].properties = ((.components[0].properties // []) + [
+          {name:"bomlens:licenseReview",value:"behavioral-use"},
+          {name:"bomlens:assessment:overall",value:"conditional"},
+          {name:"bomlens:assessment:axes",value:"license"},
+          {name:"bomlens:assessment:license",value:"conditional"},
+          {name:"bomlens:assessment:license:keys",value:"llama-community"},
+          {name:"bomlens:assessment:reasons",value:"Llama community license"}])' \
         "$ROOT_DIR/tests/fixtures/aibom-owasp-1_7.json" > "$OUT/aip_1.0_bom.json"
     bash "$ROOT_DIR/docker/lib/generate-ai-profile.sh" "$OUT/aip_1.0" "aip" >/dev/null 2>&1
     if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
@@ -740,6 +775,20 @@ assert xw["disclaimer"], "crosswalk disclaimer missing"
 assert len(xw["frameworks"]) >= 1, "no crosswalk frameworks in profile"
 assert {"id", "title", "total", "present", "gap", "review"} <= set(xw["frameworks"][0]), xw["frameworks"][0]
 assert "elements" not in xw["frameworks"][0], "crosswalk elements must be dropped from the card summary"
+# Model risk assessment (assess-ai-risk.sh verdicts re-aggregated by
+# generate-ai-profile.sh): counts + per-model verdicts with the registry's
+# joined summary/conditions and the always-riding disclaimer must pass through.
+ra = p.get("riskAssessment")
+assert isinstance(ra, dict), "riskAssessment dropped from the profile card"
+assert ra["counts"] == {"ok": 0, "conditional": 1, "caution": 0, "review": 0}, ra["counts"]
+assert ra["disclaimer"], "risk assessment disclaimer missing"
+assert len(ra["models"]) == 1, ra["models"]
+m0 = ra["models"][0]
+assert m0["overall"] == "conditional", m0
+assert m0["axes"].get("license") == "conditional" and "security" not in m0["axes"], m0["axes"]
+assert m0["reasons"] == ["Llama community license"], m0["reasons"]
+assert m0["summary"], "registry summary not joined onto the model verdict"
+assert all({"id", "label", "label_ko"} <= set(c) for c in m0["conditions"]), m0["conditions"]
 # Non-AI scan (no profile artifact) -> None.
 assert server.ai_profile_summary("nope_9.9") is None, "expected None without a profile"
 PY
@@ -775,6 +824,71 @@ PY
     fi
     rm -f "$OUT"/lic_1.0_*
 fi
+
+echo "== AI model risk verdict surfaced + counted (sbom_summary) =="
+# assess-ai-risk.sh stamps bomlens:assessment:* (and enrich-aibom.sh the
+# bomlens:hf:scan:* / bomlens:weights:*) on machine-learning-model and data
+# components. sbom_summary must surface them per-row (assessment/assessmentAxes/
+# assessmentReasons/hfScanStatus/weightFormats), only for those AI types, and
+# aggregate assessCounts over the MODEL verdicts (datasets excluded). A scan
+# with no assessed model must omit the assessCounts key entirely.
+cat > "$OUT/aimr_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "components":[
+   {"name":"llama-model","version":"3.1","type":"machine-learning-model","purl":"pkg:huggingface/meta/llama@3.1",
+    "properties":[{"name":"bomlens:assessment:overall","value":"caution"},
+                  {"name":"bomlens:assessment:axes","value":"license,security,datasets"},
+                  {"name":"bomlens:assessment:reasons","value":"Llama community license; pickle weights present"},
+                  {"name":"bomlens:hf:scan:status","value":"suspicious"},
+                  {"name":"bomlens:weights:formats","value":"bin,safetensors"}]},
+   {"name":"clean-model","version":"1.0","type":"machine-learning-model",
+    "properties":[{"name":"bomlens:assessment:overall","value":"ok"},
+                  {"name":"bomlens:assessment:axes","value":"license,security"}]},
+   {"name":"nc-dataset","version":"1.0","type":"data",
+    "properties":[{"name":"bomlens:assessment:overall","value":"review"},
+                  {"name":"bomlens:assessment:axes","value":"license,signals"}]},
+   {"name":"plain-lib","version":"2.0","type":"library",
+    "properties":[{"name":"bomlens:assessment:overall","value":"review"}]},
+   {"name":"bare-model","version":"0.1","type":"machine-learning-model"}
+ ]}
+JSON
+cat > "$OUT/aimrnone_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "components":[
+   {"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"},
+   {"name":"bare-model","version":"0.1","type":"machine-learning-model"}
+ ]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("aimr_1.0")
+rows = {r["name"]: r for r in s["componentList"]}
+m = rows["llama-model"]
+assert m["assessment"] == "caution", m
+assert m["assessmentAxes"] == "license,security,datasets", m
+assert m["assessmentReasons"] == "Llama community license; pickle weights present", m
+assert m["hfScanStatus"] == "suspicious", m
+assert m["weightFormats"] == "bin,safetensors", m
+assert rows["clean-model"]["assessment"] == "ok", rows["clean-model"]
+assert "hfScanStatus" not in rows["clean-model"], rows["clean-model"]   # no property -> absent
+assert rows["nc-dataset"]["assessment"] == "review", rows["nc-dataset"]
+assert "assessment" not in rows["plain-lib"], rows["plain-lib"]  # type-gated: never on a library
+assert "assessment" not in rows["bare-model"], rows["bare-model"]  # unassessed -> absent
+# KPI: models only (the caution llama + the ok clean-model); the review dataset
+# and the review-stamped library must NOT count.
+assert s["assessCounts"] == {"ok": 1, "conditional": 0, "caution": 1, "review": 0}, s
+# No assessed model (bare model / plain libraries) -> the key is omitted entirely.
+assert "assessCounts" not in server.sbom_summary("aimrnone_1.0"), \
+    server.sbom_summary("aimrnone_1.0")
+PY
+then
+    pass "assessment surfaced per-row (AI types only) + assessCounts over model verdicts"
+else
+    fail "AI model risk verdict summary is wrong (see assertion above)"
+fi
+rm -f "$OUT"/aimr_1.0_* "$OUT"/aimrnone_1.0_*
 
 echo "== sbom-tool-degraded property (sbom_summary) =="
 # When entrypoint records the syft fallback as bomlens:sbom-tool-degraded, the
@@ -1285,7 +1399,8 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "UPLOAD_TARGET=${UPLOAD_TARGET:-}"
   echo "API_URL=${API_URL:-}"
   echo "API_KEY=${API_KEY:-}"
-  echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
+  echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"
+  echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
 write_bom() {
     printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
         > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
@@ -1526,6 +1641,39 @@ if [ -z "$(sed -n 's/^API_KEY=//p' "$WORK/stub-env")" ] \
     pass "upload credId is single-use (reuse carries no token, upload stays off)"
 else
     fail "upload credId was reusable (token leaked to a second scan)" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== AI usage scenario param (usage= -> AI_USAGE_CONTEXT) =="
+echo ok > "$STUB_MODE_FILE"
+# An out-of-allowlist value is refused before the stream starts (HTTP 400 JSON),
+# so a crafted scenario can never reach the scan environment.
+code=$(curl -s -o "$WORK/usage-400" -w '%{http_code}' \
+    "$BASE2/scan-stream?project=use&version=1.0&source=current-dir&usage=commercial")
+if [ "$code" = "400" ] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$WORK/usage-400" 2>/dev/null; then
+    pass "invalid usage value is rejected pre-stream (400 JSON)"
+else
+    fail "invalid usage returned $code (expected 400 JSON)"
+fi
+# A valid scenario is accepted (normal SSE run) and reaches run-scan as
+# AI_USAGE_CONTEXT with the exact allowlist literal.
+rm -f "$WORK/stub-env"
+events=$(sse_events "project=use&version=1.0&source=current-dir&usage=redistribute")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is True, evs
+" && [ "$(sed -n 's/^AI_USAGE_CONTEXT=//p' "$WORK/stub-env")" = "redistribute" ]; then
+    pass "valid usage accepted; AI_USAGE_CONTEXT reaches the run-scan env"
+else
+    fail "valid usage did not reach the run-scan env" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+# No usage param -> the var stays unset (assessment runs without a scenario).
+rm -f "$WORK/stub-env"
+sse_events "project=use2&version=1.0&source=current-dir" >/dev/null
+if [ -z "$(sed -n 's/^AI_USAGE_CONTEXT=//p' "$WORK/stub-env")" ]; then
+    pass "no usage param -> AI_USAGE_CONTEXT not set"
+else
+    fail "AI_USAGE_CONTEXT leaked without a usage param" "$(cat "$WORK/stub-env")"
 fi
 
 # Conversion needs the pipeline helper + syft in this image, or a sibling scanner

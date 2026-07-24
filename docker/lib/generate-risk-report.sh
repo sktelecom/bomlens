@@ -123,6 +123,20 @@ if [ -f "$BOM" ] && [ -f "$LIB_DIR/license-flags.jq" ] && jq empty "$BOM" >/dev/
           un: ([$rows[] | select(.class=="uncategorized")]   | length) }
     ' "$BOM" 2>/dev/null || echo 'null')
 fi
+# AI model risk assessment rollup (AIBOM/ANALYZE): re-aggregate the
+# bomlens:assessment:* verdicts assess-ai-risk.sh stamped; absent for a plain
+# software SBOM, in which case the section is skipped entirely.
+AS_MODELS=0; AS_OK=0; AS_COND=0; AS_CAU=0; AS_REV=0
+if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
+    AS_COUNTS=$(jq -c '[ .components[]? | select(.type=="machine-learning-model")
+        | ((.properties // [])[] | select(.name=="bomlens:assessment:overall") | .value) ]
+        | { n: length, ok: (map(select(.=="ok"))|length), c: (map(select(.=="conditional"))|length),
+            w: (map(select(.=="caution"))|length), r: (map(select(.=="review"))|length) }' "$BOM" 2>/dev/null || echo '{"n":0}')
+    AS_MODELS=$(echo "$AS_COUNTS" | jq '.n // 0')
+    AS_OK=$(echo "$AS_COUNTS" | jq '.ok // 0'); AS_COND=$(echo "$AS_COUNTS" | jq '.c // 0')
+    AS_CAU=$(echo "$AS_COUNTS" | jq '.w // 0'); AS_REV=$(echo "$AS_COUNTS" | jq '.r // 0')
+fi
+
 HAS_LIC_CLASS=false
 NC=0; SC=0; WK=0; PM=0; UN=0; COPYLEFT_TOTAL=0
 COPYLEFT_TOP='[]'
@@ -209,6 +223,16 @@ fi
                 echo "- 외 $((COPYLEFT_TOTAL - 10))개 (전체는 SBOM의 \`bomlens:licenseClass\` 속성 참조)"
             fi
         fi
+    fi
+    if [ "$AS_MODELS" -gt 0 ]; then
+        echo ""
+        echo "### AI 모델 위험 판정"
+        echo ""
+        echo "모델별 판정 근거와 조건은 \`${OUT_PREFIX}_ai-profile.md\`에 있습니다. 이 판정은 법적 자문이 아닌 안내입니다."
+        echo ""
+        echo "| 제약 신호 없음 | 조건부 사용 | 주의 | 검토 필요 |"
+        echo "|---:|---:|---:|---:|"
+        echo "| ${AS_OK} | ${AS_COND} | ${AS_CAU} | ${AS_REV} |"
     fi
     echo ""
     echo "## ${S_NEXT}. 다음 단계"
@@ -374,6 +398,19 @@ HTMLLIC
             fi
             echo "</ul>"
         fi
+    fi
+
+    if [ "$AS_MODELS" -gt 0 ]; then
+        echo "<h3>AI 모델 위험 판정</h3>"
+        echo "<p>모델별 판정 근거와 조건은 AI 준수 개요 산출물에 있습니다. 이 판정은 법적 자문이 아닌 안내입니다.</p>"
+        cat <<HTMLASSESS
+<div class="cards">
+ <span class="pill pill-pass">제약 신호 없음 <span class="count">${AS_OK}</span></span>
+ <span class="pill pill-med">조건부 사용 <span class="count">${AS_COND}</span></span>
+ <span class="pill pill-high">주의 <span class="count">${AS_CAU}</span></span>
+ <span class="pill pill-info">검토 필요 <span class="count">${AS_REV}</span></span>
+</div>
+HTMLASSESS
     fi
 
     echo "<h2>${S_NEXT}. 다음 단계</h2>"
