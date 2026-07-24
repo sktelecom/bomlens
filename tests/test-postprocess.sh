@@ -716,6 +716,24 @@ else
     fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
 fi
 
+echo "== input-format: UTF-16 / BOM-encoded SBOMs are normalized, not rejected =="
+# A supplier SBOM saved as UTF-16 (common from Windows tooling) or with a UTF-8
+# BOM must be read, not dropped as "unknown format": jq/grep assume UTF-8, so
+# without normalization a valid SBOM fails silently. Both convert and validate
+# normalize the encoding first (sbom-detect.sh). Fixtures are derived from a
+# known-good CycloneDX so the only variable is the byte encoding.
+iconv -f UTF-8 -t UTF-16 "$FIX/good-cyclonedx.json" > "$WORK/enc-utf16.cdx.json"
+bash "$LIB/convert-to-cdx.sh" "$WORK/enc-utf16.cdx.json" "$WORK/enc-utf16-out.json" >/dev/null 2>&1
+jq -e '.bomFormat=="CycloneDX" and (.components|length>0)' "$WORK/enc-utf16-out.json" >/dev/null 2>&1 \
+    && pass "UTF-16 CycloneDX is normalized and converted" || fail "UTF-16 CycloneDX not handled"
+bash "$LIB/validate-sbom.sh" "$WORK/enc-utf16.cdx.json" "$WORK/enc-utf16-cf" "supplier" >/dev/null 2>&1
+[ -f "$WORK/enc-utf16-cf_conformance.json" ] && jq -e '.result=="pass"' "$WORK/enc-utf16-cf_conformance.json" >/dev/null 2>&1 \
+    && pass "UTF-16 CycloneDX validates (encoding does not fail conformance)" || fail "UTF-16 CycloneDX conformance not produced/pass"
+printf '\xEF\xBB\xBF' > "$WORK/enc-bom.cdx.json"; cat "$FIX/good-cyclonedx.json" >> "$WORK/enc-bom.cdx.json"
+bash "$LIB/convert-to-cdx.sh" "$WORK/enc-bom.cdx.json" "$WORK/enc-bom-out.json" >/dev/null 2>&1
+jq -e '.bomFormat=="CycloneDX"' "$WORK/enc-bom-out.json" >/dev/null 2>&1 \
+    && pass "UTF-8 BOM CycloneDX is normalized and converted" || fail "UTF-8 BOM CycloneDX not handled"
+
 echo "== conformance: spec-version range and PURL syntax are mandatory checks =="
 # The SKT submission requirements pin the accepted spec versions (CycloneDX
 # 1.3-1.6, SPDX 2.2/2.3) and require standard pkg:type/name@version PURLs.

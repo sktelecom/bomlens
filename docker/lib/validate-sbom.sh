@@ -56,6 +56,13 @@ if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     exit 1
 fi
 
+# Normalize input encoding (UTF-16/BOM/stray preamble) so jq and grep see UTF-8.
+# Validation still runs against the original submission's content — only the
+# encoding is corrected, not the SBOM data.
+# shellcheck source=docker/lib/sbom-detect.sh
+. "$(dirname "$0")/sbom-detect.sh"
+SBOM="$(normalize_sbom_encoding "$SBOM" "$(dirname "$OUT_PREFIX")")"
+
 JSON="${OUT_PREFIX}_conformance.json"
 MD="${OUT_PREFIX}_conformance.md"
 HTML="${OUT_PREFIX}_conformance.html"

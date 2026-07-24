@@ -27,6 +27,11 @@ if [ -z "$OUTPUT" ]; then
     exit 1
 fi
 
+# Normalize input encoding (UTF-16/BOM/stray preamble) so jq and syft see UTF-8.
+# shellcheck source=docker/lib/sbom-detect.sh
+. "$(dirname "$0")/sbom-detect.sh"
+INPUT="$(normalize_sbom_encoding "$INPUT" "$(dirname "$OUTPUT")")"
+
 # --------------------------------------------------------
 # Format detection (same rules as validate-sbom.sh).
 # --------------------------------------------------------
