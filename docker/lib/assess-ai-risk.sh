@@ -47,6 +47,7 @@ fi
 TMP=$(mktemp)
 jq --slurpfile kb "$KB" '
   $kb[0].licenseTerms as $terms
+  | $kb[0].datasetTagSignals as $dsig
 
   # Same normalization as the registry match contract (and license-flags.jq):
   # lowercase, runs of space/dot/underscore/slash/dash collapse to one space.
@@ -110,16 +111,55 @@ jq --slurpfile kb "$KB" '
                      + " (review)")] }
       end;
 
+  # Dataset-signal axis for a data component: the publisher-declared tag
+  # signals enrich-aibom.sh stamped (mapped back to verdicts through the same
+  # registry) plus the repository visibility. Only presence is judged — a
+  # dataset without markers simply has no signals axis.
+  def assess_signals($p):
+    ([ $p[] | select(.name == "bomlens:dataset:signal") | .value ] | unique) as $sigs
+    | ($p | map(select(.name == "bomlens:dataset:visibility")) | (.[0].value // "")) as $vis
+    | ([ $sigs[] as $sg | ($dsig[] | select(.signal == $sg))
+         | { v: .verdict, r: "dataset signal \($sg) (\(.verdict))" } ]
+       + (if $vis != "" then [{ v: "review", r: "dataset visibility \($vis): access-restricted (review)" }] else [] end)) as $per
+    | if ($per | length) == 0 then null
+      else { verdict: ($per | map(.v) | max_by(vrank[.])), reasons: ($per | map(.r)) }
+      end;
+
+  # A data component is judged on its license and its signals; both pieces are
+  # needed twice (stamping the dataset, aggregating into the model), so they
+  # are computed by one function.
+  def data_parts:
+    (.properties // []) as $p
+    | { a: assess_license, s: assess_signals($p) }
+    | . + { overall: (([.a.verdict] + (if .s != null then [.s.verdict] else [] end))
+                      | max_by(vrank[.])) };
+
   def strip_assessment:
     (.properties // []) | map(select(.name | startswith("bomlens:assessment:") | not));
 
-  (.components) |= (if type == "array" then map(
-      if (.type == "machine-learning-model" or .type == "data") then
+  # Datasets axis for the model: aggregate every data component in the BOM to
+  # the worst dataset verdict, with the offenders named (capped at three).
+  ([ .components[]? | select(.type == "data") | { name: (.name // "(unnamed)") } + data_parts ]) as $ds
+  | (if ($ds | length) == 0 then null
+     else ($ds | map(.overall) | max_by(vrank[.])) as $w
+        | { verdict: $w,
+            reasons: [ ("datasets: \($ds | length) referenced, worst \($w)"
+                        + (if $w == "ok" then ""
+                           else " (" + (([ $ds[] | select(.overall == $w) | .name ][0:3]) | join(", ")) + ")"
+                           end)) ] }
+     end) as $dax
+
+  | (.components) |= (if type == "array" then map(
+      if .type == "machine-learning-model" then
         (.properties // []) as $p0
         | (assess_license) as $a
-        | (if .type == "machine-learning-model" then assess_security($p0) else null end) as $s
-        | (["license"] + (if $s != null then ["security"] else [] end)) as $axes
-        | (([$a.verdict] + (if $s != null then [$s.verdict] else [] end))
+        | (assess_security($p0)) as $s
+        | (["license"]
+           + (if $s != null then ["security"] else [] end)
+           + (if $dax != null then ["datasets"] else [] end)) as $axes
+        | (([$a.verdict]
+            + (if $s != null then [$s.verdict] else [] end)
+            + (if $dax != null then [$dax.verdict] else [] end))
            | max_by(vrank[.])) as $overall
         | .properties = (strip_assessment + [
             { name: "bomlens:assessment:axes",         value: ($axes | join(",")) },
@@ -127,10 +167,27 @@ jq --slurpfile kb "$KB" '
             { name: "bomlens:assessment:license:keys", value: ($a.keys | join(",")) }
           ]
           + (if $s != null then [{ name: "bomlens:assessment:security", value: $s.verdict }] else [] end)
+          + (if $dax != null then [{ name: "bomlens:assessment:datasets", value: $dax.verdict }] else [] end)
           + [
             { name: "bomlens:assessment:overall",      value: $overall },
             { name: "bomlens:assessment:reasons",
-              value: (($a.reasons + (if $s != null then $s.reasons else [] end))[0:8] | join("; ")) }
+              value: (($a.reasons
+                       + (if $s != null then $s.reasons else [] end)
+                       + (if $dax != null then $dax.reasons else [] end))[0:8] | join("; ")) }
+          ])
+      elif .type == "data" then
+        (data_parts) as $d
+        | (["license"] + (if $d.s != null then ["signals"] else [] end)) as $axes
+        | .properties = (strip_assessment + [
+            { name: "bomlens:assessment:axes",         value: ($axes | join(",")) },
+            { name: "bomlens:assessment:license",      value: $d.a.verdict },
+            { name: "bomlens:assessment:license:keys", value: ($d.a.keys | join(",")) }
+          ]
+          + (if $d.s != null then [{ name: "bomlens:assessment:signals", value: $d.s.verdict }] else [] end)
+          + [
+            { name: "bomlens:assessment:overall",      value: $d.overall },
+            { name: "bomlens:assessment:reasons",
+              value: (($d.a.reasons + (if $d.s != null then $d.s.reasons else [] end))[0:8] | join("; ")) }
           ])
       else . end
   ) else . end)
