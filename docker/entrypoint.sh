@@ -535,6 +535,17 @@ if [ "${STALENESS_ENRICH:-false}" = "true" ] && [ "$SCAN_MODE" != "AIBOM" ]; the
     run_optional_step enrich-staleness python3 "$LIBDIR/enrich-staleness.py" "$OUTPUT_FILE"
 fi
 
+# AI model risk assessment: stamp every model/dataset component with a
+# bomlens:assessment:* verdict (ok / conditional / caution / review) from the
+# curated license-terms registry (ai-risk-knowledge.json). Offline, pure
+# post-processing after normalize (SPDX ids in place); an unknown license falls
+# to review, never to a guess, and the reports that print the verdict carry the
+# registry's not-legal-advice disclaimer. Self-gates on the presence of a
+# machine-learning-model component, so ANALYZE of a plain SBOM is a no-op.
+if [ "$SCAN_MODE" = "AIBOM" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
+    run_optional_step assess-ai-risk bash "$LIBDIR/assess-ai-risk.sh" "$OUTPUT_FILE"
+fi
+
 # AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
 # detects the machine-learning-model component and appends the G7 checks (model
 # id/license/card/integrity, datasets, openness — all advisory). Best-effort
