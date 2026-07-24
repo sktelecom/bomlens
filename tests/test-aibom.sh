@@ -597,6 +597,123 @@ mdax=$(jq -r '.components[] | select(.type=="machine-learning-model") | .propert
 mre=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/sig.json")
 case "$mre" in *"org/pii-ds"*) pass "the offending dataset is named in the model reasons" ;; *) fail "model reasons='$mre'" ;; esac
 
+echo "== a custom license (other) is read and its restrictive wording quoted =="
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+import os
+import tempfile
+
+
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64), _S("LICENSE")],
+    gated=False, private=False, tags=[],
+    card_data={"license": "other", "license_name": "acme-community"},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+
+    def list_repo_tree(self, mid, expand=False):
+        return []
+
+
+def hf_hub_download(repo_id, filename, **kw):
+    p = os.path.join(tempfile.gettempdir(), "hfstub-license.txt")
+    with open(p, "w") as fh:
+        fh.write(os.environ.get("HF_LICENSE_TEXT", ""))
+    return p
+STUB
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/cus.json"
+HF_LICENSE_TEXT="This model is provided for research purposes only. You may not use it for any commercial deployment." \
+    ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/cus.json" acme/custom-model >/dev/null 2>&1
+cprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/cus.json"; }
+[ "$(cprop bomlens:license:customScan)" = "matched" ] && pass "restrictive wording in the LICENSE file is detected" || fail "customScan='$(cprop bomlens:license:customScan)'"
+[ "$(cprop bomlens:license:customScan:verdict)" = "caution" ] && pass "a clear prohibition maps to caution" || fail "customScan verdict='$(cprop bomlens:license:customScan:verdict)'"
+cq=$(cprop bomlens:license:customScan:quote)
+case "$cq" in *"research purposes only"*) pass "the verdict quotes the wording it is based on" ;; *) fail "quote='$cq'" ;; esac
+[ "$(cprop bomlens:license:customName)" = "acme-community" ] && pass "the declared license_name is recorded" || fail "customName='$(cprop bomlens:license:customName)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/cus.json" >/dev/null 2>&1
+[ "$(cprop bomlens:assessment:license)" = "caution" ] && pass "the license axis picks up the custom-scan caution" || fail "license axis='$(cprop bomlens:assessment:license)'"
+# A text with no matched pattern must still read review, never clean.
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/cus.json"
+HF_LICENSE_TEXT="Enjoy this model however you like." ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/cus.json" acme/custom-model >/dev/null 2>&1
+[ "$(cprop bomlens:license:customScan)" = "no-known-restriction" ] && pass "an unmatched text is recorded as no-known-restriction" || fail "customScan='$(cprop bomlens:license:customScan)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/cus.json" >/dev/null 2>&1
+cre=$(cprop bomlens:assessment:reasons)
+case "$cre" in *"human review still required"*) pass "a pattern miss still demands human review" ;; *) fail "reasons='$cre'" ;; esac
+
+echo "== a mislabeled fine-tune inherits its base model terms =="
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64)], gated=False, private=False, tags=[],
+    card_data={"license": "apache-2.0", "base_model": "org/base-llama"},
+)
+BASE = _Info(
+    siblings=[], gated=False, private=False, tags=[],
+    card_data={"license": "llama3", "base_model": None},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return BASE if mid == "org/base-llama" else MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+
+    def list_repo_tree(self, mid, expand=False):
+        return []
+STUB
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/lin.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/lin.json" acme/llama-finetune >/dev/null 2>&1
+lprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/lin.json"; }
+[ "$(lprop bomlens:lineage:chain)" = "org/base-llama:llama3" ] && pass "the base-model chain is recorded" || fail "chain='$(lprop bomlens:lineage:chain)'"
+[ "$(lprop bomlens:lineage:conflict)" = "true" ] && pass "an undeclared inheritable ancestor license is flagged" || fail "conflict='$(lprop bomlens:lineage:conflict)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/lin.json" >/dev/null 2>&1
+[ "$(lprop bomlens:assessment:license)" = "caution" ] && pass "the lineage conflict assesses caution" || fail "license axis='$(lprop bomlens:assessment:license)'"
+lre=$(lprop bomlens:assessment:reasons)
+case "$lre" in *"org/base-llama (llama3)"*) pass "the conflicting ancestor is named in the reasons" ;; *) fail "reasons='$lre'" ;; esac
+# The aligned case: a fine-tune that declares the same family license is no conflict.
+python3 - "$WORK/hfstub/huggingface_hub.py" <<'PYEDIT'
+import sys
+p = sys.argv[1]
+s = open(p).read().replace('"license": "apache-2.0"', '"license": "llama3"')
+open(p, "w").write(s)
+PYEDIT
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/lin.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/lin.json" acme/llama-finetune >/dev/null 2>&1
+[ "$(lprop bomlens:lineage:conflict)" = "" ] && pass "a correctly declared family license raises no conflict" || fail "conflict='$(lprop bomlens:lineage:conflict)' on the aligned case"
+
 echo "== resolved dataset components carry the dataset cluster =="
 # enrich-aibom.sh resolves every dataset the model card names into a CycloneDX
 # `data` component (license, digests, upstream) linked through dependencies[].
