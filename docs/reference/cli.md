@@ -71,6 +71,7 @@ Environment variables adjust the behavior.
 | `SCANOSS_MIN_FILES` | `2` | Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set `1` to keep every single-file match |
 | `GIT_TOKEN` | — | Token for cloning private git repositories |
 | `HF_TOKEN` | — | HuggingFace read token for `--model`. Required for a private or gated model repository, which is how you review a model before publishing it. `HUGGING_FACE_HUB_TOKEN` is accepted as an alias |
+| `ENRICH_HF_SECURITY` | `true` | Read HuggingFace's own file-security scan results (ClamAV and picklescan, per file) for `--model` scans and record them in the ML-BOM. Metadata only, no file download. Set `false` to skip the lookup |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
 | `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |

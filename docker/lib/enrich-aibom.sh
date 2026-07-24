@@ -84,7 +84,12 @@ hf_api = None
 try:
     from huggingface_hub import HfApi
     hf_api = HfApi()
-    hf_info = hf_api.model_info(model_id, files_metadata=True)
+    try:
+        # securityStatus adds HuggingFace's repo-level scan rollup to the same
+        # call. Older hub versions lack the parameter; fall back cleanly.
+        hf_info = hf_api.model_info(model_id, files_metadata=True, securityStatus=True)
+    except TypeError:
+        hf_info = hf_api.model_info(model_id, files_metadata=True)
 except Exception as e:  # network down, no read access, or lib absent
     # Report only whether a token was in play, never the token itself.
     auth = "authenticated" if os.environ.get("HF_TOKEN") else "anonymous"
@@ -311,6 +316,103 @@ if hf_info is not None:
         "openness:training": "open-training" if has_training else "undisclosed",
     }
 
+    # ---- Weight-file formats (no extra API call) ----------------------------
+    # A pickle-family weight file (.bin/.pt/.pth/.ckpt) can execute code on
+    # load; safetensors and friends cannot. The format itself is a risk signal
+    # the assessment reads, computed from the siblings already fetched.
+    # PICKLE_EXTS mirrors weightFormats.pickleExts in ai-risk-knowledge.json.
+    PICKLE_EXTS = (".bin", ".pt", ".pth", ".ckpt")
+    weight_fmts = sorted({os.path.splitext(n.lower())[1].lstrip(".")
+                          for n in filenames if n.lower().endswith(WEIGHT_EXTS)})
+    pickle_files = sum(1 for n in filenames if n.lower().endswith(PICKLE_EXTS))
+    weights_props = []
+    if weight_fmts:
+        weights_props.append({"name": "bomlens:weights:formats", "value": ",".join(weight_fmts)})
+        weights_props.append({"name": "bomlens:weights:pickleFiles", "value": str(pickle_files)})
+
+    # ---- File security: HuggingFace's own scan results ----------------------
+    # HuggingFace runs ClamAV and picklescan over every repository and exposes
+    # per-file results through the tree API — one metadata call, no file
+    # download. The repo-level rollup (security_repo_status) is recorded
+    # verbatim but never judged: scansDone reads False even on long-scanned
+    # popular models, so only the per-file statuses carry meaning. Best-effort:
+    # a failure leaves no scan properties, and the assessment then reports the
+    # security axis honestly as not evaluated.
+    def _get(o, name, default=None):
+        if isinstance(o, dict):
+            camel = "".join(w.capitalize() if i else w for i, w in enumerate(name.split("_")))
+            return o.get(name, o.get(camel, default))
+        return getattr(o, name, default)
+
+    scan_props = []
+    repo_status = getattr(hf_info, "security_repo_status", None)
+    if repo_status is not None:
+        try:
+            scan_props.append({"name": "bomlens:hf:scan:repoStatus",
+                               "value": json.dumps(repo_status, separators=(",", ":"), sort_keys=True)[:500]})
+        except Exception:
+            pass
+
+    if os.environ.get("ENRICH_HF_SECURITY", "true") != "false":
+        SCAN_FILE_CAP = 1000
+        try:
+            agg = 0            # 0 safe, 1 queued (pending weight), 2 suspicious, 3 unsafe
+            n_files = n_scanned = n_flagged = 0
+            issues, truncated = [], False
+            for f in hf_api.list_repo_tree(model_id, expand=True):
+                path = str(_get(f, "path", "") or "")
+                if not path:
+                    continue
+                n_files += 1
+                if n_files > SCAN_FILE_CAP:
+                    truncated = True
+                    break
+                sec = _get(f, "security", None)
+                is_weight = path.lower().endswith(WEIGHT_EXTS)
+                status = _get(sec, "status", None) if sec is not None else None
+                fr, why = 0, ""
+                if sec is None or status in (None, "queued"):
+                    # An unscanned file only matters where code can hide.
+                    if is_weight:
+                        fr, why = 1, "scan pending"
+                elif status != "safe" or _get(sec, "safe", True) is False:
+                    fr, why = 3, f"scan status {status}"
+                else:
+                    n_scanned += 1
+                pk = _get(sec, "pickle_import_scan", None) if sec is not None else None
+                if pk is not None:
+                    imports = _get(pk, "pickle_imports", None) or _get(pk, "pickleImports", None) or []
+                    safeties = {str(_get(i, "safety", "")) for i in imports}
+                    if "dangerous" in safeties and fr < 3:
+                        fr, why = 3, "dangerous pickle import"
+                    elif "suspicious" in safeties and fr < 2:
+                        fr, why = 2, "suspicious pickle import"
+                if fr >= 2:
+                    n_flagged += 1
+                    if len(issues) < 5:
+                        issues.append(f"{path}: {why}")
+                agg = max(agg, fr)
+            if n_scanned or agg:
+                status_val = {0: "safe", 1: "queued", 2: "suspicious", 3: "unsafe"}[agg]
+            else:
+                status_val = "unavailable"
+            scan_props.append({"name": "bomlens:hf:scan:status", "value": status_val})
+            scan_props.append({"name": "bomlens:hf:scan:files", "value": str(min(n_files, SCAN_FILE_CAP))})
+            scan_props.append({"name": "bomlens:hf:scan:filesFlagged", "value": str(n_flagged)})
+            if issues:
+                scan_props.append({"name": "bomlens:hf:scan:issue", "value": "; ".join(issues)[:500]})
+            if truncated:
+                scan_props.append({"name": "bomlens:hf:scan:truncated", "value": "true"})
+            scan_props.append({"name": "bomlens:hf:scan:source", "value": "huggingface-api"})
+            print(f"[enrich] file security: {status_val} "
+                  f"({n_scanned} scanned safe, {n_flagged} flagged).", file=sys.stderr)
+        except Exception as e:
+            # The reason goes to the log, the fact goes to the BOM (same
+            # contract as the dataset step: no exception text in the SBOM).
+            print(f"[enrich] file-security lookup failed: {e}", file=sys.stderr)
+            scan_props.append({"name": "bomlens:hf:scan:status", "value": "unavailable"})
+            scan_props.append({"name": "bomlens:hf:scan:source", "value": "huggingface-api"})
+
     for m in models:
         if weight_hashes:
             existing = m.get("hashes") or []
@@ -320,10 +422,14 @@ if hf_info is not None:
                     existing.append(h)
                     seen.add((h["alg"], h["content"]))
             m["hashes"] = existing
-        # Replace any prior openness:* properties so re-runs stay idempotent.
-        props = [p for p in (m.get("properties") or []) if not str(p.get("name", "")).startswith("openness:")]
+        # Replace any prior openness/scan/weights properties so re-runs stay
+        # idempotent (same contract as the DATASET_MARK components below).
+        props = [p for p in (m.get("properties") or [])
+                 if not str(p.get("name", "")).startswith(("openness:", "bomlens:hf:scan:", "bomlens:weights:"))]
         for name, value in openness.items():
             props.append({"name": name, "value": value})
+        props.extend(scan_props)
+        props.extend(weights_props)
         m["properties"] = props
     print(f"[enrich] HuggingFace: {len(weight_hashes)} weight hash(es), openness assessed "
           f"(weights={openness['openness:weights']}).", file=sys.stderr)

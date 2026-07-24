@@ -181,6 +181,8 @@ The AI compliance profile also carries a usability verdict per model, answering 
 | caution | A known blocking signal — for example a non-commercial or research-only license. |
 | review | The tool cannot judge: an unrecognized license, a missing license, or a dataset that could not be read. A person has to look. |
 
+The file-security axis reads the scan results Hugging Face itself runs over every repository — ClamAV for malware and picklescan for executable pickle imports, per file. BomLens reads them through the metadata API without downloading a single file, records the worst status with the flagged file names, and notes whether the weights use a pickle-family format (which can execute code on load) or a safe one such as safetensors. A model whose scan is still pending reads review, not safe. Set `ENRICH_HF_SECURITY=false` to skip the lookup.
+
 The license verdict comes from a curated registry (`docker/lib/ai-risk-knowledge.json`) covering the complete Hugging Face license tag list. Each entry records whether commercial use, redistribution and derivatives are allowed, the conditions that apply, and a link to the license text; the profile prints the summary and the conditions next to the verdict, so the grounds travel with the judgement. A license the registry does not know falls to review — it is never guessed. A model's overall verdict is the worst across its assessed axes, and an axis nothing evaluated shows as not assessed rather than being read as safe.
 
 The verdicts are guidance, not legal advice, and every report that prints them says so. They gather what a reviewer needs — the terms, the sources, the unknowns — so the final decision is made by a person with the evidence in one place.

@@ -91,4 +91,22 @@ jobs:
           cl=$(jq '[.checks[] | select(.id|startswith("g7-")) | .cluster] | unique | length' "$CONF")
           echo "g7 checks: $g7   clusters: $cl"
           [ "$g7" -ge 40 ] && [ "$cl" -ge 7 ] || { echo "FAIL: G7 checklist incomplete"; exit 1; }
+
+          echo "=== file security: the real HuggingFace scan results reached the BOM ==="
+          # Early warning for an upstream API change: the tree fields moving or
+          # the security payload disappearing shows up here, not at a user.
+          scan=$(jq -r '[.components[]? | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:hf:scan:status") | .value] | first // ""' "$BOM")
+          fmts=$(jq -r '[.components[]? | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:weights:formats") | .value] | first // ""' "$BOM")
+          echo "scan status: $scan   weight formats: $fmts"
+          case "$scan" in safe|queued) : ;; *) echo "FAIL: unexpected scan status '$scan' for a known-good model"; exit 1 ;; esac
+          case "$fmts" in *safetensors*) : ;; *) echo "FAIL: weight formats missing safetensors"; exit 1 ;; esac
+
+          echo "=== risk assessment: verdicts stamped and profiled ==="
+          PROF=out/aibom-e2e_1.0_ai-profile.json
+          test -f "$PROF" || { echo "no AI profile produced"; exit 1; }
+          overall=$(jq -r '[.components[]? | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:assessment:overall") | .value] | first // ""' "$BOM")
+          nmodels=$(jq -r '.riskAssessment.models | length' "$PROF")
+          echo "overall verdict: $overall   profiled models: $nmodels"
+          [ -n "$overall" ] || { echo "FAIL: no assessment verdict stamped"; exit 1; }
+          [ "$nmodels" -ge 1 ] || { echo "FAIL: the profile carries no assessed model"; exit 1; }
           echo "OK: real-model AIBOM enrichment verified end to end."

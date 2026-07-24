@@ -128,6 +128,7 @@ docker run --rm \
 | `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
 | `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro (rpm) package PURLs so the scanner can match OS CVEs; no-op when the SBOM has no recognizable distro packages (skipped for AI SBOMs) |
 | `STALENESS_ENRICH` | — | `false` | Add deps.dev version currency (how many releases behind latest); needs network access |
+| `ENRICH_HF_SECURITY` | — | `true` | AIBOM mode: read HuggingFace's per-file security scan results (ClamAV + picklescan) into the ML-BOM; metadata only, no file download |
 | `API_KEY`, `API_URL` | For uploads | — | Upload credential and server URL. DT uses `X-Api-Key`; TRUSCA uses a Bearer token |
 | `UPLOAD_TARGET` | — | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest, not DT-compatible) |
 | `TRUSCA_PROJECT_ID` | When `trusca` | — | Target TRUSCA project id (UUID). Must already exist (no auto-create) |
