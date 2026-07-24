@@ -322,3 +322,8 @@
 [data-md-color-scheme="slate"] .md-typeset img.home-shot {
   border-color: #2d2d31;
 }
+
+/* ---- 개념 다이어그램: 항상 본문 폭을 가득 채워 라벨이 읽히게 (2x PNG라 선명) ---- */
+.md-typeset img[src*="images/diagrams/"] {
+  width: 100%;
+}
