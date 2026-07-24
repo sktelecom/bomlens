@@ -734,6 +734,28 @@ bash "$LIB/convert-to-cdx.sh" "$WORK/enc-bom.cdx.json" "$WORK/enc-bom-out.json" 
 jq -e '.bomFormat=="CycloneDX"' "$WORK/enc-bom-out.json" >/dev/null 2>&1 \
     && pass "UTF-8 BOM CycloneDX is normalized and converted" || fail "UTF-8 BOM CycloneDX not handled"
 
+echo "== input-format: SPDX 3.0 (JSON-LD) is recognized, not dropped as unknown =="
+# SPDX 3.0 is JSON-LD (@context/@graph) with no top-level .spdxVersion, so the
+# old detection dropped it as "unknown format" — the ONTAP failure in the gap
+# study. Detection now recognizes it and routes it to syft (which reads SPDX 3.0
+# in the shipped container image). The recognition is the regression this locks
+# down and it is environment-independent. The actual conversion depends on the
+# syft build reading SPDX 3.0 (the container's does; a bare host's syft may not),
+# so it is verified only when the environment's syft supports it.
+out=$(bash "$LIB/convert-to-cdx.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-out.json" 2>&1 || true)
+echo "$out" | grep -q 'input is SPDX-3.0' \
+    && pass "SPDX 3.0 JSON-LD is recognized as SPDX-3.0 (not unknown-format)" || fail "SPDX 3.0 not recognized: $out"
+if jq -e '.bomFormat=="CycloneDX" and ([.components[]?|select(.purl)]|length>=2)' "$WORK/spdx3-out.json" >/dev/null 2>&1; then
+    pass "SPDX 3.0 converts to CycloneDX with PURLs preserved (syft supports it here)"
+else
+    echo "  NOTE: this environment's syft did not convert SPDX 3.0; recognition verified, conversion is covered by the container image"
+fi
+# validate recognizes SPDX-3.0 and still emits a conformance report (measured via
+# CycloneDX when syft converts, or a recognized-but-unmeasured result otherwise).
+bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-cf" "supplier" >/dev/null 2>&1
+[ -f "$WORK/spdx3-cf_conformance.json" ] && jq -e '.checks|length>0' "$WORK/spdx3-cf_conformance.json" >/dev/null 2>&1 \
+    && pass "SPDX 3.0 produces a conformance report" || fail "SPDX 3.0 conformance not produced"
+
 echo "== conformance: spec-version range and PURL syntax are mandatory checks =="
 # The SKT submission requirements pin the accepted spec versions (CycloneDX
 # 1.3-1.6, SPDX 2.2/2.3) and require standard pkg:type/name@version PURLs.

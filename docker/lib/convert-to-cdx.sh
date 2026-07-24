@@ -40,6 +40,10 @@ if jq -e '.bomFormat=="CycloneDX" and (.specVersion!=null)' "$INPUT" >/dev/null 
     FORMAT="CycloneDX"
 elif jq -e '.spdxVersion!=null' "$INPUT" >/dev/null 2>&1; then
     FORMAT="SPDX-JSON"
+elif jq -e '(.["@context"]? // "" | tostring | test("spdx.org/rdf/3")) or (.["@graph"]? != null)' "$INPUT" >/dev/null 2>&1; then
+    # SPDX 3.0 is JSON-LD (@context/@graph) with no top-level .spdxVersion; syft
+    # convert reads it the same as SPDX-JSON.
+    FORMAT="SPDX-3.0"
 elif grep -q '^SPDXVersion:' "$INPUT" 2>/dev/null; then
     FORMAT="SPDX-TagValue"
 fi
@@ -75,7 +79,7 @@ case "$FORMAT" in
         echo "[convert] input is CycloneDX; copying as-is."
         cp "$INPUT" "$OUTPUT"
         ;;
-    SPDX-JSON|SPDX-TagValue)
+    SPDX-JSON|SPDX-TagValue|SPDX-3.0)
         echo "[convert] input is $FORMAT; converting to CycloneDX..."
         if command -v syft >/dev/null 2>&1 && syft convert "$INPUT" -o cyclonedx-json@1.6="$OUTPUT" >/dev/null 2>&1 \
            && [ -s "$OUTPUT" ] && jq -e '.bomFormat=="CycloneDX"' "$OUTPUT" >/dev/null 2>&1; then
@@ -84,7 +88,9 @@ case "$FORMAT" in
             echo "[convert] WARN: syft convert unavailable/failed; using jq fallback (license-preserving)." >&2
             spdx_json_to_cdx
         else
-            echo "[convert] ERROR: cannot convert SPDX Tag-Value without syft." >&2
+            # SPDX 3.0 JSON-LD and Tag-Value have no jq fallback (the 2.x .packages[]
+            # shape does not apply); syft is required.
+            echo "[convert] ERROR: cannot convert $FORMAT without syft." >&2
             exit 1
         fi
         ;;
