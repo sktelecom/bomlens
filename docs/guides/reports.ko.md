@@ -116,6 +116,25 @@ Components (1):
 
 ---
 
+## 정밀 CVE 대조 (`--deep-cve`)
+
+Trivy는 패키지 식별자(PURL) 기준으로 취약점을 대조하므로 생태계 보안 권고 데이터베이스는 잘 다룹니다. 하지만 오래된 Java 라이브러리의 일부 CVE는 NVD에만 CPE 식별자로 기록되어 있어 PURL 기반 스캔으로는 닿지 않습니다. `--deep-cve`는 Maven 컴포넌트에 두 번째 대조를 더합니다. BomLens가 각 컴포넌트의 groupId로부터 NVD 대조가 가능한 CPE를 만들어 주고, grype가 그 CPE를 내장 NVD 데이터베이스와 대조합니다.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+```
+
+- `--deep-cve`는 `--security`를 자동으로 켭니다. 추가로 찾은 결과는 같은 보안 보고서(`_security.json/.md/.html`)에 `nvd:cpe` 출처 표시와 함께 합쳐집니다.
+- 스캔은 grype와 데이터베이스를 내장한 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-cve:latest`로 실행되며, 플래그를 켜면 자동으로 내려받습니다(`SBOM_DEEP_CVE_IMAGE`로 지정 가능). 기본 이미지 모드(소스, 이미지, 바이너리, rootfs, SBOM 분석)에 적용되고, 펌웨어와 AI 모델 스캔에서는 경고를 출력한 뒤 grype 없이 진행합니다.
+- CPE 대조는 PURL 대조보다 느슨합니다. NVD의 버전 범위가 대략적으로 기록된 경우가 있기 때문입니다. 기본값은 오프라인 동작이라 그런 결과를 버리지 않고 보고서에 **버전 미검증**으로 표시합니다(단검 기호와 각주). 어느 행이 느슨한 버전 대조로 인한 오탐일 수 있는지 읽는 사람이 알 수 있습니다. 더 조이려면 `NVD_API_KEY`와 함께 `SECURITY_NVD_VERIFY=true`를 설정하세요. 각 결과를 NVD 실시간 버전 범위와 대조해 범위 밖 오탐을 걸러냅니다. 이 검증은 네트워크가 필요하고 수 분이 더 걸립니다.
+
+```bash
+SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
+  ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+```
+
+---
+
 ## 정밀 라이선스 탐지 (`--deep-license`)
 
 기본 고지문은 의존성(3rd-party)의 라이선스를 다룹니다. `--deep-license`는 scancode-toolkit으로 프로젝트 자체 소스코드(1st-party)의 라이선스 헤더까지 탐지합니다.

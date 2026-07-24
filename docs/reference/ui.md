@@ -80,7 +80,7 @@ If a scan finished with reduced analysis — for example cdxgen ran out of Docke
 
 ![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
 
-**Conformance** appears when you analyze an existing SBOM (the SBOM upload / ANALYZE mode), under Risk & compliance. It shows the format verdict — pass or fail — and the base CycloneDX checks (timestamp, tools, top-level component, name and version coverage, PURL coverage, transitive dependencies), with the missing items listed for each failed check. When the analyzed SBOM carries a machine-learning-model component, the G7 AI minimum-element checks (all advisory) appear here as a sub-block, grouped by the seven G7 clusters and tagged by data source — auto (read directly), inferred, declared, or review-needed when no automated source exists. The [AI model SBOM guide](../guides/ai-model.md#reading-the-conformance-report) explains the headline numbers and badges.
+**SBOM conformance** appears when you analyze an existing SBOM (the SBOM upload / ANALYZE mode), under Risk & compliance. An intro line says what the section measures: how well the SBOM meets the format and submission requirements — the regulatory crosswalk shown with it is for reference and makes no compliance determination. It shows the format verdict — pass or fail — and the base CycloneDX checks (timestamp, tools, top-level component, name and version coverage, PURL coverage, transitive dependencies), with the missing items listed for each failed check, plus a crosswalk roll-up of how the checks map to the regulatory baselines (EU CRA via BSI TR-03183-2, NTIA minimum elements). When the analyzed SBOM carries a machine-learning-model component, the G7 AI minimum-element checks (all advisory) appear here as a sub-block, grouped by the seven G7 clusters and tagged by data source — auto (read directly), inferred, declared, or review-needed when no automated source exists. The [AI model SBOM guide](../guides/ai-model.md#reading-the-conformance-report) explains the headline numbers and badges.
 
 ![Conformance — format verdict with the G7 advisory sub-block](../images/web-ui-g7.png)
 
@@ -100,7 +100,7 @@ For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), th
 
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
-The G7 AI minimum-element checks appear inside the **Conformance** section above — they are added only when the SBOM has a model component.
+The G7 AI minimum-element checks appear inside the **SBOM conformance** section above — they are added only when the SBOM has a model component.
 
 That section also shows an AI compliance profile card: a one-glance rollup of the G7 result, the number of license-flagged components, and regulatory framework coverage (EU AI Act, Korea AI Basic Act). It is advisory, not a certification, and the same data is written to the `_ai-profile` files (see [Artifacts](artifacts.md)).
 

@@ -126,7 +126,7 @@ docker run --rm \
 | `SECURITY_NVD_VERIFY` | — | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` + network; adds minutes). Off by default — findings are kept and flagged version-unverified |
 | `NVD_API_KEY` | For `SECURITY_NVD_VERIFY` | — | NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined) |
 | `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
-| `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro (rpm) package PURLs so the scanner can match OS CVEs; no-op when the SBOM has no recognizable distro packages (skipped for AI SBOMs) |
+| `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro (rpm) package PURLs. Trivy selects the distro vulnerability feed from that component, so without it the OS packages in a supplier SBOM or rootfs scan would get no OS CVE matches at all. No-op when the SBOM has no recognizable distro packages (skipped for AI SBOMs) |
 | `STALENESS_ENRICH` | — | `false` | Add deps.dev version currency (how many releases behind latest); needs network access |
 | `API_KEY`, `API_URL` | For uploads | — | Upload credential and server URL. DT uses `X-Api-Key`; TRUSCA uses a Bearer token |
 | `UPLOAD_TARGET` | — | `dependency-track` | Upload destination: `dependency-track` (DT-compatible) or `trusca` (native ingest, not DT-compatible) |

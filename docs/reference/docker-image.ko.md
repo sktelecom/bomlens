@@ -126,7 +126,7 @@ docker run --rm \
 | `SECURITY_NVD_VERIFY` | — | `false` | `--deep-cve` 사용 시: grype `nvd:cpe` 결과를 실시간 NVD 버전 범위로 검증해 범위 밖 오탐을 제거 (`NVD_API_KEY`·네트워크 필요, 수 분 추가). 기본 off — 결과는 유지하되 버전 미검증으로 표시 |
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
-| `ENRICH_OS_CONTEXT` | — | `true` | 배포판(rpm) 패키지 PURL에서 `operating-system` 컴포넌트를 합성해 스캐너가 OS 취약점을 매칭하게 함. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음 (AI SBOM은 건너뜀) |
+| `ENRICH_OS_CONTEXT` | — | `true` | 배포판(rpm) 패키지 PURL에서 `operating-system` 컴포넌트를 합성. Trivy가 이 컴포넌트를 보고 배포판 취약점 피드를 고르므로, 없으면 공급사 SBOM이나 rootfs 스캔의 OS 패키지는 OS CVE 매칭이 전혀 안 됨. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음 (AI SBOM은 건너뜀) |
 | `STALENESS_ENRICH` | — | `false` | deps.dev 버전 최신성(최신 대비 몇 릴리스 뒤처졌는지) 추가. 네트워크 접근 필요 |
 | `API_KEY`, `API_URL` | 업로드 시 | — | 업로드 자격과 서버 주소. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰입니다 |
 | `UPLOAD_TARGET` | — | `dependency-track` | 업로드 대상. `dependency-track`(DT 호환) 또는 `trusca`(네이티브 ingest, DT 비호환) |

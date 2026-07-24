@@ -65,8 +65,9 @@ Unlike a self-generated SBOM, a received SBOM additionally produces a conformanc
 The conformance report is the per-item check of whether the received SBOM meets the quality criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
 
 - If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — spec version range (CycloneDX v1.3–1.6, SPDX v2.2–2.3), timestamp, tool info, top-level component, name/version coverage, PURL coverage and syntax (standard `pkg:type/name@version` form, no `pkg:generic`), and transitive dependencies. AI SBOMs are also accepted at CycloneDX 1.7, which the AIBOM toolchain emits.
-- If a recommended item (license, hash coverage) falls short, it is a `warn`, not a `fail`.
+- If a recommended item falls short, it is a `warn`, not a `fail`. Besides license and hash coverage, this includes the advisory per-component fields the regulatory baselines call for — SHA-512 checksum coverage, component creator, component filename, source/distribution URI, and the delivered-file properties (marked review when no scan can see the artifact).
 - The cards at the top of the HTML report show pass/fail and the list of missing items.
+- Each check that corresponds to a regulatory baseline carries the reference under its row, and a crosswalk section rolls the coverage up per framework — BSI TR-03183-2 (the German technical guideline for the EU Cyber Resilience Act) and the US NTIA minimum elements. The crosswalk is reference material and makes no compliance determination; the [AI model SBOM guide](ai-model.md#regulatory-crosswalk) describes how it works.
 
 When a `fail` appears, tell whoever sent the SBOM which fields are missing and ask them to fix it. The most common unmet items are a missing PURL, use of `pkg:generic`, and missing transitive dependencies (only direct dependencies included).
 

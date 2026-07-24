@@ -99,7 +99,7 @@ A source badge on each row says where a satisfied value comes from:
 - Auto (22 checks) — read directly from a field of the ML-BOM.
 - Inferred (15) — derived from signals in the BOM rather than a single dedicated field.
 - Declared (4) — present only when a person or a manifest supplied the value.
-- Review needed (10) — no automated source exists; a person has to confirm it. The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. For an AI SBOM each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped element was checked.
+- Review needed (10) — no automated source exists; a person has to confirm it. The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. Each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped check was evaluated.
 
 The report shows how to close a gap, not only that one exists. Every advisory element with an automated source that is still absent carries a CycloneDX fragment and a link to the authoritative documentation — in the HTML, behind the "Evidence / how to fill" cell on that row; in the Markdown, gathered under "How to fill the gaps". Passing and review-only elements are left out, so a well-documented model shows none of this.
 
@@ -159,12 +159,21 @@ Ten elements have no automated source — things like the intended application a
 
 ## Regulatory crosswalk
 
-The conformance report links each G7 element that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when an element is missing, which regulatory requirement does that gap concern? Two frameworks are mapped today.
+The conformance report links each check that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when a check comes back short, which regulatory requirement does that gap concern? The reference sits under the requirement it belongs to in the check tables, and a crosswalk section above the detail rolls the coverage up — one row per framework, counting how many mapped checks are present, a gap, or review-only.
+
+Two frameworks cover every analyzed SBOM, AI or not:
+
+- EU Cyber Resilience Act — via BSI TR-03183-2, the German technical guideline written for CRA compliance and the most detailed public SBOM field specification (the CRA itself names no data fields). TR-03183-2 is a national guideline, and the European harmonized standard that will carry the binding wording is still a draft.
+- NTIA minimum elements — the seven SBOM data fields published under US Executive Order 14028 (2021). Federal SBOM collection has since been narrowed to agency-level, risk-based decisions, but the fields remain the practical baseline that individual agencies ask for.
+
+For an AI SBOM, two more frameworks map onto the G7 elements:
 
 - EU AI Act — the technical-documentation sections of Annex IV (Regulation (EU) 2024/1689, Article 11(1)).
-- AI Framework Act (Korea) — the Act's articles on transparency (제31조), safety and risk management (제32조), high-impact AI (제33·34조), and impact assessment (제35조). The Act sets framework-level duties, so these links are coarser than the EU ones. The crosswalk is a preparation aid, not a compliance verdict. BomLens does not certify compliance with either text, and the report says so in the section itself. Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups the same G7 findings by regulation, counting for each framework how many mapped elements are present, a gap, or review-only.
+- AI Framework Act (Korea) — the Act's articles on transparency (제31조), safety and risk management (제32조), high-impact AI (제33·34조), and impact assessment (제35조). The Act sets framework-level duties, so these links are coarser than the EU ones.
 
-The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by G7 element id. It is deliberately conservative: only elements with a defensible correspondence are mapped (23 of the 51 checks today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when an element is renamed.
+The crosswalk is a preparation aid, not a compliance verdict. BomLens does not certify compliance with any of these texts, and the report says so in the section itself. Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups findings the checks already produced.
+
+The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by check id — the G7 element ids for the AI checks and the plain CycloneDX check ids for the base format checks. It is deliberately conservative: only checks with a defensible correspondence are mapped (38 today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when a check is renamed.
 
 ## AI compliance profile
 

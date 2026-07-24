@@ -40,6 +40,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--lang <en\|ko>` | `en` | Language for the human-facing conformance and AI-profile reports (`.md`/`.html`). The SBOM and the JSON reports stay English regardless |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
+| `--deep-cve` | false | Also match Maven components against the NVD by CPE via grype (opt-in `bomlens-deep-cve` image, pulled automatically). Recovers NVD-only CVEs that Trivy misses for older Java libraries; implies `--security`. Findings not verified against the live NVD version range are flagged version-unverified in the report — see the [deep CVE matching guide](../guides/reports.md) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
@@ -70,10 +71,12 @@ Environment variables adjust the behavior.
 | `SCANOSS_API_KEY` | — | Credential for `SCANOSS_API_URL`, if the endpoint requires one |
 | `SCANOSS_MIN_FILES` | `2` | Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set `1` to keep every single-file match |
 | `GIT_TOKEN` | — | Token for cloning private git repositories |
-| `HF_TOKEN` | — | HuggingFace read token for `--model`. Required for a private or gated model repository, which is how you review a model before publishing it. `HUGGING_FACE_HUB_TOKEN` is accepted as an alias |
+| `HF_TOKEN` | — | HuggingFace read token for `--model` and for the dataset metadata lookups during AI SBOM analysis. Required for a private or gated repository, which is how you review a model before publishing it. `HUGGING_FACE_HUB_TOKEN` is accepted as an alias |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
 | `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |
+| `SECURITY_NVD_VERIFY` | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` and network access; adds minutes). Off by default — findings are kept and flagged version-unverified |
+| `NVD_API_KEY` | — | NVD API key for `SECURITY_NVD_VERIFY`. Passed to the container by name only, never inlined into the command |
 | `API_URL` | — | Upload server URL (a DT server, or the TRUSCA base) |
 | `API_KEY` | — | Upload credential. Used as `X-Api-Key` for DT, as a Bearer token for TRUSCA |
 | `UPLOAD_TARGET` | `dependency-track` | Upload destination: `dependency-track` or `trusca` |
