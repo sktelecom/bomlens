@@ -572,6 +572,12 @@ jobs:
       - name: Check environment-variable documentation coverage
         run: bash scripts/check-doc-env-coverage.sh
 
+      # Code->docs gate for CLI flags: every flag in the --help Options block
+      # must have its own row in the cli.md options table. A backticked mention
+      # elsewhere does not count — that is how a missing flag hides.
+      - name: Check CLI flag documentation coverage
+        run: bash scripts/check-doc-cli-coverage.sh
+
       # Korean prose gate: translation-ese and terminology rules over the
       # public docs surface (scripts/ko-style; decisions recorded in
       # docs/korean-style-guide.md). S1/S2 findings fail the job. The
