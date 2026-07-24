@@ -170,6 +170,21 @@ The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by G7 element
 
 For an AI SBOM, BomLens also writes a one-page AI compliance profile (`_ai-profile.{json,md,html}`) that gathers into one place what otherwise lives across separate artifacts: the G7 status by cluster, the regulatory crosswalk, and the components whose license is flagged for review (AI behavioral-use or non-commercial). It runs no scan and makes no compliance determination — it regroups findings the pipeline already produced, so a reviewer can read the whole picture at a glance. It is written for the AI-model (`--model`) and supplier-SBOM (`--analyze`) paths, and is a no-op for a plain (non-AI) SBOM.
 
+## Model risk assessment
+
+The AI compliance profile also carries a usability verdict per model, answering the question a development team asks first: can we use this model, and under what conditions? Each model — and each dataset entry — is assessed on the axes the pipeline has evidence for and given one of four verdicts.
+
+| Verdict | Meaning |
+| --- | --- |
+| ok | Only known unrestricted signals — for example a permissive license. |
+| conditional | Usable when the listed conditions are met — for example the Llama community license's user threshold and naming rule, or a copyleft license's notice duties. |
+| caution | A known blocking signal — for example a non-commercial or research-only license. |
+| review | The tool cannot judge: an unrecognized license, a missing license, or a dataset that could not be read. A person has to look. |
+
+The license verdict comes from a curated registry (`docker/lib/ai-risk-knowledge.json`) covering the complete Hugging Face license tag list. Each entry records whether commercial use, redistribution and derivatives are allowed, the conditions that apply, and a link to the license text; the profile prints the summary and the conditions next to the verdict, so the grounds travel with the judgement. A license the registry does not know falls to review — it is never guessed. A model's overall verdict is the worst across its assessed axes, and an axis nothing evaluated shows as not assessed rather than being read as safe.
+
+The verdicts are guidance, not legal advice, and every report that prints them says so. They gather what a reviewer needs — the terms, the sources, the unknowns — so the final decision is made by a person with the evidence in one place.
+
 ## Limits
 
 - A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.
