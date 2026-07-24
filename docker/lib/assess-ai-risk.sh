@@ -88,18 +88,49 @@ jq --slurpfile kb "$KB" '
             reasons: ($per | map(.r)) }
       end;
 
+  # File-security axis for a model: read the bomlens:hf:scan:* /
+  # bomlens:weights:* properties enrich-aibom.sh stamped from HuggingFace own
+  # scan results (ClamAV + picklescan). null when nothing was recorded — the
+  # axis is then simply not evaluated, never assumed safe.
+  def assess_security($p):
+    ($p | map(select(.name == "bomlens:hf:scan:status")) | (.[0].value // "")) as $st
+    | ($p | map(select(.name == "bomlens:weights:pickleFiles")) | (.[0].value // "0")
+        | (tonumber? // 0)) as $pk
+    | if $st == "" then null
+      elif ($st == "unsafe" or $st == "suspicious") then
+        { verdict: "caution",
+          reasons: ["file security: HuggingFace scan flags \($st) content (caution)"] }
+      elif $st == "safe" then
+        { verdict: "ok",
+          reasons: ["file security: HuggingFace scan reports all files safe (ok)"] }
+      else
+        { verdict: "review",
+          reasons: [("file security: scan \($st)"
+                     + (if $pk > 0 then ", pickle-format weights present" else "" end)
+                     + " (review)")] }
+      end;
+
   def strip_assessment:
     (.properties // []) | map(select(.name | startswith("bomlens:assessment:") | not));
 
   (.components) |= (if type == "array" then map(
       if (.type == "machine-learning-model" or .type == "data") then
-        (assess_license) as $a
+        (.properties // []) as $p0
+        | (assess_license) as $a
+        | (if .type == "machine-learning-model" then assess_security($p0) else null end) as $s
+        | (["license"] + (if $s != null then ["security"] else [] end)) as $axes
+        | (([$a.verdict] + (if $s != null then [$s.verdict] else [] end))
+           | max_by(vrank[.])) as $overall
         | .properties = (strip_assessment + [
-            { name: "bomlens:assessment:axes",         value: "license" },
+            { name: "bomlens:assessment:axes",         value: ($axes | join(",")) },
             { name: "bomlens:assessment:license",      value: $a.verdict },
-            { name: "bomlens:assessment:license:keys", value: ($a.keys | join(",")) },
-            { name: "bomlens:assessment:overall",      value: $a.verdict },
-            { name: "bomlens:assessment:reasons",      value: ($a.reasons[0:8] | join("; ")) }
+            { name: "bomlens:assessment:license:keys", value: ($a.keys | join(",")) }
+          ]
+          + (if $s != null then [{ name: "bomlens:assessment:security", value: $s.verdict }] else [] end)
+          + [
+            { name: "bomlens:assessment:overall",      value: $overall },
+            { name: "bomlens:assessment:reasons",
+              value: (($a.reasons + (if $s != null then $s.reasons else [] end))[0:8] | join("; ")) }
           ])
       else . end
   ) else . end)

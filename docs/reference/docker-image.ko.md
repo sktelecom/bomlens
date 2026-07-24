@@ -128,6 +128,7 @@ docker run --rm \
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
 | `ENRICH_OS_CONTEXT` | — | `true` | 배포판(rpm) 패키지 PURL에서 `operating-system` 컴포넌트를 합성해 스캐너가 OS 취약점을 매칭하게 함. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음 (AI SBOM은 건너뜀) |
 | `STALENESS_ENRICH` | — | `false` | deps.dev 버전 최신성(최신 대비 몇 릴리스 뒤처졌는지) 추가. 네트워크 접근 필요 |
+| `ENRICH_HF_SECURITY` | — | `true` | AIBOM 모드에서 HuggingFace의 파일별 보안 스캔 결과(ClamAV·picklescan)를 ML-BOM에 기록. 메타데이터만 읽고 파일은 내려받지 않음 |
 | `API_KEY`, `API_URL` | 업로드 시 | — | 업로드 자격과 서버 주소. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰입니다 |
 | `UPLOAD_TARGET` | — | `dependency-track` | 업로드 대상. `dependency-track`(DT 호환) 또는 `trusca`(네이티브 ingest, DT 비호환) |
 | `TRUSCA_PROJECT_ID` | `trusca`일 때 | — | 업로드할 TRUSCA 프로젝트 id(UUID). 사전에 존재해야 합니다(자동 생성 없음) |
