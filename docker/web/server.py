@@ -429,6 +429,10 @@ MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
 MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
 MAX_CROSSWALK_ELEMENTS = 200  # mapped elements listed per framework
 MAX_CROSSWALK_REFS = 12  # regulation refs per crosswalk element
+MAX_ASSESS_MODELS = 50  # assessed model entries in the AI profile card
+MAX_ASSESS_REASONS = 20  # reason strings per assessed model
+MAX_ASSESS_CONDITIONS = 20  # license conditions listed per assessed model
+MAX_ASSESS_URLS = 8  # license source links per assessed model
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -759,6 +763,63 @@ def sbom_summary(run_id):
         if last_released:
             row["lastReleased"] = last_released
 
+        # AI model/dataset risk verdict, stamped by assess-ai-risk.sh on
+        # machine-learning-model and data components (license-terms registry +
+        # HuggingFace file-scan / weight-format signals for models). Guidance,
+        # not legal advice. Surfaced read-only and only for the AI component
+        # types; an absent property means an absent field (the UI hides it).
+        if c.get("type") in ("machine-learning-model", "data"):
+            assessment = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:assessment:overall"
+                ),
+                None,
+            )
+            if assessment:
+                row["assessment"] = assessment
+            axes = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:assessment:axes"
+                ),
+                None,
+            )
+            if axes:
+                row["assessmentAxes"] = axes
+            reasons = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:assessment:reasons"
+                ),
+                None,
+            )
+            if reasons:
+                row["assessmentReasons"] = reasons
+            hf_status = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:hf:scan:status"
+                ),
+                None,
+            )
+            if hf_status:
+                row["hfScanStatus"] = hf_status
+            weight_formats = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:weights:formats"
+                ),
+                None,
+            )
+            if weight_formats:
+                row["weightFormats"] = weight_formats
+
         rows.append(row)
     # suggest-identify-vendored: set by suggest-vendored.sh when the scan looks like
     # C/C++ embedded source with no package manager. Drives the result banner.
@@ -794,8 +855,27 @@ def sbom_summary(run_id):
     # support; atRiskCount = those that ALSO carry a vulnerability — the actionable
     # set, since an EOL component has no upstream patch coming for its CVEs.
     eol_count = at_risk_count = outdated_count = 0
+    # Model risk verdict KPI across ALL model components (not just the capped
+    # rows): how many machine-learning-model components carry each
+    # bomlens:assessment:overall verdict. Datasets are excluded — the tile
+    # answers "can I use these models". Omitted entirely when no model carries
+    # a verdict, so non-AI scans see no AI tile.
+    assess_counts = {"ok": 0, "conditional": 0, "caution": 0, "review": 0}
+    assessed_models = 0
     for c in comps:
         cprops = c.get("properties") or []
+        if c.get("type") == "machine-learning-model":
+            overall = next(
+                (
+                    p.get("value")
+                    for p in cprops
+                    if p.get("name") == "bomlens:assessment:overall"
+                ),
+                None,
+            )
+            if overall in assess_counts:
+                assess_counts[overall] += 1
+                assessed_models += 1
         if any(
             p.get("name") == "bomlens:currency:outdated" and p.get("value") == "true"
             for p in cprops
@@ -813,7 +893,7 @@ def sbom_summary(run_id):
         if risk and risk.get("count", 0) > 0:
             at_risk_count += 1
     meta_comp = (data.get("metadata") or {}).get("component") or {}
-    return {
+    summary = {
         "components": len(comps),
         "componentList": rows,
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
@@ -828,6 +908,9 @@ def sbom_summary(run_id):
         "atRiskCount": at_risk_count,
         "outdatedCount": outdated_count,
     }
+    if assessed_models:
+        summary["assessCounts"] = assess_counts
+    return summary
 
 
 def scanoss_status(run_id):
@@ -1020,7 +1103,7 @@ def ai_profile_summary(run_id):
             "gap": int(fw.get("gap") or 0),
             "review": int(fw.get("review") or 0),
         })
-    return {
+    out = {
         "conformanceResult": str(data.get("conformanceResult") or "unknown"),
         "g7": {
             "total": int(g7.get("total") or 0),
@@ -1040,6 +1123,56 @@ def ai_profile_summary(run_id):
             "frameworks": frameworks,
         },
     }
+    # Model risk assessment (assess-ai-risk.sh verdicts re-aggregated by
+    # generate-ai-profile.sh with the registry's summaries/conditions).
+    # Guidance, not legal advice — the disclaimer travels with the data.
+    # Normalized defensively and capped; omitted on pre-feature profiles.
+    assess = data.get("riskAssessment")
+    if isinstance(assess, dict):
+        raw_counts = assess.get("counts") if isinstance(assess.get("counts"), dict) else {}
+        models = []
+        for m in (assess.get("models") or [])[:MAX_ASSESS_MODELS]:
+            if not isinstance(m, dict):
+                continue
+            raw_axes = m.get("axes") if isinstance(m.get("axes"), dict) else {}
+            models.append({
+                "name": str(m.get("name") or ""),
+                "version": str(m.get("version") or ""),
+                "license": str(m.get("license") or ""),
+                "overall": str(m.get("overall") or ""),
+                "usageContext": str(m.get("usageContext") or ""),
+                # Only the axes actually evaluated for this model (empty-string
+                # placeholders in the artifact are dropped).
+                "axes": {
+                    k: str(raw_axes.get(k))
+                    for k in ("license", "security", "datasets")
+                    if raw_axes.get(k)
+                },
+                "reasons": [str(r) for r in (m.get("reasons") or [])][:MAX_ASSESS_REASONS],
+                "summary": str(m.get("summary") or ""),
+                "summary_ko": str(m.get("summary_ko") or ""),
+                "conditions": [
+                    {
+                        "id": str(cond.get("id") or ""),
+                        "label": str(cond.get("label") or ""),
+                        "label_ko": str(cond.get("label_ko") or ""),
+                    }
+                    for cond in (m.get("conditions") or [])
+                    if isinstance(cond, dict)
+                ][:MAX_ASSESS_CONDITIONS],
+                "sourceUrls": [str(u) for u in (m.get("sourceUrls") or [])][:MAX_ASSESS_URLS],
+            })
+        out["riskAssessment"] = {
+            "usageContext": str(assess.get("usageContext") or ""),
+            "disclaimer": str(assess.get("disclaimer") or ""),
+            "disclaimer_ko": str(assess.get("disclaimer_ko") or ""),
+            "counts": {
+                k: int(raw_counts.get(k) or 0)
+                for k in ("ok", "conditional", "caution", "review")
+            },
+            "models": models,
+        }
+    return out
 
 
 def _max_severity(security):
@@ -1323,6 +1456,12 @@ def _emit_or_log(line, on_log, on_progress=None):
 # argument can only ever be one of these literals.
 _SIBLING_MODES = ("FIRMWARE", "AIBOM")
 
+# AI usage scenarios (the CLI's --usage) the model risk assessment may be scoped
+# to; forwarded to assess-ai-risk.sh as AI_USAGE_CONTEXT. A closed allowlist:
+# only one of these exact literals — never the request string — reaches the scan
+# environment or a docker-run argv.
+_USAGE_CONTEXTS = ("internal", "product", "redistribute", "outputs-only")
+
 
 def _valid_image_ref(ref):
     """True for a plain image reference (registry/name[:tag][@digest]).
@@ -1495,6 +1634,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
             args += ["-e", "CVE_BIN_TOOL_DISABLE_SOURCES=GAD"]
         if env.get("CVE_BIN_TOOL_MODE") == "online":
             args += ["-e", "CVE_BIN_TOOL_MODE=online"]
+    # Optional AI usage scenario for the model risk assessment: forwarded only on
+    # the AIBOM path, and only as one of the fixed _USAGE_CONTEXTS literals (the
+    # env string is compared, the allowlist literal is interpolated), so no
+    # user-influenced text can reach the docker-run argv. Any other value is
+    # simply not forwarded — assess-ai-risk.sh then runs without a scenario.
+    if mode == "AIBOM":
+        for _uc in _USAGE_CONTEXTS:
+            if env.get("AI_USAGE_CONTEXT") == _uc:
+                args += ["-e", "AI_USAGE_CONTEXT=%s" % _uc]
+                break
     if upload_file is not None:
         # The upload lives under UPLOAD_DIR (inside OUTPUT_DIR), so --volumes-from
         # already exposes it at this same container path — read it in place, no extra
@@ -1959,6 +2108,19 @@ class Handler(BaseHTTPRequestHandler):
         target = g("target").strip()
         token = g("token").strip()
 
+        # Optional AI usage scenario (--usage on the CLI) scoping the model risk
+        # assessment. Closed allowlist: an out-of-list value is refused before
+        # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
+        # the request string) is what reaches the scan environment.
+        usage = g("usage").strip()
+        if usage:
+            if usage not in _USAGE_CONTEXTS:
+                self._send(400, json.dumps(
+                    {"error": "invalid usage (expected internal|product|"
+                              "redistribute|outputs-only)"}))
+                return
+            usage = _USAGE_CONTEXTS[_USAGE_CONTEXTS.index(usage)]
+
         # Per-run output folder OUTPUT_DIR/<run_id>/ (matches scan-sbom.sh). The
         # default run_id is the {prefix}; with ?timestamp=true the folder name
         # gets a _{YYYYMMDD-HHMMSS} suffix so repeat scans don't overwrite each
@@ -2036,6 +2198,11 @@ class Handler(BaseHTTPRequestHandler):
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
         })
+        # Allowlisted above (and rebound to the _USAGE_CONTEXTS literal). Set
+        # only when given: assess-ai-risk.sh treats the absent var as "no
+        # scenario" and reports every binding condition instead.
+        if usage:
+            env["AI_USAGE_CONTEXT"] = usage
         # Optional SCANOSS token (single-use, stashed via POST /git-cred). Lets a
         # web-UI user supply their own OSSKB key, since the free anonymous endpoint
         # is heavily rate-limited. Overrides any key from the server environment.

@@ -16,6 +16,7 @@ import {
   type SourceType,
   type UploadErrorInfo,
   type UploadKind,
+  type UsageContext,
 } from "@/lib/api";
 import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
@@ -136,6 +137,9 @@ export function useScanForm({
   const [uploadUrl, setUploadUrlRaw] = useState("");
   const [uploadToken, setUploadTokenRaw] = useState("");
   const [truscaProjectId, setTruscaProjectIdRaw] = useState("");
+  // AI-model only: the intended usage the assessment grades against.
+  // "" = unspecified (the default) — the scan request then omits it.
+  const [usage, setUsage] = useState<UsageContext | "">("");
   // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
   const [includeOsv, setIncludeOsv] = useState(
     () => initialConfig?.includeOsv ?? false,
@@ -273,6 +277,7 @@ export function useScanForm({
     setTargetRaw("");
     setScanRootRaw("");
     setGitToken("");
+    setUsage("");
     setUploadError(null);
     setErrors({});
   };
@@ -376,6 +381,8 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      // AI-model only: grade the assessment against the chosen usage.
+      usage: isAiModel && usage ? usage : undefined,
       uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
       uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
       uploadCred,
@@ -405,6 +412,7 @@ export function useScanForm({
     target, setTarget,
     scanRoot, setScanRoot, scanRoots,
     gitToken, setGitToken,
+    usage, setUsage,
     file, setFile,
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,

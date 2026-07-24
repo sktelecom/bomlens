@@ -1081,6 +1081,61 @@ else
     fail "ko assessment JSON diverged from the English JSON"
 fi
 
+echo "== a usage scenario tailors the verdict to how the model will be used =="
+mkusage() {  # $1 license, $2 ctx -> verdict on stdout
+    jq --arg l "$1" '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":$l}}]' \
+        "$FIX/aibom-owasp-1_7.json" > "$WORK/uc.json"
+    AI_USAGE_CONTEXT="$2" bash "$LIB/assess-ai-risk.sh" "$WORK/uc.json" >/dev/null 2>&1
+    jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/uc.json"
+}
+[ "$(mkusage CC-BY-NC-4.0 internal)" = "conditional" ] && pass "CC-BY-NC for internal use reads conditional" || fail "CC-BY-NC internal verdict wrong"
+[ "$(mkusage CC-BY-NC-4.0 product)" = "caution" ] && pass "CC-BY-NC for product use reads caution" || fail "CC-BY-NC product verdict wrong"
+[ "$(mkusage cc-by-4.0 internal)" = "ok" ] && pass "an attribution-only license with no internal conditions reads ok" || fail "CC-BY internal verdict wrong"
+uctx=$(jq -r '.components[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
+[ "$uctx" = "internal" ] && pass "the scenario is stamped as usageContext" || fail "usageContext='$uctx'"
+[ "$(mkusage CC-BY-NC-4.0 '')" = "caution" ] && pass "no scenario judges the full terms" || fail "unset scenario verdict wrong"
+[ "$(mkusage CC-BY-NC-4.0 partytime)" = "caution" ] && pass "an unknown scenario is dropped, not guessed at" || fail "unknown scenario verdict wrong"
+uctx2=$(jq -r '.components[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
+[ "$uctx2" = "unset" ] && pass "an unknown scenario stamps no usageContext" || fail "usageContext='$uctx2' after unknown scenario"
+
+echo "== the profile states the scenario and lists only its binding conditions =="
+cp "$WORK/conf_conformance.json" "$WORK/ucprof_conformance.json"
+jq '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":"llama3.1"}}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/ucprof_bom.json"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/ucprof_bom.json" >/dev/null 2>&1
+bash "$LIB/generate-ai-profile.sh" "$WORK/ucprof" "demo" >/dev/null 2>&1
+[ "$(jq -r '.riskAssessment.usageContext' "$WORK/ucprof_ai-profile.json")" = "product" ] && pass "profile JSON carries the usage scenario" || fail "profile usageContext missing"
+grep -q "Assessed for the product usage scenario" "$WORK/ucprof_ai-profile.md" && pass "MD states the scenario the verdict was judged for" || fail "MD lacks the scenario line"
+# naming-rule binds only redistribution, so a product assessment must not list it.
+if jq -e '.riskAssessment.models[0].conditions | any(.id == "naming-rule")' "$WORK/ucprof_ai-profile.json" >/dev/null 2>&1; then
+    fail "a redistribute-only condition leaked into the product scenario"
+else
+    pass "conditions are filtered to the ones binding the scenario"
+fi
+jq -e '.riskAssessment.models[0].conditions | any(.id == "mau-threshold")' "$WORK/ucprof_ai-profile.json" >/dev/null 2>&1 \
+    && pass "conditions binding the scenario are kept" || fail "mau-threshold missing from the product scenario"
+cp "$WORK/ucprof_conformance.json" "$WORK/koucprof_conformance.json"
+cp "$WORK/ucprof_bom.json" "$WORK/koucprof_bom.json"
+REPORT_LANG=ko bash "$LIB/generate-ai-profile.sh" "$WORK/koucprof" "demo" >/dev/null 2>&1
+grep -q "제품 탑재 사용 기준으로 판정" "$WORK/koucprof_ai-profile.md" && pass "ko MD localizes the scenario line" || fail "ko scenario line not localized"
+
+echo "== the risk report rolls up the assessment counts =="
+jq '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":"llama3.1"}}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/rr_bom.json"
+bash "$LIB/assess-ai-risk.sh" "$WORK/rr_bom.json" >/dev/null 2>&1
+bash "$LIB/generate-risk-report.sh" "$WORK/rr" "demo" >/dev/null 2>&1
+grep -q "AI 모델 위험 판정" "$WORK/rr_risk-report.md" && pass "risk report MD carries the assessment section" || fail "risk report lacks the assessment section"
+grep -q "법적 자문이 아닌 안내" "$WORK/rr_risk-report.md" && pass "risk report repeats the disclaimer" || fail "risk report lacks the disclaimer"
+grep -q "AI 모델 위험 판정" "$WORK/rr_risk-report.html" && pass "risk report HTML carries the assessment section" || fail "risk report HTML lacks the section"
+# A plain software SBOM must not grow the section.
+printf '{"bomFormat":"CycloneDX","components":[{"type":"library","name":"x"}]}' > "$WORK/plainrr_bom.json"
+bash "$LIB/generate-risk-report.sh" "$WORK/plainrr" "x" >/dev/null 2>&1
+if grep -q "AI 모델 위험 판정" "$WORK/plainrr_risk-report.md" 2>/dev/null; then
+    fail "the assessment section appeared for a plain software SBOM"
+else
+    pass "no assessment section for a plain software SBOM"
+fi
+
 echo "== generate-notice.sh flags AI restrictive licenses for review =="
 bash "$LIB/generate-notice.sh" "$FIX/notice-ai-licenses.json" "$WORK/rev" "demo" >/dev/null 2>&1
 RTXT="$WORK/rev_NOTICE.txt"
