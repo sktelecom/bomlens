@@ -339,6 +339,11 @@ export interface DoneEvent {
 export type SourceType =
   | "current-dir"
   | "rootfs-dir"
+  // Deep (build) source scan of a picked scan-target folder. Not a picker tile —
+  // the form submits it in place of "rootfs-dir" when the transitive-resolution
+  // toggle is on, so a desktop "Add folder…" scan resolves transitives like the
+  // current folder does. Server clones the read-only mount into a writable tree.
+  | "scan-target-src"
   | "git-url"
   | "zip-upload"
   | "sbom-upload"

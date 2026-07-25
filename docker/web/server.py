@@ -285,6 +285,36 @@ def safe_scan_dir(rel):
     return None
 
 
+# Directories a build-based source scan re-resolves from manifests, so copying
+# them wastes time and disk (and, for a 1.8 GB tree, dominates the copy). Skipped
+# when cloning a read-only picked folder into a writable tree for a deep scan;
+# cdxgen/build-prep reinstalls dependencies from the manifests it keeps.
+_DEEP_COPY_SKIP = {
+    ".git", ".hg", ".svn",
+    "node_modules", ".venv", "venv", "env", "__pycache__",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox",
+    "build", "dist", "out", "target", ".gradle", ".next", ".nuxt",
+    "coverage", ".coverage", ".idea", ".vscode",
+}
+
+
+def copy_scan_target_tree(src, dest):
+    """Copy a read-only picked folder into a writable tree for a deep (build)
+    source scan, skipping heavy re-resolvable dirs (_DEEP_COPY_SKIP).
+
+    The desktop app mounts a chosen folder read-only at /scan-targets/<name>, but
+    cdxgen's build-prep must WRITE into the source tree (install deps, drop the
+    bom). So the tree is cloned into a writable dir under OUTPUT_DIR — which maps
+    to a host mount (host_path_of), letting the sibling cdxgen container see it via
+    --volumes-from, exactly like the current-dir path. The user's folder is never
+    touched. Returns the destination root."""
+    def _ignore(_dir, names):
+        return [n for n in names if n in _DEEP_COPY_SKIP]
+    shutil.copytree(src, dest, ignore=_ignore, symlinks=True,
+                    ignore_dangling_symlinks=True, dirs_exist_ok=True)
+    return dest
+
+
 def firmware_capable():
     """The firmware tools (unblob) are only built into the firmware image."""
     return shutil.which("unblob") is not None
@@ -2303,6 +2333,34 @@ class Handler(BaseHTTPRequestHandler):
                 env["MODE"] = "ROOTFS"
                 env["TARGET_DIR"] = scan_dir
 
+            elif source == "scan-target-src":
+                # Deep source scan of a picked folder (desktop "Add folder…"): the
+                # transitive-resolution path — same cdxgen build as current-dir —
+                # for a read-only scan-target mount. The folder is validated to a
+                # picked scan root, then cloned into a writable tree under
+                # OUTPUT_DIR so build-prep can install/write; SOURCE_ROOT_HOST is
+                # filled below (the copy is under a mount we own), which is the
+                # signal the entrypoint needs to run cdxgen instead of shallow syft.
+                scan_dir = safe_scan_dir(target)
+                if not scan_dir:
+                    fail("Invalid or out-of-bounds directory path (must be a "
+                         "picked scan-target folder)"); return
+                if not any(scan_dir == r["path"] or scan_dir.startswith(r["path"] + os.sep)
+                           for r in EXTRA_SCAN_ROOTS):
+                    fail("Deep source scan is only available for an added folder "
+                         "(the current folder already scans deep)."); return
+                cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
+                                      % os.path.basename(scan_dir.rstrip("/"))))
+                try:
+                    copy_scan_target_tree(scan_dir, cleanup_dir)
+                except (OSError, shutil.Error) as exc:
+                    fail("could not prepare the folder for a deep scan: %s" % exc)
+                    return
+                mode = "SOURCE"
+                env["MODE"] = "SOURCE"
+                env["SOURCE_ROOT"] = scan_root_of(cleanup_dir)
+
             elif source == "git-url":
                 if not target:
                     fail("Git URL required"); return
@@ -2514,7 +2572,7 @@ class Handler(BaseHTTPRequestHandler):
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)
-            if cleanup_dir and source == "git-url":
+            if cleanup_dir and source in ("git-url", "scan-target-src"):
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
 
     def log_message(self, *args):

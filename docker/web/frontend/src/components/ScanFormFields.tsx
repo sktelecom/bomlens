@@ -44,7 +44,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, setFile, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
@@ -137,6 +137,16 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           )}
           {desktopFolders && (
             <p className="text-xs text-muted-foreground">{t("source.scanFolderDesktopHint")}</p>
+          )}
+          {showDeepSource && (
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
+              <ToggleRow
+                labelKey="deepSource"
+                checked={deepSource}
+                onChange={setDeepSource}
+                disabled={busy}
+              />
+            </div>
           )}
         </div>
       )}

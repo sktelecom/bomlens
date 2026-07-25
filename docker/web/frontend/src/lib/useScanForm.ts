@@ -122,6 +122,10 @@ export function useScanForm({
   const [identifyVendored, setIdentifyVendored] = useState(
     () => initialConfig?.identifyVendored ?? false,
   );
+  // Picked scan-target folder only: resolve transitive dependencies with a real
+  // build (cdxgen), like the current folder does, instead of the shallow syft
+  // directory scan. Default on — it is the point of scanning a project folder.
+  const [deepSource, setDeepSource] = useState(true);
   // Byte-stable (reproducible) output: identical SBOM when the same input is
   // re-scanned, so it can be diffed/checksummed.
   const [byteStable, setByteStable] = useState(
@@ -173,6 +177,14 @@ export function useScanForm({
   const activeScanRoot = source === "rootfs-dir" ? scanRoot : "";
   const activeScanRootHost =
     scanRoots.find((r) => r.path === activeScanRoot)?.hostPath ?? "";
+  // A picked scan-target folder can be scanned deep (cdxgen build → transitive
+  // resolution) instead of shallow (syft dir). Offered only when such a root is
+  // selected; when on, the form submits "scan-target-src" in place of the
+  // rootfs-dir source. The target composition (root + optional subpath) is
+  // identical, so only the source string changes.
+  const showDeepSource = activeScanRoot !== "";
+  const effectiveSource: SourceType =
+    showDeepSource && deepSource ? "scan-target-src" : source;
   const isAnalyze = source === "sbom-upload";
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply.
@@ -375,7 +387,7 @@ export function useScanForm({
     onRun({
       project: project.trim(),
       version: version.trim(),
-      source,
+      source: effectiveSource,
       target: isText ? effectiveTarget : undefined,
       token,
       cred,
@@ -421,6 +433,7 @@ export function useScanForm({
     source, changeSource,
     target, setTarget,
     scanRoot, setScanRoot, scanRoots,
+    deepSource, setDeepSource, showDeepSource,
     gitToken, setGitToken,
     usage, setUsage,
     file, setFile,
