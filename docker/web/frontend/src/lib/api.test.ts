@@ -257,6 +257,7 @@ const PARAMS: ScanParams = {
   identifyVendored: false,
   includeOsv: false,
   byteStable: false,
+  deepCve: false,
 };
 
 describe("startScan", () => {
@@ -277,6 +278,7 @@ describe("startScan", () => {
     expect(qs.get("identify_vendored")).toBe("false");
     expect(qs.get("includeOsv")).toBe("false");
     expect(qs.get("byte_stable")).toBe("false");
+    expect(qs.get("deep_cve")).toBe("false");
   });
 
   it("parses log lines (JSON and raw fallback)", () => {
