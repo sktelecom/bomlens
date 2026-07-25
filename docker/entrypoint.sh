@@ -482,10 +482,13 @@ else
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE"
 fi
 
-# CPE enrichment (Plan 1): firmware/image/rootfs components often arrive with
-# name+version but no purl/cpe, so Trivy matches no CVEs. enrich-cpe.sh attaches a
-# cpe:2.3 to WHITELISTED component names only (closed list, no guessing) so Trivy
-# can match by CPE. Skipped for AI SBOMs (no OS/library components to match) and
+# CPE enrichment: firmware/image/rootfs components often arrive with name+version
+# but no purl/cpe. enrich-cpe.sh attaches (or version-normalizes) a cpe:2.3 for
+# WHITELISTED component names only (closed list, no guessing) and fills confirmed
+# SPDX licenses. The CPE keeps the SBOM identifier correct for consumers that read
+# it; note that `trivy sbom` matches by PURL and OS-context, NOT by component.cpe
+# (issue #458), so distro CVE matching comes from the OS component synthesized just
+# below and, for firmware, from the cve-bin-tool sidecar. Skipped for AI SBOMs and
 # disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
 if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"

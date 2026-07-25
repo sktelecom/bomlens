@@ -2,29 +2,37 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# enrich-cpe.sh — attach a cpe:2.3 AND a confirmed SPDX license to whitelisted
-# components so Trivy can match CVEs by CPE (Plan 1) and the NOTICE / license
-# distribution are not blank for famous OSS.
+# enrich-cpe.sh — attach a normalized cpe:2.3 AND a confirmed SPDX license to
+# whitelisted components so the NOTICE / license distribution are not blank for
+# famous OSS and the CPE identifier is correct for SBOM consumers that key on it.
 #
 # Usage: enrich-cpe.sh <sbom.json>
 #
-# Why: firmware / image / rootfs SBOMs match few/no CVEs in Trivy and carry no
-# license for famous OSS, fixed here for WHITELISTED component names only
-# (cpe-name-map.json):
+# NOTE ON CVE MATCHING: `trivy sbom` matches components by PURL (and, for distro
+# packages, by an operating-system component — see enrich-os-context.py), NOT by
+# `component.cpe`. A CPE attached here is therefore not a Trivy input on its own
+# and does not by itself produce findings; measurements confirmed a CPE-only
+# component (e.g. openssl@1.0.1f) yields 0 Trivy findings (issue #458). Distro CVE
+# matching comes from the synthesized OS component; firmware binaries with no
+# usable PURL are covered by the cve-bin-tool sidecar (scan-security.sh). The CPE
+# is retained here for correctness and for downstream consumers that read it.
 #
-#   (a) No cpe at all. A component with name+version but no purl/cpe is invisible
-#       to Trivy's matchers. We synthesize
+# Why: firmware / image / rootfs SBOMs carry no license for famous OSS, and their
+# CPEs (where present) carry distro-suffixed versions. Fixed here for WHITELISTED
+# component names only (cpe-name-map.json):
+#
+#   (a) No cpe at all. A component with name+version but no purl/cpe carries no
+#       usable identifier. We synthesize
 #         cpe:2.3:a:<vendor>:<product>:<version>:*:*:*:*:*:*:*
-#       so the CPE matcher can find its CVEs.
+#       so the SBOM records a correct, NVD-shaped CPE for that component.
 #
 #   (b) A cpe whose VERSION carries a distro package-revision suffix. syft labels
-#       OpenWRT/Buildroot packages with versions like `1.30.1-5` or `2.80-15`
-#       (upstream version + a distro rebuild count). NVD's CPE version is the bare
-#       upstream `1.30.1` / `2.80`, so Trivy's CPE compare misses and the report is
-#       empty even though the cpe vendor/product are right. For whitelisted names
-#       we rewrite the cpe's version to the upstream prefix (revision suffix
+#       OpenWRT/Buildroot/Alpine packages with versions like `1.30.1-5`, `2.80-15`
+#       or `1.36.1-r2` (upstream version + a distro rebuild count). NVD's CPE
+#       version is the bare upstream `1.30.1` / `2.80` / `1.36.1`. For whitelisted
+#       names we rewrite the cpe's version to the upstream prefix (revision suffix
 #       stripped) AND, when vendor/product disagree with our curated map, correct
-#       them — so the famous-OSS CVEs actually match.
+#       them — so the recorded CPE is the NVD-canonical identifier.
 #
 #   (c) No license. syft reads name+version from opkg/dpkg entries but not the
 #       license metadata, so famous OSS (busybox, dropbear, dnsmasq, ...) arrive
@@ -68,10 +76,11 @@ TMP="$(mktemp)"
 # Trivy reject the whole SBOM. Same guard as normalize-sbom.sh's vendored fix.
 #
 # upstream_ver: strip a SINGLE trailing distro package-revision segment so the
-# CPE version matches NVD. OpenWRT/Buildroot append `-<rebuild>` to the upstream
-# version (1.30.1-5 -> 1.30.1, 2.80-15 -> 2.80). We only strip `-<digits>` at the
-# very end (a conservative rule): a non-numeric suffix (e.g. -rc1, -beta) is a
-# real upstream qualifier and is kept. Applied to whitelisted names only.
+# CPE version matches NVD. OpenWRT/Buildroot append `-<rebuild>` and OpenWRT/Alpine
+# an `-r<rebuild>` to the upstream version (1.30.1-5 -> 1.30.1, 2.80-15 -> 2.80,
+# 1.36.1-r2 -> 1.36.1). We only strip `-<digits>` or `-r<digits>` at the very end
+# (a conservative rule): any other non-numeric suffix (e.g. -rc1, -beta) is a real
+# upstream qualifier and is kept. Applied to whitelisted names only.
 # has_license: true when the component already carries any usable license entry
 # (an id, a name, or an SPDX expression). We only fill a license when this is
 # false, so syft-populated licenses are never overwritten.
@@ -81,7 +90,7 @@ TMP="$(mktemp)"
 # {license:{id:...}}. Matches CycloneDX licenses[] shape used downstream.
 if jq --argjson cmap "$CMAP" '
   def safe_ver(v): (v // "") | test("^[A-Za-z0-9][A-Za-z0-9_.+-]*$");
-  def upstream_ver(v): (v // "") | sub("-[0-9]+$"; "");
+  def upstream_ver(v): (v // "") | sub("-r?[0-9]+$"; "");
   def has_license: ((.licenses // []) | type=="array")
     and ((.licenses // []) | any(
       ((.license.id // "") != "") or

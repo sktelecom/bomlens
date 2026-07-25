@@ -552,8 +552,14 @@ bash "$LIB/enrich-cpe.sh" "$WORK/fw.json" >/dev/null 2>&1
 # OpenWRT package-revision suffix (-5) stripped so the cpe version matches NVD.
 bb_cpe=$(jq -r '.components[] | select(.name=="busybox") | .cpe' "$WORK/fw.json")
 [ "$bb_cpe" = "cpe:2.3:a:busybox:busybox:1.30.1:*:*:*:*:*:*:*" ] \
-    && pass "busybox cpe version normalized 1.30.1-5 -> 1.30.1 (Trivy-matchable)" \
+    && pass "busybox cpe version normalized 1.30.1-5 -> 1.30.1 (NVD-canonical)" \
     || fail "busybox cpe='$bb_cpe', expected upstream version 1.30.1"
+# OpenWRT/Alpine -r<N> package-revision suffix is also stripped (issue #458): the
+# regex must handle `-r2`, not only `-<digits>`, so 1.2.11-r2 -> 1.2.11.
+zl_cpe=$(jq -r '.components[] | select(.name=="zlib") | .cpe' "$WORK/fw.json")
+[ "$zl_cpe" = "cpe:2.3:a:zlib:zlib:1.2.11:*:*:*:*:*:*:*" ] \
+    && pass "zlib cpe version normalized 1.2.11-r2 -> 1.2.11 (Alpine -r suffix stripped)" \
+    || fail "zlib cpe='$zl_cpe', expected upstream version 1.2.11"
 # A component with NO cpe at all gets one from the whitelist.
 dr_cpe=$(jq -r '.components[] | select(.name=="dropbear") | .cpe' "$WORK/fw.json")
 [ "$dr_cpe" = "cpe:2.3:a:dropbear_ssh_project:dropbear_ssh:2019.78:*:*:*:*:*:*:*" ] \
