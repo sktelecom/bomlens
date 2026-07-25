@@ -11,6 +11,7 @@ This page explains how to read and interpret BomLens reports after a scan. For h
 The open-source notice (NOTICE) groups components by license. Beyond that grouping, it also handles the following.
 
 - It normalizes license names to SPDX identifiers. For example, "Apache License, version 2.0" is normalized to `Apache-2.0`. Entries that were duplicated because the same license was written differently are merged into one.
+- When the scan tool could not name a license and left it as `CUSTOM` with the license file text attached (common for Go modules whose LICENSE file rewrites the copyright lines), the text itself is checked against the wording of major licenses (`MIT`, `BSD-2-Clause`, `BSD-3-Clause`, `Apache-2.0`, `ISC`) and the SPDX identifier is recovered. A text that stays ambiguous is kept as `CUSTOM` rather than guessed.
 - If the SBOM has a copyright value, it is shown per component.
 - The full SPDX standard texts of 21 major open-source licenses (`Apache-2.0`, `MIT`, `BSD-3-Clause`, the `GPL`/`LGPL` families, and so on) are bundled at the end of the notice. This satisfies the obligation of licenses that require the full text, without separate collection. The bundled originals are in `docker/lib/licenses/*.txt`.
 

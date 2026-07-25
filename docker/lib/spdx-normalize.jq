@@ -41,3 +41,26 @@ def normalize($s):
   elif ($n | test("bsd.*3")) then "BSD-3-Clause"
   elif ($n | test("bsd.*2")) then "BSD-2-Clause"
   else $s end;
+
+# identify_license_text — classify a full license text by its distinctive clause
+# wording, for entries where the upstream tool gave up on the name (cdxgen's Go
+# resolver emits name:"CUSTOM" + the LICENSE file text when the file deviates
+# from its template, e.g. pflag's two-copyright-line BSD-3-Clause). Matches on
+# clause phrases, never on the copyright header, so holder count and names do
+# not matter. Deliberately small and high-precision: only licenses whose body
+# has an unmistakable phrase are listed, the BSD tests reject 4-clause texts
+# (advertising clause), and a text matching several templates (e.g. a
+# concatenated multi-license file) returns "" rather than a guess.
+def identify_license_text($t):
+  (($t // "") | ascii_downcase | gsub("\\s+"; " ")) as $x |
+  [ (if ($x | test("permission is hereby granted, free of charge"))
+        and ($x | test("without restriction")) then "MIT" else empty end),
+    (if ($x | test("permission to use, copy, modify, and/or distribute this software for any purpose")) then "ISC" else empty end),
+    (if ($x | test("apache license")) and ($x | test("version 2\\.0")) then "Apache-2.0" else empty end),
+    (if ($x | test("redistributions of source code must retain"))
+        and ($x | test("redistributions in binary form must reproduce"))
+        and (($x | test("advertising materials")) | not) then
+       (if ($x | test("neither the name")) then "BSD-3-Clause" else "BSD-2-Clause" end)
+     else empty end)
+  ] as $hits |
+  if ($hits | length) == 1 then $hits[0] else "" end;
