@@ -41,6 +41,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
 | `--deep-license` | false | scancode 정밀 라이선스 탐지 (opt-in 이미지) |
+| `--deep-cve` | false | grype로 Maven 컴포넌트를 CPE 기준으로 NVD와 추가 대조한다 (opt-in `bomlens-deep-cve` 이미지, 자동으로 내려받음). 오래된 Java 라이브러리에서 Trivy가 놓치는 NVD 전용 CVE를 찾아내며, `--security`를 자동으로 켠다. NVD 실시간 버전 범위로 확인하지 못한 결과는 보고서에 버전 미검증으로 표시된다 — [정밀 CVE 대조 가이드](../guides/reports.ko.md) 참고 |
 | `--identify-vendored` | false | 패키지 매니저가 없는 C/C++ 소스에 복사돼 들어간(vendored) 오픈소스를 식별. 파일 지문을 OSSKB 서비스와 대조 (발행 이미지에 포함; 소스가 아니라 해시 전송). [내장 오픈소스 식별 가이드](../guides/identify-vendored.md) 참고 |
 | `--byte-stable` | false | 결정론적(재현 가능) SBOM 출력 |
 | `--sign` | false | cosign 서명 (`COSIGN_KEY` 필요) |
@@ -71,11 +72,13 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SCANOSS_API_KEY` | — | `SCANOSS_API_URL`이 요구하는 경우의 자격 증명 |
 | `SCANOSS_MIN_FILES` | `2` | 라이브러리를 보고하기 위해 매치돼야 하는 최소 파일 수. 단발성 다운스트림 포크 노이즈를 거른다. `1`로 두면 단일 파일 매치도 모두 유지 |
 | `GIT_TOKEN` | — | 비공개 git 저장소 클론에 쓰는 토큰 |
-| `HF_TOKEN` | — | `--model`에 쓰는 HuggingFace read 토큰. 비공개·게이트 모델 저장소에 필요하며, 모델을 공개하기 전 검토할 때 쓴다. `HUGGING_FACE_HUB_TOKEN`도 별칭으로 받는다 |
+| `HF_TOKEN` | — | `--model`과 AI SBOM 분석의 데이터셋 메타데이터 조회에 쓰는 HuggingFace read 토큰. 비공개·게이트 저장소에 필요하며, 모델을 공개하기 전 검토할 때 쓴다. `HUGGING_FACE_HUB_TOKEN`도 별칭으로 받는다 |
 | `ENRICH_HF_SECURITY` | `true` | `--model` 스캔에서 HuggingFace가 자체 실행한 파일 보안 스캔 결과(파일별 ClamAV·picklescan)를 읽어 ML-BOM에 기록한다. 메타데이터만 읽고 파일은 내려받지 않는다. `false`면 조회를 건너뛴다 |
 | `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
 | `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
+| `SECURITY_NVD_VERIFY` | `false` | `--deep-cve`와 함께: grype의 `nvd:cpe` 결과를 NVD 실시간 버전 범위와 대조해 범위 밖 오탐을 걸러낸다 (`NVD_API_KEY`와 네트워크 필요, 수 분 추가). 기본은 꺼짐 — 결과를 버리지 않고 버전 미검증으로 표시한다 |
+| `NVD_API_KEY` | — | `SECURITY_NVD_VERIFY`에 쓰는 NVD API 키. 컨테이너에 이름으로만 전달하며 명령줄에 노출하지 않는다 |
 | `API_URL` | — | 업로드 서버 주소(DT 서버 또는 TRUSCA base) |
 | `API_KEY` | — | 업로드 자격. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰임 |
 | `UPLOAD_TARGET` | `dependency-track` | 업로드 대상: `dependency-track` 또는 `trusca` |

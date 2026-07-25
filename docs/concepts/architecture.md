@@ -17,32 +17,7 @@ BomLens is a 2-stage pipeline in which two kinds of Docker images work together.
 - **Stage 1 — Generation**: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6); for container images, binaries, and directories, syft does.
 - **Stage 2 — Post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.
 
-```mermaid
-flowchart TB
-    subgraph S1["① Stage 1 — Generation (build the SBOM)"]
-        direction LR
-        SRC["Source code"] --> CDX["cdxgen<br/>(official per-language image)"]
-        IMG["Image / binary / directory"] --> SYFT["syft"]
-        CDX --> BOM[("bom.json<br/>CycloneDX 1.6")]
-        SYFT --> BOM
-    end
-
-    subgraph S2["② Stage 2 — Post-processing (bomlens image)"]
-        direction LR
-        NORM["normalize (jq)"] --> SCAN["scancode<br/>(opt-in)"]
-        SCAN --> NOTICE["notice (jq)"]
-        NOTICE --> TRIVY["Trivy<br/>(security)"]
-        TRIVY --> SIGN["cosign<br/>(signing)"]
-    end
-
-    BOM --> NORM
-    SIGN --> OUT["Host artifacts"]
-    SIGN -.upload (optional).-> DT["Dependency-Track"]
-
-    style S1 fill:#e3f2fd,stroke:#1976d2
-    style S2 fill:#f1f8e9,stroke:#689f38
-    style BOM fill:#fff9c4,stroke:#fbc02d
-```
+![BomLens two-stage pipeline: per-language cdxgen images or syft build bom.json, and the bomlens image post-processes it](../images/diagrams/architecture-overview.png)
 
 The single entry point for orchestration is `scripts/scan-sbom.sh` (`scan-sbom.bat` on Windows); this is the only script users invoke.
 
@@ -88,50 +63,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 
 The **order** in which tools are invoked, in one diagram. Dashed boxes are optional steps enabled by flags.
 
-```mermaid
-flowchart TD
-    Start([Run scan-sbom.sh]) --> Detect{Detect target type}
-
-    %% ---- Stage 1 ----
-    Detect -->|directory = source| Lang["Detect language → pull image"]
-    Detect -->|image/file/RootFS| Syft
-
-    Lang --> Prep["1 build-prep.sh<br/>cargo·go·bundle·mvn·pip"]
-    Prep --> Cdxgen["2 cdxgen --spec-version 1.6"]
-    Syft["syft -o cyclonedx-json"] --> Bom
-    Cdxgen --> Bom[("bom.json")]
-
-    %% ---- Stage 2 ----
-    Bom --> Norm["3 normalize-sbom.sh (jq)<br/>· always runs"]
-    Norm --> DeepQ{--deep-license?}
-    DeepQ -->|yes| Scancode["4 scancode<br/>1st-party licenses"]
-    DeepQ -->|no| NoticeQ
-    Scancode --> NoticeQ{--notice / --all?}
-    NoticeQ -->|yes| Notice["5 generate-notice.sh (jq)<br/>NOTICE.txt / .html"]
-    NoticeQ -->|no| SecQ
-    Notice --> SecQ{--security / --all?}
-    SecQ -->|yes| Trivy["6 scan-security.sh<br/>Trivy → json/md/html"]
-    SecQ -->|no| SignQ
-    Trivy --> SignQ{--sign?}
-    SignQ -->|yes| Cosign["7 cosign sign-blob<br/>bom.json.sig"]
-    SignQ -->|no| Copy
-    Cosign --> Copy["8 Copy artifacts to host<br/>· always runs"]
-
-    Copy --> UploadQ{Upload?}
-    UploadQ -->|default| Upload["9 curl → Dependency-Track"]
-    UploadQ -->|--generate-only| Done
-    Upload --> Done([Done])
-
-    style Prep fill:#e3f2fd
-    style Cdxgen fill:#e3f2fd
-    style Syft fill:#e3f2fd
-    style Bom fill:#fff9c4
-    style Scancode stroke-dasharray: 4 4
-    style Notice stroke-dasharray: 4 4
-    style Trivy stroke-dasharray: 4 4
-    style Cosign stroke-dasharray: 4 4
-    style Upload stroke-dasharray: 4 4
-```
+![Full tool order: build-prep and cdxgen, or syft, produce bom.json, then the numbered post-processing steps run through upload](../images/diagrams/architecture-full-pipeline.png)
 
 The sequence from the user's invocation through post-processing:
 
@@ -217,33 +149,7 @@ Two steps run inside the image:
 
 The `bomlens` image's entry point `run-scan` (`docker/entrypoint.sh`) takes the SBOM and runs the steps in a **fixed order**. Each step is enabled by an environment variable (equivalent to a CLI flag), and outputs accumulate in the `ARTIFACTS` list.
 
-```mermaid
-flowchart TD
-    A["Obtain SBOM<br/>(POSTPROCESS: Stage 1 output / otherwise: syft)"] --> B
-    B["① normalize-sbom.sh (jq) — always<br/>--stable when BYTE_STABLE"] --> C
-    C{"② DEEP_LICENSE<br/>&& /src exists"} -->|yes| C1["scancode → _scancode.json"]
-    C -->|no| D
-    C1 --> D
-    D{"③ GENERATE_NOTICE"} -->|yes| D1["generate-notice.sh →<br/>_NOTICE.txt / .html"]
-    D -->|no| E
-    D1 --> E
-    E{"④ GENERATE_SECURITY"} -->|yes| E1["scan-security.sh (Trivy) →<br/>_security.json / .md / .html"]
-    E -->|no| F
-    E1 --> F
-    F{"⑤ SIGN_SBOM<br/>&& COSIGN_KEY"} -->|yes| F1["cosign sign-blob →<br/>bom.json.sig"]
-    F -->|no| R
-    F1 --> R
-    R{"⑥ GENERATE_REPORT<br/>(on by default)"} -->|yes| R1["generate-risk-report.sh →<br/>_risk-report.md / .html"]
-    R -->|--no-report| G
-    R1 --> G
-    G["⑦ Copy artifacts to host — always"] --> H
-    H{"⑧ UPLOAD_ENABLED"} -->|default| H1["curl → TRUSCA"]
-    H -->|"false (--generate-only)"| Z([End])
-    H1 --> Z
-
-    style B fill:#f1f8e9
-    style G fill:#f1f8e9
-```
+![Stage 2 post-processing: eight fixed steps from normalize to upload, each gated by its environment variable](../images/diagrams/architecture-stage2-steps.png)
 
 Step details:
 
