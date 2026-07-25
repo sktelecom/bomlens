@@ -284,10 +284,10 @@
         <div class="content">
            <ul class="points">
              <li><b>No account, no server</b> — nothing you scan is uploaded.</li>
-             <li><b>One Docker image → 9 scan modes</b> — source, containers,
+             <li><b>One Docker image → 8 scan modes</b> — source, containers,
                  binaries, firmware, received SBOMs, AI models.</li>
-             <li><b>Three ways in</b> — CLI, a browser UI, a double-click
-                 desktop app.</li>
+             <li><b>Three ways in</b> — a double-click desktop app, a browser
+                 UI, the CLI.</li>
              <li><b>Bilingual</b> — full docs in English and Korean.</li>
            </ul>
            <p class="boundary">Not a governance portal · not SaaS · not a
@@ -336,13 +336,13 @@
     <section class="slide" data-kind="live" data-index="5"
              data-notes-id="note-5">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 1 of 5</span></div>
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 1 of 6</span></div>
         <h2 class="headline">One folder → a full SBOM</h2>
         <div class="content">
-           <p class="lede">A Java/Maven project folder, in the browser. No
+           <p class="lede">A Java/Maven project folder, in the desktop app. No
            command line. SBOM, open-source notice and security report in a
            single run.</p>
-           <p class="cue">Switch to the web UI · scan the current folder</p>
+           <p class="cue">Open the desktop app · pick the project folder</p>
          </div>
         
       </div>
@@ -352,7 +352,7 @@
     <section class="slide" data-kind="live" data-index="6"
              data-notes-id="note-6">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 2 of 5</span></div>
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 2 of 6</span></div>
         <h2 class="headline">What the scan tells you</h2>
         <div class="content">
            <p class="lede">Components. Vulnerabilities with EPSS and CISA&nbsp;KEV.
@@ -367,31 +367,58 @@
     <section class="slide" data-kind="live" data-index="7"
              data-notes-id="note-7">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 3 of 5</span></div>
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 3 of 6</span></div>
         <h2 class="headline">14 lines in, 39 components out</h2>
         <div class="content">
-           <p class="lede">requirements.txt pins <b>14</b> direct dependencies —
-           no lockfile. A real install inside the container surfaces
-           <b>39</b> components, transitive versions exact.</p>
-           <p class="cue">requirements.txt: 14 lines · scan in the browser · 39 components</p>
-           <p class="evidence">Measured independently: on the same no-lockfile
-           Python case, the OpenChain Korea WG SCA benchmark has syft, cdxgen and
-           trivy stop at the <b>4</b> direct pins — BomLens resolves <b>11</b>.</p>
+           <p class="lede">A public repo pins <b>14</b> direct dependencies —
+           no lockfile, no local checkout. A real install inside the container
+           surfaces <b>39</b> components, transitive versions exact.</p>
+           <p class="cue">same app · paste a Git URL · 39 components</p>
+           <p class="evidence">Independently, on <b>another</b> no-lockfile
+           Python project, the OpenChain Korea WG SCA benchmark has syft, cdxgen
+           and trivy stop at its <b>4</b> direct pins — BomLens resolves
+           <b>11</b>.</p>
          </div>
         
       </div>
     </section>
     <template id="note-7"></template>
 
-    <section class="slide" data-kind="live" data-index="8"
+    <section class="slide" data-kind="reg" data-index="8"
              data-notes-id="note-8">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 4 of 5</span></div>
-        <h2 class="headline">Validate what a supplier sent</h2>
+        <div class="eyebrow"><span class="ey-text">Where this lands</span></div>
+        <h2 class="headline">The rules are arriving now</h2>
         <div class="content">
-           <p class="lede">The reason this exists. Take an SBOM you received,
-           check it against your criteria, and see exactly what's missing.</p>
-           <p class="cue">Upload an SBOM · read the conformance report</p>
+           <div class="reg-cols">
+             <div class="reg-col">
+               <div class="reg-label reg-now">Checked today</div>
+               <ul class="reg-list">
+                 <li><b>SBOM minimum elements</b>
+                   <span class="reg-when">EU CRA (BSI TR-03183-2) &amp; US NTIA fields, PURL &amp; dependency coverage · crosswalked live in demo 4</span></li>
+                 <li><b>G7 minimum elements for AI</b>
+                   <span class="reg-when">51 checks · 41 automated, 10 for human review</span></li>
+                 <li><b>EU AI Act</b> — Annex IV crosswalk
+                   <span class="reg-when">obligations from 2 Aug 2026 · 23 elements mapped</span></li>
+                 <li><b>Korea AI Framework Act</b> — Articles 31–35
+                   <span class="reg-when">in force since 22 Jan 2026</span></li>
+               </ul>
+             </div>
+             <div class="reg-col">
+               <div class="reg-label reg-next">Beyond an SBOM</div>
+               <ul class="reg-list">
+                 <li><b>EU CRA</b> — vulnerability handling &amp; reporting
+                   <span class="reg-when">manufacturer process duties, not SBOM fields</span></li>
+                 <li><b>EU AI Act</b> — risk, bias &amp; fairness assessment
+                   <span class="reg-when">separate documentation an SBOM can't carry</span></li>
+               </ul>
+               <p class="reg-open">The crosswalk maps only what an SBOM can express.</p>
+             </div>
+           </div>
+           <p class="stamp">A regulation lands on a customer; the customer passes
+           it to its suppliers as "send us an SBOM." <b>So the next two demos
+           check an SBOM against exactly these rules — it makes gaps visible, it
+           does not certify compliance.</b></p>
          </div>
         
       </div>
@@ -401,7 +428,24 @@
     <section class="slide" data-kind="live" data-index="9"
              data-notes-id="note-9">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 5 of 5</span></div>
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 4 of 6</span></div>
+        <h2 class="headline">Validate what a supplier sent</h2>
+        <div class="content">
+           <p class="lede">Two SBOMs a supplier might send. One in <b>SPDX</b>
+           fails the minimum elements — no version, PURLs on 25%, no dependency
+           graph. One in <b>CycloneDX</b> passes — yet carries <b>6 critical</b>
+           known-exploitable vulnerabilities. Completeness isn't safety.</p>
+           <p class="cue">Upload SPDX → the gaps · upload CycloneDX → the CVEs</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-9"></template>
+
+    <section class="slide" data-kind="live" data-index="10"
+             data-notes-id="note-10">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 5 of 6</span></div>
         <h2 class="headline">An SBOM for an AI model</h2>
         <div class="content">
            <p class="lede">A HuggingFace model → a CycloneDX ML-BOM, checked
@@ -413,66 +457,46 @@
         
       </div>
     </section>
-    <template id="note-9"></template>
-
-    <section class="slide" data-kind="reg" data-index="10"
-             data-notes-id="note-10">
-      <div class="slide-inner">
-        <div class="eyebrow"><span class="ey-text">Where this lands</span></div>
-        <h2 class="headline">The rules are arriving now</h2>
-        <div class="content">
-           <div class="reg-cols">
-             <div class="reg-col">
-               <div class="reg-label reg-now">Checked today</div>
-               <ul class="reg-list">
-                 <li><b>G7 minimum elements for AI</b>
-                   <span class="reg-when">51 checks · 41 automated, 10 for human review</span></li>
-                 <li><b>EU AI Act</b> — Annex IV crosswalk
-                   <span class="reg-when">obligations from 2 Aug 2026 · 23 elements mapped</span></li>
-                 <li><b>Korea AI Framework Act</b> — Articles 31–35
-                   <span class="reg-when">in force since 22 Jan 2026</span></li>
-               </ul>
-             </div>
-             <div class="reg-col">
-               <div class="reg-label reg-next">In development</div>
-               <ul class="reg-list">
-                 <li><b>EU Cyber Resilience Act</b>
-                   <span class="reg-when">reporting duties from Sep 2026</span></li>
-                 <li><b>US EO 14028 / NTIA minimum elements</b>
-                   <span class="reg-when">federal procurement baseline</span></li>
-               </ul>
-               <p class="reg-open">Open work — contributions welcome.</p>
-             </div>
-           </div>
-           <p class="stamp">A regulation lands on a customer; the customer passes
-           it to its suppliers as "send us an SBOM." That is where this tool
-           starts. <b>It makes gaps visible — it does not certify compliance.</b></p>
-         </div>
-        
-      </div>
-    </section>
     <template id="note-10"></template>
 
-    <section class="slide" data-kind="points" data-index="11"
+    <section class="slide" data-kind="live" data-index="11"
              data-notes-id="note-11">
       <div class="slide-inner">
-        <div class="eyebrow"><span class="ey-text">By design</span></div>
-        <h2 class="headline">Your code never leaves your machine</h2>
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 6 of 6</span></div>
+        <h2 class="headline">Close the loop: hand it to governance</h2>
         <div class="content">
-           <ul class="points">
-             <li><b>No upload, works air-gapped</b> — data stays on the host.</li>
-             <li><b>Standard output</b> — CycloneDX, portable to any tool.</li>
-             <li><b>One job, done well</b> — BomLens generates and assesses;
-                 org-wide governance is a separate portal's job.</li>
-           </ul>
+           <p class="lede">Local-first is deliberate — but one laptop can't
+           govern a whole supply chain. BomLens emits standard CycloneDX, so the
+           SBOM flows into any portal that reads it — here, TRUSCA by
+           TrustedOSS.</p>
+           <p class="cue">Upload the demo-1 SBOM to TRUSCA · read it back</p>
          </div>
         
       </div>
     </section>
     <template id="note-11"></template>
 
-    <section class="slide" data-kind="try" data-index="12"
+    <section class="slide" data-kind="statement" data-index="12"
              data-notes-id="note-12">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">Full circle</span></div>
+        <h2 class="headline">The mandate, now with a tool</h2>
+        <div class="content">
+           <p class="big">A regulation lands on a customer. The customer turns it
+           into "send us an SBOM." That request reaches a supplier with no
+           tooling — which is exactly where we started.</p>
+           <p class="big muted">The difference now is the tool. Your source never
+           leaves the laptop; the standard SBOM is the one thing built to travel
+           onward.</p>
+           <p class="turn">It makes gaps visible — it does not certify compliance.</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-12"></template>
+
+    <section class="slide" data-kind="try" data-index="13"
+             data-notes-id="note-13">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Try it</span></div>
         <h2 class="headline">One line to your first SBOM</h2>
@@ -488,10 +512,10 @@
         
       </div>
     </section>
-    <template id="note-12"></template>
+    <template id="note-13"></template>
 
-    <section class="slide" data-kind="thanks" data-index="13"
-             data-notes-id="note-13">
+    <section class="slide" data-kind="thanks" data-index="14"
+             data-notes-id="note-14">
       <div class="slide-inner">
         
         <h2 class="headline">Thank you</h2>
@@ -507,7 +531,7 @@
         
       </div>
     </section>
-    <template id="note-13"></template>
+    <template id="note-14"></template>
   <div class="foot">
     <span class="fmark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="BomLens">
   <defs>
@@ -527,7 +551,7 @@
     <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
   </g>
 </svg> <span>BomLens · SBOM for supply-chain security</span></span>
-    <span class="fnum"><span id="cur">1</span> / 13</span>
+    <span class="fnum"><span id="cur">1</span> / 14</span>
   </div>
   <div id="progress"></div>
 </div></div>
