@@ -43,7 +43,7 @@ MISSING_CAP=50                            # cap missing-item lists in the report
 # need it, while the plain dependency-SBOM submission range stays 1.3-1.6.
 CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6}"
 AI_CYCLONEDX_SPEC_VERSIONS="${AI_CYCLONEDX_SPEC_VERSIONS:-$CYCLONEDX_SPEC_VERSIONS 1.7}"
-SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3}"
+SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3 SPDX-3.0}"
 
 # Practical PURL shape gate (purl-spec): pkg:type/[namespace/]name@version
 # [?qualifiers][#subpath]. The segment charset tolerates the unencoded '@'
@@ -55,6 +55,13 @@ if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[validate] SBOM file not found: $SBOM" >&2
     exit 1
 fi
+
+# Normalize input encoding (UTF-16/BOM/stray preamble) so jq and grep see UTF-8.
+# Validation still runs against the original submission's content — only the
+# encoding is corrected, not the SBOM data.
+# shellcheck source=docker/lib/sbom-detect.sh
+. "$(dirname "$0")/sbom-detect.sh"
+SBOM="$(normalize_sbom_encoding "$SBOM" "$(dirname "$OUT_PREFIX")")"
 
 JSON="${OUT_PREFIX}_conformance.json"
 MD="${OUT_PREFIX}_conformance.md"
@@ -69,6 +76,8 @@ if jq -e '.bomFormat=="CycloneDX" and (.specVersion!=null)' "$SBOM" >/dev/null 2
     FORMAT="CycloneDX"
 elif jq -e '.spdxVersion!=null' "$SBOM" >/dev/null 2>&1; then
     FORMAT="SPDX-JSON"
+elif jq -e '(.["@context"]? // "" | tostring | test("spdx.org/rdf/3")) or (.["@graph"]? != null)' "$SBOM" >/dev/null 2>&1; then
+    FORMAT="SPDX-3.0"
 elif grep -q '^SPDXVersion:' "$SBOM" 2>/dev/null; then
     FORMAT="SPDX-TagValue"
 fi
@@ -420,6 +429,25 @@ case "$FORMAT" in
         fi
         ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;
+    SPDX-3.0)
+        # SPDX 3.0 is JSON-LD (@graph); the 2.x package/relationship shape the
+        # spdx_json checks read does not exist. Measure conformance on the
+        # CycloneDX that syft produces from it — the same converter the analysis
+        # pipeline uses — so PURL coverage, name/version, and transitive edges
+        # come from real component data instead of reading as all-zero.
+        SPDX3_CDX="${OUT_PREFIX}.spdx3-cdx.$$.json"
+        if command -v syft >/dev/null 2>&1 \
+           && syft convert "$SBOM" -o cyclonedx-json@1.6="$SPDX3_CDX" >/dev/null 2>&1 \
+           && [ -s "$SPDX3_CDX" ]; then
+            SBOM="$SPDX3_CDX"
+            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+            rm -f "$SPDX3_CDX"
+            echo "[validate] SPDX 3.0 measured via CycloneDX conversion"
+        else
+            echo "[validate] WARN: syft unavailable; SPDX 3.0 recognized but not measured" >&2
+            CHECKS='[{"id":"spec-version","label":"Spec version (SPDX-3.0)","required":true,"status":"pass","detail":"SPDX-3.0 (recognized; not measured without syft)","missing":[]}]'
+        fi
+        ;;
     SPDX-TagValue) CHECKS=$(spdx_tv_checks) ;;
     *)
         CHECKS='[{"id":"format","label":"Recognized SBOM format","required":true,"status":"fail","detail":"not CycloneDX or SPDX","missing":[]}]'

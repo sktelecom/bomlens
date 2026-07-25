@@ -73,6 +73,8 @@
     "scanossTokenHint": "The free OSSKB endpoint is rate-limited — fine for an occasional scan, but frequent runs may return nothing. For regular use, add a token from scanoss.com. Used once for this scan; never stored or logged.",
     "includeOsv": "More vulnerability advisories",
     "includeOsvHint": "Adds OSV.dev advisories to the firmware vulnerability match. The OSV database is not bundled in the image, so it downloads from osv.dev on this run (progress is shown below).",
+    "deepCve": "Deep CVE matching (maven, NVD)",
+    "deepCveHint": "Also checks older Java (Maven) libraries against NVD-only vulnerabilities that other sources miss. Takes longer.",
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "upload": "Upload to a server",
