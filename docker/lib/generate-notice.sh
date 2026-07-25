@@ -197,7 +197,7 @@ done)
         echo "================================================================================"
         echo "License review needed — AI / restrictive terms (human review required)"
         echo "================================================================================"
-        echo "behavioral-use = use-based restrictions (RAIL/Llama/Gemma 등); non-commercial = 상업적 사용 제한."
+        echo "behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use."
         echo "$REVIEW" | jq -r '.[] |
             "\n[\(.flag)] \(.license)  (\(.components|length) component(s)):",
             (.components[] | "  - \(.)")'
@@ -295,7 +295,7 @@ HTMLHEAD
     # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
     if [ "$REVIEW_N" -gt 0 ]; then
         echo '<div class="review"><h2>License review needed — AI / restrictive terms</h2>'
-        echo '<p class="meta">behavioral-use = use-based restrictions (RAIL/Llama/Gemma 등); non-commercial = restricted commercial use. Human review required.</p><ul>'
+        echo '<p class="meta">behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use. Human review required.</p><ul>'
         echo "$REVIEW" | jq -r '.[] |
             "<li><b>[" + (.flag|@html) + "]</b> " + (.license|@html) + " — "
             + (.components | map(@html) | join(", ")) + "</li>"'
