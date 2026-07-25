@@ -3,7 +3,7 @@
   "extends": ["config:recommended"],
   "enabledManagers": ["custom.regex"],
   "dependencyDashboard": true,
-  "labels": ["dependencies", "tool-upgrade"],
+  "labels": ["dependencies", "tool-upgrade", "run-heavy-e2e"],
   "commitMessagePrefix": "chore(deps):",
   "prConcurrentLimit": 5,
   "separateMajorMinor": true,

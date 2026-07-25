@@ -245,7 +245,11 @@ jobs:
   #   - full-e2e / docs-walkthrough: main pushes and dispatch (scanner PRs
   #     already run the real-Docker integration suite); the nightly run bounds
   #     drift on quiet days to 24h. A PR can opt in by adding the
-  #     run-heavy-e2e label (e.g. a risky scanner or docs change).
+  #     run-heavy-e2e label (e.g. a risky scanner or docs change). Renovate
+  #     applies that label to every tool-pin bump (renovate.json manages only
+  #     the scanner tool ARGs / cdxgen images), so a version bump that quietly
+  #     shrinks the SBOM is caught by the component-count checks in full-e2e
+  #     instead of merging on the default checks alone.
   web-e2e:
     name: Web UI E2E
     needs: [changes]
