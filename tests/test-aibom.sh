@@ -539,6 +539,64 @@ ENRICH_HF_SECURITY=false HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=fals
 bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
 [ "$(mprop bomlens:assessment:axes)" = "license" ] && pass "the security axis is omitted, not guessed, when unavailable" || fail "axes='$(mprop bomlens:assessment:axes)'"
 
+echo "== dataset tag signals and visibility feed the datasets axis =="
+# A publisher tag like "pii" is a declared risk marker; a gated repository is
+# an access restriction. Both must reach the dataset entry and roll up into
+# the model, without a tagless dataset ever being called clean.
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64)], gated=False, private=False, tags=[],
+    card_data={"datasets": ["org/pii-ds", "org/gated-ds"], "license": "apache-2.0"},
+)
+PII_DS = _Info(
+    siblings=[_S("data.parquet", "b" * 64)], private=False, gated=False,
+    sha="feedface12345678", tags=["pii", "language:en"],
+    card_data={"license": "cc-by-4.0"},
+)
+GATED_DS = _Info(
+    siblings=[], private=False, gated="manual", sha="0123456789abcdef",
+    card_data={"license": "cc-by-4.0"},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        return PII_DS if did == "org/pii-ds" else GATED_DS
+
+    def list_repo_tree(self, mid, expand=False):
+        return []
+STUB
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/sig.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/sig.json" google-bert/bert-base-uncased >/dev/null 2>&1
+sigv=$(jq -r '[.components[] | select(.name=="org/pii-ds") | .properties[]? | select(.name=="bomlens:dataset:signal") | .value] | join(",")' "$WORK/sig.json")
+[ "$sigv" = "pii" ] && pass "a pii tag is stamped as a dataset signal" || fail "signal='$sigv', expected pii"
+tagf=$(jq -r '[.components[] | select(.name=="org/pii-ds") | .data[]?.contents.properties[]? | select(.name=="hf:tags") | .value] | first // ""' "$WORK/sig.json")
+case "$tagf" in *pii*) pass "the raw tags ride along as an hf:tags facet" ;; *) fail "hf:tags facet='$tagf'" ;; esac
+bash "$LIB/assess-ai-risk.sh" "$WORK/sig.json" >/dev/null 2>&1
+piiv=$(jq -r '.components[] | select(.name=="org/pii-ds") | .properties[] | select(.name=="bomlens:assessment:signals") | .value' "$WORK/sig.json")
+[ "$piiv" = "caution" ] && pass "the pii signal assesses the dataset caution" || fail "pii dataset signals axis='$piiv', expected caution"
+gatv=$(jq -r '.components[] | select(.name=="org/gated-ds") | .properties[] | select(.name=="bomlens:assessment:signals") | .value' "$WORK/sig.json")
+[ "$gatv" = "review" ] && pass "a gated dataset assesses review (access-restricted)" || fail "gated dataset signals axis='$gatv', expected review"
+mdax=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:datasets") | .value' "$WORK/sig.json")
+[ "$mdax" = "caution" ] && pass "the model datasets axis takes the worst dataset verdict" || fail "model datasets axis='$mdax', expected caution"
+mre=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/sig.json")
+case "$mre" in *"org/pii-ds"*) pass "the offending dataset is named in the model reasons" ;; *) fail "model reasons='$mre'" ;; esac
+
 echo "== resolved dataset components carry the dataset cluster =="
 # enrich-aibom.sh resolves every dataset the model card names into a CycloneDX
 # `data` component (license, digests, upstream) linked through dependencies[].

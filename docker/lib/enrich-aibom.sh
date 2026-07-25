@@ -49,6 +49,12 @@ if [ -z "$MODEL_ID" ]; then
     exit 0
 fi
 
+# Hand the curated registry path to the Python step: the dataset tag-signal
+# mapping (pii, not-for-all-audiences, …) lives there, shared with
+# assess-ai-risk.sh so stamping and judging never disagree. Overridable for
+# tests, absent file tolerated.
+export AI_RISK_KNOWLEDGE="${AI_RISK_KNOWLEDGE:-$(dirname "$0")/ai-risk-knowledge.json}"
+
 # Locate cdxgen so the Python step can decide whether to harvest pedigree/metrics.
 # ENRICH_CDXGEN=false disables the harvest (it makes a network call and is off by
 # default in offline test runs); HuggingFace hash/openness enrichment still runs.
@@ -66,6 +72,22 @@ import json, os, subprocess, sys, tempfile
 sbom_path, model_id, cdxgen_bin = sys.argv[1], sys.argv[2], sys.argv[3]
 
 WEIGHT_EXTS = (".safetensors", ".bin", ".gguf", ".pt", ".pth", ".onnx", ".h5", ".ckpt", ".msgpack")
+
+# Dataset tag signals from the curated registry (ai-risk-knowledge.json,
+# path handed in by the bash wrapper): a card tag like "pii" or
+# "not-for-all-audiences" is a risk marker the assessment reads. The mapping
+# lives in the registry, not here, so the two never disagree; a missing
+# registry just means no signals are stamped.
+TAG_SIGNALS = {}
+try:
+    _kb_path = os.environ.get("AI_RISK_KNOWLEDGE", "")
+    if _kb_path and os.path.isfile(_kb_path):
+        with open(_kb_path) as _f:
+            TAG_SIGNALS = {str(e.get("tag", "")).lower(): str(e.get("signal", ""))
+                           for e in (json.load(_f).get("datasetTagSignals") or [])
+                           if e.get("tag") and e.get("signal")}
+except Exception as e:
+    print(f"[enrich] tag-signal registry unreadable ({e}); no signals stamped.", file=sys.stderr)
 
 with open(sbom_path) as f:
     sbom = json.load(f)
@@ -217,6 +239,21 @@ def build_dataset_component(api, ds_id):
         if isinstance(val, list):
             val = ", ".join(str(v) for v in val if v is not None)
         facets.append({"name": "hf:" + key, "value": str(val)[:200]})
+    # Risk-relevant card tags: recorded verbatim as a facet, and matched
+    # against the registry's tag signals (pii, not-for-all-audiences, …) so
+    # the assessment can read them. A tag is the publisher's own marker — its
+    # absence proves nothing, so only presence is ever stamped.
+    all_tags = [str(t) for t in (getattr(info, "tags", None) or []) if t is not None]
+    card_tags = card_get(info, "tags")
+    if isinstance(card_tags, list):
+        all_tags += [str(t) for t in card_tags if t is not None]
+    all_tags = list(dict.fromkeys(all_tags))
+    if all_tags:
+        facets.append({"name": "hf:tags", "value": ", ".join(all_tags)[:300]})
+    for tag in dict.fromkeys(t.lower() for t in all_tags):
+        sig = TAG_SIGNALS.get(tag)
+        if sig:
+            props.append({"name": "bomlens:dataset:signal", "value": sig})
     if facets:
         cdata["contents"]["properties"] = facets
 
