@@ -308,9 +308,19 @@ def copy_scan_target_tree(src, dest):
     to a host mount (host_path_of), letting the sibling cdxgen container see it via
     --volumes-from, exactly like the current-dir path. The user's folder is never
     touched. Returns the destination root."""
+    # Barrier at the filesystem sink: re-resolve and confirm the source stays
+    # inside an allowed scan root. safe_scan_dir already did this on the caller's
+    # side, but keeping realpath + containment local to the copy stops any future
+    # caller from feeding an unchecked path here — and it is the sanitizer the
+    # py/path-injection analysis recognizes, so the taint is provably cleared.
+    real_src = os.path.realpath(src)
+    if not any(real_src == os.path.realpath(r) or real_src.startswith(os.path.realpath(r) + os.sep)
+               for r in ALLOWED_SCAN_ROOTS):
+        raise ValueError("scan source resolves outside the allowed scan roots")
+
     def _ignore(_dir, names):
         return [n for n in names if n in _DEEP_COPY_SKIP]
-    shutil.copytree(src, dest, ignore=_ignore, symlinks=True,
+    shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
                     ignore_dangling_symlinks=True, dirs_exist_ok=True)
     return dest
 
