@@ -47,6 +47,17 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: [version-update:semver-major]
+      # @playwright/test is coupled to the pinned mcr.microsoft.com/playwright
+      # container the visual-regression and guide-screenshot jobs run in
+      # (.github/workflows/ci.yml, docker/web/frontend/README.md): the image bakes
+      # the matching browser build, so a bump here without moving the image tag in
+      # lockstep breaks with "Executable doesn't exist". Hold even minor/patch for a
+      # deliberate, baseline-reseeded upgrade rather than batching it with cosmetic
+      # font/CSS deps.
+      - dependency-name: "@playwright/test"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
 
   # Base images for the post-process scanner image. Hold base-image majors
   # (e.g. node, python) for a deliberate, tested bump.
