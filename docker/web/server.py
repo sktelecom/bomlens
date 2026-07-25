@@ -2355,15 +2355,23 @@ class Handler(BaseHTTPRequestHandler):
                 if not scan_dir:
                     fail("Invalid or out-of-bounds directory path (must be a "
                          "picked scan-target folder)"); return
-                if not any(scan_dir == r["path"] or scan_dir.startswith(r["path"] + os.sep)
-                           for r in EXTRA_SCAN_ROOTS):
+                # The request only selects WHICH registered scan root to build.
+                # Copy from that root's own recorded path (from EXTRA_SCAN_ROOTS,
+                # set by the desktop app / --mount), never from the request-derived
+                # path — a deep scan always builds the whole picked folder, and
+                # sourcing the server's own record keeps request input out of the
+                # copytree sink.
+                picked = next((r for r in EXTRA_SCAN_ROOTS
+                               if scan_dir == r["path"] or scan_dir.startswith(r["path"] + os.sep)),
+                              None)
+                if picked is None:
                     fail("Deep source scan is only available for an added folder "
                          "(the current folder already scans deep)."); return
                 cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
                 sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
-                                      % os.path.basename(scan_dir.rstrip("/"))))
+                                      % os.path.basename(picked["path"].rstrip("/"))))
                 try:
-                    copy_scan_target_tree(scan_dir, cleanup_dir)
+                    copy_scan_target_tree(picked["path"], cleanup_dir)
                 except (OSError, shutil.Error) as exc:
                     fail("could not prepare the folder for a deep scan: %s" % exc)
                     return
