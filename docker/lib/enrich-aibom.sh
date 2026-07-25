@@ -67,27 +67,54 @@ fi
 # Each feature is guarded independently; a failure in one leaves the others (and
 # the original SBOM) intact.
 python3 - "$SBOM" "$MODEL_ID" "$CDXGEN_BIN" <<'PY' || echo "[enrich] enrichment skipped (python/network/tool unavailable)" >&2
-import json, os, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile
 
 sbom_path, model_id, cdxgen_bin = sys.argv[1], sys.argv[2], sys.argv[3]
 
 WEIGHT_EXTS = (".safetensors", ".bin", ".gguf", ".pt", ".pth", ".onnx", ".h5", ".ckpt", ".msgpack")
 
-# Dataset tag signals from the curated registry (ai-risk-knowledge.json,
-# path handed in by the bash wrapper): a card tag like "pii" or
-# "not-for-all-audiences" is a risk marker the assessment reads. The mapping
-# lives in the registry, not here, so the two never disagree; a missing
-# registry just means no signals are stamped.
-TAG_SIGNALS = {}
+# Curated registry (ai-risk-knowledge.json, path handed in by the bash
+# wrapper): dataset tag signals, custom-license text patterns, and the
+# license-terms entries the lineage check needs. All judgement data lives in
+# the registry, not here, so this stamping and assess-ai-risk.sh can never
+# disagree; a missing registry just means the extra signals are not stamped.
+KB = {}
 try:
     _kb_path = os.environ.get("AI_RISK_KNOWLEDGE", "")
     if _kb_path and os.path.isfile(_kb_path):
         with open(_kb_path) as _f:
-            TAG_SIGNALS = {str(e.get("tag", "")).lower(): str(e.get("signal", ""))
-                           for e in (json.load(_f).get("datasetTagSignals") or [])
-                           if e.get("tag") and e.get("signal")}
+            KB = json.load(_f)
 except Exception as e:
-    print(f"[enrich] tag-signal registry unreadable ({e}); no signals stamped.", file=sys.stderr)
+    print(f"[enrich] risk registry unreadable ({e}); registry-driven signals skipped.", file=sys.stderr)
+TAG_SIGNALS = {str(e.get("tag", "")).lower(): str(e.get("signal", ""))
+               for e in (KB.get("datasetTagSignals") or [])
+               if e.get("tag") and e.get("signal")}
+CUSTOM_PATTERNS = KB.get("customLicensePatterns") or []
+LICENSE_TERMS = KB.get("licenseTerms") or []
+
+
+def _norm_lic(s):
+    return re.sub(r"[ ._/-]+", " ", str(s or "").lower()).strip()
+
+
+def _match_term(lic):
+    """First registry entry matching a license string — ids exactly, then the
+    match regexes in registry order (mirrors assess-ai-risk.sh)."""
+    n = _norm_lic(lic)
+    if not n:
+        return None
+    for t in LICENSE_TERMS:
+        if any(_norm_lic(i) == n for i in (t.get("ids") or [])):
+            return t
+    for t in LICENSE_TERMS:
+        rx = t.get("match")
+        if rx:
+            try:
+                if re.search(rx, n):
+                    return t
+            except re.error:
+                pass
+    return None
 
 with open(sbom_path) as f:
     sbom = json.load(f)
@@ -450,6 +477,108 @@ if hf_info is not None:
             scan_props.append({"name": "bomlens:hf:scan:status", "value": "unavailable"})
             scan_props.append({"name": "bomlens:hf:scan:source", "value": "huggingface-api"})
 
+    # ---- Custom license text (license: other) -------------------------------
+    # A model tagged "other" keeps its terms in the repository's LICENSE file.
+    # Reading that one small text file (capped, still no weight download) lets
+    # the assessment quote the restrictive wording instead of saying only
+    # "unclassified". No match does NOT mean no restriction — the scan can
+    # only raise concerns, so the property says "no-known-restriction" and the
+    # verdict stays review either way.
+    lic_props = []
+    model_license = card_get(hf_info, "license")
+    if isinstance(model_license, list):
+        model_license = model_license[0] if model_license else None
+    if str(model_license or "").lower() == "other":
+        LICENSE_TEXT_CAP = 256 * 1024
+        lic_file = next((n for n in filenames
+                         if re.match(r"^license([._-].*)?$", n.rsplit("/", 1)[-1], re.IGNORECASE)), None)
+        lic_name = card_get(hf_info, "license_name")
+        if lic_name:
+            lic_props.append({"name": "bomlens:license:customName", "value": str(lic_name)[:120]})
+        text = ""
+        if lic_file:
+            try:
+                from huggingface_hub import hf_hub_download
+                _p = hf_hub_download(model_id, lic_file)
+                with open(_p, "r", errors="replace") as fh:
+                    text = fh.read(LICENSE_TEXT_CAP)
+            except Exception as e:
+                print(f"[enrich] custom license text unavailable: {e}", file=sys.stderr)
+        else:
+            print("[enrich] license tagged other but no LICENSE file found.", file=sys.stderr)
+        if text:
+            RANKS = {"ok": 1, "conditional": 2, "review": 3, "caution": 4}
+            flat = re.sub(r"\s+", " ", text)
+            hits, worst = [], "review"
+            for pat in CUSTOM_PATTERNS:
+                rx = pat.get("pattern")
+                if not rx:
+                    continue
+                try:
+                    m = re.search(rx, flat, re.IGNORECASE)
+                except re.error:
+                    continue
+                if m:
+                    quote = flat[m.start():m.start() + 200].strip()
+                    hits.append(f"{pat.get('label', rx)}: \"{quote}\"")
+                    v = str(pat.get("verdict", "review"))
+                    if RANKS.get(v, 3) > RANKS.get(worst, 3):
+                        worst = v
+            if hits:
+                lic_props.append({"name": "bomlens:license:customScan", "value": "matched"})
+                lic_props.append({"name": "bomlens:license:customScan:verdict", "value": worst})
+                lic_props.append({"name": "bomlens:license:customScan:quote", "value": "; ".join(hits)[:500]})
+            else:
+                lic_props.append({"name": "bomlens:license:customScan", "value": "no-known-restriction"})
+            lic_props.append({"name": "bomlens:license:customScan:file", "value": lic_file})
+            print(f"[enrich] custom license text scanned: {len(hits)} restrictive pattern(s).", file=sys.stderr)
+
+    # ---- Base-model lineage -------------------------------------------------
+    # A fine-tune inherits its base model's terms even when its own tag says
+    # otherwise — a common mislabeling on the hub. Walk the base_model chain
+    # (depth-capped, cycle-guarded, one light metadata call per ancestor) and
+    # flag an ancestor whose license the registry marks inheritable when this
+    # model declares something else.
+    lineage_props = []
+    _base = card_get(hf_info, "base_model")
+    _bases = _base if isinstance(_base, list) else ([_base] if _base else [])
+    if _bases:
+        chain, visited = [], {model_id}
+        own_term = _match_term(model_license)
+        conflict = None
+        cur, depth = str(_bases[0]), 0
+        while cur and cur not in visited and depth < 5:
+            visited.add(cur)
+            depth += 1
+            try:
+                binfo = hf_api.model_info(cur)
+            except Exception as e:
+                print(f"[enrich] lineage: {cur} unreadable: {e}", file=sys.stderr)
+                chain.append(f"{cur}:unreadable")
+                break
+            blic = card_get(binfo, "license")
+            if isinstance(blic, list):
+                blic = blic[0] if blic else None
+            chain.append(f"{cur}:{blic or 'none'}")
+            bterm = _match_term(blic)
+            if conflict is None and bterm and bterm.get("inheritable") \
+               and (own_term is None or own_term.get("key") != bterm.get("key")):
+                conflict = (cur, str(blic))
+            nxt = card_get(binfo, "base_model")
+            if isinstance(nxt, list):
+                nxt = nxt[0] if nxt else None
+            cur = str(nxt) if nxt else None
+        if chain:
+            lineage_props.append({"name": "bomlens:lineage:chain", "value": " > ".join(chain)[:500]})
+            lineage_props.append({"name": "bomlens:lineage:rootLicense",
+                                  "value": chain[-1].rsplit(":", 1)[-1]})
+            if conflict:
+                lineage_props.append({"name": "bomlens:lineage:conflict", "value": "true"})
+                lineage_props.append({"name": "bomlens:lineage:conflictWith",
+                                      "value": f"{conflict[0]} ({conflict[1]})"})
+            print(f"[enrich] lineage: {len(chain)} ancestor(s), "
+                  f"conflict={'yes' if conflict else 'no'}.", file=sys.stderr)
+
     for m in models:
         if weight_hashes:
             existing = m.get("hashes") or []
@@ -462,11 +591,15 @@ if hf_info is not None:
         # Replace any prior openness/scan/weights properties so re-runs stay
         # idempotent (same contract as the DATASET_MARK components below).
         props = [p for p in (m.get("properties") or [])
-                 if not str(p.get("name", "")).startswith(("openness:", "bomlens:hf:scan:", "bomlens:weights:"))]
+                 if not str(p.get("name", "")).startswith(
+                     ("openness:", "bomlens:hf:scan:", "bomlens:weights:",
+                      "bomlens:license:", "bomlens:lineage:"))]
         for name, value in openness.items():
             props.append({"name": name, "value": value})
         props.extend(scan_props)
         props.extend(weights_props)
+        props.extend(lic_props)
+        props.extend(lineage_props)
         m["properties"] = props
     print(f"[enrich] HuggingFace: {len(weight_hashes)} weight hash(es), openness assessed "
           f"(weights={openness['openness:weights']}).", file=sys.stderr)

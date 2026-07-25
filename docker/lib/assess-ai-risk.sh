@@ -89,6 +89,26 @@ jq --slurpfile kb "$KB" '
             reasons: ($per | map(.r)) }
       end;
 
+  # Extra license evidence for a model: the custom-license text scan and the
+  # base-model lineage check enrich-aibom.sh stamped. A matched restrictive
+  # wording carries its own verdict and the quoted text; a clean scan still
+  # reads review (a pattern miss proves nothing); an inheritable ancestor
+  # license the model does not declare is a known conflict (caution).
+  def assess_license_extras($p):
+    ($p | map(select(.name == "bomlens:license:customScan"))         | (.[0].value // "")) as $cs
+    | ($p | map(select(.name == "bomlens:license:customScan:verdict")) | (.[0].value // "review")) as $cv
+    | ($p | map(select(.name == "bomlens:license:customScan:quote"))   | (.[0].value // "")) as $cq
+    | ($p | map(select(.name == "bomlens:lineage:conflict"))           | (.[0].value // "")) as $lc
+    | ($p | map(select(.name == "bomlens:lineage:conflictWith"))       | (.[0].value // "")) as $lw
+    | (if $cs == "matched" then
+         [{ v: $cv, r: "custom license text: restrictive wording found — \($cq) (\($cv))" }]
+       elif $cs == "no-known-restriction" then
+         [{ v: "review", r: "custom license text: no known restrictive wording matched; human review still required (review)" }]
+       else [] end)
+    + (if $lc == "true" then
+         [{ v: "caution", r: "lineage: conditions of base model \($lw) may be inherited but are not declared here (caution)" }]
+       else [] end);
+
   # File-security axis for a model: read the bomlens:hf:scan:* /
   # bomlens:weights:* properties enrich-aibom.sh stamped from HuggingFace own
   # scan results (ClamAV + picklescan). null when nothing was recorded — the
@@ -152,7 +172,11 @@ jq --slurpfile kb "$KB" '
   | (.components) |= (if type == "array" then map(
       if .type == "machine-learning-model" then
         (.properties // []) as $p0
-        | (assess_license) as $a
+        | (assess_license) as $a0
+        | (assess_license_extras($p0)) as $ex
+        | { verdict: (([$a0.verdict] + ($ex | map(.v))) | max_by(vrank[.])),
+            keys: $a0.keys,
+            reasons: ($a0.reasons + ($ex | map(.r))) } as $a
         | (assess_security($p0)) as $s
         | (["license"]
            + (if $s != null then ["security"] else [] end)
