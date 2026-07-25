@@ -627,9 +627,9 @@ JSON
 python3 "$OSCTX" "$WORK/osc-rocky.json" >/dev/null 2>&1
 osc_rv=$(jq -r '[.components[]|select(.type=="operating-system")]|.[0].version' "$WORK/osc-rocky.json")
 [ "$osc_rv" = "8" ] && pass "existing 'rocky 8.10' normalized to major '8'" || fail "rocky version='$osc_rv', expected '8'"
-# (d) no-op guards: a maven-only SBOM and a deb-only SBOM get NO synthesized OS
-# (deb is recovered by the OSV engine, not by an OS component; unknown distros are
-# never guessed).
+# (d) no-op guards: a maven-only SBOM (no distro packages) and a deb PURL with no
+# `distro=` version qualifier get NO synthesized OS — the OS version is never
+# guessed. (deb/apk WITH a qualifier are covered positively in (e) below.)
 cat > "$WORK/osc-maven.json" <<'JSON'
 {"bomFormat":"CycloneDX","specVersion":"1.6","components":[
  {"type":"library","name":"guava","version":"22.0","purl":"pkg:maven/com.google.guava/guava@22.0"}]}
@@ -643,7 +643,38 @@ cat > "$WORK/osc-deb.json" <<'JSON'
 JSON
 python3 "$OSCTX" "$WORK/osc-deb.json" >/dev/null 2>&1
 osc_dn=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-deb.json")
-[ "$osc_dn" = "0" ] && pass "deb-only SBOM gets no synthesized OS (OSV engine handles deb)" || fail "deb SBOM gained $osc_dn OS component(s)"
+[ "$osc_dn" = "0" ] && pass "deb PURL with no distro= qualifier gets no OS (version not guessed)" || fail "deb SBOM gained $osc_dn OS component(s)"
+# (e) apk/deb WITH a syft `distro=<id>-<ver>` qualifier synthesize the OS Trivy
+# needs. Empirically these recover CVEs that the PURL alone does not (openssl
+# probes: alpine 0->39, debian 0->15, ubuntu 0->22 on Trivy v0.72). Version rule:
+# debian reduced to major, ubuntu kept as major.minor, alpine kept as-is.
+osc_of() { jq -r '[.components[]|select(.type=="operating-system")]|.[0]|"\(.name) \(.version)"' "$1"; }
+cat > "$WORK/osc-apk.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"musl","version":"1.2.3-r5","purl":"pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=alpine-3.17.10"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-apk.json" >/dev/null 2>&1
+[ "$(osc_of "$WORK/osc-apk.json")" = "alpine 3.17.10" ] && pass "apk PURL (distro=alpine-3.17.10) -> operating-system alpine 3.17.10" || fail "apk OS='$(osc_of "$WORK/osc-apk.json")', expected 'alpine 3.17.10'"
+cat > "$WORK/osc-debian.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"bash","version":"5.1-2+deb11u1","purl":"pkg:deb/debian/bash@5.1-2+deb11u1?arch=amd64&distro=debian-11"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-debian.json" >/dev/null 2>&1
+[ "$(osc_of "$WORK/osc-debian.json")" = "debian 11" ] && pass "deb PURL (distro=debian-11) -> operating-system debian 11 (major)" || fail "debian OS='$(osc_of "$WORK/osc-debian.json")', expected 'debian 11'"
+cat > "$WORK/osc-ubuntu.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"openssl","version":"1.1.1-1ubuntu2.1~18.04.5","purl":"pkg:deb/ubuntu/openssl@1.1.1-1ubuntu2.1~18.04.5?arch=amd64&distro=ubuntu-18.04"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-ubuntu.json" >/dev/null 2>&1
+[ "$(osc_of "$WORK/osc-ubuntu.json")" = "ubuntu 18.04" ] && pass "deb PURL (distro=ubuntu-18.04) -> operating-system ubuntu 18.04 (major.minor kept)" || fail "ubuntu OS='$(osc_of "$WORK/osc-ubuntu.json")', expected 'ubuntu 18.04'"
+# An unsupported distro (Trivy carries no OpenWRT advisory DB) is never synthesized.
+cat > "$WORK/osc-owrt.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"dropbear","version":"2019.78","purl":"pkg:openwrt/dropbear@2019.78"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-owrt.json" >/dev/null 2>&1
+osc_on=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-owrt.json")
+[ "$osc_on" = "0" ] && pass "OpenWRT SBOM gets no synthesized OS (Trivy has no OpenWRT advisories)" || fail "OpenWRT SBOM gained $osc_on OS component(s)"
 echo "== F-1c: maven CPE enrichment — groupId-derived NVD cpe:2.3 =="
 MVNCPE="$LIB/enrich-maven-cpe.py"
 cat > "$WORK/mvn.json" <<'JSON'

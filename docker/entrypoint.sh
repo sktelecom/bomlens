@@ -494,14 +494,16 @@ if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
 fi
 
-# OS-context enrichment: a supplier SBOM can list every rpm/deb package yet omit
-# the operating-system component Trivy needs to pick a distro advisory DB. Without
-# it an SBOM full of pkg:rpm/centos/... returns ZERO findings despite valid PURLs.
-# enrich-os-context.py infers (distro, major version) from the dominant rpm PURL
-# and appends one operating-system component (or normalizes an existing "8.10" ->
-# "8" so RHEL-like matching works). Skipped for AI SBOMs and with
-# ENRICH_OS_CONTEXT=false; a no-op when the SBOM has no recognizable distro
-# packages. Runs before the security scan; best-effort, never aborts.
+# OS-context enrichment: a supplier SBOM can list every rpm/deb/apk package yet
+# omit the operating-system component Trivy needs to pick a distro advisory DB.
+# Without it an SBOM full of pkg:rpm/centos/... (or pkg:deb/..., pkg:apk/...)
+# returns ZERO findings despite valid PURLs. enrich-os-context.py infers (distro,
+# version) from the dominant distro PURL and appends one operating-system component
+# (or normalizes an existing "8.10" -> "8" so RHEL-like matching works): rpm and
+# debian by major, ubuntu by major.minor, alpine by its release id. Skipped for AI
+# SBOMs and with ENRICH_OS_CONTEXT=false; a no-op when the SBOM has no recognizable
+# distro packages (an unsupported distro like OpenWRT, or deb/apk PURLs with no
+# distro= version). Runs before the security scan; best-effort, never aborts.
 if [ "${ENRICH_OS_CONTEXT:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-os-context python3 "$LIBDIR/enrich-os-context.py" "$OUTPUT_FILE"
 fi

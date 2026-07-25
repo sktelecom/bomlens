@@ -3,30 +3,46 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # enrich-os-context.py — synthesize an operating-system component from distro
-# package PURLs so the vulnerability scanner can match rpm/deb CVEs.
+# package PURLs so the vulnerability scanner can match rpm/deb/apk CVEs.
 #
 # Usage: enrich-os-context.py <sbom.json>   (CycloneDX JSON, edited in place)
 #
 # Why: a supplier SBOM can list every OS package (pkg:rpm/centos/...,
-# pkg:deb/ubuntu/...) yet omit an `operating-system` component. Trivy needs that
-# OS component to know which distro advisory database to match against; without
-# it, an SBOM full of rpm/deb packages returns ZERO findings even though the PURLs
-# are perfectly formed. Adding one OS component recovers them — measured on real
-# supplier SBOMs, a CentOS-package SBOM went from 0 to tens of thousands of
-# findings once the OS component was present.
+# pkg:deb/debian/..., pkg:apk/alpine/...) yet omit an `operating-system`
+# component. Trivy needs that OS component to know which distro advisory database
+# to match against; without it, an SBOM full of distro packages returns ZERO
+# findings even though the PURLs are perfectly formed. Adding one OS component
+# recovers them — measured with Trivy v0.72: a CentOS SBOM went from 0 to tens of
+# thousands of findings, and single-package probes for openssl went 0 -> 39
+# (alpine 3.17), 0 -> 15 (debian 10), 0 -> 22 (ubuntu 18.04) once the OS component
+# was present. deb and apk need the OS component just as rpm does; they are NOT
+# recovered by the PURL alone.
 #
-# What it does: infer (distro, major version) from the dominant rpm PURL's
-# namespace (centos/rocky/redhat/...) and its `.elN` release suffix or a
-# `distro=` qualifier, then append a single `operating-system` component. If the
-# SBOM already carries one, only normalize its version to the major for RHEL-like
-# distros (Trivy matches rpm distros by MAJOR version, so a syft-supplied
-# "rocky 8.10" matches nothing and is corrected to "8").
+# What it does: infer (distro, version) from the dominant distro PURL and append a
+# single `operating-system` component.
+#   - rpm  : namespace (centos/rocky/redhat/...) + `.elN` suffix or a `distro=`
+#            qualifier -> MAJOR version (Trivy keys rpm distros by major).
+#   - apk  : `distro=alpine-<ver>` qualifier -> alpine + that version (Trivy
+#            tolerates the patch, e.g. 3.17 / 3.17.10 both match).
+#   - deb  : `distro=<debian|ubuntu>-<ver>` qualifier -> debian (reduced to major,
+#            Trivy keys debian by major) or ubuntu (kept as major.minor, its
+#            advisory key). A distro version is REQUIRED — a deb/apk PURL without a
+#            `distro=` qualifier carries no OS version to match against, so nothing
+#            is synthesized (the version is never guessed).
+# If the SBOM already carries an OS component, only normalize its version to the
+# major for RHEL-like distros (a syft-supplied "rocky 8.10" matches nothing and is
+# corrected to "8"); syft's native deb/apk OS versions already match and are left
+# as-is.
 #
-# Accuracy first: only rpm namespaces we can name a Trivy distro for are voted on;
-# an unrecognized namespace or a deb-only SBOM is left untouched (deb is recovered
-# by the OSV engine, not by an OS component). Best-effort: any failure leaves the
-# SBOM unchanged and never aborts the scan. Idempotent: re-running is a no-op once
-# the OS component exists and its version is already normalized.
+# Not covered: distros Trivy carries no advisory DB for (e.g. OpenWRT/Buildroot —
+# verified 0 findings even with an `openwrt` OS component). Those firmware images
+# are matched by the cve-bin-tool sidecar in FIRMWARE mode instead.
+#
+# Accuracy first: only namespaces/qualifiers we can name a Trivy distro for are
+# voted on; an unrecognized distro or a version-less PURL is left untouched.
+# Best-effort: any failure leaves the SBOM unchanged and never aborts the scan.
+# Idempotent: re-running is a no-op once the OS component exists and its version is
+# already normalized.
 #
 # Toggle: ENRICH_OS_CONTEXT (default on); the entrypoint skips it for AI SBOMs.
 import json
@@ -47,37 +63,73 @@ NS_TO_OS = {
     "fedora": "fedora",
 }
 
+# apk / deb distro id (from the `distro=<id>-<ver>` qualifier, or the PURL
+# namespace) -> the OS `name` Trivy matches on. Same closed-list discipline as rpm.
+APK_TO_OS = {"alpine": "alpine"}
+DEB_TO_OS = {"debian": "debian", "ubuntu": "ubuntu"}
+
 # Distros Trivy matches by MAJOR version only; a minor-carrying version ("8.10")
-# matches nothing and must be reduced to the major ("8").
+# matches nothing and must be reduced to the major ("8"). Debian is keyed by major
+# too ("11"), while alpine (3.17) and ubuntu (18.04) keep their full release id.
 RHEL_LIKE = {"centos", "rocky", "redhat", "alma", "fedora", "amazon"}
+DEB_MAJOR_ONLY = {"debian"}
 
 
-def _rpm_ns(purl):
-    """pkg:rpm/<ns>/name@ver -> <ns> (lowercased), or None if not an rpm PURL."""
-    if not purl or not purl.startswith("pkg:rpm/"):
+def _ns(purl, prefix):
+    """pkg:<type>/<ns>/name@ver -> <ns> (lowercased) for the given pkg: prefix."""
+    return purl[len(prefix):].split("/", 1)[0].split("@", 1)[0].lower()
+
+
+def _classify(purl):
+    """Map one distro PURL to a (os_name, version) Trivy can match, or None.
+
+    rpm keys by major version; deb (debian) by major, ubuntu by major.minor;
+    apk (alpine) by its release id. deb/apk REQUIRE a `distro=` qualifier for the
+    version — it is never guessed."""
+    if not purl:
         return None
-    return purl[len("pkg:rpm/"):].split("/", 1)[0].split("@", 1)[0].lower()
+
+    if purl.startswith("pkg:rpm/"):
+        os_name = NS_TO_OS.get(_ns(purl, "pkg:rpm/"))
+        if not os_name:
+            return None
+        # A `distro=<name>-<major>[.minor]` qualifier is authoritative; the
+        # `[0-9]+` stops at the dot so we take the major only (Trivy keys rpm
+        # distros by major version).
+        mq = re.search(r"distro=([a-z]+)-([0-9]+)", purl)
+        if mq:
+            return (NS_TO_OS.get(mq.group(1), mq.group(1)), mq.group(2))
+        # Otherwise the `.elN` release suffix carries the major version.
+        me = re.search(r"\.el(\d+)", purl)
+        if me:
+            return (os_name, me.group(1))
+        return None
+
+    if purl.startswith("pkg:apk/") or purl.startswith("pkg:deb/"):
+        # apk/deb PURLs from syft carry `distro=<id>-<versionId>` (e.g.
+        # alpine-3.17.10, debian-11, ubuntu-18.04). The version is required — no
+        # qualifier means no matchable OS version, so we skip rather than guess.
+        dq = re.search(r"[?&]distro=([a-z][a-z0-9]*)-([0-9][0-9.]*)", purl)
+        table = APK_TO_OS if purl.startswith("pkg:apk/") else DEB_TO_OS
+        ns = _ns(purl, "pkg:apk/" if purl.startswith("pkg:apk/") else "pkg:deb/")
+        did = dq.group(1) if dq else None
+        os_name = table.get(did) or table.get(ns)
+        if not os_name or not dq:
+            return None
+        ver = dq.group(2)
+        if os_name in DEB_MAJOR_ONLY:
+            ver = ver.split(".", 1)[0]
+        return (os_name, ver)
+
+    return None
 
 
 def infer_os(purls):
-    """Vote a dominant (os_name, major_version) from rpm PURLs. None if none map."""
+    """Vote a dominant (os_name, version) from distro PURLs. None if none map."""
     votes = {}
     for p in purls:
-        ns = _rpm_ns(p)
-        os_name = NS_TO_OS.get(ns) if ns else None
-        if not os_name:
-            continue
-        # A `distro=<name>-<major>[.minor]` qualifier is authoritative; take the
-        # major only (Trivy matches rpm distros by major version).
-        mq = re.search(r"distro=([a-z]+)-([0-9]+)", p)
-        if mq:
-            key = (NS_TO_OS.get(mq.group(1), mq.group(1)), mq.group(2))
-            votes[key] = votes.get(key, 0) + 1
-            continue
-        # Otherwise the `.elN` release suffix carries the major version.
-        me = re.search(r"\.el(\d+)", p)
-        if me:
-            key = (os_name, me.group(1))
+        key = _classify(p)
+        if key:
             votes[key] = votes.get(key, 0) + 1
     if not votes:
         return None
@@ -121,7 +173,8 @@ def enrich(path):
 
     os_info = infer_os(purls)
     if not os_info:
-        return  # no recognizable distro packages (e.g. deb-only or non-OS SBOM)
+        return  # no recognizable distro packages (non-OS SBOM, an unsupported
+        # distro like OpenWRT, or deb/apk PURLs with no distro= version qualifier)
 
     components.append({
         "type": "operating-system",
