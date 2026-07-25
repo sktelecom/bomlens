@@ -96,7 +96,7 @@ Conversion needs syft. The scanner image ships it, so the usual deployment conve
 
 For an AI/ML SBOM (a CycloneDX SBOM with a machine-learning-model component), the rail adds:
 
-**Models & datasets** — each model card's identifier, architecture, task, license, supplier and integrity, a four-axis disclosure panel (weights / architecture / training data / training process, as documented in the BOM), and the datasets the model references.
+**Models & datasets** — each model card's identifier, architecture, task, license, supplier and integrity, a four-axis disclosure panel (weights / architecture / training data / training process, as documented in the BOM), and the datasets the model references. When the SBOM carries a model risk assessment, the card opens with the overall grade badge (ok / conditional / caution / review), the per-axis verdicts (license, file security, datasets — an unevaluated axis shows a dash), the reasons behind the grade, the quoted custom-license wording and lineage warning when present, and the usage scenario the verdict was judged for; each dataset row carries its own grade badge. The section ends with the reminder that the assessment is guidance, not legal advice. For AI model scans, the New scan form adds a usage-context selector (internal / product / redistribute / outputs-only) that tailors this assessment.
 
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 

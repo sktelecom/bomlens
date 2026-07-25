@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { USAGE_CONTEXTS, type UsageContext } from "@/lib/api";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
+import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
 
 /**
@@ -209,9 +211,37 @@ export function SourceControls({ state }: { state: ScanFormState }) {
         </div>
       )}
 
+      {source === "ai-model" && <UsageContextSelect state={state} />}
+
       <SiblingPullNotice state={state} />
       <HfAuthNotice state={state} />
     </>
+  );
+}
+
+/** AI-model only: how the model will be used. Optional — the default sends
+ *  nothing, and the pipeline then assesses without a usage-specific tightening. */
+function UsageContextSelect({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const { usage, setUsage, busy } = state;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="usage">{t("source.usageContext")}</Label>
+      <Select
+        id="usage"
+        value={usage}
+        onChange={(e) => setUsage(e.target.value as UsageContext | "")}
+        disabled={busy}
+      >
+        <option value="">{t("source.usageUnspecified")}</option>
+        {USAGE_CONTEXTS.map((u) => (
+          <option key={u} value={u}>
+            {t(USAGE_LABEL_KEY[u])}
+          </option>
+        ))}
+      </Select>
+      <p className="text-xs text-muted-foreground">{t("source.usageContextHint")}</p>
+    </div>
   );
 }
 

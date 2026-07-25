@@ -22,7 +22,11 @@
 # --byte-stable output stay byte-identical.
 #
 # Usage: assess-ai-risk.sh <sbom.json>
-#   env AI_RISK_KNOWLEDGE  override the registry path (tests)
+#   env AI_RISK_KNOWLEDGE   override the registry path (tests)
+#   env AI_USAGE_CONTEXT    usage scenario (internal | product | redistribute |
+#                           outputs-only): only the license conditions that
+#                           bind that scenario decide the verdict; unset (the
+#                           default) judges against every condition
 set -e
 
 SBOM="$1"
@@ -44,8 +48,18 @@ if ! jq -e '[.components[]? | select(.type=="machine-learning-model")] | length 
     exit 0
 fi
 
+# Usage scenario: validated here as well as in the CLI, because this script is
+# also driven directly (entrypoint, tests). An unknown value is dropped, not
+# guessed at.
+CTX="${AI_USAGE_CONTEXT:-}"
+case "$CTX" in
+    internal|product|redistribute|outputs-only) : ;;
+    "") : ;;
+    *) echo "[assess] unknown AI_USAGE_CONTEXT '$CTX'; assessing without a scenario." >&2; CTX="" ;;
+esac
+
 TMP=$(mktemp)
-jq --slurpfile kb "$KB" '
+jq --arg ctx "$CTX" --slurpfile kb "$KB" '
   $kb[0].licenseTerms as $terms
   | $kb[0].datasetTagSignals as $dsig
 
@@ -81,8 +95,18 @@ jq --slurpfile kb "$KB" '
               { v: "review", k: null,
                 r: "license \($l): not in the license-terms registry (review)" }
             else
-              { v: $e.verdict, k: $e.key,
-                r: "license \($l): \($e.name) (\($e.verdict))" }
+              # Scenario tailoring: an explicit per-scenario verdict wins;
+              # otherwise a conditional entry none of whose conditions bind
+              # this scenario reads ok for it. Unset judges the full terms.
+              (if $ctx != "" then
+                 ($e.scenarioVerdicts[$ctx]? //
+                  (if ($e.verdict == "conditional")
+                      and (([ $e.conditions[]? | select((.appliesTo // []) | index($ctx)) ] | length) == 0)
+                   then "ok" else $e.verdict end))
+               else $e.verdict end) as $v
+              | { v: $v, k: $e.key,
+                  r: ("license \($l): \($e.name) (\($v)"
+                      + (if $ctx != "" then " for \($ctx) use" else "" end) + ")") }
             end ] as $per
         | { verdict: ($per | map(.v) | max_by(vrank[.])),
             keys:    ($per | map(.k) | map(select(. != null)) | unique),
@@ -186,7 +210,10 @@ jq --slurpfile kb "$KB" '
             + (if $dax != null then [$dax.verdict] else [] end))
            | max_by(vrank[.])) as $overall
         | .properties = (strip_assessment + [
-            { name: "bomlens:assessment:axes",         value: ($axes | join(",")) },
+            { name: "bomlens:assessment:axes",         value: ($axes | join(",")) }
+          ]
+          + (if $ctx != "" then [{ name: "bomlens:assessment:usageContext", value: $ctx }] else [] end)
+          + [
             { name: "bomlens:assessment:license",      value: $a.verdict },
             { name: "bomlens:assessment:license:keys", value: ($a.keys | join(",")) }
           ]

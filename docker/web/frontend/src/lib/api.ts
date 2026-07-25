@@ -359,6 +359,19 @@ export const SOURCE_TYPES: SourceType[] = [
 
 export type UploadKind = "zip" | "sbom" | "firmware";
 
+/** How the user intends to use a scanned AI model. Sent with the scan start so
+ *  the pipeline grades the license assessment against this use, and stamped
+ *  back on the model as `bomlens:assessment:usageContext`. Absent = unspecified
+ *  (the pipeline assesses without a usage-specific tightening). */
+export type UsageContext = "internal" | "product" | "redistribute" | "outputs-only";
+
+export const USAGE_CONTEXTS: UsageContext[] = [
+  "internal",
+  "product",
+  "redistribute",
+  "outputs-only",
+];
+
 export interface ScanParams {
   project: string;
   version: string;
@@ -377,6 +390,10 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** AI-model scans only: the intended usage the assessment should grade
+   *  against. Read server-side as the exact `usage` query parameter; omitted
+   *  (sent empty) when unspecified or for any other source. */
+  usage?: UsageContext;
   /** SBOM-upload only: also match against NVD-only (CPE) advisories, catching
    *  vulnerabilities in older Java (Maven) libraries other sources miss. Read
    *  server-side as the exact `deep_cve` flag. Ignored for every other source. */
@@ -657,6 +674,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
     upload_target: params.uploadTarget ?? "",
     upload_url: params.uploadUrl ?? "",

@@ -132,6 +132,120 @@ describe("parseModelCards", () => {
     expect(parseModelCards(withProp).models[0].disclosure.trainingData).toBe(false);
   });
 
+  // The pipeline stamps its risk verdict as bomlens:assessment:* properties.
+  // The parser reads them verbatim — it never re-derives a grade — so these
+  // cases only assert faithful transport, not classification.
+  const ASSESSED = {
+    ...ML_BOM,
+    components: [
+      {
+        ...ML_BOM.components[0],
+        properties: [
+          { name: "bomlens:assessment:overall", value: "caution" },
+          { name: "bomlens:assessment:license", value: "conditional" },
+          { name: "bomlens:assessment:security", value: "ok" },
+          { name: "bomlens:assessment:datasets", value: "review" },
+          { name: "bomlens:assessment:axes", value: "license,security,datasets" },
+          { name: "bomlens:assessment:usageContext", value: "product" },
+          { name: "bomlens:assessment:reasons", value: "Custom license restricts commercial use; Weights include pickle files" },
+          { name: "bomlens:license:customScan", value: "true" },
+          { name: "bomlens:license:customScan:quote", value: "You may not use this model commercially." },
+          { name: "bomlens:lineage:conflict", value: "true" },
+          { name: "bomlens:lineage:conflictWith", value: "meta-llama/Llama-3-8B" },
+          { name: "bomlens:hf:scan:status", value: "suspicious" },
+          { name: "bomlens:hf:scan:issue", value: "pickle imports os.system" },
+          { name: "bomlens:weights:formats", value: "bin,safetensors" },
+        ],
+      },
+    ],
+  };
+
+  it("reads the stamped assessment verbatim", () => {
+    const m = parseModelCards(ASSESSED).models[0];
+    expect(m.assessment).toEqual({
+      overall: "caution",
+      license: "conditional",
+      security: "ok",
+      datasets: "review",
+      usageContext: "product",
+      reasons: [
+        "Custom license restricts commercial use",
+        "Weights include pickle files",
+      ],
+    });
+    expect(m.scanStatus).toBe("suspicious");
+    expect(m.scanIssue).toBe("pickle imports os.system");
+    expect(m.weightFormats).toEqual(["bin", "safetensors"]);
+    expect(m.customLicenseQuote).toBe("You may not use this model commercially.");
+    expect(m.lineageConflictWith).toBe("meta-llama/Llama-3-8B");
+  });
+
+  it("leaves the assessment absent when the pipeline stamped none", () => {
+    const m = parseModelCards(ML_BOM).models[0];
+    expect(m.assessment).toBeUndefined();
+    expect(m.scanStatus).toBeUndefined();
+    expect(m.scanIssue).toBeUndefined();
+    expect(m.weightFormats).toBeUndefined();
+    expect(m.customLicenseQuote).toBeUndefined();
+    expect(m.lineageConflictWith).toBeUndefined();
+  });
+
+  it("keeps unevaluated axes absent when only the overall grade is stamped", () => {
+    const overallOnly = {
+      ...ML_BOM,
+      components: [
+        {
+          ...ML_BOM.components[0],
+          properties: [{ name: "bomlens:assessment:overall", value: "ok" }],
+        },
+      ],
+    };
+    const a = parseModelCards(overallOnly).models[0].assessment!;
+    expect(a.overall).toBe("ok");
+    expect(a.license).toBeUndefined();
+    expect(a.security).toBeUndefined();
+    expect(a.datasets).toBeUndefined();
+    expect(a.usageContext).toBeUndefined();
+    expect(a.reasons).toEqual([]);
+  });
+
+  it("treats an out-of-vocabulary grade as not stamped, never re-grades", () => {
+    const weird = {
+      ...ML_BOM,
+      components: [
+        {
+          ...ML_BOM.components[0],
+          properties: [{ name: "bomlens:assessment:overall", value: "banana" }],
+        },
+      ],
+    };
+    expect(parseModelCards(weird).models[0].assessment).toBeUndefined();
+  });
+
+  it("reads a dataset's stamped overall and signal grades", () => {
+    const dsAssessed = {
+      ...ML_BOM,
+      components: [
+        ...ML_BOM.components,
+        {
+          type: "data",
+          "bom-ref": "dataset:huggingface/wikipedia",
+          name: "wikipedia",
+          properties: [
+            { name: "bomlens:assessment:overall", value: "conditional" },
+            { name: "bomlens:assessment:signals", value: "review" },
+          ],
+        },
+      ],
+    };
+    const { datasets } = parseModelCards(dsAssessed);
+    const wiki = datasets.find((d) => d.name === "wikipedia")!;
+    expect(wiki.assessment).toBe("conditional");
+    expect(wiki.signals).toBe("review");
+    // The other dataset carries no stamp and stays unassessed.
+    expect(datasets.find((d) => d.name === "bookcorpus")!.assessment).toBeUndefined();
+  });
+
   it("is defensive about partial / non-AI input", () => {
     expect(parseModelCards({}).models).toEqual([]);
     expect(parseModelCards({ components: [{ type: "library", name: "x" }] }).models).toEqual([]);

@@ -4,6 +4,7 @@ import {
   CircleDashed,
   Database,
   ExternalLink,
+  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,9 +12,32 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
-import { type AiModelData, type ModelCard, parseModelCards } from "@/lib/models";
+import {
+  type AiModelData,
+  type AssessmentGrade,
+  GRADE_LABEL_KEY,
+  type ModelAssessment,
+  type ModelCard,
+  parseModelCards,
+  USAGE_LABEL_KEY,
+} from "@/lib/models";
 import { loadSbom } from "@/lib/sbomGraph";
 import { cn } from "@/lib/utils";
+
+/** Badge tone per pipeline grade — the grade word itself is always shown, so
+ *  the color is a reinforcement, never the only signal. */
+const GRADE_TONE: Record<AssessmentGrade, "success" | "high" | "critical" | "info"> = {
+  ok: "success",
+  conditional: "high",
+  caution: "critical",
+  review: "info",
+};
+
+/** A stamped grade as word + tone (verbatim from the SBOM property). */
+function GradeBadge({ grade }: { grade: AssessmentGrade }) {
+  const { t } = useTranslation();
+  return <Badge tone={GRADE_TONE[grade]}>{t(GRADE_LABEL_KEY[grade])}</Badge>;
+}
 
 /**
  * Models & Datasets — the AI surface. Fetches the raw ML-BOM, parses each
@@ -61,6 +85,11 @@ export function ModelsDatasets({
     return <EmptyState icon={Boxes}>{t("models.empty")}</EmptyState>;
   }
 
+  // The assessment surface only exists when the pipeline stamped one (older
+  // BOMs and non-assessed runs render exactly as before).
+  const hasDsAssessment = data.datasets.some((d) => d.assessment);
+  const hasAssessment = data.models.some((m) => m.assessment) || hasDsAssessment;
+
   return (
     <div className="space-y-6">
       {data.models.map((m, i) => (
@@ -80,6 +109,11 @@ export function ModelsDatasets({
                   <th scope="col" className="px-3 py-2 font-medium">
                     {t("models.dsName")}
                   </th>
+                  {hasDsAssessment && (
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      {t("models.dsAssessment")}
+                    </th>
+                  )}
                   <th scope="col" className="px-3 py-2 font-medium">
                     {t("models.dsLicense")}
                   </th>
@@ -111,6 +145,15 @@ export function ModelsDatasets({
                         </a>
                       )}
                     </td>
+                    {hasDsAssessment && (
+                      <td className="px-3 py-2 align-top">
+                        {d.assessment ? (
+                          <GradeBadge grade={d.assessment} />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-2 align-top">
                       {/* An unreadable repository is said so, rather than shown as
                           a dataset with no license — the two mean different things. */}
@@ -146,6 +189,9 @@ export function ModelsDatasets({
           </div>
         </div>
       )}
+      {hasAssessment && (
+        <p className="text-xs text-muted-foreground">{t("models.disclaimer")}</p>
+      )}
     </div>
   );
 }
@@ -155,6 +201,85 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-0.5">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-sm">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The pipeline's stamped verdict: per-axis grades (an unevaluated axis shows
+ * "—"), the grounds, the custom-license excerpt and the lineage warning. Pure
+ * display — every value comes verbatim from the SBOM properties.
+ */
+function AssessmentBlock({
+  assessment: a,
+  customLicenseQuote,
+  lineageConflictWith,
+}: {
+  assessment: ModelAssessment;
+  customLicenseQuote?: string;
+  lineageConflictWith?: string;
+}) {
+  const { t } = useTranslation();
+  const axes: Array<{ key: string; label: string; grade?: AssessmentGrade }> = [
+    { key: "license", label: t("models.assessLicense"), grade: a.license },
+    { key: "security", label: t("models.assessSecurity"), grade: a.security },
+    { key: "datasets", label: t("models.assessDatasets"), grade: a.datasets },
+  ];
+
+  return (
+    <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">{t("models.assessment")}</span>
+        {axes.map(({ key, label, grade }) => (
+          <span
+            key={key}
+            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+          >
+            {label}
+            {grade ? (
+              <GradeBadge grade={grade} />
+            ) : (
+              <>
+                <span className="text-muted-foreground" aria-hidden>
+                  —
+                </span>
+                <span className="sr-only">{t("models.assessNotEvaluated")}</span>
+              </>
+            )}
+          </span>
+        ))}
+      </div>
+
+      {a.usageContext && (
+        <Field label={t("models.usageContext")}>
+          {t(USAGE_LABEL_KEY[a.usageContext])}
+        </Field>
+      )}
+
+      {a.reasons.length > 0 && (
+        <Field label={t("models.reasons")}>
+          <ul className="list-inside list-disc text-sm text-muted-foreground">
+            {a.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </Field>
+      )}
+
+      {customLicenseQuote && (
+        <Field label={t("models.customLicenseQuote")}>
+          <p className="border-l-2 border-border pl-3 text-sm italic text-muted-foreground">
+            {customLicenseQuote}
+          </p>
+        </Field>
+      )}
+
+      {lineageConflictWith && (
+        <p className="flex items-start gap-1.5 text-xs text-foreground">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-risk-high" aria-hidden />
+          {t("models.lineageConflict", { name: lineageConflictWith })}
+        </p>
+      )}
     </div>
   );
 }
@@ -178,12 +303,21 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
             {m.name}
             {m.version ? <span className="text-muted-foreground"> {m.version}</span> : null}
           </span>
+          {m.assessment && <GradeBadge grade={m.assessment.overall} />}
           {m.licenses.map((l) => (
             <Badge key={l} variant="muted">
               {l}
             </Badge>
           ))}
         </div>
+
+        {m.assessment && (
+          <AssessmentBlock
+            assessment={m.assessment}
+            customLicenseQuote={m.customLicenseQuote}
+            lineageConflictWith={m.lineageConflictWith}
+          />
+        )}
 
         {m.description && (
           <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">

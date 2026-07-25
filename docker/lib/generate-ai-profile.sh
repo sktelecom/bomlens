@@ -120,18 +120,25 @@ if [ -f "$BOM" ] && [ -f "$KBJ" ]; then
               overall: $ov,
               keys: (($p | map(select(.name == "bomlens:assessment:license:keys")) | (.[0].value // ""))
                       | split(",") | map(select(. != ""))),
+              usageContext: ($p | map(select(.name == "bomlens:assessment:usageContext")) | (.[0].value // "")),
               reasons: (($p | map(select(.name == "bomlens:assessment:reasons")) | (.[0].value // ""))
                       | split("; ") | map(select(. != ""))) }
           | . + { terms: [ .keys[] as $k | ($K.licenseTerms[] | select(.key == $k)) ] }
+          # With a usage scenario, only the conditions that bind it are listed;
+          # the verdict was computed the same way, so the two stay consistent.
+          | .usageContext as $uc
           | . + { summary:    ([ .terms[].summary ]    | join(" ")),
                   summary_ko: ([ .terms[].summary_ko ] | join(" ")),
-                  conditions: ([ .terms[].conditions[]?.id ] | unique
+                  conditions: ([ .terms[].conditions[]?
+                                 | select($uc == "" or ((.appliesTo // []) | index($uc)))
+                                 | .id ] | unique
                                | map({ id: ., label: ($K.conditionLabels[.].en // .),
                                        label_ko: ($K.conditionLabels[.].ko // .) })),
                   sourceUrls: ([ .terms[].sourceUrl ] | unique) }
           | del(.terms)
         ] as $models
-      | { disclaimer: $K.disclaimer.en, disclaimer_ko: $K.disclaimer.ko,
+      | { usageContext: ([ $models[].usageContext ] | map(select(. != "")) | (.[0] // "")),
+          disclaimer: $K.disclaimer.en, disclaimer_ko: $K.disclaimer.ko,
           counts: { ok:          ($models | map(select(.overall == "ok"))          | length),
                     conditional: ($models | map(select(.overall == "conditional")) | length),
                     caution:     ($models | map(select(.overall == "caution"))     | length),
@@ -227,6 +234,11 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_H2_ASSESS=$(kstr aiprofile.h2_assessment)
     P_SUM_ASSESS=$(tfmt aiprofile.sum_assess "$AOK" "$ACOND" "$ACAU" "$AREV")
     P_ASSESS_DISC=$(echo "$ASSESS" | jq -r '.disclaimer_ko // .disclaimer')
+    AUC=$(echo "$ASSESS" | jq -r '.usageContext // ""')
+    P_ASSESS_USAGE=""
+    if [ -n "$AUC" ]; then
+        P_ASSESS_USAGE=$(tfmt aiprofile.assess_usage "$(kstr "aiprofile.usage_${AUC}")")
+    fi
     P_TH_LICV=$(kstr aiprofile.th_lic_verdict); P_TH_SEC=$(kstr aiprofile.th_security)
     P_TH_DS=$(kstr aiprofile.th_datasets); P_TH_OVERALL=$(kstr aiprofile.th_overall)
     P_ASSESS_COND=$(kstr aiprofile.assess_conditions); P_ASSESS_SRC=$(kstr aiprofile.assess_source)
@@ -255,6 +267,9 @@ else
     P_H2_ASSESS="Model risk assessment"
     P_SUM_ASSESS="- Model risk assessment: ok ${AOK}, conditional ${ACOND}, caution ${ACAU}, review ${AREV}."
     P_ASSESS_DISC=$(echo "$ASSESS" | jq -r '.disclaimer')
+    AUC=$(echo "$ASSESS" | jq -r '.usageContext // ""')
+    P_ASSESS_USAGE=""
+    [ -n "$AUC" ] && P_ASSESS_USAGE="Assessed for the ${AUC} usage scenario; conditions that do not bind it are omitted."
     P_TH_LICV="License verdict"; P_TH_SEC="File security"; P_TH_DS="Datasets"; P_TH_OVERALL="Overall"
     P_ASSESS_COND="conditions"; P_ASSESS_SRC="source"
     L_OK="ok"; L_COND="conditional"; L_CAU="caution"; L_REV="review"
@@ -286,6 +301,10 @@ fi
         echo ""
         echo "_${P_ASSESS_DISC}_"
         echo ""
+        if [ -n "$P_ASSESS_USAGE" ]; then
+            echo "${P_ASSESS_USAGE}"
+            echo ""
+        fi
         echo "| ${P_TH_COMP} | ${P_TH_VER} | ${P_TH_LIC} | ${P_TH_LICV} | ${P_TH_SEC} | ${P_TH_DS} | ${P_TH_OVERALL} |"
         echo "|-----------|---------|---------|------|------|------|------|"
         echo "$ASSESS" | jq -r --arg lok "$L_OK" --arg lcond "$L_COND" --arg lcau "$L_CAU" --arg lrev "$L_REV" '
