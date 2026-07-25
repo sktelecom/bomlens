@@ -1,0 +1,58 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "application", "name": "app", "version": "1.0.0" }
+  },
+  "components": [
+    {
+      "type": "library", "name": "github.com/spf13/pflag", "version": "v1.0.5",
+      "purl": "pkg:golang/github.com/spf13/pflag@v1.0.5",
+      "licenses": [ { "license": {
+        "name": "CUSTOM",
+        "text": {
+          "content": "Copyright (c) 2012 Alex Ogier. All rights reserved.\nCopyright (c) 2012 The Go Authors. All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n   * Redistributions of source code must retain the above copyright\nnotice, this list of conditions and the following disclaimer.\n   * Redistributions in binary form must reproduce the above\ncopyright notice, this list of conditions and the following disclaimer\nin the documentation and/or other materials provided with the\ndistribution.\n   * Neither the name of Google Inc. nor the names of its\ncontributors may be used to endorse or promote products derived from\nthis software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.\n",
+          "contentType": "text/plain"
+        }
+      } } ]
+    },
+    {
+      "type": "library", "name": "mit-variant", "version": "1.0.0",
+      "licenses": [ { "license": {
+        "name": "custom",
+        "url": "https://example.org/license",
+        "text": {
+          "content": "Copyright (c) 2020 Example Author\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.\n"
+        }
+      } } ]
+    },
+    {
+      "type": "library", "name": "truly-custom", "version": "1.0.0",
+      "licenses": [ { "license": {
+        "name": "CUSTOM",
+        "text": {
+          "content": "This software may be used for internal evaluation only. Redistribution of any kind requires a separate written agreement with the author.\n"
+        }
+      } } ]
+    },
+    {
+      "type": "library", "name": "multi-license-file", "version": "1.0.0",
+      "licenses": [ { "license": {
+        "name": "CUSTOM",
+        "text": {
+          "content": "Part A: Permission is hereby granted, free of charge, to any person obtaining a copy of this software, to deal in the software without restriction.\n\nPart B: Redistribution and use in source and binary forms are permitted provided that the following conditions are met: Redistributions of source code must retain the above copyright notice. Redistributions in binary form must reproduce the above copyright notice. Neither the name of the project nor the names of its contributors may be used to endorse or promote products.\n"
+        }
+      } } ]
+    },
+    {
+      "type": "library", "name": "named-not-placeholder", "version": "1.0.0",
+      "licenses": [ { "license": {
+        "name": "Sleepycat License",
+        "text": {
+          "content": "Permission is hereby granted, free of charge, to any person obtaining a copy of this software, to deal in the software without restriction.\n"
+        }
+      } } ]
+    }
+  ]
+}

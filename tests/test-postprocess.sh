@@ -259,6 +259,30 @@ date_expr=$(jq -r '.components[] | select(.name=="python-dateutil") | .licenses[
 pkg_expr=$(jq -r '.components[] | select(.name=="packaging") | .licenses[0].expression // "ABSENT"' "$WORK/c.json")
 [ "$pkg_expr" = "Apache-2.0 OR BSD-2-Clause" ] && pass "compound expression left untouched" || fail "packaging expression='$pkg_expr'"
 
+echo "== license-text: CUSTOM entries with an embedded text are classified by clause wording =="
+# Regression for the benchmark-team report: cdxgen's Go resolver emits
+# name:"CUSTOM" + the LICENSE file text when the file deviates from its
+# template (pflag's two-copyright-line BSD-3-Clause). normalize-sbom.sh must
+# recover the SPDX id from the clause wording, and must NOT guess when the
+# text is genuinely custom, matches several templates, or the name is a real
+# license name rather than a placeholder.
+cp "$FIX/license-custom-text.json" "$WORK/lt.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/lt.json" >/dev/null 2>&1
+pflag_id=$(jq -r '.components[] | select(.name=="github.com/spf13/pflag") | .licenses[0].license.id // "ABSENT"' "$WORK/lt.json")
+[ "$pflag_id" = "BSD-3-Clause" ] && pass "CUSTOM + BSD-3-Clause text (2 copyright lines) promoted to id BSD-3-Clause" || fail "pflag license id='$pflag_id', expected BSD-3-Clause"
+pflag_text=$(jq -r '.components[] | select(.name=="github.com/spf13/pflag") | .licenses[0].license.text.content // "ABSENT"' "$WORK/lt.json")
+case "$pflag_text" in *"Redistribution and use"*) pass "license text kept as evidence for the promotion" ;; *) fail "license text was dropped on promotion" ;; esac
+mitv_id=$(jq -r '.components[] | select(.name=="mit-variant") | .licenses[0].license.id // "ABSENT"' "$WORK/lt.json")
+mitv_url=$(jq -r '.components[] | select(.name=="mit-variant") | .licenses[0].license.url // "ABSENT"' "$WORK/lt.json")
+[ "$mitv_id" = "MIT" ] && pass "lowercase custom + MIT text promoted to id MIT" || fail "mit-variant license id='$mitv_id', expected MIT"
+[ "$mitv_url" = "https://example.org/license" ] && pass "license url survives text-based promotion" || fail "mit-variant url='$mitv_url'"
+tc_name=$(jq -r '.components[] | select(.name=="truly-custom") | .licenses[0].license.name // "ABSENT"' "$WORK/lt.json")
+[ "$tc_name" = "CUSTOM" ] && pass "genuinely custom text stays CUSTOM (no guess)" || fail "truly-custom license name='$tc_name', expected CUSTOM"
+ml_name=$(jq -r '.components[] | select(.name=="multi-license-file") | .licenses[0].license.name // "ABSENT"' "$WORK/lt.json")
+[ "$ml_name" = "CUSTOM" ] && pass "text matching several templates stays CUSTOM (ambiguity guard)" || fail "multi-license-file license name='$ml_name', expected CUSTOM"
+sc_name=$(jq -r '.components[] | select(.name=="named-not-placeholder") | .licenses[0].license.name // "ABSENT"' "$WORK/lt.json")
+[ "$sc_name" = "Sleepycat License" ] && pass "a real license name is never rewritten from its text" || fail "named-not-placeholder license name='$sc_name'"
+
 echo "== license-class: bomlens:licenseClass copyleft-strength classification =="
 # normalize-sbom.sh stamps every component with exactly one copyleft-strength
 # class, using the license-flags.jq classifier that MIRRORS the web UI's

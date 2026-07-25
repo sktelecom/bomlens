@@ -220,6 +220,13 @@ def src_props($sn; $sv; $sr; $se):
 # valid-but-wrong upstream id (e.g. cdxgen mislabeling a package 0BSD) are left
 # as-is rather than guessed. Free text that maps to a single SPDX id is promoted
 # from .license.name / .expression to a proper .license.id; the source url is kept.
+# When the name is an explicit placeholder (cdxgen's Go resolver emits "CUSTOM"
+# for any LICENSE file that deviates from its template, e.g. pflag's
+# two-copyright-line BSD-3-Clause) and the entry carries the license text, the
+# text itself is classified by clause wording (identify_license_text). The
+# embedded text is kept as the evidence for the promotion; the stale
+# cdx:license:* properties describing the unidentified state are dropped, same
+# as the name-alias promotion drops them.
 NORMALIZE_DEF="$(cat "$SCRIPT_DIR/spdx-normalize.jq")"
 LICENSE_FIX='(.components) |= (if type=="array" then map(
   if (.licenses|type)=="array" then
@@ -229,7 +236,14 @@ LICENSE_FIX='(.components) |= (if type=="array" then map(
         (if $n != .expression then {license:{id:$n}} else . end)
       elif ((.license|type)=="object" and (.license.id == null) and ((.license.name // null) != null)) then
         .license |= (normalize(.name) as $n |
-          (if $n != .name then ({id:$n} + (if .url then {url:.url} else {} end)) else . end))
+          if $n != .name then ({id:$n} + (if .url then {url:.url} else {} end))
+          elif (.name | test("^(custom|unknown|noassertion)$"; "i"))
+               and ((.text.content // "") != "") then
+            (identify_license_text(.text.content)) as $tid |
+            (if $tid != "" then
+               ({id:$tid} + (if .url then {url:.url} else {} end) + {text:.text})
+             else . end)
+          else . end)
       else . end
     )
   else . end
