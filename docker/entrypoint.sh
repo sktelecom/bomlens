@@ -470,7 +470,7 @@ ARTIFACTS=("$OUTPUT_FILE")
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS|ROOTFS)
         # No `|| true`: a stamp failure means the SBOM still carries a leaked/placeholder
-        # root name (e.g. src@latest), which collides in Black Duck. Fail closed under
+        # root name (e.g. src@latest), which collides in some SBOM import platforms. Fail closed under
         # set -e so a mis-named SBOM is never normalized, signed, or uploaded.
         bash "$LIBDIR/stamp-metadata.sh" "$OUTPUT_FILE" "$PROJECT_NAME" "$PROJECT_VERSION"
         ;;

@@ -312,7 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Source scans no longer leak `src@latest` as the root component name, which became a non-unique Black Duck codelocation and blocked unrelated imports. The caller's project name is now passed to cdxgen and stamped into the root component, and the pipeline fails closed if stamping does not take. (#166)
+- Source scans no longer leak `src@latest` as the root component name, which became a non-unique codelocation in some SBOM import platforms and blocked unrelated imports. The caller's project name is now passed to cdxgen and stamped into the root component, and the pipeline fails closed if stamping does not take. (#166)
 - `--merge` preserves each input's dependency graph so the merged BOM stays CycloneDX-conformant. (#164)
 - Follow-ups from the v1.3.0 verification pass (V13-1/2/3). (#159)
 - Corrected the first-scan link in the Korean server-delivery guide and modeled static linking as a blind spot rather than a separate layer. (#162, #163)

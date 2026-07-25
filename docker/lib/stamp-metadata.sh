@@ -31,7 +31,7 @@ fi
 
 # jq is mandatory in the post-process image. A missing jq is a build defect, not a
 # runtime condition to tolerate — failing closed keeps a mis-named SBOM (which would
-# collide in Black Duck on the codelocation name) from being delivered.
+# collide on the codelocation name in some SBOM import platforms) from being delivered.
 if ! command -v jq >/dev/null 2>&1; then
     echo "[stamp] ERROR: jq not available; cannot stamp metadata.component. This is a build defect — rebuild the image with jq." >&2
     exit 1
@@ -59,7 +59,7 @@ fi
 # Final net (engine-agnostic): confirm the root component now carries the caller's
 # project name and is not a generic placeholder. cdxgen/syft default the root name
 # to the scan path (src/app/target) when they cannot resolve one; such a name
-# becomes a non-unique Black Duck codelocation and blocks unrelated imports. We
+# becomes a non-unique codelocation in some SBOM import platforms and blocks unrelated imports. We
 # reach here only after a successful stamp, so a mismatch means the write silently
 # did not take — and src/app means the caller itself passed a colliding name.
 ACTUAL="$(jq -r '.metadata.component.name // ""' "$SBOM" 2>/dev/null)"

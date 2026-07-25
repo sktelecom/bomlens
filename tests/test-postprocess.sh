@@ -123,7 +123,7 @@ else
 fi
 
 echo "== src-latest: cdxgen src@latest root is stamped over, never delivered as 'src' =="
-# Regression for the Black Duck codelocation collision: two unrelated source SBOMs
+# Regression for the codelocation collision in some SBOM import platforms: two unrelated source SBOMs
 # both came out as metadata.component = src/latest (pkg:generic/src@latest), so the
 # second import was blocked as a duplicate codelocation. The stamp must replace it
 # with the caller's project name.
