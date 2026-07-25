@@ -153,12 +153,21 @@ const AI_DONE = {
   security: null,
   conformance: null,
   sbom: {
-    components: 1,
+    components: 3,
     componentList: [
-      { name: "bert-base-uncased", version: "86b5e093", group: "google-bert", purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", type: "machine-learning-model", licenses: ["Apache-2.0"] },
+      { name: "bert-base-uncased", version: "86b5e093", group: "google-bert", purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", type: "machine-learning-model", licenses: ["Apache-2.0"], assessment: "review", assessmentAxes: "license,security,datasets", hfScanStatus: "safe", weightFormats: "safetensors" },
+      { name: "wikipedia", version: "", group: "", purl: "", type: "data", licenses: ["cc-by-sa-4.0"], assessment: "conditional" },
+      { name: "bookcorpus", version: "", group: "", purl: "", type: "data", licenses: [], assessment: "review" },
     ],
+    assessCounts: { ok: 0, conditional: 0, caution: 0, review: 1 },
   },
 };
+// A resolved ML-BOM the way enrich-aibom.sh + assess-ai-risk.sh leave it: the
+// model carries its file-security scan result and its assessment verdicts, and
+// each referenced dataset is a standalone `data` component with its own grade.
+// bert-base-uncased is Apache-2.0 (license ok) with safe, safetensors weights
+// (security ok); one dataset declares no license, so the datasets axis — and
+// therefore the overall verdict — is review, the guide's own worked point.
 const AI_SBOM = {
   bomFormat: "CycloneDX",
   specVersion: "1.7",
@@ -169,6 +178,18 @@ const AI_SBOM = {
       purl: "pkg:huggingface/google-bert/bert-base-uncased@86b5e093", description: "A BERT model.",
       licenses: [{ license: { id: "Apache-2.0" } }], supplier: { name: "google-bert" }, authors: [{ name: "google-bert" }],
       externalReferences: [{ type: "distribution", url: "https://huggingface.co/google-bert/bert-base-uncased/tree/main" }],
+      properties: [
+        { name: "openness:weights", value: "open-weight" },
+        { name: "openness:training-data", value: "declared-unverified" },
+        { name: "bomlens:hf:scan:status", value: "safe" },
+        { name: "bomlens:weights:formats", value: "safetensors" },
+        { name: "bomlens:assessment:axes", value: "license,security,datasets" },
+        { name: "bomlens:assessment:license", value: "ok" },
+        { name: "bomlens:assessment:security", value: "ok" },
+        { name: "bomlens:assessment:datasets", value: "review" },
+        { name: "bomlens:assessment:overall", value: "review" },
+        { name: "bomlens:assessment:reasons", value: "license Apache-2.0: Permissive open-source license (ok); file security: HuggingFace scan reports all files safe (ok); datasets: 2 referenced, worst review (bookcorpus)" },
+      ],
       modelCard: {
         modelParameters: {
           task: "fill-mask", modelArchitecture: "bert",
@@ -179,6 +200,27 @@ const AI_SBOM = {
         },
         considerations: { technicalLimitations: ["Intended to be fine-tuned."] },
       },
+    },
+    {
+      type: "data", "bom-ref": "dataset:huggingface/wikipedia", name: "wikipedia",
+      licenses: [{ license: { name: "cc-by-sa-4.0" } }], hashes: [{ alg: "SHA-256", content: "b".repeat(64) }],
+      externalReferences: [{ type: "distribution", url: "https://huggingface.co/datasets/wikipedia" }],
+      data: [{ type: "dataset", name: "wikipedia", contents: { url: "https://huggingface.co/datasets/wikipedia" } }],
+      properties: [
+        { name: "bomlens:dataset:collectedBy", value: "huggingface" },
+        { name: "bomlens:assessment:license", value: "conditional" },
+        { name: "bomlens:assessment:overall", value: "conditional" },
+      ],
+    },
+    {
+      type: "data", "bom-ref": "dataset:huggingface/bookcorpus", name: "bookcorpus",
+      externalReferences: [{ type: "distribution", url: "https://huggingface.co/datasets/bookcorpus" }],
+      data: [{ type: "dataset", name: "bookcorpus", contents: { url: "https://huggingface.co/datasets/bookcorpus" } }],
+      properties: [
+        { name: "bomlens:dataset:collectedBy", value: "huggingface" },
+        { name: "bomlens:assessment:license", value: "review" },
+        { name: "bomlens:assessment:overall", value: "review" },
+      ],
     },
   ],
 };
