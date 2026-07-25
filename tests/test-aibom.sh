@@ -431,6 +431,114 @@ ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
 goneval=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-gone.json")
 [ "$goneval" = "declared-unverified" ] && pass "named-but-unreachable datasets read as declared-unverified" || fail "openness:training-data='$goneval', expected declared-unverified"
 
+echo "== enrich-aibom.sh records HuggingFace file-security scan results =="
+# The tree API is stubbed like the datasets API above: the property shape it
+# writes is the contract the assessment and the UI read. Scenarios cover safe,
+# a dangerous pickle import, an unsafe file, and a still-queued scan.
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+import os
+
+
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+class _Sec:
+    def __init__(self, status, safeties=None):
+        self.status = status
+        self.safe = status == "safe"
+        self.av_scan = {"status": status}
+        self.pickle_import_scan = (
+            {"pickleImports": [{"safety": s} for s in safeties]} if safeties is not None else None
+        )
+
+
+class _F:
+    def __init__(self, path, sec):
+        self.path = path
+        self.security = sec
+
+
+MODEL = _Info(
+    siblings=[_S("model.safetensors", "a" * 64), _S("pytorch_model.bin", "c" * 64)],
+    gated=False, private=False, tags=[],
+    card_data={"license": "apache-2.0"},
+    security_repo_status={"scansDone": True, "filesWithIssues": []},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+
+    def list_repo_tree(self, mid, expand=False):
+        calls = os.environ.get("HF_TREE_CALLS")
+        if calls:
+            with open(calls, "a") as fh:
+                fh.write("x")
+        scenario = os.environ.get("HF_SCAN_SCENARIO", "safe")
+        if scenario == "safe":
+            return [_F("model.safetensors", _Sec("safe")),
+                    _F("pytorch_model.bin", _Sec("safe", ["innocuous"]))]
+        if scenario == "dangerous":
+            return [_F("model.safetensors", _Sec("safe")),
+                    _F("pytorch_model.bin", _Sec("safe", ["innocuous", "dangerous"]))]
+        if scenario == "unsafe":
+            return [_F("evil.bin", _Sec("unsafe"))]
+        return [_F("pytorch_model.bin", None)]
+STUB
+run_scan() {  # $1 scenario -> writes $WORK/scan.json
+    cp "$FIX/aibom-owasp-1_7.json" "$WORK/scan.json"
+    HF_SCAN_SCENARIO="$1" HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+        bash "$LIB/enrich-aibom.sh" "$WORK/scan.json" google-bert/bert-base-uncased >/dev/null 2>&1
+}
+mprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/scan.json"; }
+: > "$WORK/tree-calls.txt"
+run_scan safe
+[ "$(mprop bomlens:hf:scan:status)" = "safe" ] && pass "all-safe scan reads safe" || fail "scan status='$(mprop bomlens:hf:scan:status)', expected safe"
+[ "$(mprop bomlens:weights:formats)" = "bin,safetensors" ] && pass "weight formats recorded from siblings" || fail "weights formats='$(mprop bomlens:weights:formats)'"
+[ "$(mprop bomlens:weights:pickleFiles)" = "1" ] && pass "pickle-format weight count recorded" || fail "pickleFiles='$(mprop bomlens:weights:pickleFiles)'"
+rs=$(mprop bomlens:hf:scan:repoStatus)
+case "$rs" in *scansDone*) pass "repo-level rollup recorded verbatim (never judged)" ;; *) fail "repoStatus='$rs'" ;; esac
+bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
+[ "$(mprop bomlens:assessment:security)" = "ok" ] && pass "safe scan assesses the security axis ok" || fail "security axis='$(mprop bomlens:assessment:security)', expected ok"
+[ "$(mprop bomlens:assessment:axes)" = "license,security" ] && pass "axes record license,security" || fail "axes='$(mprop bomlens:assessment:axes)'"
+run_scan dangerous
+[ "$(mprop bomlens:hf:scan:status)" = "unsafe" ] && pass "a dangerous pickle import reads unsafe" || fail "scan status='$(mprop bomlens:hf:scan:status)', expected unsafe"
+iss=$(mprop bomlens:hf:scan:issue)
+case "$iss" in *"pytorch_model.bin: dangerous pickle import"*) pass "the flagged file and reason are named" ;; *) fail "issue='$iss'" ;; esac
+bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
+[ "$(mprop bomlens:assessment:security)" = "caution" ] && pass "unsafe scan assesses caution" || fail "security axis='$(mprop bomlens:assessment:security)', expected caution"
+[ "$(mprop bomlens:assessment:overall)" = "caution" ] && pass "overall worst-of picks up the security caution" || fail "overall='$(mprop bomlens:assessment:overall)', expected caution"
+run_scan queued
+[ "$(mprop bomlens:hf:scan:status)" = "queued" ] && pass "an unscanned pickle weight reads queued" || fail "scan status='$(mprop bomlens:hf:scan:status)', expected queued"
+bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
+[ "$(mprop bomlens:assessment:security)" = "review" ] && pass "a pending scan assesses review, not safe" || fail "security axis='$(mprop bomlens:assessment:security)', expected review"
+# Idempotency: enriching twice leaves one property set.
+HF_SCAN_SCENARIO=safe HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/scan.json" google-bert/bert-base-uncased >/dev/null 2>&1
+scnt=$(jq '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:hf:scan:status")] | length' "$WORK/scan.json")
+[ "$scnt" = "1" ] && pass "re-enriching keeps one scan status (idempotent)" || fail "scan status properties=$scnt, expected 1"
+# Gate: ENRICH_HF_SECURITY=false must not call the tree API nor stamp a status.
+: > "$WORK/tree-calls.txt"
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/scan.json"
+ENRICH_HF_SECURITY=false HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/scan.json" google-bert/bert-base-uncased >/dev/null 2>&1
+[ ! -s "$WORK/tree-calls.txt" ] && pass "ENRICH_HF_SECURITY=false skips the tree lookup" || fail "the tree API was called despite the gate"
+[ "$(mprop bomlens:hf:scan:status)" = "" ] && pass "no scan status is stamped when the lookup is off" || fail "scan status stamped despite the gate"
+bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
+[ "$(mprop bomlens:assessment:axes)" = "license" ] && pass "the security axis is omitted, not guessed, when unavailable" || fail "axes='$(mprop bomlens:assessment:axes)'"
+
 echo "== resolved dataset components carry the dataset cluster =="
 # enrich-aibom.sh resolves every dataset the model card names into a CycloneDX
 # `data` component (license, digests, upstream) linked through dependencies[].

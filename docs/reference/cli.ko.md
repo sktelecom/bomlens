@@ -72,6 +72,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SCANOSS_MIN_FILES` | `2` | 라이브러리를 보고하기 위해 매치돼야 하는 최소 파일 수. 단발성 다운스트림 포크 노이즈를 거른다. `1`로 두면 단일 파일 매치도 모두 유지 |
 | `GIT_TOKEN` | — | 비공개 git 저장소 클론에 쓰는 토큰 |
 | `HF_TOKEN` | — | `--model`과 AI SBOM 분석의 데이터셋 메타데이터 조회에 쓰는 HuggingFace read 토큰. 비공개·게이트 저장소에 필요하며, 모델을 공개하기 전 검토할 때 쓴다. `HUGGING_FACE_HUB_TOKEN`도 별칭으로 받는다 |
+| `ENRICH_HF_SECURITY` | `true` | `--model` 스캔에서 HuggingFace가 자체 실행한 파일 보안 스캔 결과(파일별 ClamAV·picklescan)를 읽어 ML-BOM에 기록한다. 메타데이터만 읽고 파일은 내려받지 않는다. `false`면 조회를 건너뛴다 |
 | `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
 | `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
