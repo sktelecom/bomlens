@@ -116,6 +116,25 @@ For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation,
 
 ---
 
+## Deep CVE matching (`--deep-cve`)
+
+Trivy matches vulnerabilities by package identity (PURL), which covers the ecosystem advisory databases well. Some CVEs in older Java libraries, however, are recorded only in the NVD against a CPE identifier, so a PURL-based scan never reaches them. `--deep-cve` adds a second pass for Maven components: BomLens derives an NVD-matchable CPE for each component from its groupId, and grype matches those CPEs against a bundled NVD database.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+```
+
+- `--deep-cve` implies `--security`. The extra findings merge into the same security report (`_security.json/.md/.html`), tagged with their `nvd:cpe` source.
+- The scan runs on the opt-in `ghcr.io/sktelecom/bomlens-deep-cve:latest` image, which bundles grype and its database; it is pulled automatically when the flag is set (override with `SBOM_DEEP_CVE_IMAGE`). The flag applies to the base-image modes (source, image, binary, rootfs, SBOM analysis); a firmware or AI-model scan prints a warning and runs without grype.
+- CPE matching is looser than PURL matching, because NVD version ranges can be recorded coarsely. By default the scan stays offline: such findings are kept and marked **version-unverified** in the report (a dagger with a footnote), so a reader knows which rows may be loose-version false positives. To tighten them, set `SECURITY_NVD_VERIFY=true` with an `NVD_API_KEY`: each finding is then checked against the live NVD version range and out-of-range false positives are dropped. The verification needs network access and adds minutes.
+
+```bash
+SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
+  ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
+```
+
+---
+
 ## Deep license detection (`--deep-license`)
 
 The basic notice covers the licenses of dependencies (third-party). `--deep-license` uses scancode-toolkit to also detect license headers in the project's own source code (first-party).

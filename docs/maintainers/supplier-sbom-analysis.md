@@ -107,13 +107,15 @@ flowchart TD
 
 `validate-sbom.sh <sbom_file> <out_prefix> <project_name>` (기존 lib 인자 규약을 따릅니다).
 
-포맷 판별은 세 갈래입니다. CycloneDX는 `.bomFormat=="CycloneDX"`와 `.specVersion`으로, SPDX JSON은 `.spdxVersion`으로, SPDX Tag-Value는 `SPDXVersion:`을 grep해 가립니다.
+판별 전에 입력 인코딩을 UTF-8로 정규화합니다(`sbom-detect.sh`). UTF-16이나 BOM으로 저장된 SBOM(Windows 도구에서 흔합니다)은 그대로 두면 jq·grep이 UTF-8을 가정해 형식 불명으로 조용히 거부되므로, 앞머리 바이트로 UTF-16(BOM 유무 무관)과 UTF-8 BOM을 판정해 UTF-8 사본을 만들어 씁니다. 원본은 바꾸지 않으며, 손상된 입력은 기존대로 명확한 오류로 거부합니다.
+
+포맷 판별은 네 갈래입니다. CycloneDX는 `.bomFormat=="CycloneDX"`와 `.specVersion`으로, SPDX JSON은 `.spdxVersion`으로, SPDX 3.0 JSON-LD는 `@context`/`@graph`(최상위 `.spdxVersion`이 없음)로, SPDX Tag-Value는 `SPDXVersion:`을 grep해 가립니다. SPDX 3.0은 syft로 CycloneDX로 변환한 뒤 검사·스캔하므로, 취약점 스캔과 적합성 측정이 SPDX 2.x와 동일하게 동작합니다.
 
 검사 항목은 CycloneDX와 SPDX 양쪽 jq 경로로 다음과 같습니다.
 
 | 항목 | CycloneDX | SPDX | 판정 |
 |------|-----------|------|------|
-| spec version 범위 | `.specVersion` (1.3~1.6) | `.spdxVersion` (SPDX-2.2/2.3) | 필수 |
+| spec version 범위 | `.specVersion` (1.3~1.6) | `.spdxVersion` (SPDX-2.2/2.3); 3.0은 변환 후 CycloneDX 기준 | 필수 |
 | timestamp | `.metadata.timestamp` | `.creationInfo.created` | 필수 |
 | tool info | `.metadata.tools[\|.components]` | `.creationInfo.creators[] (Tool:)` | 필수 |
 | top component | `.metadata.component.name/.version` | document name + describes root | 필수 |

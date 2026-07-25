@@ -1,0 +1,11 @@
+{
+  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph": [
+    {"type":"CreationInfo","@id":"_:ci","specVersion":"3.0.1","created":"2026-01-01T00:00:00Z","createdBy":["urn:agent:org"],"createdUsing":["urn:agent:tool"]},
+    {"type":"Organization","spdxId":"urn:agent:org","name":"test-org","creationInfo":"_:ci"},
+    {"type":"Tool","spdxId":"urn:agent:tool","name":"test-tool","creationInfo":"_:ci"},
+    {"type":"SpdxDocument","spdxId":"urn:doc","name":"supplier-spdx3","creationInfo":"_:ci","rootElement":["urn:pkg:log4j"],"element":["urn:pkg:log4j","urn:pkg:express"]},
+    {"type":"software_Package","spdxId":"urn:pkg:log4j","name":"log4j-core","software_packageVersion":"2.14.1","software_downloadLocation":"NOASSERTION","creationInfo":"_:ci","software_packageUrl":"pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"},
+    {"type":"software_Package","spdxId":"urn:pkg:express","name":"express","software_packageVersion":"4.17.1","software_downloadLocation":"NOASSERTION","creationInfo":"_:ci","software_packageUrl":"pkg:npm/express@4.17.1"}
+  ]
+}

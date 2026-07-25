@@ -140,6 +140,11 @@ export function useScanForm({
   const [includeOsv, setIncludeOsv] = useState(
     () => initialConfig?.includeOsv ?? false,
   );
+  // SBOM-upload only: opt in to deep CVE matching (NVD-only advisories for older
+  // Maven libraries). Runs grype in this image or via the deep-cve sibling.
+  const [deepCve, setDeepCve] = useState(
+    () => initialConfig?.deepCve ?? false,
+  );
   const [scanossToken, setScanossToken] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [uploadError, setUploadError] = useState<UploadErrorInfo | null>(null);
@@ -183,8 +188,11 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // Deep CVE matching only applies to an uploaded SBOM we analyze, and only when
+  // this environment can run it (grype in-image or the deep-cve sibling).
+  const showDeepCve = isAnalyze && Boolean(capabilities.deepCve);
   const showScanOptions =
-    showDeepLicense || showVendored || showIncludeOsv || showByteStable;
+    showDeepLicense || showVendored || showIncludeOsv || showByteStable || showDeepCve;
   // Any scan produces an SBOM, so upload is offered for every source.
   const showUpload = true;
   const busy = running || uploading;
@@ -376,6 +384,8 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      // Deep CVE matching: SBOM-upload-only opt-in; ignored for any other source.
+      deepCve: showDeepCve ? deepCve : false,
       uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
       uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
       uploadCred,
@@ -409,6 +419,7 @@ export function useScanForm({
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
     includeOsv, setIncludeOsv,
+    deepCve, setDeepCve,
     byteStable, setByteStable,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
@@ -418,7 +429,7 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showByteStable, showScanOptions, showUpload,
+    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showScanOptions, showUpload,
     options, submit,
     capabilities,
   };
