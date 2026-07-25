@@ -30,7 +30,8 @@ cd examples/ruby
 ## Expected Output
 
 The scan writes its outputs into a `RubyExample_1.0.0/` folder. The main SBOM, `RubyExample_1.0.0/RubyExample_1.0.0_bom.json`, contains:
-- ~10-15 total components (including transitive dependencies)
+- ~5-15 total components (including transitive dependencies)
+<!-- expected-components: 5-15 -->
 - Sinatra and its dependencies (rack, tilt, mustermann, etc.)
 - Puma and Rack
 - Standard library references

@@ -29,6 +29,8 @@ cd examples/php
 
 The scan writes its outputs into a `PHPExample_1.0.0/` folder. The main SBOM, `PHPExample_1.0.0/PHPExample_1.0.0_bom.json`, contains:
 
+- ~10-24 total components (including transitive dependencies)
+<!-- expected-components: 10-24 -->
 - Slim and its PSR-7 dependencies (psr/http-message, nikic/fast-route, etc.)
 - Monolog and psr/log
 - Guzzle and its dependencies (guzzlehttp/psr7, guzzlehttp/promises)

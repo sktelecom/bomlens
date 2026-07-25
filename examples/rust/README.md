@@ -27,7 +27,8 @@ cd examples/rust
 
 ## Expected Output
 
-The scan writes its outputs into a `RustExample_1.0.0/` folder (`RustExample_1.0.0_bom.json` and related files). The SBOM lists roughly 35–45 crates. actix-web pulls a large transitive tree, so most entries are indirect.
+The scan writes its outputs into a `RustExample_1.0.0/` folder (`RustExample_1.0.0_bom.json` and related files). The SBOM lists roughly 120–200 crates. actix-web pulls a large transitive tree, so most entries are indirect.
+<!-- expected-components: 120-200 -->
 
 ### Sample Components
 

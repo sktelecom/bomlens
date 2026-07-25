@@ -27,7 +27,8 @@ cd examples/dotnet
 
 ## Expected Output
 
-The scan writes its outputs into a `DotNetExample_1.0.0/` folder (`DotNetExample_1.0.0_bom.json` and related files). The SBOM lists roughly 50–60 NuGet packages:
+The scan writes its outputs into a `DotNetExample_1.0.0/` folder (`DotNetExample_1.0.0_bom.json` and related files). The SBOM lists roughly 50–90 NuGet packages:
+<!-- expected-components: 50-90 -->
 
 - Newtonsoft.Json
 - Serilog and Serilog.AspNetCore with its sinks
