@@ -374,10 +374,6 @@
            no lockfile, no local checkout. A real install inside the container
            surfaces <b>39</b> components, transitive versions exact.</p>
            <p class="cue">same app · paste a Git URL · 39 components</p>
-           <p class="evidence">Independently, on <b>another</b> no-lockfile
-           Python project, the OpenChain Korea WG SCA benchmark has syft, cdxgen
-           and trivy stop at its <b>4</b> direct pins — BomLens resolves
-           <b>11</b>.</p>
          </div>
         
       </div>
@@ -482,13 +478,13 @@
         <div class="eyebrow"><span class="ey-text">Full circle</span></div>
         <h2 class="headline">The mandate, now with a tool</h2>
         <div class="content">
-           <p class="big">A regulation lands on a customer. The customer turns it
+           <p class="lede">A regulation lands on a customer. The customer turns it
            into "send us an SBOM." That request reaches a supplier with no
            tooling — which is exactly where we started.</p>
-           <p class="big muted">The difference now is the tool. Your source never
+           <p class="lede muted">The difference now is the tool. Your source never
            leaves the laptop; the standard SBOM is the one thing built to travel
            onward.</p>
-           <p class="turn">It makes gaps visible — it does not certify compliance.</p>
+           <p class="boundary">It makes gaps visible — it does not certify compliance.</p>
          </div>
         
       </div>
@@ -635,16 +631,25 @@
     if(e.clientX < window.innerWidth*0.25) show(i-1); else show(i+1);
   });
 
-  // Scale the fixed 1280x720 canvas to the viewport.
+  // Scale the fixed 1280x720 canvas to the viewport. Robust on mobile: prefer
+  // the visual viewport, re-fit on orientation change and after load, and guard
+  // against a zero/NaN scale when the viewport isn't settled yet at first paint.
   function fit(){
-    var pad=0; var w=window.innerWidth-pad, h=window.innerHeight-pad;
+    var vv=window.visualViewport;
+    var w=vv?vv.width:(document.documentElement.clientWidth||window.innerWidth);
+    var h=vv?vv.height:(document.documentElement.clientHeight||window.innerHeight);
     var k=Math.min(w/1280, h/720);
+    if(!(k>0)) k=(w/1280)||1;
     var deck=document.getElementById('deck');
     deck.style.transform='scale('+k+')';
     deck.style.transformOrigin='center center';
   }
   window.addEventListener('resize',fit);
+  window.addEventListener('orientationchange',function(){setTimeout(fit,200);});
+  window.addEventListener('load',fit);
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',fit);}
   fit(); show(0);
+  setTimeout(fit,300);
 })();
 </script>
 </body>
