@@ -35,9 +35,13 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
   /* Stage: a fixed 16:9 canvas scaled to fit any projector. */
-  #stage{position:fixed;inset:0;display:grid;place-items:center;background:var(--paper)}
+  #stage{position:fixed;inset:0;overflow:hidden;background:var(--paper)}
+  /* Margin-centered absolute box: the 1280x720 deck stays centered even when the
+     viewport is narrower than it (mobile), where grid/flex centering of an
+     oversized item can drift to one side. scale() keeps its origin at center. */
   #deck{
-    position:relative;width:1280px;height:720px;overflow:hidden;
+    position:absolute;left:50%;top:50%;margin:-360px 0 0 -640px;
+    width:1280px;height:720px;overflow:hidden;
     background:var(--paper);
     box-shadow:0 24px 80px -30px rgba(27,22,20,.35);
   }
