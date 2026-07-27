@@ -590,7 +590,8 @@
     b.setAttribute('aria-hidden', open?'false':'true');
   }
   function fs(){
-    if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||function(){})(); }
+    var el=document.documentElement;
+    if(!document.fullscreenElement){ if(el.requestFullscreen){ el.requestFullscreen(); } }
     else if(document.exitFullscreen){ document.exitFullscreen(); }
   }
   function buildOverview(){
