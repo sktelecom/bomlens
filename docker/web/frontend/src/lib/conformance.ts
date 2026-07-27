@@ -124,6 +124,7 @@ export interface CrosswalkTotals {
   present: number;
   gap: number;
   review: number;
+  advisory: number;
 }
 
 /** How a crosswalk element counts toward its framework coverage. Mirrors the
@@ -153,8 +154,9 @@ export function crosswalkTotals(frameworks: CoverageCounts[]): CrosswalkTotals {
       present: acc.present + f.present,
       gap: acc.gap + f.gap,
       review: acc.review + f.review,
+      advisory: acc.advisory + (f.total - f.present - f.gap - f.review),
     }),
-    { total: 0, present: 0, gap: 0, review: 0 },
+    { total: 0, present: 0, gap: 0, review: 0, advisory: 0 },
   );
 }
 

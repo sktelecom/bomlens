@@ -149,11 +149,11 @@ describe("crosswalkTotals", () => {
         { total: 5, present: 3, gap: 1, review: 1 },
         { total: 4, present: 2, gap: 2, review: 0 },
       ]),
-    ).toEqual({ total: 9, present: 5, gap: 3, review: 1 });
+    ).toEqual({ total: 9, present: 5, gap: 3, review: 1, advisory: 0 });
   });
 
   it("is all-zero for no frameworks", () => {
-    expect(crosswalkTotals([])).toEqual({ total: 0, present: 0, gap: 0, review: 0 });
+    expect(crosswalkTotals([])).toEqual({ total: 0, present: 0, gap: 0, review: 0, advisory: 0 });
   });
 });
 
@@ -202,7 +202,7 @@ describe("profileCard", () => {
       licenseBehavioral: 1,
       licenseNonCommercial: 1,
       frameworkCount: 2,
-      crosswalk: { total: 14, present: 8, gap: 4, review: 2 },
+      crosswalk: { total: 14, present: 8, gap: 4, review: 2, advisory: 0 },
     });
   });
 });

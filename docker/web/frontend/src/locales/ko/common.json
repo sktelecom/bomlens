@@ -665,12 +665,13 @@
   "crosswalk": {
     "title": "규제 대응표",
     "disclaimer": "규정 준수 판정이 아니라 문서 준비를 돕는 자료입니다. 이 대응표는 SBOM이 담을 수 있는 문서화 항목만 다루며, 공정성·편향 평가나 위험관리처럼 SBOM으로 표현할 수 없는 의무는 별도 문서로 이행해야 합니다.",
-    "totals": "매핑된 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 검토 필요 {{review}}개",
+    "totals": "매핑된 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 권고 {{advisory}}개, 검토 필요 {{review}}개",
     "thFramework": "프레임워크",
     "thTotal": "합계",
     "refs": "참조:",
     "present": "충족",
     "gap": "미비",
+    "advisory": "권고",
     "review": "검토 필요"
   },
   "aiProfile": {

@@ -665,12 +665,13 @@
   "crosswalk": {
     "title": "Regulatory crosswalk",
     "disclaimer": "A documentation-preparation aid, not a compliance verdict. This crosswalk covers only the documentation elements an SBOM can carry; obligations it cannot express — bias and fairness assessment, risk management — must be met through separate documents.",
-    "totals": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}} mapped",
+    "totals": "{{present}} present, {{gap}} gap, {{advisory}} advisory, {{review}} need review of {{total}} mapped",
     "thFramework": "Framework",
     "thTotal": "Total",
     "refs": "References:",
     "present": "Present",
     "gap": "Gap",
+    "advisory": "Advisory",
     "review": "Review needed"
   },
   "aiProfile": {

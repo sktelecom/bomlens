@@ -123,6 +123,7 @@ function CrosswalkBlock({
             {t("crosswalk.totals", {
               present: totals.present,
               gap: totals.gap,
+              advisory: totals.advisory,
               review: totals.review,
               total: totals.total,
             })}
@@ -135,6 +136,7 @@ function CrosswalkBlock({
                 <th className="py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
                 <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
                 <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
+                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.advisory")}</th>
                 <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.review")}</th>
                 <th className="py-1.5 pl-2 text-right font-medium tabular-nums">{t("crosswalk.thTotal")}</th>
               </tr>
@@ -148,6 +150,7 @@ function CrosswalkBlock({
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.gap}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.total - fw.present - fw.gap - fw.review}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.review}</td>
                   <td className="py-1.5 pl-2 text-right tabular-nums text-foreground">{fw.total}</td>
                 </tr>
