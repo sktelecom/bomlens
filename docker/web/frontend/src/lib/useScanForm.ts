@@ -131,6 +131,11 @@ export function useScanForm({
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
+  // Outbound license (SPDX id) switching the license-conflict check on. Free
+  // text, since any SPDX id is valid; empty simply leaves the check off.
+  const [outboundLicense, setOutboundLicense] = useState(
+    () => initialConfig?.license ?? "",
+  );
   // Optional upload of the generated SBOM to Dependency-Track or TRUSCA. The
   // server URL and token are never persisted (not in the re-scan sidecar), so a
   // re-scan always starts with upload off and the fields blank.
@@ -204,11 +209,16 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // A received SBOM carries its supplier's own root license and an AI model has
+  // no outbound license of ours, so the field is offered only where we generate
+  // the SBOM and therefore own what it ships under.
+  const showOutboundLicense = !isAnalyze && !isAiModel;
   // Deep CVE matching only applies to an uploaded SBOM we analyze, and only when
   // this environment can run it (grype in-image or the deep-cve sibling).
   const showDeepCve = isAnalyze && Boolean(capabilities.deepCve);
   const showScanOptions =
-    showDeepLicense || showVendored || showIncludeOsv || showByteStable || showDeepCve;
+    showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
+    showOutboundLicense || showDeepCve;
   // Any scan produces an SBOM, so upload is offered for every source.
   const showUpload = true;
   const busy = running || uploading;
@@ -401,6 +411,8 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      // Outbound license: only where we generate the SBOM (see showOutboundLicense).
+      license: showOutboundLicense ? outboundLicense.trim() : "",
       // AI-model only: grade the assessment against the chosen usage.
       usage: isAiModel && usage ? usage : undefined,
       // Deep CVE matching: SBOM-upload-only opt-in; ignored for any other source.
@@ -442,6 +454,7 @@ export function useScanForm({
     includeOsv, setIncludeOsv,
     deepCve, setDeepCve,
     byteStable, setByteStable,
+    outboundLicense, setOutboundLicense,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
     uploadTarget, setUploadTarget,
@@ -450,7 +463,8 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showScanOptions, showUpload,
+    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showOutboundLicense,
+    showScanOptions, showUpload,
     options, submit,
     capabilities,
   };

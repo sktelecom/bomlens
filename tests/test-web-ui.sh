@@ -1517,7 +1517,8 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "API_URL=${API_URL:-}"
   echo "API_KEY=${API_KEY:-}"
   echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"
-  echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
+  echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"
+  echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
 write_bom() {
     printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
         > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
@@ -1717,6 +1718,25 @@ assert re.fullmatch(r'demo2_1\.0_\d{8}-\d{6}', d['id']), d['id']
     pass "done event id carries the timestamped run id"
 else
     fail "done id is not the timestamped run id" "$events"
+fi
+
+echo "== license: the outbound license reaches the scan env, and only when given =="
+echo ok > "$STUB_MODE_FILE"
+rm -f "$WORK/stub-env"
+sse_events "project=lic1&version=1.0&source=current-dir&license=Apache-2.0" >/dev/null
+if [ "$(sed -n 's/^PROJECT_LICENSE=//p' "$WORK/stub-env")" = "Apache-2.0" ]; then
+    pass "license=Apache-2.0 -> PROJECT_LICENSE in the run-scan env"
+else
+    fail "outbound license did not reach the scan env" "$(cat "$WORK/stub-env")"
+fi
+# Omitted -> empty, which is what leaves the conflict check off. An empty value
+# must not become some default, or every scan would claim an outbound license.
+rm -f "$WORK/stub-env"
+sse_events "project=lic2&version=1.0&source=current-dir" >/dev/null
+if [ -z "$(sed -n 's/^PROJECT_LICENSE=//p' "$WORK/stub-env")" ]; then
+    pass "no license param -> PROJECT_LICENSE stays empty (conflict check off)"
+else
+    fail "PROJECT_LICENSE was set without a license param" "$(cat "$WORK/stub-env")"
 fi
 
 echo "== upload: web upload params map to the run-scan env (token via single-use cred) =="

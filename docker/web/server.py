@@ -778,6 +778,30 @@ def sbom_summary(run_id):
         if review:
             row["licenseReview"] = review
 
+        # Outbound-license conflict, set by normalize-sbom.sh only when the SBOM's
+        # root component declares a license (--license / PROJECT_LICENSE). Absent
+        # means "not assessed" — the UI says so rather than implying an all-clear.
+        conflict = next(
+            (
+                p.get("value")
+                for p in props
+                if p.get("name") == "bomlens:licenseConflict"
+            ),
+            "",
+        )
+        if conflict:
+            row["licenseConflict"] = conflict
+            why = next(
+                (
+                    p.get("value")
+                    for p in props
+                    if p.get("name") == "bomlens:licenseConflict:why"
+                ),
+                "",
+            )
+            if why:
+                row["licenseConflictWhy"] = why
+
         # End-of-life: set by enrich-eol.sh from a bundled endoflife.date snapshot.
         # "true"/"false"/"unknown" for a mapped component; absent for unmapped ones
         # (implicitly unknown). Surfaced read-only so a reviewer sees which runtimes
@@ -994,6 +1018,34 @@ def sbom_summary(run_id):
         "atRiskCount": at_risk_count,
         "outdatedCount": outdated_count,
     }
+    # Outbound license the project declares, and the conflict tally across ALL
+    # components. Both omitted when nothing declared it — the UI then explains
+    # how to turn the check on instead of showing an empty, all-clear table.
+    outbound = next(
+        (
+            lic
+            for lic in _component_licenses(meta_comp)
+            if lic
+        ),
+        "",
+    )
+    if outbound:
+        summary["outboundLicense"] = outbound
+        conflict_counts = {"incompatible": 0, "conditional": 0, "unknown": 0, "compatible": 0}
+        for c in comps:
+            if not isinstance(c, dict):
+                continue
+            v = next(
+                (
+                    p.get("value")
+                    for p in _dicts(c.get("properties"))
+                    if p.get("name") == "bomlens:licenseConflict"
+                ),
+                None,
+            )
+            if v in conflict_counts:
+                conflict_counts[v] += 1
+        summary["conflictCounts"] = conflict_counts
     if assessed_models:
         summary["assessCounts"] = assess_counts
     return summary
@@ -1708,6 +1760,9 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
         "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
         "-e", "PROJECT_VERSION=%s" % _env_flag_value(env.get("PROJECT_VERSION", "")),
+        # Outbound license (SPDX id) for the license-conflict check. Sanitized the
+        # same way as the project name; empty means the check stays off.
+        "-e", "PROJECT_LICENSE=%s" % _env_flag_value(env.get("PROJECT_LICENSE", "")),
         "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
@@ -2238,6 +2293,11 @@ class Handler(BaseHTTPRequestHandler):
         source = g("source", "current-dir").strip() or "current-dir"
         target = g("target").strip()
         token = g("token").strip()
+        # Optional outbound license (--license on the CLI) enabling the
+        # license-conflict check. Free text by nature (any SPDX id), so it is
+        # bounded here and sanitized again at the docker-run boundary; an empty
+        # value simply leaves the check off.
+        outbound_license = g("license").strip()[:64]
 
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
@@ -2317,6 +2377,7 @@ class Handler(BaseHTTPRequestHandler):
         env.update({
             "PROJECT_NAME": project,
             "PROJECT_VERSION": version,
+            "PROJECT_LICENSE": outbound_license,
             "UPLOAD_ENABLED": "false",
             "HOST_OUTPUT_DIR": run_out,
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",

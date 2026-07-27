@@ -1,4 +1,4 @@
-import { ScrollText, TriangleAlert } from "lucide-react";
+import { Scale, ScrollText, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import {
   componentRiskTier,
+  conflictGroups,
+  type ConflictVerdict,
   isCopyleft,
   type LicenseReview,
   type LicenseRiskTier,
@@ -23,6 +25,22 @@ const FLAG_LABEL: Record<LicenseReview, string> = {
   "non-commercial": "licenses.flagNonCommercial",
 };
 
+const CONFLICT_LABEL: Record<ConflictVerdict, string> = {
+  incompatible: "licenses.conflictIncompatible",
+  conditional: "licenses.conflictConditional",
+  unknown: "licenses.conflictUnknown",
+  compatible: "licenses.conflictCompatible",
+};
+
+/** Badge tone per verdict. Tone alone never carries the meaning — the label
+ *  text says which verdict it is, so the section reads without colour. */
+const CONFLICT_TONE: Record<ConflictVerdict, "high" | "medium" | "info"> = {
+  incompatible: "high",
+  conditional: "medium",
+  unknown: "info",
+  compatible: "info",
+};
+
 /**
  * Licenses — the full license distribution, led by any components whose terms
  * need human review (AI behavioral-use / non-commercial), flagged from the
@@ -33,10 +51,15 @@ const FLAG_LABEL: Record<LicenseReview, string> = {
 export function Licenses({
   components,
   initialTier,
+  outboundLicense,
 }: {
   components: ComponentItem[];
   /** Tier seeded from an Overview classification-bar click (filters on open). */
   initialTier?: LicenseRiskTier | "";
+  /** The license the project declares it ships under. Absent means the conflict
+   *  check never ran, which the section states outright rather than leaving the
+   *  reader to read an empty table as an all-clear. */
+  outboundLicense?: string;
 }) {
   const { t } = useTranslation();
   // Clicking a classification tier filters the rest of the tab to that tier.
@@ -53,6 +76,7 @@ export function Licenses({
     [tier, components],
   );
   const review = useMemo(() => reviewGroups(filtered), [filtered]);
+  const conflicts = useMemo(() => conflictGroups(filtered), [filtered]);
   const { groups, unlicensed } = useMemo(() => licenseGroups(filtered), [filtered]);
   const selectedComps = useMemo(
     () => (selected ? filtered.filter((c) => c.licenses.includes(selected)) : []),
@@ -79,6 +103,51 @@ export function Licenses({
   return (
     <div className="space-y-6">
       <LicenseRiskBar components={components} selected={tier} onSelect={toggleTier} />
+
+      {outboundLicense && conflicts.length > 0 && (
+        <Card className="border-amber-300/60 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-950/20">
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Scale className="h-4 w-4 text-risk-medium" aria-hidden />
+              {t("licenses.conflictTitle", { license: outboundLicense })}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("licenses.conflictHint")}</p>
+            <div className="space-y-3">
+              {conflicts.map((g) => (
+                <div key={g.verdict} className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge tone={CONFLICT_TONE[g.verdict]}>{t(CONFLICT_LABEL[g.verdict])}</Badge>
+                    <span className="tabular-nums text-muted-foreground">
+                      {g.components.length}
+                    </span>
+                  </div>
+                  <ul className="divide-y rounded-md border bg-card">
+                    {g.components.map((c, i) => (
+                      <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-mono">
+                            {c.group ? `${c.group} / ` : ""}
+                            {c.name}
+                            {c.version ? (
+                              <span className="text-muted-foreground"> {c.version}</span>
+                            ) : null}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.licenses.join(", ")}
+                          </span>
+                        </div>
+                        {c.licenseConflictWhy ? (
+                          <p className="text-xs text-muted-foreground">{c.licenseConflictWhy}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {review.length > 0 && (
         <Card className="border-amber-300/60 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-950/20">
@@ -121,6 +190,17 @@ export function Licenses({
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!outboundLicense && (
+        <Card>
+          <CardContent className="space-y-1 p-4">
+            <div className="text-sm font-semibold text-foreground">
+              {t("licenses.conflictOffTitle")}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("licenses.conflictOffHint")}</p>
           </CardContent>
         </Card>
       )}

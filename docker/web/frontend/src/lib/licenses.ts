@@ -350,3 +350,26 @@ export function componentConflict(
     CONFLICT_RANK[v.verdict] < CONFLICT_RANK[best.verdict] ? v : best,
   );
 }
+
+export interface ConflictGroup {
+  verdict: ConflictVerdict;
+  components: ComponentItem[];
+}
+
+/** Components grouped by conflict verdict, worst first, skipping "compatible" —
+ *  the section lists what needs a look, not what is already fine. Empty when the
+ *  scan carried no outbound license, since then nothing was assessed. */
+export function conflictGroups(components: ComponentItem[]): ConflictGroup[] {
+  const byVerdict = new Map<ConflictVerdict, ComponentItem[]>();
+  for (const c of components) {
+    const v = c.licenseConflict;
+    if (!v || v === "compatible") continue;
+    const list = byVerdict.get(v) ?? [];
+    list.push(c);
+    byVerdict.set(v, list);
+  }
+  return CONFLICT_ORDER.filter((v) => byVerdict.has(v)).map((verdict) => ({
+    verdict,
+    components: byVerdict.get(verdict)!,
+  }));
+}

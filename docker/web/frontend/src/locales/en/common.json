@@ -83,7 +83,9 @@
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "upload": "Upload to a server",
-    "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored."
+    "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored.",
+    "outboundLicense": "Outbound license (optional)",
+    "outboundLicenseHint": "The SPDX id your project ships under, e.g. Apache-2.0. Dependencies whose terms clash with it are then flagged. A source scan cannot infer this, so without it the check stays off."
   },
   "upload": {
     "target": "Destination",
@@ -708,7 +710,15 @@
       "reviewNeeded": "Review needed",
       "uncategorized": "Uncategorized",
       "permissive": "Permissive"
-    }
+    },
+    "conflictTitle": "Conflicts with your outbound license ({{license}})",
+    "conflictHint": "How each dependency's terms sit against the license you distribute under. A documentation aid — it surfaces combinations that need a person to look, and makes no legal determination.",
+    "conflictIncompatible": "Cannot be met",
+    "conflictConditional": "Depends on how you ship",
+    "conflictUnknown": "Cannot judge",
+    "conflictCompatible": "No conflict",
+    "conflictOffTitle": "Outbound-license conflicts were not checked",
+    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on."
   },
   "recent": {
     "title": "Scan management",

@@ -938,6 +938,81 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   expect(results.violations).toEqual([]);
 });
 
+// A scan that declared an outbound license, so the conflict check ran. The
+// verdicts here are the ones the scanner produces (see license-flags.jq); this
+// fixture pins how the section presents them.
+const CONFLICT_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "conf_1.0",
+  results: [{ name: "conf_1.0_bom.json", size: 100 }],
+  security: null,
+  conformance: null,
+  sbom: {
+    components: 3,
+    outboundLicense: "Apache-2.0",
+    conflictCounts: { incompatible: 1, conditional: 1, unknown: 0, compatible: 1 },
+    componentList: [
+      { name: "gpl-dep", version: "1", group: "", purl: "", type: "library", licenses: ["GPL-3.0-only"], licenseConflict: "incompatible", licenseConflictWhy: "Distributing a combined work requires the whole work to be offered under the copyleft license." },
+      { name: "epl-dep", version: "1", group: "", purl: "", type: "library", licenses: ["EPL-2.0"], licenseConflict: "conditional", licenseConflictWhy: "File-level reciprocity: check how you link and distribute." },
+      { name: "mit-dep", version: "1", group: "", purl: "", type: "library", licenses: ["MIT"], licenseConflict: "compatible", licenseConflictWhy: "Both are permissive." },
+    ],
+  },
+};
+
+async function stubConflictAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(CONFLICT_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "conf");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+// The conflict block sits below the fold of the licenses screenshot, so the
+// visual baseline cannot police it — these assertions are what guard it.
+test("Licenses section lists outbound-license conflicts worst first", async ({ page }) => {
+  await stubConflictAndRun(page);
+  await page.getByRole("link", { name: /^Licenses/ }).first().click();
+
+  // The heading names the license the dependencies were judged against, so the
+  // reader knows what "conflict" is relative to.
+  await expect(page.getByText("Conflicts with your outbound license (Apache-2.0)")).toBeVisible();
+
+  // Worst first, and the verdict is spelled out in words — the badge colour is
+  // never the only carrier of meaning.
+  const badges = page.locator("main").getByText(/Cannot be met|Depends on how you ship/);
+  await expect(badges.first()).toHaveText("Cannot be met");
+  await expect(page.getByText("gpl-dep")).toBeVisible();
+  await expect(
+    page.getByText("Distributing a combined work requires the whole work"),
+  ).toBeVisible();
+
+  // A compatible dependency is not listed: the block is what needs a look.
+  await expect(page.locator("main").getByText("mit-dep")).toHaveCount(0);
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("Licenses section says so when no outbound license was declared", async ({ page }) => {
+  // LIC_DONE carries no outboundLicense — an empty conflict table would read as
+  // an all-clear, so the section states the check never ran and how to turn it on.
+  await stubLicensesAndRun(page);
+  await page.getByRole("link", { name: /^Licenses/ }).first().click();
+
+  await expect(page.getByText("Outbound-license conflicts were not checked")).toBeVisible();
+  await expect(page.getByText(/--license/)).toBeVisible();
+  await expect(page.getByText(/Conflicts with your outbound license/)).toHaveCount(0);
+});
+
 for (const { theme, lang } of COMBOS) {
   test(`licenses section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubLicensesAndRun(page, theme, lang);

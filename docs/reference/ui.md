@@ -48,6 +48,8 @@ Generation options are the open-source notice and the security (vulnerability) r
 
 A **Reproducible output** toggle produces byte-identical SBOMs across runs (the UI equivalent of `--byte-stable`); it is available for source, image and firmware scans, not for SBOM analysis or AI models.
 
+An **Outbound license** field takes the SPDX id your project ships under, such as `Apache-2.0` (the UI equivalent of `--license`). Fill it in and the Licenses section reports which dependencies clash with it; leave it empty and that check stays off, which the section says outright. It appears wherever BomLens generates the SBOM, so not for an analyzed supplier SBOM (which carries the supplier's own declaration) or an AI model.
+
 Below the outputs, an optional **Upload** step can send the finished SBOM to a server. Turn it on to pick the destination — Dependency-Track or TRUSCA — and enter the server URL and an access token; TRUSCA also asks for the target project id. The URL and token are used for that one run and are never saved. It is the UI equivalent of the CLI upload options; see [Upload to Dependency-Track / TRUSCA](../guides/upload.md).
 
 ## Scan running
@@ -76,7 +78,7 @@ If a scan finished with reduced analysis — for example cdxgen ran out of Docke
 
 ![Dependencies — direct and vulnerable packages marked](../images/web-ui-dependencies.png)
 
-**Licenses** opens with a license classification axis that groups components by copyleft strength — network copyleft (AGPL), strong copyleft (GPL), weak copyleft (LGPL, MPL, EPL, …), permissive, review needed, and uncategorized. An unrecognised license is never assumed permissive; it falls to uncategorized so a person looks at it. Click a class to filter the rest of the section to it. Below the classification come the components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — and then the full license distribution; click a license to list the components that use it.
+**Licenses** opens with a license classification axis that groups components by copyleft strength — network copyleft (AGPL), strong copyleft (GPL), weak copyleft (LGPL, MPL, EPL, …), permissive, review needed, and uncategorized. An unrecognised license is never assumed permissive; it falls to uncategorized so a person looks at it. Click a class to filter the rest of the section to it. Below the classification, when the scan declared an outbound license, come the dependencies whose terms clash with it — grouped worst first, each with the reasoning for its verdict. It is a documentation aid, not a legal determination. If no outbound license was declared the section says the check did not run and how to turn it on, rather than leaving an empty list to read as an all-clear. Then come the components whose terms need human review — AI behavioral-use (RAIL/Llama/Gemma) and non-commercial licenses — and the full license distribution; click a license to list the components that use it.
 
 ![Licenses — review-first, then the full distribution](../images/web-ui-licenses.png)
 

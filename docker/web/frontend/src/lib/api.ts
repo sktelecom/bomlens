@@ -42,6 +42,12 @@ export interface ComponentItem {
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
   licenseReview?: "behavioral-use" | "non-commercial";
+  /** How this component's license sits against the project's declared outbound
+   *  license (normalize-sbom.sh, rules in docker/lib/license-compat.json).
+   *  Absent when no outbound license was declared — "not assessed", not clean. */
+  licenseConflict?: "compatible" | "conditional" | "incompatible" | "unknown";
+  /** Why that verdict — the rule's reasoning, shown beside the badge. */
+  licenseConflictWhy?: string;
   /** Source / download location (externalReferences vcs/distribution/website). */
   source?: string;
   /** Copyright holder line, when the SBOM captured one. */
@@ -91,6 +97,17 @@ export interface SbomSummary {
   /** Components behind the latest patch in their own release cycle (offline
    *  currency from the endoflife snapshot). */
   outdatedCount?: number;
+  /** The outbound license the project declares on its root component. Absent
+   *  when none was declared, which is what turns the conflict check off. */
+  outboundLicense?: string;
+  /** Conflict verdict tally across every component (not just the capped rows).
+   *  Present only alongside outboundLicense. */
+  conflictCounts?: {
+    incompatible: number;
+    conditional: number;
+    unknown: number;
+    compatible: number;
+  };
 }
 
 export const SEVERITY_ORDER = [
@@ -305,6 +322,9 @@ export interface ScanConfig {
   identifyVendored: boolean;
   includeOsv: boolean;
   byteStable: boolean;
+  /** The outbound license declared for this scan (SPDX id), which switches the
+   *  license-conflict check on. Empty or absent means it stayed off. */
+  license?: string;
   /** SBOM-upload only: match components against NVD-only (CPE) advisories too —
    *  catches vulnerabilities in older Java (Maven) libraries other sources miss. */
   deepCve: boolean;
@@ -395,6 +415,9 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** Outbound license (SPDX id) the project ships under. Read server-side as the
+   *  exact `license` parameter; empty leaves the license-conflict check off. */
+  license?: string;
   /** AI-model scans only: the intended usage the assessment should grade
    *  against. Read server-side as the exact `usage` query parameter; omitted
    *  (sent empty) when unspecified or for any other source. */
@@ -679,6 +702,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    license: params.license ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
     upload_target: params.uploadTarget ?? "",

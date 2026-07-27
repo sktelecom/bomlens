@@ -86,6 +86,7 @@ export function ResultSection({
         <Licenses
           components={result.sbom?.componentList ?? []}
           initialTier={seedTier}
+          outboundLicense={result.sbom?.outboundLicense}
         />
       );
 

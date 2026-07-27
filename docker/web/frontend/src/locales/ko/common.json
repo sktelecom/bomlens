@@ -83,7 +83,9 @@
     "byteStable": "재현 가능한 출력",
     "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
     "upload": "서버로 업로드",
-    "uploadHint": "스캔 후 생성된 SBOM을 Dependency-Track 또는 TRUSCA 서버로 보냅니다. 서버 주소와 토큰은 이 실행에만 쓰이고 저장하지 않습니다."
+    "uploadHint": "스캔 후 생성된 SBOM을 Dependency-Track 또는 TRUSCA 서버로 보냅니다. 서버 주소와 토큰은 이 실행에만 쓰이고 저장하지 않습니다.",
+    "outboundLicense": "배포 라이선스 (선택)",
+    "outboundLicenseHint": "프로젝트를 배포하는 SPDX 식별자입니다(예: Apache-2.0). 지정하면 조건이 충돌하는 의존성을 표시합니다. 소스 스캔으로는 알아낼 수 없어 지정하지 않으면 검사하지 않습니다."
   },
   "upload": {
     "target": "대상",
@@ -708,7 +710,15 @@
       "reviewNeeded": "검토 필요",
       "uncategorized": "미분류",
       "permissive": "허용적"
-    }
+    },
+    "conflictTitle": "배포 라이선스({{license}})와의 충돌",
+    "conflictHint": "배포하는 라이선스를 기준으로 각 의존성의 조건이 어떻게 맞물리는지 보여 줍니다. 검토가 필요한 조합을 드러내는 참고 자료이며 법적 판단을 내리지 않습니다.",
+    "conflictIncompatible": "충족 불가",
+    "conflictConditional": "배포 방식에 따라 달라짐",
+    "conflictUnknown": "판정 불가",
+    "conflictCompatible": "충돌 없음",
+    "conflictOffTitle": "배포 라이선스 충돌은 검사하지 않았습니다",
+    "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정해 다시 스캔하면 검사가 켜집니다."
   },
   "recent": {
     "title": "스캔 관리",

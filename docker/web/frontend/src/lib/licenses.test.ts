@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ComponentItem } from "./api";
 import {
   componentConflict,
+  conflictGroups,
   isCopyleft,
   licenseGroups,
   licenseRiskSummary,
@@ -234,5 +235,52 @@ describe("componentConflict", () => {
 
   it("is unknown when the component declares no license", () => {
     expect(v([])).toBe("unknown");
+  });
+});
+
+describe("conflictGroups", () => {
+  const c = (
+    name: string,
+    verdict?: ComponentItem["licenseConflict"],
+  ): ComponentItem => ({
+    name,
+    version: "1",
+    group: "",
+    purl: `pkg:maven/x/${name}@1`,
+    type: "library",
+    licenses: ["MIT"],
+    vendored: false,
+    matchConfidence: "",
+    source: "",
+    copyright: "",
+    ...(verdict ? { licenseConflict: verdict } : {}),
+  });
+
+  it("orders the worst verdict first", () => {
+    const groups = conflictGroups([
+      c("a", "conditional"),
+      c("b", "incompatible"),
+      c("d", "unknown"),
+    ]);
+    expect(groups.map((g) => g.verdict)).toEqual([
+      "incompatible",
+      "conditional",
+      "unknown",
+    ]);
+  });
+
+  it("omits components that carry no conflict", () => {
+    // "compatible" is not listed — the section shows what needs a look — and a
+    // component with no verdict at all was never assessed.
+    expect(conflictGroups([c("a", "compatible"), c("b")])).toEqual([]);
+  });
+
+  it("collects every component under its verdict", () => {
+    const groups = conflictGroups([
+      c("a", "incompatible"),
+      c("b", "incompatible"),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].components.map((x) => x.name)).toEqual(["a", "b"]);
   });
 });

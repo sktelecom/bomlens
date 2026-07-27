@@ -352,6 +352,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepCve,
     byteStable,
     setByteStable,
+    outboundLicense,
+    setOutboundLicense,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -359,6 +361,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showIncludeOsv,
     showDeepCve,
     showByteStable,
+    showOutboundLicense,
     capabilities,
     busy,
   } = state;
@@ -435,6 +438,27 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setByteStable}
           disabled={busy}
         />
+      )}
+      {showOutboundLicense && (
+        <div className="space-y-1.5">
+          <label htmlFor="outbound-license" className="text-sm font-medium text-foreground">
+            {t("options.outboundLicense")}
+          </label>
+          <input
+            id="outbound-license"
+            type="text"
+            value={outboundLicense}
+            onChange={(e) => setOutboundLicense(e.target.value)}
+            disabled={busy}
+            placeholder="Apache-2.0"
+            spellCheck={false}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
+            aria-describedby="outbound-license-hint"
+          />
+          <p id="outbound-license-hint" className="text-xs text-muted-foreground">
+            {t("options.outboundLicenseHint")}
+          </p>
+        </div>
       )}
     </div>
   );
