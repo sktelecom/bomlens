@@ -100,10 +100,12 @@
   [data-kind="diagram"] svg{display:block;width:100%;max-width:1080px;height:auto;margin:0 auto}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:6px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:24px 26px;box-shadow:0 10px 30px -24px rgba(27,22,20,.5)}
-  .card-h{font-size:21px;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
-  .card p{margin:0;font-size:18.5px;line-height:1.34;color:var(--ink-2)}
+    padding:32px 36px;box-shadow:0 10px 30px -24px rgba(27,22,20,.5)}
+  .card-h{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:12px}
+  .card p{margin:0;font-size:20px;line-height:1.45;color:var(--ink-2)}
   .card b{color:var(--sk-red)}
+  .acro{margin-top:18px;font-size:14px;line-height:1.4;color:var(--ink-3);letter-spacing:.01em;text-wrap:pretty}
+  ul.reg-list.reg-2col{display:grid;grid-template-columns:1fr 1fr;gap:26px 56px}
 
   /* Benchmark evidence line (demo 3) */
   .evidence{margin-top:22px;font-size:18px;line-height:1.35;color:var(--ink-3);
@@ -153,7 +155,9 @@
   [data-kind="points"] .slide-inner,
   [data-kind="live"] .slide-inner,
   [data-kind="try"] .slide-inner,
-  [data-kind="diagram"] .slide-inner{justify-content:center}
+  [data-kind="diagram"] .slide-inner,
+  [data-kind="cards"] .slide-inner,
+  [data-kind="reg"] .slide-inner{justify-content:center}
   [data-kind="title"] .eyebrow{border-image:none;border-bottom:none;
     margin-bottom:30px;color:var(--ink-2)}
   .brandmark{margin-bottom:20px}
@@ -356,6 +360,7 @@
            <p class="lede">Components. Vulnerabilities with EPSS and CISA&nbsp;KEV.
            Licenses classified by copyleft strength.</p>
            <p class="cue">Overview → Components → Dependencies → Vulnerabilities → Licenses</p>
+           <p class="acro">EPSS — Exploit Prediction Scoring System · CISA KEV — the U.S. CISA Known Exploited Vulnerabilities catalog</p>
          </div>
         
       </div>
@@ -384,30 +389,18 @@
         <div class="eyebrow"><span class="ey-text">Where this lands</span></div>
         <h2 class="headline">The rules are arriving now</h2>
         <div class="content">
-           <div class="reg-cols">
-             <div class="reg-col">
-               <div class="reg-label reg-now">Checked today</div>
-               <ul class="reg-list">
-                 <li><b>SBOM minimum elements</b>
-                   <span class="reg-when">EU CRA (BSI TR-03183-2) &amp; US NTIA fields, PURL &amp; dependency coverage · crosswalked live in demo 4</span></li>
-                 <li><b>G7 minimum elements for AI</b>
-                   <span class="reg-when">51 checks · 41 automated, 10 for human review</span></li>
-                 <li><b>EU AI Act</b> — Annex IV crosswalk
-                   <span class="reg-when">obligations from 2 Aug 2026 · 23 elements mapped</span></li>
-                 <li><b>Korea AI Framework Act</b> — Articles 31–35
-                   <span class="reg-when">in force since 22 Jan 2026</span></li>
-               </ul>
-             </div>
-             <div class="reg-col">
-               <div class="reg-label reg-next">Beyond an SBOM</div>
-               <ul class="reg-list">
-                 <li><b>EU CRA</b> — vulnerability handling &amp; reporting
-                   <span class="reg-when">manufacturer process duties, not SBOM fields</span></li>
-                 <li><b>EU AI Act</b> — risk, bias &amp; fairness assessment
-                   <span class="reg-when">separate documentation an SBOM can't carry</span></li>
-               </ul>
-               <p class="reg-open">The crosswalk maps only what an SBOM can express.</p>
-             </div>
+           <div class="reg-col">
+             <div class="reg-label reg-now">Checked today</div>
+             <ul class="reg-list reg-2col">
+               <li><b>SBOM minimum elements</b>
+                 <span class="reg-when">EU CRA (BSI TR-03183-2) &amp; US NTIA fields · PURL &amp; dependency coverage · live in demo 4</span></li>
+               <li><b>G7 minimum elements for AI</b>
+                 <span class="reg-when">51 checks · 41 automated, 10 for human review</span></li>
+               <li><b>EU AI Act</b> — Annex IV crosswalk
+                 <span class="reg-when">obligations from 2 Aug 2026 · 23 elements mapped</span></li>
+               <li><b>Korea AI Framework Act</b> — Articles 31–35
+                 <span class="reg-when">in force since 22 Jan 2026</span></li>
+             </ul>
            </div>
            <p class="stamp">A regulation lands on a customer; the customer passes
            it to its suppliers as "send us an SBOM." <b>So the next two demos
@@ -472,7 +465,6 @@
              <text x="32" y="276" font-size="15" fill="#8a807a">No account · no server</text>
              <line x1="398" y1="182" x2="602" y2="182" stroke="#EA002C" stroke-width="3" marker-end="url(#ah)"/>
              <text x="500" y="162" font-size="15" fill="#EA002C" text-anchor="middle" font-family="ui-monospace,monospace">standard CycloneDX</text>
-             <text x="500" y="210" font-size="13" fill="#8a807a" text-anchor="middle">source stays local — only the SBOM travels</text>
              <rect x="602" y="66" width="392" height="230" rx="18" fill="#fff" stroke="#e6ded9" stroke-width="1.5"/>
              <text x="628" y="108" font-size="27" font-weight="800" fill="#1b1614">TRUSCA</text>
              <text x="628" y="136" font-size="15" fill="#8a807a">Governance portal · a separate project</text>
@@ -528,15 +520,19 @@
              data-notes-id="note-14">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Try it</span></div>
-        <h2 class="headline">One line to your first SBOM</h2>
+        <h2 class="headline">Your first SBOM, no command line</h2>
         <div class="content">
-           <div class="cmd">docker pull ghcr.io/sktelecom/bomlens:latest</div>
+           <p class="lede">Download the desktop app, double-click, and scan — it
+           checks Docker, pulls the image, and opens the UI. No console.</p>
            <div class="links">
+             <div><span class="k">Download</span> github.com/sktelecom/bomlens/releases
+               <span class="dim">· Windows .exe · double-click</span></div>
              <div><span class="k">Repo</span> github.com/sktelecom/bomlens</div>
              <div><span class="k">Docs</span> sktelecom.github.io/bomlens
                <span class="dim">· English &amp; 한국어</span></div>
              <div><span class="k">License</span> Apache-2.0</div>
            </div>
+           <p class="acro">Prefer the command line? docker pull ghcr.io/sktelecom/bomlens:latest</p>
          </div>
         
       </div>
