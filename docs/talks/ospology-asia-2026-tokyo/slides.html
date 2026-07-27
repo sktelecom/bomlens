@@ -96,6 +96,7 @@
   /* Cards — use the full width so the 2×2 grid breathes and never spills into
      the footer (the narrow reading column would crush it vertically). */
   [data-kind="cards"] .content{max-width:none}
+  [data-kind="diagram"] .content{max-width:none;margin-top:10px}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:6px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
     padding:24px 26px;box-shadow:0 10px 30px -24px rgba(27,22,20,.5)}
@@ -150,7 +151,8 @@
   [data-kind="statement"] .slide-inner,
   [data-kind="points"] .slide-inner,
   [data-kind="live"] .slide-inner,
-  [data-kind="try"] .slide-inner{justify-content:center}
+  [data-kind="try"] .slide-inner,
+  [data-kind="diagram"] .slide-inner{justify-content:center}
   [data-kind="title"] .eyebrow{border-image:none;border-bottom:none;
     margin-bottom:30px;color:var(--ink-2)}
   .brandmark{margin-bottom:20px}
@@ -450,8 +452,43 @@
     </section>
     <template id="note-10"></template>
 
-    <section class="slide" data-kind="live" data-index="11"
+    <section class="slide" data-kind="diagram" data-index="11"
              data-notes-id="note-11">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">How it fits</span></div>
+        <h2 class="headline">Generate locally, govern centrally</h2>
+        <div class="content">
+           <svg viewBox="0 0 1000 372" width="100%" role="img"
+                aria-label="BomLens generates a standard CycloneDX SBOM locally; TRUSCA ingests it for org-wide governance">
+             <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4"
+               orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#EA002C"/></marker></defs>
+             <rect x="6" y="66" width="392" height="230" rx="18" fill="#fff" stroke="#e6ded9" stroke-width="1.5"/>
+             <text x="32" y="108" font-size="27" font-weight="800" fill="#1b1614">BomLens</text>
+             <text x="32" y="136" font-size="15" fill="#8a807a">On your machine · local-first</text>
+             <text x="32" y="182" font-size="16" fill="#5c534e">Source · container image · firmware ·</text>
+             <text x="32" y="206" font-size="16" fill="#5c534e">received SBOM · AI model</text>
+             <text x="32" y="244" font-size="16" font-weight="700" fill="#1b1614">→ generate SBOM + assess risk</text>
+             <text x="32" y="276" font-size="15" fill="#8a807a">No account · no server</text>
+             <line x1="398" y1="182" x2="602" y2="182" stroke="#EA002C" stroke-width="3" marker-end="url(#ah)"/>
+             <text x="500" y="162" font-size="15" fill="#EA002C" text-anchor="middle" font-family="ui-monospace,monospace">standard CycloneDX</text>
+             <text x="500" y="210" font-size="13" fill="#8a807a" text-anchor="middle">source stays local — only the SBOM travels</text>
+             <rect x="602" y="66" width="392" height="230" rx="18" fill="#fff" stroke="#e6ded9" stroke-width="1.5"/>
+             <text x="628" y="108" font-size="27" font-weight="800" fill="#1b1614">TRUSCA</text>
+             <text x="628" y="136" font-size="15" fill="#8a807a">Governance portal · a separate project</text>
+             <text x="628" y="182" font-size="16" fill="#5c534e">Ingests SBOMs across suppliers</text>
+             <text x="628" y="220" font-size="16" font-weight="700" fill="#1b1614">Components · Vulnerabilities · Compliance</text>
+             <text x="628" y="252" font-size="15" fill="#8a807a">Org-wide policy &amp; history</text>
+             <text x="202" y="340" font-size="15" fill="#5c534e" text-anchor="middle">generate &amp; assess — local</text>
+             <text x="798" y="340" font-size="15" fill="#5c534e" text-anchor="middle">govern — org-wide</text>
+           </svg>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-11"></template>
+
+    <section class="slide" data-kind="live" data-index="12"
+             data-notes-id="note-12">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 6 of 6</span></div>
         <h2 class="headline">Close the loop: hand it to governance</h2>
@@ -465,10 +502,10 @@
         
       </div>
     </section>
-    <template id="note-11"></template>
+    <template id="note-12"></template>
 
-    <section class="slide" data-kind="statement" data-index="12"
-             data-notes-id="note-12">
+    <section class="slide" data-kind="statement" data-index="13"
+             data-notes-id="note-13">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Full circle</span></div>
         <h2 class="headline">The mandate, now with a tool</h2>
@@ -484,10 +521,10 @@
         
       </div>
     </section>
-    <template id="note-12"></template>
+    <template id="note-13"></template>
 
-    <section class="slide" data-kind="try" data-index="13"
-             data-notes-id="note-13">
+    <section class="slide" data-kind="try" data-index="14"
+             data-notes-id="note-14">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Try it</span></div>
         <h2 class="headline">One line to your first SBOM</h2>
@@ -503,10 +540,10 @@
         
       </div>
     </section>
-    <template id="note-13"></template>
+    <template id="note-14"></template>
 
-    <section class="slide" data-kind="thanks" data-index="14"
-             data-notes-id="note-14">
+    <section class="slide" data-kind="thanks" data-index="15"
+             data-notes-id="note-15">
       <div class="slide-inner">
         
         <h2 class="headline">Thank you</h2>
@@ -522,7 +559,7 @@
         
       </div>
     </section>
-    <template id="note-14"></template>
+    <template id="note-15"></template>
   <div class="foot">
     <span class="fmark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="BomLens">
   <defs>
@@ -542,7 +579,7 @@
     <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
   </g>
 </svg> <span>BomLens · SBOM for supply-chain security</span></span>
-    <span class="fnum"><span id="cur">1</span> / 14</span>
+    <span class="fnum"><span id="cur">1</span> / 15</span>
   </div>
   <div id="progress"></div>
 </div></div>
