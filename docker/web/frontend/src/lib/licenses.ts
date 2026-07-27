@@ -135,9 +135,7 @@ function worstTier(licenses: string[]): LicenseRiskTier {
 export function isCopyleft(license: string): boolean {
   const t = licenseRiskTier(license);
   return (
-    t === "network-copyleft" ||
-    t === "strong-copyleft" ||
-    t === "weak-copyleft"
+    t === "network-copyleft" || t === "strong-copyleft" || t === "weak-copyleft"
   );
 }
 
@@ -197,4 +195,158 @@ export function reviewGroups(components: ComponentItem[]): ReviewGroup[] {
 /** Total components needing license review. */
 export function reviewCount(components: ComponentItem[]): number {
   return components.filter((c) => c.licenseReview).length;
+}
+
+// ---------------------------------------------------------------------------
+// SPDX expression parsing + outbound-license conflict verdicts.
+//
+// MIRROR of parse_license_expr / license_conflict in
+// docker/lib/license-flags.jq; tests/test-postprocess.sh diffs the operator
+// patterns of the two files, so neither side can change alone.
+//
+// Why a parser: a component's license arrives either as several entries in
+// `licenses[]` or as ONE string holding an SPDX expression ("MIT OR
+// Apache-2.0"). OR and AND mean opposite things for a verdict — OR lets the
+// consumer pick one, AND applies every term — so licenseRiskTier's worst-of
+// rule, right for a strength label, is wrong here.
+//
+// Flat expressions only: a parenthesised expression yields no terms and the
+// caller reports "unknown" rather than guessing. AND binds tighter than OR, as
+// in the SPDX spec.
+// ---------------------------------------------------------------------------
+
+/** A slash is the other OR spelling in the wild ("MIT/X11") — only when there
+ *  is exactly one and no URL scheme, so a license name holding a link survives. */
+function slashIsOr(s: string): boolean {
+  return (s.match(/\//g) ?? []).length === 1 && !s.includes("://");
+}
+
+/** OR alternatives, each a list of AND terms. `[]` when nothing is parseable. */
+export function parseLicenseExpression(s: string): string[][] {
+  const e = (s ?? "").trim();
+  if (!e || /[()]/.test(e)) return [];
+  const flat = slashIsOr(e) ? e.replace(/\s*\/\s*/, " OR ") : e;
+  return flat
+    .split(/\s+OR\s+/i)
+    .map((group) =>
+      group
+        .split(/\s+AND\s+/i)
+        .map((t) => t.trim())
+        .filter(Boolean),
+    )
+    .filter((group) => group.length > 0);
+}
+
+/** True when a term carries an exception clause, which exists precisely to
+ *  permit a combination the base license would otherwise forbid. */
+export function hasLicenseException(term: string): boolean {
+  return /\bWITH\b|-with-.*-exception/i.test(term ?? "");
+}
+
+export type ConflictVerdict =
+  "compatible" | "conditional" | "incompatible" | "unknown";
+
+/** Worst-first ordering; AND takes the max, OR takes the min. */
+export const CONFLICT_RANK: Record<ConflictVerdict, number> = {
+  compatible: 0,
+  conditional: 1,
+  unknown: 2,
+  incompatible: 3,
+};
+
+/** Display order for grouping: the ones a person must act on come first. */
+export const CONFLICT_ORDER: ConflictVerdict[] = [
+  "incompatible",
+  "conditional",
+  "unknown",
+  "compatible",
+];
+
+/** The rules file (docker/lib/license-compat.json) as the UI consumes it. */
+export interface CompatRules {
+  matrix: Record<
+    string,
+    Record<string, { verdict: ConflictVerdict; why: string }>
+  >;
+  pairs?: {
+    outbound: string;
+    dependency: string;
+    verdict: ConflictVerdict;
+    why: string;
+  }[];
+}
+
+export interface ConflictResult {
+  verdict: ConflictVerdict;
+  why: string;
+}
+
+/** Verdict for ONE dependency term. Explicit pairs win over the class matrix;
+ *  an exception clause caps the result at "conditional". */
+export function termVerdict(
+  term: string,
+  outbound: string,
+  rules: CompatRules,
+): ConflictResult {
+  const pair = (rules.pairs ?? []).find(
+    (p) =>
+      p.outbound.toUpperCase() === outbound.toUpperCase() &&
+      p.dependency.toUpperCase() === term.toUpperCase(),
+  );
+  let result: ConflictResult = pair
+    ? { verdict: pair.verdict, why: pair.why }
+    : (rules.matrix[licenseRiskTier(outbound)]?.[licenseRiskTier(term)] ?? {
+        verdict: "unknown" as const,
+        why: "No rule for this combination.",
+      });
+  if (hasLicenseException(term) && result.verdict === "incompatible") {
+    result = {
+      verdict: "conditional",
+      why: `The dependency carries an exception clause, which exists to permit exactly this combination. Confirm the exception covers your use. (${result.why})`,
+    };
+  }
+  return result;
+}
+
+/** Verdict for one license string, which may be an SPDX expression. `null`
+ *  when nothing parseable came out of it. */
+export function expressionVerdict(
+  s: string,
+  outbound: string,
+  rules: CompatRules,
+): ConflictResult | null {
+  const groups = parseLicenseExpression(s);
+  if (groups.length === 0) return null;
+  const perGroup = groups.map((terms) =>
+    terms
+      .map((t) => termVerdict(t, outbound, rules))
+      .reduce((worst, v) =>
+        CONFLICT_RANK[v.verdict] > CONFLICT_RANK[worst.verdict] ? v : worst,
+      ),
+  );
+  return perGroup.reduce((best, v) =>
+    CONFLICT_RANK[v.verdict] < CONFLICT_RANK[best.verdict] ? v : best,
+  );
+}
+
+/** Verdict for a whole component. Several license entries are alternatives
+ *  (the consumer may pick one), so the best verdict across them wins. */
+export function componentConflict(
+  licenses: string[],
+  outbound: string,
+  rules: CompatRules,
+): ConflictResult {
+  if (licenses.length === 0)
+    return { verdict: "unknown", why: "The component declares no license." };
+  const verdicts = licenses
+    .map((l) => expressionVerdict(l, outbound, rules))
+    .filter((v): v is ConflictResult => v !== null);
+  if (verdicts.length === 0)
+    return {
+      verdict: "unknown",
+      why: "The declared license could not be parsed as an SPDX expression.",
+    };
+  return verdicts.reduce((best, v) =>
+    CONFLICT_RANK[v.verdict] < CONFLICT_RANK[best.verdict] ? v : best,
+  );
 }

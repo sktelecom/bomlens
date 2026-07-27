@@ -18,6 +18,14 @@
 # names the root component after the scan path (/target) — meaningless and leaking
 # the mount path, the same problem described above. IMAGE/BINARY/FIRMWARE/ANALYZE
 # carry their own meaningful root component and should not call this.
+#
+# Also records the project's OUTBOUND license from $PROJECT_LICENSE, when set. A
+# source scan cannot infer it: cdxgen leaves metadata.component.licenses empty for
+# maven and gradle trees (only npm fills it, from package.json), so without a
+# declaration the license-conflict check has nothing to compare dependencies
+# against. Only ever FILLS an empty value — an existing root license is left alone,
+# and the modes that carry a supplier's own root component (ANALYZE/MERGE) do not
+# call this file at all, so a received SBOM's declaration can never be overwritten.
 set -e
 
 SBOM="$1"
@@ -43,13 +51,23 @@ if ! jq empty "$SBOM" 2>/dev/null; then
 fi
 
 TMP="$(mktemp)"
-if jq --arg n "$NAME" --arg v "$VERSION" \
+if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
     '.metadata.component.name = $n
      | .metadata.component.version = $v
-     | (.metadata.component) |= del(.purl)' \
+     | (.metadata.component) |= del(.purl)
+     | (if $lic != "" and (((.metadata.component.licenses // []) | length) == 0)
+        then .metadata.component.licenses = [{license: {id: $lic}}]
+        else . end)' \
     "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"
     echo "[stamp] metadata.component set to ${NAME}@${VERSION}: $SBOM"
+    if [ -n "${PROJECT_LICENSE:-}" ]; then
+        if jq -e '((.metadata.component.licenses // [])[0].license.id // "") == $ENV.PROJECT_LICENSE' "$SBOM" >/dev/null 2>&1; then
+            echo "[stamp] outbound license declared: ${PROJECT_LICENSE} (drives the license-conflict check)"
+        else
+            echo "[stamp] outbound license already present in the SBOM; PROJECT_LICENSE=${PROJECT_LICENSE} not applied"
+        fi
+    fi
 else
     rm -f "$TMP"
     echo "[stamp] ERROR: could not stamp metadata.component (jq transform failed): $SBOM" >&2

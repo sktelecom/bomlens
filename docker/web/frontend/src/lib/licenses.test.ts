@@ -2,21 +2,38 @@ import { describe, expect, it } from "vitest";
 
 import type { ComponentItem } from "./api";
 import {
+  componentConflict,
   isCopyleft,
   licenseGroups,
   licenseRiskSummary,
   licenseRiskTier,
+  parseLicenseExpression,
   reviewCount,
   reviewGroups,
 } from "./licenses";
+import type { CompatRules } from "./licenses";
 
 const c = (over: Partial<ComponentItem>): ComponentItem => ({
-  name: "x", version: "1", group: "", purl: "", type: "library", licenses: [], ...over,
+  name: "x",
+  version: "1",
+  group: "",
+  purl: "",
+  type: "library",
+  licenses: [],
+  ...over,
 });
 
 const COMPONENTS = [
-  c({ name: "llama", licenses: ["LLaMA-3.1"], licenseReview: "behavioral-use" }),
-  c({ name: "nc-data", licenses: ["CC-BY-NC-4.0"], licenseReview: "non-commercial" }),
+  c({
+    name: "llama",
+    licenses: ["LLaMA-3.1"],
+    licenseReview: "behavioral-use",
+  }),
+  c({
+    name: "nc-data",
+    licenses: ["CC-BY-NC-4.0"],
+    licenseReview: "non-commercial",
+  }),
   c({ name: "lib-a", licenses: ["MIT"] }),
   c({ name: "lib-b", licenses: ["MIT"] }),
   c({ name: "unlic", licenses: [] }),
@@ -34,7 +51,10 @@ describe("licenseGroups", () => {
 describe("reviewGroups", () => {
   it("groups flagged components, behavioral-use before non-commercial", () => {
     const groups = reviewGroups(COMPONENTS);
-    expect(groups.map((g) => g.flag)).toEqual(["behavioral-use", "non-commercial"]);
+    expect(groups.map((g) => g.flag)).toEqual([
+      "behavioral-use",
+      "non-commercial",
+    ]);
     expect(groups[0].components.map((x) => x.name)).toEqual(["llama"]);
   });
 
@@ -46,7 +66,13 @@ describe("reviewGroups", () => {
 
 describe("isCopyleft", () => {
   it("flags copyleft/reciprocal ids and leaves permissive ones alone", () => {
-    for (const id of ["GPL-3.0-only", "AGPL-3.0", "LGPL-2.1", "MPL-2.0", "EPL-2.0"]) {
+    for (const id of [
+      "GPL-3.0-only",
+      "AGPL-3.0",
+      "LGPL-2.1",
+      "MPL-2.0",
+      "EPL-2.0",
+    ]) {
       expect(isCopyleft(id)).toBe(true);
     }
     for (const id of ["MIT", "Apache-2.0", "BSD-3-Clause", "ISC"]) {
@@ -93,5 +119,120 @@ describe("licenseRiskSummary", () => {
     const s = licenseRiskSummary([c({ licenses: ["Weird-1.0"] })]);
     expect(s.uncategorized).toBe(1);
     expect(s.permissive).toBe(0);
+  });
+});
+
+// The rules the scanner ships in docker/lib/license-compat.json, trimmed to what
+// these cases exercise. Kept literal rather than imported: the UI receives the
+// verdict already computed by the scanner, so this file's job is to prove the
+// mirror agrees with the jq side, case for case.
+const RULES: CompatRules = {
+  matrix: {
+    permissive: {
+      permissive: { verdict: "compatible", why: "" },
+      "weak-copyleft": { verdict: "conditional", why: "" },
+      "strong-copyleft": { verdict: "incompatible", why: "" },
+      "network-copyleft": { verdict: "incompatible", why: "" },
+      uncategorized: { verdict: "unknown", why: "" },
+    },
+    "strong-copyleft": {
+      permissive: { verdict: "compatible", why: "" },
+      "weak-copyleft": { verdict: "conditional", why: "" },
+      "strong-copyleft": { verdict: "conditional", why: "" },
+      "network-copyleft": { verdict: "conditional", why: "" },
+      uncategorized: { verdict: "unknown", why: "" },
+    },
+  },
+  pairs: [
+    {
+      outbound: "GPL-2.0-ONLY",
+      dependency: "APACHE-2.0",
+      verdict: "incompatible",
+      why: "",
+    },
+  ],
+};
+
+describe("parseLicenseExpression", () => {
+  // Every string here was measured in a real BomLens SBOM.
+  it("splits OR alternatives", () => {
+    expect(parseLicenseExpression("MIT OR Apache-2.0")).toEqual([
+      ["MIT"],
+      ["Apache-2.0"],
+    ]);
+  });
+
+  it("keeps AND terms together", () => {
+    expect(parseLicenseExpression("EPL-1.0 AND LGPL-2.1-only")).toEqual([
+      ["EPL-1.0", "LGPL-2.1-only"],
+    ]);
+  });
+
+  it("binds AND tighter than OR", () => {
+    expect(parseLicenseExpression("A OR B AND C")).toEqual([["A"], ["B", "C"]]);
+  });
+
+  it("treats a lone slash as OR", () => {
+    expect(parseLicenseExpression("MIT/X11")).toEqual([["MIT"], ["X11"]]);
+  });
+
+  it("leaves a URL intact", () => {
+    expect(parseLicenseExpression("https://example.com/lic")).toEqual([
+      ["https://example.com/lic"],
+    ]);
+  });
+
+  it("refuses a parenthesised expression rather than guessing", () => {
+    expect(parseLicenseExpression("(A OR B) AND C")).toEqual([]);
+  });
+
+  it("is empty for an empty string", () => {
+    expect(parseLicenseExpression("")).toEqual([]);
+  });
+});
+
+describe("componentConflict", () => {
+  const v = (licenses: string[], outbound = "Apache-2.0") =>
+    componentConflict(licenses, outbound, RULES).verdict;
+
+  it("flags strong copyleft under a permissive outbound license", () => {
+    expect(v(["GPL-3.0-only"])).toBe("incompatible");
+  });
+
+  it("clears an OR expression when one alternative fits", () => {
+    expect(v(["MIT OR Apache-2.0"])).toBe("compatible");
+  });
+
+  it("takes the worst term of an AND expression", () => {
+    expect(v(["EPL-1.0 AND LGPL-2.1-only"])).toBe("conditional");
+  });
+
+  // The case that decides the feature: java-maven's jakarta components. A naive
+  // pair check calls this incompatible; the exception clause exists to allow it.
+  it("caps a term carrying an exception clause at conditional", () => {
+    expect(v(["EPL-2.0 AND GPL-2.0-with-classpath-exception"])).toBe(
+      "conditional",
+    );
+  });
+
+  it("treats several license entries as alternatives", () => {
+    expect(v(["EPL-1.0", "LGPL-2.1-only"])).toBe("conditional");
+  });
+
+  it("applies an explicit pair over the class matrix", () => {
+    expect(v(["Apache-2.0"], "GPL-2.0-only")).toBe("incompatible");
+    expect(v(["Apache-2.0"], "GPL-3.0-only")).toBe("compatible");
+  });
+
+  it("is unknown for free-text that is not an SPDX id", () => {
+    expect(
+      v([
+        "Eclipse Public License v. 2.0 OR Eclipse Distribution License v. 1.0",
+      ]),
+    ).toBe("unknown");
+  });
+
+  it("is unknown when the component declares no license", () => {
+    expect(v([])).toBe("unknown");
   });
 });

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Dependencies are now checked against the licence the project itself is distributed under, so a combination that cannot legally ship is visible before delivery rather than at review time. The existing licence classification labels each component's copyleft strength in isolation; a conflict only exists relative to an outbound licence, which a source scan cannot infer — cdxgen leaves the root licence empty for maven and gradle trees. Declare it with `--license <spdx-id>` (or `PROJECT_LICENSE`) and every component gains a `bomlens:licenseConflict` verdict — `compatible`, `conditional`, `incompatible` or `unknown` — with the reasoning recorded alongside it, plus a summary section in the risk report. The rules live in reviewable data (`docker/lib/license-compat.json`): a copyleft-strength matrix with explicit pairs for the cases it cannot express, such as GPL-2.0-only with Apache-2.0. Verdicts follow SPDX operators rather than flattening them — `MIT OR Apache-2.0` clears when one alternative fits, an `AND` expression is condemned by its worst term, and a licence carrying an exception clause (the classpath exception being the common one) is capped at `conditional` because that clause exists to permit the combination. Nothing is stamped when no outbound licence is declared: an absent verdict means "not assessed", never an all-clear. Advisory throughout — it surfaces combinations that need a person to look and makes no legal determination.
+
 ## [v1.9.0] - 2026-07-25
 
 ### Added

@@ -372,6 +372,97 @@ else
     fail "tier results diverged" "licenses.ts: $(echo "$ts_tier" | tr '\n' ' ') / license-flags.jq: $(echo "$jq_tier" | tr '\n' ' ')"
 fi
 
+echo "== license-conflict: expression parsing and outbound-license verdicts =="
+# The conflict check needs an OUTBOUND license on metadata.component. Every
+# expression below was measured in a real BomLens SBOM, so this pins the cases
+# that actually occur rather than invented ones.
+COMPAT="$LIB/license-compat.json"
+if [ ! -f "$COMPAT" ]; then
+    fail "license-compat.json is missing from docker/lib"
+else
+    cat > "$WORK/lconf.json" <<'LCJSON'
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+  "metadata": { "component": { "type": "application", "name": "app", "version": "1.0",
+                               "licenses": [ { "license": { "id": "Apache-2.0" } } ] } },
+  "components": [
+    { "type": "library", "name": "gpl-dep", "version": "1", "purl": "pkg:maven/x/gpl-dep@1",
+      "licenses": [ { "license": { "id": "GPL-3.0-only" } } ] },
+    { "type": "library", "name": "dual", "version": "1", "purl": "pkg:maven/x/dual@1",
+      "licenses": [ { "expression": "MIT OR Apache-2.0" } ] },
+    { "type": "library", "name": "andexpr", "version": "1", "purl": "pkg:maven/x/andexpr@1",
+      "licenses": [ { "expression": "EPL-1.0 AND LGPL-2.1-only" } ] },
+    { "type": "library", "name": "classpath", "version": "1", "purl": "pkg:maven/x/classpath@1",
+      "licenses": [ { "expression": "EPL-2.0 AND GPL-2.0-with-classpath-exception" } ] },
+    { "type": "library", "name": "twoentries", "version": "1", "purl": "pkg:maven/x/twoentries@1",
+      "licenses": [ { "license": { "id": "EPL-1.0" } }, { "license": { "id": "LGPL-2.1-only" } } ] },
+    { "type": "library", "name": "freetext", "version": "1", "purl": "pkg:maven/x/freetext@1",
+      "licenses": [ { "license": { "name": "Eclipse Public License v. 2.0 OR Eclipse Distribution License v. 1.0" } } ] },
+    { "type": "library", "name": "nolicense", "version": "1", "purl": "pkg:maven/x/nolicense@1" }
+  ]
+}
+LCJSON
+    bash "$LIB/normalize-sbom.sh" "$WORK/lconf.json" >/dev/null 2>&1
+    verdict_of() { jq -r --arg n "$1" '[.components[] | select(.name==$n)
+        | ((.properties // [])[] | select(.name=="bomlens:licenseConflict") | .value)] | first // "none"' "$WORK/lconf.json"; }
+    lc_expect() {
+        got=$(verdict_of "$1")
+        [ "$got" = "$2" ] && pass "license conflict: $1 -> $2" \
+                          || fail "license conflict: $1 expected $2, got $got"
+    }
+    lc_expect gpl-dep     incompatible
+    lc_expect dual        compatible
+    lc_expect andexpr     conditional
+    # The decisive case: an exception clause exists to permit the combination, so
+    # it must never reach "incompatible" (java-maven's jakarta components).
+    lc_expect classpath   conditional
+    lc_expect twoentries  conditional
+    lc_expect freetext    unknown
+    lc_expect nolicense   unknown
+
+    # No outbound license -> no property at all. An absent verdict means "not
+    # assessed"; stamping "compatible" would claim an all-clear nobody checked.
+    jq 'del(.metadata.component.licenses)' "$WORK/lconf.json" \
+        | jq 'del(.components[].properties)' > "$WORK/lconf-nolic.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/lconf-nolic.json" >/dev/null 2>&1
+    if [ "$(jq '[.components[].properties // [] | .[] | select(.name=="bomlens:licenseConflict")] | length' "$WORK/lconf-nolic.json")" = "0" ]; then
+        pass "no outbound license declared -> no licenseConflict property stamped"
+    else
+        fail "licenseConflict was stamped without a declared outbound license"
+    fi
+
+    # Byte-stability: the property must not disturb --stable determinism.
+    cp "$WORK/lconf.json" "$WORK/lcf1.json"; cp "$WORK/lconf.json" "$WORK/lcf2.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/lcf1.json" --stable >/dev/null 2>&1
+    bash "$LIB/normalize-sbom.sh" "$WORK/lcf2.json" --stable >/dev/null 2>&1
+    diff -q "$WORK/lcf1.json" "$WORK/lcf2.json" >/dev/null 2>&1 \
+        && pass "--stable output with licenseConflict is byte-identical across runs" \
+        || fail "licenseConflict stamping broke --byte-stable determinism"
+fi
+
+echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
+# Same contract as the license-class guard above: the SPDX operator patterns and
+# the exception test are hand-mirrored, so extract both sides and diff them.
+jq_ops=$(sed -n '/^def parse_license_expr/,/^def has_license_exception/p' "$LFJ" \
+    | grep -oE 'splits\("[^"]+"' | sed 's/^splits("//; s/"$//; s/\\\\/\\/g' | sort)
+ts_ops=$(sed -n '/^export function parseLicenseExpression/,/^}/p' "$LTS" \
+    | grep -oE 'split\(/[^/]+/i\)' | sed 's:^split(/::; s:/i)$::' | sort)
+if [ -z "$jq_ops" ] || [ -z "$ts_ops" ]; then
+    fail "could not extract the SPDX operator patterns (license-flags.jq / licenses.ts changed shape?)"
+elif [ "$jq_ops" = "$ts_ops" ]; then
+    pass "SPDX operator patterns are identical ($(printf '%s\n' "$jq_ops" | tr '\n' ' '))"
+else
+    fail "SPDX operator patterns diverged between license-flags.jq and licenses.ts" \
+         "$(diff <(printf '%s\n' "$jq_ops") <(printf '%s\n' "$ts_ops") | grep '^[<>]' | sed 's/^</license-flags.jq:/; s/^>/licenses.ts:/')"
+fi
+jq_exc=$(grep -A2 '^def has_license_exception' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g')
+ts_exc=$(sed -n '/^export function hasLicenseException/,/^}/p' "$LTS" | grep -oE '/[^/]*WITH[^/]*/i' | sed 's:^/::; s:/i$::')
+if [ "$jq_exc" = "$ts_exc" ] && [ -n "$jq_exc" ]; then
+    pass "exception-clause patterns match"
+else
+    fail "exception-clause pattern diverged" "license-flags.jq: $jq_exc / licenses.ts: $ts_exc"
+fi
+
 echo "== risk-report: license classification summary drives from the SBOM =="
 # generate-risk-report.sh must add the per-class table and the copyleft driver
 # list (network/strong, up to 10) when the BOM artifact exists, and skip the

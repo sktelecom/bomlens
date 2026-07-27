@@ -112,6 +112,30 @@ if [ -f "$BOM" ] && [ -f "$LIB_DIR/license-flags.jq" ] && jq empty "$BOM" >/dev/
           un: ([$rows[] | select(.class=="uncategorized")]   | length) }
     ' "$BOM" 2>/dev/null || echo 'null')
 fi
+# Outbound-license conflict rollup. normalize-sbom.sh stamps a per-component
+# bomlens:licenseConflict verdict, but ONLY when the SBOM's root component
+# declares an outbound license (see --license / PROJECT_LICENSE). With no
+# declaration no property exists and this whole block stays absent from the
+# report — an omitted section means "not assessed", never "no conflicts".
+OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'
+if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
+    OUTBOUND_LIC=$(jq -r '[ (.metadata.component.licenses // [])[]
+        | (.license.id // .license.name // .expression // "") | select(. != "") ] | first // ""' "$BOM" 2>/dev/null || echo "")
+    if [ -n "$OUTBOUND_LIC" ]; then
+        LC_COUNTS=$(jq -c '[ .components[]?
+            | { v: (((.properties // [])[] | select(.name=="bomlens:licenseConflict") | .value) // ""),
+                label: ((.name // "?") + "@" + (.version // "?")) } | select(.v != "") ] as $rows
+          | { i: ([$rows[] | select(.v=="incompatible")] | length),
+              c: ([$rows[] | select(.v=="conditional")]  | length),
+              u: ([$rows[] | select(.v=="unknown")]      | length),
+              top: ([$rows[] | select(.v=="incompatible") | .label] | .[0:10]) }' "$BOM" 2>/dev/null || echo '{}')
+        LC_INCOMPAT=$(echo "$LC_COUNTS" | jq '.i // 0')
+        LC_COND=$(echo "$LC_COUNTS" | jq '.c // 0')
+        LC_UNKNOWN=$(echo "$LC_COUNTS" | jq '.u // 0')
+        LC_TOP=$(echo "$LC_COUNTS" | jq -c '.top // []')
+    fi
+fi
+
 # AI model risk assessment rollup (AIBOM/ANALYZE): re-aggregate the
 # bomlens:assessment:* verdicts assess-ai-risk.sh stamped; absent for a plain
 # software SBOM, in which case the section is skipped entirely.
@@ -198,6 +222,10 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_LICCLASS_INTRO_A=$(kstr risk.licclass_intro_html_a); P_LICCLASS_INTRO_B=$(kstr risk.licclass_intro_html_b)
     P_TH_UNCAT=$(kstr risk.th_uncat)
     P_COPYLEFT_DRIVERS=$(kstr risk.copyleft_drivers)
+    P_H3_LICCONFLICT=$(kstr risk.h3_licconflict)
+    P_LICCONFLICT_INTRO=$(kstr risk.licconflict_intro)
+    P_TH_LC=$(kstr risk.th_licconflict)
+    P_LICCONFLICT_DRIVERS=$(kstr risk.licconflict_drivers)
     P_COPYLEFT_MORE_MD=$(tfmt risk.copyleft_more_md "$((COPYLEFT_TOTAL - 10))")
     P_CL_MORE_PRE=$(kstr risk.copyleft_more_pre); P_CL_MORE_MID=$(kstr risk.copyleft_more_mid); P_CL_MORE_END=$(kstr risk.copyleft_more_end)
     P_H3_AI=$(kstr risk.h3_ai)
@@ -251,6 +279,10 @@ else
     P_LICCLASS_INTRO_B=" property. An unrecognized license is left uncategorized rather than assumed permissive."
     P_TH_UNCAT="Uncategorized"
     P_COPYLEFT_DRIVERS="Components that create copyleft exposure (network/strong, up to 10):"
+    P_H3_LICCONFLICT="Outbound-license conflicts"
+    P_LICCONFLICT_INTRO="Dependencies checked against the declared outbound license. Advisory only — it surfaces combinations that need a person to look, and makes no legal determination."
+    P_TH_LC="| Outbound license | Incompatible | Conditional | Unknown |"
+    P_LICCONFLICT_DRIVERS="Dependencies whose terms clash with the outbound license (up to 10):"
     P_COPYLEFT_MORE_MD="- … and $((COPYLEFT_TOTAL - 10)) more (see the SBOM \`bomlens:licenseClass\` property for all)"
     P_CL_MORE_PRE="… and "
     P_CL_MORE_MID=" more (see the SBOM "
@@ -342,6 +374,22 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
             if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
                 echo "${P_COPYLEFT_MORE_MD}"
             fi
+        fi
+    fi
+    if [ -n "$OUTBOUND_LIC" ]; then
+        echo ""
+        echo "### ${P_H3_LICCONFLICT}"
+        echo ""
+        echo "${P_LICCONFLICT_INTRO}"
+        echo ""
+        echo "${P_TH_LC}"
+        echo "|---|---:|---:|---:|"
+        echo "| \`${OUTBOUND_LIC}\` | ${LC_INCOMPAT} | ${LC_COND} | ${LC_UNKNOWN} |"
+        if [ "$LC_INCOMPAT" -gt 0 ]; then
+            echo ""
+            echo "${P_LICCONFLICT_DRIVERS}"
+            echo ""
+            echo "$LC_TOP" | jq -r '.[] | "- `" + . + "`"'
         fi
     fi
     if [ "$AS_MODELS" -gt 0 ]; then
@@ -519,6 +567,24 @@ HTMLLIC
             echo "</ul>"
         fi
     fi
+    if [ -n "$OUTBOUND_LIC" ]; then
+        echo "<h3>${P_H3_LICCONFLICT}</h3>"
+        echo "<p>${P_LICCONFLICT_INTRO}</p>"
+        echo "<p><code>$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</code></p>"
+        cat <<HTMLLC
+<div class="cards">
+ <span class="pill pill-crit">Incompatible <span class="count">${LC_INCOMPAT}</span></span>
+ <span class="pill pill-med">Conditional <span class="count">${LC_COND}</span></span>
+ <span class="pill pill-info">Unknown <span class="count">${LC_UNKNOWN}</span></span>
+</div>
+HTMLLC
+        if [ "$LC_INCOMPAT" -gt 0 ]; then
+            echo "<p>${P_LICCONFLICT_DRIVERS}</p>"
+            echo "<ul class=\"mono\">"
+            echo "$LC_TOP" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
+            echo "</ul>"
+        fi
+    fi
 
     if [ "$AS_MODELS" -gt 0 ]; then
         echo "<h3>${P_H3_AI}</h3>"
@@ -545,4 +611,4 @@ HTMLASSESS
     echo "</body></html>"
 } > "$HTML"
 
-echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL})"
+echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL}${OUTBOUND_LIC:+, license-conflict incompatible=${LC_INCOMPAT}})"
