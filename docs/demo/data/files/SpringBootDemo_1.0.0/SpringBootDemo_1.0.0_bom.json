@@ -22,7 +22,7 @@
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
       "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, July 28, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-07-28T11:57:53Z"
+      "timestamp": "2026-07-28T12:31:39Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -5181,7 +5181,7 @@
         "value": "pom.xml"
       }
     ],
-    "timestamp": "2026-07-28T11:57:53Z",
+    "timestamp": "2026-07-28T12:31:39Z",
     "tools": {
       "components": [
         {
@@ -5201,7 +5201,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:a41ac35f-248b-4aad-9c4c-ec00968e1ffc",
+  "serialNumber": "urn:uuid:e4699c14-49ad-4d82-94fe-ec6268b94fee",
   "services": [],
   "specVersion": "1.6",
   "version": 1
