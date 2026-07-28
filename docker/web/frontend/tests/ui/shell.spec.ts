@@ -938,6 +938,69 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   expect(results.violations).toEqual([]);
 });
 
+// A scan whose SBOM carries a known-malicious package. The Overview must lead
+// with it and the component row must carry the badge — neither is covered by a
+// screenshot, since the attention list and the table sit at different scroll
+// positions.
+const MALICIOUS_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "mal_1.0",
+  results: [{ name: "mal_1.0_bom.json", size: 100 }],
+  security: { CRITICAL: 1, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 1, vulnerabilities: [
+    { id: "CVE-2024-9999", severity: "CRITICAL", pkg: "honest", installed: "2.0", fixed: "2.1", title: "flaw" },
+  ] },
+  conformance: null,
+  sbom: {
+    components: 2,
+    maliciousCount: 1,
+    componentList: [
+      { name: "evil", version: "1.0", group: "", purl: "pkg:npm/evil@1.0", type: "library", licenses: ["MIT"], malicious: true, maliciousId: "MAL-2024-1", maliciousSource: "osv.dev@2026-01-02" },
+      { name: "honest", version: "2.0", group: "", purl: "pkg:npm/honest@2.0", type: "library", licenses: ["MIT"], maxSeverity: "CRITICAL", vulnCount: 1 },
+    ],
+  },
+};
+
+async function stubMaliciousAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(MALICIOUS_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "mal");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("Overview leads with malicious packages, above critical vulnerabilities", async ({ page }) => {
+  await stubMaliciousAndRun(page);
+
+  const attention = page.locator("main ul li a");
+  // Ordering is the assertion: a package already running in the build outranks
+  // a vulnerability waiting to be patched.
+  await expect(attention.first()).toContainText(/known-malicious/i);
+  await expect(attention.first()).toContainText(/remove and rotate/i);
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("Components table badges the malicious package", async ({ page }) => {
+  await stubMaliciousAndRun(page);
+  await page.getByRole("link", { name: /^Components/ }).first().click();
+
+  const row = page.locator("main li, main tr").filter({ hasText: "evil" }).first();
+  // Spelled out in words, so the badge does not rely on colour alone.
+  await expect(row.getByText("Malicious package")).toBeVisible();
+  // The honest component keeps its severity and gains no malicious badge.
+  await expect(page.locator("main").getByText("Malicious package")).toHaveCount(1);
+});
+
 // A scan that declared an outbound license, so the conflict check ran. The
 // verdicts here are the ones the scanner produces (see license-flags.jq); this
 // fixture pins how the section presents them.

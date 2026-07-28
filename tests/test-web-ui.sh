@@ -641,6 +641,57 @@ then
 else
     fail "EOL summary produced wrong values (see assertion above)"
 fi
+echo "== malicious flag surfaced + counted (sbom_summary) =="
+# enrich-malicious.sh writes bomlens:malicious plus the advisory id and snapshot
+# date. sbom_summary must surface them per-row and count them separately from
+# the vulnerability figures — a malicious package is removed, not patched, so
+# folding it into maxSeverity would file it under the wrong action.
+cat > "$OUT/malsum_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX",
+ "components":[
+   {"name":"evil","version":"1.0","type":"library","purl":"pkg:npm/evil@1.0",
+    "properties":[{"name":"bomlens:malicious","value":"true"},
+                  {"name":"bomlens:malicious:id","value":"MAL-2024-1"},
+                  {"name":"bomlens:malicious:source","value":"osv.dev@2026-01-02"}]},
+   {"name":"honest","version":"2.0","type":"library","purl":"pkg:npm/honest@2.0"}
+ ]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("malsum_1.0")
+assert s["maliciousCount"] == 1, s
+rows = {r["name"]: r for r in s["componentList"]}
+assert rows["evil"]["malicious"] is True, rows["evil"]
+assert rows["evil"]["maliciousId"] == "MAL-2024-1", rows["evil"]
+assert rows["evil"]["maliciousSource"] == "osv.dev@2026-01-02", rows["evil"]
+# Kept out of the severity figures on purpose.
+assert "maxSeverity" not in rows["evil"], rows["evil"]
+assert "malicious" not in rows["honest"], rows["honest"]
+PY
+then
+    pass "malicious flag surfaced per-row (id, snapshot) and counted apart from severities"
+else
+    fail "malicious summary produced wrong values (see assertion above)"
+fi
+# No flagged component -> the count is absent, not zero. The snapshot may simply
+# not have been bundled, and a zero would read as an all-clear nobody checked.
+cat > "$OUT/malnone_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","components":[{"name":"a","version":"1","type":"library","purl":"pkg:npm/a@1"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("malnone_1.0")
+assert "maliciousCount" not in s, s
+PY
+then
+    pass "nothing flagged -> maliciousCount absent (never a reassuring zero)"
+else
+    fail "maliciousCount was present with nothing flagged"
+fi
 echo "== version currency surfaced + counted (sbom_summary) =="
 # enrich-eol.sh writes bomlens:currency:* (offline, behind latest patch in cycle);
 # enrich-staleness.py (opt-in) writes bomlens:staleness:* (deps.dev absolute). The

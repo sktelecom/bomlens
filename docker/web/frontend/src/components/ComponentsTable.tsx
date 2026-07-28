@@ -364,6 +364,20 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
                         {t("result.vendoredBadge")}
                       </Badge>
                     )}
+                    {/* Leads the badges: a package to remove outranks anything
+                        that is merely out of date or vulnerable. */}
+                    {c.malicious && (
+                      <Badge
+                        tone="critical"
+                        title={
+                          c.maliciousId
+                            ? `${t("result.maliciousBadgeHint")} (${c.maliciousId}${c.maliciousSource ? `, ${c.maliciousSource}` : ""})`
+                            : t("result.maliciousBadgeHint")
+                        }
+                      >
+                        {t("result.maliciousBadge")}
+                      </Badge>
+                    )}
                     {c.eol === "true" && (
                       <Badge tone="high" title={t("result.eolBadgeHint")}>
                         {t("result.eolBadge")}

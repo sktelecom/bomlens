@@ -1,4 +1,5 @@
 import {
+  Biohazard,
   Boxes,
   CalendarX,
   ChevronRight,
@@ -42,6 +43,7 @@ const TONE_ICON: Record<AttentionItem["tone"], string> = {
   info: "text-risk-info",
 };
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
+  malicious: Biohazard,
   conformance: FileCheck2,
   vulns: ShieldAlert,
   review: Eye,
@@ -182,11 +184,13 @@ export function Overview({
               {attention.map((item) => {
                 const Icon = ATTN_ICON[item.id];
                 const label =
-                  item.id === "conformance"
-                    ? t("overview.attnConformance", { count: item.count })
-                    : item.id === "vulns"
-                      ? t("overview.attnVulns", { count: item.count })
-                      : t("overview.attnReview", { count: item.count });
+                  item.id === "malicious"
+                    ? t("overview.attnMalicious", { count: item.count })
+                    : item.id === "conformance"
+                      ? t("overview.attnConformance", { count: item.count })
+                      : item.id === "vulns"
+                        ? t("overview.attnVulns", { count: item.count })
+                        : t("overview.attnReview", { count: item.count });
                 return (
                   <li key={item.id}>
                     <a

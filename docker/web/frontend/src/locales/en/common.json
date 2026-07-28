@@ -249,7 +249,9 @@
     "outdatedReleasesBehind": "{{count}} releases behind",
     "outdatedLastReleased": "released {{date}}",
     "filterOutdated": "Outdated",
-    "colCurrency": "Version currency"
+    "colCurrency": "Version currency",
+    "maliciousBadge": "Malicious package",
+    "maliciousBadgeHint": "Published to attack whoever installs it. Remove it and rotate any credential the build could reach — there is no version to upgrade to."
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -377,7 +379,8 @@
     "compSame": "no component change",
     "sevUp": "more severe than before",
     "sevDown": "less severe than before",
-    "sevSame": "severity unchanged"
+    "sevSame": "severity unchanged",
+    "attnMalicious": "{{count}} known-malicious package(s) — remove and rotate credentials"
   },
   "models": {
     "loading": "Loading model details…",

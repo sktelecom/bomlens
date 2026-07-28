@@ -74,6 +74,15 @@ export interface ComponentItem {
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
   licenseReview?: "behavioral-use" | "non-commercial";
+  /** A known-malicious package (bundled OSV snapshot). Not a severity: this one
+   *  is removed rather than upgraded, so it is kept out of maxSeverity/vulnCount
+   *  and shown as its own signal. */
+  malicious?: boolean;
+  /** The OSV advisory id (MAL-…) behind that flag. */
+  maliciousId?: string;
+  /** Which snapshot said so, e.g. "osv.dev@2026-07-28" — a clean result means
+   *  "not in this snapshot", so the date is part of the answer. */
+  maliciousSource?: string;
   /** How this component's license sits against the project's declared outbound
    *  license (normalize-sbom.sh, rules in docker/lib/license-compat.json).
    *  Absent when no outbound license was declared — "not assessed", not clean. */
@@ -129,6 +138,9 @@ export interface SbomSummary {
   /** Components behind the latest patch in their own release cycle (offline
    *  currency from the endoflife snapshot). */
   outdatedCount?: number;
+  /** Components that are known-malicious packages. Absent when none — the tile
+   *  appears only when there is something to act on. */
+  maliciousCount?: number;
   /** The outbound license the project declares on its root component. Absent
    *  when none was declared, which is what turns the conflict check off. */
   outboundLicense?: string;

@@ -799,6 +799,29 @@ def sbom_summary(run_id):
             ),
             "",
         )
+        # Known-malicious package (enrich-malicious.sh, bundled OSV snapshot).
+        # Deliberately not folded into maxSeverity/vulnCount: this is not a flaw
+        # to patch but a package to remove, so the UI must be able to show it
+        # apart from the severity counts.
+        malicious = any(
+            p.get("name") == "bomlens:malicious" and p.get("value") == "true"
+            for p in props
+        )
+        if malicious:
+            row["malicious"] = True
+            mal_id = next(
+                (p.get("value") for p in props if p.get("name") == "bomlens:malicious:id"),
+                "",
+            )
+            if mal_id:
+                row["maliciousId"] = mal_id
+            mal_src = next(
+                (p.get("value") for p in props if p.get("name") == "bomlens:malicious:source"),
+                "",
+            )
+            if mal_src:
+                row["maliciousSource"] = mal_src
+
         if conflict:
             row["licenseConflict"] = conflict
             why = next(
@@ -1056,6 +1079,21 @@ def sbom_summary(run_id):
             if v in conflict_counts:
                 conflict_counts[v] += 1
         summary["conflictCounts"] = conflict_counts
+    # Malicious-package count across ALL components, so the KPI is right on a
+    # large SBOM too. Omitted when zero: the tile appears only when there is
+    # something to act on, and its absence never claims the scan was clean —
+    # the snapshot may simply not have been bundled.
+    malicious_count = 0
+    for c in comps:
+        if not isinstance(c, dict):
+            continue
+        if any(
+            p.get("name") == "bomlens:malicious" and p.get("value") == "true"
+            for p in _dicts(c.get("properties"))
+        ):
+            malicious_count += 1
+    if malicious_count:
+        summary["maliciousCount"] = malicious_count
     if assessed_models:
         summary["assessCounts"] = assess_counts
     return summary

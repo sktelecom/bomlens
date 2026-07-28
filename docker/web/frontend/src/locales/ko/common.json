@@ -249,7 +249,9 @@
     "outdatedReleasesBehind": "릴리스 {{count}}개 뒤처짐",
     "outdatedLastReleased": "{{date}} 배포",
     "filterOutdated": "최신 아님",
-    "colCurrency": "버전 최신성"
+    "colCurrency": "버전 최신성",
+    "maliciousBadge": "악성 패키지",
+    "maliciousBadgeHint": "설치하는 쪽을 공격하려고 배포된 패키지입니다. 올릴 수 있는 버전이 없으므로 제거하고, 빌드가 접근할 수 있었던 자격 증명을 교체하세요."
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -377,7 +379,8 @@
     "compSame": "컴포넌트 변동 없음",
     "sevUp": "이전보다 심각도 높음",
     "sevDown": "이전보다 심각도 낮음",
-    "sevSame": "심각도 변동 없음"
+    "sevSame": "심각도 변동 없음",
+    "attnMalicious": "악성 패키지 {{count}}개 — 제거하고 자격 증명을 교체하세요"
   },
   "models": {
     "loading": "모델 정보를 불러오는 중…",
