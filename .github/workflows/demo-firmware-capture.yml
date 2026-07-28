@@ -17,9 +17,13 @@ on:
   workflow_dispatch:
     inputs:
       firmware_url:
+        # rootfs 이미지를 기본으로 둔다. 기기용 sysupgrade/factory 이미지는
+        # U-Boot 헤더 같은 벤더 컨테이너로 한 겹 더 감싸여 있어 unblob이 내부
+        # squashfs를 찾지 못하는 일이 있다(ath79로 시도했을 때 packages=0).
+        # rootfs 이미지는 squashfs 그 자체라 패키지 DB가 그대로 잡힌다.
         description: "펌웨어 이미지 URL (같은 폴더에 sha256sums가 있어야 한다)"
         required: false
-        default: "https://archive.openwrt.org/releases/21.02.7/targets/ath79/generic/openwrt-21.02.7-ath79-generic-tplink_archer-c7-v2-squashfs-sysupgrade.bin"
+        default: "https://archive.openwrt.org/releases/21.02.7/targets/x86/64/openwrt-21.02.7-x86-64-generic-squashfs-rootfs.img.gz"
       project:
         description: "데모 목록에 보일 프로젝트 이름"
         required: false
@@ -95,4 +99,8 @@ jobs:
         with:
           name: demo-firmware-scan
           path: out/
+          # The run folder carries a dot-prefixed .scanmeta.json recording what
+          # was scanned; the Overview reads it to show the firmware's filename.
+          # upload-artifact skips hidden files by default, which would drop it.
+          include-hidden-files: true
           retention-days: 7
