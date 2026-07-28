@@ -1,5 +1,3 @@
-// @no-unit-test: three build-time constants read from import.meta.env — a test
-// could only re-assert the literals, since Vite inlines them at build time.
 /**
  * Static-demo mode — the published read-only demo.
  *
@@ -24,11 +22,26 @@ export const DEMO_DATA_BASE = (import.meta.env.VITE_DEMO_DATA_BASE ?? "").replac
 export const IS_STATIC_DEMO = DEMO_DATA_BASE !== "";
 
 /**
+ * Root of the documentation site, without a trailing slash. Overridable at
+ * build time so a fork or a preview deploy can point at its own docs.
+ */
+const DOCS_BASE = (
+  import.meta.env.VITE_DEMO_DOCS_BASE ?? "https://sktelecom.github.io/bomlens"
+).replace(/\/+$/, "");
+
+/**
  * Where the demo sends someone who wants to scan their own code. The demo
  * cannot run a scan, so the "New scan" action becomes this link — the one
- * thing a visitor should do next. Overridable at build time so a fork or a
- * preview deploy can point at its own docs.
+ * thing a visitor should do next.
+ *
+ * The docs site keeps English at the root and Korean under `/ko/`, so the link
+ * follows the UI's own language. Sending a reader of the English demo to Korean
+ * install instructions (or the reverse) is a dead end, and the site's language
+ * switch is too far from the moment they decided to try it.
  */
-export const DEMO_INSTALL_URL =
-  import.meta.env.VITE_DEMO_INSTALL_URL ??
-  "https://sktelecom.github.io/bomlens/getting-started/";
+export function demoInstallUrl(language: string | undefined): string {
+  // Match the subtag, not a prefix: i18next reports "ko" or "ko-KR", and a
+  // bare startsWith would also claim unrelated codes such as "kor".
+  const korean = /^ko(-|$)/i.test(language ?? "");
+  return `${DOCS_BASE}/${korean ? "ko/" : ""}start/first-scan/`;
+}

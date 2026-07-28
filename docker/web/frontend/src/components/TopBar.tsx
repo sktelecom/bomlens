@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { DEMO_INSTALL_URL, IS_STATIC_DEMO } from "@/lib/demo";
+import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -61,7 +61,7 @@ export function TopBar({
   recent = [],
   onDeleteRecent,
 }: TopBarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
   // would look outside the deployment. It is "/" in a normal build.
   const logo = (
@@ -121,7 +121,7 @@ export function TopBar({
             visitor can act on: getting the tool. Same slot, same weight. */}
         {IS_STATIC_DEMO ? (
           <a
-            href={DEMO_INSTALL_URL}
+            href={demoInstallUrl(i18n.language)}
             target="_blank"
             rel="noreferrer"
             aria-label={t("shell.demoGetTool")}

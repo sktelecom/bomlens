@@ -1,7 +1,7 @@
 import { FlaskConical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { DEMO_INSTALL_URL } from "@/lib/demo";
+import { demoInstallUrl } from "@/lib/demo";
 
 /**
  * The strip the read-only demo shows under the top bar.
@@ -12,7 +12,7 @@ import { DEMO_INSTALL_URL } from "@/lib/demo";
  * demo — `AppShell` gates it, so a normal build never mounts this.
  */
 export function DemoBanner() {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   return (
     <div
       role="note"
@@ -28,7 +28,7 @@ export function DemoBanner() {
       </span>
       <span className="min-w-0 flex-1">{t("shell.demoBannerBody")}</span>
       <a
-        href={DEMO_INSTALL_URL}
+        href={demoInstallUrl(i18n.language)}
         target="_blank"
         rel="noreferrer"
         className="shrink-0 font-medium text-brand underline underline-offset-2 hover:no-underline"

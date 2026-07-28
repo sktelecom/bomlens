@@ -7,8 +7,8 @@
 interface ImportMetaEnv {
   /** Base URL of the captured JSON the demo reads instead of calling a server. */
   readonly VITE_DEMO_DATA_BASE?: string;
-  /** Where the demo's primary action sends a visitor to get the real tool. */
-  readonly VITE_DEMO_INSTALL_URL?: string;
+  /** Docs-site root the demo links to for install instructions. */
+  readonly VITE_DEMO_DOCS_BASE?: string;
 }
 
 interface ImportMeta {
