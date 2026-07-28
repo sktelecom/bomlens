@@ -1524,3 +1524,66 @@ n_latest=$(jq '[.components[] | (.properties // [])[] | select(.name=="bomlens:s
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
+
+echo "== outbound-license: read the declaration out of the project's own manifest =="
+# The licence-conflict check only runs when the SBOM's root component carries a
+# licence, and cdxgen fills that for npm only. detect-project-license.py reads
+# the manifest so a project that already declared its licence the standard way
+# does not have to repeat it with --license. Guessing is the failure mode to
+# guard against: a wrong id produces conflict verdicts against a licence the
+# project never chose, so an unrecognised value must yield nothing.
+DPL="$ROOT_DIR/docker/lib/detect-project-license.py"
+lic_dir="$WORK/lic"
+
+mk_pom() { # mk_pom <dir> <inner-xml>
+    mkdir -p "$1"
+    { echo '<project xmlns="http://maven.apache.org/POM/4.0.0"><artifactId>a</artifactId>'
+      echo "$2"; echo '</project>'; } > "$1/pom.xml"
+}
+
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>Apache-2.0</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: SPDX id read as-is" || fail "pom.xml SPDX id -> '$got'"
+
+# Real POMs mostly spell the licence out rather than using the SPDX id.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>The Apache License, Version 2.0</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: free-text licence name mapped to SPDX" || fail "pom.xml free text -> '$got'"
+
+# URL-only declarations: apache.org's is unambiguous, others are not.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><url>https://www.apache.org/licenses/LICENSE-2.0</url></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: apache.org URL alone is enough" || fail "pom.xml url -> '$got'"
+
+# An in-house or unrecognised name must NOT be turned into an SPDX id.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>Acme Internal Use Only</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "pom.xml: an unrecognised licence name yields nothing" || fail "unrecognised name guessed '$got'"
+
+# No <licenses> block at all — the check stays off.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<name>x</name>'
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "pom.xml: no declaration yields nothing" || fail "missing declaration produced '$got'"
+
+# package.json / Cargo.toml / pyproject.toml carry the same information.
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+echo '{"name":"a","license":"MIT"}' > "$lic_dir/package.json"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "MIT" ] && pass "package.json: license read" || fail "package.json -> '$got'"
+
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+printf '[package]\nname = "a"\nlicense = "MIT OR Apache-2.0"\n' > "$lic_dir/Cargo.toml"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "MIT OR Apache-2.0" ] && pass "Cargo.toml: SPDX expression kept intact" || fail "Cargo.toml -> '$got'"
+
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+printf '[project]\nname = "a"\nlicense = { text = "BSD-3-Clause" }\n' > "$lic_dir/pyproject.toml"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "BSD-3-Clause" ] && pass "pyproject.toml: PEP 621 table form read" || fail "pyproject.toml -> '$got'"
+
+# A dependency's manifest must never be mistaken for the project's own.
+rm -rf "$lic_dir"; mkdir -p "$lic_dir/node_modules/dep"
+echo '{"name":"root"}' > "$lic_dir/package.json"
+echo '{"name":"dep","license":"GPL-3.0-only"}' > "$lic_dir/node_modules/dep/package.json"
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "vendored manifests are ignored" || fail "picked up a dependency's licence: '$got'"

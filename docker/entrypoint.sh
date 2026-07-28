@@ -469,6 +469,26 @@ ARTIFACTS=("$OUTPUT_FILE")
 # See stamp-metadata.sh for the rationale.
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS|ROOTFS)
+        # Outbound licence: what the project itself ships under, which decides
+        # whether the licence-conflict check runs at all. cdxgen fills this from
+        # package.json for npm and leaves it empty everywhere else, so a Maven
+        # project with a perfectly good <licenses> block in its pom.xml used to be
+        # told no outbound licence was declared — the user had to repeat it with
+        # --license. Read the manifest here instead. An explicit --license still
+        # wins, and a manifest we cannot read confidently yields nothing, which
+        # leaves the check off rather than inventing a licence to compare against.
+        if [ -z "${PROJECT_LICENSE:-}" ] && command -v python3 >/dev/null 2>&1; then
+            _lic_src="${SOURCE_ROOT:-/src}"
+            [ -d "$_lic_src" ] || _lic_src=""
+            if [ -n "$_lic_src" ]; then
+                _detected="$(python3 "$LIBDIR/detect-project-license.py" "$_lic_src" 2>/dev/null || true)"
+                if [ -n "$_detected" ]; then
+                    PROJECT_LICENSE="$_detected"
+                    export PROJECT_LICENSE
+                    echo "[license] outbound license read from the project manifest: $PROJECT_LICENSE"
+                fi
+            fi
+        fi
         # No `|| true`: a stamp failure means the SBOM still carries a leaked/placeholder
         # root name (e.g. src@latest), which collides in some SBOM import platforms. Fail closed under
         # set -e so a mis-named SBOM is never normalized, signed, or uploaded.

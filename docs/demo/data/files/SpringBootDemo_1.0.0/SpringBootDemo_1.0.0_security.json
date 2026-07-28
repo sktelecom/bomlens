@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.72.0"
   },
-  "ReportID": "019fa6ed-7ce3-7641-9770-3d76cf1c3f96",
-  "CreatedAt": "2026-07-28T04:13:29.699417334Z",
+  "ReportID": "019fa896-e260-738c-b9db-599559e8d80a",
+  "CreatedAt": "2026-07-28T11:58:08.480236722Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -92,30 +92,39 @@
           "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar",
-            "UID": "e9f255e0c3a3dfcb",
+            "UID": "8d11f3411ff118cf",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3",
           "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
-            "UID": "aa3d6e5892f8fbc6",
+            "UID": "56ee3951200fea9b",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml.jackson.module:jackson-module-parameter-names:2.15.3",
           "Name": "com.fasterxml.jackson.module:jackson-module-parameter-names",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar",
-            "UID": "811e07f8efec8bd3",
+            "UID": "a1083beb8e2e3c66",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml:classmate:1.5.1",
@@ -204,10 +213,13 @@
           "Name": "io.smallrye:jandex",
           "Identifier": {
             "PURL": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
-            "UID": "114157861659ce6f",
+            "UID": "2b8c7099e46adaa1",
             "BOMRef": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar"
           },
-          "Version": "3.1.2"
+          "Version": "3.1.2",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "jakarta.activation:jakarta.activation-api:2.1.2",
@@ -737,10 +749,13 @@
           "Name": "org.springframework.data:spring-data-jpa",
           "Identifier": {
             "PURL": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
-            "UID": "86a046b043dac9d6",
+            "UID": "99dff5e8c5b0b3a3",
             "BOMRef": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar"
           },
           "Version": "3.2.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
           "DependsOn": [
             "org.slf4j:slf4j-api:2.0.2",
             "org.springframework.data:spring-data-commons:3.2.0",
@@ -1524,7 +1539,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
             "https://errata.almalinux.org/9/ALSA-2026-40895.html",
-            "https://errata.rockylinux.org/RLSA-2026:43400",
+            "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/434d6c511de7fdd9872f29157aafb6162d12d8d5",
             "https://github.com/FasterXML/jackson-databind/issues/5988",
@@ -1601,9 +1616,11 @@
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492010",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2492015",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
             "https://errata.almalinux.org/9/ALSA-2026-40895.html",
-            "https://errata.rockylinux.org/RLSA-2026:43218",
+            "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/01d1692c8d0ed03e51a0e3c4f8a9e6908e4931e5",
             "https://github.com/FasterXML/jackson-databind/commit/24529da29fdf46ff94ca38de9ebf31cd188f5e8e",
@@ -1921,7 +1938,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50379",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-24813",
             "https://errata.almalinux.org/9/ALSA-2025-3645.html",
-            "https://errata.rockylinux.org/RLSA-2025:3683",
+            "https://errata.rockylinux.org/RLSA-2025:3645",
             "https://github.com/absholi7ly/POC-CVE-2025-24813/blob/main/README.md",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/0a668e0c27f2b7ca0cc7c6eea32253b9b5ecb29c",
@@ -2225,7 +2242,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2295651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-34750",
             "https://errata.almalinux.org/9/ALSA-2024-5693.html",
-            "https://errata.rockylinux.org/RLSA-2024:5694",
+            "https://errata.rockylinux.org/RLSA-2024:5693",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2344a4c0d03e307ba6b8ab6dc8b894cc8bac63f2",
             "https://github.com/apache/tomcat/commit/2afae300c9ac9c0e516e2e9de580847d925365c3",
@@ -2390,7 +2407,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50379",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-24813",
             "https://errata.almalinux.org/9/ALSA-2025-3645.html",
-            "https://errata.rockylinux.org/RLSA-2025:3683",
+            "https://errata.rockylinux.org/RLSA-2025:3645",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/05ddeeaa54df1e2dc427d0164bedd6b79f78d81f",
             "https://github.com/apache/tomcat/commit/05ddeeaa54df1e2dc427d0164bedd6b79f78d81f%20%2810.1.34%29",
@@ -2482,7 +2499,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
             "https://errata.almalinux.org/9/ALSA-2025-11335.html",
-            "https://errata.rockylinux.org/RLSA-2025:11333",
+            "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://linux.oracle.com/cve/CVE-2024-56337.html",
             "https://linux.oracle.com/errata/ELSA-2025-11335.html",
@@ -2531,7 +2548,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -2582,7 +2599,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
             "https://errata.almalinux.org/9/ALSA-2025-14181.html",
-            "https://errata.rockylinux.org/RLSA-2025:14177",
+            "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2b0ab14fb55d4edc896e5f1817f2ab76f714ae5e",
             "https://github.com/apache/tomcat/commit/2b0ab14fb55d4edc896e5f1817f2ab76f714ae5e%20%2811.0.8%29",
@@ -2683,7 +2700,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
             "https://errata.almalinux.org/9/ALSA-2025-14181.html",
-            "https://errata.rockylinux.org/RLSA-2025:14177",
+            "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/73c04a10395774bda71a0b37802cf983662ce255",
             "https://github.com/apache/tomcat/commit/73c04a10395774bda71a0b37802cf983662ce255%20%2810.1.44%29",
@@ -2786,7 +2803,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
             "https://errata.almalinux.org/9/ALSA-2025-14181.html",
-            "https://errata.rockylinux.org/RLSA-2025:14177",
+            "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/927d66fbc294cb65242102b817a45fd80834e040",
             "https://github.com/apache/tomcat/commit/927d66fbc294cb65242102b817a45fd80834e040%20%289.0.107%29",
@@ -2884,7 +2901,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
             "https://errata.almalinux.org/9/ALSA-2025-14181.html",
-            "https://errata.rockylinux.org/RLSA-2025:14177",
+            "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2aa6261276ebe50b99276953591e3a2be7898bdb",
             "https://github.com/apache/tomcat/commit/2aa6261276ebe50b99276953591e3a2be7898bdb%20%2810.1.43%29",
@@ -2969,7 +2986,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
             "https://errata.almalinux.org/9/ALSA-2025-23049.html",
-            "https://errata.rockylinux.org/RLSA-2025:23048",
+            "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/130d36d8492ef9e4eb22952c17c92423cb35fd06",
             "https://github.com/apache/tomcat/commit/130d36d8492ef9e4eb22952c17c92423cb35fd06%20%2810.1.45%29",
@@ -3062,33 +3079,9 @@
             "https://access.redhat.com/security/cve/CVE-2026-24734",
             "https://bugzilla.redhat.com/2440426",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2440426",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2440430",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2440437",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457020",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457025",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457027",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457031",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457037",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457038",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457039",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24880",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-25854",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29129",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29145",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29146",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-32990",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34483",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34486",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34487",
-            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34500",
             "https://errata.almalinux.org/9/ALSA-2026-26323.html",
-            "https://errata.rockylinux.org/RLSA-2026:36790",
+            "https://errata.rockylinux.org/RLSA-2026:26323",
             "https://github.com/apache/tomcat",
             "https://linux.oracle.com/cve/CVE-2026-24734.html",
             "https://linux.oracle.com/errata/ELSA-2026-26323.html",
@@ -3561,7 +3554,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-23672",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24549",
             "https://errata.almalinux.org/9/ALSA-2024-3307.html",
-            "https://errata.rockylinux.org/RLSA-2024:3666",
+            "https://errata.rockylinux.org/RLSA-2024:3307",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/0cac540a882220231ba7a82330483cbd5f6b1f96",
             "https://github.com/apache/tomcat/commit/810f49d5ff6d64b704af85d5b8d0aab9ec3c83f5",
@@ -3656,7 +3649,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
             "https://errata.almalinux.org/9/ALSA-2025-11335.html",
-            "https://errata.rockylinux.org/RLSA-2025:11333",
+            "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1eef1dc459c45f1e421d8bd25ef340fc1cc34edc",
             "https://github.com/apache/tomcat/commit/40ae788c2e64d018b4e58cd4210bb96434d0100d",
@@ -3820,7 +3813,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
             "https://errata.almalinux.org/9/ALSA-2025-14181.html",
-            "https://errata.rockylinux.org/RLSA-2025:14177",
+            "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/7617b9c247bc77ed0444dd69adcd8aa48777886c",
             "https://github.com/apache/tomcat/commit/7617b9c247bc77ed0444dd69adcd8aa48777886c%20%2810.1.42%29",
@@ -4188,7 +4181,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
             "https://errata.almalinux.org/9/ALSA-2025-23049.html",
-            "https://errata.rockylinux.org/RLSA-2025:23048",
+            "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/066bf6b6a15a4e7e0941d4acf096841165b97098",
             "https://github.com/apache/tomcat/commit/175dc75fc428930034a6c93fb52f830d955d8e64",
@@ -4412,7 +4405,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,
@@ -4603,7 +4596,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-23672",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24549",
             "https://errata.almalinux.org/9/ALSA-2024-3307.html",
-            "https://errata.rockylinux.org/RLSA-2024:3666",
+            "https://errata.rockylinux.org/RLSA-2024:3307",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/0052b374684b613b0c849899b325ebe334ac6501",
             "https://github.com/apache/tomcat/commit/0052b374684b613b0c849899b325ebe334ac6501%20%2810.1.19%29",

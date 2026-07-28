@@ -22,7 +22,7 @@
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
       "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, July 28, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-07-28T04:13:19Z"
+      "timestamp": "2026-07-28T11:57:53Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -383,6 +383,14 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-datatype-jdk8",
       "properties": [
         {
@@ -391,15 +399,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -438,6 +446,14 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-datatype-jsr310",
       "properties": [
         {
@@ -446,15 +462,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -493,6 +509,14 @@
         }
       ],
       "group": "com.fasterxml.jackson.module",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-module-parameter-names",
       "properties": [
         {
@@ -501,15 +525,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -920,6 +944,14 @@
         }
       ],
       "group": "io.smallrye",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/smallrye/jandex/blob/main/LICENSE.txt"
+          }
+        }
+      ],
       "name": "jandex",
       "properties": [
         {
@@ -928,15 +960,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -3513,6 +3545,14 @@
         }
       ],
       "group": "org.springframework.data",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://github.com/spring-projects/spring-data-jpa/blob/main/LICENSE.txt"
+          }
+        }
+      ],
       "name": "spring-data-jpa",
       "properties": [
         {
@@ -3521,15 +3561,15 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -5141,7 +5181,7 @@
         "value": "pom.xml"
       }
     ],
-    "timestamp": "2026-07-28T04:13:19Z",
+    "timestamp": "2026-07-28T11:57:53Z",
     "tools": {
       "components": [
         {
@@ -5161,7 +5201,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:53f4299d-ac20-4b40-91b5-1d5e8a8cd999",
+  "serialNumber": "urn:uuid:a41ac35f-248b-4aad-9c4c-ec00968e1ffc",
   "services": [],
   "specVersion": "1.6",
   "version": 1
