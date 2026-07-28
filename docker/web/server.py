@@ -1120,6 +1120,35 @@ def scanoss_status(run_id):
     return {"status": status, "count": len(_as_list(data.get("components")))}
 
 
+def yocto_vex_summary(run_id):
+    """Build-time vulnerability judgements from a Yocto SPDX SBOM (ANALYZE only).
+
+    Written by parse-yocto-spdx.py. The security report lists only what is still
+    unresolved, so without these counts the UI cannot tell "this build patched
+    12255 CVEs" from "we found nothing" — two very different statements. Absent
+    (None) for every non-Yocto scan.
+    """
+    p = run_file(run_id, "_yocto_vex.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    def _count(value):
+        return value if isinstance(value, int) and value >= 0 else 0
+
+    j = data.get("judgements") if isinstance(data.get("judgements"), dict) else {}
+    return {
+        "fixed": _count(j.get("fixed")),
+        "notAffected": _count(j.get("notAffected")),
+        "affected": _count(j.get("affected")),
+        "unresolved": _count(data.get("unresolved")),
+    }
+
+
 def conformance_summary(run_id):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
     p = run_file(run_id, "_conformance.json")
@@ -1457,6 +1486,8 @@ def scan_detail(run_id):
         "sbom": sbom,
         "security": security_summary(run_id),
         "conformance": conformance_summary(run_id),
+        # Yocto build-time VEX counts (Yocto SPDX input only); None otherwise.
+        "yoctoVex": yocto_vex_summary(run_id),
         # AI compliance profile card (AI SBOMs only); None otherwise. Paired with
         # the done-event payload below — keep both in sync.
         "aiProfile": ai_profile_summary(run_id),
@@ -2811,6 +2842,8 @@ class Handler(BaseHTTPRequestHandler):
                 "sbom": sbom_summary(run_id),
                 "security": security_summary(run_id) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(run_id),
+                # Yocto build-time VEX counts (Yocto SPDX input only); None otherwise.
+                "yoctoVex": yocto_vex_summary(run_id),
                 # AI compliance profile card (AI SBOMs only); None otherwise.
                 # Paired with scan_detail() so a re-opened scan carries it too.
                 "aiProfile": ai_profile_summary(run_id),

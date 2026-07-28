@@ -187,6 +187,24 @@ export interface VulnItem {
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */
+/** Build-time vulnerability judgements carried inside a Yocto SPDX SBOM.
+ *
+ *  Yocto runs its own CVE analysis during the build and records the verdict per
+ *  CVE, so it knows whether the recipe applied the patch. `fixed` therefore means
+ *  genuinely closed on this image — an outside scanner matching on version alone
+ *  would report those same CVEs as open. Only `unresolved` reaches the security
+ *  panel; the rest are shown as work the build already did. */
+export interface YoctoVex {
+  /** CVEs the build patched (SPDX `fixedIn`). */
+  fixed: number;
+  /** CVEs judged inapplicable to this image (SPDX `doesNotAffect`). */
+  notAffected: number;
+  /** CVEs with no verdict — these are the ones that still need attention. */
+  affected: number;
+  /** Rows handed to the security report; equals `affected` minus duplicates. */
+  unresolved: number;
+}
+
 export type SecuritySummary = Record<Severity, number> & {
   TOTAL: number;
   vulnerabilities?: VulnItem[];
@@ -393,6 +411,11 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** Vulnerability judgements Yocto recorded while building the image (Yocto SPDX
+   *  input only; null otherwise). The security panel lists only what is still
+   *  unresolved, so these counts are what distinguishes "the build already patched
+   *  these" from "nothing was found". */
+  yoctoVex?: YoctoVex | null;
   /** AI compliance profile card rollup (AI SBOMs only; null otherwise). Present on
    *  both the SSE `done` event and the `/scan` detail (loadScan), kept in sync
    *  server-side. Drives the AI compliance summary card. */

@@ -376,6 +376,11 @@
     "jumpHint": "{{section}} 보기",
     "depBreakdown": "직접 {{direct}} · 전이 {{transitive}}",
     "typeSummaryTitle": "컴포넌트 유형",
+    "yoctoVex": {
+      "title": "빌드에서 이미 처리한 취약점",
+      "allHandled": "이 이미지에서 알려진 취약점은 빌드 과정에서 모두 처리됐습니다. 패치 적용 {{fixed}}건, 해당 없음 {{notAffected}}건이며 남은 것은 없습니다.",
+      "withOpen": "{{open}}건이 아직 남아 있습니다. 나머지는 빌드에서 처리했습니다. 패치 적용 {{fixed}}건, 해당 없음 {{notAffected}}건입니다."
+    },
     "vsPrevious": "{{label}} 대비",
     "compDelta": "컴포넌트 {{delta}}",
     "compSame": "컴포넌트 변동 없음",

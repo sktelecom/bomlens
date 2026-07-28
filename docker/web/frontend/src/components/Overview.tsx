@@ -15,6 +15,7 @@ import {
   History,
   Package,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -26,6 +27,7 @@ import type {
   RecentScan,
   ResultFile,
   Severity,
+  YoctoVex,
 } from "@/lib/api";
 import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
@@ -259,6 +261,8 @@ export function Overview({
         </Card>
       )}
 
+      {result.yoctoVex && <YoctoVexNote vex={result.yoctoVex} />}
+
       {/* The two risk axes side by side; clicking a band routes into its
           section with that filter applied. */}
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
@@ -278,6 +282,44 @@ export function Overview({
 
       <TypeSummary components={result.sbom?.componentList ?? []} />
     </div>
+  );
+}
+
+/**
+ * Vulnerability work the Yocto build already did.
+ *
+ * A Yocto SBOM carries bitbake's own CVE verdicts, and on a real image the
+ * patched count dwarfs the open one (measured on core-image-minimal: 12255
+ * patched, 63 not applicable, 0 open). The security panel lists only what is
+ * still open, so without this note "0 vulnerabilities" would read as "nothing
+ * was checked" instead of "the build closed all of them" — the opposite of the
+ * truth. Rendered only for Yocto input; `yoctoVex` is null everywhere else.
+ */
+function YoctoVexNote({ vex }: { vex: YoctoVex }) {
+  const { t } = useTranslation();
+  const handled = vex.fixed + vex.notAffected;
+  if (handled === 0) return null;
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-3 p-4">
+        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-risk-info" aria-hidden />
+        <div className="space-y-1">
+          <div className="text-sm font-medium">{t("overview.yoctoVex.title")}</div>
+          <p className="text-sm text-muted-foreground">
+            {vex.unresolved > 0
+              ? t("overview.yoctoVex.withOpen", {
+                  fixed: vex.fixed,
+                  notAffected: vex.notAffected,
+                  open: vex.unresolved,
+                })
+              : t("overview.yoctoVex.allHandled", {
+                  fixed: vex.fixed,
+                  notAffected: vex.notAffected,
+                })}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
