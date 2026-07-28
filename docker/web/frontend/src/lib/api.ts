@@ -355,6 +355,12 @@ export interface ScanConfig {
   source: SourceType;
   /** git URL / docker image (empty for current-folder and upload sources). */
   target: string;
+  /** What the user actually picked, when `target` cannot say it: the uploaded
+   *  file's name, or the folder a CLI scan ran against. Shown as the scan's
+   *  provenance (see lib/provenance.ts); absent on scans that predate it.
+   *  Kept separate from `target` because "re-scan" refills the form from
+   *  `target`, and an upload has to be chosen again rather than retyped. */
+  sourceLabel?: string;
   project: string;
   version: string;
   notice: boolean;

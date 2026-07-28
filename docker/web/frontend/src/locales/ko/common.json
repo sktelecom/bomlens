@@ -769,5 +769,13 @@
     "uploadUrl": "업로드 서버 주소를 입력하세요.",
     "uploadToken": "업로드 API 토큰을 입력하세요.",
     "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요."
+  },
+  "provenance": {
+    "folder": "스캔한 폴더",
+    "git": "복제한 저장소",
+    "image": "컨테이너 이미지",
+    "file": "업로드한 파일",
+    "sbom": "받은 SBOM",
+    "model": "AI 모델"
   }
 }

@@ -159,22 +159,34 @@ for run in "${RUNS[@]}"; do
     # into HTML (so the download would 404) and would fail `--strict` for not
     # being in the nav. Every one of them ships an .html twin carrying the same
     # report, so dropping them costs the demo nothing.
-    find "$SRC/$run" -maxdepth 1 -type f ! -name '*.md' \
+    # Dot-files are internal (.scanmeta.json records how the scan was launched);
+    # the server keeps them out of /results, so they must stay out of the copied
+    # folder and its zip too, or the demo would publish more than the app does.
+    find "$SRC/$run" -maxdepth 1 -type f ! -name '*.md' ! -name '.*' \
         -exec cp {} "$DEST/files/$run/" \;
     (cd "$DEST/files" && zip -qr "$run.zip" "$run")
 
     # Keep the listings honest about what was copied: a name left in results[]
-    # would render a download link to a file that is not there.
-    python3 - "$DEST/scan-$run.json" "$DEST/results-$run.json" <<'PY'
-import json, sys
+    # would render a download link to a file that is not there. The same pass
+    # shortens the capture machine's home directory to `~` in the provenance
+    # path, which the Overview prints — publishing an absolute path would leak
+    # the operator's username for no benefit to the reader.
+    HOME="$HOME" python3 - "$DEST/scan-$run.json" "$DEST/results-$run.json" <<'PY'
+import json, os, sys
 
 def drop_markdown(results):
     return [r for r in results if not r.get("name", "").endswith(".md")]
 
 scan_path, results_path = sys.argv[1], sys.argv[2]
+home = os.environ.get("HOME", "")
 
 scan = json.load(open(scan_path))
 scan["results"] = drop_markdown(scan.get("results", []))
+cfg = scan.get("scanConfig")
+if isinstance(cfg, dict) and home:
+    label = cfg.get("sourceLabel") or ""
+    if label == home or label.startswith(home + os.sep):
+        cfg["sourceLabel"] = "~" + label[len(home):]
 json.dump(scan, open(scan_path, "w"))
 
 json.dump(drop_markdown(json.load(open(results_path))), open(results_path, "w"))

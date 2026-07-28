@@ -769,5 +769,13 @@
     "uploadUrl": "Enter the upload server URL.",
     "uploadToken": "Enter the upload API token.",
     "truscaProjectId": "Enter the TRUSCA project id."
+  },
+  "provenance": {
+    "folder": "Scanned folder",
+    "git": "Cloned from",
+    "image": "Container image",
+    "file": "Uploaded file",
+    "sbom": "Received SBOM",
+    "model": "AI model"
   }
 }

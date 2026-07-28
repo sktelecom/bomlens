@@ -669,6 +669,49 @@ if [ "$MODE" = "AIBOM" ] && [ "$GENERATE_SECURITY" = "true" ]; then
     GENERATE_SECURITY="false"
 fi
 
+# ---------------------------------------------------------------------------
+# Provenance sidecar (.scanmeta.json)
+#
+# The web UI writes this file when it launches a scan (write_scanmeta in
+# docker/web/server.py) so the result page can say what was scanned. A CLI scan
+# produced no such record, so re-opening one in the UI showed counts with no
+# indication of where they came from. Write the same file, with the same field
+# names, so one reader serves both.
+#
+# Only the fields the result page reads are filled: the feature toggles belong
+# to the UI's "re-scan with the same settings", which cannot replay a CLI run.
+# ---------------------------------------------------------------------------
+json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+case "$MODE" in
+    AIBOM)    META_SOURCE="ai-model";        META_TARGET="$MODEL";  META_LABEL="" ;;
+    ANALYZE)  META_SOURCE="sbom-upload";     META_TARGET=""; META_LABEL="$(basename "$ANALYZE_SBOM")" ;;
+    IMAGE)    META_SOURCE="docker-image";    META_TARGET="$TARGET"; META_LABEL="" ;;
+    FIRMWARE) META_SOURCE="firmware-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
+    BINARY)   META_SOURCE="package-upload";  META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
+    ROOTFS)   META_SOURCE="rootfs-dir";      META_TARGET=""; META_LABEL="$TARGET" ;;
+    MERGE)    META_SOURCE="";                META_TARGET=""; META_LABEL="" ;;
+    *)
+        # SOURCE covers three different inputs: a clone, an extracted archive,
+        # and the current folder. GIT_URL is what distinguishes the first.
+        if [ -n "$GIT_URL" ]; then
+            META_SOURCE="git-url";    META_TARGET="$GIT_URL"; META_LABEL=""
+        elif [ -n "$TARGET" ]; then
+            META_SOURCE="zip-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")"
+        else
+            META_SOURCE="current-dir"; META_TARGET=""; META_LABEL="$(pwd)"
+        fi
+        ;;
+esac
+
+if [ -n "$META_SOURCE" ]; then
+    printf '{"source":"%s","target":"%s","sourceLabel":"%s","project":"%s","version":"%s"}\n' \
+        "$(json_escape "$META_SOURCE")" "$(json_escape "$META_TARGET")" \
+        "$(json_escape "$META_LABEL")" "$(json_escape "$PROJECT_NAME")" \
+        "$(json_escape "$PROJECT_VERSION")" \
+        > "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
+fi
+
 echo "=========================================="
 echo "  SBOM Analysis — Mode: $MODE — $PROJECT_NAME ($PROJECT_VERSION)"
 [ -n "$TARGET" ] && echo "  Target: $TARGET"

@@ -766,20 +766,20 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-03:44:39@1.0",
+      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-04:14:01@1.0",
       "description": "Generating SBOM for google-bert/bert-base-uncased",
       "manufacturer": {
         "name": "OWASP AIBOM Generator"
       },
-      "name": "job-2026-07-28-03:44:39",
-      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-03:44:39@1.0",
+      "name": "job-2026-07-28-04:14:01",
+      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-04:14:01@1.0",
       "supplier": {
         "name": "OWASP AIBOM Generator"
       },
       "type": "application",
       "version": "1.0"
     },
-    "timestamp": "2026-07-28T03:44:39+00:00",
+    "timestamp": "2026-07-28T04:14:01+00:00",
     "tools": {
       "components": [
         {
@@ -794,7 +794,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:30cad767-21a0-484b-9fa9-7695ea71cd61",
+  "serialNumber": "urn:uuid:468ae427-009a-49cb-8ac1-6f39c1f861ef",
   "specVersion": "1.7",
   "version": 1
 }

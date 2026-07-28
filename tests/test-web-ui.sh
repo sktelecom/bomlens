@@ -1158,6 +1158,10 @@ assert run_out and os.path.isdir(run_out), run_out
 cfg = {
     "source": "git-url",
     "target": "https://example.com/acme/widget.git",
+    # What the Overview prints as the scan's provenance when `target` cannot say
+    # it (an uploaded filename, a scanned folder). Part of the sidecar contract:
+    # scan-sbom.sh writes the same key for CLI runs.
+    "sourceLabel": "",
     "project": "cfg",
     "version": "2.0",
     "notice": True,
@@ -1179,8 +1183,9 @@ assert not server.SCANMETA_NAME.endswith(server.ARTIFACT_SUFFIXES), server.SCANM
 # scanmeta() reads it back verbatim; the exact camelCase contract keys are present.
 got = server.scanmeta("cfg_2.0")
 assert got == cfg, got
-expected_keys = {"source", "target", "project", "version", "notice", "security",
-                 "spdx", "deepLicense", "identifyVendored", "includeOsv", "byteStable"}
+expected_keys = {"source", "target", "sourceLabel", "project", "version",
+                 "notice", "security", "spdx", "deepLicense", "identifyVendored",
+                 "includeOsv", "byteStable"}
 assert set(got) == expected_keys, set(got)
 # No secret material is ever stored.
 assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",

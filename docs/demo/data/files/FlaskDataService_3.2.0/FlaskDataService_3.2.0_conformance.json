@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-07-28T00:24:40Z",
+  "generatedAt": "2026-07-28T04:14:56Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -34,7 +34,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-07-28T00:10:55Z",
+      "detail": "2026-07-28T04:14:38Z",
       "missing": [],
       "regulations": [
         {
@@ -347,7 +347,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-07-28T00:10:55Z",
+            "detail": "2026-07-28T04:14:38Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -498,7 +498,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-07-28T00:10:55Z",
+            "detail": "2026-07-28T04:14:38Z",
             "refs": [
               "Timestamp"
             ]

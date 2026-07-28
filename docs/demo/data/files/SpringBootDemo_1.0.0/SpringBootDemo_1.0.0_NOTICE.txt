@@ -1,6 +1,6 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-07-28T00:09:11Z
-Total components: 71 · Distinct licenses: 13
+Generated: 2026-07-28T04:13:20Z
+Total components: 64 · Distinct licenses: 13
 
 This product includes the following open source software.
 Each component lists its source/download location and copyright/attribution.
@@ -16,7 +16,7 @@ Components (2):
       Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/)
 
 License: Apache-2.0
-Components (46):
+Components (40):
   - HikariCP@5.0.1
       Source: https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/
       Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/)
@@ -38,21 +38,9 @@ Components (46):
   - jackson-databind@2.16.0
       Source: https://github.com/FasterXML/jackson-databind
       Copyright: holders not captured in SBOM — see source (https://github.com/FasterXML/jackson-databind)
-  - jackson-datatype-jdk8@2.15.3
-      Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
-  - jackson-datatype-jsr310@2.15.3
-      Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
-  - jackson-module-parameter-names@2.15.3
-      Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
   - jakarta.inject-api@2.0.1
       Source: https://github.com/eclipse-ee4j/injection-api
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/injection-api)
-  - jandex@3.1.2
-      Source: https://github.com/smallrye/jandex/
-      Copyright: holders not captured in SBOM — see source (https://github.com/smallrye/jandex/)
   - jboss-logging@3.5.0.Final
       Source: https://github.com/jboss-logging/jboss-logging
       Copyright: holders not captured in SBOM — see source (https://github.com/jboss-logging/jboss-logging)
@@ -81,9 +69,6 @@ Components (46):
       Source: https://github.com/spring-projects/spring-framework
       Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-boot-autoconfigure@3.2.0
-      Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
-  - spring-boot-jarmode-layertools@3.2.0
       Source: https://github.com/spring-projects/spring-boot
       Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-aop@3.2.0
@@ -122,9 +107,6 @@ Components (46):
   - spring-data-commons@3.2.0
       Source: https://github.com/spring-projects/spring-data-commons
       Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-data-commons)
-  - spring-data-jpa@3.2.0
-      Source: https://github.com/spring-projects/spring-data-jpa
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-data-jpa)
   - spring-expression@6.1.1
       Source: https://github.com/spring-projects/spring-framework
       Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
@@ -250,28 +232,25 @@ Components (1):
       Copyright: holders not captured in SBOM — see source (https://github.com/h2database/h2database)
 
 License: NOASSERTION
-Components (7):
-  - aspectjweaver@1.9.20.1
-      Source: https://repo1.maven.org/maven2/org/aspectj/weaver/aspectjweaver/1.9.20.1/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/aspectj/weaver/aspectjweaver/1.9.20.1/)
-  - hibernate-commons-annotations@6.0.6.Final
-      Source: https://repo1.maven.org/maven2/org/hibernate/hibernate-commons-annotations/6.0.6.Final/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/hibernate/hibernate-commons-annotations/6.0.6.Final/)
-  - hibernate-core@6.3.1.Final
-      Source: https://repo1.maven.org/maven2/org/hibernate/orm/core/hibernate-core/6.3.1.Final/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/hibernate/orm/core/hibernate-core/6.3.1.Final/)
+Components (6):
+  - jackson-datatype-jdk8@2.15.3
+      Source: http://github.com/FasterXML/jackson-modules-java8
+      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
+  - jackson-datatype-jsr310@2.15.3
+      Source: http://github.com/FasterXML/jackson-modules-java8
+      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
+  - jackson-module-parameter-names@2.15.3
+      Source: http://github.com/FasterXML/jackson-modules-java8
+      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
+  - jandex@3.1.2
+      Source: https://github.com/smallrye/jandex/
+      Copyright: holders not captured in SBOM — see source (https://github.com/smallrye/jandex/)
   - jul-to-slf4j@2.0.9
       Source: https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/
       Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/)
-  - lombok@1.18.30
-      Source: https://repo1.maven.org/maven2/lombok/lombok/1.18.30/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/lombok/lombok/1.18.30/)
-  - micrometer-commons@1.12.0
-      Source: https://repo1.maven.org/maven2/micrometer-commons/micrometer-commons/1.12.0/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/micrometer-commons/micrometer-commons/1.12.0/)
-  - micrometer-observation@1.12.0
-      Source: https://repo1.maven.org/maven2/micrometer-observation/micrometer-observation/1.12.0/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/micrometer-observation/micrometer-observation/1.12.0/)
+  - spring-data-jpa@3.2.0
+      Source: https://github.com/spring-projects/spring-data-jpa
+      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-data-jpa)
 
 ================================================================================
 License texts (SPDX standard)

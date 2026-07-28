@@ -35169,7 +35169,7 @@
         "value": "NGINX Docker Maintainers <docker-maint@nginx.com>"
       }
     ],
-    "timestamp": "2026-07-28T03:43:46Z",
+    "timestamp": "2026-07-28T04:13:37Z",
     "tools": {
       "components": [
         {
@@ -35181,7 +35181,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:1ed53dd3-05cf-4d31-a826-2176c6bda615",
+  "serialNumber": "urn:uuid:6b986a46-a746-4485-beeb-d07c976553d7",
   "specVersion": "1.6",
   "version": 1
 }

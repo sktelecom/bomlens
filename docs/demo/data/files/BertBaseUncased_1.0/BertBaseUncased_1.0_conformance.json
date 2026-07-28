@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-07-28T03:44:44Z",
+  "generatedAt": "2026-07-28T04:14:08Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -34,7 +34,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-07-28T03:44:39+00:00",
+      "detail": "2026-07-28T04:14:01+00:00",
       "missing": [],
       "regulations": [
         {
@@ -82,7 +82,7 @@
       "label": "Top-level component name+version",
       "required": true,
       "status": "pass",
-      "detail": "job-2026-07-28-03:44:39@1.0",
+      "detail": "job-2026-07-28-04:14:01@1.0",
       "missing": [],
       "regulations": [
         {
@@ -1775,7 +1775,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-07-28T03:44:39+00:00",
+            "detail": "2026-07-28T04:14:01+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1795,7 +1795,7 @@
             "label": "Top-level component name+version",
             "status": "pass",
             "source": null,
-            "detail": "job-2026-07-28-03:44:39@1.0",
+            "detail": "job-2026-07-28-04:14:01@1.0",
             "refs": [
               "Section 5.1"
             ]
@@ -1926,7 +1926,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-07-28T03:44:39+00:00",
+            "detail": "2026-07-28T04:14:01+00:00",
             "refs": [
               "Timestamp"
             ]

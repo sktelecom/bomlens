@@ -3,9 +3,13 @@ import {
   Boxes,
   CalendarX,
   ChevronRight,
+  Container,
   Cpu,
   Eye,
   FileCheck2,
+  FileJson,
+  FileText,
+  FolderOpen,
   GitBranch,
   type LucideIcon,
   History,
@@ -27,6 +31,7 @@ import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
+import { type ProvenanceKind, provenanceOf } from "@/lib/provenance";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
 import { conformanceCount, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
@@ -48,6 +53,24 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
   vulns: ShieldAlert,
   review: Eye,
 };
+
+/** Icon per provenance kind, so the input reads at a glance. */
+const PROVENANCE_ICON: Record<ProvenanceKind, LucideIcon> = {
+  folder: FolderOpen,
+  git: GitBranch,
+  image: Container,
+  file: FileText,
+  sbom: FileJson,
+  model: Cpu,
+};
+
+function ProvenanceIcon({
+  kind,
+  ...props
+}: { kind: ProvenanceKind } & React.ComponentProps<LucideIcon>) {
+  const Icon = PROVENANCE_ICON[kind];
+  return <Icon {...props} />;
+}
 
 /**
  * Decision-first Overview: what needs attention first, then the at-a-glance
@@ -83,9 +106,32 @@ export function Overview({
   const ai = isAiScan(result);
   const hasConformance = Boolean(result.conformance?.checks?.length);
   const comparison = scanId ? scanComparison(recent, scanId) : null;
+  const provenance = provenanceOf(result.scanConfig);
 
   return (
     <div className="space-y-6">
+      {provenance && (
+        // What was scanned. Sits above the counts because it frames them: the
+        // same "71 components" means something different for a folder on disk
+        // than for an image someone pulled.
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          data-testid="provenance"
+        >
+          <ProvenanceIcon
+            kind={provenance.kind}
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden
+          />
+          <span>{t(provenance.labelKey)}</span>
+          <code
+            className="min-w-0 break-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground"
+            title={provenance.value}
+          >
+            {provenance.value}
+          </code>
+        </div>
+      )}
       {comparison && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>

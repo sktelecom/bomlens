@@ -77,6 +77,15 @@ control sits outside that form are forced off instead, because they would render
 a button that does nothing: SPDX export converts server-side, `hfAuth` is a
 token the demo never holds, and host paths do not exist on a static host.
 
+The Overview prints each scan's provenance — the folder, URL, image reference or
+uploaded filename it came from — which `scan-sbom.sh` records in a
+`.scanmeta.json` sidecar beside the artifacts. Two consequences for a capture.
+Dot-files are not copied, so the sidecar never reaches the published folder or
+its zip (the server keeps it out of `/results` for the same reason). And the
+capture rewrites the capture machine's home directory to `~` in that path,
+because an absolute path would publish the operator's username; run the demo
+scans from a folder whose name you are willing to show.
+
 Markdown reports are dropped from the capture, and their names are removed from
 the two listings so no download link points at a missing file. The data folder
 sits inside the MkDocs docs tree, where any `*.md` is treated as a page: it gets

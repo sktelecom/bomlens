@@ -2379,6 +2379,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         os.makedirs(run_out, exist_ok=True)
 
+        # What to show as this scan's provenance when `target` cannot say it.
+        # An upload arrives as an opaque token, so the name the user picked is
+        # only knowable here; a folder scan has no target at all, so name the
+        # host folder it was launched from (or the mount it selected). Falls
+        # back to empty, which the UI reads as "nothing honest to show".
+        source_label = ""
+        if token:
+            uploaded = resolve_upload(token)
+            if uploaded:
+                source_label = os.path.basename(uploaded)
+        elif source == "current-dir":
+            source_label = os.environ.get("SBOM_UI_HOST_DIR", "")
+        elif source in ("rootfs-dir", "scan-target-src"):
+            source_label = next(
+                (r["hostPath"] for r in EXTRA_SCAN_ROOTS if r["path"] == target),
+                "",
+            )
+
         # Record how this scan was launched (source + non-secret feature toggles)
         # so the UI can offer "re-scan with the same settings". Saved into the run
         # folder as a dot-prefixed sidecar that stays out of the artifact listing
@@ -2387,6 +2405,12 @@ class Handler(BaseHTTPRequestHandler):
         scan_config = {
             "source": source,
             "target": target,
+            # What the user actually picked, when `target` cannot say it: the
+            # uploaded file's name, or the folder a mounted scan ran against.
+            # The Overview prints this as the scan's provenance. Kept out of
+            # `target` because "re-scan" refills the form from `target`, and an
+            # upload has to be chosen again rather than retyped.
+            "sourceLabel": source_label,
             "project": project,
             "version": version,
             "notice": g("notice", "true") == "true",
