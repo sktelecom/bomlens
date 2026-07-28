@@ -9,7 +9,10 @@ hide:
 A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
 
 [Get started](start/first-scan.md){ .md-button .md-button--primary }
+[Try the demo](https://sktelecom.github.io/bomlens/demo/){ .md-button }
 [Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
+
+Want to see what a result looks like before installing anything? The [live demo](https://sktelecom.github.io/bomlens/demo/) is the real web UI holding two finished scans — a Spring Boot project with 70 components and 65 known vulnerabilities, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by an ordinary local run.
 
 Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md).
 

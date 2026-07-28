@@ -9,7 +9,10 @@ hide:
 SaaS 없이 로컬에서 단일 프로젝트의 [SBOM](concepts/what-is-sbom.ko.md)(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM, HuggingFace AI 모델에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다. AI 모델은 CycloneDX ML-BOM을 만들고 [AI를 위한 G7 최소 요소](guides/ai-model.ko.md)로 검사합니다. 이 요소들은 EU 인공지능법(AI Act) Annex IV와 상당 부분 겹칩니다.
 
 [시작하기](start/first-scan.ko.md){ .md-button .md-button--primary }
+[데모 둘러보기](https://sktelecom.github.io/bomlens/demo/){ .md-button }
 [Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
+
+설치하기 전에 결과가 어떤 모습인지 보고 싶다면 [데모](https://sktelecom.github.io/bomlens/demo/)를 둘러보세요. 완료된 스캔 두 건을 담은 실제 웹 UI입니다. 컴포넌트 70개와 알려진 취약점 65건이 나온 Spring Boot 프로젝트, 그리고 형식 요건을 검사한 공급사 SBOM입니다. 설치할 것이 없고 아무것도 업로드되지 않습니다. 평범한 로컬 실행으로 나온 결과를 그대로 담아 둔 화면입니다.
 
 CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
 

@@ -1,0 +1,7 @@
+# The demo bundle is built by scripts/build-demo-bundle.sh during the docs
+# workflow, not committed. Only data/ (captured by scripts/capture-demo-data.sh)
+# is tracked, because it is the demo's input rather than a build output.
+*
+!.gitignore
+!data/
+!data/**

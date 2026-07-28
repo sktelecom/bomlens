@@ -9,6 +9,7 @@
  * we never invent a finer type. See the plan's data-honesty constraint.
  */
 import { type RecentScan, SEVERITY_ORDER } from "./api";
+import { IS_STATIC_DEMO } from "./demo";
 
 export interface RecentSummary {
   /** Total stored scans. */
@@ -206,12 +207,21 @@ export function scanComparison(
  * Human "2 hours ago" / "yesterday" / "just now" for a unix-seconds timestamp.
  * `nowMs` is injected (Date.now() in the caller) so the result is deterministic
  * under test. Uses Intl.RelativeTimeFormat, so it localizes for free.
+ *
+ * The demo shows the calendar date instead. Its scans were captured once and
+ * never re-run, so a relative label would age into "9 months ago" and read as
+ * an abandoned deployment — while the date it was actually produced stays true.
  */
 export function formatRelativeTime(
   unixSec: number,
   nowMs: number,
   locale: string,
 ): string {
+  if (IS_STATIC_DEMO) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+      new Date(unixSec * 1000),
+    );
+  }
   const diffSec = Math.round(unixSec - nowMs / 1000); // negative = past
   const abs = Math.abs(diffSec);
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });

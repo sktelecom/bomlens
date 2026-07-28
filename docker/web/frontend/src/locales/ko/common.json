@@ -322,7 +322,11 @@
     "artifacts": "산출물"
   },
   "shell": {
-    "newScan": "새 스캔"
+    "newScan": "새 스캔",
+    "demoGetTool": "BomLens 받기",
+    "demoBannerTitle": "읽기 전용 데모",
+    "demoBannerBody": "실제로 스캔한 결과를 그대로 담아 둘러볼 수 있게 한 화면입니다. 여기서는 스캔과 업로드, 삭제가 꺼져 있습니다. 직접 만든 결과를 보려면 각자 환경에서 BomLens를 실행하면 됩니다.",
+    "demoBannerCta": "실행 방법 보기"
   },
   "search": {
     "placeholder": "컴포넌트, CVE 검색…",
@@ -746,7 +750,8 @@
     "emptyOutSbom": "SBOM (CycloneDX)",
     "emptyOutNotice": "오픈소스 고지문",
     "emptyOutSecurity": "보안 보고서",
-    "source": "파일을 지우면 목록에서도 사라집니다."
+    "source": "파일을 지우면 목록에서도 사라집니다.",
+    "demoSubtitle": "완료된 스캔 두 건입니다. 하나는 프로젝트 소스를 스캔한 결과이고, 하나는 공급사에게 받은 SBOM을 검증한 결과입니다"
   },
   "validation": {
     "required": "위에 표시된 필수 항목을 채워 주세요.",

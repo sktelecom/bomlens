@@ -322,7 +322,11 @@
     "artifacts": "Artifacts"
   },
   "shell": {
-    "newScan": "New scan"
+    "newScan": "New scan",
+    "demoGetTool": "Get BomLens",
+    "demoBannerTitle": "Read-only demo",
+    "demoBannerBody": "These are real results from a real scan, frozen so you can look around. Scanning, uploading and deleting are turned off here — run BomLens on your own code to produce your own.",
+    "demoBannerCta": "How to run it"
   },
   "search": {
     "placeholder": "Search components, CVEs…",
@@ -746,7 +750,8 @@
     "emptyOutSbom": "SBOM (CycloneDX)",
     "emptyOutNotice": "Open-source notice",
     "emptyOutSecurity": "Security report",
-    "source": "Delete a file and it leaves this list too."
+    "source": "Delete a file and it leaves this list too.",
+    "demoSubtitle": "Two finished scans: one from a project's source, one reviewing an SBOM received from a supplier"
   },
   "validation": {
     "required": "Fill in the required fields marked above.",

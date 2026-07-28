@@ -1,0 +1,570 @@
+{
+  "project": "FlaskDataService",
+  "format": "CycloneDX",
+  "result": "pass",
+  "generatedAt": "2026-07-28T00:24:40Z",
+  "untraceableComponents": 0,
+  "checks": [
+    {
+      "id": "spec-version",
+      "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6)",
+      "required": true,
+      "status": "pass",
+      "detail": "CycloneDX 1.6",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 4",
+          "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Automation Support",
+          "basis": "the SBOM must use an automation-capable format (SPDX, CycloneDX or SWID)",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "timestamp",
+      "label": "Timestamp (metadata.timestamp)",
+      "required": true,
+      "status": "pass",
+      "detail": "2026-07-28T00:10:55Z",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.1",
+          "basis": "required SBOM-level field: date and time of the SBOM data compilation",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Timestamp",
+          "basis": "the date and time the SBOM was assembled",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "Tool info (metadata.tools)",
+      "required": true,
+      "status": "pass",
+      "detail": "1 tool(s)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.1",
+          "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Author of SBOM Data",
+          "basis": "the entity that created the SBOM data for this component",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "top-component",
+      "label": "Top-level component name+version",
+      "required": true,
+      "status": "pass",
+      "detail": "FlaskDataService@3.2.0",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.1",
+          "basis": "the primary component the SBOM describes has to be identifiable",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "name-version",
+      "label": "Component name+version coverage (100%)",
+      "required": true,
+      "status": "pass",
+      "detail": "39/39",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component fields: component name and component version",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Name / Version",
+          "basis": "the name and version assigned to each unit of software",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "purl",
+      "label": "PURL coverage (>= 90%)",
+      "required": true,
+      "status": "pass",
+      "detail": "100% (39/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.4",
+          "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Other Unique Identifiers",
+          "basis": "identifiers that serve as a look-up key for relevant databases",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "no-generic",
+      "label": "Traceable PURL (no pkg:generic, advisory)",
+      "required": false,
+      "status": "pass",
+      "detail": "0 untraceable",
+      "missing": [],
+      "regulations": []
+    },
+    {
+      "id": "purl-syntax",
+      "label": "PURL syntax (pkg:type/name@version)",
+      "required": true,
+      "status": "pass",
+      "detail": "0 malformed",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Other Unique Identifiers",
+          "basis": "an identifier only serves as a database look-up key if it parses",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "transitive",
+      "label": "Transitive dependencies (graph edges)",
+      "required": true,
+      "status": "pass",
+      "detail": "52 edge(s)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.1; 5.2.2",
+          "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Dependency Relationship",
+          "basis": "the relationship between an upstream component and its dependencies",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "license",
+      "label": "License coverage (>= 80%, recommended)",
+      "required": false,
+      "status": "pass",
+      "detail": "97% (38/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the distribution licence under which the component may be used",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "hash",
+      "label": "Hash coverage (>= 50%, recommended)",
+      "required": false,
+      "status": "pass",
+      "detail": "100% (39/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: a cryptographic checksum of the deployable component",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "hash-algorithm",
+      "label": "SHA-512 checksum coverage (>= 80%, recommended)",
+      "required": false,
+      "status": "warn",
+      "detail": "0% (0/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "the deployable-component checksum is specified as SHA-512",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "component-creator",
+      "label": "Component creator coverage (>= 80%, recommended)",
+      "required": false,
+      "status": "pass",
+      "detail": "82% (32/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        },
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Supplier Name",
+          "basis": "the name of the entity that creates, defines and identifies the component",
+          "short": "NTIA",
+          "short_ko": "NTIA"
+        }
+      ]
+    },
+    {
+      "id": "component-filename",
+      "label": "Component filename coverage (>= 80%, recommended)",
+      "required": false,
+      "status": "warn",
+      "detail": "0% (0/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the actual filename of the component",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "artifact-uri",
+      "label": "Source or distribution URI coverage (>= 80%, recommended)",
+      "required": false,
+      "status": "pass",
+      "detail": "100% (39/39)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.4",
+          "basis": "additional fields: the source code URI and the URI of the deployable form, required where they exist",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    },
+    {
+      "id": "file-properties",
+      "label": "Delivered-file properties (executable/archive/structured)",
+      "required": false,
+      "source": "na",
+      "status": "warn",
+      "detail": "requires inspecting the delivered files (no automated source in this scan)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ]
+    }
+  ],
+  "regulatoryCrosswalk": {
+    "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk covers only the documentation elements an SBOM can carry; obligations that an SBOM cannot express — bias and fairness assessment, risk management, human oversight — are out of its scope and must be met through separate documents. It makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
+    "frameworks": [
+      {
+        "id": "bsi-tr-03183-2",
+        "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
+        "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
+        "total": 14,
+        "present": 11,
+        "gap": 2,
+        "review": 1,
+        "elements": [
+          {
+            "id": "spec-version",
+            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6)",
+            "status": "pass",
+            "source": null,
+            "detail": "CycloneDX 1.6",
+            "refs": [
+              "Section 4"
+            ]
+          },
+          {
+            "id": "timestamp",
+            "label": "Timestamp (metadata.timestamp)",
+            "status": "pass",
+            "source": null,
+            "detail": "2026-07-28T00:10:55Z",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tool info (metadata.tools)",
+            "status": "pass",
+            "source": null,
+            "detail": "1 tool(s)",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "top-component",
+            "label": "Top-level component name+version",
+            "status": "pass",
+            "source": null,
+            "detail": "FlaskDataService@3.2.0",
+            "refs": [
+              "Section 5.1"
+            ]
+          },
+          {
+            "id": "name-version",
+            "label": "Component name+version coverage (100%)",
+            "status": "pass",
+            "source": null,
+            "detail": "39/39",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "purl",
+            "label": "PURL coverage (>= 90%)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (39/39)",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "transitive",
+            "label": "Transitive dependencies (graph edges)",
+            "status": "pass",
+            "source": null,
+            "detail": "52 edge(s)",
+            "refs": [
+              "Section 5.1; 5.2.2"
+            ]
+          },
+          {
+            "id": "license",
+            "label": "License coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "97% (38/39)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash",
+            "label": "Hash coverage (>= 50%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (39/39)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash-algorithm",
+            "label": "SHA-512 checksum coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": null,
+            "detail": "0% (0/39)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-creator",
+            "label": "Component creator coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "82% (32/39)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-filename",
+            "label": "Component filename coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": null,
+            "detail": "0% (0/39)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "artifact-uri",
+            "label": "Source or distribution URI coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (39/39)",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "file-properties",
+            "label": "Delivered-file properties (executable/archive/structured)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires inspecting the delivered files (no automated source in this scan)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "us-sbom-minimum-elements",
+        "title": "US SBOM minimum elements",
+        "source": "Executive Order 14028 §4; NTIA \"The Minimum Elements For a Software Bill of Materials\" (2021-07-12)",
+        "total": 8,
+        "present": 8,
+        "gap": 0,
+        "review": 0,
+        "elements": [
+          {
+            "id": "spec-version",
+            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6)",
+            "status": "pass",
+            "source": null,
+            "detail": "CycloneDX 1.6",
+            "refs": [
+              "Automation Support"
+            ]
+          },
+          {
+            "id": "timestamp",
+            "label": "Timestamp (metadata.timestamp)",
+            "status": "pass",
+            "source": null,
+            "detail": "2026-07-28T00:10:55Z",
+            "refs": [
+              "Timestamp"
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tool info (metadata.tools)",
+            "status": "pass",
+            "source": null,
+            "detail": "1 tool(s)",
+            "refs": [
+              "Author of SBOM Data"
+            ]
+          },
+          {
+            "id": "name-version",
+            "label": "Component name+version coverage (100%)",
+            "status": "pass",
+            "source": null,
+            "detail": "39/39",
+            "refs": [
+              "Component Name / Version"
+            ]
+          },
+          {
+            "id": "purl",
+            "label": "PURL coverage (>= 90%)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (39/39)",
+            "refs": [
+              "Other Unique Identifiers"
+            ]
+          },
+          {
+            "id": "purl-syntax",
+            "label": "PURL syntax (pkg:type/name@version)",
+            "status": "pass",
+            "source": null,
+            "detail": "0 malformed",
+            "refs": [
+              "Other Unique Identifiers"
+            ]
+          },
+          {
+            "id": "transitive",
+            "label": "Transitive dependencies (graph edges)",
+            "status": "pass",
+            "source": null,
+            "detail": "52 edge(s)",
+            "refs": [
+              "Dependency Relationship"
+            ]
+          },
+          {
+            "id": "component-creator",
+            "label": "Component creator coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "82% (32/39)",
+            "refs": [
+              "Supplier Name"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

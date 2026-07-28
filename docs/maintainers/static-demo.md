@@ -1,0 +1,75 @@
+# Publishing and refreshing the read-only demo
+
+The demo at `https://sktelecom.github.io/bomlens/demo/` is the real web UI with
+its data source swapped: instead of calling `server.py`, it reads JSON captured
+from a real scan. It costs nothing to host, because it rides along with the
+documentation site already on GitHub Pages.
+
+## How the pieces fit
+
+The bundle is the same SPA as the app, built with two settings. `BASE_PATH`
+tells Vite the site is served from a sub-path; `VITE_DEMO_DATA_BASE` points the
+API layer at the captured files and, by being non-empty, turns on demo mode
+(`docker/web/frontend/src/lib/demo.ts`). In demo mode the UI hides scanning,
+upload, delete and SPDX export, shows a read-only banner, and swaps the "New
+scan" button for a link to the install guide.
+
+The data lives in `docs/demo/data/` and is committed. The bundle is not: CI
+builds it into `docs/demo/` right before `mkdocs build`, and MkDocs copies the
+whole folder into the site. `docs/demo/.gitignore` enforces that split, so a
+local build cannot accidentally commit a bundle.
+
+## Refreshing the data
+
+Run the scans you want to publish into one folder, then capture them:
+
+```bash
+# A source scan and a supplier-SBOM review make a good pair: one shows what
+# BomLens produces, the other what it checks in an SBOM someone sent you.
+cd examples/java-maven
+scripts/scan-sbom.sh --project SpringBootDemo --version 1.0.0 \
+    --license Apache-2.0 --generate-only -o ~/demo-scans
+
+scripts/capture-demo-data.sh ~/demo-scans
+```
+
+`capture-demo-data.sh` starts the real `server.py` against that folder and saves
+what it answers, so the captured shapes are the server's shapes by construction.
+Writing the JSON by hand would drift the moment a field changes.
+
+Two things to know when choosing what to publish.
+
+Scan in **source mode** — from inside the project folder, without `--target` —
+rather than pointing `--target` at a directory. A source scan declares its root
+component as `application`, which is what makes the recent-scans list label it
+"Source" instead of the generic "SBOM"; a directory target is read as a rootfs
+scan and every row ends up looking the same. Source mode also resolves far more
+of the dependency graph.
+
+The capture runs on a machine with Docker, so `capabilities.json` would report
+whatever that machine can do. The script forces every capability off, since each
+one leads to a write the demo cannot serve — a capability left on would render a
+button that does nothing.
+
+## Checking it before you push
+
+```bash
+scripts/build-demo-bundle.sh
+
+# Serve it the way Pages will, under the site's sub-path.
+mkdir -p /tmp/demo-preview/bomlens
+cp -R docs/demo /tmp/demo-preview/bomlens/demo
+(cd /tmp/demo-preview && python3 -m http.server 8901)
+# → http://127.0.0.1:8901/bomlens/demo/
+```
+
+Serving it at a host root instead would hide exactly the class of bug this
+setup is prone to: an asset or data path that ignores the base path and works
+only at `/`.
+
+## What the demo deliberately does not do
+
+It never runs a scan. Scanning builds the target project, so a public scan
+endpoint would be arbitrary code execution on whoever hosts it — which is also
+why the demo is a static page rather than a server. Visitors who want their own
+results are pointed at the install guide instead.

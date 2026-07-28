@@ -6,7 +6,12 @@ import { defineConfig } from "vite";
 // sbom-tools local UI. Built to a static SPA (dist/) that docker/web/server.py
 // serves. In dev, proxy the data API to a locally-running server.py (port 8080)
 // so the SSE scan stream and result endpoints work without rebuilding.
+//
+// BASE_PATH exists for the published read-only demo, which is served from a
+// sub-path (`/bomlens/demo/`) rather than a host root. server.py serves the app
+// at `/`, so a normal build leaves this at the default.
 export default defineConfig({
+  base: process.env.BASE_PATH || "/",
   plugins: [react()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

@@ -178,6 +178,9 @@ validation:
 
 nav:
   - Home: index.md
+  # 읽기 전용 데모. 사이트 안(/demo/)에 있지만 MkDocs 페이지가 아니라 SPA 번들이라
+  # 전체 URL로 건다 — 상대 경로로 걸면 --strict의 링크 검증이 문서를 찾지 못한다.
+  - Live demo: https://sktelecom.github.io/bomlens/demo/
   - Get started:
       - What is an SBOM: concepts/what-is-sbom.md
       - First scan: start/first-scan.md

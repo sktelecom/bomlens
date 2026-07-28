@@ -16,6 +16,38 @@
  * project/version. Omitting `id` falls back to the legacy flat layout.
  */
 
+import { DEMO_DATA_BASE, IS_STATIC_DEMO } from "./demo";
+
+/**
+ * Map a server path to its captured file. A static host cannot answer query
+ * strings, so `/scan?id=<run>` becomes `<base>/scan-<run>.json`; the capture
+ * step writes the same names. Unmapped paths pass through unchanged — they
+ * belong to write endpoints, which never run in demo mode.
+ */
+function apiUrl(path: string): string {
+  if (!IS_STATIC_DEMO) return path;
+  const [route, query] = path.split("?");
+  const id = new URLSearchParams(query ?? "").get("id") ?? "";
+  switch (route) {
+    case "/capabilities":
+      return `${DEMO_DATA_BASE}/capabilities.json`;
+    case "/scans":
+      return `${DEMO_DATA_BASE}/scans.json`;
+    case "/scan":
+      return `${DEMO_DATA_BASE}/scan-${encodeURIComponent(id)}.json`;
+    case "/results":
+      return `${DEMO_DATA_BASE}/results-${encodeURIComponent(id)}.json`;
+    default:
+      return path;
+  }
+}
+
+/** Thrown by the write helpers when the read-only demo bundle calls them. The
+ *  UI hides those entry points, so reaching this is a bug, not a user path. */
+function demoWriteRefused(): never {
+  throw new Error("This is a read-only demo — scanning is disabled.");
+}
+
 export interface ResultFile {
   name: string;
   size: number;
@@ -490,7 +522,7 @@ export interface Capabilities {
 /** Which input types this running image supports (firmware needs the fw image). */
 export async function getCapabilities(): Promise<Capabilities> {
   try {
-    const res = await fetch("/capabilities");
+    const res = await fetch(apiUrl("/capabilities"));
     if (!res.ok) return { firmware: false, scanoss: false, docker: true };
     return (await res.json()) as Capabilities;
   } catch {
@@ -539,6 +571,7 @@ export async function uploadFile(
   file: File,
   kind: UploadKind,
 ): Promise<{ token: string; filename: string }> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
   const fd = new FormData();
   fd.append("kind", kind);
   fd.append("file", file);
@@ -561,6 +594,7 @@ export async function uploadFile(
 
 /** Stash a private-repo token; returns a single-use credId for the scan. */
 export async function stashGitCred(token: string): Promise<{ credId: string }> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
   const res = await fetch("/git-cred", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -585,6 +619,11 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
  * the server falls back to the legacy flat layout (back-compat).
  */
 export function fileUrl(id: string | null | undefined, name: string): string {
+  if (IS_STATIC_DEMO) {
+    // The capture step copies each run folder verbatim, so the artifact keeps
+    // its own name under a folder named for the run.
+    return `${DEMO_DATA_BASE}/files/${encodeURIComponent(id ?? "")}/${encodeURIComponent(name)}`;
+  }
   const idPart = id ? `id=${encodeURIComponent(id)}&` : "";
   return `/file?${idPart}name=${encodeURIComponent(name)}`;
 }
@@ -600,6 +639,9 @@ export function fileUrl(id: string | null | undefined, name: string): string {
 export async function exportSpdx(
   id: string,
 ): Promise<{ name: string; results: ResultFile[] } | null> {
+  // The demo capture reports spdxExport: false, so the button never renders;
+  // conversion needs the server. Null keeps the caller's failure path.
+  if (IS_STATIC_DEMO) return null;
   try {
     const res = await fetch(`/spdx-export?id=${encodeURIComponent(id)}`);
     if (!res.ok) return null;
@@ -631,7 +673,7 @@ export interface RecentScan {
 /** List past scans (newest first). Empty on any failure — history is optional. */
 export async function listScans(): Promise<RecentScan[]> {
   try {
-    const res = await fetch("/scans");
+    const res = await fetch(apiUrl("/scans"));
     if (!res.ok) return [];
     return (await res.json()) as RecentScan[];
   } catch {
@@ -641,6 +683,7 @@ export async function listScans(): Promise<RecentScan[]> {
 
 /** Delete one past scan by run_id (removes its run folder, or legacy {id}_*). */
 export async function deleteScan(id: string): Promise<boolean> {
+  if (IS_STATIC_DEMO) return false; // the demo dataset is fixed; the UI hides this
   try {
     const res = await fetch(`/scan-delete?id=${encodeURIComponent(id)}`, {
       method: "POST",
@@ -654,7 +697,7 @@ export async function deleteScan(id: string): Promise<boolean> {
 /** Re-open a past scan by run_id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {
-    const res = await fetch(`/scan?id=${encodeURIComponent(id)}`);
+    const res = await fetch(apiUrl(`/scan?id=${encodeURIComponent(id)}`));
     if (!res.ok) return null;
     return (await res.json()) as DoneEvent;
   } catch {
@@ -669,13 +712,20 @@ export function absoluteFileUrl(id: string | null | undefined, name: string): st
 
 /** URL that streams a run's generated artifacts as a single zip (scoped by id). */
 export function downloadAllUrl(id?: string | null): string {
+  // The capture step zips each run folder ahead of time, so "download all"
+  // stays a real download rather than a disabled button.
+  if (IS_STATIC_DEMO) {
+    return `${DEMO_DATA_BASE}/files/${encodeURIComponent(id ?? "")}.zip`;
+  }
   return id ? `/download-all?id=${encodeURIComponent(id)}` : "/download-all";
 }
 
 /** List a run's result files (scoped by run_id; all runs when omitted). */
 export async function listResults(id?: string | null): Promise<ResultFile[]> {
   try {
-    const res = await fetch(id ? `/results?id=${encodeURIComponent(id)}` : "/results");
+    const res = await fetch(
+      apiUrl(id ? `/results?id=${encodeURIComponent(id)}` : "/results"),
+    );
     if (!res.ok) return [];
     return (await res.json()) as ResultFile[];
   } catch {

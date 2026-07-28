@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 
+import { DemoBanner } from "./DemoBanner";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { IS_STATIC_DEMO } from "@/lib/demo";
 import {
   EMPTY_SCAN,
   type RecentScanLink,
@@ -88,6 +90,7 @@ export function AppShell({
         recent={recent}
         onDeleteRecent={onDeleteRecent}
       />
+      {IS_STATIC_DEMO && <DemoBanner />}
       <div className="flex min-h-0 flex-1">
         {showSections && (
           <Sidebar

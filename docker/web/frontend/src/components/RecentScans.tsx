@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { RecentScan, Severity } from "@/lib/api";
@@ -202,7 +203,9 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">
           {t("recent.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">{t("recent.subtitle")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
+        </p>
       </div>
 
       {scans.length === 0 ? (
@@ -305,9 +308,11 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                       className="text-right"
                     />
                     <SortHeader label={t("recent.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
-                    <th className={cn(TH, "text-right")}>
-                      <span className="sr-only">{t("recent.delete")}</span>
-                    </th>
+                    {!IS_STATIC_DEMO && (
+                      <th className={cn(TH, "text-right")}>
+                        <span className="sr-only">{t("recent.delete")}</span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -366,17 +371,21 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onDelete(s.id)}
-                          aria-label={t("recent.delete")}
-                          title={t("recent.delete")}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                          <Trash2 className="h-4 w-4" aria-hidden />
-                        </button>
-                      </td>
+                      {/* The demo dataset is fixed, so the whole column goes —
+                          header included, or the row would gain a blank cell. */}
+                      {!IS_STATIC_DEMO && (
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => onDelete(s.id)}
+                            aria-label={t("recent.delete")}
+                            title={t("recent.delete")}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                     ))
                   )}
@@ -385,13 +394,17 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
             </CardContent>
           </Card>
 
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <FolderOpen className="h-3.5 w-3.5" aria-hidden />
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
-              ~/sbom-output
-            </code>
-            <span>{t("recent.source")}</span>
-          </p>
+          {/* Where the list comes from — true of a local run, false of the
+              demo, whose list is a fixed capture and not a folder on disk. */}
+          {!IS_STATIC_DEMO && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <FolderOpen className="h-3.5 w-3.5" aria-hidden />
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                ~/sbom-output
+              </code>
+              <span>{t("recent.source")}</span>
+            </p>
+          )}
         </>
       )}
     </div>

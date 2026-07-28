@@ -16,6 +16,8 @@
   <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI showing a scan result: the Overview with counts and a severity/license summary, the Components table with filters, the Vulnerabilities list, the Dependencies as a graph and tree, and the Licenses section" width="860" />
 </p>
 
+**Live demo:** [sktelecom.github.io/bomlens/demo](https://sktelecom.github.io/bomlens/demo/) — the real web UI holding two finished scans: a Spring Boot project (71 components, 65 known vulnerabilities, 23 past end-of-life) and a supplier SBOM checked against the format requirements. Read-only, nothing to install, and nothing is uploaded — it is a frozen copy of results from an ordinary local run.
+
 ## What it does
 
 One Docker image, two jobs. It **generates**: scan your source code, a container image, or a binary and get a CycloneDX SBOM, an open-source notice, and a security report. It also **assesses open-source risk** in what you receive — a supplier's finished SBOM (`--analyze`) or a firmware binary — reporting licenses and known vulnerabilities with Critical-7d / High-30d remediation deadlines. Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.

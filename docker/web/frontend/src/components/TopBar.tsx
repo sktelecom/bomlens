@@ -1,8 +1,9 @@
-import { Clock, Plus, RotateCw, X } from "lucide-react";
+import { Clock, Download, Plus, RotateCw, X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { DEMO_INSTALL_URL, IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -61,8 +62,14 @@ export function TopBar({
   onDeleteRecent,
 }: TopBarProps) {
   const { t } = useTranslation();
+  // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
+  // would look outside the deployment. It is "/" in a normal build.
   const logo = (
-    <img src="/logo.svg" alt={t("appTitle")} className="h-7 w-auto shrink-0" />
+    <img
+      src={`${import.meta.env.BASE_URL}logo.svg`}
+      alt={t("appTitle")}
+      className="h-7 w-auto shrink-0"
+    />
   );
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -98,7 +105,7 @@ export function TopBar({
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {search}
-        {onRescan && (
+        {onRescan && !IS_STATIC_DEMO && (
           <Button
             variant="outline"
             size="sm"
@@ -110,14 +117,29 @@ export function TopBar({
             <span>{t("result.rescan")}</span>
           </Button>
         )}
-        <a
-          href={newHref}
-          aria-label={t("shell.newScan")}
-          className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          <span className="hidden sm:inline">{t("shell.newScan")}</span>
-        </a>
+        {/* The demo cannot scan, so the primary action becomes the one thing a
+            visitor can act on: getting the tool. Same slot, same weight. */}
+        {IS_STATIC_DEMO ? (
+          <a
+            href={DEMO_INSTALL_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("shell.demoGetTool")}
+            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">{t("shell.demoGetTool")}</span>
+          </a>
+        ) : (
+          <a
+            href={newHref}
+            aria-label={t("shell.newScan")}
+            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">{t("shell.newScan")}</span>
+          </a>
+        )}
         <RecentMenu
           recent={recent}
           homeHref={homeHref}
