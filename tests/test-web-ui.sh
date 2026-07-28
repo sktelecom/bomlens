@@ -516,6 +516,38 @@ c_kind=$(curl -s -o /dev/null -w '%{http_code}' -F "file=@$WORK/sample.zip" "$BA
 c_ext=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=zip" -F "file=@$WORK/payload.txt" "$BASE/upload?kind=zip")
 [ "$c_ext" = "415" ] && pass "wrong extension rejected (415)" || fail ".txt as zip returned $c_ext (expected 415)"
 
+echo "== upload size caps are enforced before the body is read =="
+# The SBOM cap is sized from measurement, not taste: a Yocto core-image-minimal
+# SPDX 3.0 document is 15.8 MB and parsing peaks around 4.8x the file size, so the
+# cap has to clear real build-system output while still bounding memory. Guarding
+# the declared Content-Length means an oversized upload costs nothing to refuse —
+# assert that, rather than actually sending 100 MB.
+sbom_cap=$(python3 - "$ROOT_DIR/docker/web/server.py" <<'PY'
+import re, sys
+src = open(sys.argv[1]).read()
+m = re.search(r'"sbom":\s*(\d+)\s*\*\s*1024\s*\*\s*1024', src)
+print(m.group(1) if m else "0")
+PY
+)
+[ "${sbom_cap:-0}" -ge 25 ] \
+    && pass "sbom upload cap is at least 25 MB (declared: ${sbom_cap} MB)" \
+    || fail "sbom cap is ${sbom_cap} MB — too small for build-system SBOMs"
+# An over-cap declaration is refused with 413 without streaming a body, and the
+# message names the limit so the user knows whether trimming the file would help.
+over=$(( (sbom_cap + 1) * 1024 * 1024 ))
+cap_resp=$(curl -s -o "$WORK/cap.out" -w '%{http_code}' -X POST \
+    -H "Content-Type: multipart/form-data; boundary=zz" \
+    -H "Content-Length: $over" \
+    --max-time 10 "$BASE/upload?kind=sbom" 2>/dev/null || echo "000")
+if [ "$cap_resp" = "413" ]; then
+    pass "over-cap upload refused with 413 before the body is read"
+    grep -q "limit" "$WORK/cap.out" 2>/dev/null \
+        && pass "413 response names the limit" \
+        || fail "413 body does not mention the limit: $(head -c 200 "$WORK/cap.out")"
+else
+    fail "over-cap upload returned $cap_resp (expected 413)"
+fi
+
 echo "== package upload: the accepted extensions are the measured ones =="
 # A build artifact instead of source. The list is measured (see the archive
 # table in the plan): java archives and OS packages are readable as a file, a

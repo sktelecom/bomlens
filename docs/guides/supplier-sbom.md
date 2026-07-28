@@ -86,6 +86,33 @@ The risk report (`_risk-report`) is a document built by re-aggregating the outpu
 
 If you supply SPDX (JSON, Tag-Value), it is converted to CycloneDX internally with `syft convert` and then analyzed through the same pipeline. Conformance validation is based on the original SPDX before conversion, because metadata such as timestamp, tools, or transitive dependencies can be normalized away during conversion. Some SPDX license expressions may be simplified when moved to CycloneDX.
 
+## Yocto images
+
+A Yocto build can produce its own SPDX SBOM, and that file can be uploaded directly. It is read by a dedicated parser rather than the generic SPDX path, because a Yocto document carries two things the generic path loses.
+
+To produce one, add the following to `local.conf` and build as usual.
+
+```
+INHERIT += "create-spdx-3.0"
+INHERIT += "vex"
+```
+
+The SBOM appears in the deploy directory as `tmp/deploy/images/<machine>/<image>.rootfs.spdx.json`. Upload that file.
+
+What you get differs from a normal SBOM scan in two ways.
+
+The component list contains only the packages installed in the image. A Yocto document also describes every source archive the build consumed, which is useful for provenance but would misrepresent what the product ships. Those are left out.
+
+Vulnerabilities come from the build itself. Yocto runs a CVE analysis while building and records a verdict per CVE, so it knows whether a recipe applied the patch. Those verdicts are shown split three ways: patched during the build, judged not applicable, and still open. Only the open ones are counted as findings. On the reference `core-image-minimal` image this is the difference between reporting 12255 vulnerabilities and reporting none, since every one of them was already closed by the build.
+
+Two limits are worth knowing before you start.
+
+Only SPDX 3.0 is supported. Yocto 4.0 (Kirkstone) and 5.0 (Scarthgap) emit SPDX 2.2 by default, which is not a single file: the top-level `.spdx.json` is an index and the packages live in per-recipe documents inside the sibling `.spdx.tar.zst`. Uploading the index alone is detected and reported rather than silently returning an empty result. Both releases can emit SPDX 3.0 with the setting above.
+
+Conformance checks that depend on PURL will fail. Yocto identifies packages with CPE rather than PURL, so PURL coverage and the checks derived from it cannot pass. This reflects a difference in identifier convention, not a defect in the SBOM.
+
+Uploads are capped at 100 MB. For scale, the reference `core-image-minimal` document is 15.8 MB with 35 installed packages.
+
 ## Asking for remediation
 
 After validation and analysis, send the risk report (`_risk-report.html`) to whoever sent the SBOM and ask for the following.

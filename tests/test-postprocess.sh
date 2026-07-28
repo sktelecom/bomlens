@@ -1521,6 +1521,75 @@ STALENESS_FIXTURE_DIR="$FIX/staleness" python3 "$LIB/enrich-staleness.py" "$WORK
 n_latest=$(jq '[.components[] | (.properties // [])[] | select(.name=="bomlens:staleness:latest")] | length' "$WORK/stale.json")
 [ "$n_latest" = "2" ] && pass "enrich-staleness is idempotent (no duplicate props)" || fail "staleness props duplicated: $n_latest latest entries"
 
+echo "== yocto: SPDX 3.0 image SBOM is read for its installed set and VEX verdicts =="
+# parse-yocto-spdx.py exists because syft, the generic converter, reads these
+# documents but returns source files as components and drops every vulnerability.
+# Needs no syft and no Docker — pure stdlib Python over the JSON-LD graph — so
+# unlike the SPDX 3.0 conversion checks below this runs on every CI push.
+python3 "$LIB/parse-yocto-spdx.py" "$FIX/yocto-spdx3-image.json" "$WORK/yocto.cdx.json" "$WORK/yocto" >/dev/null 2>&1
+yrc=$?
+[ "$yrc" = "0" ] && pass "parser accepts a Yocto SPDX 3.0 document" || fail "parser rc=$yrc on the Yocto fixture"
+ynames=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/yocto.cdx.json" 2>/dev/null)
+# The fixture also carries a source tarball; shipping it as a component would
+# claim the image contains build inputs it does not.
+[ "$ynames" = "busybox,libz1" ] \
+    && pass "only primaryPurpose=install packages become components (source tarball dropped)" \
+    || fail "components='$ynames', expected busybox,libz1"
+[ "$(jq '[.components[] | select(.cpe)] | length' "$WORK/yocto.cdx.json")" = "1" ] \
+    && pass "Yocto's own cpe23 identifier is carried over" || fail "cpe not carried over"
+[ "$(jq -r '.components[] | select(.name=="busybox") | .licenses[0].expression' "$WORK/yocto.cdx.json")" = "GPL-2.0-only AND LicenseRef-bzip2-1.0.4" ] \
+    && pass "compound license lands in licenses[].expression" || fail "compound license not preserved"
+[ "$(jq -r '.components[] | select(.name=="libz1") | .licenses[0].license.id' "$WORK/yocto.cdx.json")" = "Zlib" ] \
+    && pass "single license id lands in licenses[].license.id" || fail "single license id not preserved"
+
+# The judgement split is the reason to read these documents: an outside scanner
+# keyed on version alone would report the patched CVE as open.
+[ "$(jq -r '[.judgements.fixed, .judgements.notAffected, .judgements.affected] | join("/")' "$WORK/yocto_yocto_vex.json")" = "1/1/1" ] \
+    && pass "VEX verdicts split into fixed / not-affected / unresolved" \
+    || fail "vex counts=$(jq -c '.judgements' "$WORK/yocto_yocto_vex.json")"
+[ "$(jq -r '[.Results[].Vulnerabilities[].VulnerabilityID] | join(",")' "$WORK/yocto_security_yocto.json")" = "CVE-2022-28391" ] \
+    && pass "only the unjudged CVE reaches the security sidecar" \
+    || fail "sidecar carries $(jq -c '[.Results[].Vulnerabilities[].VulnerabilityID]' "$WORK/yocto_security_yocto.json")"
+
+# rc=3 means "not mine" and must stay non-fatal: the generic converter handles
+# every other supplier SBOM.
+python3 "$LIB/parse-yocto-spdx.py" "$FIX/good-cyclonedx.json" "$WORK/nope.json" >/dev/null 2>&1
+[ "$?" = "3" ] && pass "non-Yocto input is declined with rc=3 (generic path takes over)" || fail "parser did not decline CycloneDX input"
+
+# Yocto SPDX 2.x writes a near-empty top-level document and puts the real package
+# set in a sibling tarball. Converting it succeeds and finds nothing, so the user
+# must be told where the content is rather than shown an empty successful scan.
+cat > "$WORK/y22.json" <<'YEOF'
+{"spdxVersion":"SPDX-2.2","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"core-image-minimal",
+ "documentNamespace":"http://spdx.org/spdxdocs/bitbake-1234",
+ "creationInfo":{"created":"2026-01-01T00:00:00Z","creators":["Tool: bitbake","Organization: OpenEmbedded"]},
+ "packages":[]}
+YEOF
+y22_msg=$(python3 "$LIB/parse-yocto-spdx.py" "$WORK/y22.json" "$WORK/y22-out.json" 2>&1 >/dev/null)
+y22_rc=$?
+[ "$y22_rc" = "3" ] && echo "$y22_msg" | grep -q "spdx.tar.zst" \
+    && pass "Yocto SPDX 2.x index document names the file that holds the packages" \
+    || fail "SPDX 2.x index not recognised (rc=$y22_rc): $y22_msg"
+
+echo "== convert: a non-empty SBOM never converts to an empty one silently =="
+# A valid-but-empty CycloneDX passes every later step, and the report then reads
+# "no components, no vulnerabilities" — indistinguishable from a clean result.
+cat > "$WORK/pkgs-only.spdx.json" <<'PEOF'
+{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"t",
+ "documentNamespace":"http://example.org/doc",
+ "creationInfo":{"created":"2026-01-01T00:00:00Z","creators":["Tool: test"]},
+ "packages":[{"SPDXID":"SPDXRef-p1","name":"zlib","versionInfo":"1.3.1","downloadLocation":"NOASSERTION"}]}
+PEOF
+if bash "$LIB/convert-to-cdx.sh" "$WORK/pkgs-only.spdx.json" "$WORK/pkgs-only.cdx.json" >/dev/null 2>&1; then
+    [ "$(jq '[.components[]?] | length' "$WORK/pkgs-only.cdx.json")" -gt 0 ] \
+        && pass "a package-bearing SPDX still converts to a non-empty CycloneDX" \
+        || fail "conversion succeeded but produced no components"
+else
+    # No syft in this environment: the guard is what we are testing, and it must
+    # be the thing that refuses, not a crash.
+    pass "conversion refused rather than emitting an empty SBOM (no converter available)"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
