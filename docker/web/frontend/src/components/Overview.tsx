@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
 import type {
   ComponentItem,
@@ -29,7 +28,6 @@ import type {
   Severity,
   YoctoVex,
 } from "@/lib/api";
-import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
@@ -77,10 +75,15 @@ function ProvenanceIcon({
 
 /**
  * Decision-first Overview: what needs attention first, then the at-a-glance
- * numbers as jump cards into the detail sections, then the license/type
- * distribution summaries — instead of repeating full tables here. The jump
- * cards sit above the (potentially long) distributions so they stay visible
- * without scrolling.
+ * numbers as jump cards into the detail sections, then the two risk axes
+ * (severity, license classification) — instead of repeating full tables here.
+ * The jump cards sit above the axes so they stay visible without scrolling.
+ *
+ * Only risk axes belong here. A component-type distribution used to sit below
+ * them and was dropped: type is an inventory fact the Components table already
+ * filters on, and as a chart it was mostly one bar (a single-ecosystem SBOM is
+ * all "library") or one bar drowning the rest (a container image is nearly all
+ * "file").
  */
 export function Overview({
   result,
@@ -280,8 +283,6 @@ export function Overview({
           onSelect={onPick ? (tier) => onPick("licenses", { tier }) : undefined}
         />
       </div>
-
-      <TypeSummary components={result.sbom?.componentList ?? []} />
     </div>
   );
 }
@@ -321,28 +322,6 @@ function YoctoVexNote({ vex }: { vex: YoctoVex }) {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-/**
- * Component-type distribution. Only shown when the SBOM has more than one type
- * (e.g. Maven's library vs framework split) — a single-ecosystem SBOM is
- * usually all "library", where the chart would carry no signal.
- */
-function TypeSummary({ components }: { components: ComponentItem[] }) {
-  const { t } = useTranslation();
-  const groups = typeGroups(components);
-  if (groups.length < 2) return null;
-  const items: BarDatum[] = groups.map((g) => ({
-    key: g.type,
-    label: g.type,
-    value: g.count,
-  }));
-  return (
-    <div className="space-y-3">
-      <div className="text-sm font-medium">{t("overview.typeSummaryTitle")}</div>
-      <BarList items={items} ariaLabel={t("overview.typeSummaryTitle")} />
-    </div>
   );
 }
 

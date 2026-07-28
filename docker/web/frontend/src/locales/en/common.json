@@ -413,7 +413,6 @@
     "explore": "Explore",
     "jumpHint": "View {{section}}",
     "depBreakdown": "{{direct}} direct · {{transitive}} transitive",
-    "typeSummaryTitle": "Component types",
     "yoctoVex": {
       "title": "Already handled during the build",
       "allHandled": "Every known CVE on this image was closed while it was built: {{fixed}} patched, {{notAffected}} not applicable. Nothing is left open.",
