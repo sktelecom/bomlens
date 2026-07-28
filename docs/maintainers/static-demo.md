@@ -51,6 +51,14 @@ whatever that machine can do. The script forces every capability off, since each
 one leads to a write the demo cannot serve — a capability left on would render a
 button that does nothing.
 
+Markdown reports are dropped from the capture, and their names are removed from
+the two listings so no download link points at a missing file. The data folder
+sits inside the MkDocs docs tree, where any `*.md` is treated as a page: it gets
+rendered to HTML (the download would 404) and fails `mkdocs build --strict` for
+not being in the nav. Each dropped report has an `.html` twin with the same
+content, so nothing is lost. Adding a new artifact type is safe as long as it is
+not Markdown.
+
 ## Checking it before you push
 
 ```bash

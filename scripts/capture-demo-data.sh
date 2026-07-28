@@ -145,8 +145,32 @@ for run in "${RUNS[@]}"; do
     mkdir -p "$DEST/files/$run"
     # Artifacts are copied rather than re-fetched: /file streams the same bytes
     # and copying keeps the run folder's names exactly as results[] reports them.
-    find "$SRC/$run" -maxdepth 1 -type f -exec cp {} "$DEST/files/$run/" \;
+    #
+    # Markdown reports are the exception. This folder ends up inside the MkDocs
+    # docs tree, where any *.md is taken as a page to render — it would be turned
+    # into HTML (so the download would 404) and would fail `--strict` for not
+    # being in the nav. Every one of them ships an .html twin carrying the same
+    # report, so dropping them costs the demo nothing.
+    find "$SRC/$run" -maxdepth 1 -type f ! -name '*.md' \
+        -exec cp {} "$DEST/files/$run/" \;
     (cd "$DEST/files" && zip -qr "$run.zip" "$run")
+
+    # Keep the listings honest about what was copied: a name left in results[]
+    # would render a download link to a file that is not there.
+    python3 - "$DEST/scan-$run.json" "$DEST/results-$run.json" <<'PY'
+import json, sys
+
+def drop_markdown(results):
+    return [r for r in results if not r.get("name", "").endswith(".md")]
+
+scan_path, results_path = sys.argv[1], sys.argv[2]
+
+scan = json.load(open(scan_path))
+scan["results"] = drop_markdown(scan.get("results", []))
+json.dump(scan, open(scan_path, "w"))
+
+json.dump(drop_markdown(json.load(open(results_path))), open(results_path, "w"))
+PY
 done
 
 echo "[INFO] wrote $DEST ($(du -sh "$DEST" | cut -f1))"
