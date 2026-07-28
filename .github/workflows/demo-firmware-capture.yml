@@ -1,0 +1,98 @@
+name: Demo firmware capture
+
+# 읽기 전용 데모(/demo/)에 실을 펌웨어 스캔을 한 건 만들어 아티팩트로 올린다.
+#
+# 손으로 돌리지 못해서 있는 워크플로다. 펌웨어 이미지(unblob/cve-bin-tool)는
+# linux/amd64로만 빌드되므로 Apple Silicon 장비에서는 에뮬레이션 없이 돌지
+# 않는다. amd64 러너에서 스캔만 수행하고, 데이터를 저장소에 넣는 일은 사람이
+# 아티팩트를 받아 scripts/capture-demo-data.sh로 처리한다. 배포 경로가 아니라
+# 데이터 생산 경로이므로 수동 실행 전용이다.
+#
+# 대상은 OpenWRT다. GPL 오픈소스라 분석 결과를 공개하는 데 제약이 없고,
+# busybox·dropbear·musl 같은 실제 임베디드 리눅스 구성을 담고 있다. 기본값이
+# 이미 지원 종료된 21.02.7인 것은 의도한 선택으로, 노후 컴포넌트와 취약점이
+# 실제로 잡혀야 데모가 쓸모 있기 때문이다. 라우터 펌웨어가 오래 방치되는
+# 현장 상황과도 맞는다.
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: "펌웨어 이미지 URL (같은 폴더에 sha256sums가 있어야 한다)"
+        required: false
+        default: "https://archive.openwrt.org/releases/21.02.7/targets/ath79/generic/openwrt-21.02.7-ath79-generic-tplink_archer-c7-v2-squashfs-sysupgrade.bin"
+      project:
+        description: "데모 목록에 보일 프로젝트 이름"
+        required: false
+        default: "OpenWrtRouterFirmware"
+      version:
+        description: "버전 표기"
+        required: false
+        default: "21.02.7"
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # 펌웨어 이미지는 opt-in 빌드라 ghcr에서 받아온다. 공개 이미지지만
+      # 비인증 pull은 속도 제한에 걸리므로 러너 토큰으로 로그인한다.
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull the firmware scanner image
+        run: docker pull ghcr.io/sktelecom/bomlens-firmware:latest
+
+      # 외부에서 받은 바이너리를 그대로 스캐너에 넣기 전에 공개된 체크섬과
+      # 대조한다. OpenWRT는 각 타깃 폴더에 sha256sums를 함께 게시한다.
+      - name: Download the firmware, checksum-verified
+        run: |
+          set -euo pipefail
+          url="${{ inputs.firmware_url }}"
+          name="$(basename "$url")"
+          mkdir -p fw && cd fw
+          curl -fsSL -o "$name" "$url"
+          curl -fsSL -o sha256sums "$(dirname "$url")/sha256sums"
+          # The published line is "<sha> *<name>"; rebuild it in the plain
+          # "<sha>  <name>" form sha256sum -c expects.
+          expected="$(grep -F "$name" sha256sums | head -1 | awk '{print $1}')"
+          [ -n "$expected" ] || { echo "::error::no checksum published for $name"; exit 1; }
+          echo "${expected}  ${name}" | sha256sum -c -
+          echo "FW_FILE=$name" >> "$GITHUB_ENV"
+          ls -lh "$name"
+
+      - name: Scan the firmware
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          ./scripts/scan-sbom.sh \
+            --project "${{ inputs.project }}" \
+            --version "${{ inputs.version }}" \
+            --target "fw/${FW_FILE}" \
+            --firmware --generate-only -o out
+
+      # 사람이 받아 로컬에서 캡처·검토한 뒤 커밋한다. 산출물만 올리고
+      # 펌웨어 바이너리 자체는 올리지 않는다 — 재배포할 이유가 없다.
+      - name: Summarize what was produced
+        run: |
+          set -euo pipefail
+          run_dir="$(find out -mindepth 1 -maxdepth 1 -type d | head -1)"
+          [ -n "$run_dir" ] || { echo "::error::the scan produced no run folder"; exit 1; }
+          echo "### Firmware capture" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ls -1 "$run_dir" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          bom="$(find "$run_dir" -name '*_bom.json' | head -1)"
+          if [ -n "$bom" ]; then
+            echo "components: $(jq '[.components[]?]|length' "$bom")" >> "$GITHUB_STEP_SUMMARY"
+            echo "root type:  $(jq -r '.metadata.component.type' "$bom")" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-firmware-scan
+          path: out/
+          retention-days: 7
