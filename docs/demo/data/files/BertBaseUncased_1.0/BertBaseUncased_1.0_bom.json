@@ -1,0 +1,800 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "dataset:huggingface/bookcorpus",
+      "data": [
+        {
+          "contents": {
+            "properties": [
+              {
+                "name": "hf:task_categories",
+                "value": "text-generation, fill-mask"
+              },
+              {
+                "name": "hf:size_categories",
+                "value": "10M<n<100M"
+              },
+              {
+                "name": "hf:language",
+                "value": "en"
+              },
+              {
+                "name": "hf:annotations_creators",
+                "value": "no-annotation"
+              },
+              {
+                "name": "hf:multilinguality",
+                "value": "monolingual"
+              },
+              {
+                "name": "hf:tags",
+                "value": "task_categories:text-generation, task_categories:fill-mask, task_ids:language-modeling, task_ids:masked-language-modeling, annotations_creators:no-annotation, language_creators:found, multilinguality:monolingual, source_datasets:original, language:en, license:unknown, size_categories:10M<n<100M, arx"
+              }
+            ],
+            "url": "https://huggingface.co/datasets/bookcorpus"
+          },
+          "description": "Books are a rich source of both fine-grained information, how a character, an object or a scene looks like, as well as high-level semantics, what someone is thinking, feeling and how these states evolve through a story.This work aims to align books to their movie releases in order to providerich descriptive explanations for visual content that go semantically farbeyond the captions available in current datasets. \\",
+          "name": "bookcorpus",
+          "type": "dataset"
+        }
+      ],
+      "description": "Books are a rich source of both fine-grained information, how a character, an object or a scene looks like, as well as high-level semantics, what someone is thinking, feeling and how these states evolve through a story.This work aims to align books to their movie releases in order to providerich descriptive explanations for visual content that go semantically farbeyond the captions available in current datasets. \\",
+      "externalReferences": [
+        {
+          "comment": "Dataset repository",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/bookcorpus"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "name": "unknown"
+          }
+        }
+      ],
+      "name": "bookcorpus",
+      "properties": [
+        {
+          "name": "bomlens:dataset:collectedBy",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:dataset:revision",
+          "value": "d917559bbe9cf49c638fc331c37c4bf239e3b637"
+        },
+        {
+          "name": "bomlens:dataset:fileCount",
+          "value": "3"
+        },
+        {
+          "name": "bomlens:dataset:sourceDataset",
+          "value": "original"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:assessment:axes",
+          "value": "license"
+        },
+        {
+          "name": "bomlens:assessment:license",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:license:keys",
+          "value": "unknown-declared"
+        },
+        {
+          "name": "bomlens:assessment:overall",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:reasons",
+          "value": "license unknown: License declared unknown (review for product use)"
+        }
+      ],
+      "type": "data",
+      "version": "d917559b"
+    },
+    {
+      "authors": [
+        {
+          "name": "google-bert"
+        }
+      ],
+      "bom-ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "description": "No description available",
+      "externalReferences": [
+        {
+          "comment": "Model repository",
+          "type": "website",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased"
+        },
+        {
+          "comment": "Model files",
+          "type": "distribution",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/tree/main"
+        },
+        {
+          "comment": "Specific commit",
+          "type": "vcs",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/commit/86b5e0934494bd15c9632b12f734a8a67f723594"
+        },
+        {
+          "comment": "Training dataset: bookcorpus",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/bookcorpus"
+        },
+        {
+          "comment": "Training dataset: wikipedia",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/wikipedia"
+        },
+        {
+          "comment": "ArXiv Paper",
+          "type": "documentation",
+          "url": "https://arxiv.org/abs/1810.04805"
+        }
+      ],
+      "group": "google-bert",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c0c9f4914b4f0053785e96b8583cd59cda63c2f1b6e95a03970d772bf097e289"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ea201fabe466ef7182f1f687fb5be4b62a73d3a78883f11264ff7f682cdb54bf"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "44d7a2896d341c51fb1eba89aea3a590e6af0ce33e25481136f7eeecb62e5f7f"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "68d45e234eb4a928074dfd868cead0219ab85354cc53d20e772753c6bb9169d3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "097417381d6c7230bd9e3557456d726de6e83245ec8b24f529f60198a67b203a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a7a17d6d844b5de815ccab5f42cad6d24496db3850a2a43d8258221018ce87d2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "manufacturer": {
+        "name": "google-bert",
+        "url": [
+          "https://huggingface.co/google-bert"
+        ]
+      },
+      "modelCard": {
+        "considerations": {
+          "technicalLimitations": [
+            "You can use the raw model for either masked language modeling or next sentence prediction, but it's mostly intended to be fine-tuned on a downstream task"
+          ]
+        },
+        "modelParameters": {
+          "datasets": [
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/bookcorpus"
+              },
+              "name": "bookcorpus",
+              "type": "dataset"
+            },
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/wikipedia"
+              },
+              "name": "wikipedia",
+              "type": "dataset"
+            }
+          ],
+          "modelArchitecture": "bert",
+          "task": "fill-mask"
+        },
+        "properties": [
+          {
+            "name": "genai:aibom:modelcard:vocabSize",
+            "value": "30522"
+          },
+          {
+            "name": "serialNumber",
+            "value": "urn:uuid:google-bert-bert-base-uncased"
+          },
+          {
+            "name": "safetyRiskAssessment",
+            "value": "Even if the training data used for this model could be characterized as fairly neutral, this model can have biased predictions: ```python >>> from transformers import pipeline >>> unmasker = pipeline('fill-mask', model='bert-base-uncased') >>> unmasker(\"The man worked as a [MASK]"
+          }
+        ]
+      },
+      "name": "bert-base-uncased",
+      "properties": [
+        {
+          "name": "openness:weights",
+          "value": "open-weight"
+        },
+        {
+          "name": "openness:architecture",
+          "value": "open-architecture"
+        },
+        {
+          "name": "openness:training-data",
+          "value": "open-data"
+        },
+        {
+          "name": "openness:training",
+          "value": "undisclosed"
+        },
+        {
+          "name": "bomlens:hf:scan:repoStatus",
+          "value": "{\"filesWithIssues\":[],\"scansDone\":true}"
+        },
+        {
+          "name": "bomlens:hf:scan:status",
+          "value": "queued"
+        },
+        {
+          "name": "bomlens:hf:scan:files",
+          "value": "14"
+        },
+        {
+          "name": "bomlens:hf:scan:filesFlagged",
+          "value": "0"
+        },
+        {
+          "name": "bomlens:hf:scan:source",
+          "value": "huggingface-api"
+        },
+        {
+          "name": "bomlens:weights:formats",
+          "value": "bin,h5,msgpack,onnx,safetensors"
+        },
+        {
+          "name": "bomlens:weights:pickleFiles",
+          "value": "2"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "huggingface"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "huggingface-api"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modality",
+          "value": "fill-mask"
+        },
+        {
+          "name": "cdx:huggingface:downloads",
+          "value": "95783043"
+        },
+        {
+          "name": "cdx:huggingface:downloadsAllTime",
+          "value": "3101631529"
+        },
+        {
+          "name": "cdx:huggingface:likes",
+          "value": "2714"
+        },
+        {
+          "name": "cdx:huggingface:gated",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:private",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:disabled",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:createdAt",
+          "value": "2022-03-02T23:29:04.000Z"
+        },
+        {
+          "name": "cdx:huggingface:lastModified",
+          "value": "2024-02-19T11:06:12.000Z"
+        },
+        {
+          "name": "cdx:huggingface:fileCount",
+          "value": "16"
+        },
+        {
+          "name": "cdx:huggingface:libraryName",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:huggingface:spaceCount",
+          "value": "100"
+        },
+        {
+          "name": "cdx:huggingface:inferenceProviderCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:ai:parameterCount",
+          "value": "110106428"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:assessment:axes",
+          "value": "license,security,datasets"
+        },
+        {
+          "name": "bomlens:assessment:usageContext",
+          "value": "product"
+        },
+        {
+          "name": "bomlens:assessment:license",
+          "value": "ok"
+        },
+        {
+          "name": "bomlens:assessment:license:keys",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:assessment:security",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:datasets",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:overall",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:reasons",
+          "value": "license Apache-2.0: Permissive open-source license (ok for product use); file security: scan queued, pickle-format weights present (review); datasets: 2 referenced, worst review (bookcorpus)"
+        }
+      ],
+      "purl": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "supplier": {
+        "name": "google-bert"
+      },
+      "type": "machine-learning-model",
+      "version": "86b5e093"
+    },
+    {
+      "bom-ref": "dataset:huggingface/wikipedia",
+      "data": [
+        {
+          "contents": {
+            "properties": [
+              {
+                "name": "hf:task_categories",
+                "value": "text-generation, fill-mask"
+              },
+              {
+                "name": "hf:size_categories",
+                "value": "n<1K, 1K<n<10K, 10K<n<100K, 100K<n<1M, 1M<n<10M"
+              },
+              {
+                "name": "hf:language",
+                "value": "aa, ab, ace, af, ak, als, am, an, ang, ar, arc, arz, as, ast, atj, av, ay, az, azb, ba, bar, bcl, be, bg, bh, bi, bjn, bm, bn, bo, bpy, br, bs, bug, bxr, ca, cbk, cdo, ce, ceb, ch, cho, chr, chy, ckb,"
+              },
+              {
+                "name": "hf:annotations_creators",
+                "value": "no-annotation"
+              },
+              {
+                "name": "hf:multilinguality",
+                "value": "multilingual"
+              },
+              {
+                "name": "hf:tags",
+                "value": "task_categories:text-generation, task_categories:fill-mask, task_ids:language-modeling, task_ids:masked-language-modeling, annotations_creators:no-annotation, language_creators:crowdsourced, multilinguality:multilingual, source_datasets:original, language:aa, language:ab, language:ace, language:af, "
+              }
+            ],
+            "url": "https://huggingface.co/datasets/wikipedia"
+          },
+          "description": "Wikipedia dataset containing cleaned articles of all languages.\nThe datasets are built from the Wikipedia dump\n(https://dumps.wikimedia.org/) with one split per language. Each example\ncontains the content of one full Wikipedia article with cleaning to strip\nmarkdown and unwanted sections (references, etc.).",
+          "name": "wikipedia",
+          "type": "dataset"
+        }
+      ],
+      "description": "Wikipedia dataset containing cleaned articles of all languages.\nThe datasets are built from the Wikipedia dump\n(https://dumps.wikimedia.org/) with one split per language. Each example\ncontains the content of one full Wikipedia article with cleaning to strip\nmarkdown and unwanted sections (references, etc.).",
+      "externalReferences": [
+        {
+          "comment": "Dataset repository",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/wikipedia"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0500438ad38e4136c589c0343f5879c0815a7ece4be1176ae42b7aae05ed16ad"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "c69e7937dc26d7180adff1658a49554923d33ecfa6b194c4bb3fe3c6b6a6bf6e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5d2fa9959eef3280ac103042326f9ac3f277fe61cd67b2e8eeecbadb9bfbd334"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "9db8370750dbec527efc24f884b64efbe830df75d19592179404e43b4b50177f"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "4ca237a43a96199477dbcb57afc6adc8804e9dcd5a0f6606bd23f95524da6cdb"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "470023e06f024d40dc846e21fe6683df2106e1b311af29f85b253b1260418734"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0c014b921d779b0c3b368cfac2ba70acd1ab038116a0000ca0cc0c73ff597cb1"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f1fc8364f4bded402908d301a68423eeefa0ec504cbbb58832e12f98ca6dc515"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0deba018fb44f85f3854820405c97ea00397b8354dae32dc854edbeb5df1d18b"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "034a2928b48f1b85b450d58d23e34ef0f78189c56aefb5edf9d3d6692cd50765"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "bf846cdc38aa3fffb3c950e265c753f91c19f36a24fc50829ee9086585c4b37a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e63be06b7a4bba1a82e5e63b7c4e59636585b9100f54893883ed207986595990"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5a202f1c124cfc5e88e7f2e5031aaa9354df03d4e69256c37e62339ae9b4ebce"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2eaa0c5d230b469f4ef94e7b4a2069ed94cd3a2938107d08eaeef4a2ca401d8d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2698625116984d87316225e822148425e4e2e9ca22040ea4fe3a247cacd8cdbb"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "36cca8720ae88c70a3c918bc0945bf3408cbd53eff7c6e7f2129e49a535bfbb4"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d772d01e45941e931a9ff05e38f8692d44b193b149d3e069c48f271e8bc41b83"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e127fd22dbc05128019dec3562f51e15b837def03d25d034437985226ff7ac1e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "676bfe5d3b0ad2f61ab9f55e1c9d91ec772fb7352ce35e195ec45edf2e015cf3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "03ce6a3459611b05f9336ac65fb494a8c156809ac28951886f7eb8ae3dcfbaff"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2a0c9825f73d9a664461fe20e9f2f6113f733733cdb6ee5ec078aaf36afda004"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e3fa3a6872b9b3a63c9a0a99b188b38fa2719f9eb11bbcdb1d7e1e6088c58b85"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d1f9ff760acf02272ac5c367401b87cacadcbab1fea997afff78d1b35de901db"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a46ab5dc2c4e26660fa87a3ac2b0d760ee0e39b02f73cf9d48cc1bb319b2c23e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "eff56d329e66cbae894a2b5607f0685b88a2590ffbfe6ac76b554e5e88a3c085"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e353eeaabfa8baa699e9c2f66cf2a82c41209e8507b86cdfb0a3807ba5502cd3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "6e7ab9f1116a7995b97f61275b25837a8d9788cd1d256a729d4e7e23ac44502a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5822565421a3e0449a32b36fe4f231aacceabff149e2a0b1aeb51f137fef54e6"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e126a68a3ffccc6748eb87930fd3edb0abc288f4c9c7170c9bbd537c58818ccb"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "52bbfb0697caf5592c1a663d54ae35d6293e1ad42817f5449a0b42bc1232b039"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "562592598ab5e5b212fb0d36c609b02f5dda6258a8e6570e6bc8a6757e862853"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "707583005ef35279bdf28cdffffd827149f7e967893032059bbb03c7c1246e4b"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "4d1047f36e1cf9ee7e666cb60f744b5ab99888e630963d396f3af141bc5f516e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d95929da383dfe39d92f29d08056057f60f5dc45622bd11384194abbc13743ff"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0ab22cb8320c5b7631b5f658a273a09d5a0421464daa76ff80a0aa3ea0d1fe64"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0878f4c1bb951b6c84481a432bce65ddd36ad0eca601443b2f4cbc902562d357"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7c819591d26c2d396b4d7ad0ca4ca1a911cbbc37faad796822e1d7d1ba30b724"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e1351550afbb921f21fb8f126cd039cb427afee17c778075aea95089f0b8b562"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "39047ceee7f49532ff3df22aced7c01ecc9f2fb7819f949c03832e5a843fac30"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "10bdc008b46c2ae6de85bfa7953921c6b3f1e592cf3151d52f6489720c031245"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "1ed66822c18b6cbbbe65037cc58b42506dc932e7189a17ec7b120183b7fcc608"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "26d8bf5b9590ba54fff7ea94692f8815a4d29d7460a8993646c23cd3f4063921"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7893511b5908319c785910e091fbb723b6fed45fafbd787b71f58cb43dc1d167"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "97c0d3fca8a21c0fb43639c20aaa30698d838670a98369f437ff58ea085c300a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "41d69bca719cec091495aed57ec8030690866da0081064d324d84a9092704594"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5ce90801f203838049e80906b685a19be121f5c4935c07d1e37adefbd16673d0"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "359ffc8724c80666e19a8218374d1c97877065368d89f3ef7dee260025e8efe8"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d356846c052d98ef8f1d91c10be771b467219e366440dd65c48ec2bdb43ac2bd"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "c75d7b66a259cc38b293bf1eea2d02a55d8d1e437df730f8b0d50e9294a1ef7c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "067d83c9a7b4312da61101a0627f76b997d59803cb261ee6b9c5a0acba2fd301"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "6280a4e1fe8113521de839db26f8016cda268131e254052ce5394418e97f47f7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0eefa4a2ca53d5b3d37a34b39c80488a74481882295f97a8c7af1d3c7d791957"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f96bed8b55c96608bc5aef965562a717475939f4ec3f70806654eb0a293356e5"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "b5567db36443561d5d2fba2483bdee00276d0ce8383ca9cc3aff1fd7271dc636"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "dd157c6e87f480f56cf92ec6eab6e014b7799828c4369fd87cc98be564fc858a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3bfff41e14cda838ec2d931a208f281a4b57bc82fca445f22d73046d37154a67"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "b82334311f19a68400ffdfa96a570a65e5d1f996d3ff4347de4cc1b9cb30976d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2f3fdd38e644afaafd0c21c5be8cfa70b945234710a3e79f1646696ab5b5e9ab"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "04c395e37d371f10f60da55cc081db4001cdde4c034d1a9f40eea09318960791"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "8d3c376fa1b9b106ce2b46b4b30e411eeb4956630876edffbc667960b9a82b8e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "af79c37d9620ba2f56c8cb8e3bed4e8ad8371aed77109248257a4086ebd8a3cc"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5659d1a1f41558b194faf012fa774e68676e4e520f99da3f396f73181f8e89f1"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2ed8266c38743d53da26654201472f6f9110256fa11b4c13e6258fe97d82ea2b"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "8f7e320f515b70cae17884e94b05819d2a7f9983c738258f931c72ff8340c1f1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "CC-BY-SA-3.0"
+          }
+        }
+      ],
+      "name": "wikipedia",
+      "properties": [
+        {
+          "name": "bomlens:dataset:collectedBy",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:dataset:revision",
+          "value": "97a0b052c326b45fb68593a14972d9eed884cd17"
+        },
+        {
+          "name": "bomlens:dataset:hashedFiles",
+          "value": "64 of 86"
+        },
+        {
+          "name": "bomlens:dataset:fileCount",
+          "value": "89"
+        },
+        {
+          "name": "bomlens:dataset:sourceDataset",
+          "value": "original"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:assessment:axes",
+          "value": "license"
+        },
+        {
+          "name": "bomlens:assessment:license",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:assessment:license:keys",
+          "value": "cc-share-alike"
+        },
+        {
+          "name": "bomlens:assessment:overall",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:assessment:reasons",
+          "value": "license CC-BY-SA-3.0: Share-alike data/content license (conditional for product use)"
+        }
+      ],
+      "type": "data",
+      "version": "97a0b052"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ],
+      "ref": "pkg:generic/google-bert/bert-base-uncased@86b5e093"
+    },
+    {
+      "dependsOn": [
+        "dataset:huggingface/bookcorpus",
+        "dataset:huggingface/wikipedia"
+      ],
+      "ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+    },
+    {
+      "dependsOn": [],
+      "ref": "dataset:huggingface/bookcorpus"
+    },
+    {
+      "dependsOn": [],
+      "ref": "dataset:huggingface/wikipedia"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-03:44:39@1.0",
+      "description": "Generating SBOM for google-bert/bert-base-uncased",
+      "manufacturer": {
+        "name": "OWASP AIBOM Generator"
+      },
+      "name": "job-2026-07-28-03:44:39",
+      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-03:44:39@1.0",
+      "supplier": {
+        "name": "OWASP AIBOM Generator"
+      },
+      "type": "application",
+      "version": "1.0"
+    },
+    "timestamp": "2026-07-28T03:44:39+00:00",
+    "tools": {
+      "components": [
+        {
+          "bom-ref": "pkg:generic/owasp-genai/owasp-aibom-generator@1.0.2",
+          "manufacturer": {
+            "name": "OWASP GenAI Security Project"
+          },
+          "name": "owasp-aibom-generator",
+          "type": "application",
+          "version": "1.0.2"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:30cad767-21a0-484b-9fa9-7695ea71cd61",
+  "specVersion": "1.7",
+  "version": 1
+}

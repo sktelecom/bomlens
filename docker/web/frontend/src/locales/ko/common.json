@@ -758,7 +758,7 @@
     "emptyOutNotice": "오픈소스 고지문",
     "emptyOutSecurity": "보안 보고서",
     "source": "파일을 지우면 목록에서도 사라집니다.",
-    "demoSubtitle": "완료된 스캔 두 건입니다. 하나는 프로젝트 소스를 스캔한 결과이고, 하나는 공급사에게 받은 SBOM을 검증한 결과입니다"
+    "demoSubtitle": "완료된 스캔 네 건입니다. 프로젝트 소스와 컨테이너 이미지, AI 모델, 그리고 공급사에게 받은 SBOM을 각각 스캔했습니다"
   },
   "validation": {
     "required": "위에 표시된 필수 항목을 채워 주세요.",

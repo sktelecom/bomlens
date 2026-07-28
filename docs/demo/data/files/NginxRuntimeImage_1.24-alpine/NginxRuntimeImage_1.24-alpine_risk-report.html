@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>Open-source risk analysis report — NginxRuntimeImage</title>
+<style>
+ :root{
+  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
+  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+ }
+ @media (prefers-color-scheme:dark){:root{
+  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --th-bg:#1f1f23;--row-hover:#202024;
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+ }}
+ *{box-sizing:border-box;}
+ body{font-family:var(--font);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+ a{color:var(--brand);}
+ .report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;}
+ .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
+  letter-spacing:-.02em;color:var(--brand);}
+ .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+ .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+ h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
+ h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+ h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
+ .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
+ .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+ .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
+ .pill .count{font-variant-numeric:tabular-nums;}
+ .pill-crit{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-high{background:rgba(234,88,12,.12);color:#ea580c;}
+ .pill-med{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .pill-low{background:rgba(37,99,235,.12);color:#2563eb;}
+ .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
+ .pill-kev{background:rgba(234,0,44,.12);color:#EA002C;}
+ .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
+ .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
+ .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
+ .note{background:rgba(244,119,37,.09);border-left:3px solid var(--brand-2);
+  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:.875rem;}
+ .note b{color:var(--text);}
+ .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+ table{border-collapse:collapse;width:100%;font-size:.85rem;}
+ th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
+ td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
+ tr:last-child td{border-bottom:none;}
+ tr:hover td{background:var(--row-hover);}
+ td.num{text-align:right;font-variant-numeric:tabular-nums;}
+ .sev-CRITICAL{color:#dc2626;font-weight:700;}
+ .sev-HIGH{color:#ea580c;font-weight:700;}
+ .sev-MEDIUM{color:#ca8a04;font-weight:600;}
+ .sev-LOW{color:#2563eb;font-weight:600;}
+ .sev-UNKNOWN{color:#71717a;}
+ .mono li{font-family:var(--mono);font-size:.82rem;}
+ ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+ li{margin:.3rem 0;}
+</style></head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">Risk Report</div>
+</header>
+<h1>Open-source risk analysis report</h1>
+<p class="meta">Project: NginxRuntimeImage &middot; Generated: 2026-07-28T03:44:15Z</p>
+<h2>1. Vulnerability analysis and remediation deadlines</h2>
+<div class="note">Recommended remediation deadlines: <b>Critical → within 7 days</b>, <b>High → within 30 days</b>. We recommend preparing a remediation plan or risk justification.</div>
+<div class="cards">
+ <span class="pill pill-crit">Critical <span class="count">2</span></span>
+ <span class="pill pill-high">High <span class="count">11</span></span>
+ <span class="pill pill-med">Medium <span class="count">25</span></span>
+ <span class="pill pill-low">Low <span class="count">28</span></span>
+ <span class="pill pill-info">Unknown <span class="count">0</span></span>
+</div>
+<div class="table-wrap"><table><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Deadline</th></tr>
+<tr><td class="sev-CRITICAL">CRITICAL</td><td>CVE-2024-45491</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.3-r0</td><td>within 7 days</td></tr>
+<tr><td class="sev-CRITICAL">CRITICAL</td><td>CVE-2024-45492</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.3-r0</td><td>within 7 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2024-6197</td><td>curl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2024-6119</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.15-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-15467</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-69421</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2024-6197</td><td>libcurl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2024-45490</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.3-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2024-6119</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.15-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-15467</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-69421</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-26519</td><td>musl</td><td>1.2.3-r5</td><td>1.2.3-r6</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td>CVE-2025-26519</td><td>musl-utils</td><td>1.2.3-r5</td><td>1.2.3-r6</td><td>within 30 days</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42363</td><td>busybox</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42364</td><td>busybox</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42365</td><td>busybox</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42366</td><td>busybox</td><td>1.35.0-r29</td><td>1.35.0-r30</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42363</td><td>busybox-binsh</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42364</td><td>busybox-binsh</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42365</td><td>busybox-binsh</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42366</td><td>busybox-binsh</td><td>1.35.0-r29</td><td>1.35.0-r30</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-0853</td><td>curl</td><td>8.5.0-r0</td><td>8.6.0-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-2398</td><td>curl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-2466</td><td>curl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-6874</td><td>curl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2025-69419</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2025-9230</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-0853</td><td>libcurl</td><td>8.5.0-r0</td><td>8.6.0-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-2398</td><td>libcurl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-2466</td><td>libcurl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-6874</td><td>libcurl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2024-50602</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.4-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2025-69419</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2025-9230</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42363</td><td>ssl_client</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42364</td><td>ssl_client</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42365</td><td>ssl_client</td><td>1.35.0-r29</td><td>1.35.0-r31</td><td>Per policy</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td>CVE-2023-42366</td><td>ssl_client</td><td>1.35.0-r29</td><td>1.35.0-r30</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2004</td><td>curl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2379</td><td>curl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-13176</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2511</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.12-r5</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-4603</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.13-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-4741</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.14-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-5535</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.14-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-9143</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.15-r1</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-68160</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-69418</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-69420</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-9232</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2026-22795</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2026-22796</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2004</td><td>libcurl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2379</td><td>libcurl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-13176</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-2511</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.12-r5</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-4603</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.13-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-4741</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.14-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-5535</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.14-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2024-9143</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.15-r1</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-68160</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-69418</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-69420</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2025-9232</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2026-22795</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+<tr><td class="sev-LOW">LOW</td><td>CVE-2026-22796</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>Per policy</td></tr>
+</table></div>
+<h2>2. License summary</h2>
+<p>Distinct licenses identified: <b>30</b> (see the NOTICE artifact for details).</p>
+<h3>License classification (copyleft strength)</h3>
+<p>Each component is also recorded in the SBOM with a <code>bomlens:licenseClass</code> property. An unrecognized license is left uncategorized rather than assumed permissive.</p>
+<div class="cards">
+ <span class="pill pill-crit">Network copyleft <span class="count">0</span></span>
+ <span class="pill pill-high">Strong copyleft <span class="count">13</span></span>
+ <span class="pill pill-med">Weak copyleft <span class="count">4</span></span>
+ <span class="pill pill-pass">Permissive <span class="count">25</span></span>
+ <span class="pill pill-info">Uncategorized <span class="count">1351</span></span>
+</div>
+<p>Components that create copyleft exposure (network/strong, up to 10):</p>
+<ul class="mono">
+<li>alpine-baselayout-data@3.4.0-r0 (strong-copyleft)</li>
+<li>alpine-baselayout@3.4.0-r0 (strong-copyleft)</li>
+<li>apk-tools@2.12.10-r1 (strong-copyleft)</li>
+<li>busybox-binsh@1.35.0-r29 (strong-copyleft)</li>
+<li>busybox@1.35.0-r29 (strong-copyleft)</li>
+<li>freetype@2.12.1-r0 (strong-copyleft)</li>
+<li>geoip@1.6.12-r3 (strong-copyleft)</li>
+<li>libgpg-error@1.46-r1 (strong-copyleft)</li>
+<li>musl-utils@1.2.3-r5 (strong-copyleft)</li>
+<li>scanelf@1.3.5-r1 (strong-copyleft)</li>
+<li>… and 3 more (see the SBOM <code>bomlens:licenseClass</code> property for all)</li>
+</ul>
+<h2>3. Next steps</h2>
+<ol>
+ <li>Prepare a <b>remediation plan or risk justification</b> within the recommended deadlines above.</li>
+ <li>Keep and distribute the notice (NOTICE) together with the SBOM.</li>
+</ol>
+</body></html>

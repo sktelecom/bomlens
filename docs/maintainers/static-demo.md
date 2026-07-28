@@ -24,14 +24,35 @@ local build cannot accidentally commit a bundle.
 Run the scans you want to publish into one folder, then capture them:
 
 ```bash
-# A source scan and a supplier-SBOM review make a good pair: one shows what
-# BomLens produces, the other what it checks in an SBOM someone sent you.
-cd examples/java-maven
-scripts/scan-sbom.sh --project SpringBootDemo --version 1.0.0 \
+# One run per kind of result, so the list shows the range of inputs.
+cd examples/java-maven && scripts/scan-sbom.sh \
+    --project SpringBootDemo --version 1.0.0 \
     --license Apache-2.0 --generate-only -o ~/demo-scans
 
+scripts/scan-sbom.sh --project NginxRuntimeImage --version 1.24-alpine \
+    --target nginx:1.24-alpine --generate-only -o ~/demo-scans
+
+scripts/scan-sbom.sh --project BertBaseUncased --version 1.0 \
+    --model "google-bert/bert-base-uncased" --usage product \
+    --generate-only -o ~/demo-scans
+
+# The supplier review needs an SBOM to review, so scan something first and
+# feed the result back in with --analyze.
 scripts/capture-demo-data.sh ~/demo-scans
 ```
+
+Pick runs whose *results* differ, not whose input flag differs. A GitHub URL, a
+ZIP and a local folder all produce the same kind of source scan, so publishing
+all three would fill the list with rows that look identical. Source, container,
+AI model and supplier-SBOM review each land on a visibly different screen — the
+container brings OS packages, the AI model a CycloneDX 1.7 ML-BOM with the G7
+checks, the review a conformance verdict.
+
+Firmware is the one kind the demo does not carry. Its image is built for amd64
+only (see the `docker-publish` workflow), so capturing a firmware run needs an
+amd64 machine — on Apple Silicon it would have to run under emulation, where the
+unpacking tools are slow and unreliable. Capture it from an amd64 host if you
+want that row.
 
 `capture-demo-data.sh` starts the real `server.py` against that folder and saves
 what it answers, so the captured shapes are the server's shapes by construction.

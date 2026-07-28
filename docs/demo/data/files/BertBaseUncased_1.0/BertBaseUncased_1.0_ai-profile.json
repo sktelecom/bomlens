@@ -1,0 +1,826 @@
+{
+  "project": "BertBaseUncased",
+  "generatedAt": "2026-07-28T03:44:44Z",
+  "conformanceResult": "pass",
+  "g7": {
+    "total": 51,
+    "auto": 41,
+    "present": 32,
+    "gap": 9,
+    "review": 10,
+    "clusters": [
+      {
+        "cluster": "dp",
+        "total": 10,
+        "present": 8,
+        "gap": 0,
+        "review": 2
+      },
+      {
+        "cluster": "infrastructure",
+        "total": 2,
+        "present": 0,
+        "gap": 2,
+        "review": 0
+      },
+      {
+        "cluster": "kpi",
+        "total": 2,
+        "present": 0,
+        "gap": 1,
+        "review": 1
+      },
+      {
+        "cluster": "metadata",
+        "total": 10,
+        "present": 7,
+        "gap": 3,
+        "review": 0
+      },
+      {
+        "cluster": "models",
+        "total": 14,
+        "present": 13,
+        "gap": 1,
+        "review": 0
+      },
+      {
+        "cluster": "slp",
+        "total": 9,
+        "present": 4,
+        "gap": 1,
+        "review": 4
+      },
+      {
+        "cluster": "sp",
+        "total": 4,
+        "present": 0,
+        "gap": 1,
+        "review": 3
+      }
+    ],
+    "reviewItems": [
+      {
+        "id": "g7-slp-data-flow",
+        "label": "System data flow",
+        "cluster": "slp"
+      },
+      {
+        "id": "g7-slp-data-usage",
+        "label": "System data usage",
+        "cluster": "slp"
+      },
+      {
+        "id": "g7-slp-io",
+        "label": "System input/output properties",
+        "cluster": "slp"
+      },
+      {
+        "id": "g7-slp-app-area",
+        "label": "Intended application area",
+        "cluster": "slp"
+      },
+      {
+        "id": "g7-ds-statistics",
+        "label": "Dataset statistical properties",
+        "cluster": "dp"
+      },
+      {
+        "id": "g7-ds-sensitivity",
+        "label": "Dataset sensitivity (PII/copyright)",
+        "cluster": "dp"
+      },
+      {
+        "id": "g7-sec-controls",
+        "label": "Security controls",
+        "cluster": "sp"
+      },
+      {
+        "id": "g7-sec-compliance",
+        "label": "Security compliance",
+        "cluster": "sp"
+      },
+      {
+        "id": "g7-sec-policy",
+        "label": "Cybersecurity policy information",
+        "cluster": "sp"
+      },
+      {
+        "id": "g7-kpi-security",
+        "label": "Security metrics",
+        "cluster": "kpi"
+      }
+    ],
+    "gapItems": [
+      {
+        "id": "g7-meta-author",
+        "label": "SBOM author",
+        "cluster": "metadata",
+        "docUrl": ""
+      },
+      {
+        "id": "g7-meta-signature",
+        "label": "SBOM author signature",
+        "cluster": "metadata",
+        "docUrl": "https://cyclonedx.org/docs/1.7/json/#signature"
+      },
+      {
+        "id": "g7-meta-gen-context",
+        "label": "SBOM generation context",
+        "cluster": "metadata",
+        "docUrl": ""
+      },
+      {
+        "id": "g7-slp-producer",
+        "label": "System producer",
+        "cluster": "slp",
+        "docUrl": ""
+      },
+      {
+        "id": "g7-model-io",
+        "label": "Model input-output properties",
+        "cluster": "models",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      {
+        "id": "g7-infra-software",
+        "label": "Infrastructure software (dependencies)",
+        "cluster": "infrastructure",
+        "docUrl": ""
+      },
+      {
+        "id": "g7-infra-hardware",
+        "label": "Infrastructure hardware (HBOM link)",
+        "cluster": "infrastructure",
+        "docUrl": "https://cyclonedx.org/capabilities/hbom/"
+      },
+      {
+        "id": "g7-sec-vulns",
+        "label": "Vulnerability referencing",
+        "cluster": "sp",
+        "docUrl": ""
+      },
+      {
+        "id": "g7-kpi-operational",
+        "label": "Operational performance KPIs",
+        "cluster": "kpi",
+        "docUrl": ""
+      }
+    ]
+  },
+  "regulatoryCrosswalk": {
+    "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk covers only the documentation elements an SBOM can carry; obligations that an SBOM cannot express — bias and fairness assessment, risk management, human oversight — are out of its scope and must be met through separate documents. It makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
+    "frameworks": [
+      {
+        "id": "eu-ai-act",
+        "title": "EU AI Act — Annex IV technical documentation",
+        "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
+        "total": 23,
+        "present": 9,
+        "gap": 5,
+        "review": 9,
+        "elements": [
+          {
+            "id": "g7-slp-name",
+            "label": "System name",
+            "status": "pass",
+            "source": "declared",
+            "detail": "present",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-data-flow",
+            "label": "System data flow",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-data-usage",
+            "label": "System data usage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-slp-io",
+            "label": "System input/output properties",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-app-area",
+            "label": "Intended application area",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-model-description",
+            "label": "Model description",
+            "status": "pass",
+            "source": "auto",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-model-card",
+            "label": "Model properties (model card)",
+            "status": "pass",
+            "source": "auto",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "Annex IV(2)(b)-(c)"
+            ]
+          },
+          {
+            "id": "g7-model-io",
+            "label": "Model input-output properties",
+            "status": "warn",
+            "source": "inferred",
+            "detail": "0/1 model component(s)",
+            "refs": [
+              "Annex IV(3)"
+            ]
+          },
+          {
+            "id": "g7-model-training",
+            "label": "Model training properties",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-name",
+            "label": "Dataset name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-description",
+            "label": "Dataset description",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-content",
+            "label": "Dataset content",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-provenance",
+            "label": "Dataset provenance",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-statistics",
+            "label": "Dataset statistical properties",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-sensitivity",
+            "label": "Dataset sensitivity (PII/copyright)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-license",
+            "label": "Dataset license",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-infra-software",
+            "label": "Infrastructure software (dependencies)",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(c)"
+            ]
+          },
+          {
+            "id": "g7-infra-hardware",
+            "label": "Infrastructure hardware (HBOM link)",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-sec-controls",
+            "label": "Security controls",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-sec-policy",
+            "label": "Cybersecurity policy information",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(5)"
+            ]
+          },
+          {
+            "id": "g7-sec-vulns",
+            "label": "Vulnerability referencing",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-kpi-security",
+            "label": "Security metrics",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-kpi-operational",
+            "label": "Operational performance KPIs",
+            "status": "warn",
+            "source": "inferred",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(g)"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "kr-ai-framework-act",
+        "title": "AI Framework Act (Korea)",
+        "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
+        "total": 10,
+        "present": 2,
+        "gap": 1,
+        "review": 7,
+        "elements": [
+          {
+            "id": "g7-slp-name",
+            "label": "System name",
+            "status": "pass",
+            "source": "declared",
+            "detail": "present",
+            "refs": [
+              "제31조"
+            ]
+          },
+          {
+            "id": "g7-slp-data-flow",
+            "label": "System data flow",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-slp-data-usage",
+            "label": "System data usage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-slp-app-area",
+            "label": "Intended application area",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제33조"
+            ]
+          },
+          {
+            "id": "g7-model-training",
+            "label": "Model training properties",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-ds-sensitivity",
+            "label": "Dataset sensitivity (PII/copyright)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-sec-controls",
+            "label": "Security controls",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-sec-policy",
+            "label": "Cybersecurity policy information",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-sec-vulns",
+            "label": "Vulnerability referencing",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-kpi-security",
+            "label": "Security metrics",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bsi-tr-03183-2",
+        "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
+        "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
+        "total": 14,
+        "present": 11,
+        "gap": 2,
+        "review": 1,
+        "elements": [
+          {
+            "id": "spec-version",
+            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)",
+            "status": "pass",
+            "source": null,
+            "detail": "CycloneDX 1.7",
+            "refs": [
+              "Section 4"
+            ]
+          },
+          {
+            "id": "timestamp",
+            "label": "Timestamp (metadata.timestamp)",
+            "status": "pass",
+            "source": null,
+            "detail": "2026-07-28T03:44:39+00:00",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tool info (metadata.tools)",
+            "status": "pass",
+            "source": null,
+            "detail": "1 tool(s)",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "top-component",
+            "label": "Top-level component name+version",
+            "status": "pass",
+            "source": null,
+            "detail": "job-2026-07-28-03:44:39@1.0",
+            "refs": [
+              "Section 5.1"
+            ]
+          },
+          {
+            "id": "name-version",
+            "label": "Component name+version coverage (100%)",
+            "status": "pass",
+            "source": null,
+            "detail": "1/1",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "purl",
+            "label": "PURL coverage (>= 90%)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (1/1)",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "transitive",
+            "label": "Transitive dependencies (graph edges)",
+            "status": "pass",
+            "source": null,
+            "detail": "3 edge(s)",
+            "refs": [
+              "Section 5.1; 5.2.2"
+            ]
+          },
+          {
+            "id": "license",
+            "label": "License coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (3/3)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash",
+            "label": "Hash coverage (>= 50%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "66% (2/3)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash-algorithm",
+            "label": "SHA-512 checksum coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": null,
+            "detail": "0% (0/3)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-creator",
+            "label": "Component creator coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (1/1)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-filename",
+            "label": "Component filename coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": null,
+            "detail": "0% (0/1)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "artifact-uri",
+            "label": "Source or distribution URI coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (1/1)",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "file-properties",
+            "label": "Delivered-file properties (executable/archive/structured)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires inspecting the delivered files (no automated source in this scan)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "us-sbom-minimum-elements",
+        "title": "US SBOM minimum elements",
+        "source": "Executive Order 14028 §4; NTIA \"The Minimum Elements For a Software Bill of Materials\" (2021-07-12)",
+        "total": 8,
+        "present": 8,
+        "gap": 0,
+        "review": 0,
+        "elements": [
+          {
+            "id": "spec-version",
+            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)",
+            "status": "pass",
+            "source": null,
+            "detail": "CycloneDX 1.7",
+            "refs": [
+              "Automation Support"
+            ]
+          },
+          {
+            "id": "timestamp",
+            "label": "Timestamp (metadata.timestamp)",
+            "status": "pass",
+            "source": null,
+            "detail": "2026-07-28T03:44:39+00:00",
+            "refs": [
+              "Timestamp"
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tool info (metadata.tools)",
+            "status": "pass",
+            "source": null,
+            "detail": "1 tool(s)",
+            "refs": [
+              "Author of SBOM Data"
+            ]
+          },
+          {
+            "id": "name-version",
+            "label": "Component name+version coverage (100%)",
+            "status": "pass",
+            "source": null,
+            "detail": "1/1",
+            "refs": [
+              "Component Name / Version"
+            ]
+          },
+          {
+            "id": "purl",
+            "label": "PURL coverage (>= 90%)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (1/1)",
+            "refs": [
+              "Other Unique Identifiers"
+            ]
+          },
+          {
+            "id": "purl-syntax",
+            "label": "PURL syntax (pkg:type/name@version)",
+            "status": "pass",
+            "source": null,
+            "detail": "0 malformed",
+            "refs": [
+              "Other Unique Identifiers"
+            ]
+          },
+          {
+            "id": "transitive",
+            "label": "Transitive dependencies (graph edges)",
+            "status": "pass",
+            "source": null,
+            "detail": "3 edge(s)",
+            "refs": [
+              "Dependency Relationship"
+            ]
+          },
+          {
+            "id": "component-creator",
+            "label": "Component creator coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": null,
+            "detail": "100% (1/1)",
+            "refs": [
+              "Supplier Name"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "licenseReview": {
+    "total": 0,
+    "behavioral": 0,
+    "nonCommercial": 0,
+    "items": []
+  },
+  "riskAssessment": {
+    "usageContext": "product",
+    "disclaimer": "This assessment is guidance, not legal advice. It summarizes license terms and recorded signals; the final use decision needs human review.",
+    "disclaimer_ko": "이 판정은 법적 자문이 아닌 안내입니다. 라이선스 조건과 수집된 신호를 요약한 것이며, 최종 사용 판단은 사람의 검토가 필요합니다.",
+    "counts": {
+      "ok": 0,
+      "conditional": 0,
+      "caution": 0,
+      "review": 1
+    },
+    "models": [
+      {
+        "name": "bert-base-uncased",
+        "version": "86b5e093",
+        "license": "Apache-2.0",
+        "axes": {
+          "license": "ok",
+          "security": "review",
+          "datasets": "review"
+        },
+        "overall": "review",
+        "keys": [
+          "permissive"
+        ],
+        "usageContext": "product",
+        "reasons": [
+          "license Apache-2.0: Permissive open-source license (ok for product use)",
+          "file security: scan queued, pickle-format weights present (review)",
+          "datasets: 2 referenced, worst review (bookcorpus)"
+        ],
+        "summary": "Permissive license: commercial use, modification and redistribution are allowed; keep the copyright and license notices.",
+        "summary_ko": "허용적 라이선스입니다. 상업 이용·수정·재배포가 가능하며 저작권과 라이선스 고지를 유지해야 합니다.",
+        "conditions": [
+          {
+            "id": "attribution",
+            "label": "Keep the copyright notice and credit the source",
+            "label_ko": "저작권 고지 유지와 출처 표시"
+          },
+          {
+            "id": "notice-file",
+            "label": "Include the license text and NOTICE when distributing",
+            "label_ko": "배포 시 라이선스 원문과 NOTICE 포함"
+          }
+        ],
+        "sourceUrls": [
+          "https://spdx.org/licenses/"
+        ]
+      }
+    ]
+  }
+}

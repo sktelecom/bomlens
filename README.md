@@ -16,7 +16,7 @@
   <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI showing a scan result: the Overview with counts and a severity/license summary, the Components table with filters, the Vulnerabilities list, the Dependencies as a graph and tree, and the Licenses section" width="860" />
 </p>
 
-**Live demo:** [sktelecom.github.io/bomlens/demo](https://sktelecom.github.io/bomlens/demo/) — the real web UI holding two finished scans: a Spring Boot project (71 components, 65 known vulnerabilities, 23 past end-of-life) and a supplier SBOM checked against the format requirements. Read-only, nothing to install, and nothing is uploaded — it is a frozen copy of results from an ordinary local run.
+**Live demo:** [sktelecom.github.io/bomlens/demo](https://sktelecom.github.io/bomlens/demo/) — the real web UI holding one finished scan of each kind: a Spring Boot project from source (71 components, 65 known vulnerabilities, 23 past end-of-life), a container image (1,393 components), an AI model as a CycloneDX ML-BOM checked against the G7 minimum elements, and a supplier SBOM checked against the format requirements. Read-only, nothing to install, and nothing is uploaded — it is a frozen copy of results from ordinary local runs.
 
 ## What it does
 
