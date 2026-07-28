@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Clock, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -23,14 +23,30 @@ interface SidebarProps {
   /** Icon-only rail when collapsed (narrow widths / user toggle). */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
+  /** Hash for the Scan management screen — the way back out of this scan. */
+  homeHref: string;
+  /** Hash for the New scan screen. */
+  newHref: string;
 }
 
+/** Shared row shape for every rail link — global block and sections alike. */
+const RAIL_ROW =
+  "group relative flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm " +
+  "transition-colors duration-fast ease-out-soft " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
+
+/** The resting (non-active) row colours. */
+const RAIL_ROW_IDLE =
+  "font-medium text-muted-foreground hover:bg-muted hover:text-foreground";
+
 /**
- * Left rail: the current scan's grouped sections, adapting to the scan type (AI
- * surfaces appear only for AI/ANALYZE scans). Purely intra-scan navigation —
- * the global actions (New scan, Recent scans) live in the TopBar, so the rail
- * stays one altitude. Tokens only; the brand accent marks the active section.
- * Collapses to an icon rail on narrow widths or via the header toggle.
+ * Left rail: a small block of global links (Scan management, New scan) over the
+ * current scan's grouped sections, which adapt to the scan type (AI surfaces
+ * appear only for AI/ANALYZE scans). The global block repeats what the TopBar
+ * offers, spelled out in words: from a result screen the only labelled way back
+ * to the scan list was the logo, which reads as decoration. Tokens only; the
+ * brand accent marks the active section. Collapses to an icon rail on narrow
+ * widths or via the header toggle.
  */
 export function Sidebar({
   scan = EMPTY_SCAN,
@@ -39,6 +55,8 @@ export function Sidebar({
   counts = {},
   collapsed = false,
   onToggleCollapsed,
+  homeHref,
+  newHref,
 }: SidebarProps) {
   const { t } = useTranslation();
   const groups = visibleGroups(scan);
@@ -73,6 +91,26 @@ export function Sidebar({
         </button>
       </div>
 
+      {/* Global links, kept above the sections and separated by a rule so the
+          rail reads as "leave this scan" over "move within this scan". */}
+      <ul className="mb-2 flex flex-col gap-0.5 border-b border-sidebar-border pb-2">
+        {[
+          { href: homeHref, icon: Clock, label: t("nav.recentScans") },
+          { href: newHref, icon: Plus, label: t("shell.newScan") },
+        ].map(({ href, icon: Icon, label }) => (
+          <li key={href}>
+            <a
+              href={href}
+              title={collapsed ? label : undefined}
+              className={cn(RAIL_ROW, RAIL_ROW_IDLE, collapsed && "justify-center")}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+
       {groups.map((group) => (
         <div key={group.id} className="mb-2">
           {!collapsed && (
@@ -93,15 +131,13 @@ export function Sidebar({
                     aria-current={active ? "page" : undefined}
                     title={collapsed ? label : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm",
-                      "transition-colors duration-fast ease-out-soft",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
+                      RAIL_ROW,
                       collapsed && "justify-center",
                       // Label stays at foreground contrast (AA); the brand accent
                       // lives in the icon + left indicator, not the text.
                       active
                         ? "bg-brand/10 font-semibold text-foreground"
-                        : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
+                        : RAIL_ROW_IDLE,
                     )}
                   >
                     <Icon

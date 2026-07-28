@@ -291,6 +291,37 @@ test("a deep link to a scan section restores that scan and section (open-in-new-
   await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("href", "#/scan/demo_1.0");
 });
 
+test("the rail spells out the way back to the scan list", async ({ page }) => {
+  // The logo and the top bar's clock icon are unlabelled, so a result screen
+  // needs a named exit. The rail carries both global links above its sections.
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 3, maxSeverity: "CRITICAL", isAiScan: false, generatedAt: 1700000000 },
+    ]) }),
+  );
+  await page.route("**/scan?id=demo_1.0", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
+  );
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+
+  await page.goto("/?ui=next#/scan/demo_1.0");
+
+  const rail = page.getByRole("navigation", { name: "Sections" });
+  // Real hash links, so both open in a new tab like every other rail row.
+  await expect(rail.getByRole("link", { name: "New scan" })).toHaveAttribute("href", "#/new");
+  const home = rail.getByRole("link", { name: "Scan management" });
+  await expect(home).toHaveAttribute("href", "#/");
+
+  await home.click();
+  await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
+});
+
 test("an unknown scan id falls back to the Recent scans home screen", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),

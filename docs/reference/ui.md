@@ -24,10 +24,10 @@ cd ~/sbom-output      # output folder (anywhere is fine)
 The interface has a top bar across the width, a left rail for the current scan's sections, and a content area:
 
 - **Top bar** — the product mark (links home), the current project, a Re-scan button (shown on a scan that still carries its settings, so you can re-run the same target with the toggles prefilled), global search across components and CVEs, the Scan management menu (the clock icon opens a list of past scans with a delete control and a link to the full list), the New scan button, and the language (한국어 / EN) and light/dark toggles.
-- **Left rail** — the current scan's sections, grouped under Inventory, Security, Compliance, AI and Outputs. The rail adapts to the scan: AI sections appear only for AI/ML SBOMs, and a section appears only when its data exists. It collapses to icons on narrow windows. With no scan open — the home screen — there is no rail.
+- **Left rail** — two named links out of the scan (Scan management, New scan) above the current scan's sections, which are grouped under Inventory, Security, Compliance, AI and Outputs. The rail adapts to the scan: AI sections appear only for AI/ML SBOMs, and a section appears only when its data exists. It collapses to icons on narrow windows. With no scan open — the home screen — there is no rail.
 - **Content** — the home (Scan management) screen, the New scan form, the running view, or the active result section.
 
-The global actions (New scan, Scan management) live in the top bar so the rail stays purely the current scan's sections. Every navigation element — the logo, New scan, the rail sections, the jump cards and the past-scan links — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
+The global actions (New scan, Scan management) live in the top bar, and the rail repeats them as labelled links above its sections so a result screen always shows a named way back. Every navigation element — the logo, New scan, the rail sections, the jump cards and the past-scan links — is a real link backed by a URL hash (`#/scan/<id>/<section>`), so Cmd/Ctrl or middle click opens it in a new tab.
 
 ## New scan
 
@@ -115,7 +115,7 @@ That section also shows an AI compliance profile card: a one-glance rollup of th
 
 ## Scan management
 
-The home screen — opened from the logo or the top bar's Scan management (clock) menu — lists every past scan saved on this machine. Each scan's `{Project}_{Version}/` subfolder under the output base is one entry. A search box and scan-type filter chips (only the types that exist — Source, Container, RootFS, Firmware, AI model, SBOM) narrow the list; three summary cards show the total scans, how many are at risk (click that card to filter to them), and the project count. The table sorts by scan, generated time, components or top severity. Click a row to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
+The home screen — opened from the rail's Scan management link, the logo, or the top bar's Scan management (clock) menu — lists every past scan saved on this machine. Each scan's `{Project}_{Version}/` subfolder under the output base is one entry. A search box and scan-type filter chips (only the types that exist — Source, Container, RootFS, Firmware, AI model, SBOM) narrow the list; three summary cards show the total scans, how many are at risk (click that card to filter to them), and the project count. The table sorts by scan, generated time, components or top severity. Click a row to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
 
 ## Notes
 

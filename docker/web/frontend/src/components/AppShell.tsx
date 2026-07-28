@@ -44,10 +44,10 @@ const COLLAPSE_QUERY = "(max-width: 1024px)";
 
 /**
  * The application frame: a sticky top bar over a left rail + scrolling canvas.
- * The top bar carries the global actions (New scan, Recent); the left rail is
- * purely the current scan's sections and only appears once a scan is loaded. The
- * rail adapts to the scan type and collapses automatically on narrow viewports
- * (and via the in-rail toggle).
+ * The top bar carries the global actions (New scan, Recent); the left rail
+ * appears once a scan is loaded and repeats those two as labelled links above
+ * the scan's own sections. The rail adapts to the scan type and collapses
+ * automatically on narrow viewports (and via the in-rail toggle).
  */
 export function AppShell({
   scan = EMPTY_SCAN,
@@ -100,6 +100,8 @@ export function AppShell({
             counts={counts}
             collapsed={collapsed}
             onToggleCollapsed={() => setManualCollapsed(!collapsed)}
+            homeHref={homeHref}
+            newHref={newHash()}
           />
         )}
         {/* tabIndex makes the scrollable region keyboard-accessible (axe
