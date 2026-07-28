@@ -6,8 +6,13 @@ export interface BarDatum {
   key: string;
   label: ReactNode;
   value: number;
-  /** Tint the fill to flag this row for review (e.g. copyleft licenses). */
-  emphasis?: boolean;
+  /** Fill class for this row, from the design tokens. Neutral when absent. */
+  fill?: string;
+  /**
+   * Rendered before the label. Whatever `fill` encodes has to be readable
+   * without seeing the colour, so a row that is tinted should also carry this.
+   */
+  badge?: ReactNode;
 }
 
 interface Props {
@@ -45,13 +50,14 @@ export function BarList({ items, max, ariaLabel, onSelect, selectedKey }: Props)
             <div
               className={cn(
                 "absolute inset-y-0 left-0 origin-left animate-grow-x",
-                it.emphasis ? "bg-risk-medium/25" : "bg-muted-foreground/20",
+                it.fill ?? "bg-muted-foreground/20",
               )}
               style={{ width: `${pct}%` }}
               aria-hidden
             />
-            <span className="relative z-10 truncate pl-2.5 text-sm text-foreground">
-              {it.label}
+            <span className="relative z-10 flex min-w-0 items-center gap-1.5 pl-2.5 text-sm text-foreground">
+              {it.badge}
+              <span className="truncate">{it.label}</span>
             </span>
             <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-muted-foreground">
               {it.value}

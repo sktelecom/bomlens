@@ -1,3 +1,4 @@
+import { Scale } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -41,6 +42,50 @@ const LABEL: Record<LicenseRiskTier, string> = {
   uncategorized: "licenses.tier.uncategorized",
   permissive: "licenses.tier.permissive",
 };
+
+/** i18n key per tier, for anywhere that names a tier outside this bar. */
+export const TIER_LABEL = LABEL;
+
+/**
+ * Fill for a tier behind text — the distribution list draws its label on top of
+ * the bar, so these are the translucent counterparts of BAR above. Same hues, so
+ * one colour language covers both charts.
+ *
+ * Permissive and uncategorized stay neutral: tinting every row would leave
+ * nothing standing out, and neither one is a finding.
+ */
+export const TIER_FILL: Record<LicenseRiskTier, string> = {
+  "network-copyleft": "bg-risk-critical/30",
+  "strong-copyleft": "bg-risk-high/30",
+  "weak-copyleft": "bg-risk-medium/30",
+  "review-needed": "bg-amber-500/25",
+  uncategorized: "bg-muted-foreground/20",
+  permissive: "bg-muted-foreground/20",
+};
+
+/** Tiers that carry an obligation worth a second look, so they get a badge. */
+export const TIER_FLAGGED: ReadonlySet<LicenseRiskTier> = new Set([
+  "network-copyleft",
+  "strong-copyleft",
+  "weak-copyleft",
+  "review-needed",
+]);
+
+/**
+ * The marker beside a flagged license in the distribution list. It exists so the
+ * tint is not the only thing saying "this one has obligations" — colour alone
+ * fails anyone who cannot separate these hues, and a translucent fill is easy to
+ * miss regardless. Names its tier, so hovering or reading it aloud is specific.
+ */
+export function TierBadge({ tier }: { tier: LicenseRiskTier }) {
+  const { t } = useTranslation();
+  const label = t(TIER_LABEL[tier]);
+  return (
+    <span title={label} className="flex shrink-0 items-center">
+      <Scale className="h-3.5 w-3.5 text-muted-foreground" role="img" aria-label={label} />
+    </span>
+  );
+}
 
 interface Props {
   components: ComponentItem[];

@@ -11,14 +11,19 @@ import {
   componentRiskTier,
   conflictGroups,
   type ConflictVerdict,
-  isCopyleft,
   type LicenseReview,
   type LicenseRiskTier,
   licenseGroups,
+  licenseRiskTier,
   reviewGroups,
 } from "@/lib/licenses";
 
-import { LicenseRiskBar } from "./LicenseRiskBar";
+import {
+  LicenseRiskBar,
+  TIER_FILL,
+  TIER_FLAGGED,
+  TierBadge,
+} from "./LicenseRiskBar";
 
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
@@ -93,12 +98,19 @@ export function Licenses({
     setSelected(null);
   };
 
-  const bars: BarDatum[] = groups.map((g) => ({
-    key: g.name,
-    label: g.name,
-    value: g.count,
-    emphasis: isCopyleft(g.name),
-  }));
+  // Colour each bar by its own tier rather than a single "is it copyleft" tint:
+  // the tier is already computed, the risk bar above uses the same hues, and one
+  // flat tint made GPL and LGPL look alike while barely reading as a highlight.
+  const bars: BarDatum[] = groups.map((g) => {
+    const t2 = licenseRiskTier(g.name);
+    return {
+      key: g.name,
+      label: g.name,
+      value: g.count,
+      fill: TIER_FILL[t2],
+      badge: TIER_FLAGGED.has(t2) ? <TierBadge tier={t2} /> : undefined,
+    };
+  });
 
   return (
     <div className="space-y-6">

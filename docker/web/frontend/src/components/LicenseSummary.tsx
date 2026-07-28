@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import type { ComponentItem } from "@/lib/api";
-import { isCopyleft, licenseGroups } from "@/lib/licenses";
+import { licenseGroups, licenseRiskTier } from "@/lib/licenses";
+
+import { TIER_FILL, TIER_FLAGGED, TierBadge } from "./LicenseRiskBar";
 
 const TOP = 8;
 
@@ -28,12 +30,18 @@ export function LicenseSummary({ components }: { components: ComponentItem[] }) 
   // when the unlicensed bucket isn't the largest.
   const max = Math.max(1, groups[0]?.count ?? 0, unlicensed);
 
-  const items: BarDatum[] = shown.map((g) => ({
-    key: g.name,
-    label: g.name,
-    value: g.count,
-    emphasis: isCopyleft(g.name),
-  }));
+  // Same tier colouring as the Licenses section, so a bar means the same thing
+  // in both places.
+  const items: BarDatum[] = shown.map((g) => {
+    const tier = licenseRiskTier(g.name);
+    return {
+      key: g.name,
+      label: g.name,
+      value: g.count,
+      fill: TIER_FILL[tier],
+      badge: TIER_FLAGGED.has(tier) ? <TierBadge tier={tier} /> : undefined,
+    };
+  });
   if (unlicensed > 0) {
     items.push({ key: "__none__", label: t("result.licenseNone"), value: unlicensed });
   }
