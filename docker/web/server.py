@@ -73,8 +73,15 @@ LIB_DIR = os.environ.get("SBOM_LIB_DIR") or next(
 )
 
 # Per-kind upload size caps (bytes).
+#
+# The SBOM cap is set from measurement, not preference. Build-system SBOMs are far
+# larger than hand-written ones: a Yocto core-image-minimal SPDX 3.0 document is
+# 15.8 MB, and a product image with more packages scales from there. Parsing peaks
+# at ~4.8x the file size (15.8 MB in, 75.7 MB resident, 0.23 s), so 100 MB keeps the
+# worst case near 500 MB of transient memory — affordable for a local single-run
+# tool, while still refusing inputs large enough to threaten the container.
 MAX_BYTES = {
-    "sbom": 25 * 1024 * 1024,        # 25 MB
+    "sbom": 100 * 1024 * 1024,       # 100 MB
     "zip": 500 * 1024 * 1024,        # 500 MB
     "package": 500 * 1024 * 1024,    # 500 MB
     "firmware": 500 * 1024 * 1024,   # 500 MB
@@ -2198,7 +2205,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(411, json.dumps({"error": "Content-Length required"}))
             return
         if length > MAX_BYTES[kind]:
-            self._send(413, json.dumps({"error": "file too large for %s" % kind}))
+            # Name the limit and the actual size: "too large" alone leaves the user
+            # guessing whether trimming helps or the file is simply unsupported.
+            self._send(413, json.dumps({
+                "error": "file too large for %s: %.1f MB (limit %d MB)" % (
+                    kind, length / (1024.0 * 1024.0), MAX_BYTES[kind] // (1024 * 1024)
+                )
+            }))
             return
 
         token = secrets.token_hex(16)

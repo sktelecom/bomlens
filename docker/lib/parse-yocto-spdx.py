@@ -109,6 +109,28 @@ def is_yocto_spdx3(doc):
     return False
 
 
+def yocto_spdx2_index(doc):
+    """True for the top-level document of a Yocto SPDX 2.x build.
+
+    SPDX 2.2 output is not one file: bitbake writes a small top-level document
+    that points at a per-recipe document for every package, plus a .spdx.index.json
+    and a .spdx.tar.zst holding the actual set. Uploading the top-level file alone
+    converts cleanly and yields almost no components — a silent empty result rather
+    than an error, which is the worst outcome for a user who cannot tell the two
+    apart. Detected conservatively: an SPDX 2.x document produced by bitbake whose
+    own package list is essentially empty.
+    """
+    version = str(doc.get("spdxVersion") or "")
+    if not version.startswith("SPDX-2"):
+        return False
+    creators = " ".join(str(c) for c in (doc.get("creationInfo") or {}).get("creators") or [])
+    marker = creators + " " + str(doc.get("documentNamespace") or "")
+    if "bitbake" not in marker.lower() and "openembedded" not in marker.lower():
+        return False
+    packages = doc.get("packages")
+    return not isinstance(packages, list) or len(packages) <= 1
+
+
 def extract(doc):
     """Return (components, vuln_rows, counts) from a Yocto SPDX 3.0 document."""
     graph = _iter_graph(doc)
@@ -269,6 +291,19 @@ def main():
     except (OSError, ValueError) as exc:
         print("[yocto-spdx] cannot read %s: %s" % (src, exc), file=sys.stderr)
         return 1
+
+    if yocto_spdx2_index(doc):
+        # Convertible but nearly empty. Say why, and name the file that holds the
+        # real content, before the generic path reports "0 components" as success.
+        print(
+            "[yocto-spdx] NOTE: this is the top-level document of a Yocto SPDX 2.x "
+            "build, which lists almost no packages on its own. The package set lives "
+            "in the per-recipe documents inside <image>.spdx.tar.zst next to it. "
+            "Re-run with an SPDX 3.0 SBOM (INHERIT += \"create-spdx-3.0\") for the "
+            "full image contents and its vulnerability judgements.",
+            file=sys.stderr,
+        )
+        return 3
 
     if not is_yocto_spdx3(doc):
         print("[yocto-spdx] not a Yocto SPDX 3.x document; leaving it to syft.", file=sys.stderr)
