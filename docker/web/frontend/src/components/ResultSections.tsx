@@ -36,6 +36,7 @@ export function ResultSection({
   searchQuery,
   seedSeverity,
   seedTier,
+  seedLicense,
   onPick,
   onResultsChange,
 }: {
@@ -51,10 +52,13 @@ export function ResultSection({
   seedSeverity?: string;
   /** License tier seeded into the Licenses filter (Overview bar click). */
   seedTier?: LicenseRiskTier | "";
-  /** Route into a section with a filter pre-applied (the Overview risk bars). */
+  /** License id seeded into the Components license filter (Licenses row click). */
+  seedLicense?: string;
+  /** Route into a section with a filter pre-applied (the Overview risk bars,
+   *  a Licenses distribution row). */
   onPick?: (
     section: SectionId,
-    seed: { severity?: Severity; tier?: LicenseRiskTier },
+    seed: { severity?: Severity; tier?: LicenseRiskTier; license?: string },
   ) => void;
   /** An artifact was produced after the scan (the on-demand SPDX export), so
    *  the owner can refresh the result it holds. */
@@ -75,6 +79,7 @@ export function ResultSection({
           total={result.sbom?.components ?? 0}
           truncated={result.sbom?.truncated}
           initialQuery={searchQuery}
+          initialLicense={seedLicense}
         />
       );
 
@@ -95,6 +100,9 @@ export function ResultSection({
           components={result.sbom?.componentList ?? []}
           initialTier={seedTier}
           outboundLicense={result.sbom?.outboundLicense}
+          onPickLicense={
+            onPick ? (license) => onPick("components", { license }) : undefined
+          }
         />
       );
 

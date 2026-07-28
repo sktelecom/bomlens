@@ -21,6 +21,9 @@ interface Props {
   truncated?: boolean;
   /** Search term seeded from global search; applied to the name/license filter. */
   initialQuery?: string;
+  /** License id seeded from a Licenses distribution row; selects that license
+   *  in the license filter, leaving the other filters open. */
+  initialLicense?: string;
 }
 
 type Sort = { key: ComponentSortKey; dir: SortDir };
@@ -115,11 +118,18 @@ function FilterChip({
 
 /** Searchable, sortable, filterable table of detected SBOM components, with
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
-export function ComponentsTable({ items, total, truncated, initialQuery }: Props) {
+export function ComponentsTable({
+  items,
+  total,
+  truncated,
+  initialQuery,
+  initialLicense,
+}: Props) {
   const { t } = useTranslation();
   const [filters, setFilters] = useState<ComponentFilters>(() => ({
     ...EMPTY_FILTERS,
     query: initialQuery ?? "",
+    license: initialLicense ?? "",
   }));
   // Re-seed the search when global search routes in a new term.
   useEffect(() => {
@@ -127,6 +137,12 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
       setFilters((f) => ({ ...f, query: initialQuery }));
     }
   }, [initialQuery]);
+  // Same for a license routed in from the Licenses distribution.
+  useEffect(() => {
+    if (initialLicense !== undefined) {
+      setFilters((f) => ({ ...f, license: initialLicense }));
+    }
+  }, [initialLicense]);
   const [sort, setSort] = useState<Sort | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   // Chunk recycling state: which chunks render real rows, and the measured
@@ -237,7 +253,9 @@ export function ComponentsTable({ items, total, truncated, initialQuery }: Props
             ))}
           </Select>
         )}
-        {licenses.length > 1 && (
+        {/* Also shown for a single license when one is selected — a filter
+            routed in from the Licenses section must stay clearable. */}
+        {(licenses.length > 1 || filters.license) && (
           <Select
             value={filters.license}
             onChange={(e) => patch({ license: e.target.value })}

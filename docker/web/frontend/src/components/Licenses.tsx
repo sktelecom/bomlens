@@ -12,11 +12,11 @@ import {
   type ConflictVerdict,
   type LicenseReview,
   type LicenseRiskTier,
-  licenseGroups,
   reviewGroups,
 } from "@/lib/licenses";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
+import { LicenseSummary } from "./LicenseSummary";
 
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
@@ -40,16 +40,19 @@ const CONFLICT_TONE: Record<ConflictVerdict, "high" | "medium" | "info"> = {
 };
 
 /**
- * Licenses — the full license distribution, led by any components whose terms
- * need human review (AI behavioral-use / non-commercial), flagged from the
- * bomlens:licenseReview property so the badge matches the NOTICE review section.
- * The distribution is a proportional bar chart (copyleft tinted for review);
- * click a bar to list its components.
+ * Licenses — the classification axis (copyleft strength) over the per-license
+ * distribution, followed by the obligations a component list cannot express:
+ * conflicts with the declared outbound license, and terms that need human
+ * review (AI behavioral-use / non-commercial, flagged from the
+ * bomlens:licenseReview property so the badge matches the NOTICE review
+ * section). Picking a classification narrows the distribution below it; picking
+ * a license opens the Components table filtered to it.
  */
 export function Licenses({
   components,
   initialTier,
   outboundLicense,
+  onPickLicense,
 }: {
   components: ComponentItem[];
   /** Tier seeded from an Overview classification-bar click (filters on open). */
@@ -58,6 +61,8 @@ export function Licenses({
    *  check never ran, which the section states outright rather than leaving the
    *  reader to read an empty table as an all-clear. */
   outboundLicense?: string;
+  /** Open the Components section filtered to one license id. */
+  onPickLicense?: (license: string) => void;
 }) {
   const { t } = useTranslation();
   // Clicking a classification tier filters the rest of the tab to that tier.
@@ -74,7 +79,6 @@ export function Licenses({
   );
   const review = useMemo(() => reviewGroups(filtered), [filtered]);
   const conflicts = useMemo(() => conflictGroups(filtered), [filtered]);
-  const { unlicensed } = useMemo(() => licenseGroups(filtered), [filtered]);
 
   if (components.length === 0) {
     return <EmptyState icon={ScrollText}>{t("licenses.empty")}</EmptyState>;
@@ -86,7 +90,12 @@ export function Licenses({
 
   return (
     <div className="space-y-6">
+      {/* The bar keeps the whole scan's proportions — it is the filter control,
+          so filtering it by its own selection would erase what was picked. The
+          distribution below is what narrows. */}
       <LicenseRiskBar components={components} selected={tier} onSelect={toggleTier} />
+
+      <LicenseSummary components={filtered} onPickLicense={onPickLicense} />
 
       {outboundLicense && conflicts.length > 0 && (
         <Card className="border-amber-300/60 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-950/20">
@@ -189,21 +198,6 @@ export function Licenses({
         </Card>
       )}
 
-      {/* No per-license bar chart here. Listing which components carry a given
-          license is what the Components table already does, with filters that
-          combine license with type, scope and risk — this section's job is the
-          obligations that table cannot express. The counts per license stay one
-          click away rather than being restated in a weaker form. */}
-      <p className="text-xs text-muted-foreground">
-        {t("licenses.perLicenseHint")}
-        {unlicensed > 0 && (
-          <>
-            {" · "}
-            {t("result.licenseNone")}{" "}
-            <span className="tabular-nums">{unlicensed}</span>
-          </>
-        )}
-      </p>
     </div>
   );
 }

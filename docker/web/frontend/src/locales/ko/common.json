@@ -205,6 +205,7 @@
     "licenseClassTitle": "라이선스 분류",
     "licenseClassFilterHint": "분류를 클릭하면 필터됩니다",
     "licenseMore": "외 {{count}}개",
+    "licenseRowHint": "라이선스를 클릭하면 컴포넌트가 열립니다",
     "componentsCount": "{{total}}개 중 {{shown}}개",
     "truncated": "목록 일부만 표시",
     "noMatch": "일치하는 항목이 없습니다.",
@@ -770,8 +771,7 @@
     "conflictUnknown": "판정 불가",
     "conflictCompatible": "충돌 없음",
     "conflictOffTitle": "배포 라이선스 충돌은 검사하지 않았습니다",
-    "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정해 다시 스캔하면 검사가 켜집니다.",
-    "perLicenseHint": "특정 라이선스를 쓰는 컴포넌트를 보려면 컴포넌트 화면에서 라이선스로 필터하세요."
+    "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정해 다시 스캔하면 검사가 켜집니다."
   },
   "recent": {
     "title": "스캔 관리",

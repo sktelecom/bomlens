@@ -13,6 +13,8 @@ export interface BarDatum {
    * without seeing the colour, so a row that is tinted should also carry this.
    */
   badge?: ReactNode;
+  /** Keep this row plain text even in an interactive list (nothing to open). */
+  inert?: boolean;
 }
 
 interface Props {
@@ -24,6 +26,14 @@ interface Props {
   /** When set, each bar becomes a toggle button (re-selecting clears upstream). */
   onSelect?: (key: string) => void;
   selectedKey?: string | null;
+  /**
+   * When set, each bar becomes a button that navigates somewhere — not a filter
+   * the list itself holds. Kept apart from `onSelect` so a row that goes
+   * elsewhere never claims a pressed state it doesn't have.
+   */
+  onActivate?: (key: string) => void;
+  /** Tooltip on an `onActivate` row, saying where it goes. */
+  activateHint?: string;
 }
 
 /**
@@ -34,9 +44,21 @@ interface Props {
  * from the design tokens, so the chart follows light/dark and passes the token
  * lint with no hardcoded colours.
  */
-export function BarList({ items, max, ariaLabel, onSelect, selectedKey }: Props) {
+export function BarList({
+  items,
+  max,
+  ariaLabel,
+  onSelect,
+  selectedKey,
+  onActivate,
+  activateHint,
+}: Props) {
   const top = max ?? Math.max(1, ...items.map((i) => i.value));
   const interactive = Boolean(onSelect);
+  // Shared button chrome for both interactive modes.
+  const rowButton =
+    "block w-full rounded-md text-left transition duration-fast ease-out-soft " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
   return (
     <ul role="list" aria-label={ariaLabel} className="space-y-1">
@@ -64,7 +86,21 @@ export function BarList({ items, max, ariaLabel, onSelect, selectedKey }: Props)
             </span>
           </div>
         );
-        if (!interactive) {
+        if (onActivate && !it.inert) {
+          return (
+            <li key={it.key}>
+              <button
+                type="button"
+                title={activateHint}
+                onClick={() => onActivate(it.key)}
+                className={cn(rowButton, "hover:opacity-90")}
+              >
+                {inner}
+              </button>
+            </li>
+          );
+        }
+        if (!interactive || it.inert) {
           return <li key={it.key}>{inner}</li>;
         }
         return (
@@ -74,8 +110,7 @@ export function BarList({ items, max, ariaLabel, onSelect, selectedKey }: Props)
               aria-pressed={sel}
               onClick={() => onSelect?.(it.key)}
               className={cn(
-                "block w-full rounded-md text-left transition duration-fast ease-out-soft",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                rowButton,
                 sel ? "ring-2 ring-foreground ring-offset-1" : "hover:opacity-90",
               )}
             >

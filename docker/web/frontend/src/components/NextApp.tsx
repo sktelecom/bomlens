@@ -98,13 +98,15 @@ export function NextApp() {
   // clears it, so a subsequent plain New scan starts blank.
   const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
   // A navigation seed: route into a section with a filter pre-applied — a
-  // global-search term, or an Overview risk-bar click (severity / license tier).
+  // global-search term, an Overview risk-bar click (severity / license tier), or
+  // a Licenses distribution row (one license id).
   // The section's own control re-seeds only when the value changes.
   const [seed, setSeed] = useState<{
     section: SectionId;
     term?: string;
     severity?: Severity;
     tier?: LicenseRiskTier;
+    license?: string;
   } | null>(null);
 
   // The scan id currently held in `result` — so the hash router can tell a
@@ -314,7 +316,7 @@ export function NextApp() {
   // An Overview risk-bar click routes into the section with that filter applied.
   const handleFilterPick = (
     section: SectionId,
-    filter: { severity?: Severity; tier?: LicenseRiskTier },
+    filter: { severity?: Severity; tier?: LicenseRiskTier; license?: string },
   ) => {
     setSeed({ section, ...filter });
     if (loadedIdRef.current) {
@@ -439,6 +441,9 @@ export function NextApp() {
             }
             seedTier={
               seed && seed.section === activeSection ? seed.tier : undefined
+            }
+            seedLicense={
+              seed && seed.section === activeSection ? seed.license : undefined
             }
             onPick={handleFilterPick}
             // An on-demand SPDX export adds an artifact after the scan ended, so

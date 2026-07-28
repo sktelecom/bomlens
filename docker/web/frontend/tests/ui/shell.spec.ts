@@ -942,14 +942,40 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   await expect(page.getByText("Non-commercial")).toBeVisible();
   await expect(page.getByText("some-llama-model")).toBeVisible();
   await expect(page.getByText("some-nc-dataset")).toBeVisible();
-  // The per-license listing lives in the Components table, so this section
-  // points there instead of repeating it as a chart.
-  await expect(page.getByText(/filter by license in the Components/i)).toBeVisible();
+  // The section names the licenses it counted — the rail badge promises that
+  // number, so the list has to be here and not one section away.
+  const distribution = page.getByRole("list", { name: "Licenses" });
+  for (const id of ["LLaMA-3.1", "CC-BY-NC-4.0", "MIT", "GPL-3.0-only"]) {
+    await expect(distribution.getByText(id, { exact: true })).toBeVisible();
+  }
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+});
+
+test("a classification narrows the license distribution, and a license opens its components", async ({ page }) => {
+  await stubLicensesAndRun(page);
+  await page.getByRole("link", { name: /^Licenses/ }).first().click();
+
+  const distribution = page.getByRole("list", { name: "Licenses" });
+  await expect(distribution.getByRole("listitem")).toHaveCount(4);
+
+  // Picking a classification has to change what is listed — LIC_DONE has one
+  // strong-copyleft component, so only GPL-3.0-only survives.
+  await page.getByRole("button", { name: "Strong copyleft 1" }).first().click();
+  await expect(distribution.getByRole("listitem")).toHaveCount(1);
+  await expect(distribution.getByText("GPL-3.0-only", { exact: true })).toBeVisible();
+
+  // The row leads to that license's components, with the filter applied.
+  await distribution.getByRole("button").first().click();
+  await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByText("copyleft-lib", { exact: true })).toBeVisible();
+  await expect(page.getByText("ordinary-lib", { exact: true })).toHaveCount(0);
 });
 
 // A scan whose SBOM carries a known-malicious package. The Overview must lead

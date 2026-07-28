@@ -205,6 +205,7 @@
     "licenseClassTitle": "License classification",
     "licenseClassFilterHint": "Click a class to filter",
     "licenseMore": "+{{count}} more",
+    "licenseRowHint": "Click a license for its components",
     "componentsCount": "{{shown}} of {{total}} components",
     "truncated": "list truncated",
     "noMatch": "No matching rows.",
@@ -770,8 +771,7 @@
     "conflictUnknown": "Cannot judge",
     "conflictCompatible": "No conflict",
     "conflictOffTitle": "Outbound-license conflicts were not checked",
-    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on.",
-    "perLicenseHint": "To see which components carry a given license, filter by license in the Components section."
+    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on."
   },
   "recent": {
     "title": "Scan management",
