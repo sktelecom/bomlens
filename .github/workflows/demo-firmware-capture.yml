@@ -8,30 +8,29 @@ name: Demo firmware capture
 # 아티팩트를 받아 scripts/capture-demo-data.sh로 처리한다. 배포 경로가 아니라
 # 데이터 생산 경로이므로 수동 실행 전용이다.
 #
-# 대상은 OpenWRT다. GPL 오픈소스라 분석 결과를 공개하는 데 제약이 없고,
-# busybox·dropbear·musl 같은 실제 임베디드 리눅스 구성을 담고 있다. 기본값이
-# 이미 지원 종료된 21.02.7인 것은 의도한 선택으로, 노후 컴포넌트와 취약점이
-# 실제로 잡혀야 데모가 쓸모 있기 때문이다. 라우터 펌웨어가 오래 방치되는
-# 현장 상황과도 맞는다.
+# 대상은 Raspberry Pi OS Lite다. 자유롭게 받을 수 있는 실제 기기 이미지이면서
+# Debian 기반이라 dpkg 패키지 DB가 들어 있다. 이 점이 중요하다. syft의 OS
+# 카탈로거는 apk·dpkg·rpm뿐이라, opkg를 쓰는 OpenWRT를 넣으면 언패킹이 되더라도
+# 패키지가 하나도 잡히지 않고 바이너리 서명 식별만 남는다(실제로 두 번 시도해
+# packages=0을 확인했다). 펌웨어 모드가 무엇을 주는지 보여주려면 패키지 목록과
+# 취약점이 함께 나와야 한다.
 on:
   workflow_dispatch:
     inputs:
       firmware_url:
-        # rootfs 이미지를 기본으로 둔다. 기기용 sysupgrade/factory 이미지는
-        # U-Boot 헤더 같은 벤더 컨테이너로 한 겹 더 감싸여 있어 unblob이 내부
-        # squashfs를 찾지 못하는 일이 있다(ath79로 시도했을 때 packages=0).
-        # rootfs 이미지는 squashfs 그 자체라 패키지 DB가 그대로 잡힌다.
-        description: "펌웨어 이미지 URL (같은 폴더에 sha256sums가 있어야 한다)"
+        # 체크섬은 두 형태를 모두 받는다: 파일별 <url>.sha256(Raspberry Pi)과
+        # 폴더 단위 sha256sums(OpenWRT 등).
+        description: "펌웨어 이미지 URL (<url>.sha256 또는 같은 폴더의 sha256sums 필요)"
         required: false
-        default: "https://archive.openwrt.org/releases/21.02.7/targets/x86/64/openwrt-21.02.7-x86-64-generic-squashfs-rootfs.img.gz"
+        default: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-06-19/2026-06-18-raspios-trixie-arm64-lite.img.xz"
       project:
         description: "데모 목록에 보일 프로젝트 이름"
         required: false
-        default: "OpenWrtRouterFirmware"
+        default: "RaspberryPiOsLite"
       version:
         description: "버전 표기"
         required: false
-        default: "21.02.7"
+        default: "2026-06-18"
 
 permissions:
   contents: read
@@ -59,11 +58,17 @@ jobs:
           name="$(basename "$url")"
           mkdir -p fw && cd fw
           curl -fsSL -o "$name" "$url"
-          curl -fsSL -o sha256sums "$(dirname "$url")/sha256sums"
-          # The published line is "<sha> *<name>"; rebuild it in the plain
-          # "<sha>  <name>" form sha256sum -c expects.
-          expected="$(grep -F "$name" sha256sums | head -1 | awk '{print $1}')"
+          # Publishers use one of two layouts: a per-file <name>.sha256, or one
+          # sha256sums listing the whole folder. Try the specific one first.
+          if curl -fsSL -o file.sha256 "${url}.sha256"; then
+            expected="$(awk '{print $1}' file.sha256 | head -1)"
+          else
+            curl -fsSL -o sha256sums "$(dirname "$url")/sha256sums"
+            expected="$(grep -F "$name" sha256sums | head -1 | awk '{print $1}')"
+          fi
           [ -n "$expected" ] || { echo "::error::no checksum published for $name"; exit 1; }
+          # Rebuild the line in the plain "<sha>  <name>" form sha256sum expects
+          # (some publishers write "<sha> *<name>" for binary mode).
           echo "${expected}  ${name}" | sha256sum -c -
           echo "FW_FILE=$name" >> "$GITHUB_ENV"
           ls -lh "$name"
