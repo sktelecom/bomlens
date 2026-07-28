@@ -10,7 +10,7 @@ BomLens runs locally, with no SaaS backend. What you analyze — source code, fi
 
 ## Works in closed and offline networks
 
-BomLens runs on air-gapped and offline networks. The few features that need an external lookup can be turned off, and everything else is still produced. The security report's EPSS and CISA KEV enrichment is the main case: set `SECURITY_ENRICH=false` to skip it and still generate the rest of the report. License lookups can likewise be skipped with `FETCH_LICENSE=false`.
+BomLens runs on air-gapped and offline networks. The few features that need an external lookup can be turned off, and everything else is still produced. The security report's EPSS and CISA KEV enrichment is the main case: set `SECURITY_ENRICH=false` to skip it and still generate the rest of the report. License lookups can likewise be skipped with `FETCH_LICENSE=false`. Going the other way, three checks that sound like they need the network do not: end-of-life flagging, the malicious-package check and the outbound-license conflict check all read data baked into the image at build time, so they keep working with no connection at all.
 
 ## Standard, portable outputs
 

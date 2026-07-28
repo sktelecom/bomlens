@@ -44,6 +44,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | Source ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | same |
 | Local directory (C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | same |
 | Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same + conformance report |
+| Build artifact (`.jar`, `.deb`, …) | BINARY | `$SBOM --target app.jar --all --generate-only` | same |
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 | AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 

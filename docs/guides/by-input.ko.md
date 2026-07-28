@@ -44,6 +44,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 소스 ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | 〃 |
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
 | 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃 + 적합성 보고서 |
+| 빌드 산출물(`.jar`, `.deb` 등) | BINARY | `$SBOM --target app.jar --all --generate-only` | 〃 |
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
 | AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 

@@ -155,6 +155,18 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 
 ---
 
+## 배포 라이선스 충돌 (`--license`)
+
+프로젝트를 배포하는 라이선스를 선언해, 각 의존성을 그 기준으로 판정하게 합니다. 소스 스캔으로는 알아낼 수 없는 값이라(cdxgen이 maven과 gradle에서 루트 라이선스를 비워 둡니다) 지정하지 않으면 판정하지 않습니다.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
+```
+
+선언한 값은 SBOM 루트 컴포넌트에 기록되고, 위험분석보고서에 충돌 절이 생깁니다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않습니다. 판정을 읽는 방법은 [보고서 읽는 법](../concepts/reports-explained.ko.md#배포-라이선스-충돌)을 참고하세요.
+
+---
+
 ## 결정론적 출력 (`--byte-stable`)
 
 같은 입력이면 항상 동일한 바이트의 SBOM을 생성합니다. CI에서 의미 없는 diff(타임스탬프, 랜덤 ID, 정렬 차이)를 제거하고 재현성을 확보합니다.

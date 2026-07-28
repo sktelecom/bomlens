@@ -34,6 +34,18 @@ docker pull ghcr.io/sktelecom/bomlens:latest
   (예: `%USERPROFILE%\bomlens-wintest`). 끝나면 삭제한다.
 - JSON 확인에 jq가 없을 수 있다. PowerShell `ConvertFrom-Json`을 쓴다.
 
+### 실측 소요 시간 (2026-07 Windows 11 + Rancher Desktop)
+
+절차를 잡을 때 참고할 값이다. 특히 첫 항목은 사용자 안내에 직접 영향을 준다.
+
+| 항목 | 실측값 | 시사점 |
+|---|---|---|
+| Rancher Desktop 콜드 스타트에서 `docker info` 성공까지 | 200초 | 앱이나 런처를 켜기 전에 Docker를 먼저 실행하고 3분 이상 기다려야 한다 |
+| `sbom-ui.bat` 정상 경로 전체 | 5.2초 | 대부분 docker CLI 호출 세 번이다 |
+| 포트 검사 한 번 | 1.82초 | 예약 범위 캐싱 전에는 5.8초였다 |
+| 전 구간이 예약 범위일 때 포기까지 | 41초 | 20회 시도 후 명확한 오류로 끝난다 |
+| `ghcr.io/sktelecom/bomlens:latest` 실제 크기 | 997MB | 안내 문구의 "약 3~4GB"와 차이가 크다 |
+
 ## 지켜야 할 것
 
 - 검증 중에는 저장소에 아무것도 커밋·푸시하지 않는다. 산출물은 전부 테스트 폴더에만 만든다.
