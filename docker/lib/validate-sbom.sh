@@ -436,7 +436,21 @@ case "$FORMAT" in
         # pipeline uses — so PURL coverage, name/version, and transitive edges
         # come from real component data instead of reading as all-zero.
         SPDX3_CDX="${OUT_PREFIX}.spdx3-cdx.$$.json"
-        if command -v syft >/dev/null 2>&1 \
+        # Yocto documents are measured on the set the pipeline actually analyses.
+        # syft turns this document into 1000 components of which 872 are source
+        # FILES, so name/version coverage reads 35/1000 and the verdict describes a
+        # document nobody downstream sees — the report is built from the 35 installed
+        # packages parse-yocto-spdx.py extracts. Measuring what is judged is the
+        # point of a conformance check. Non-Yocto SPDX 3.0 falls through to syft.
+        if command -v python3 >/dev/null 2>&1 \
+           && [ -f "$(dirname "$0")/parse-yocto-spdx.py" ] \
+           && python3 "$(dirname "$0")/parse-yocto-spdx.py" "$SBOM" "$SPDX3_CDX" >/dev/null 2>&1 \
+           && [ -s "$SPDX3_CDX" ]; then
+            SBOM="$SPDX3_CDX"
+            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+            rm -f "$SPDX3_CDX"
+            echo "[validate] SPDX 3.0 (Yocto) measured on the installed package set"
+        elif command -v syft >/dev/null 2>&1 \
            && syft convert "$SBOM" -o cyclonedx-json@1.6="$SPDX3_CDX" >/dev/null 2>&1 \
            && [ -s "$SPDX3_CDX" ]; then
             SBOM="$SPDX3_CDX"

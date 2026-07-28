@@ -6,7 +6,9 @@
     {"type":"Organization","spdxId":"urn:agent:oe","name":"OpenEmbedded","creationInfo":"_:ci"},
     {"type":"Tool","spdxId":"urn:agent:bitbake","name":"bitbake","creationInfo":"_:ci"},
     {"type":"SpdxDocument","spdxId":"urn:doc","name":"core-image-minimal","creationInfo":"_:ci","rootElement":["urn:sbom"]},
-    {"type":"software_Sbom","spdxId":"urn:sbom","creationInfo":"_:ci","rootElement":["urn:pkg:busybox"]},
+    {"type":"software_Sbom","spdxId":"urn:sbom","creationInfo":"_:ci","name":"core-image-minimal-qemux86-64.rootfs-20260101000000","rootElement":["urn:pkg:image","urn:file:ext4"]},
+    {"type":"software_Package","spdxId":"urn:pkg:image","creationInfo":"_:ci","name":"core-image-minimal","software_primaryPurpose":"archive"},
+    {"type":"software_File","spdxId":"urn:file:ext4","creationInfo":"_:ci","name":"core-image-minimal-qemux86-64.rootfs.ext4"},
 
     {"type":"software_Package","spdxId":"urn:pkg:busybox","creationInfo":"_:ci","name":"busybox","software_packageVersion":"1.36.1","software_primaryPurpose":"install",
      "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cpe23","identifier":"cpe:2.3:*:*:busybox:1.36.1:*:*:*:*:*:*:*"}]},
@@ -26,6 +28,10 @@
      "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2022-28391"}]},
 
     {"type":"Relationship","spdxId":"urn:rel:vuln1","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:fixed","urn:vuln:notaffected","urn:vuln:open"]},
+
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep1","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"dependsOn","scope":"runtime","to":["urn:pkg:libz1"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep2","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"dependsOn","scope":"build","to":["urn:pkg:libz1"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep3","creationInfo":"_:ci","from":"urn:pkg:libz1","relationshipType":"dependsOn","scope":"runtime","to":["urn:pkg:src"]},
 
     {"type":"security_VexFixedVulnAssessmentRelationship","spdxId":"urn:vex:fixed","creationInfo":"_:ci","from":"urn:vuln:fixed","relationshipType":"fixedIn","to":["urn:pkg:busybox"]},
     {"type":"security_VexNotAffectedVulnAssessmentRelationship","spdxId":"urn:vex:na","creationInfo":"_:ci","from":"urn:vuln:notaffected","relationshipType":"doesNotAffect","to":["urn:pkg:busybox"]}

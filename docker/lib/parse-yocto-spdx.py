@@ -132,7 +132,7 @@ def yocto_spdx2_index(doc):
 
 
 def extract(doc):
-    """Return (components, vuln_rows, counts) from a Yocto SPDX 3.0 document."""
+    """Return (components, vuln_rows, counts, dependencies) from a Yocto SPDX 3.0 document."""
     graph = _iter_graph(doc)
     by_id = {e["spdxId"]: e for e in graph if isinstance(e, dict) and e.get("spdxId")}
 
@@ -149,6 +149,7 @@ def extract(doc):
 
     license_of = {}
     vulns_of = {}
+    depends_of = {}
     for rel in graph:
         if rel.get("type") not in REL_TYPES:
             continue
@@ -156,7 +157,18 @@ def extract(doc):
         src = rel.get("from")
         if src not in installed:
             continue
-        if rtype == "hasConcludedLicense":
+        if rtype == "dependsOn":
+            # Runtime dependencies between installed packages (busybox-syslog needs
+            # busybox, eudev needs kmod). Yocto marks the scope, and only "runtime"
+            # belongs in a shipped-image graph — build-time edges describe how the
+            # image was produced, not what it needs to run. Targets outside the
+            # installed set are dropped so every edge points at a real component.
+            if rel.get("scope") not in (None, "runtime"):
+                continue
+            targets = [t for t in _as_list(rel.get("to")) if t in installed]
+            if targets:
+                depends_of.setdefault(src, []).extend(targets)
+        elif rtype == "hasConcludedLicense":
             targets = _as_list(rel.get("to"))
             if targets:
                 lic = by_id.get(targets[0], {})
@@ -225,20 +237,68 @@ def extract(doc):
                 }
             )
 
-    return components, vuln_rows, counts
+    dependencies = [
+        {"ref": ref, "dependsOn": sorted(set(targets))}
+        for ref, targets in sorted(depends_of.items())
+    ]
+    return components, vuln_rows, counts, dependencies
 
 
-def write_cyclonedx(path, components, source_name):
+def document_metadata(doc_graph, fallback_name):
+    """Image identity and creation time, for CycloneDX metadata.
+
+    Both are in the document and both are checked by conformance, so dropping
+    them would trade a correct component list for a worse verdict. The image is
+    the software_Package among the SBOM's rootElement entries (the other roots are
+    the built artefacts, e.g. the .ext4 and .tar.bz2 files).
+    """
+    by_id = {e["spdxId"]: e for e in doc_graph if isinstance(e, dict) and e.get("spdxId")}
+    creation_by_id = {
+        e["@id"]: e for e in doc_graph if isinstance(e, dict) and e.get("@id")
+    }
+
+    name, version, timestamp = fallback_name, "", ""
+    for element in doc_graph:
+        if element.get("type") not in ("SpdxDocument", "software_Sbom"):
+            continue
+        if element.get("name") and name == fallback_name:
+            name = element["name"]
+        ci = element.get("creationInfo")
+        if isinstance(ci, str) and not timestamp:
+            created = (creation_by_id.get(ci) or {}).get("created")
+            if created:
+                timestamp = created
+        for root in _as_list(element.get("rootElement")):
+            target = by_id.get(root) or {}
+            if target.get("type") == "software_Package":
+                name = target.get("name") or name
+                version = target.get("software_packageVersion") or version
+                break
+    return name, version, timestamp
+
+
+def write_cyclonedx(path, components, source_name, doc_graph=(), dependencies=()):
+    name, version, timestamp = document_metadata(doc_graph, source_name)
+    root = {"type": "operating-system", "name": name}
+    if version:
+        root["version"] = version
+    metadata = {
+        "tools": {"components": [{"type": "application", "name": "bomlens-yocto-spdx"}]},
+        "component": root,
+    }
+    if timestamp:
+        metadata["timestamp"] = timestamp
     doc = {
         "bomFormat": "CycloneDX",
         "specVersion": CDX_VERSION,
         "version": 1,
-        "metadata": {
-            "tools": {"components": [{"type": "application", "name": "bomlens-yocto-spdx"}]},
-            "component": {"type": "operating-system", "name": source_name},
-        },
+        "metadata": metadata,
         "components": components,
     }
+    # Only emit the graph when there is one: an empty dependencies array is a
+    # claim that nothing depends on anything, which is not what we measured.
+    if dependencies:
+        doc["dependencies"] = list(dependencies)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(doc, fh, indent=2, sort_keys=False)
         fh.write("\n")
@@ -309,7 +369,7 @@ def main():
         print("[yocto-spdx] not a Yocto SPDX 3.x document; leaving it to syft.", file=sys.stderr)
         return 3
 
-    components, vuln_rows, counts = extract(doc)
+    components, vuln_rows, counts, dependencies = extract(doc)
     if not components:
         # A Yocto document with no installed packages means we read the wrong
         # element set — fail rather than hand the pipeline an empty SBOM that
@@ -320,7 +380,7 @@ def main():
         )
         return 1
 
-    write_cyclonedx(out, components, os.path.basename(src))
+    write_cyclonedx(out, components, os.path.basename(src), _iter_graph(doc), dependencies)
     if out_prefix:
         write_sidecars(out_prefix, vuln_rows, counts)
 

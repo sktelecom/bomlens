@@ -1551,6 +1551,21 @@ ynames=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/yocto.cdx.json" 
     && pass "only the unjudged CVE reaches the security sidecar" \
     || fail "sidecar carries $(jq -c '[.Results[].Vulnerabilities[].VulnerabilityID]' "$WORK/yocto_security_yocto.json")"
 
+# Runtime dependency edges. The fixture also carries a build-scoped edge and an
+# edge into the source tarball; neither describes what the image needs to run, so
+# exactly one edge (busybox -> libz1) must survive.
+[ "$(jq '[.dependencies[]?.dependsOn[]?] | length' "$WORK/yocto.cdx.json")" = "1" ] \
+    && pass "only runtime-scoped edges between installed packages become dependencies" \
+    || fail "dependency edges=$(jq -c '[.dependencies[]?]' "$WORK/yocto.cdx.json")"
+# Conformance measures name/version and the graph, so losing document metadata
+# would trade a correct component list for a worse verdict.
+[ "$(jq -r '.metadata.component.name' "$WORK/yocto.cdx.json")" = "core-image-minimal" ] \
+    && pass "root component names the image, not the uploaded filename" \
+    || fail "root component='$(jq -r '.metadata.component.name' "$WORK/yocto.cdx.json")'"
+[ "$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")" = "2026-01-01T00:00:00Z" ] \
+    && pass "document creation time is carried into metadata.timestamp" \
+    || fail "timestamp='$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")'"
+
 # rc=3 means "not mine" and must stay non-fatal: the generic converter handles
 # every other supplier SBOM.
 python3 "$LIB/parse-yocto-spdx.py" "$FIX/good-cyclonedx.json" "$WORK/nope.json" >/dev/null 2>&1
