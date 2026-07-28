@@ -347,8 +347,25 @@ EOF
         # Conformance never aborts the pipeline (best-effort report).
         run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
         echo "[1/2] Converting supplier SBOM to CycloneDX..."
-        if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
-            echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+        # Yocto SPDX 3.0 takes a dedicated path. syft converts these documents but
+        # drops every vulnerability and lists source FILES as components (measured:
+        # 1000 components, 872 of them files, 0 vulnerabilities — against 35 installed
+        # packages and 3188 vulnerabilities actually in the document). The parser
+        # reads the installed set and the VEX judgements Yocto recorded at build time.
+        # rc=3 means "not a Yocto document" and is the normal path for every other
+        # supplier SBOM; any other non-zero rc is a real failure that still falls back
+        # so a parser bug cannot block a scan.
+        YOCTO_RC=3
+        if command -v python3 >/dev/null 2>&1 && [ -f "$LIBDIR/parse-yocto-spdx.py" ]; then
+            YOCTO_RC=0
+            python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+                || YOCTO_RC=$?
+        fi
+        if [ "$YOCTO_RC" != 0 ]; then
+            [ "$YOCTO_RC" = 3 ] || echo "[analyze] WARN: Yocto SPDX parser failed (rc=$YOCTO_RC); using the generic converter." >&2
+            if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
+                echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+            fi
         fi
         ;;
 
@@ -609,6 +626,11 @@ fi
 # Collect the file tree if any source-having mode produced one (SOURCE/ROOTFS
 # above, or FIRMWARE from scan-firmware.sh).
 [ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")
+# Yocto VEX judgement counts (parse-yocto-spdx.py). Shipped as an artifact because
+# the numbers it carries — how many CVEs the build already patched — are not
+# recoverable from the CycloneDX or the security report, which list only what is
+# still unresolved.
+[ -f "${OUT_PREFIX}_yocto_vex.json" ] && ARTIFACTS+=("${OUT_PREFIX}_yocto_vex.json")
 
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then

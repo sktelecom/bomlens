@@ -87,7 +87,10 @@ fi
 # Each already carries the .Results[].Vulnerabilities[] contract, so we append its
 # Results to Trivy's; the FINDINGS dedup above collapses any (purl, cve) overlap so
 # the report and its counts read one unified, non-double-counted file.
-for engine in cvebintool grype; do
+#   _security_yocto.json       — Yocto SPDX VEX statements that stayed unresolved
+#                                (parse-yocto-spdx.py; patched/not-affected CVEs are
+#                                counted in _yocto_vex.json instead of listed here)
+for engine in cvebintool grype yocto; do
     SIDECAR="${OUT_PREFIX}_security_${engine}.json"
     [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1 || continue
     SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
