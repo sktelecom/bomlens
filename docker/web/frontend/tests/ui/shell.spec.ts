@@ -902,11 +902,15 @@ const LIC_DONE = {
   security: null,
   conformance: null,
   sbom: {
-    components: 3,
+    components: 4,
     componentList: [
       { name: "some-llama-model", version: "1", group: "", purl: "", type: "machine-learning-model", licenses: ["LLaMA-3.1"], licenseReview: "behavioral-use" },
       { name: "some-nc-dataset", version: "1", group: "", purl: "", type: "data", licenses: ["CC-BY-NC-4.0"], licenseReview: "non-commercial" },
       { name: "ordinary-lib", version: "1", group: "", purl: "", type: "library", licenses: ["MIT"] },
+      // A copyleft row, so the distribution's tier colouring and its badge are
+      // in this section's baseline. The others are AI-restrictive or permissive
+      // and all render neutral, which left the flagged styling uncovered.
+      { name: "copyleft-lib", version: "1", group: "", purl: "", type: "library", licenses: ["GPL-3.0-only"] },
     ],
   },
 };
