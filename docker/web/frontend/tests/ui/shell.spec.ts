@@ -573,10 +573,13 @@ test("Overview license bar routes into filtered Licenses", async ({ page }) => {
   // LIC_DONE is 2 review-needed + 1 permissive (MIT); click the Permissive band.
   await page.getByRole("button", { name: "Permissive 1" }).first().click();
 
-  // Lands on Licenses filtered to permissive — the AI-restrictive review card is gone.
+  // Lands on Licenses filtered to permissive — the AI-restrictive review card is
+  // gone, and the classification band stays selected so the filter is visible.
   await expect(page.getByRole("link", { name: /^Licenses/ })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("License review needed")).toHaveCount(0);
-  await expect(page.getByText("MIT")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Permissive 1" }).first(),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("dependency graph is labelled and the tree view is keyboard-reachable", async ({ page }) => {
@@ -939,7 +942,9 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   await expect(page.getByText("Non-commercial")).toBeVisible();
   await expect(page.getByText("some-llama-model")).toBeVisible();
   await expect(page.getByText("some-nc-dataset")).toBeVisible();
-  await expect(page.getByText("License distribution")).toBeVisible();
+  // The per-license listing lives in the Components table, so this section
+  // points there instead of repeating it as a chart.
+  await expect(page.getByText(/filter by license in the Components/i)).toBeVisible();
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
