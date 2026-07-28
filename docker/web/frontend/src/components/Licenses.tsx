@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
-import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
@@ -14,16 +13,10 @@ import {
   type LicenseReview,
   type LicenseRiskTier,
   licenseGroups,
-  licenseRiskTier,
   reviewGroups,
 } from "@/lib/licenses";
 
-import {
-  LicenseRiskBar,
-  TIER_FILL,
-  TIER_FLAGGED,
-  TierBadge,
-} from "./LicenseRiskBar";
+import { LicenseRiskBar } from "./LicenseRiskBar";
 
 const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
@@ -69,7 +62,6 @@ export function Licenses({
   const { t } = useTranslation();
   // Clicking a classification tier filters the rest of the tab to that tier.
   const [tier, setTier] = useState<LicenseRiskTier | "">(initialTier ?? "");
-  const [selected, setSelected] = useState<string | null>(null);
   // Re-seed the tier filter when an Overview bar click routes one in.
   useEffect(() => {
     if (initialTier !== undefined) setTier(initialTier);
@@ -82,35 +74,15 @@ export function Licenses({
   );
   const review = useMemo(() => reviewGroups(filtered), [filtered]);
   const conflicts = useMemo(() => conflictGroups(filtered), [filtered]);
-  const { groups, unlicensed } = useMemo(() => licenseGroups(filtered), [filtered]);
-  const selectedComps = useMemo(
-    () => (selected ? filtered.filter((c) => c.licenses.includes(selected)) : []),
-    [selected, filtered],
-  );
+  const { unlicensed } = useMemo(() => licenseGroups(filtered), [filtered]);
 
   if (components.length === 0) {
     return <EmptyState icon={ScrollText}>{t("licenses.empty")}</EmptyState>;
   }
 
-  // Toggle the tier filter; clear the license drill-down when the class changes.
   const toggleTier = (next: LicenseRiskTier) => {
     setTier((cur) => (cur === next ? "" : next));
-    setSelected(null);
   };
-
-  // Colour each bar by its own tier rather than a single "is it copyleft" tint:
-  // the tier is already computed, the risk bar above uses the same hues, and one
-  // flat tint made GPL and LGPL look alike while barely reading as a highlight.
-  const bars: BarDatum[] = groups.map((g) => {
-    const t2 = licenseRiskTier(g.name);
-    return {
-      key: g.name,
-      label: g.name,
-      value: g.count,
-      fill: TIER_FILL[t2],
-      badge: TIER_FLAGGED.has(t2) ? <TierBadge tier={t2} /> : undefined,
-    };
-  });
 
   return (
     <div className="space-y-6">
@@ -217,54 +189,21 @@ export function Licenses({
         </Card>
       )}
 
-      <div className="space-y-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="text-sm font-semibold text-foreground">
-            {t("licenses.distribution")}
-          </div>
-          <span className="text-xs text-muted-foreground">{t("licenses.clickHint")}</span>
-        </div>
-        <div className="max-h-[26rem] overflow-auto rounded-md">
-          <BarList
-            items={bars}
-            ariaLabel={t("licenses.distribution")}
-            selectedKey={selected}
-            onSelect={(key) => setSelected((cur) => (cur === key ? null : key))}
-          />
-        </div>
+      {/* No per-license bar chart here. Listing which components carry a given
+          license is what the Components table already does, with filters that
+          combine license with type, scope and risk — this section's job is the
+          obligations that table cannot express. The counts per license stay one
+          click away rather than being restated in a weaker form. */}
+      <p className="text-xs text-muted-foreground">
+        {t("licenses.perLicenseHint")}
         {unlicensed > 0 && (
-          <div className="text-xs text-muted-foreground">
+          <>
+            {" · "}
             {t("result.licenseNone")}{" "}
             <span className="tabular-nums">{unlicensed}</span>
-          </div>
+          </>
         )}
-
-        {selected && (
-          <div className="space-y-1.5 pt-1">
-            <div className="text-sm">
-              <span className="font-medium">{selected}</span>{" "}
-              <span className="tabular-nums text-muted-foreground">· {selectedComps.length}</span>
-            </div>
-            <ul className="max-h-[28rem] resize-y divide-y overflow-auto rounded-md border bg-card">
-              {selectedComps.map((c, i) => (
-                <li
-                  key={c.purl || `${c.name}-${i}`}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm"
-                >
-                  <span className="font-mono">
-                    {c.group ? `${c.group} / ` : ""}
-                    {c.name}
-                    {c.version ? <span className="text-muted-foreground"> {c.version}</span> : null}
-                  </span>
-                  {c.licenses.length > 1 && (
-                    <span className="text-xs text-muted-foreground">({c.licenses.join(", ")})</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+      </p>
     </div>
   );
 }

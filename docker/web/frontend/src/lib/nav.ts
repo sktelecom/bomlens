@@ -110,10 +110,22 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  // Security and compliance are split because they are read by different people
+  // at different moments: a CVE list is triaged against a patch schedule, while
+  // licence obligations are settled once per release. Grouping them together
+  // made whoever needed one of them scan past the other.
   {
-    id: "risk",
-    labelKey: "nav.group.risk",
+    id: "security",
+    labelKey: "nav.group.security",
     sections: [
+      { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
+    ],
+  },
+  {
+    id: "compliance",
+    labelKey: "nav.group.compliance",
+    sections: [
+      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
       // Supplier-SBOM conformance: shown whenever an ANALYZE produced a
       // conformance report, regardless of AI content. The G7 AI minimum-element
       // checks (when present) render as a sub-block inside this section.
@@ -123,8 +135,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FileCheck2,
         requires: (c) => c.hasConformance,
       },
-      { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
-      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
     ],
   },
   {

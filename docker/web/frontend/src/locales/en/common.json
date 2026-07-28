@@ -313,9 +313,10 @@
     "sectionsHint": "Run a scan to see result sections here.",
     "group": {
       "inventory": "Inventory",
-      "risk": "Risk & compliance",
       "ai": "AI",
-      "outputs": "Outputs"
+      "outputs": "Outputs",
+      "security": "Security",
+      "compliance": "Compliance"
     },
     "overview": "Overview",
     "components": "Components",
@@ -712,8 +713,6 @@
     "reviewHint": "AI-restrictive terms — human review required.",
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
-    "distribution": "License distribution",
-    "clickHint": "Click a license to see its components",
     "tier": {
       "networkCopyleft": "Network copyleft",
       "strongCopyleft": "Strong copyleft",
@@ -729,7 +728,8 @@
     "conflictUnknown": "Cannot judge",
     "conflictCompatible": "No conflict",
     "conflictOffTitle": "Outbound-license conflicts were not checked",
-    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on."
+    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on.",
+    "perLicenseHint": "To see which components carry a given license, filter by license in the Components section."
   },
   "recent": {
     "title": "Scan management",

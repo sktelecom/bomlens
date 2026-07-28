@@ -47,24 +47,25 @@ const LABEL: Record<LicenseRiskTier, string> = {
 export const TIER_LABEL = LABEL;
 
 /**
- * Fill for a tier behind text — the distribution list draws its label on top of
- * the bar, so these are the translucent counterparts of BAR above. Same hues, so
- * one colour language covers both charts.
+ * Fill for a flagged row in the distribution list.
  *
- * Kept at the same alpha as the neutral fill. The bar above is a thin strip
- * where a saturated colour is proportionate; here it floods a whole row, and at
- * a heavier alpha the flagged rows shouted over everything else on the page.
- * Hue carries the distinction, and the badge states it outright, so the tint
- * only has to be noticeable — not loud.
+ * The brand accent, matching the left rail's active-section tint, rather than
+ * the risk hues the bar above uses. Those hues belong to vulnerability
+ * severity; carrying them into a licence list makes an obligation look like a
+ * CVE, and the amber/orange end of that scale dominated a row-wide fill.
  *
- * Permissive and uncategorized stay neutral: tinting every row would leave
- * nothing standing out, and neither one is a finding.
+ * One accent for every flagged tier: the tint says "this row has obligations",
+ * and the badge beside the label says which kind. The distinction lives in the
+ * text, not in four shades a reader would have to learn.
+ *
+ * Permissive and uncategorized stay neutral — neither is a finding, and tinting
+ * every row would leave nothing standing out.
  */
 export const TIER_FILL: Record<LicenseRiskTier, string> = {
-  "network-copyleft": "bg-risk-critical/20",
-  "strong-copyleft": "bg-risk-high/20",
-  "weak-copyleft": "bg-risk-medium/20",
-  "review-needed": "bg-amber-500/20",
+  "network-copyleft": "bg-brand/15",
+  "strong-copyleft": "bg-brand/15",
+  "weak-copyleft": "bg-brand/15",
+  "review-needed": "bg-brand/15",
   uncategorized: "bg-muted-foreground/20",
   permissive: "bg-muted-foreground/20",
 };

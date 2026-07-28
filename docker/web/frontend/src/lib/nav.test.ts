@@ -51,11 +51,23 @@ describe("visibleGroups — scan-type + data adaptation", () => {
 
   it("shows conformance whenever a conformance report exists, AI or not", () => {
     // Core supplier-SBOM fix: a non-AI SBOM with a conformance report still
-    // reaches the conformance section (it lives under Risk, not AI).
+    // reaches the conformance section (it lives under Compliance, not AI).
     expect(visibleSectionIds(SUPPLIER_SBOM)).toContain("conformance");
     expect(visibleSectionIds(AI_SCAN)).toContain("conformance");
-    const riskGroup = visibleGroups(SUPPLIER_SBOM).find((g) => g.id === "risk");
-    expect(riskGroup?.sections.map((s) => s.id)).toContain("conformance");
+    const group = visibleGroups(SUPPLIER_SBOM).find((g) => g.id === "compliance");
+    expect(group?.sections.map((s) => s.id)).toContain("conformance");
+  });
+
+  it("keeps security and compliance apart", () => {
+    // They are read by different people at different moments, so a CVE list and
+    // a licence obligation must not sit in one group.
+    const groups = visibleGroups(SOURCE_SCAN);
+    const security = groups.find((g) => g.id === "security");
+    const compliance = groups.find((g) => g.id === "compliance");
+    expect(security?.sections.map((s) => s.id)).toEqual(["vulnerabilities"]);
+    expect(compliance?.sections.map((s) => s.id)).toContain("licenses");
+    expect(compliance?.sections.map((s) => s.id)).not.toContain("vulnerabilities");
+    expect(groups.map((g) => g.id)).not.toContain("risk");
   });
 
   it("hides conformance when no conformance report exists", () => {

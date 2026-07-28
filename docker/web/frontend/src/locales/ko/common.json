@@ -313,9 +313,10 @@
     "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
     "group": {
       "inventory": "인벤토리",
-      "risk": "위험 · 컴플라이언스",
       "ai": "AI",
-      "outputs": "산출물"
+      "outputs": "산출물",
+      "security": "보안",
+      "compliance": "컴플라이언스"
     },
     "overview": "개요",
     "components": "컴포넌트",
@@ -712,8 +713,6 @@
     "reviewHint": "AI 제한 조항 — 사람 검토가 필요합니다.",
     "flagBehavioral": "행위 기반 제한",
     "flagNonCommercial": "비상업",
-    "distribution": "라이선스 분포",
-    "clickHint": "라이선스를 클릭하면 해당 컴포넌트를 봅니다",
     "tier": {
       "networkCopyleft": "네트워크 카피레프트",
       "strongCopyleft": "강한 카피레프트",
@@ -729,7 +728,8 @@
     "conflictUnknown": "판정 불가",
     "conflictCompatible": "충돌 없음",
     "conflictOffTitle": "배포 라이선스 충돌은 검사하지 않았습니다",
-    "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정해 다시 스캔하면 검사가 켜집니다."
+    "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정해 다시 스캔하면 검사가 켜집니다.",
+    "perLicenseHint": "특정 라이선스를 쓰는 컴포넌트를 보려면 컴포넌트 화면에서 라이선스로 필터하세요."
   },
   "recent": {
     "title": "스캔 관리",
