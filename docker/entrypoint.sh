@@ -531,6 +531,18 @@ if [ "${ENRICH_EOL:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-eol bash "$LIBDIR/enrich-eol.sh" "$OUTPUT_FILE"
 fi
 
+# Malicious-package check: flag components that are known-malicious packages
+# (typosquats, hijacked accounts, install-time payloads), fully OFFLINE from a
+# bundled OSV snapshot. A different question from "does this have a CVE?", and a
+# different response — removal and credential rotation rather than an upgrade —
+# so it is reported as its own signal. Matches by PURL only; a name match would
+# be exactly wrong here, since these packages are named to resemble real ones.
+# Runs for every mode: an AI SBOM's dependencies can be malicious too. Disable
+# with ENRICH_MALICIOUS=false. Best-effort; never aborts the scan.
+if [ "${ENRICH_MALICIOUS:-true}" != "false" ]; then
+    run_optional_step enrich-malicious bash "$LIBDIR/enrich-malicious.sh" "$OUTPUT_FILE"
+fi
+
 # Staleness enrichment (OPT-IN, default off): query deps.dev for absolute version
 # currency (newest version, how many releases behind, last-release date). Unlike
 # EOL this makes one network call per package, so it trades the scan's offline

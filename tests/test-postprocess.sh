@@ -372,6 +372,96 @@ else
     fail "tier results diverged" "licenses.ts: $(echo "$ts_tier" | tr '\n' ' ') / license-flags.jq: $(echo "$jq_tier" | tr '\n' ' ')"
 fi
 
+echo "== malicious packages: PURL-keyed, version-aware, and silent without a snapshot =="
+# A tiny stand-in for the bundled OSV index. Two shapes matter: an entry with no
+# version list (every published version is malicious — the common case) and one
+# that names versions (only those are).
+cat > "$WORK/mal-index.json" <<'MALJSON'
+{
+  "_snapshot": "2026-01-02",
+  "_ecosystems": ["npm"],
+  "packages": {
+    "pkg:npm/evil-all": "MAL-0000-1",
+    "pkg:npm/evil-some": "MAL-0000-2"
+  },
+  "versions": {
+    "pkg:npm/evil-some": ["2.0.0"]
+  }
+}
+MALJSON
+cat > "$WORK/mal.json" <<'MALSBOM'
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+  "components": [
+    { "type": "library", "name": "evil-all", "version": "1.0.0", "purl": "pkg:npm/evil-all@1.0.0" },
+    { "type": "library", "name": "evil-all", "version": "7.7.7", "purl": "pkg:npm/evil-all@7.7.7" },
+    { "type": "library", "name": "evil-some", "version": "2.0.0", "purl": "pkg:npm/evil-some@2.0.0" },
+    { "type": "library", "name": "evil-some", "version": "1.0.0", "purl": "pkg:npm/evil-some@1.0.0" },
+    { "type": "library", "name": "qualified", "version": "1.0.0", "purl": "pkg:npm/evil-all@1.0.0?arch=x64" },
+    { "type": "library", "name": "evil-all", "version": "1.0.0" },
+    { "type": "library", "name": "honest", "version": "1.0.0", "purl": "pkg:npm/honest@1.0.0" }
+  ]
+}
+MALSBOM
+MALICIOUS_DATA_FILE="$WORK/mal-index.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+mal_of() { jq -r --arg n "$1" --arg v "$2" '[.components[] | select(.name==$n and .version==$v)
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json"; }
+mal_expect() {
+    got=$(mal_of "$1" "$2")
+    [ "$got" = "$3" ] && pass "malicious: $1@$2 -> $3" || fail "malicious: $1@$2 expected $3, got $got"
+}
+# No version list means every version is malicious.
+mal_expect evil-all  1.0.0 true
+mal_expect evil-all  7.7.7 true
+# A version list means only those versions are — the rest are untouched, so the
+# check cannot condemn a package the advisory did not name.
+mal_expect evil-some 2.0.0 true
+mal_expect evil-some 1.0.0 none
+mal_expect honest    1.0.0 none
+# Qualifiers are stripped before the lookup, and a component with no purl is not
+# matched by name — malicious packages are named to resemble real ones, so a
+# name match here would be the wrong tool.
+if [ "$(jq -r '[.components[] | select(.name=="qualified")
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json")" = "true" ]; then
+    pass "malicious: purl qualifiers are stripped before the lookup"
+else
+    fail "qualified purl was not matched" "$(jq -c '.components[4]' "$WORK/mal.json")"
+fi
+if [ "$(jq -r '[.components[] | select(.name=="evil-all" and (has("purl")|not))
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json")" = "none" ]; then
+    pass "malicious: a component with no purl is never matched by name"
+else
+    fail "a purl-less component was flagged by name" "$(jq -c '.components[5]' "$WORK/mal.json")"
+fi
+# The id and the snapshot date ride along, so a reader can look the advisory up
+# and knows how old the answer is.
+if jq -e '[.components[] | select(.name=="evil-all")
+      | ((.properties // [])[] | select(.name=="bomlens:malicious:id") | .value)] | first == "MAL-0000-1"' \
+      "$WORK/mal.json" >/dev/null 2>&1 \
+   && jq -e '[.components[] | select(.name=="evil-all")
+      | ((.properties // [])[] | select(.name=="bomlens:malicious:source") | .value)] | first == "osv.dev@2026-01-02"' \
+      "$WORK/mal.json" >/dev/null 2>&1; then
+    pass "malicious: advisory id and snapshot date are recorded on the component"
+else
+    fail "malicious id/source properties missing" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
+fi
+# No bundled snapshot: the step is skipped and the SBOM comes back untouched.
+# Stamping nothing is the point — an absent property means "not assessed".
+cp "$WORK/mal.json" "$WORK/mal-before.json"
+MALICIOUS_DATA_FILE="$WORK/does-not-exist.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+if diff -q "$WORK/mal-before.json" "$WORK/mal.json" >/dev/null 2>&1; then
+    pass "no bundled snapshot -> SBOM untouched, scan still succeeds"
+else
+    fail "missing snapshot changed the SBOM"
+fi
+# Re-running must not accumulate duplicate properties (byte-stability).
+MALICIOUS_DATA_FILE="$WORK/mal-index.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+if [ "$(jq '[.components[0].properties[] | select(.name=="bomlens:malicious")] | length' "$WORK/mal.json")" = "1" ]; then
+    pass "re-running replaces rather than appends the malicious properties"
+else
+    fail "malicious properties duplicated on re-run" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
+fi
+
 echo "== license-conflict: expression parsing and outbound-license verdicts =="
 # The conflict check needs an OUTBOUND license on metadata.component. Every
 # expression below was measured in a real BomLens SBOM, so this pins the cases

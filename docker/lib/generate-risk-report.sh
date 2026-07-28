@@ -136,6 +136,24 @@ if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
     fi
 fi
 
+# Known-malicious packages (enrich-malicious.sh, bundled OSV snapshot). Kept
+# apart from the vulnerability counts on purpose: a CVE is a flaw to patch,
+# whereas a malicious package has to be removed and any credential the build
+# could reach rotated. Absent from the report entirely when the snapshot was not
+# bundled — no section rather than a reassuring zero.
+MAL_COUNT=0; MAL_SNAP=""; MAL_TOP='[]'
+if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
+    MAL_ROWS=$(jq -c '[ .components[]?
+        | select((.properties // []) | any(.name=="bomlens:malicious" and .value=="true"))
+        | { label: ((.name // "?") + "@" + (.version // "?")),
+            id: (((.properties // [])[] | select(.name=="bomlens:malicious:id") | .value) // ""),
+            src: (((.properties // [])[] | select(.name=="bomlens:malicious:source") | .value) // "") } ]' \
+        "$BOM" 2>/dev/null || echo '[]')
+    MAL_COUNT=$(echo "$MAL_ROWS" | jq 'length')
+    MAL_SNAP=$(echo "$MAL_ROWS" | jq -r '.[0].src // ""')
+    MAL_TOP=$(echo "$MAL_ROWS" | jq -c '.[0:20]')
+fi
+
 # AI model risk assessment rollup (AIBOM/ANALYZE): re-aggregate the
 # bomlens:assessment:* verdicts assess-ai-risk.sh stamped; absent for a plain
 # software SBOM, in which case the section is skipped entirely.
@@ -226,6 +244,9 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_LICCONFLICT_INTRO=$(kstr risk.licconflict_intro)
     P_TH_LC=$(kstr risk.th_licconflict)
     P_LICCONFLICT_DRIVERS=$(kstr risk.licconflict_drivers)
+    P_H3_MALICIOUS=$(kstr risk.h3_malicious)
+    P_MALICIOUS_INTRO=$(kstr risk.malicious_intro)
+    P_MALICIOUS_LIST=$(kstr risk.malicious_list)
     P_COPYLEFT_MORE_MD=$(tfmt risk.copyleft_more_md "$((COPYLEFT_TOTAL - 10))")
     P_CL_MORE_PRE=$(kstr risk.copyleft_more_pre); P_CL_MORE_MID=$(kstr risk.copyleft_more_mid); P_CL_MORE_END=$(kstr risk.copyleft_more_end)
     P_H3_AI=$(kstr risk.h3_ai)
@@ -283,6 +304,9 @@ else
     P_LICCONFLICT_INTRO="Dependencies checked against the declared outbound license. Advisory only — it surfaces combinations that need a person to look, and makes no legal determination."
     P_TH_LC="| Outbound license | Incompatible | Conditional | Unknown |"
     P_LICCONFLICT_DRIVERS="Dependencies whose terms clash with the outbound license (up to 10):"
+    P_H3_MALICIOUS="Known-malicious packages"
+    P_MALICIOUS_INTRO="These are not vulnerabilities to patch. A package published to attack whoever installs it has to be removed, and any credential the build could reach should be rotated."
+    P_MALICIOUS_LIST="Packages matched against the bundled OSV snapshot:"
     P_COPYLEFT_MORE_MD="- … and $((COPYLEFT_TOTAL - 10)) more (see the SBOM \`bomlens:licenseClass\` property for all)"
     P_CL_MORE_PRE="… and "
     P_CL_MORE_MID=" more (see the SBOM "
@@ -391,6 +415,18 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
             echo ""
             echo "$LC_TOP" | jq -r '.[] | "- `" + . + "`"'
         fi
+    fi
+    if [ "$MAL_COUNT" -gt 0 ]; then
+        echo ""
+        echo "### ${P_H3_MALICIOUS}"
+        echo ""
+        echo "${P_MALICIOUS_INTRO}"
+        echo ""
+        echo "${P_MALICIOUS_LIST}"
+        echo ""
+        echo "$MAL_TOP" | jq -r '.[] | "- `" + .label + "` (" + .id + ")"'
+        echo ""
+        echo "_${MAL_SNAP}_"
     fi
     if [ "$AS_MODELS" -gt 0 ]; then
         echo ""
@@ -586,6 +622,16 @@ HTMLLC
         fi
     fi
 
+    if [ "$MAL_COUNT" -gt 0 ]; then
+        echo "<h3>${P_H3_MALICIOUS}</h3>"
+        echo "<p>${P_MALICIOUS_INTRO}</p>"
+        echo "<div class=\"cards\"><span class=\"pill pill-crit\">${P_H3_MALICIOUS} <span class=\"count\">${MAL_COUNT}</span></span></div>"
+        echo "<p>${P_MALICIOUS_LIST}</p>"
+        echo "<ul class=\"mono\">"
+        echo "$MAL_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + (.id|@html) + ")</li>"'
+        echo "</ul>"
+        echo "<p class=\"meta\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p>"
+    fi
     if [ "$AS_MODELS" -gt 0 ]; then
         echo "<h3>${P_H3_AI}</h3>"
         echo "<p>${P_AI_SEE_HTML} ${P_AI_DISC}</p>"
@@ -611,4 +657,4 @@ HTMLASSESS
     echo "</body></html>"
 } > "$HTML"
 
-echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL}${OUTBOUND_LIC:+, license-conflict incompatible=${LC_INCOMPAT}})"
+echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL}${OUTBOUND_LIC:+, license-conflict incompatible=${LC_INCOMPAT}}, malicious=${MAL_COUNT})"

@@ -27,6 +27,15 @@ The table puts KEV-listed items at the top, then sorts by severity, and finally 
 
 EPSS and KEV require external API lookups. On an air-gapped network, set `SECURITY_ENRICH=false` to omit the two columns and still generate the rest of the report.
 
+## Known-malicious packages
+
+A vulnerability says an honest package has a flaw. A malicious package is a different thing: it was published to attack whoever installs it — a typosquat of a name you meant to type, a release pushed from a hijacked maintainer account, a payload that runs during installation. BomLens flags these separately from the vulnerability table, because the response is different. You remove the package, and you rotate any credential the build could reach; there is no version to upgrade to.
+
+- Matching is by PURL, never by name. These packages are deliberately named to resemble real ones, so a name match is exactly the wrong tool.
+- The data is a bundled snapshot of the malicious-package advisories OSV publishes (the ones carrying a `MAL-` id), so the check runs offline like the EOL flag. Set `ENRICH_MALICIOUS=false` to skip it.
+- Most advisories name no versions, which means every published version of that package is malicious. When an advisory does name versions, only those are flagged.
+- Each flagged component carries the advisory id and the snapshot date (`bomlens:malicious:id`, `bomlens:malicious:source`). The date matters: this is a fast-moving area, so a clean result means "not in this snapshot", not "safe today".
+
 ## Component end-of-life (EOL)
 
 BomLens also flags whether each component's release cycle has reached its upstream end-of-life. This is a supply-chain risk separate from CVEs: a runtime or framework past its support date gets no more upstream security fixes, so a Critical or High reported later has no patch to apply.

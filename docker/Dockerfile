@@ -353,6 +353,22 @@ RUN timeout 120 python3 /tmp/build-eol-index.py \
     || echo "[build] endoflife snapshot skipped; EOL flagging will be inactive at scan time" \
     ; rm -f /tmp/build-eol-index.py
 
+# Bundle an OSV malicious-package snapshot beside enrich-malicious.sh, for the
+# same reason as the EOL bundle above: the check must run OFFLINE at scan time.
+# This one is far heavier to build than the EOL bundle — the source archives are
+# ~275 MB — so it gets its own layer and a much larger timeout, and the reduced
+# index it writes is ~12 MB (232k packages, measured 2026-07-28). Its own layer
+# also means a rebuild that changes nothing else reuses the cached download
+# instead of fetching it again, which matters on the multi-architecture publish
+# where every stage would otherwise pay for it twice.
+# Best-effort in the same way: if the fetch fails no file is written and
+# enrich-malicious.sh skips cleanly at scan time. See build-malicious-index.py.
+COPY build-malicious-index.py /tmp/build-malicious-index.py
+RUN timeout 1200 python3 /tmp/build-malicious-index.py \
+        /usr/local/lib/sbom/malicious-index.json \
+    || echo "[build] OSV malicious snapshot skipped; the check will be inactive at scan time" \
+    ; rm -f /tmp/build-malicious-index.py
+
 WORKDIR /src
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
