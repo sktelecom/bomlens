@@ -13,7 +13,6 @@
  * `loadScan` takes). `<section>` is a SectionId. Ids are encoded so any run_id
  * survives a round-trip; parsing decodes and tolerates a missing leading slash.
  */
-import { IS_STATIC_DEMO } from "./demo";
 import type { SectionId } from "./nav";
 
 export type Route =
@@ -32,9 +31,7 @@ export function parseHash(hash: string): Route {
   if (!h) return { kind: "recent" };
 
   const parts = h.split("/");
-  // The demo has no scan screen to route to, and a hand-typed `#/new` would
-  // otherwise land on a form that cannot submit. Send it home instead.
-  if (parts[0] === "new") return IS_STATIC_DEMO ? { kind: "recent" } : { kind: "new" };
+  if (parts[0] === "new") return { kind: "new" };
   if (parts[0] === "scan" && parts[1]) {
     const id = safeDecode(parts[1]);
     if (id) {

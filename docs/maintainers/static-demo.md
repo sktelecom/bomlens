@@ -46,10 +46,15 @@ component as `application`, which is what makes the recent-scans list label it
 scan and every row ends up looking the same. Source mode also resolves far more
 of the dependency graph.
 
-The capture runs on a machine with Docker, so `capabilities.json` would report
-whatever that machine can do. The script forces every capability off, since each
-one leads to a write the demo cannot serve — a capability left on would render a
-button that does nothing.
+The capture would otherwise report whatever the capture machine can do, which is
+the wrong thing to publish. The demo shows the scan form so visitors can see the
+range of inputs BomLens accepts, so the script forces the input-side
+capabilities on — firmware and AI-model scanning would look unsupported just
+because the capture machine lacks those opt-in images. The run button is
+disabled in demo mode, so nothing there can be acted on. Capabilities whose
+control sits outside that form are forced off instead, because they would render
+a button that does nothing: SPDX export converts server-side, `hfAuth` is a
+token the demo never holds, and host paths do not exist on a static host.
 
 Markdown reports are dropped from the capture, and their names are removed from
 the two listings so no download link points at a missing file. The data folder
@@ -79,5 +84,11 @@ only at `/`.
 
 It never runs a scan. Scanning builds the target project, so a public scan
 endpoint would be arbitrary code execution on whoever hosts it — which is also
-why the demo is a static page rather than a server. Visitors who want their own
-results are pointed at the install guide instead.
+why the demo is a static page rather than a server.
+
+The scan form is still reachable, because it is where the range of supported
+inputs is visible and hiding it made the demo look like a results viewer rather
+than a tool. Its run button is disabled with the reason stated next to it, and
+that reason carries the link to the install guide. Disabled rather than hidden:
+a missing button reads as a broken page, a disabled one with a reason reads as
+a boundary.

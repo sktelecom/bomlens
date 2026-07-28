@@ -12,7 +12,9 @@
     "options": "Generation options",
     "advanced": "Advanced",
     "run": "Run scan",
-    "running": "Scanning…"
+    "running": "Scanning…",
+    "demoRunDisabled": "This demo cannot run a scan — it is a static page with no machine behind it.",
+    "demoRunDisabledCta": "Run it on your own code"
   },
   "source": {
     "label": "Scan target",

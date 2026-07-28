@@ -1,9 +1,9 @@
-import { Clock, Download, Plus, RotateCw, X } from "lucide-react";
+import { Clock, Plus, RotateCw, X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
+import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -105,6 +105,9 @@ export function TopBar({
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {search}
+        {/* Re-scan parks the finished scan's config in the form and reruns it,
+            which the demo cannot do. New scan stays: the form itself is worth
+            seeing, and its run button explains why it is disabled. */}
         {onRescan && !IS_STATIC_DEMO && (
           <Button
             variant="outline"
@@ -117,29 +120,14 @@ export function TopBar({
             <span>{t("result.rescan")}</span>
           </Button>
         )}
-        {/* The demo cannot scan, so the primary action becomes the one thing a
-            visitor can act on: getting the tool. Same slot, same weight. */}
-        {IS_STATIC_DEMO ? (
-          <a
-            href={demoInstallUrl(i18n.language)}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t("shell.demoGetTool")}
-            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-          >
-            <Download className="h-4 w-4" aria-hidden />
-            <span className="hidden sm:inline">{t("shell.demoGetTool")}</span>
-          </a>
-        ) : (
-          <a
-            href={newHref}
-            aria-label={t("shell.newScan")}
-            className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            <span className="hidden sm:inline">{t("shell.newScan")}</span>
-          </a>
-        )}
+        <a
+          href={newHref}
+          aria-label={t("shell.newScan")}
+          className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">{t("shell.newScan")}</span>
+        </a>
         <RecentMenu
           recent={recent}
           homeHref={homeHref}

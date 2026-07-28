@@ -12,7 +12,9 @@
     "options": "생성 옵션",
     "advanced": "고급",
     "run": "스캔 실행",
-    "running": "스캔 중…"
+    "running": "스캔 중…",
+    "demoRunDisabled": "이 데모는 스캔을 실행할 수 없습니다. 뒤에 실행할 컴퓨터가 없는 정적 페이지입니다.",
+    "demoRunDisabledCta": "내 코드에서 실행해 보기"
   },
   "source": {
     "label": "스캔 대상",

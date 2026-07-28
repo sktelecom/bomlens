@@ -118,18 +118,26 @@ fetch() { # fetch <path> <dest-file>
 
 fetch "/scans" "$DEST/scans.json"
 
-# Capabilities decide which controls the UI offers. Every one of them leads to
-# a write the demo cannot serve, so force the whole set off — the bundle also
-# refuses these paths, but a capability left on would still render a dead
-# button. Kept as a jq-free python edit so the script needs no extra tool.
+# Capabilities decide which input types and options the scan form offers. The
+# demo shows that form so a visitor can see the range of inputs BomLens takes,
+# so the input-side capabilities are forced ON rather than reported from the
+# capture machine — otherwise the demo would advertise less than the tool does
+# just because this machine lacks the opt-in firmware/AI images. The run button
+# is disabled in demo mode, so nothing here can be acted on.
+#
+# Turned off instead: capabilities whose control sits outside that form and
+# would be a dead button (SPDX export converts server-side; hfAuth is a token
+# the demo never has; host paths do not exist on a static host). Kept as a
+# jq-free python edit so the script needs no extra tool.
 fetch "/capabilities" "$DEST/capabilities.json"
 python3 - "$DEST/capabilities.json" <<'PY'
 import json, sys
 p = sys.argv[1]
 caps = json.load(open(p))
-for k in ("firmware", "scanoss", "docker", "aibom", "deepCve", "spdxExport",
-          "hfAuth", "firmwareSibling", "aibomSibling", "deepCveSibling",
-          "spdxSibling"):
+for k in ("firmware", "scanoss", "docker", "aibom", "deepCve"):
+    caps[k] = True
+for k in ("spdxExport", "hfAuth", "firmwareSibling", "aibomSibling",
+          "deepCveSibling", "spdxSibling"):
     if k in caps:
         caps[k] = False
 caps["hostDir"] = ""
