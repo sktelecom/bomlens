@@ -22,12 +22,14 @@ import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanD
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
+  "package-upload": "package",
   "sbom-upload": "sbom",
   "firmware-upload": "firmware",
 };
 
 export const ACCEPT: Record<UploadKind, string> = {
   zip: ".zip,.tar.gz,.tgz,.tar.bz2,.tar.xz,.tar",
+  package: ".jar,.war,.ear,.deb,.rpm,.whl",
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json",
   firmware:
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +

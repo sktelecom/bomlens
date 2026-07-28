@@ -59,7 +59,9 @@
     "uploadErrorTooLarge": "The file is too large for the server to accept. Try a smaller archive, or scan the unpacked folder instead.",
     "uploadErrorNetwork": "Could not reach the scan server. Check that it is still running, then try again.",
     "uploadErrorServer": "The server could not process the request. Try again; if it keeps failing, restart the scanner.",
-    "uploadErrorRejected": "The server did not accept the upload. Check the file and try again."
+    "uploadErrorRejected": "The server did not accept the upload. Check the file and try again.",
+    "packageUpload": "Build artifact",
+    "packageUploadHint": "A jar, war, deb, rpm or wheel. An executable jar carries its bundled dependencies, so scanning one gives close to what scanning the source would; a plain library jar carries none and yields nothing."
   },
   "options": {
     "notice": "Notice",

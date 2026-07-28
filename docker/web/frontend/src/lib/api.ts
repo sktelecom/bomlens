@@ -366,6 +366,7 @@ export type SourceType =
   | "scan-target-src"
   | "git-url"
   | "zip-upload"
+  | "package-upload"
   | "sbom-upload"
   | "firmware-upload"
   | "ai-model"
@@ -376,13 +377,14 @@ export const SOURCE_TYPES: SourceType[] = [
   "rootfs-dir",
   "git-url",
   "zip-upload",
+  "package-upload",
   "sbom-upload",
   "firmware-upload",
   "ai-model",
   "docker-image",
 ];
 
-export type UploadKind = "zip" | "sbom" | "firmware";
+export type UploadKind = "zip" | "sbom" | "firmware" | "package";
 
 /** How the user intends to use a scanned AI model. Sent with the scan start so
  *  the pipeline grades the license assessment against this use, and stamped

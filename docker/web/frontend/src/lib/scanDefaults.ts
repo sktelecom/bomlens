@@ -152,6 +152,7 @@ export function suggestIdentity(
       return project ? { project } : {};
     }
     case "zip-upload":
+    case "package-upload":
     case "firmware-upload":
     case "sbom-upload":
       return fileIdentity(ctx.fileName ?? "");

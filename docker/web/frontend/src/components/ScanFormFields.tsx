@@ -197,7 +197,9 @@ export function SourceControls({ state }: { state: ScanFormState }) {
               ? t("source.zipUpload")
               : uploadKind === "sbom"
                 ? t("source.sbomUpload")
-                : t("source.firmwareUpload")}
+                : uploadKind === "package"
+                  ? t("source.packageUpload")
+                  : t("source.firmwareUpload")}
             <RequiredMark />
           </Label>
           <input
@@ -217,6 +219,9 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           )}
           {source === "firmware-upload" && (
             <p className="text-xs text-muted-foreground">{t("source.firmwareHint")}</p>
+          )}
+          {source === "package-upload" && (
+            <p className="text-xs text-muted-foreground">{t("source.packageUploadHint")}</p>
           )}
         </div>
       )}

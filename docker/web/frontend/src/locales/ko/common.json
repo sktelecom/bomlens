@@ -59,7 +59,9 @@
     "uploadErrorTooLarge": "파일이 커서 서버가 받을 수 없습니다. 더 작은 압축본으로 다시 시도하거나, 압축을 푼 폴더를 스캔해 주세요.",
     "uploadErrorNetwork": "스캔 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하고 다시 시도해 주세요.",
     "uploadErrorServer": "서버가 요청을 처리하지 못했습니다. 다시 시도하고, 계속 실패하면 스캐너를 재시작해 주세요.",
-    "uploadErrorRejected": "서버가 업로드를 받지 않았습니다. 파일을 확인하고 다시 시도해 주세요."
+    "uploadErrorRejected": "서버가 업로드를 받지 않았습니다. 파일을 확인하고 다시 시도해 주세요.",
+    "packageUpload": "빌드 산출물",
+    "packageUploadHint": "jar, war, deb, rpm, whl 파일입니다. 실행 가능한 jar에는 내장된 의존성이 함께 들어 있어 소스를 스캔한 것과 비슷한 결과가 나오고, 의존성이 없는 라이브러리 jar는 결과가 비어 나옵니다."
   },
   "options": {
     "notice": "고지문",

@@ -31,7 +31,7 @@ The global actions (New scan, Scan management) live in the top bar so the rail s
 
 ## New scan
 
-The New scan screen is two panes. On the left, pick a source — grouped into Code (current folder, a directory path, a GitHub URL, a ZIP upload), Artifact (a Docker image, a firmware image), SBOM (analyze an existing SBOM) and AI model (generate an ML-BOM from a HuggingFace model) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
+The New scan screen is two panes. On the left, pick a source — grouped into Code (current folder, a directory path, a GitHub URL, a ZIP upload), Artifact (a Docker image, a package or build artifact, a firmware image), SBOM (analyze an existing SBOM) and AI model (generate an ML-BOM from a HuggingFace model) — and fill in the source-specific input below the tiles. On the right, enter the project name and version, choose the outputs to generate, and start the scan.
 
 | Scan target | Input method | Backend mode |
 |-------------|--------------|--------------|
@@ -39,6 +39,7 @@ The New scan screen is two panes. On the left, pick a source — grouped into Co
 | Directory path | a subfolder under the run folder (e.g. an OS rootfs), a folder mounted with `--ui --mount <dir>`, or — in the desktop app — a folder added with the Add folder button | ROOTFS |
 | GitHub URL | enter the repository URL | SOURCE (clone) |
 | ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
+| Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` | BINARY (a wheel is unpacked and scanned as ROOTFS) |
 | SBOM upload | upload an existing SBOM (JSON) | ANALYZE |
 | Firmware upload | upload a `.bin`, etc. | FIRMWARE |
 | Docker image | enter the image name | IMAGE |

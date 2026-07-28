@@ -516,6 +516,25 @@ c_kind=$(curl -s -o /dev/null -w '%{http_code}' -F "file=@$WORK/sample.zip" "$BA
 c_ext=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=zip" -F "file=@$WORK/payload.txt" "$BASE/upload?kind=zip")
 [ "$c_ext" = "415" ] && pass "wrong extension rejected (415)" || fail ".txt as zip returned $c_ext (expected 415)"
 
+echo "== package upload: the accepted extensions are the measured ones =="
+# A build artifact instead of source. The list is measured (see the archive
+# table in the plan): java archives and OS packages are readable as a file, a
+# wheel is readable once unpacked, and formats that yield nothing either way are
+# not accepted at all — receiving one would produce an empty scan that reads as
+# a broken feature.
+: > "$WORK/lib.jar"
+resp=$(curl -fsS -F "kind=package" -F "file=@$WORK/lib.jar" "$BASE/upload?kind=package" 2>/dev/null)
+ptoken=$(echo "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+if [ -n "$ptoken" ]; then
+    pass "POST /upload (package, .jar) returns a token"
+else
+    fail "package upload did not return a token" "$resp"
+fi
+: > "$WORK/lib.gem"
+c_gem=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=package" -F "file=@$WORK/lib.gem" "$BASE/upload?kind=package")
+[ "$c_gem" = "415" ] && pass ".gem rejected (415) — measured at zero components" \
+                     || fail ".gem returned $c_gem (expected 415)"
+
 echo "== git-cred stash returns a credId =="
 cid=$(curl -fsS -X POST -H "Content-Type: application/json" -d '{"token":"ghp_demo"}' "$BASE/git-cred" 2>/dev/null \
       | python3 -c "import sys,json;print(json.load(sys.stdin).get('credId',''))" 2>/dev/null)
@@ -1518,7 +1537,13 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "API_KEY=${API_KEY:-}"
   echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"
   echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"
-  echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"; } > "${STUB_ENV_FILE:-/dev/null}"
+  echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"
+  echo "MODE=${MODE:-}"
+  echo "TARGET_FILE=${TARGET_FILE:-}"
+  echo "TARGET_DIR=${TARGET_DIR:-}"
+  # Counted here, while the scan is running: an extracted upload tree is removed
+  # once the scan finishes, so a later check would always find it empty.
+  echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
 write_bom() {
     printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
         > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
@@ -1718,6 +1743,45 @@ assert re.fullmatch(r'demo2_1\.0_\d{8}-\d{6}', d['id']), d['id']
     pass "done event id carries the timestamped run id"
 else
     fail "done id is not the timestamped run id" "$events"
+fi
+
+echo "== package upload: extension decides the scan mode =="
+# jar and OS packages are read as a file (BINARY); a wheel carries no manifest
+# syft reads from the file itself, so it is unpacked and scanned as a directory.
+echo ok > "$STUB_MODE_FILE"
+: > "$WORK/lib2.jar"
+jtoken=$(curl -fsS -F "kind=package" -F "file=@$WORK/lib2.jar" "$BASE2/upload?kind=package" 2>/dev/null \
+         | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+rm -f "$WORK/stub-env"
+sse_events "project=pkg&version=1.0&source=package-upload&token=$jtoken" >/dev/null
+if [ "$(sed -n 's/^MODE=//p' "$WORK/stub-env")" = "BINARY" ] \
+   && grep -q '^TARGET_FILE=.*\.jar$' "$WORK/stub-env"; then
+    pass "package-upload (.jar) -> MODE=BINARY with TARGET_FILE"
+else
+    fail "jar did not route to BINARY" "$(cat "$WORK/stub-env")"
+fi
+
+python3 - "$WORK/pkg.whl" <<'WHL'
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr("demo-1.0.dist-info/METADATA", "Metadata-Version: 2.1\nName: demo\nVersion: 1.0\n")
+WHL
+wtoken=$(curl -fsS -F "kind=package" -F "file=@$WORK/pkg.whl" "$BASE2/upload?kind=package" 2>/dev/null \
+         | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+rm -f "$WORK/stub-env"
+sse_events "project=whl&version=1.0&source=package-upload&token=$wtoken" >/dev/null
+if [ "$(sed -n 's/^MODE=//p' "$WORK/stub-env")" = "ROOTFS" ] \
+   && [ -n "$(sed -n 's/^TARGET_DIR=//p' "$WORK/stub-env")" ]; then
+    pass "package-upload (.whl) -> unpacked, MODE=ROOTFS with TARGET_DIR"
+else
+    fail "wheel did not route to ROOTFS" "$(cat "$WORK/stub-env")"
+fi
+# Counted by the stub while the scan ran; the extracted tree is cleaned up
+# afterwards, so checking here would always see an empty directory.
+if [ "$(sed -n 's/^TARGET_DIR_FILES=//p' "$WORK/stub-env")" -gt 0 ] 2>/dev/null; then
+    pass "wheel contents were extracted before the directory scan"
+else
+    fail "wheel was not extracted" "$(cat "$WORK/stub-env")"
 fi
 
 echo "== license: the outbound license reaches the scan env, and only when given =="

@@ -17,6 +17,7 @@
 #   rootfs-dir    -> MODE=ROOTFS  (syft dir scan of <target>, a subfolder of /src)
 #   git-url       -> clone <target> then MODE=SOURCE
 #   zip-upload    -> extract uploaded zip then MODE=SOURCE
+#   package-upload-> MODE=BINARY on a jar/deb/rpm, or extract a wheel then ROOTFS
 #   sbom-upload   -> MODE=ANALYZE on the uploaded SBOM
 #   firmware-upload -> MODE=FIRMWARE (only when unblob is present in this image)
 #   ai-model      -> MODE=AIBOM on <model id> (only in the bomlens-aibom image)
@@ -75,12 +76,21 @@ LIB_DIR = os.environ.get("SBOM_LIB_DIR") or next(
 MAX_BYTES = {
     "sbom": 25 * 1024 * 1024,        # 25 MB
     "zip": 500 * 1024 * 1024,        # 500 MB
+    "package": 500 * 1024 * 1024,    # 500 MB
     "firmware": 500 * 1024 * 1024,   # 500 MB
 }
 # Accepted extensions per upload kind (lowercased).
 UPLOAD_EXTS = {
     "sbom": (".json", ".xml", ".spdx", ".cdx.json", ".spdx.json"),
     "zip": (".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar"),
+    # Build artifacts a supplier ships instead of source. The list is measured,
+    # not aspirational: syft's file scan reads java archives (an executable jar
+    # yields its bundled dependencies) and OS packages (one component, the
+    # package itself), while a python wheel yields nothing until it is unpacked
+    # — see the routing in the package-upload branch. Formats that stayed at
+    # zero either way (ruby gems, double-compressed) are deliberately absent, as
+    # is .apk, which names both an Android and an Alpine package.
+    "package": (".jar", ".war", ".ear", ".deb", ".rpm", ".whl"),
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
                  ".trx", ".chk", ".fw", ".rom", ".dlf",
                  # Compressed firmware images (unblob unpacks these), e.g. the
@@ -2570,6 +2580,32 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
                 env["SOURCE_ROOT"] = scan_root_of(cleanup_dir)
+
+            elif source == "package-upload":
+                # A build artifact rather than source: the case where a supplier
+                # ships a jar or a package instead of the tree it was built from.
+                up = resolve_upload(token)
+                if not up:
+                    fail("uploaded package not found (re-upload)"); return
+                if up.lower().endswith(".whl"):
+                    # A wheel carries no manifest syft can read from the file
+                    # itself; unpacked, its dist-info is an ordinary directory
+                    # scan. It is a zip, so the existing traversal-guarded
+                    # extractor applies unchanged.
+                    cleanup_dir = os.path.join(os.path.dirname(up), "extracted")
+                    os.makedirs(cleanup_dir, exist_ok=True)
+                    sse("log", json.dumps("▶ Extracting %s ..." % os.path.basename(up)))
+                    try:
+                        safe_extract_zip(up, cleanup_dir)
+                    except (ValueError, OSError) as exc:
+                        fail("archive extraction failed: %s" % exc); return
+                    mode = "ROOTFS"
+                    env["MODE"] = "ROOTFS"
+                    env["TARGET_DIR"] = cleanup_dir
+                else:
+                    mode = "BINARY"
+                    env["MODE"] = "BINARY"
+                    env["TARGET_FILE"] = up
 
             elif source == "sbom-upload":
                 up = resolve_upload(token)
