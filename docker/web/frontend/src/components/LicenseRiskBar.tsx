@@ -51,14 +51,20 @@ export const TIER_LABEL = LABEL;
  * the bar, so these are the translucent counterparts of BAR above. Same hues, so
  * one colour language covers both charts.
  *
+ * Kept at the same alpha as the neutral fill. The bar above is a thin strip
+ * where a saturated colour is proportionate; here it floods a whole row, and at
+ * a heavier alpha the flagged rows shouted over everything else on the page.
+ * Hue carries the distinction, and the badge states it outright, so the tint
+ * only has to be noticeable — not loud.
+ *
  * Permissive and uncategorized stay neutral: tinting every row would leave
  * nothing standing out, and neither one is a finding.
  */
 export const TIER_FILL: Record<LicenseRiskTier, string> = {
-  "network-copyleft": "bg-risk-critical/30",
-  "strong-copyleft": "bg-risk-high/30",
-  "weak-copyleft": "bg-risk-medium/30",
-  "review-needed": "bg-amber-500/25",
+  "network-copyleft": "bg-risk-critical/20",
+  "strong-copyleft": "bg-risk-high/20",
+  "weak-copyleft": "bg-risk-medium/20",
+  "review-needed": "bg-amber-500/20",
   uncategorized: "bg-muted-foreground/20",
   permissive: "bg-muted-foreground/20",
 };
