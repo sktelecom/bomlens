@@ -1,0 +1,1804 @@
+{
+  "files": [
+    {
+      "path": "run",
+      "type": "directory"
+    },
+    {
+      "path": "etc",
+      "type": "directory"
+    },
+    {
+      "path": "etc/ld.so.conf.d",
+      "type": "directory"
+    },
+    {
+      "path": "etc/modprobe.d",
+      "type": "directory"
+    },
+    {
+      "path": "etc/udev",
+      "type": "directory"
+    },
+    {
+      "path": "usr",
+      "type": "directory"
+    },
+    {
+      "path": "usr/sbin",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/modules",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/systemd",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/systemd/network",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/systemd",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/firmware",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/modprobe.d",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/udev",
+      "type": "directory"
+    },
+    {
+      "path": "usr/lib/udev/rules.d",
+      "type": "directory"
+    },
+    {
+      "path": "usr/bin",
+      "type": "directory"
+    },
+    {
+      "path": "scripts",
+      "type": "directory"
+    },
+    {
+      "path": "scripts/init-top",
+      "type": "directory"
+    },
+    {
+      "path": "scripts/local-premount",
+      "type": "directory"
+    },
+    {
+      "path": "scripts/local-bottom",
+      "type": "directory"
+    },
+    {
+      "path": "scripts/init-bottom",
+      "type": "directory"
+    },
+    {
+      "path": "conf",
+      "type": "directory"
+    },
+    {
+      "path": "conf/conf.d",
+      "type": "directory"
+    },
+    {
+      "path": "init",
+      "type": "file"
+    },
+    {
+      "path": "etc/ld.so.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/fstab",
+      "type": "file"
+    },
+    {
+      "path": "etc/ld.so.cache",
+      "type": "file"
+    },
+    {
+      "path": "etc/ld.so.conf.d/aarch64-linux-gnu.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/ld.so.conf.d/fakeroot-aarch64-linux-gnu.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/ld.so.conf.d/libc.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/modprobe.d/blacklist-8192cu.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/modprobe.d/rfkill_default.conf",
+      "type": "file"
+    },
+    {
+      "path": "etc/udev/udev.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/fdisk",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/logread",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/ifconfig",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mkdosfs",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/poweroff",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/i2cset",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/hwclock",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/i2cdump",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/httpd",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/lsmod",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/udhcpd",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/init",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/rdate",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/insmod",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/fstrim",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mke2fs",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/klogd",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/swapoff",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/nameif",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/getty",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/ifdown",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/arp",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/partprobe",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/tc",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/tunctl",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/devmem",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/loadkmap",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/fsfreeze",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/losetup",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/ubirename",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/freeramdisk",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/route",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/i2cget",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/run-init",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/acpid",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/syslogd",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mkswap",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/modinfo",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/pivot_root",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/chroot",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/crond",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/adjtimex",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/watchdog",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/swapon",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/fsck",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mount.fuse3",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/sulogin",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/switch_root",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mim",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/reboot",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/nbd-client",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/udhcpc",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/findfs",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/arping",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/depmod",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/i2ctransfer",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/dmsetup",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/ip",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/brctl",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/logsave",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/i2cdetect",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/ifup",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/blockdev",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/fsck.fat",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/blkid",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/halt",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/start-stop-daemon",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/e2fsck",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/loadfont",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/vconfig",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/sysctl",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/nologin",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/mdev",
+      "type": "file"
+    },
+    {
+      "path": "usr/sbin/uevent",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.order",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.builtin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.dep.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.alias",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.symbols.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.builtin.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.devname",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.symbols",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.alias.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.softdep",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.builtin.alias.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.builtin.modinfo",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.dep",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modules/6.18.34+rpt-rpi-v8/modules.weakdep",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/systemd/network/80-container-vb.link",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/systemd/network/80-vm-vt.link",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/systemd/network/80-container-ve.link",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/systemd/network/80-6rd-tunnel.link",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/systemd/network/80-container-vz.link",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/liblzma.so.5.8.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libc.so.6",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libfuse3.so.3.17.2",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libdevmapper.so.1.02.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libaudit.so.1.0.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libext2fs.so.2.4",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/systemd/libsystemd-shared-257.so",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libcap.so.2.75",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libseccomp.so.2.6.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libblkid.so.1.1.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libcap-ng.so.0.0.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libe2p.so.2.3",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libm.so.6",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libz.so.1.3.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libkmod.so.2.5.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libcrypt.so.1.1.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libcrypto.so.3",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libparted.so.2.0.5",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libpam.so.0.85.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libacl.so.1.1.2302",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libselinux.so.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libpcre2-8.so.0.14.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libzstd.so.1.5.7",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libuuid.so.1.3.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libsmartcols.so.1.1.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libreadline.so.8.2",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libresolv.so.2",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libtinfo.so.6.5",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libudev.so.1.7.10",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libmount.so.1.1.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libntfs-3g.so.89.0.0",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/aarch64-linux-gnu/libcom_err.so.2.1",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/klibc-_rzK-ixOubiu2mWuAuEG4QterRg.so",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8105e-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8153c-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8411-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168f-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8153b-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168f-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8107e-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8153a-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168g-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8153a-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168e-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8411-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168e-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8156a-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8402-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168h-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8125d-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8125d-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8126a-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8106e-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8153a-4.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8125b-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168g-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168e-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8126a-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168fp-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8125a-3.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8125bp-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168d-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8168d-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8106e-1.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/firmware/rtl_nic/rtl8156b-2.fw",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modprobe.d/aliases.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modprobe.d/g_ether.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modprobe.d/rpi-brcmfmac.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modprobe.d/systemd.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/modprobe.d/fbdev-blacklist.conf",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/73-special-net-names.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/60-persistent-storage-dm.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/50-firmware.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/75-net-description.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/95-dm-notify.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/50-udev-default.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/60-persistent-storage.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/80-net-setup-link.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/99-rpi-keyboard.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/60-block.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/71-seat.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/55-dm.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/rules.d/80-drivers.rules",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/ata_id",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/scsi_id",
+      "type": "file"
+    },
+    {
+      "path": "usr/lib/udev/hwdb.bin",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/rev",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/udhcpc6",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/more",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/chmod",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nuke",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uname",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sh",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dd",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unlink",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sleep",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unxz",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/usleep",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/login",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/busybox",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dumpleases",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/traceroute",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/last",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/hostname",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ipconfig",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/clear",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/stat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/logger",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/w",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/touch",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/groups",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uuencode",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/find",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/traceroute6",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/bzip2",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/getfattr",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sync",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sha256sum",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/zcat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unzip",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/killall",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/fallocate",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/free",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mv",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/setsid",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/blkdiscard",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/hexdump",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/kmod",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/xargs",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ionice",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cut",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ls",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/microcom",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/getopt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/strings",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/setpriv",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mkpasswd",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/taskset",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tail",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unix2dos",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uudecode",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sort",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/stty",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/xxd",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/grep",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/realpath",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/chgrp",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sha512sum",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/run-parts",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/arch",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/fatattr",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cal",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/which",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/lsblk",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/expr",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/patch",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ssl_client",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/date",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/chvt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nproc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/expand",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/rpm",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/rmdir",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/true",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/minips",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mount",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ping",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/egrep",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ascii",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/env",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nfsmount",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sha1sum",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/[",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mknod",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/timeout",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/od",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/deallocvt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ftpget",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/resume",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/gzip",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/hostid",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/time",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/truncate",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uncompress",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unshare",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mktemp",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/id",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ed",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/paste",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/who",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/parted",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/install",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/head",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/link",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/lzcat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/wc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cmp",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/df",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/wget",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/basename",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/bzcat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/udevadm",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nsenter",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/crontab",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cttyhack",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dumpkmap",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ps",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ftpput",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/false",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/diff",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/fgrep",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/su",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/base64",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/top",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/openvt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/passwd",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/less",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dmesg",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/readlink",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/xzcat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mkdir",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/factor",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ar",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/printf",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/[[",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/shuf",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/umount",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/vi",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cp",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nslookup",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/lzma",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ping6",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/linuxrc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uptime",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dpkg",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sed",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/xz",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/reset",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/renice",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dpkg-deb",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tac",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tty",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/linux64",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/crc32",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/test",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dnsdomainname",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/watch",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ln",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/netstat",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/lzop",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/echo",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/linux32",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/mkfifo",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/whoami",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/uniq",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nl",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/svc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unexpand",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tee",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/gunzip",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/cpio",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/lsscsi",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/md5sum",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/sha3sum",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ash",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/setkeycodes",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/logname",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/rm",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/seq",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/shred",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/du",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/chown",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/unlzma",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/nc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ipcalc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ts",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dos2unix",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/svok",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tftp",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tar",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/fold",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/kill",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/fstype",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/findmnt",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/bunzip2",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/dirname",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/rpm2cpio",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/bc",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/tr",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/ntfs-3g",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/yes",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/pidof",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/pwd",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/telnet",
+      "type": "file"
+    },
+    {
+      "path": "usr/bin/awk",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/ORDER",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/rpi_wd",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/all_generic_ide",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/keymap",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/blacklist",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-top/udev",
+      "type": "file"
+    },
+    {
+      "path": "scripts/nfs",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local",
+      "type": "file"
+    },
+    {
+      "path": "scripts/functions",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-premount/ORDER",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-premount/resume",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-premount/resize_early",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-premount/ntfs_3g",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-bottom/ORDER",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-bottom/set_partuuid",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-bottom/ntfs_3g",
+      "type": "file"
+    },
+    {
+      "path": "scripts/local-bottom/imager_fixup",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-bottom/ORDER",
+      "type": "file"
+    },
+    {
+      "path": "scripts/init-bottom/udev",
+      "type": "file"
+    },
+    {
+      "path": "conf/arch.conf",
+      "type": "file"
+    },
+    {
+      "path": "conf/initramfs.conf",
+      "type": "file"
+    }
+  ]
+}

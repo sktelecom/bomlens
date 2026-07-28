@@ -758,7 +758,7 @@
     "emptyOutNotice": "Open-source notice",
     "emptyOutSecurity": "Security report",
     "source": "Delete a file and it leaves this list too.",
-    "demoSubtitle": "Four finished scans — a project's source, a container image, an AI model, and an SBOM received from a supplier"
+    "demoSubtitle": "Five finished scans — a project's source, a container image, a device firmware image, an AI model, and an SBOM received from a supplier"
   },
   "validation": {
     "required": "Fill in the required fields marked above.",

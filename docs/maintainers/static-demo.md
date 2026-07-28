@@ -48,11 +48,23 @@ AI model and supplier-SBOM review each land on a visibly different screen — th
 container brings OS packages, the AI model a CycloneDX 1.7 ML-BOM with the G7
 checks, the review a conformance verdict.
 
-Firmware is the one kind the demo does not carry. Its image is built for amd64
-only (see the `docker-publish` workflow), so capturing a firmware run needs an
-amd64 machine — on Apple Silicon it would have to run under emulation, where the
-unpacking tools are slow and unreliable. Capture it from an amd64 host if you
-want that row.
+Firmware is captured differently from the rest. Its scanner image is built for
+amd64 only (see the `docker-publish` workflow), so it cannot run on an Apple
+Silicon machine without emulation, where the unpacking tools are slow and
+unreliable. The `Demo firmware capture` workflow runs that one scan on an amd64
+runner and uploads the run folder as an artifact; download it, drop it beside
+the other runs, and capture them together.
+
+Two things that cost a few attempts when picking a firmware target:
+
+- **The package manager has to be one syft knows.** Its OS catalogers are apk,
+  dpkg and rpm. OpenWRT uses opkg, so no matter how cleanly the image unpacks,
+  the package list comes back empty and only cve-bin-tool's binary signatures
+  remain. A Debian-based device image (the workflow defaults to Raspberry Pi OS
+  Lite) catalogues properly.
+- **Prefer a plain rootfs or disk image over a vendor flash image.** Device
+  `sysupgrade`/`factory` files wrap the filesystem in another container — a
+  U-Boot header, for instance — that the unpacker may not see through.
 
 `capture-demo-data.sh` starts the real `server.py` against that folder and saves
 what it answers, so the captured shapes are the server's shapes by construction.
