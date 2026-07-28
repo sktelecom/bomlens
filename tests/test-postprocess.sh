@@ -942,6 +942,42 @@ cbt_cvss=$(jq -r '[ .Results[]?.Vulnerabilities[]? | select(.VulnerabilityID=="C
     | ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ] | map(select(.!=null)) | (max // null)) ][0]' "$WORK/sec.json")
 [ "$cbt_cvss" = "7.2" ] && pass "cve-bin-tool CVSS score readable by the report flatten" || fail "cve-bin-tool CVSS='$cbt_cvss', expected 7.2"
 
+echo "== F-3: firmware component names carry no unpack path =="
+# cve-bin-tool names a file it cannot attribute to a package by its full path on
+# disk, which is the throwaway unpack directory. Shipping that puts the scanning
+# machine's temp path into a document meant to be handed to other people. The
+# merge in scan-firmware.sh keeps only the path inside the firmware, which
+# unblob marks with its `<something>_extract/` nesting.
+cat > "$WORK/fw-names.json" <<'JSON'
+{"components":[
+ {"name":"/tmp/tmp.aBcD/extract/fw.img.xz_extract/xz.uncompressed_extract/8388608-545257472.fat_extract/initramfs8_extract/z.zstd_extract/usr/bin/findmnt","type":"file"},
+ {"name":"/usr/lib/libfoo.so.1","type":"file"},
+ {"name":"busybox","version":"1.36.1","type":"library","purl":"pkg:deb/debian/busybox@1.36.1"},
+ {"name":"CVEBINTOOL-zstd-uncompressed_extract","type":"application"},
+ {"name":"","type":"file"}
+]}
+JSON
+# The same expression scan-firmware.sh's comps_of() applies.
+jq -c '[.components[]? | select((.name // "") != "")
+       | .name |= (if test("_extract/") then (split("_extract/") | last)
+                   elif startswith("/") then (split("/") | last)
+                   else . end)]' "$WORK/fw-names.json" > "$WORK/fw-names-out.json"
+
+leaked=$(jq '[.[] | select(.name | test("^/|/tmp/|_extract/"))] | length' "$WORK/fw-names-out.json")
+[ "$leaked" = "0" ] && pass "firmware names: no unpack/absolute path survives" || fail "firmware names: $leaked component(s) still carry a path"
+n1=$(jq -r '.[0].name' "$WORK/fw-names-out.json")
+[ "$n1" = "usr/bin/findmnt" ] && pass "firmware names: path inside the firmware is kept" || fail "firmware names: got '$n1', expected usr/bin/findmnt"
+n2=$(jq -r '.[1].name' "$WORK/fw-names-out.json")
+[ "$n2" = "libfoo.so.1" ] && pass "firmware names: a plain absolute path falls back to its basename" || fail "firmware names: got '$n2', expected libfoo.so.1"
+# A package name must pass through untouched, or dedupe by name@version breaks.
+n3=$(jq -r '.[2].name' "$WORK/fw-names-out.json")
+[ "$n3" = "busybox" ] && pass "firmware names: package names are left alone" || fail "firmware names: package name became '$n3'"
+# The cve-bin-tool marker ends in _extract but has no trailing slash: not a path.
+n4=$(jq -r '.[3].name' "$WORK/fw-names-out.json")
+[ "$n4" = "CVEBINTOOL-zstd-uncompressed_extract" ] && pass "firmware names: a name merely ending in _extract is not truncated" || fail "firmware names: marker became '$n4'"
+cnt=$(jq 'length' "$WORK/fw-names-out.json")
+[ "$cnt" = "4" ] && pass "firmware names: the empty-name component is dropped" || fail "firmware names: kept $cnt components, expected 4"
+
 echo "== D-4: validate-sbom.sh emits a conformance report for clean SPDX Tag-Value =="
 # grep -c exits 1 on zero matches, so the old `grep -cE … || echo 0` appended a
 # second "0" for every empty count. pkg:generic is always 0 in a clean SBOM, so

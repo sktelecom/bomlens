@@ -210,7 +210,24 @@ fi
 # A large rootfs (e.g. an OpenWRT ext4 image) yields huge component arrays.
 # Pass them to jq through files (--slurpfile), not --argjson, or the merge blows
 # the command-line length limit ("Argument list too long").
-comps_of() { jq -c '[.components[]? | select((.name // "") != "")]' "$1" 2>/dev/null || echo '[]'; }
+#
+# Names are also stripped back to the path inside the firmware. cve-bin-tool
+# names a file it could not attribute to a package by its full path on disk,
+# which at this point is the throwaway unpack directory:
+#
+#   /tmp/tmp.lf7KK2AeBn/extract/fw.img.xz_extract/xz.uncompressed_extract/
+#   8388608-545257472.fat_extract/initramfs8_extract/…/usr/bin/findmnt
+#
+# Shipping that verbatim puts the scanning machine's temp path into a document
+# meant to be handed to other people, and buries the one useful part. unblob
+# names every nesting level `<something>_extract/`, so the text after the last
+# one is the path as it exists inside the firmware — keep exactly that.
+comps_of() {
+    jq -c '[.components[]? | select((.name // "") != "")
+           | .name |= (if test("_extract/") then (split("_extract/") | last)
+                       elif startswith("/") then (split("/") | last)
+                       else . end)]' "$1" 2>/dev/null || echo '[]'
+}
 comps_of "$PKG_SBOM" > "$WORK/pkg-comps.json"
 comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
 
