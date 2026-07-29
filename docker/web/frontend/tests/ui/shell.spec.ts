@@ -428,6 +428,45 @@ test("a failed scan surfaces the error with recovery actions", async ({ page }) 
   ).toHaveAttribute("href", "#/new");
 });
 
+// The subtitle under the result heading names what was scanned. It lives inside
+// the screenshot baselines, but pixels are the wrong guard for wording: a short
+// phrase edit stays under the diff tolerance, so the baselines kept an outdated
+// subtitle for three merges without a single check failing. Assert the text.
+const SUBTITLES: Array<[string, Record<string, unknown>, string]> = [
+  ["a container image", { componentType: "container" }, "Container image"],
+  ["a firmware image", { componentType: "firmware" }, "Firmware"],
+  ["a root filesystem", { componentType: "operating-system" }, "Root filesystem"],
+  ["a source tree", { componentType: "application" }, "Source"],
+  // No root type to read: say SBOM rather than guess at something finer.
+  ["an SBOM with no root type", { componentType: null }, "SBOM"],
+];
+
+for (const [label, sbomOver, expected] of SUBTITLES) {
+  test(`the result subtitle names ${label}`, async ({ page }) => {
+    await page.route("**/capabilities", (r) =>
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+    );
+    await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+    await page.route("**/file**", (r) =>
+      r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+    );
+    await page.route("**/scan-stream**", (r) =>
+      r.fulfill({
+        contentType: "text/event-stream",
+        body: `event: done\ndata: ${JSON.stringify({ ...DONE, sbom: { ...DONE.sbom, ...sbomOver } })}\n\n`,
+      }),
+    );
+    await page.goto("/?ui=next#/new");
+    await page.fill("#project", "demo");
+    await page.fill("#version", "1.0");
+    await page.getByTestId("run-scan").click();
+    await page.locator("main h1").waitFor();
+
+    const subtitle = page.locator("main h1").locator("xpath=../following-sibling::p[1]");
+    await expect(subtitle).toHaveText(expected);
+  });
+}
+
 test("global search routes to a component with the term applied", async ({ page }) => {
   await stubAndRun(page);
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();

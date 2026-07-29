@@ -10,12 +10,19 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
-  // Tolerate a few pixels of cross-version antialiasing drift: each Playwright
-  // bump ships a newer chromium that renders text edges slightly differently
-  // (a sub-0.1% delta on otherwise identical pages). 100px keeps the gate
-  // meaningful for real layout changes while not failing on engine noise.
+  // Exact match. The baselines are produced in one pinned container
+  // (playwright:v1.61.1-jammy) and compared in the same one, so rendering is
+  // reproducible: measured on this suite, 17 of 33 baselines came back
+  // bit-identical at a 0-pixel tolerance while the 16 that had genuinely
+  // changed differed by 16-86 pixels.
+  //
+  // The old 100px allowance was meant to absorb cross-version antialiasing, but
+  // every real change also fits under it: three merged UI edits left their
+  // baselines stale and no check failed. A Playwright bump does need the
+  // baselines regenerated (reseed_visual) — that is the honest signal, not
+  // something to tolerate silently.
   expect: {
-    toHaveScreenshot: { maxDiffPixels: 100 },
+    toHaveScreenshot: { maxDiffPixels: 0 },
   },
   use: {
     baseURL: "http://localhost:4173",
