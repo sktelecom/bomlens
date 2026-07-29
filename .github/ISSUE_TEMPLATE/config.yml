@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://sktelecom.github.io/bomlens/
+    about: Install steps, the CLI reference, and task guides in English and Korean.
+  - name: Live demo
+    url: https://sktelecom.github.io/bomlens/demo/
+    about: Finished scan results in the real web UI, with nothing to install.
+  - name: Questions and support
+    url: https://github.com/sktelecom/bomlens/blob/main/SUPPORT.md
+    about: Where to ask a question and what to include so it can be answered.
+  - name: Security vulnerability
+    url: https://github.com/sktelecom/bomlens/security/policy
+    about: Report privately through the security policy, not as a public issue.

@@ -12,17 +12,21 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/bomlens/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/bomlens)
 
+Try it without installing anything: the [live demo](https://sktelecom.github.io/bomlens/demo/) is the real web UI holding finished scan results. To run your own scans, download the installer for [Windows](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), or go straight to the [CLI](#cli-advanced).
+
 <p align="center">
   <img src="docs/images/web-ui-demo.gif" alt="BomLens web UI showing a scan result: the Overview with counts and a severity/license summary, the Components table with filters, the Vulnerabilities list, the Dependencies as a graph and tree, and the Licenses section" width="860" />
 </p>
 
-**Live demo:** [sktelecom.github.io/bomlens/demo](https://sktelecom.github.io/bomlens/demo/) — the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image (1,393 components), a Raspberry Pi OS device image unpacked as firmware, an AI model as a CycloneDX ML-BOM checked against the G7 minimum elements, and a supplier SBOM checked against the format requirements. Read-only, nothing to install, and nothing is uploaded — it is a frozen copy of results from ordinary local runs.
+The demo at [sktelecom.github.io/bomlens/demo](https://sktelecom.github.io/bomlens/demo/) holds one finished scan of each kind: a Spring Boot project from source, a container image (1,393 components), a Raspberry Pi OS device image unpacked as firmware, an AI model as a CycloneDX ML-BOM checked against the G7 minimum elements, and a supplier SBOM checked against the format requirements. Read-only, nothing to install, and nothing is uploaded — it is a frozen copy of results from ordinary local runs.
 
 ## What it does
 
 One Docker image, two jobs. It **generates**: scan your source code, a container image, or a binary and get a CycloneDX SBOM, an open-source notice, and a security report. It also **assesses open-source risk** in what you receive — a supplier's finished SBOM (`--analyze`) or a firmware binary — reporting licenses and known vulnerabilities with Critical-7d / High-30d remediation deadlines. Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
 
 Languages: Java, Python, Node.js, Ruby, PHP, Rust, Go, .NET, Swift, C/C++ (Conan/vcpkg, or `--identify-vendored` when there is no package manager). Inputs: a source folder, a GitHub URL, a ZIP archive, a Docker image, a binary or RootFS, an existing SBOM, a Yocto build directory, firmware, or a HuggingFace AI model (CycloneDX ML-BOM checked against the [G7 minimum elements for AI](https://sktelecom.github.io/bomlens/guides/ai-model/), which map to the EU AI Act's Annex IV).
+
+The project is under active development at SK Telecom's open source program office. Releases go out every week or two, and every change runs through CI covering ShellCheck, the scanner integration tests, the web UI contract tests, and a per-language check of the ten example projects.
 
 Full docs — searchable, English and Korean — live at **[sktelecom.github.io/bomlens](https://sktelecom.github.io/bomlens/)**, mirrored under [docs/](docs/):
 
@@ -63,6 +67,6 @@ On Windows, run the same command through `scripts\scan-sbom.bat` (Git for Window
 
 ## Contributing & License
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/bomlens/issues).
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/bomlens/issues). For questions, where to ask and what to include are in [SUPPORT.md](SUPPORT.md).
 
 Apache License 2.0 · © 2026 SK Telecom Co., Ltd. Bundled third-party tools keep their own licenses — see [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
