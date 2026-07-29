@@ -9,7 +9,7 @@
   images are inlined as data URIs, all CSS/JS is here. Opens with a double-click
   (file://). Single light theme on purpose — a projected deck is shown as
   authored, not adapted to a viewer's OS theme.
-  Keys:  ← / → / Space  move   ·   f  fullscreen   ·   s  speaker notes
+  Keys:  ← / → / Space  move   ·   f  fullscreen
          b  backup screenshot (on live slides)      ·   o  overview grid
 -->
 <style>
@@ -196,20 +196,6 @@
   #progress{position:absolute;left:0;bottom:0;height:4px;width:0;
     background:var(--grad);transition:width .28s ease}
 
-  /* Speaker notes panel */
-  #notes{position:fixed;right:0;top:0;bottom:0;width:420px;background:#fff;
-    border-left:1px solid var(--line);box-shadow:-20px 0 60px -30px rgba(0,0,0,.4);
-    transform:translateX(100%);transition:transform .25s ease;z-index:40;
-    padding:26px 26px 30px;overflow:auto}
-  #notes.open{transform:none}
-  #notes h3{margin:0 0 4px;font-size:13px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--ink-3)}
-  #notes .nslide{font-size:20px;font-weight:800;margin:0 0 16px}
-  #notes .body{font-size:15px;line-height:1.5;color:var(--ink)}
-  #notes .body p{margin:0 0 12px}
-  #notes .body b{color:var(--sk-red)}
-  #notes code,#notes kbd{font-family:var(--mono);font-size:.9em;
-    background:var(--paper-2);border-radius:5px;padding:1px 6px}
 
   /* Overview grid */
   #overview{position:fixed;inset:0;background:var(--paper);z-index:50;
@@ -233,8 +219,7 @@
 <body>
 <div id="stage"><div id="deck">
 
-    <section class="slide" data-kind="title" data-index="1"
-             data-notes-id="note-1">
+    <section class="slide" data-kind="title" data-index="1">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">OSPOlogy Asia 2026 · Tokyo · 27 July 2026</span></div>
         <div class="brandmark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="BomLens">
@@ -269,8 +254,7 @@
     </section>
     <template id="note-1"></template>
 
-    <section class="slide" data-kind="statement" data-index="2"
-             data-notes-id="note-2">
+    <section class="slide" data-kind="statement" data-index="2">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Why it exists</span></div>
         <h2 class="headline">A mandate with no tool</h2>
@@ -287,15 +271,14 @@
     </section>
     <template id="note-2"></template>
 
-    <section class="slide" data-kind="points" data-index="3"
-             data-notes-id="note-3">
+    <section class="slide" data-kind="points" data-index="3">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">What it is</span></div>
         <h2 class="headline">Local-first. One image. Every input.</h2>
         <div class="content">
            <ul class="points">
              <li><b>No account, no server</b> — nothing you scan is uploaded.</li>
-             <li><b>One Docker image → 8 scan modes</b> — source, containers,
+             <li><b>One Docker image → 7 scan modes</b> — source, containers,
                  binaries, firmware, received SBOMs, AI models.</li>
              <li><b>Three ways in</b> — a double-click desktop app, a browser
                  UI, the CLI.</li>
@@ -309,8 +292,7 @@
     </section>
     <template id="note-3"></template>
 
-    <section class="slide" data-kind="cards" data-index="4"
-             data-notes-id="note-4">
+    <section class="slide" data-kind="cards" data-index="4">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">What's different</span></div>
         <h2 class="headline">Coverage, not just a scan</h2>
@@ -335,8 +317,7 @@
     </section>
     <template id="note-4"></template>
 
-    <section class="slide" data-kind="live" data-index="5"
-             data-notes-id="note-5">
+    <section class="slide" data-kind="live" data-index="5">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 1 of 6</span></div>
         <h2 class="headline">One folder → a full SBOM</h2>
@@ -351,8 +332,7 @@
     </section>
     <template id="note-5"></template>
 
-    <section class="slide" data-kind="live" data-index="6"
-             data-notes-id="note-6">
+    <section class="slide" data-kind="live" data-index="6">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 2 of 6</span></div>
         <h2 class="headline">What the scan tells you</h2>
@@ -367,8 +347,7 @@
     </section>
     <template id="note-6"></template>
 
-    <section class="slide" data-kind="live" data-index="7"
-             data-notes-id="note-7">
+    <section class="slide" data-kind="live" data-index="7">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 3 of 6</span></div>
         <h2 class="headline">14 lines in, 39 components out</h2>
@@ -383,8 +362,7 @@
     </section>
     <template id="note-7"></template>
 
-    <section class="slide" data-kind="reg" data-index="8"
-             data-notes-id="note-8">
+    <section class="slide" data-kind="reg" data-index="8">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Where this lands</span></div>
         <h2 class="headline">The rules are arriving now</h2>
@@ -412,8 +390,7 @@
     </section>
     <template id="note-8"></template>
 
-    <section class="slide" data-kind="live" data-index="9"
-             data-notes-id="note-9">
+    <section class="slide" data-kind="live" data-index="9">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 4 of 6</span></div>
         <h2 class="headline">Validate what a supplier sent</h2>
@@ -429,8 +406,7 @@
     </section>
     <template id="note-9"></template>
 
-    <section class="slide" data-kind="live" data-index="10"
-             data-notes-id="note-10">
+    <section class="slide" data-kind="live" data-index="10">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 5 of 6</span></div>
         <h2 class="headline">Can you use this AI model?</h2>
@@ -448,8 +424,7 @@
     </section>
     <template id="note-10"></template>
 
-    <section class="slide" data-kind="diagram" data-index="11"
-             data-notes-id="note-11">
+    <section class="slide" data-kind="diagram" data-index="11">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">How it fits</span></div>
         <h2 class="headline">Generate locally, govern centrally</h2>
@@ -482,8 +457,7 @@
     </section>
     <template id="note-11"></template>
 
-    <section class="slide" data-kind="live" data-index="12"
-             data-notes-id="note-12">
+    <section class="slide" data-kind="live" data-index="12">
       <div class="slide-inner">
         <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 6 of 6</span></div>
         <h2 class="headline">Close the loop: hand it to governance</h2>
@@ -499,8 +473,7 @@
     </section>
     <template id="note-12"></template>
 
-    <section class="slide" data-kind="statement" data-index="13"
-             data-notes-id="note-13">
+    <section class="slide" data-kind="statement" data-index="13">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Full circle</span></div>
         <h2 class="headline">The mandate, now with a tool</h2>
@@ -518,8 +491,7 @@
     </section>
     <template id="note-13"></template>
 
-    <section class="slide" data-kind="try" data-index="14"
-             data-notes-id="note-14">
+    <section class="slide" data-kind="try" data-index="14">
       <div class="slide-inner">
         <div class="eyebrow"><span class="ey-text">Try it</span></div>
         <h2 class="headline">Your first SBOM, no command line</h2>
@@ -541,8 +513,7 @@
     </section>
     <template id="note-14"></template>
 
-    <section class="slide" data-kind="thanks" data-index="15"
-             data-notes-id="note-15">
+    <section class="slide" data-kind="thanks" data-index="15">
       <div class="slide-inner">
         
         <h2 class="headline">Thank you</h2>
@@ -583,11 +554,6 @@
   <div id="progress"></div>
 </div></div>
 
-<aside id="notes" aria-label="Speaker notes">
-  <h3>Speaker notes</h3>
-  <div class="nslide" id="notes-title"></div>
-  <div class="body" id="notes-body"></div>
-</aside>
 
 <div id="overview" aria-label="Slide overview"></div>
 <div class="hint">← → move · f full · o overview</div>
@@ -597,14 +563,8 @@
   var slides=[].slice.call(document.querySelectorAll('.slide'));
   var total=slides.length, i=0;
   var cur=document.getElementById('cur'), prog=document.getElementById('progress');
-  var notes=document.getElementById('notes');
-  var nTitle=document.getElementById('notes-title'), nBody=document.getElementById('notes-body');
   var overview=document.getElementById('overview');
 
-  function noteFor(idx){
-    var s=slides[idx]; var t=document.getElementById(s.dataset.notesId);
-    return t?t.innerHTML:'';
-  }
   function headFor(idx){
     var h=slides[idx].querySelector('.headline');
     return h?h.textContent:('Slide '+(idx+1));
@@ -614,8 +574,6 @@
     slides.forEach(function(s,x){s.classList.toggle('active',x===i);});
     cur.textContent=i+1;
     prog.style.width=((i)/(total-1)*100)+'%';
-    nTitle.textContent=(i+1)+'. '+headFor(i);
-    nBody.innerHTML=noteFor(i);
     // hide any open backup when leaving a slide
     slides.forEach(function(s){var b=s.querySelector('.backup');
       if(b){b.hidden=true;b.setAttribute('aria-hidden','true');}});
@@ -652,13 +610,12 @@
       case 'Home': show(0); break;
       case 'End': show(total-1); break;
       case 'f': case 'F': fs(); break;
-      case 's': case 'S': notes.classList.toggle('open'); break;
       case 'b': case 'B': toggleBackup(); break;
       case 'o': case 'O': toggleOverview(); break;
-      case 'Escape': overview.classList.remove('open'); notes.classList.remove('open'); break;
+      case 'Escape': overview.classList.remove('open'); break;
     }
   });
-  // Click / tap to advance (ignore clicks inside the notes panel).
+  // Click / tap to advance.
   document.getElementById('deck').addEventListener('click',function(e){
     if(e.clientX < window.innerWidth*0.25) show(i-1); else show(i+1);
   });
