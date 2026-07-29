@@ -34,7 +34,7 @@ Full docs — searchable, English and Korean — live at **[sktelecom.github.io/
 - [No-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) — click by click, for non-developers
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, an existing SBOM, firmware
 - [CLI reference](docs/reference/cli.md) — every option and environment variable
-- Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.en.md) and the [architecture](docs/concepts/architecture.md)
+- Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.md) and the [architecture](docs/concepts/architecture.md)
 
 ## Quick Start
 
@@ -67,6 +67,6 @@ On Windows, run the same command through `scripts\scan-sbom.bat` (Git for Window
 
 ## Contributing & License
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.en.md) ([한국어](CONTRIBUTING.md)) and [GitHub Issues](https://github.com/sktelecom/bomlens/issues). For questions, where to ask and what to include are in [SUPPORT.md](SUPPORT.md).
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) ([한국어](CONTRIBUTING.ko.md)) and [GitHub Issues](https://github.com/sktelecom/bomlens/issues). For questions, where to ask and what to include are in [SUPPORT.md](SUPPORT.md).
 
 Apache License 2.0 · © 2026 SK Telecom Co., Ltd. Bundled third-party tools keep their own licenses — see [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

@@ -42,7 +42,7 @@ const BASELINE_PATH = path.join(REPO_ROOT, ".ko-style-baseline.json");
 const SCOPE = [
   "docs",
   "README.md",
-  "CONTRIBUTING.md",
+  "CONTRIBUTING.ko.md",
   "examples",
   "docker",
   "electron",

@@ -176,7 +176,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
 | 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |
-| 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) |
+| 프로젝트 기여 | [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.ko.md) |
 
 ---
 

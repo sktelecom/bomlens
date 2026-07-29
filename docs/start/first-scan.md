@@ -174,7 +174,7 @@ Clone the repo inside WSL and run `./scripts/scan-sbom.sh ...` as above. For the
 | Every option and CI/CD | [CLI reference](../reference/cli.md) |
 | Language example projects | [Ecosystems](../reference/ecosystems.md) |
 | Internals | [Architecture](../concepts/architecture.md) |
-| Contributing | [Contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) |
+| Contributing | [Contributing guide](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) |
 
 ---
 

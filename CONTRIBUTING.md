@@ -1,94 +1,94 @@
-# 기여 가이드
+# Contributing
 
-> **English**: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
+> **한국어**: [CONTRIBUTING.ko.md](CONTRIBUTING.ko.md)
 
-BomLens 프로젝트에 관심 가져 주셔서 감사합니다! 버그 수정, 문서 개선, 새로운 언어 지원 추가 등 어떤 형태의 기여든 환영합니다.
+Thanks for your interest in BomLens! Contributions of any kind are welcome — bug fixes, documentation improvements, new language support, and more.
 
-> **관련 문서**: [아키텍처](docs/concepts/architecture.ko.md) | [테스트 가이드](docs/contribute/testing.ko.md) | [패키지 매니저 추가](docs/contribute/package-managers.ko.md)
+> **Related**: [Architecture](docs/concepts/architecture.md) | [Testing guide](docs/contribute/testing.md) | [Adding a package manager](docs/contribute/package-managers.md)
 
-## 목차
+## Contents
 
-- [행동 강령](#행동-강령)
-- [기여 방법](#기여-방법)
-- [개발 환경 설정](#개발-환경-설정)
-- [Pull Request 절차](#pull-request-절차)
-- [코딩 스타일](#코딩-스타일)
-- [커밋 메시지 규칙](#커밋-메시지-규칙)
-- [이슈 및 토론](#이슈-및-토론)
+- [Code of conduct](#code-of-conduct)
+- [Ways to contribute](#ways-to-contribute)
+- [Development setup](#development-setup)
+- [Pull request process](#pull-request-process)
+- [Coding style](#coding-style)
+- [Commit message convention](#commit-message-convention)
+- [Issues and discussions](#issues-and-discussions)
 
-## 행동 강령
+## Code of conduct
 
-이 프로젝트는 [Contributor Covenant](https://www.contributor-covenant.org/) 기반의 [행동 강령](CODE_OF_CONDUCT.md)을 따릅니다. 프로젝트에 참여함으로써 이 강령을 지키는 데 동의하는 것으로 간주합니다. 보안 취약점은 [보안 정책](SECURITY.md)에 따라 비공개로 신고해 주세요.
+This project follows a [Code of Conduct](CODE_OF_CONDUCT.md) based on the [Contributor Covenant](https://www.contributor-covenant.org/). By participating, you agree to abide by it. Report security vulnerabilities privately per the [Security Policy](SECURITY.md).
 
-## 기여 방법
+## Ways to contribute
 
-| 유형 | 방법 |
-|------|------|
-| 버그 수정 | [Issues](https://github.com/sktelecom/bomlens/issues)에서 버그를 찾아 수정 |
-| 새 언어 지원 | [패키지 매니저 추가 가이드](docs/contribute/package-managers.ko.md) 참고 |
-| 문서 개선 | 오타 수정, 예제 추가, 설명 보완 |
-| 테스트 작성 | [테스트 가이드](docs/contribute/testing.ko.md) 참고 |
-| 기능 제안 | [Discussions](https://github.com/sktelecom/bomlens/discussions)에서 먼저 논의 |
+| Type | How |
+|------|-----|
+| Bug fix | Find and fix a bug from [Issues](https://github.com/sktelecom/bomlens/issues) |
+| New language support | See [adding a package manager](docs/contribute/package-managers.md) |
+| Documentation | Fix typos, add examples, improve explanations |
+| Tests | See the [testing guide](docs/contribute/testing.md) |
+| Feature proposal | Discuss first in [Discussions](https://github.com/sktelecom/bomlens/discussions) |
 
-한국어 문서를 작성·수정할 때는 [한국어 문서 문체 가이드](docs/korean-style-guide.md)를 따른다.
+When writing or editing Korean documentation, follow the [Korean style guide](docs/korean-style-guide.md).
 
-## 개발 환경 설정
+## Development setup
 
-### 필수 요구사항
+### Prerequisites
 
-- Docker 20.10 이상
+- Docker 20.10+
 - Git
-- bash (Linux/macOS) 또는 Git Bash (Windows)
+- bash (Linux/macOS) or Git Bash (Windows)
 
-### 저장소 클론 및 환경 준비
+### Clone and prepare
 
 ```bash
 git clone https://github.com/sktelecom/bomlens.git
 cd bomlens
 
-# Docker 이미지 빌드 (로컬 수정 시)
+# Build the Docker image (when changing it locally)
 cd docker && docker build -t sbom-scanner:local .
 
-# 기본 동작 확인
+# Smoke test
 cd examples/nodejs
 ../../scripts/scan-sbom.sh --project "NodeExample" --version "1.0.0" --generate-only
 ```
 
-## Pull Request 절차
+## Pull request process
 
-1. 새 기능이나 버그 수정 전에 관련 이슈를 먼저 생성하거나, 기존 이슈에서 작업 의사를 밝혀 주세요.
+1. Before a new feature or bug fix, open a related issue first, or note your intent on an existing one.
 
-2. 저장소를 포크하고 목적에 맞는 브랜치를 만듭니다.
+2. Fork the repository and create a purpose-named branch.
    ```bash
    git checkout -b feat/add-kotlin-support
    git checkout -b fix/java-gradle-detection
    ```
 
-3. 코드를 수정하고 테스트가 모두 통과하는지 확인합니다.
+3. Make your changes and confirm all tests pass.
    ```bash
    ./tests/test-scan.sh
    ```
 
-4. 변경 사항을 명확히 설명하는 PR을 제출합니다. 아래 체크리스트를 모두 확인해 주세요.
+4. Submit a PR that clearly describes the change. Confirm the checklist below.
 
-5. 리뷰어의 피드백에 성실히 응답하고 필요한 수정을 진행합니다.
+5. Respond to reviewer feedback and make the needed adjustments.
 
-### PR 체크리스트
+### PR checklist
 
-- [ ] 변경 사항에 대한 테스트를 작성했습니다.
-- [ ] `./tests/test-scan.sh` 가 모두 통과합니다.
-- [ ] 관련 문서를 업데이트했습니다.
-- [ ] 커밋 메시지가 [규칙](#커밋-메시지-규칙)을 따릅니다.
+- [ ] I added tests for the change.
+- [ ] `./tests/test-scan.sh` passes.
+- [ ] I updated the relevant documentation.
+- [ ] My commit messages follow the [convention](#commit-message-convention).
 
-## 코딩 스타일
+## Coding style
 
-### Shell 스크립트
+### Shell scripts
 
-- 첫 줄: `#!/usr/bin/env bash`
-- 전역 변수: `UPPER_SNAKE_CASE`, 지역 변수: `lower_snake_case`
-- 함수명: `lower_snake_case`
-- 오류 처리: 스크립트 상단에 `set -euo pipefail` 사용
-- 짧은 옵션보다 긴 옵션 선호 (`--verbose` > `-v`)
+- First line: `#!/usr/bin/env bash`
+- Global variables: `UPPER_SNAKE_CASE`, local variables: `lower_snake_case`
+- Function names: `lower_snake_case`
+- Error handling: `set -euo pipefail` at the top of the script
+- Prefer long options over short ones (`--verbose` over `-v`)
 
 ```bash
 #!/usr/bin/env bash
@@ -107,13 +107,13 @@ function validate_input() {
 
 ### Dockerfile
 
-- 공식 베이스 이미지 사용
-- `RUN` 명령어를 통합하여 레이어 최소화
-- 각 설치 단계에 명확한 주석 작성
+- Use official base images
+- Combine `RUN` commands to minimize layers
+- Add a clear comment to each install step
 
-## 커밋 메시지 규칙
+## Commit message convention
 
-[Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다.
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) format.
 
 ```
 <type>(<scope>): <subject>
@@ -123,18 +123,18 @@ function validate_input() {
 [footer]
 ```
 
-### Type 목록
+### Types
 
-| Type | 설명 |
-|------|------|
-| `feat` | 새로운 기능 추가 |
-| `fix` | 버그 수정 |
-| `docs` | 문서 변경 |
-| `test` | 테스트 추가/수정 |
-| `refactor` | 리팩토링 (기능·버그 변경 없음) |
-| `chore` | 빌드, 의존성 등 기타 변경 |
+| Type | Description |
+|------|-------------|
+| `feat` | A new feature |
+| `fix` | A bug fix |
+| `docs` | Documentation changes |
+| `test` | Adding or fixing tests |
+| `refactor` | Refactoring (no feature/bug change) |
+| `chore` | Build, dependencies, and other changes |
 
-### 작성 예시
+### Example
 
 ```
 feat(scanner): add Kotlin/Gradle support
@@ -145,20 +145,20 @@ Uses cdxgen with KOTLIN_HOME environment variable.
 Closes #42
 ```
 
-## 이슈 및 토론
+## Issues and discussions
 
-### 버그 제보
+### Bug reports
 
-[GitHub Issues](https://github.com/sktelecom/bomlens/issues)를 이용해 주세요. 아래 정보를 포함하면 빠른 해결에 도움이 됩니다.
+Please use [GitHub Issues](https://github.com/sktelecom/bomlens/issues). Including the following helps us resolve it faster.
 
-- 환경: OS, Docker 버전, 스크립트 버전
-- 재현 방법: 버그를 재현하는 최소한의 단계
-- 기대 결과와 실제 결과 (에러 메시지 포함)
+- Environment: OS, Docker version, script version
+- Reproduction: the minimal steps that reproduce the bug
+- Expected vs actual result (include error messages)
 
-### 기능 제안
+### Feature proposals
 
-[GitHub Discussions](https://github.com/sktelecom/bomlens/discussions)에서 먼저 논의한 뒤 이슈로 이어가면 좋습니다.
+Discuss first in [GitHub Discussions](https://github.com/sktelecom/bomlens/discussions), then move to an issue.
 
 ---
 
-문의: [opensource@sktelecom.com](mailto:opensource@sktelecom.com)
+Contact: [opensource@sktelecom.com](mailto:opensource@sktelecom.com)

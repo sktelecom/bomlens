@@ -194,4 +194,4 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 
 ---
 
-> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Adding a package manager](package-managers.md)
+> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) | [Architecture](../concepts/architecture.md) | [Adding a package manager](package-managers.md)

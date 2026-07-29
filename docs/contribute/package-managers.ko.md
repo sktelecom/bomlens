@@ -96,7 +96,7 @@ source "$(dirname "$0")/cases/test-kotlin.sh"
 
 ### 6. PR 제출
 
-[기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md)에 따라 PR을 제출합니다. PR 본문에 다음을 포함하세요.
+[기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.ko.md)에 따라 PR을 제출합니다. PR 본문에 다음을 포함하세요.
 
 - 추가한 언어/패키지 매니저 이름
 - 테스트 실행 결과 (스크린샷 또는 로그)
@@ -156,4 +156,4 @@ Kotlin은 Maven 생태계를 공유하므로 PURL은 `pkg:maven/` 접두사를 �
 
 ---
 
-> **관련 문서**: [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) | [아키텍처](../concepts/architecture.ko.md) | [테스트 가이드](testing.ko.md)
+> **관련 문서**: [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.ko.md) | [아키텍처](../concepts/architecture.ko.md) | [테스트 가이드](testing.ko.md)

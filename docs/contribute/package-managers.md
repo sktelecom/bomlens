@@ -160,4 +160,4 @@ Confirm every item before submitting a PR that adds a new language.
 
 ---
 
-> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.en.md) | [Architecture](../concepts/architecture.md) | [Testing guide](testing.md)
+> **Related**: [Contributing](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) | [Architecture](../concepts/architecture.md) | [Testing guide](testing.md)

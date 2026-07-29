@@ -190,4 +190,4 @@ DEBUG_MODE=true ./tests/cases/test-nodejs.sh
 
 ---
 
-> **관련 문서**: [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md) | [아키텍처](../concepts/architecture.ko.md) | [패키지 매니저 추가](package-managers.ko.md)
+> **관련 문서**: [기여 가이드](https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.ko.md) | [아키텍처](../concepts/architecture.ko.md) | [패키지 매니저 추가](package-managers.ko.md)
