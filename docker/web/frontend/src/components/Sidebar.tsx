@@ -30,8 +30,14 @@ interface SidebarProps {
 }
 
 /** Shared row shape for every rail link — global block and sections alike. */
+// The gap and horizontal padding are tighter than a comfortable default on
+// purpose. The rail is a fixed 15rem, and `main` is sized from what is left
+// (1040px at the 1280px capture viewport), so widening the rail would resize
+// every section screenshot. The longest label — "SBOM conformance" beside its
+// 13/16 badge — needed 133px and had 128px, so the row reclaims 8px from its
+// own spacing instead: 2px at each of the two gaps, 2px at each side padding.
 const RAIL_ROW =
-  "group relative flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-sm " +
+  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-sm " +
   "transition-colors duration-fast ease-out-soft " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
 
@@ -101,7 +107,7 @@ export function Sidebar({
           <li key={href}>
             <a
               href={href}
-              title={collapsed ? label : undefined}
+              title={label}
               className={cn(RAIL_ROW, RAIL_ROW_IDLE, collapsed && "justify-center")}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -129,7 +135,7 @@ export function Sidebar({
                   <a
                     href={activeScanId ? scanHash(activeScanId, section.id) : undefined}
                     aria-current={active ? "page" : undefined}
-                    title={collapsed ? label : undefined}
+                    title={label}
                     className={cn(
                       RAIL_ROW,
                       collapsed && "justify-center",

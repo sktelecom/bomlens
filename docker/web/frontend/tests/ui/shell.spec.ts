@@ -873,6 +873,36 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   expect(results.violations).toEqual([]);
 });
 
+// The rail is a fixed width, so a label plus its count badge has a hard budget.
+// "SBOM conformance" overran it once and rendered as "SBOM conforma…". Nothing
+// else would catch that: it clips silently, and the section screenshots crop to
+// <main>.
+//
+// This fixture's badges are narrow (6/8), so every badge is first widened to the
+// widest shape a real scan produces — a two-digit pair like 13/16, seen on the
+// demo's own conformance count. Testing the labels against the badges that
+// happen to be in the fixture would pass while the app clips.
+const WIDEST_BADGE = "13/16";
+
+for (const lang of ["en", "ko"] as const) {
+  test(`rail labels survive the widest count badge — ${lang}`, async ({ page }) => {
+    await stubAiAndRun(page, "light", lang);
+    await page.getByRole("navigation").locator('a[href$="/conformance"]').first().waitFor();
+
+    const clipped = await page.evaluate((badge) => {
+      for (const b of document.querySelectorAll("nav a span.tabular-nums")) {
+        b.textContent = badge;
+      }
+      // Read a layout property to flush the mutations before measuring.
+      void document.body.offsetHeight;
+      return [...document.querySelectorAll("nav a span.truncate")]
+        .filter((s) => s.scrollWidth > (s as HTMLElement).clientWidth)
+        .map((s) => `${s.textContent} (${(s as HTMLElement).clientWidth}/${s.scrollWidth})`);
+    }, WIDEST_BADGE);
+    expect(clipped).toEqual([]);
+  });
+}
+
 // A conformance report that has G7 checks but no aiProfile and no crosswalk (a
 // plain re-open of an older AI scan, or a non-AI SBOM path): neither the summary
 // card nor the crosswalk sub-block renders — only the G7 and format checks do.
