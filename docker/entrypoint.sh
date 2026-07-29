@@ -80,7 +80,8 @@ self_container_id() {
 # so cdxgen never ran and the scan silently fell back to syft. --volumes-from replays the
 # daemon's already-resolved mount, so the source appears at the SAME container path on
 # every host OS. build-prep.sh is injected inline (it lives only inside THIS image, not on
-# the host). cdxgen writes the bom into the scanned tree; we move it to the working dir.
+# the host). cdxgen writes the bom straight into the working dir when that dir is on a
+# shared mount, so the scanned tree stays untouched (see bom_path below).
 #   $1 = scanned tree, this container's path (also the sibling's, via --volumes-from)
 #   $2 = output bom filename (relative)
 generate_sbom_cdxgen() {
@@ -103,6 +104,21 @@ generate_sbom_cdxgen() {
         echo "[INFO] Language: $lang -> $img"
     fi
     local prep; prep=$(cat "$LIBDIR/build-prep.sh")
+    # Where cdxgen writes the bom. Our working dir is the right place — a scan
+    # must not drop files into the project it analyzes — but the sibling only
+    # sees that dir if it sits on a mount we inherited via --volumes-from, so
+    # confirm it against /proc/self/mountinfo (field 5 is the mount point; "/"
+    # is this container's own layer and is NOT shared). If it is not shared we
+    # fall back to writing inside the tree and move the file out below, which is
+    # what this always did.
+    local outdir bom_path
+    outdir=$(pwd)
+    if awk -v d="$outdir" '$5 != "/" && ($5 == d || index(d, $5 "/") == 1) { found = 1 } END { exit !found }' \
+           /proc/self/mountinfo 2>/dev/null; then
+        bom_path="$outdir/$out"
+    else
+        bom_path="$src/$out"
+    fi
     # Capture the sibling output for diagnosis while still streaming it live, so
     # an out-of-disk extraction failure can be reported specifically (rather than
     # a bare rc=125) and recorded for the UI.
@@ -115,7 +131,7 @@ generate_sbom_cdxgen() {
         -e PROJECT_NAME="$PROJECT_NAME" \
         -e PROJECT_VERSION="$PROJECT_VERSION" \
         --entrypoint sh "$img" \
-        -c "$prep" _ "$src" "$src/$out" 1.6 2>&1 | tee "$logf"
+        -c "$prep" _ "$src" "$bom_path" 1.6 2>&1 | tee "$logf"
     rc=${PIPESTATUS[0]}
     if [ "$rc" -ne 0 ]; then
         if grep -qi "no space left on device" "$logf"; then
@@ -129,11 +145,12 @@ generate_sbom_cdxgen() {
         return 1
     fi
     rm -f "$logf"
-    if [ -f "$src/$out" ]; then
-        mv "$src/$out" "./$out"
-    else
+    if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
+        mv "$bom_path" "$outdir/$out"
+    fi
+    if [ ! -f "$outdir/$out" ]; then
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        echo "[WARN] cdxgen produced no SBOM at $src/$out."; return 1
+        echo "[WARN] cdxgen produced no SBOM at $bom_path."; return 1
     fi
     return 0
 }

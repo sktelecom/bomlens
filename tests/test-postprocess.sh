@@ -2211,6 +2211,61 @@ python3 "$DESC" "$desc_dir/junk.txt" "$desc_dir/junk.json" >/dev/null 2>&1
     && pass "an unrecognized input writes no summary rather than a guess" \
     || fail "wrote a summary for a non-SBOM input"
 
+echo "== source-tree guard: a scan leaves the scanned project unchanged =="
+# Regression for the pollution defect: build-prep.sh resolves dependencies IN the
+# mounted source tree, so a scan of a checkout rewrote go.mod (~30 lines of
+# indirect requires) and left go.sum, Cargo.lock and build dirs behind — the tool
+# modified what it measured. build-prep.sh must snapshot the resolver-owned files
+# and put the tree back. Driven with stub resolvers on PATH (no Docker, no real
+# toolchain): a fake `go` that mutates go.mod + writes go.sum, and a fake `cdxgen`
+# that leaves build dirs and writes the bom where -o points.
+GUARD_ROOT="$WORK/guard"
+mkdir -p "$GUARD_ROOT/bin" "$GUARD_ROOT/src/keepdir" "$GUARD_ROOT/out"
+cat > "$GUARD_ROOT/bin/go" <<'STUB'
+#!/bin/sh
+printf 'require (\n\tgithub.com/indirect/dep v1.0.0 // indirect\n)\n' >> go.mod
+echo 'github.com/indirect/dep v1.0.0 h1:deadbeef' > go.sum
+STUB
+cat > "$GUARD_ROOT/bin/cdxgen" <<'STUB'
+#!/bin/sh
+mkdir -p build/classes mod-new/build
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+[ -n "$out" ] && echo '{"bomFormat":"CycloneDX","components":[]}' > "$out"
+exit 0
+STUB
+chmod +x "$GUARD_ROOT/bin/go" "$GUARD_ROOT/bin/cdxgen"
+printf 'module example.com/demo\n\ngo 1.24\n' > "$GUARD_ROOT/src/go.mod"
+printf 'package main\n' > "$GUARD_ROOT/src/main.go"
+printf 'keep me\n' > "$GUARD_ROOT/src/keepdir/file.txt"
+cp "$GUARD_ROOT/src/go.mod" "$GUARD_ROOT/go.mod.orig"
+PATH="$GUARD_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$GUARD_ROOT/src" "$GUARD_ROOT/out/bom.json" >/dev/null 2>&1
+cmp -s "$GUARD_ROOT/go.mod.orig" "$GUARD_ROOT/src/go.mod" \
+    && pass "go.mod is byte-identical after the scan" \
+    || fail "the scan rewrote go.mod" "$(diff "$GUARD_ROOT/go.mod.orig" "$GUARD_ROOT/src/go.mod" | head -5)"
+[ ! -e "$GUARD_ROOT/src/go.sum" ] \
+    && pass "the go.sum the resolver created is gone" \
+    || fail "go.sum was left in the source tree"
+[ ! -e "$GUARD_ROOT/src/build" ] && [ ! -e "$GUARD_ROOT/src/mod-new" ] \
+    && pass "build dirs created by the run are gone (including their new parent)" \
+    || fail "build output left in the source tree" "$(cd "$GUARD_ROOT/src" && find . | sort | tr '\n' ' ')"
+[ -f "$GUARD_ROOT/src/keepdir/file.txt" ] \
+    && pass "a directory that existed before the scan is untouched" \
+    || fail "the guard deleted a pre-existing directory"
+[ -s "$GUARD_ROOT/out/bom.json" ] \
+    && pass "the generated SBOM survives the restore" \
+    || fail "the guard removed the generated SBOM"
+
+# Opt-out: BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree for debugging.
+rm -rf "$GUARD_ROOT/src" "$GUARD_ROOT/out"; mkdir -p "$GUARD_ROOT/src" "$GUARD_ROOT/out"
+cp "$GUARD_ROOT/go.mod.orig" "$GUARD_ROOT/src/go.mod"
+printf 'package main\n' > "$GUARD_ROOT/src/main.go"
+BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
+    sh "$LIB/build-prep.sh" "$GUARD_ROOT/src" "$GUARD_ROOT/out/bom.json" >/dev/null 2>&1
+[ -f "$GUARD_ROOT/src/go.sum" ] && [ -d "$GUARD_ROOT/src/build" ] \
+    && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
+    || fail "the opt-out did not keep the resolved tree"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

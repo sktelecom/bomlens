@@ -25,6 +25,107 @@ cd "$SRC" 2>/dev/null || exit 0
 
 log() { echo "[build-prep] $*"; }
 
+# ---------------------------------------------------------------------------
+# Source-tree guard — hand the scanned project back exactly as we found it.
+#
+# The resolve steps below run IN the mounted source tree, because the build
+# tools need the real sources: `go mod tidy` rewrites go.mod and creates go.sum,
+# `cargo generate-lockfile` writes Cargo.lock, `bundle lock` writes Gemfile.lock,
+# `swift package resolve` writes Package.resolved, and gradle/maven leave their
+# build directories behind. Scanning a checkout therefore left the user's
+# working tree dirty (go.mod gained ~30 lines of indirect requires, go.sum
+# appeared). A scan must not change what it measures, and in CI the diff the
+# scan itself created is worse still.
+#
+# So we snapshot the resolver-owned files before the run and put the tree back
+# afterwards: snapshotted files are restored byte for byte, and files or build
+# directories that were NOT there before are removed. Nothing outside these
+# names is considered, and nothing that already existed is deleted, so a
+# committed lockfile or a pre-existing build/ is never lost.
+# BOMLENS_KEEP_BUILD_OUTPUT=1 opts out (leave the resolved tree in place, e.g.
+# to inspect what a resolution produced).
+# ---------------------------------------------------------------------------
+GUARD_DIR=""
+
+# Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
+# (app/build, services/api/go.mod) without walking a whole monorepo; .git and
+# node_modules are pruned because nothing we run resolves inside them.
+guard_paths() {
+    if [ "$1" = "f" ]; then
+        find . -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -type f \
+            \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
+               -o -name Package.resolved -o -name package-lock.json \
+               -o -name composer.lock \) -print 2>/dev/null | LC_ALL=C sort
+    else
+        find . -maxdepth 4 -name .git -prune -o -type d \
+            \( -name .gradle -o -name .build -o -name build -o -name target \
+               -o -name node_modules -o -name __pycache__ -o -name .venv \) \
+            -print -prune 2>/dev/null | LC_ALL=C sort
+    fi
+}
+
+guard_snapshot() {
+    [ -z "${BOMLENS_KEEP_BUILD_OUTPUT:-}" ] || { log "source-tree guard off (BOMLENS_KEEP_BUILD_OUTPUT)"; return 0; }
+    GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
+    guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
+    guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
+    while IFS= read -r _f; do
+        [ -n "$_f" ] || continue
+        mkdir -p "$GUARD_DIR/tree/$(dirname "$_f")" 2>/dev/null
+        cp -p "$_f" "$GUARD_DIR/tree/$_f" 2>/dev/null
+    done < "$GUARD_DIR/files.before"
+}
+
+# Idempotent: clears GUARD_DIR first, so the explicit call and the trap that
+# covers an abort (docker stop, cdxgen crash) cannot both run the restore.
+guard_restore() {
+    [ -n "$GUARD_DIR" ] || return 0
+    _g="$GUARD_DIR"; GUARD_DIR=""
+    cd "$SRC" 2>/dev/null || { rm -rf "$_g"; return 0; }
+    _rst=0; _del=0
+    while IFS= read -r _f; do
+        [ -n "$_f" ] || continue
+        [ -f "$_g/tree/$_f" ] || continue
+        # Untouched file: leave it alone (keeps the log honest and the mtime
+        # stable). Without cmp we simply copy back — same result, noisier count.
+        if command -v cmp >/dev/null 2>&1 && cmp -s "$_g/tree/$_f" "$_f" 2>/dev/null; then
+            continue
+        fi
+        cp -p "$_g/tree/$_f" "$_f" 2>/dev/null && _rst=$((_rst + 1))
+    done < "$_g/files.before"
+    guard_paths f > "$_g/files.after" 2>/dev/null
+    while IFS= read -r _f; do
+        [ -n "$_f" ] || continue
+        # Never the SBOM itself: the web-UI path asks cdxgen to write it inside
+        # the tree when the run folder is not on a shared mount.
+        [ "$SRC/${_f#./}" = "$OUT" ] && continue
+        grep -qxF "$_f" "$_g/files.before" 2>/dev/null && continue
+        rm -f "$_f" 2>/dev/null && _del=$((_del + 1))
+    done < "$_g/files.after"
+    guard_paths d > "$_g/dirs.after" 2>/dev/null
+    while IFS= read -r _d; do
+        [ -n "$_d" ] || continue
+        [ -d "$_d" ] || continue
+        grep -qxF "$_d" "$_g/dirs.before" 2>/dev/null && continue
+        rm -rf "$_d" 2>/dev/null && _del=$((_del + 1))
+        # Drop the parents the run created on the way (gradle's app/build leaves
+        # an empty app/ behind when the module dir itself is new). rmdir refuses
+        # a non-empty directory, so a real module dir survives; the tree root (.)
+        # is never a candidate.
+        _p=$(dirname "$_d")
+        [ "$_p" != "." ] && rmdir -p "$_p" 2>/dev/null
+    done < "$_g/dirs.after"
+    [ "$_rst" -gt 0 ] || [ "$_del" -gt 0 ] \
+        && log "source tree restored ($_rst file(s) put back, $_del build artifact(s) removed)"
+    rm -rf "$_g"
+    return 0
+}
+
+guard_snapshot
+trap 'guard_restore' EXIT
+trap 'guard_restore; exit 130' INT
+trap 'guard_restore; exit 143' TERM
+
 # Rust — cdxgen does NOT auto-run cargo; lockfile is essential for transitive deps
 if [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1; then
     log "cargo generate-lockfile"
@@ -390,6 +491,10 @@ MFILTER_JS
     node "$_mflt" "$OUT" || log "maven: filter skipped (non-fatal)"
     rm -f "$_mflt"
 fi
+
+# Put the scanned tree back before the ownership fix below, so anything we
+# restored is chown'd too (the trap only covers an abnormal exit).
+guard_restore
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
 # so the build steps above (npm install, cargo/go fetch, the bom write) leave

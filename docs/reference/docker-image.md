@@ -137,6 +137,7 @@ docker run --rm \
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | Ingest release label |
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven source scans: set `1` to keep the full resolved graph instead of filtering to compile/runtime scope |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js source scans: set `1` to keep the full dev-plus-production graph instead of the production-only set |
+| `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | Source scans: set `1` to leave the resolved tree in place. By default the scan restores the files its resolvers rewrote (`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`) and removes the build directories they created, so the scanned project is handed back as it was |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM), which additionally allow 1.7 |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | Accepted SPDX spec versions for the conformance check |
