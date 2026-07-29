@@ -132,6 +132,7 @@ fi
 # Only files of at least 256 KiB are probed with `file`, to keep this from running
 # a subprocess per entry on a tree with thousands of small files.
 # --------------------------------------------------------
+CARVED_UNOPENED=""
 extract_carved_filesystems() {
     local img out found=0
     # Returns non-zero when nothing was opened, which is also the right answer when
@@ -151,6 +152,11 @@ extract_carved_filesystems() {
             found=1
         else
             rm -rf "$out"
+            # Recorded, not just skipped. A squashfs the standard tool cannot open is
+            # usually a vendor-modified variant, and that is the difference between
+            # "this firmware has nothing in it" and "we could not get in" — which the
+            # reader has to know, because only one of those is theirs to act on.
+            CARVED_UNOPENED="${CARVED_UNOPENED:+$CARVED_UNOPENED }${img#"$EXTRACT"/}"
         fi
     done < <(find "$EXTRACT" -type f -size +256k 2>/dev/null)
     return $((1 - found))
@@ -345,6 +351,38 @@ jq -n \
 }' > "$OUTPUT"
 
 echo "[firmware] SBOM written: $OUTPUT (components=${NTOTAL}: packages=${NPKG}, binaries=${NBIN})"
+
+# --------------------------------------------------------
+# ④.5 Say why an empty result is empty.
+#
+# Zero components has several causes, and they call for different responses:
+# encrypted firmware is nothing the reader can do anything about, a squashfs
+# variant we cannot open is a gap in this image, and a tree we walked but could
+# not attribute is a limit of the identifiers. Reporting all three as a bare
+# "components=0" leaves the reader unable to tell a clean scan from a failed one.
+#
+# Measured on seven vendor firmware images: three returned zero, for three
+# different reasons.
+# --------------------------------------------------------
+if [ "${NTOTAL:-0}" -eq 0 ]; then
+    NFILES=$(find "$EXTRACT" -type f 2>/dev/null | wc -l | tr -d ' ')
+    echo "[firmware] WARN: no components identified." >&2
+    if [ -n "$CARVED_UNOPENED" ]; then
+        echo "[firmware]       A filesystem image was found but could not be opened:" >&2
+        for u in $CARVED_UNOPENED; do echo "[firmware]         $u" >&2; done
+        echo "[firmware]       A squashfs that standard unsquashfs rejects is usually a" >&2
+        echo "[firmware]       vendor-modified variant, which needs sasquatch — not bundled." >&2
+    elif [ "$unpacked" = 0 ]; then
+        echo "[firmware]       Nothing could be unpacked at all; see the warning above." >&2
+    elif [ "${NFILES:-0}" -le 8 ]; then
+        echo "[firmware]       Only ${NFILES} file(s) came out of the image and no filesystem was" >&2
+        echo "[firmware]       found inside it. A payload that yields no known format and does" >&2
+        echo "[firmware]       not compress is normally encrypted or signed." >&2
+    else
+        echo "[firmware]       ${NFILES} file(s) were unpacked, but they carry no package database" >&2
+        echo "[firmware]       and no binary matched a known version signature." >&2
+    fi
+fi
 
 # --------------------------------------------------------
 # ⑤ Plan 2 — emit cve-bin-tool CVEs as a Trivy-shaped sidecar.

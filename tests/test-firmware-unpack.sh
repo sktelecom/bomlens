@@ -165,6 +165,42 @@ else
          "the caller would mark the firmware unpacked and skip the warning"
 fi
 
+echo "== an empty result says why it is empty =="
+
+# Seven vendor firmware images were scanned; three returned zero components, for
+# three different reasons — encrypted payload, a squashfs variant the bundled
+# extractor rejects, and a tree that unpacked but matched no signature. Reporting
+# all three as a bare "components=0" leaves the reader unable to tell a clean scan
+# from a failed one, and only one of the three is theirs to act on.
+if grep -q 'no components identified' "$SCRIPT"; then
+    pass "an empty result is called out"
+else
+    fail "an empty result is reported as a bare component count"
+fi
+
+# The distinguishing input is the list of images that were found but not opened.
+# Drop the recording and every empty result collapses to the same generic message.
+if awk '/^extract_carved_filesystems\(\) \{/,/^}/' "$SCRIPT" | grep -q 'CARVED_UNOPENED='; then
+    pass "images that could not be opened are recorded, not just skipped"
+else
+    fail "an unopenable filesystem image is skipped without a trace" \
+         "every empty result would then report the same generic cause"
+fi
+
+if grep -q 'sasquatch' "$SCRIPT"; then
+    pass "the unopenable-squashfs case names what is missing"
+else
+    fail "the unopenable-squashfs case does not say what would fix it"
+fi
+
+# Three branches, so the reader gets a cause rather than a catch-all.
+branches=$(sed -n '/no components identified/,/^fi$/p' "$SCRIPT" | grep -cE '^\s*(if|elif)')
+if [ "${branches:-0}" -ge 3 ]; then
+    pass "the diagnostic distinguishes at least three causes"
+else
+    fail "the diagnostic does not distinguish the known causes" "found $branches branch(es)"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]
