@@ -179,6 +179,12 @@ jobs:
       - name: Merge-mode unit tests
         run: bash tests/test-merge.sh
 
+      # No Docker: checks that an archive is routed by what it holds, not by its
+      # extension. A root filesystem or a `docker save` tar scanned as source
+      # reports nothing, and nothing is indistinguishable from a clean result.
+      - name: Input routing unit tests
+        run: bash tests/test-input-routing.sh
+
       - name: Output regression snapshots
         run: bash tests/test-snapshot.sh
 

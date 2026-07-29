@@ -91,7 +91,7 @@ SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 # lands in argv where `ps` could read it.
 HF_TOKEN="${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}"
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
-INGEST_SOURCE="false"; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
+INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
 MERGE_ROOT=""
 OUTPUT_BASE=""; TIMESTAMP="false"
@@ -156,6 +156,11 @@ Options:
                          existing root license in the SBOM is never replaced.
   --target <target>      Not set: source (current dir) | image name | file |
                          directory | .zip/.tar.gz archive (auto-extracted).
+                         An archive is routed by what it holds, not by its
+                         extension: a root filesystem is scanned as ROOTFS so
+                         its package database is read, a `docker save` tar is
+                         scanned as the image it is, and anything else is
+                         scanned as source.
                          A Yocto build directory is recognized as such: its
                          image SBOM under tmp/deploy/images/ is analyzed
                          instead of the build tree being walked.
@@ -164,7 +169,10 @@ Options:
                          with --target/--analyze/--firmware.
   --branch <ref>         Branch, tag, or commit for --git (alias: --ref;
                          default: repo default)
-  --firmware             Force firmware mode for --target file (opt-in image)
+  --firmware             Force firmware mode for --target (opt-in image). Works
+                         on an archive too: the firmware unpacker reads it
+                         directly, nested formats and all, instead of the
+                         archive being extracted and scanned as source.
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
   --model <owner/name>   Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a
@@ -645,12 +653,68 @@ is_sbom_file() {
     fi
 }
 
-# A source archive we auto-extract and scan as SOURCE.
+# An archive we auto-extract. What it holds decides the mode, not the extension:
+# see looks_like_rootfs / is_container_archive below.
 is_archive() {
     case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
         *.zip|*.tar.gz|*.tgz|*.tar.bz2|*.tar.xz|*.tar) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# An archive can hold a root filesystem rather than source: suppliers ship /etc,
+# /bin and /usr as a plain zip or tarball. Scanning that tree as source finds
+# nothing, because there is no manifest or lockfile to read — the packages are
+# recorded in the filesystem's own package database, which the ROOTFS path reads.
+#
+# Recognized by an `etc` directory next to at least two other system directories.
+# Two, not one, because a source repository with `etc/` and `lib/` is common and
+# must keep going to the source path; `etc` plus two of bin/sbin/usr/lib/var is
+# not something a source tree has.
+_is_rootfs_dir() {
+    local d="$1" sub hits=0
+    [ -d "$d/etc" ] || return 1
+    for sub in bin sbin usr lib var; do
+        [ -d "$d/$sub" ] && hits=$((hits + 1))
+    done
+    [ "$hits" -ge 2 ]
+}
+
+# Print the directory holding the root filesystem, or nothing. Searches the tree
+# root and two levels down: a delivery is as often wrapped in a release folder
+# (`nat-rootfs-20260719/rootfs/`) as it is packed at the top level.
+find_rootfs_dir() {
+    local root="$1" d
+    for d in "$root" "$root"/*/ "$root"/*/*/; do
+        [ -d "$d" ] || continue
+        d="${d%/}"
+        if _is_rootfs_dir "$d"; then printf '%s' "$d"; return 0; fi
+    done
+    return 1
+}
+
+# Does the root filesystem record its own packages? syft reads apk/dpkg/rpm and
+# reports the installed set exactly; without one of these there is nothing for it
+# to read, and only binary signature identification (the firmware image) will
+# find anything. Used to tell the user which of the two they are getting.
+has_package_db() {
+    local d="$1"
+    [ -f "$d/lib/apk/db/installed" ] && return 0
+    [ -f "$d/var/lib/dpkg/status" ] && return 0
+    [ -d "$d/var/lib/rpm" ] && return 0
+    [ -d "$d/usr/lib/sysimage/rpm" ] && return 0
+    return 1
+}
+
+# `docker save` writes a tar that syft reads as an image, package database and
+# all. Extracting it as a source archive throws that away and leaves compressed
+# layer blobs no language detector can read. Recognized by the image manifest
+# sitting next to either OCI blobs or a legacy per-layer tar.
+is_container_archive() {
+    local names
+    names=$(tar -tf "$1" 2>/dev/null | head -400) || return 1
+    printf '%s\n' "$names" | grep -qE '^(\./)?manifest\.json$' || return 1
+    printf '%s\n' "$names" | grep -qE '(^|/)(oci-layout$|blobs/|layer\.tar$)'
 }
 
 # Pick the scan root inside an extracted/cloned temp dir: if it contains exactly
@@ -729,6 +793,12 @@ ingest_archive() {
             ;;
     esac
     SCAN_INPUT_DIR=$(flatten_single_dir "$tmp")
+    local rootfs_dir
+    if rootfs_dir=$(find_rootfs_dir "$SCAN_INPUT_DIR"); then
+        SCAN_INPUT_DIR="$rootfs_dir"
+        INGEST_ROOTFS="true"
+        INGEST_ARCHIVE="$arc"
+    fi
     INGEST_SOURCE="true"
 }
 
@@ -747,8 +817,19 @@ if [ -n "$GIT_URL" ]; then
     [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --git cannot be combined with --firmware."; exit 1; }
     ingest_git "$GIT_URL"
 elif [ -n "$TARGET" ] && [ -f "$TARGET" ] && is_archive "$TARGET"; then
-    [ "$FORCE_FIRMWARE" = "true" ] && { echo "[ERROR] --firmware cannot be combined with a source archive."; exit 1; }
-    ingest_archive "$TARGET"
+    # An archive is not automatically source. Three cases, decided by content:
+    #   --firmware  the user wants the deep unpacker, which reads the archive
+    #               itself (nested formats and all) — leave the file target alone.
+    #   container   syft reads a `docker save` tar directly; extracting it first
+    #               would leave only unreadable layer blobs.
+    #   otherwise   extract, then let ingest_archive decide source vs rootfs.
+    if [ "$FORCE_FIRMWARE" = "true" ]; then
+        echo "[INFO] --firmware: unpacking $TARGET with the firmware unpacker."
+    elif is_container_archive "$TARGET"; then
+        echo "[INFO] Container image archive detected; scanning the image, not its layers."
+    else
+        ingest_archive "$TARGET"
+    fi
 fi
 
 MODE="SOURCE"
@@ -775,9 +856,24 @@ if [ "${#MERGE_FILES[@]}" -gt 0 ]; then
 elif [ -n "$MERGE_ROOT" ]; then
     echo "[ERROR] --merge-root only applies with --merge."; exit 1
 elif [ "$INGEST_SOURCE" = "true" ]; then
-    # A git clone / extracted archive is always scanned as SOURCE (the temp dir
-    # would otherwise be detected as ROOTFS below).
-    MODE="SOURCE"
+    if [ "$INGEST_ROOTFS" = "true" ]; then
+        # The archive held a root filesystem, not source. Point the ROOTFS path
+        # at the extracted tree so syft reads its package database; scanning it
+        # as source would report nothing, since there is no manifest in it.
+        echo "[INFO] Archive contains a root filesystem; scanning as ROOTFS."
+        if ! has_package_db "$SCAN_INPUT_DIR"; then
+            echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
+            echo "       so there is no installed-package list to read. Re-run with"
+            echo "       --firmware to identify the binaries by signature instead"
+            echo "       (opt-in image: docker build --build-arg SBOM_FIRMWARE=true)."
+        fi
+        TARGET="$SCAN_INPUT_DIR"
+        MODE="ROOTFS"
+    else
+        # A git clone / extracted source archive is scanned as SOURCE (the temp
+        # dir would otherwise be detected as ROOTFS below).
+        MODE="SOURCE"
+    fi
 elif [ -n "$ANALYZE_SBOM" ]; then
     # Supplier SBOM analysis takes precedence; it does not use --target.
     [ -z "$TARGET" ] || { echo "[ERROR] --analyze/--sbom is mutually exclusive with --target."; exit 1; }
@@ -974,7 +1070,14 @@ case "$MODE" in
     IMAGE)    META_SOURCE="docker-image";    META_TARGET="$TARGET"; META_LABEL="" ;;
     FIRMWARE) META_SOURCE="firmware-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
     BINARY)   META_SOURCE="package-upload";  META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
-    ROOTFS)   META_SOURCE="rootfs-dir";      META_TARGET=""; META_LABEL="$TARGET" ;;
+    ROOTFS)   META_SOURCE="rootfs-dir";      META_TARGET=""
+              # An archive that turned out to hold a root filesystem is labelled
+              # by the file the user handed us, not by the throwaway unpack dir.
+              if [ -n "$INGEST_ARCHIVE" ]; then
+                  META_SOURCE="rootfs-archive"; META_LABEL="$(basename "$INGEST_ARCHIVE")"
+              else
+                  META_LABEL="$TARGET"
+              fi ;;
     MERGE)    META_SOURCE="";                META_TARGET=""; META_LABEL="" ;;
     *)
         # SOURCE covers three different inputs: a clone, an extracted archive,
