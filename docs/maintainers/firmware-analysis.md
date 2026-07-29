@@ -1,6 +1,6 @@
 # 펌웨어 분석 (Firmware Analysis)
 
-> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [번들 도구 라이선스](../../THIRD_PARTY_LICENSES.md)
+> **관련 문서**: [아키텍처](../concepts/architecture.ko.md) | [고지문·보안 보고서 가이드](../guides/reports.ko.md) | [번들 도구 라이선스](../../THIRD_PARTY_LICENSES.ko.md)
 >
 > 성격: 메인테이너용 설계·의사결정 문서입니다. Phase 1+2는 구현·머지를 마쳤으며(§5), §1의 "현재"는 펌웨어 도구가 없는 기본 이미지를 기준으로 한 한계를 뜻합니다. opt-in `sbom-scanner-firmware` 이미지(`--firmware`)가 이를 해소합니다. Phase 3(함수 핑거프린팅)만 선택적 향후 과제로 남습니다.
 
@@ -275,4 +275,4 @@ CPE가 없는 항목은 취약점 용도로는 5.7의 존재 판정과 값이 �
 - 다만 GPL 바이너리를 이미지로 재배포하므로 라이선스 텍스트 동봉과 소스 오퍼 의무가 있습니다.
 - AGPL 도구는 사용하지 않으므로(unblob=MIT 확인), 웹 UI(`--ui`)의 네트워크 조항을 걱정할 일이 없습니다.
 - GPL은 별도 `sbom-scanner-firmware` 이미지에만 들어가고, 기본 이미지는 permissive-only로 유지합니다.
-- 상세 인벤토리·의무는 [../../THIRD_PARTY_LICENSES.md](../../THIRD_PARTY_LICENSES.md) 참조.
+- 상세 인벤토리·의무는 [../../THIRD_PARTY_LICENSES.ko.md](../../THIRD_PARTY_LICENSES.ko.md) 참조.
