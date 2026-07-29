@@ -726,6 +726,13 @@ export interface RecentScan {
    * honest Type label. `null` when the SBOM omits it.
    */
   componentType: string | null;
+  /**
+   * What the scan was pointed at, from the run's saved config. The root
+   * component type cannot separate an analyzed supplier SBOM from a source
+   * scan — both declare "application" — so the Type label reads this first.
+   * `null` for a scan saved before the config sidecar existed.
+   */
+  inputSource: SourceType | null;
   /** Unix seconds of the SBOM file mtime. */
   generatedAt: number;
 }

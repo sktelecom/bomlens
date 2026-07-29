@@ -202,6 +202,42 @@ test("Recent home renders the summary strip and the scan table", async ({ page }
   await expect(page.getByText("AI model").first()).toBeVisible();
 });
 
+test("a submitted SBOM is typed as an SBOM, not as source", async ({ page }) => {
+  // Both rows declare "application" as their root component type — the only
+  // thing separating them is what the scan was pointed at. Reading the type
+  // alone labelled the analyzed supplier document a Source scan, and the
+  // result screen agreed with it.
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { id: "vendor_2.0", project: "vendor", version: "2.0", components: 3, maxSeverity: "HIGH", isAiScan: false, componentType: "application", inputSource: "sbom-upload", generatedAt: 1700000200 },
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 3, maxSeverity: "CRITICAL", isAiScan: false, componentType: "application", inputSource: "current-dir", generatedAt: 1700000000 },
+    ]) }),
+  );
+  await page.route("**/scan?id=vendor_2.0", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({
+      ...DONE,
+      id: "vendor_2.0",
+      scanConfig: { source: "sbom-upload", target: "", sourceLabel: "vendor.cdx.json", project: "vendor", version: "2.0" },
+    }) }),
+  );
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+  await page.goto("/?ui=next");
+
+  const table = page.getByRole("table");
+  await expect(table.getByRole("row", { name: /vendor/ })).toContainText("SBOM");
+  await expect(table.getByRole("row", { name: /demo/ })).toContainText("Source");
+
+  // The result screen's subtitle reads from the same signal.
+  await page.getByRole("link", { name: /vendor @2.0/ }).click();
+  await expect(page.locator("main h1")).toBeVisible();
+  await expect(page.getByText("SBOM analysis")).toBeVisible();
+});
+
 test("Recent home opens a past scan from the table row", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),

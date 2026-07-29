@@ -1670,8 +1670,14 @@ def list_scans():
             "isAiScan": any(c.get("type") == "machine-learning-model" for c in comps),
             # CycloneDX root component type — lets the Recent list label the scan
             # honestly (application/firmware/container/operating-system/data),
-            # straight from what the SBOM declares (no mode is stored elsewhere).
+            # straight from what the SBOM declares.
             "componentType": meta.get("type"),
+            # What the scan was actually pointed at, from the run-folder sidecar.
+            # The root component type alone cannot tell an analyzed supplier SBOM
+            # from a source scan: both end up as "application", so a submitted
+            # SBOM was labelled Source. None for a pre-sidecar scan, where the
+            # type falls back to the component type as before.
+            "inputSource": (scanmeta(run_id) or {}).get("source"),
             "generatedAt": mtime,
         })
 

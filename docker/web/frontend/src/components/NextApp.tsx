@@ -46,6 +46,20 @@ const SCAN_KIND_KEY: Record<string, string> = {
   data: "result.kindAnalyze",
 };
 
+/**
+ * Label key for the subtitle under the result heading — what was scanned.
+ *
+ * The saved input comes first: a submitted supplier SBOM usually declares
+ * "application" at its root, indistinguishable from a source scan, so reading
+ * the component type alone called it Source. Everything else keeps using the
+ * component type, which survives a re-open where the scan MODE does not.
+ */
+function scanKindKey(isAi: boolean, result: DoneEvent): string {
+  if (isAi) return "result.kindAi";
+  if (result.scanConfig?.source === "sbom-upload") return "result.kindAnalyze";
+  return SCAN_KIND_KEY[result.sbom?.componentType ?? ""] ?? "result.kindSbom";
+}
+
 /** Map a stored scan to the top bar's Recent-menu link shape. */
 function toRecentLink(s: RecentScan): RecentScanLink {
   const sev = s.maxSeverity;
@@ -419,12 +433,7 @@ export function NextApp() {
               </span>
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              {t(
-                scan.isAiScan
-                  ? "result.kindAi"
-                  : (SCAN_KIND_KEY[result.sbom?.componentType ?? ""] ??
-                      "result.kindSbom"),
-              )}
+              {t(scanKindKey(scan.isAiScan, result))}
             </p>
           </div>
 

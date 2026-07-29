@@ -121,7 +121,7 @@ That section also shows an AI compliance profile card: a one-glance rollup of th
 
 ## Scan management
 
-The home screen — opened from the rail's Scan management link, the logo, or the top bar's Scan management (clock) menu — lists every past scan saved on this machine. Each scan's `{Project}_{Version}/` subfolder under the output base is one entry. A search box and scan-type filter chips (only the types that exist — Source, Container, RootFS, Firmware, AI model, SBOM) narrow the list; three summary cards show the total scans, how many are at risk (click that card to filter to them), and the project count. The table sorts by scan, generated time, components or top severity. Click a row to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
+The home screen — opened from the rail's Scan management link, the logo, or the top bar's Scan management (clock) menu — lists every past scan saved on this machine. Each scan's `{Project}_{Version}/` subfolder under the output base is one entry. A search box and scan-type filter chips (only the types that exist — Source, Container, RootFS, Firmware, AI model, SBOM) narrow the list. The type comes from what the scan was pointed at and, where that leaves it open, from the root component the SBOM declares — an analyzed supplier document reads as SBOM rather than as the Source its root usually claims to be. Three summary cards show the total scans, how many are at risk (click that card to filter to them), and the project count. The table sorts by scan, generated time, components or top severity. Click a row to re-open its results, or delete one to remove its subfolder. This is local files only — no account, no database.
 
 ## Notes
 

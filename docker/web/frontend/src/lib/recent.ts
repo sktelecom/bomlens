@@ -63,15 +63,21 @@ export function filterRecent(
 }
 
 /**
- * A scan's kind, derived only from honest SBOM signals: `isAiScan` (an
- * ML-model component) wins, otherwise the CycloneDX root component.type the SBOM
- * declared. Unknown/absent types fall back to a generic "sbom" — we never invent
- * a finer type than the data supports.
+ * A scan's kind, derived only from honest signals: `isAiScan` (an ML-model
+ * component) wins, then what the scan was pointed at, then the CycloneDX root
+ * component.type the SBOM declared. Unknown/absent types fall back to a generic
+ * "sbom" — we never invent a finer type than the data supports.
  */
 export type ScanType = "ai" | "source" | "firmware" | "container" | "rootfs" | "sbom";
 
 export function scanType(scan: RecentScan): ScanType {
   if (scan.isAiScan) return "ai";
+  // A submitted SBOM is the one case the root component type gets wrong: a
+  // supplier's document usually declares "application", the same as a source
+  // scan, so an analyzed SBOM was labelled Source. The saved input settles it.
+  // Every other input either matches its component type or has none to conflict
+  // with, so they stay on the SBOM's own declaration.
+  if (scan.inputSource === "sbom-upload") return "sbom";
   switch (scan.componentType) {
     case "firmware":
       return "firmware";

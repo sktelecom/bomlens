@@ -1577,6 +1577,28 @@ assert t['project'] == 'demo' and t['components'] == 1, t
 else
     fail "/scans did not list the run subfolders" "$scans"
 fi
+# The listing carries the input the scan ran with, from the run-folder sidecar.
+# Without it an analyzed supplier SBOM is indistinguishable from a source scan:
+# both declare "application" as the root component type, so the UI called the
+# submitted SBOM a Source scan.
+cat > "$OUT/demo_1.0/.scanmeta.json" <<'JSON'
+{"source":"sbom-upload","sourceLabel":"vendor.cdx.json","project":"demo","version":"1.0"}
+JSON
+scans=$(curl -fsS "$BASE/scans" 2>/dev/null)
+if echo "$scans" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+s = next(x for x in d if x['id'] == 'demo_1.0')
+assert s['inputSource'] == 'sbom-upload', s
+# A run with no sidecar reports null rather than guessing.
+t = next(x for x in d if x['id'] == 'demo_1.0_20260101-120000')
+assert t['inputSource'] is None, t
+"; then
+    pass "/scans reports the saved input source (null when there is no sidecar)"
+else
+    fail "/scans did not report inputSource" "$scans"
+fi
+rm -f "$OUT/demo_1.0/.scanmeta.json"
 # /scan?id=<run_id> re-opens the scan from its folder.
 if curl -fsS "$BASE/scan?id=demo_1.0" 2>/dev/null | python3 -c "
 import sys, json
