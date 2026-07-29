@@ -338,17 +338,81 @@ EOF
         ;;
 
     ANALYZE)
+        # A Yocto build directory that published no SPDX document at all. There is
+        # no supplier document to validate or convert here — the build's own
+        # records (the image package manifest, license.manifest, cve-check) are
+        # read into the same CycloneDX the SPDX path produces, and the rest of the
+        # pipeline continues unchanged. Set by scan-sbom.sh / server.py only after
+        # they have established the folder is a build directory with no SBOM.
+        if [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; then
+            if [ ! -d "$YOCTO_BUILD_DIR" ]; then
+                echo "[ERROR] YOCTO_BUILD_DIR not found: $YOCTO_BUILD_DIR"; exit 1
+            fi
+            echo "[1/2] Reading the Yocto build's own records (no SPDX in this build)..."
+            if ! python3 "$LIBDIR/parse-yocto-manifests.py" \
+                    "$YOCTO_BUILD_DIR" "$OUTPUT_FILE" "$OUT_PREFIX"; then
+                echo "[ERROR] this build directory holds no image package manifest to read."
+                exit 1
+            fi
+            # No conformance report: conformance measures a document someone sent
+            # us against the submission criteria, and there is no document here.
+        else
         # Supplier-submitted SBOM (CycloneDX or SPDX). Validate the ORIGINAL for
         # conformance, then convert to CycloneDX so the common pipeline is reused.
         if [ -z "$ANALYZE_SBOM" ] || [ ! -f "$ANALYZE_SBOM" ]; then
             echo "[ERROR] ANALYZE_SBOM not found: $ANALYZE_SBOM"; exit 1
         fi
+        # An SPDX 2.x archive is not a document: it is a bundle of them, and the
+        # image document inside is an index listing one package. Measuring either
+        # against the submission criteria would report an unparseable or almost
+        # empty SBOM for something we read 36 packages out of, so conformance is
+        # skipped here for the same reason the manifest path skips it — there is
+        # no submitted document to judge.
+        case "$ANALYZE_SBOM" in
+            *.spdx.tar.zst) YOCTO_ARCHIVE=true ;;
+            *)              YOCTO_ARCHIVE=false ;;
+        esac
+        if [ "$YOCTO_ARCHIVE" = "false" ]; then
         echo "[1/2] Validating supplier SBOM (conformance, original input)..."
         # Conformance never aborts the pipeline (best-effort report).
         run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
+        # Describe the document the supplier actually sent, before conversion
+        # rewrites it: the format and version it was written in, the tool that
+        # produced it, when, and on whose authority. The result screens otherwise
+        # only ever describe the CycloneDX conversion. Best-effort.
+        run_optional_step describe-input python3 "$LIBDIR/describe-input-sbom.py" \
+            "$ANALYZE_SBOM" "${OUT_PREFIX}_input.json" "$(basename "$ANALYZE_SBOM")"
+        fi
         echo "[1/2] Converting supplier SBOM to CycloneDX..."
-        if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
-            echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+        # Yocto SPDX 3.0 takes a dedicated path. syft converts these documents but
+        # drops every vulnerability and lists source FILES as components (measured:
+        # 1000 components, 872 of them files, 0 vulnerabilities — against 35 installed
+        # packages and 3188 vulnerabilities actually in the document). The parser
+        # reads the installed set and the VEX judgements Yocto recorded at build time.
+        # rc=3 means "not a Yocto document" and is the normal path for every other
+        # supplier SBOM; any other non-zero rc is a real failure that still falls back
+        # so a parser bug cannot block a scan.
+        YOCTO_RC=3
+        if command -v python3 >/dev/null 2>&1 && [ -f "$LIBDIR/parse-yocto-spdx.py" ]; then
+            YOCTO_RC=0
+            python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+                || YOCTO_RC=$?
+        fi
+        if [ "$YOCTO_RC" != 0 ] && [ "$YOCTO_ARCHIVE" = "true" ]; then
+            # An archive is never CycloneDX or SPDX text, so the generic converter
+            # has nothing to try; it would only report an unrecognized format and
+            # bury the reason the archive could not be read (zstd missing, or a
+            # bundle with no image document in it).
+            echo "[ERROR] could not read the Yocto SPDX archive: $(basename "$ANALYZE_SBOM")"
+            echo "        See the [yocto-spdx] message above for what stopped it."
+            exit 1
+        fi
+        if [ "$YOCTO_RC" != 0 ]; then
+            [ "$YOCTO_RC" = 3 ] || echo "[analyze] WARN: Yocto SPDX parser failed (rc=$YOCTO_RC); using the generic converter." >&2
+            if ! bash "$LIBDIR/convert-to-cdx.sh" "$ANALYZE_SBOM" "$OUTPUT_FILE"; then
+                echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
+            fi
+        fi
         fi
         ;;
 
@@ -469,6 +533,26 @@ ARTIFACTS=("$OUTPUT_FILE")
 # See stamp-metadata.sh for the rationale.
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS|ROOTFS)
+        # Outbound licence: what the project itself ships under, which decides
+        # whether the licence-conflict check runs at all. cdxgen fills this from
+        # package.json for npm and leaves it empty everywhere else, so a Maven
+        # project with a perfectly good <licenses> block in its pom.xml used to be
+        # told no outbound licence was declared — the user had to repeat it with
+        # --license. Read the manifest here instead. An explicit --license still
+        # wins, and a manifest we cannot read confidently yields nothing, which
+        # leaves the check off rather than inventing a licence to compare against.
+        if [ -z "${PROJECT_LICENSE:-}" ] && command -v python3 >/dev/null 2>&1; then
+            _lic_src="${SOURCE_ROOT:-/src}"
+            [ -d "$_lic_src" ] || _lic_src=""
+            if [ -n "$_lic_src" ]; then
+                _detected="$(python3 "$LIBDIR/detect-project-license.py" "$_lic_src" 2>/dev/null || true)"
+                if [ -n "$_detected" ]; then
+                    PROJECT_LICENSE="$_detected"
+                    export PROJECT_LICENSE
+                    echo "[license] outbound license read from the project manifest: $PROJECT_LICENSE"
+                fi
+            fi
+        fi
         # No `|| true`: a stamp failure means the SBOM still carries a leaked/placeholder
         # root name (e.g. src@latest), which collides in some SBOM import platforms. Fail closed under
         # set -e so a mis-named SBOM is never normalized, signed, or uploaded.
@@ -531,6 +615,18 @@ if [ "${ENRICH_EOL:-true}" != "false" ] && [ "$SCAN_MODE" != "AIBOM" ]; then
     run_optional_step enrich-eol bash "$LIBDIR/enrich-eol.sh" "$OUTPUT_FILE"
 fi
 
+# Malicious-package check: flag components that are known-malicious packages
+# (typosquats, hijacked accounts, install-time payloads), fully OFFLINE from a
+# bundled OSV snapshot. A different question from "does this have a CVE?", and a
+# different response — removal and credential rotation rather than an upgrade —
+# so it is reported as its own signal. Matches by PURL only; a name match would
+# be exactly wrong here, since these packages are named to resemble real ones.
+# Runs for every mode: an AI SBOM's dependencies can be malicious too. Disable
+# with ENRICH_MALICIOUS=false. Best-effort; never aborts the scan.
+if [ "${ENRICH_MALICIOUS:-true}" != "false" ]; then
+    run_optional_step enrich-malicious bash "$LIBDIR/enrich-malicious.sh" "$OUTPUT_FILE"
+fi
+
 # Staleness enrichment (OPT-IN, default off): query deps.dev for absolute version
 # currency (newest version, how many releases behind, last-release date). Unlike
 # EOL this makes one network call per package, so it trades the scan's offline
@@ -576,27 +672,76 @@ if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
     fi
 fi
 
-# Source file tree (${OUT_PREFIX}_files.json). For modes with actual source files
-# on disk, emit a ScanCode-shaped inventory so the web UI's source-tree view works
-# WITHOUT the opt-in ScanCode deep-license scan — structure only, no licenses.
-# When ScanCode already produced a _scancode.json, that one wins (it carries
-# licenses), so we skip this fallback. SOURCE/ROOTFS walk the tree here; FIRMWARE
-# already wrote it inside scan-firmware.sh (its extracted rootfs is a temp dir
-# removed before we get here). Modes with no source files (AIBOM/ANALYZE/MERGE/
-# POSTPROCESS-without-source/BINARY) are excluded. Best-effort: never aborts.
-if [ ! -f "${OUT_PREFIX}_scancode.json" ]; then
-    SRC_TREE_DIR=""
-    case "$SCAN_MODE" in
-        SOURCE) SRC_TREE_DIR="${SOURCE_ROOT:-/src}" ;;
-        ROOTFS) SRC_TREE_DIR="$TARGET_DIR" ;;
-    esac
-    if [ -n "$SRC_TREE_DIR" ] && [ -d "$SRC_TREE_DIR" ]; then
-        bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" || true
+# Where this mode's scanned files sit on disk. SOURCE (web UI) and POSTPROCESS
+# (the CLI source scan, which mounts the scanned tree at /src) both look at a
+# source tree; ROOTFS looks at the extracted image directory. FIRMWARE handles
+# itself inside scan-firmware.sh, because its extracted rootfs is a temp dir
+# removed before we get here. AIBOM/ANALYZE/MERGE have no files at all.
+SRC_TREE_DIR=""
+UNPACKED_DIR=""
+case "$SCAN_MODE" in
+    SOURCE) SRC_TREE_DIR="${SOURCE_ROOT:-/src}" ;;
+    POSTPROCESS) [ "$SOURCE_SCAN" = "true" ] && SRC_TREE_DIR="${SOURCE_ROOT:-/src}" ;;
+    ROOTFS) SRC_TREE_DIR="$TARGET_DIR" ;;
+    IMAGE|BINARY)
+        # A container image is layers, and a build artifact is one packed file:
+        # neither has a directory to walk, so the scan alone can say what is
+        # INSIDE them but never show it. Unpack a readable copy to a temp dir,
+        # build the tree and snapshot from it, and delete it below — the same
+        # shape scan-firmware.sh already uses for its extraction. Best-effort:
+        # an ELF binary or a missing docker socket prints nothing and the file
+        # views are simply absent.
+        UNPACK_TARGET="$TARGET_IMAGE"
+        [ "$SCAN_MODE" = "BINARY" ] && UNPACK_TARGET="$TARGET_FILE"
+        # stdout is the directory (empty when it could not unpack); stderr is the
+        # reason, and belongs in the scan log where the user reads it.
+        UNPACKED_DIR="$(bash "$LIBDIR/unpack-scan-target.sh" "$SCAN_MODE" "$UNPACK_TARGET")"
+        SRC_TREE_DIR="$UNPACKED_DIR"
+        ;;
+esac
+[ -n "$SRC_TREE_DIR" ] && [ -d "$SRC_TREE_DIR" ] || SRC_TREE_DIR=""
+
+# Source file tree (${OUT_PREFIX}_files.json): a ScanCode-shaped inventory so the
+# web UI's source-tree view works WITHOUT the opt-in ScanCode deep-license scan —
+# structure only, no licenses. When ScanCode already produced a _scancode.json,
+# that one wins (it carries licenses), so we skip this fallback. Best-effort:
+# never aborts.
+if [ ! -f "${OUT_PREFIX}_scancode.json" ] && [ -n "$SRC_TREE_DIR" ]; then
+    bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" || true
+fi
+# Collect the file tree if any source-having mode produced one (the modes above,
+# or FIRMWARE from scan-firmware.sh).
+[ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")
+
+# Source snapshot (${OUT_PREFIX}_source.json): the CONTENT behind that tree, so
+# the UI can show what was scanned and not only what was found. Takes the file
+# list just written (either artifact — both carry the same ScanCode `files[]`
+# shape) so the exclusions live in one place. The scanned tree is gone once the
+# container exits, which is why the content is captured now. FIRMWARE again does
+# its own inside scan-firmware.sh. Best-effort: never aborts.
+if [ -n "$SRC_TREE_DIR" ]; then
+    SRC_LIST=""
+    [ -f "${OUT_PREFIX}_files.json" ] && SRC_LIST="${OUT_PREFIX}_files.json"
+    [ -f "${OUT_PREFIX}_scancode.json" ] && SRC_LIST="${OUT_PREFIX}_scancode.json"
+    if [ -n "$SRC_LIST" ]; then
+        run_optional_step source-snapshot python3 "$LIBDIR/source-snapshot.py" \
+            "$SRC_TREE_DIR" "$SRC_LIST" "${OUT_PREFIX}_source.json"
     fi
 fi
-# Collect the file tree if any source-having mode produced one (SOURCE/ROOTFS
-# above, or FIRMWARE from scan-firmware.sh).
-[ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")
+[ -f "${OUT_PREFIX}_source.json" ] && ARTIFACTS+=("${OUT_PREFIX}_source.json")
+# The unpacked copy of an image / build artifact has served its purpose once the
+# tree and the snapshot are written. It can be gigabytes, so it goes now rather
+# than at container exit.
+if [ -n "$UNPACKED_DIR" ] && [ -d "$UNPACKED_DIR" ]; then
+    rm -rf "$UNPACKED_DIR"
+fi
+# Supplier-SBOM header summary (ANALYZE, written before the conversion above).
+[ -f "${OUT_PREFIX}_input.json" ] && ARTIFACTS+=("${OUT_PREFIX}_input.json")
+# Yocto VEX judgement counts (parse-yocto-spdx.py). Shipped as an artifact because
+# the numbers it carries — how many CVEs the build already patched — are not
+# recoverable from the CycloneDX or the security report, which list only what is
+# still unresolved.
+[ -f "${OUT_PREFIX}_yocto_vex.json" ] && ARTIFACTS+=("${OUT_PREFIX}_yocto_vex.json")
 
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     if bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"; then

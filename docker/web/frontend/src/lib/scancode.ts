@@ -30,6 +30,14 @@ export interface FileNode {
   name: string;
   path: string;
   isDir: boolean;
+  /**
+   * A symlink rather than a regular file. Most of a container image or a
+   * firmware rootfs is links (nearly every command in Alpine's /bin points at
+   * busybox), so they are listed — the tree would otherwise show a /bin with
+   * almost nothing in it — but they are marked, because what a link holds is a
+   * destination, not content.
+   */
+  isLink: boolean;
   licenses: string[];
   children: FileNode[];
 }
@@ -71,15 +79,23 @@ export function parseScanCode(report: ScanCodeReport): FileNode[] {
   // Index intermediate nodes by their full path so we can attach children.
   const byPath = new Map<string, FileNode>();
 
-  const ensure = (path: string, isDir: boolean): FileNode => {
+  const ensure = (path: string, isDir: boolean, isLink = false): FileNode => {
     const existing = byPath.get(path);
     if (existing) {
       if (isDir) existing.isDir = true;
+      if (isLink) existing.isLink = true;
       return existing;
     }
     const segments = path.split("/");
     const name = segments[segments.length - 1] || path;
-    const node: FileNode = { name, path, isDir, licenses: [], children: [] };
+    const node: FileNode = {
+      name,
+      path,
+      isDir,
+      isLink,
+      licenses: [],
+      children: [],
+    };
     byPath.set(path, node);
     if (segments.length === 1) {
       roots.push(node);
@@ -94,7 +110,7 @@ export function parseScanCode(report: ScanCodeReport): FileNode[] {
   for (const f of files) {
     if (typeof f.path !== "string" || !f.path) continue;
     const isDir = f.type === "directory";
-    const node = ensure(f.path, isDir);
+    const node = ensure(f.path, isDir, f.type === "symlink");
     if (!isDir) {
       const lics = licenseOf(f);
       if (lics.length) node.licenses = lics;

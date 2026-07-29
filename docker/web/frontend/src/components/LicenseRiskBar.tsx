@@ -1,3 +1,4 @@
+import { Scale } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -41,6 +42,57 @@ const LABEL: Record<LicenseRiskTier, string> = {
   uncategorized: "licenses.tier.uncategorized",
   permissive: "licenses.tier.permissive",
 };
+
+/** i18n key per tier, for anywhere that names a tier outside this bar. */
+export const TIER_LABEL = LABEL;
+
+/**
+ * Fill for a flagged row in the distribution list.
+ *
+ * The brand accent, matching the left rail's active-section tint, rather than
+ * the risk hues the bar above uses. Those hues belong to vulnerability
+ * severity; carrying them into a licence list makes an obligation look like a
+ * CVE, and the amber/orange end of that scale dominated a row-wide fill.
+ *
+ * One accent for every flagged tier: the tint says "this row has obligations",
+ * and the badge beside the label says which kind. The distinction lives in the
+ * text, not in four shades a reader would have to learn.
+ *
+ * Permissive and uncategorized stay neutral — neither is a finding, and tinting
+ * every row would leave nothing standing out.
+ */
+export const TIER_FILL: Record<LicenseRiskTier, string> = {
+  "network-copyleft": "bg-brand/15",
+  "strong-copyleft": "bg-brand/15",
+  "weak-copyleft": "bg-brand/15",
+  "review-needed": "bg-brand/15",
+  uncategorized: "bg-muted-foreground/20",
+  permissive: "bg-muted-foreground/20",
+};
+
+/** Tiers that carry an obligation worth a second look, so they get a badge. */
+export const TIER_FLAGGED: ReadonlySet<LicenseRiskTier> = new Set([
+  "network-copyleft",
+  "strong-copyleft",
+  "weak-copyleft",
+  "review-needed",
+]);
+
+/**
+ * The marker beside a flagged license in the distribution list. It exists so the
+ * tint is not the only thing saying "this one has obligations" — colour alone
+ * fails anyone who cannot separate these hues, and a translucent fill is easy to
+ * miss regardless. Names its tier, so hovering or reading it aloud is specific.
+ */
+export function TierBadge({ tier }: { tier: LicenseRiskTier }) {
+  const { t } = useTranslation();
+  const label = t(TIER_LABEL[tier]);
+  return (
+    <span title={label} className="flex shrink-0 items-center">
+      <Scale className="h-3.5 w-3.5 text-muted-foreground" role="img" aria-label={label} />
+    </span>
+  );
+}
 
 interface Props {
   components: ComponentItem[];

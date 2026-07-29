@@ -11,9 +11,12 @@
 | [공급사 제출 SBOM 검증·분석](supplier-sbom-analysis.md) | ANALYZE 모드 검증·변환·위험 보고 설계 |
 | [검출 모드](detection-modes.md) | SOURCE 스캔에 경량·정적 검출 모드를 옵트인으로 더하는 설계(미구현 제안) |
 | [펌웨어 분석](firmware-analysis.md) | FIRMWARE 모드 언팩·바이너리 식별 설계와 도구 선정 |
+| [Yocto 지원 검증 절차](yocto-validation.md) | 공개된 Yocto 릴리스 산출물로 세 입력 경로를 실물 검증하는 방법과 기준선 수치 |
 | [배포 절차](release-guide.md) | 태그 기반 릴리스 체크리스트와 실행 절차 |
+| [읽기 전용 데모 발행](static-demo.md) | 문서 사이트에 얹는 정적 데모의 구성과 데이터 갱신 절차 |
 | [도구 버전 업그레이드 안전장치](dependency-upgrade-policy.md) | 외부 도구 신규 버전 도입을 지키는 4계층(감지·스냅샷·정본·호환성 점검) |
 | [Windows 종합 검증 절차](windows-verification.md) | 실제 Windows PC에서 CLI·웹 UI 전체 흐름을 검증하는 절차(사람 또는 코딩 에이전트 실행용) |
 | [Windows 검증 결과 — 2026-07](windows-verification-2026-07-results.md) | SPDX 출력 출시 회차의 Windows 검증 실행 결과와 후속 과제 |
+| [실행되는 문서 블록](runnable-doc-blocks.md) | 가이드의 명령을 CI가 실제로 실행해 검증하는 방식과 블록 표기 규칙 |
 
 > 사용자용 경량 가이드는 상위 [docs/](../)에 있습니다. 펌웨어는 [펌웨어 분석 가이드](../guides/firmware.ko.md), 공급사 SBOM 검증은 [공급사 SBOM 검증 가이드](../guides/supplier-sbom.ko.md)를 참고하세요.

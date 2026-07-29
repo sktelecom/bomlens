@@ -46,6 +46,20 @@ const SCAN_KIND_KEY: Record<string, string> = {
   data: "result.kindAnalyze",
 };
 
+/**
+ * Label key for the subtitle under the result heading — what was scanned.
+ *
+ * The saved input comes first: a submitted supplier SBOM usually declares
+ * "application" at its root, indistinguishable from a source scan, so reading
+ * the component type alone called it Source. Everything else keeps using the
+ * component type, which survives a re-open where the scan MODE does not.
+ */
+function scanKindKey(isAi: boolean, result: DoneEvent): string {
+  if (isAi) return "result.kindAi";
+  if (result.scanConfig?.source === "sbom-upload") return "result.kindAnalyze";
+  return SCAN_KIND_KEY[result.sbom?.componentType ?? ""] ?? "result.kindSbom";
+}
+
 /** Map a stored scan to the top bar's Recent-menu link shape. */
 function toRecentLink(s: RecentScan): RecentScanLink {
   const sev = s.maxSeverity;
@@ -98,13 +112,15 @@ export function NextApp() {
   // clears it, so a subsequent plain New scan starts blank.
   const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
   // A navigation seed: route into a section with a filter pre-applied — a
-  // global-search term, or an Overview risk-bar click (severity / license tier).
+  // global-search term, an Overview risk-bar click (severity / license tier), or
+  // a Licenses distribution row (one license id).
   // The section's own control re-seeds only when the value changes.
   const [seed, setSeed] = useState<{
     section: SectionId;
     term?: string;
     severity?: Severity;
     tier?: LicenseRiskTier;
+    license?: string;
   } | null>(null);
 
   // The scan id currently held in `result` — so the hash router can tell a
@@ -314,7 +330,7 @@ export function NextApp() {
   // An Overview risk-bar click routes into the section with that filter applied.
   const handleFilterPick = (
     section: SectionId,
-    filter: { severity?: Severity; tier?: LicenseRiskTier },
+    filter: { severity?: Severity; tier?: LicenseRiskTier; license?: string },
   ) => {
     setSeed({ section, ...filter });
     if (loadedIdRef.current) {
@@ -417,12 +433,7 @@ export function NextApp() {
               </span>
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              {t(
-                scan.isAiScan
-                  ? "result.kindAi"
-                  : (SCAN_KIND_KEY[result.sbom?.componentType ?? ""] ??
-                      "result.kindSbom"),
-              )}
+              {t(scanKindKey(scan.isAiScan, result))}
             </p>
           </div>
 
@@ -439,6 +450,9 @@ export function NextApp() {
             }
             seedTier={
               seed && seed.section === activeSection ? seed.tier : undefined
+            }
+            seedLicense={
+              seed && seed.section === activeSection ? seed.license : undefined
             }
             onPick={handleFilterPick}
             // An on-demand SPDX export adds an artifact after the scan ended, so

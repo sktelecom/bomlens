@@ -3,6 +3,12 @@ name: Docs site
 # docs/ 정본 마크다운을 MkDocs Material로 빌드해 GitHub Pages(gh-pages 브랜치)에 배포한다.
 # 사이트 소스는 docs/이며, internal/과 contributing/는 mkdocs.yml의 exclude_docs로 제외된다.
 # 최초 1회 저장소 Settings > Pages에서 소스를 "gh-pages 브랜치"로 지정해야 한다.
+#
+# 사이트에는 읽기 전용 데모(/demo/)도 함께 실린다. 데이터(docs/demo/data/)는
+# scripts/capture-demo-data.sh가 만들어 저장소에 커밋된 것이고, 화면을 그리는
+# 번들만 여기서 빌드해 docs/demo/에 넣는다. 빌드 산출물을 저장소에 두지 않으려는
+# 것이며, mkdocs가 docs/ 하위의 비마크다운 파일을 그대로 복사하므로 별도 배포
+# 단계는 필요하지 않다.
 on:
   push:
     branches:
@@ -12,6 +18,7 @@ on:
       - overrides/**
       - mkdocs.yml
       - .github/workflows/docs.yml
+      - docker/web/frontend/**
   pull_request:
     branches:
       - main
@@ -20,10 +27,17 @@ on:
       - overrides/**
       - mkdocs.yml
       - .github/workflows/docs.yml
+      - docker/web/frontend/**
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  # 사이트가 하위 경로(/bomlens/)에 서비스되므로 번들의 자산 경로와 데이터 경로
+  # 모두 그 하위를 가리켜야 한다. mkdocs.yml의 site_url과 함께 움직인다.
+  DEMO_BASE_PATH: /bomlens/demo/
+  DEMO_DATA_BASE: /bomlens/demo/data
 
 jobs:
   # PR에서는 배포 없이 빌드만 검증한다. --strict라 깨진 링크·설정 오류가
@@ -33,6 +47,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docker/web/frontend/package-lock.json
+      - name: Build the demo bundle
+        run: bash scripts/build-demo-bundle.sh
       # 시스템 파이썬은 externally-managed라 venv로 격리해 의존성을 설치한다.
       - name: Build (no deploy)
         run: |
@@ -50,6 +71,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docker/web/frontend/package-lock.json
+      - name: Build the demo bundle
+        run: bash scripts/build-demo-bundle.sh
       # 시스템 파이썬은 externally-managed라 venv로 격리해 의존성을 설치한다.
       - name: Build and deploy
         run: |

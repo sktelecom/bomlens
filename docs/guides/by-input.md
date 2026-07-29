@@ -1,12 +1,12 @@
 ---
-description: How BomLens produces an SBOM, an open-source notice, and a risk report for six input forms — a GitHub URL, a ZIP archive, local source, an existing SBOM, firmware, and a HuggingFace AI model.
+description: How BomLens produces an SBOM, an open-source notice, and a risk report for seven input forms — a GitHub URL, a ZIP archive, local source, an existing SBOM, a Yocto build directory, firmware, and a HuggingFace AI model.
 ---
 
 # Input scenarios guide
 
 ## Overview
 
-An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of six input forms. (An AI model differs slightly — an ML-BOM and no security report; see Scenario 6.)
+An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of seven input forms. (An AI model differs slightly — an ML-BOM and no security report; see Scenario 7.)
 
 **The three deliverables**
 
@@ -44,6 +44,8 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | Source ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | same |
 | Local directory (C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | same |
 | Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same + conformance report |
+| Yocto build directory | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | same + conformance report |
+| Build artifact (`.jar`, `.deb`, …) | BINARY | `$SBOM --target app.jar --all --generate-only` | same |
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 | AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 
@@ -119,12 +121,31 @@ $SBOM --project team4-proj --version 2.0.0 \
 
 **Deliverables**: notice, SBOM (converted), risk report, conformance report
 
-## Scenario 5 — Firmware binary
+## Scenario 5 — Yocto build directory
+
+You build an embedded Linux image with Yocto and want to know what shipped in it. Point the scan at the build directory; the build already recorded the answer.
+
+```bash
+$SBOM --project team5-image --version 1.0.0 \
+  --target ~/poky/build \
+  --generate-only
+```
+
+- Configure the build to emit an SBOM — add `INHERIT += "create-spdx-3.0"` and `INHERIT += "vex"` to `conf/local.conf` — and you get the most out of it. That setting needs 5.0 Scarthgap or later; 4.0 Kirkstone has no such class. SPDX 2.2 (the default on both LTS releases) is read too, from the `.spdx.tar.zst` beside the image document, but carries no CVE verdicts. A build with no SPDX at all falls back to the manifests it wrote anyway; a build with neither stops the scan and says so.
+- The image SBOM under `tmp/deploy/images/<machine>/` is analyzed — not the build tree, which holds sysroots and native build tools that never ship in the image.
+- The component list is the packages installed in the image, and vulnerabilities carry the verdicts the build itself made (patched by a recipe, judged not applicable, or still open). Only the open ones count as findings.
+- If several machines or images were built, the newest SBOM is analyzed and every candidate is listed in the log; pass `--analyze <file>` to choose a different one.
+- In the web UI, pick the folder with the **Directory / rootfs** input (mount it with `--ui --mount ~/poky/build`, or use Add folder in the desktop app) — the same detection runs there.
+- For the full behavior and its limits, see the [Yocto section of the supplier SBOM guide](supplier-sbom.md#yocto-images).
+
+**Deliverables**: notice, SBOM, risk report, conformance report
+
+## Scenario 6 — Firmware binary
 
 A team handed you a built firmware image (`dev.bin`). Unpack it and identify components.
 
 ```bash
-$SBOM --project team5-fw --version 1.0.0 \
+$SBOM --project team6-fw --version 1.0.0 \
   --target "./dev.bin" --firmware \
   --all --generate-only
 ```
@@ -135,7 +156,7 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 **Deliverables**: notice, SBOM, risk report (three)
 
-## Scenario 6 — AI model (HuggingFace)
+## Scenario 7 — AI model (HuggingFace)
 
 A team points you at a HuggingFace model instead of code. Generate an ML-BOM from the model id — no source code and no model-weight download.
 

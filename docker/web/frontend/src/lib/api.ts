@@ -16,6 +16,38 @@
  * project/version. Omitting `id` falls back to the legacy flat layout.
  */
 
+import { DEMO_DATA_BASE, IS_STATIC_DEMO } from "./demo";
+
+/**
+ * Map a server path to its captured file. A static host cannot answer query
+ * strings, so `/scan?id=<run>` becomes `<base>/scan-<run>.json`; the capture
+ * step writes the same names. Unmapped paths pass through unchanged — they
+ * belong to write endpoints, which never run in demo mode.
+ */
+function apiUrl(path: string): string {
+  if (!IS_STATIC_DEMO) return path;
+  const [route, query] = path.split("?");
+  const id = new URLSearchParams(query ?? "").get("id") ?? "";
+  switch (route) {
+    case "/capabilities":
+      return `${DEMO_DATA_BASE}/capabilities.json`;
+    case "/scans":
+      return `${DEMO_DATA_BASE}/scans.json`;
+    case "/scan":
+      return `${DEMO_DATA_BASE}/scan-${encodeURIComponent(id)}.json`;
+    case "/results":
+      return `${DEMO_DATA_BASE}/results-${encodeURIComponent(id)}.json`;
+    default:
+      return path;
+  }
+}
+
+/** Thrown by the write helpers when the read-only demo bundle calls them. The
+ *  UI hides those entry points, so reaching this is a bug, not a user path. */
+function demoWriteRefused(): never {
+  throw new Error("This is a read-only demo — scanning is disabled.");
+}
+
 export interface ResultFile {
   name: string;
   size: number;
@@ -42,6 +74,21 @@ export interface ComponentItem {
   /** AI-relevant restrictive license class needing human review, set by
    *  normalize-sbom.sh (shared license-flags.jq). Absent for ordinary licenses. */
   licenseReview?: "behavioral-use" | "non-commercial";
+  /** A known-malicious package (bundled OSV snapshot). Not a severity: this one
+   *  is removed rather than upgraded, so it is kept out of maxSeverity/vulnCount
+   *  and shown as its own signal. */
+  malicious?: boolean;
+  /** The OSV advisory id (MAL-…) behind that flag. */
+  maliciousId?: string;
+  /** Which snapshot said so, e.g. "osv.dev@2026-07-28" — a clean result means
+   *  "not in this snapshot", so the date is part of the answer. */
+  maliciousSource?: string;
+  /** How this component's license sits against the project's declared outbound
+   *  license (normalize-sbom.sh, rules in docker/lib/license-compat.json).
+   *  Absent when no outbound license was declared — "not assessed", not clean. */
+  licenseConflict?: "compatible" | "conditional" | "incompatible" | "unknown";
+  /** Why that verdict — the rule's reasoning, shown beside the badge. */
+  licenseConflictWhy?: string;
   /** Source / download location (externalReferences vcs/distribution/website). */
   source?: string;
   /** Copyright holder line, when the SBOM captured one. */
@@ -91,6 +138,20 @@ export interface SbomSummary {
   /** Components behind the latest patch in their own release cycle (offline
    *  currency from the endoflife snapshot). */
   outdatedCount?: number;
+  /** Components that are known-malicious packages. Absent when none — the tile
+   *  appears only when there is something to act on. */
+  maliciousCount?: number;
+  /** The outbound license the project declares on its root component. Absent
+   *  when none was declared, which is what turns the conflict check off. */
+  outboundLicense?: string;
+  /** Conflict verdict tally across every component (not just the capped rows).
+   *  Present only alongside outboundLicense. */
+  conflictCounts?: {
+    incompatible: number;
+    conditional: number;
+    unknown: number;
+    compatible: number;
+  };
 }
 
 export const SEVERITY_ORDER = [
@@ -126,6 +187,24 @@ export interface VulnItem {
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */
+/** Build-time vulnerability judgements carried inside a Yocto SPDX SBOM.
+ *
+ *  Yocto runs its own CVE analysis during the build and records the verdict per
+ *  CVE, so it knows whether the recipe applied the patch. `fixed` therefore means
+ *  genuinely closed on this image — an outside scanner matching on version alone
+ *  would report those same CVEs as open. Only `unresolved` reaches the security
+ *  panel; the rest are shown as work the build already did. */
+export interface YoctoVex {
+  /** CVEs the build patched (SPDX `fixedIn`). */
+  fixed: number;
+  /** CVEs judged inapplicable to this image (SPDX `doesNotAffect`). */
+  notAffected: number;
+  /** CVEs with no verdict — these are the ones that still need attention. */
+  affected: number;
+  /** Rows handed to the security report; equals `affected` minus duplicates. */
+  unresolved: number;
+}
+
 export type SecuritySummary = Record<Severity, number> & {
   TOTAL: number;
   vulnerabilities?: VulnItem[];
@@ -294,6 +373,12 @@ export interface ScanConfig {
   source: SourceType;
   /** git URL / docker image (empty for current-folder and upload sources). */
   target: string;
+  /** What the user actually picked, when `target` cannot say it: the uploaded
+   *  file's name, or the folder a CLI scan ran against. Shown as the scan's
+   *  provenance (see lib/provenance.ts); absent on scans that predate it.
+   *  Kept separate from `target` because "re-scan" refills the form from
+   *  `target`, and an upload has to be chosen again rather than retyped. */
+  sourceLabel?: string;
   project: string;
   version: string;
   notice: boolean;
@@ -305,6 +390,9 @@ export interface ScanConfig {
   identifyVendored: boolean;
   includeOsv: boolean;
   byteStable: boolean;
+  /** The outbound license declared for this scan (SPDX id), which switches the
+   *  license-conflict check on. Empty or absent means it stayed off. */
+  license?: string;
   /** SBOM-upload only: match components against NVD-only (CPE) advisories too —
    *  catches vulnerabilities in older Java (Maven) libraries other sources miss. */
   deepCve: boolean;
@@ -323,6 +411,11 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** Vulnerability judgements Yocto recorded while building the image (Yocto SPDX
+   *  input only; null otherwise). The security panel lists only what is still
+   *  unresolved, so these counts are what distinguishes "the build already patched
+   *  these" from "nothing was found". */
+  yoctoVex?: YoctoVex | null;
   /** AI compliance profile card rollup (AI SBOMs only; null otherwise). Present on
    *  both the SSE `done` event and the `/scan` detail (loadScan), kept in sync
    *  server-side. Drives the AI compliance summary card. */
@@ -344,8 +437,15 @@ export type SourceType =
   // toggle is on, so a desktop "Add folder…" scan resolves transitives like the
   // current folder does. Server clones the read-only mount into a writable tree.
   | "scan-target-src"
+  // A Yocto build directory, recognized from a folder the user pointed at. Not a
+  // picker tile: the CLI (and, later, the folder pickers) route to it on its own
+  // when the folder turns out to be a build directory, and analyze the image
+  // SBOM the build wrote. Appears in a finished scan's config, never in a
+  // request.
+  | "yocto-build-dir"
   | "git-url"
   | "zip-upload"
+  | "package-upload"
   | "sbom-upload"
   | "firmware-upload"
   | "ai-model"
@@ -356,13 +456,25 @@ export const SOURCE_TYPES: SourceType[] = [
   "rootfs-dir",
   "git-url",
   "zip-upload",
+  "package-upload",
   "sbom-upload",
   "firmware-upload",
   "ai-model",
   "docker-image",
 ];
 
-export type UploadKind = "zip" | "sbom" | "firmware";
+/**
+ * The input a finished scan should be replayed from. "Re-scan" seeds the form
+ * from a scan's config, and `yocto-build-dir` is not an input the form offers —
+ * it is what a picked folder turned out to be. Replaying it means picking the
+ * same folder again, so it maps back to the directory input; the scanner then
+ * decides afresh whether that folder is still a Yocto build directory.
+ */
+export function formSourceOf(source: SourceType): SourceType {
+  return source === "yocto-build-dir" ? "rootfs-dir" : source;
+}
+
+export type UploadKind = "zip" | "sbom" | "firmware" | "package";
 
 /** How the user intends to use a scanned AI model. Sent with the scan start so
  *  the pipeline grades the license assessment against this use, and stamped
@@ -395,6 +507,9 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** Outbound license (SPDX id) the project ships under. Read server-side as the
+   *  exact `license` parameter; empty leaves the license-conflict check off. */
+  license?: string;
   /** AI-model scans only: the intended usage the assessment should grade
    *  against. Read server-side as the exact `usage` query parameter; omitted
    *  (sent empty) when unspecified or for any other source. */
@@ -467,7 +582,7 @@ export interface Capabilities {
 /** Which input types this running image supports (firmware needs the fw image). */
 export async function getCapabilities(): Promise<Capabilities> {
   try {
-    const res = await fetch("/capabilities");
+    const res = await fetch(apiUrl("/capabilities"));
     if (!res.ok) return { firmware: false, scanoss: false, docker: true };
     return (await res.json()) as Capabilities;
   } catch {
@@ -516,6 +631,7 @@ export async function uploadFile(
   file: File,
   kind: UploadKind,
 ): Promise<{ token: string; filename: string }> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
   const fd = new FormData();
   fd.append("kind", kind);
   fd.append("file", file);
@@ -538,6 +654,7 @@ export async function uploadFile(
 
 /** Stash a private-repo token; returns a single-use credId for the scan. */
 export async function stashGitCred(token: string): Promise<{ credId: string }> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
   const res = await fetch("/git-cred", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -562,6 +679,11 @@ export async function stashGitCred(token: string): Promise<{ credId: string }> {
  * the server falls back to the legacy flat layout (back-compat).
  */
 export function fileUrl(id: string | null | undefined, name: string): string {
+  if (IS_STATIC_DEMO) {
+    // The capture step copies each run folder verbatim, so the artifact keeps
+    // its own name under a folder named for the run.
+    return `${DEMO_DATA_BASE}/files/${encodeURIComponent(id ?? "")}/${encodeURIComponent(name)}`;
+  }
   const idPart = id ? `id=${encodeURIComponent(id)}&` : "";
   return `/file?${idPart}name=${encodeURIComponent(name)}`;
 }
@@ -577,6 +699,9 @@ export function fileUrl(id: string | null | undefined, name: string): string {
 export async function exportSpdx(
   id: string,
 ): Promise<{ name: string; results: ResultFile[] } | null> {
+  // The demo capture reports spdxExport: false, so the button never renders;
+  // conversion needs the server. Null keeps the caller's failure path.
+  if (IS_STATIC_DEMO) return null;
   try {
     const res = await fetch(`/spdx-export?id=${encodeURIComponent(id)}`);
     if (!res.ok) return null;
@@ -601,6 +726,13 @@ export interface RecentScan {
    * honest Type label. `null` when the SBOM omits it.
    */
   componentType: string | null;
+  /**
+   * What the scan was pointed at, from the run's saved config. The root
+   * component type cannot separate an analyzed supplier SBOM from a source
+   * scan — both declare "application" — so the Type label reads this first.
+   * `null` for a scan saved before the config sidecar existed.
+   */
+  inputSource: SourceType | null;
   /** Unix seconds of the SBOM file mtime. */
   generatedAt: number;
 }
@@ -608,7 +740,7 @@ export interface RecentScan {
 /** List past scans (newest first). Empty on any failure — history is optional. */
 export async function listScans(): Promise<RecentScan[]> {
   try {
-    const res = await fetch("/scans");
+    const res = await fetch(apiUrl("/scans"));
     if (!res.ok) return [];
     return (await res.json()) as RecentScan[];
   } catch {
@@ -618,6 +750,7 @@ export async function listScans(): Promise<RecentScan[]> {
 
 /** Delete one past scan by run_id (removes its run folder, or legacy {id}_*). */
 export async function deleteScan(id: string): Promise<boolean> {
+  if (IS_STATIC_DEMO) return false; // the demo dataset is fixed; the UI hides this
   try {
     const res = await fetch(`/scan-delete?id=${encodeURIComponent(id)}`, {
       method: "POST",
@@ -631,7 +764,7 @@ export async function deleteScan(id: string): Promise<boolean> {
 /** Re-open a past scan by run_id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {
-    const res = await fetch(`/scan?id=${encodeURIComponent(id)}`);
+    const res = await fetch(apiUrl(`/scan?id=${encodeURIComponent(id)}`));
     if (!res.ok) return null;
     return (await res.json()) as DoneEvent;
   } catch {
@@ -646,13 +779,20 @@ export function absoluteFileUrl(id: string | null | undefined, name: string): st
 
 /** URL that streams a run's generated artifacts as a single zip (scoped by id). */
 export function downloadAllUrl(id?: string | null): string {
+  // The capture step zips each run folder ahead of time, so "download all"
+  // stays a real download rather than a disabled button.
+  if (IS_STATIC_DEMO) {
+    return `${DEMO_DATA_BASE}/files/${encodeURIComponent(id ?? "")}.zip`;
+  }
   return id ? `/download-all?id=${encodeURIComponent(id)}` : "/download-all";
 }
 
 /** List a run's result files (scoped by run_id; all runs when omitted). */
 export async function listResults(id?: string | null): Promise<ResultFile[]> {
   try {
-    const res = await fetch(id ? `/results?id=${encodeURIComponent(id)}` : "/results");
+    const res = await fetch(
+      apiUrl(id ? `/results?id=${encodeURIComponent(id)}` : "/results"),
+    );
     if (!res.ok) return [];
     return (await res.json()) as ResultFile[];
   } catch {
@@ -679,6 +819,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    license: params.license ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
     upload_target: params.uploadTarget ?? "",

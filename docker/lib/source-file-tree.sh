@@ -68,6 +68,15 @@ trap 'rm -f "$tmp"' EXIT
         \( -type d \( "${prune_expr[@]}" \) -prune \) -o \
         \( -type f -print \) 2>/dev/null \
         | sed -e 's#^\./##' -e '/^$/d' -e 's/^/f\t/'
+    # Symlinks, tagged "l". Without these a container image or a firmware rootfs
+    # loses most of its contents: an Alpine image is 90 regular files against 334
+    # symlinks (nearly every command in /bin points at busybox), so omitting them
+    # shows a tree in which /bin/cat does not exist. Their targets are read
+    # later; the link itself is never followed.
+    find . -mindepth 1 \
+        \( -type d \( "${prune_expr[@]}" \) -prune \) -o \
+        \( -type l -print \) 2>/dev/null \
+        | sed -e 's#^\./##' -e '/^$/d' -e 's/^/l\t/'
 ) > "$tmp" || true
 
 total=$(wc -l < "$tmp" 2>/dev/null | tr -d ' ')
@@ -87,7 +96,9 @@ if command -v jq >/dev/null 2>&1; then
             | map(select(length > 0) | split("\t"))
             | map({
                 path: .[1],
-                type: (if .[0] == "d" then "directory" else "file" end)
+                type: (if .[0] == "d" then "directory"
+                       elif .[0] == "l" then "symlink"
+                       else "file" end)
               })
         )}
     ' "$tmp" > "$OUT" 2>/dev/null; then

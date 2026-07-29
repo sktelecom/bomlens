@@ -31,6 +31,24 @@ export function sourceTreeFileName(result: DoneEvent): string | undefined {
   return scancodeFileName(result) ?? sourceFilesFileName(result);
 }
 
+/**
+ * The source snapshot (`_source.json`), if present: the file contents behind the
+ * tree. Absent for scans with nothing readable on disk, and for scans run before
+ * the scanner started capturing it — the tree renders either way.
+ */
+export function sourceSnapshotFileName(result: DoneEvent): string | undefined {
+  return result.results.find((r) => r.name.endsWith("_source.json"))?.name;
+}
+
+/**
+ * The supplier-SBOM header summary (`_input.json`), written by an ANALYZE scan
+ * from the document as it arrived — before the conversion to CycloneDX that the
+ * rest of the result describes.
+ */
+export function inputSbomFileName(result: DoneEvent): string | undefined {
+  return result.results.find((r) => r.name.endsWith("_input.json"))?.name;
+}
+
 /** Build the rail's scan context from a result (null before any scan). */
 export function deriveScanContext(result: DoneEvent | null): ScanContext {
   if (!result) return EMPTY_SCAN;
@@ -39,6 +57,7 @@ export function deriveScanContext(result: DoneEvent | null): ScanContext {
     isAiScan: isAiScan(result),
     hasDependencies: Boolean(sbomFileName(result)),
     hasSourceTree: Boolean(sourceTreeFileName(result)),
+    hasInputSbom: Boolean(inputSbomFileName(result)),
     hasConformance: (result.conformance?.checks ?? []).length > 0,
   };
 }

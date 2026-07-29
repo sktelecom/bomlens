@@ -10,6 +10,7 @@ import {
   Boxes,
   Cpu,
   FileCheck2,
+  FileInput,
   FileText,
   GitBranch,
   type LucideIcon,
@@ -25,6 +26,7 @@ export type SectionId =
   | "components"
   | "dependencies"
   | "sourceTree"
+  | "inputSbom"
   | "vulnerabilities"
   | "licenses"
   | "conformance"
@@ -69,6 +71,8 @@ export interface ScanContext {
   hasDependencies: boolean;
   /** A ScanCode artifact exists, so the source tree can be shown. */
   hasSourceTree: boolean;
+  /** The scan's input was an SBOM and its header summary was captured. */
+  hasInputSbom: boolean;
   /**
    * An SBOM conformance report exists (ANALYZE produced format/G7 checks), so
    * the conformance section applies — regardless of AI content.
@@ -81,6 +85,7 @@ export const EMPTY_SCAN: ScanContext = {
   isAiScan: false,
   hasDependencies: false,
   hasSourceTree: false,
+  hasInputSbom: false,
   hasConformance: false,
 };
 
@@ -108,12 +113,34 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FileText,
         requires: (c) => c.hasSourceTree,
       },
+      // The scanned input, when that input was itself an SBOM: what the
+      // supplier sent, before the conversion to CycloneDX that everything else
+      // on screen describes. Sits beside the source tree because it answers the
+      // same question for a different kind of scan — what did we look at?
+      {
+        id: "inputSbom",
+        labelKey: "nav.inputSbom",
+        icon: FileInput,
+        requires: (c) => c.hasInputSbom,
+      },
+    ],
+  },
+  // Security and compliance are split because they are read by different people
+  // at different moments: a CVE list is triaged against a patch schedule, while
+  // licence obligations are settled once per release. Grouping them together
+  // made whoever needed one of them scan past the other.
+  {
+    id: "security",
+    labelKey: "nav.group.security",
+    sections: [
+      { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
     ],
   },
   {
-    id: "risk",
-    labelKey: "nav.group.risk",
+    id: "compliance",
+    labelKey: "nav.group.compliance",
     sections: [
+      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
       // Supplier-SBOM conformance: shown whenever an ANALYZE produced a
       // conformance report, regardless of AI content. The G7 AI minimum-element
       // checks (when present) render as a sub-block inside this section.
@@ -123,8 +150,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: FileCheck2,
         requires: (c) => c.hasConformance,
       },
-      { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
-      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
     ],
   },
   {

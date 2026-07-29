@@ -1,0 +1,58 @@
+{
+  "_comment": "Outbound-license compatibility rules for bomlens:licenseConflict. Read by license-flags.jq (license_conflict) and mirrored by the web UI in licenses.ts. A documentation aid that surfaces combinations worth a human look — never a legal determination, which is why 'conditional' is used generously and 'incompatible' is reserved for the combinations that are uncontroversial.",
+  "_sources": [
+    "https://www.gnu.org/licenses/license-list.html",
+    "https://www.gnu.org/licenses/gpl-faq.html#AllCompatibility",
+    "https://spdx.org/licenses/"
+  ],
+  "_verdicts": {
+    "compatible": "No conflict between this dependency and the declared outbound license.",
+    "conditional": "Permitted, but the combination carries obligations that depend on how you distribute or link. A person has to check.",
+    "incompatible": "The dependency's terms cannot be met while distributing under the declared outbound license.",
+    "unknown": "Not enough information to judge — the license was not recognised, or the outbound license was not declared."
+  },
+  "matrix": {
+    "permissive": {
+      "permissive": { "verdict": "compatible", "why": "Both are permissive; keep the notices." },
+      "weak-copyleft": { "verdict": "conditional", "why": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine." },
+      "strong-copyleft": { "verdict": "incompatible", "why": "Distributing a combined work requires the whole work to be offered under the copyleft license, which the declared permissive outbound license does not do." },
+      "network-copyleft": { "verdict": "incompatible", "why": "Network copyleft extends the reciprocity to users served over a network, which the declared permissive outbound license cannot satisfy." },
+      "uncategorized": { "verdict": "unknown", "why": "The dependency's license was not recognised." }
+    },
+    "weak-copyleft": {
+      "permissive": { "verdict": "compatible", "why": "A permissive dependency imposes no reciprocal obligation." },
+      "weak-copyleft": { "verdict": "conditional", "why": "Two file- or library-level reciprocal licenses. Each keeps its own scope, so check that the boundaries do not overlap in the combined work." },
+      "strong-copyleft": { "verdict": "incompatible", "why": "The dependency requires the combined work to be offered under its terms, which a weaker reciprocal outbound license does not provide." },
+      "network-copyleft": { "verdict": "incompatible", "why": "The dependency adds network-use reciprocity that the declared outbound license does not carry." },
+      "uncategorized": { "verdict": "unknown", "why": "The dependency's license was not recognised." }
+    },
+    "strong-copyleft": {
+      "permissive": { "verdict": "compatible", "why": "Permissive terms can be met while distributing under a strong copyleft license." },
+      "weak-copyleft": { "verdict": "conditional", "why": "Usually absorbable into a strong copyleft work, but some file-level reciprocal licenses need an explicit compatibility clause. Check the specific pair." },
+      "strong-copyleft": { "verdict": "conditional", "why": "Same family, but versions differ in compatibility — notably GPL-2.0-only cannot be combined with GPL-3.0 code. Check the versions." },
+      "network-copyleft": { "verdict": "conditional", "why": "Network copyleft adds obligations beyond the declared outbound license; combining is allowed in one direction only. Check which way this goes." },
+      "uncategorized": { "verdict": "unknown", "why": "The dependency's license was not recognised." }
+    },
+    "network-copyleft": {
+      "permissive": { "verdict": "compatible", "why": "Permissive terms can be met while distributing under a network copyleft license." },
+      "weak-copyleft": { "verdict": "conditional", "why": "Usually absorbable, but check whether the dependency's reciprocal scope has an explicit compatibility clause." },
+      "strong-copyleft": { "verdict": "conditional", "why": "AGPL-3.0 and GPL-3.0 are designed to combine; older strong copyleft versions are not. Check the versions." },
+      "network-copyleft": { "verdict": "compatible", "why": "Same reciprocal scope." },
+      "uncategorized": { "verdict": "unknown", "why": "The dependency's license was not recognised." }
+    }
+  },
+  "pairs": [
+    {
+      "outbound": "GPL-2.0-ONLY",
+      "dependency": "APACHE-2.0",
+      "verdict": "incompatible",
+      "why": "The FSF treats Apache-2.0's patent termination and indemnification terms as further restrictions that GPL-2.0 does not permit. GPL-3.0 does not have this problem."
+    },
+    {
+      "outbound": "GPL-2.0-ONLY",
+      "dependency": "APACHE-1.1",
+      "verdict": "incompatible",
+      "why": "The advertising and naming clauses are further restrictions that GPL-2.0 does not permit."
+    }
+  ]
+}

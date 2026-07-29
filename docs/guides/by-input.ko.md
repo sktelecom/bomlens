@@ -1,12 +1,12 @@
 ---
-description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, 펌웨어, HuggingFace AI 모델 등 6가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
+description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터리, 펌웨어, HuggingFace AI 모델 등 7가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
 ---
 
 # 입력 시나리오별 처리 가이드
 
 ## 개요
 
-여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 6가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다. (AI 모델은 약간 다릅니다. ML-BOM이고 보안 보고서가 없습니다. 시나리오 6 참고.)
+여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 7가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다. (AI 모델은 약간 다릅니다. ML-BOM이고 보안 보고서가 없습니다. 시나리오 7 참고.)
 
 **3종 산출물**
 
@@ -44,6 +44,8 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 소스 ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | 〃 |
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
 | 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃 + 적합성 보고서 |
+| Yocto 빌드 디렉터리 | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | 〃 + 적합성 보고서 |
+| 빌드 산출물(`.jar`, `.deb` 등) | BINARY | `$SBOM --target app.jar --all --generate-only` | 〃 |
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
 | AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 
@@ -119,12 +121,31 @@ $SBOM --project team4-proj --version 2.0.0 \
 
 **산출물**: 고지문, SBOM(변환본), 위험분석보고서, 적합성 보고서
 
-## 시나리오 5 — 펌웨어 바이너리
+## 시나리오 5 — Yocto 빌드 디렉터리
 
-개발5팀이 빌드된 펌웨어(`dev.bin`)를 전달한 경우. 언패킹 후 구성요소를 식별합니다.
+Yocto로 임베디드 리눅스 이미지를 빌드하고 그 이미지에 무엇이 들어갔는지 확인하려는 경우. 빌드 디렉터리를 그대로 지정하면 됩니다. 빌드가 이미 기록해 둔 내용을 읽습니다.
 
 ```bash
-$SBOM --project team5-fw --version 1.0.0 \
+$SBOM --project team5-image --version 1.0.0 \
+  --target ~/poky/build \
+  --generate-only
+```
+
+- `conf/local.conf`에 `INHERIT += "create-spdx-3.0"`과 `INHERIT += "vex"`를 넣고 빌드하면 가장 많은 정보를 얻습니다. 이 설정은 5.0 Scarthgap 이상에서만 쓸 수 있고, 4.0 Kirkstone에는 해당 클래스가 없습니다. 두 LTS의 기본값인 SPDX 2.2도 이미지 문서 옆의 `.spdx.tar.zst`와 함께 읽지만 CVE 판정은 담기지 않습니다. SPDX가 전혀 없는 빌드는 빌드가 남긴 매니페스트를 대신 읽고, 둘 다 없으면 스캔을 멈추고 알려 줍니다.
+- 분석 대상은 `tmp/deploy/images/<machine>/` 아래의 이미지 SBOM입니다. 빌드 트리 자체는 훑지 않습니다. 이미지에 들어가지 않는 sysroot와 빌드용 도구가 결과에 섞이기 때문입니다.
+- 구성요소는 이미지에 설치된 패키지이고, 취약점에는 빌드가 내린 판정(레시피가 패치함, 해당 없음, 아직 남음)이 함께 담깁니다. 남은 것만 발견 항목으로 셉니다.
+- 머신이나 이미지를 여럿 빌드했다면 가장 최근 SBOM을 분석하고 후보 전체를 로그에 남깁니다. 다른 것을 고르려면 `--analyze <파일>`로 지정합니다.
+- 웹 UI에서는 **디렉터리 / rootfs** 입력으로 그 폴더를 고르면 됩니다(`--ui --mount ~/poky/build`로 마운트하거나 데스크톱 앱의 폴더 추가 사용). 같은 감지가 동작합니다.
+- 자세한 동작과 한계는 [공급사 SBOM 가이드의 Yocto 이미지 절](supplier-sbom.ko.md#yocto-이미지)을 참고하세요.
+
+**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서
+
+## 시나리오 6 — 펌웨어 바이너리
+
+개발6팀이 빌드된 펌웨어(`dev.bin`)를 전달한 경우. 언패킹 후 구성요소를 식별합니다.
+
+```bash
+$SBOM --project team6-fw --version 1.0.0 \
   --target "./dev.bin" --firmware \
   --all --generate-only
 ```
@@ -135,7 +156,7 @@ $SBOM --project team5-fw --version 1.0.0 \
 
 **산출물**: 고지문, SBOM, 위험분석보고서 (3종)
 
-## 시나리오 6 — AI 모델(HuggingFace)
+## 시나리오 7 — AI 모델(HuggingFace)
 
 개발팀이 코드 대신 HuggingFace 모델을 가리킨 경우. 모델 id만으로 ML-BOM을 생성합니다. 소스 코드도, 모델 가중치 다운로드도 필요 없습니다.
 

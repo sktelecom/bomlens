@@ -28,8 +28,19 @@ describe("deriveScanContext", () => {
       isAiScan: false,
       hasDependencies: false,
       hasSourceTree: false,
+      hasInputSbom: false,
       hasConformance: false,
     });
+  });
+
+  it("flags a submitted SBOM only when the scan captured its header", () => {
+    // ANALYZE writes _input.json from the document as it arrived; every other
+    // mode has no such artifact, and the section must not offer itself there.
+    expect(deriveScanContext(makeResult()).hasInputSbom).toBe(false);
+    const analyzed = makeResult({
+      results: [{ name: "supplier_1.0_input.json", size: 400 }],
+    });
+    expect(deriveScanContext(analyzed).hasInputSbom).toBe(true);
   });
 
   it("flags conformance when the report carries checks", () => {

@@ -155,6 +155,18 @@ Additional output: `MyApp_1.0.0_scancode.json`
 
 ---
 
+## Outbound-license conflicts (`--license`)
+
+Declares the license you distribute under, so each dependency can be judged against it. A source scan cannot infer this — cdxgen leaves the root license empty for maven and gradle trees — so without the flag no verdict is produced.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
+```
+
+The value is recorded on the SBOM's root component, and the risk report gains a conflict section. An existing root license — a supplier SBOM's own declaration — is never replaced. For how to read the verdicts see [What the reports mean](../concepts/reports-explained.md#outbound-license-conflicts).
+
+---
+
 ## Deterministic output (`--byte-stable`)
 
 Produces a byte-identical SBOM for the same input. It removes meaningless diffs in CI (timestamps, random IDs, ordering differences) and ensures reproducibility.

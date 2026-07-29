@@ -61,12 +61,19 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
         },
         // Risk severity tokens — domain semantics fixed (shared with portal).
+        //
+        // The variables hold bare RGB channels ("234 88 12"), not a colour, so
+        // that `<alpha-value>` can be substituted here. With a plain
+        // `var(--risk-high)` Tailwind cannot see the channels and silently emits
+        // no rule at all for a modifier like `bg-risk-high/30` — the element
+        // then renders with no background rather than a faint one, which is how
+        // the license distribution's copyleft tint was invisible from the start.
         risk: {
-          critical: "var(--risk-critical)",
-          high: "var(--risk-high)",
-          medium: "var(--risk-medium)",
-          low: "var(--risk-low)",
-          info: "var(--risk-info)",
+          critical: "rgb(var(--risk-critical) / <alpha-value>)",
+          high: "rgb(var(--risk-high) / <alpha-value>)",
+          medium: "rgb(var(--risk-medium) / <alpha-value>)",
+          low: "rgb(var(--risk-low) / <alpha-value>)",
+          info: "rgb(var(--risk-info) / <alpha-value>)",
         },
       },
       fontFamily: {

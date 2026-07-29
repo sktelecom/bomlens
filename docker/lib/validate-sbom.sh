@@ -124,6 +124,12 @@ cdx_checks() {
     # checksum coverage below still count them, because those they can carry.
     | ([ \$pkg[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$pkg[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
+    # Packages that carry a CPE where they carry no PURL. The submission criteria
+    # require a PURL, so this does not change the verdict. It reads as
+    # unidentified components when the truth can be identified another way,
+    # and the regulatory baselines under this row (BSI 5.2.4, NTIA) accept either.
+    # A Yocto image is the case in point: bitbake writes CPEs, never PURLs.
+    | ([ \$pkg[] | select((.purl==null) and ((.cpe // \"\") != \"\")) ] | length) as \$cpe_only
     | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
     | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
     | (\$okvers | split(\" \")) as \$vers
@@ -166,7 +172,8 @@ cdx_checks() {
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
         status:(if \$ptot==0 or pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:(if \$ptot==0 then \"no packages to measure\"
-                else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\" end),
+                else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\"
+                     + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
@@ -322,6 +329,10 @@ spdx_json_checks() {
     | (.creationInfo.created // \"\") as \$ts
     | ([ \$p[] | select((.name==null) or (.versionInfo==null)) | (.name // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$p[] | select(([.externalRefs[]? | select(.referenceType==\"purl\")]|length)==0) | (.name // \"(unnamed)\") ]) as \$miss_purl
+    # See the CycloneDX side: a package identified by CPE and not by PURL still
+    # fails the submission criteria, but the report says which of the two it is.
+    | ([ \$p[] | select((([.externalRefs[]? | select(.referenceType==\"purl\")]|length)==0)
+                       and (([.externalRefs[]? | select(.referenceType==\"cpe23Type\")]|length)>0)) ] | length) as \$cpe_only
     | ([ \$p[] | .externalRefs[]? | select((.referenceLocator // \"\")|startswith(\"pkg:generic\")) | .referenceLocator ]) as \$generic
     | ([ \$p[] | .externalRefs[]? | select(.referenceType==\"purl\") | (.referenceLocator // \"\") | select(test(\$purlre) | not) ]) as \$badpurl
     | (\$okvers | split(\" \")) as \$vers
@@ -349,7 +360,8 @@ spdx_json_checks() {
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
         status:(if \$tot==0 or pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:(if \$tot==0 then \"no packages to measure\"
-                else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\" end),
+                else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\"
+                     + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
@@ -436,7 +448,21 @@ case "$FORMAT" in
         # pipeline uses — so PURL coverage, name/version, and transitive edges
         # come from real component data instead of reading as all-zero.
         SPDX3_CDX="${OUT_PREFIX}.spdx3-cdx.$$.json"
-        if command -v syft >/dev/null 2>&1 \
+        # Yocto documents are measured on the set the pipeline actually analyses.
+        # syft turns this document into 1000 components of which 872 are source
+        # FILES, so name/version coverage reads 35/1000 and the verdict describes a
+        # document nobody downstream sees — the report is built from the 35 installed
+        # packages parse-yocto-spdx.py extracts. Measuring what is judged is the
+        # point of a conformance check. Non-Yocto SPDX 3.0 falls through to syft.
+        if command -v python3 >/dev/null 2>&1 \
+           && [ -f "$(dirname "$0")/parse-yocto-spdx.py" ] \
+           && python3 "$(dirname "$0")/parse-yocto-spdx.py" "$SBOM" "$SPDX3_CDX" >/dev/null 2>&1 \
+           && [ -s "$SPDX3_CDX" ]; then
+            SBOM="$SPDX3_CDX"
+            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+            rm -f "$SPDX3_CDX"
+            echo "[validate] SPDX 3.0 (Yocto) measured on the installed package set"
+        elif command -v syft >/dev/null 2>&1 \
            && syft convert "$SBOM" -o cyclonedx-json@1.6="$SPDX3_CDX" >/dev/null 2>&1 \
            && [ -s "$SPDX3_CDX" ]; then
             SBOM="$SPDX3_CDX"

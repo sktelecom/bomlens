@@ -4,12 +4,20 @@ import { EmptyState } from "@/components/ui/state";
 import type { DoneEvent, RecentScan, ResultFile, Severity } from "@/lib/api";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
-import { sbomFileName, scancodeFileName, sourceTreeFileName } from "@/lib/results";
+import {
+  inputSbomFileName,
+  sbomFileName,
+  scancodeFileName,
+  sourceSnapshotFileName,
+  sourceTreeFileName,
+} from "@/lib/results";
+import { scanHash } from "@/lib/route";
 
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { ConformancePanel } from "./ConformancePanel";
 import { DependenciesPanel } from "./DependenciesPanel";
+import { InputSbomPanel } from "./InputSbomPanel";
 import { Licenses } from "./Licenses";
 import { ModelsDatasets } from "./ModelsDatasets";
 import { SourceTreePanel } from "./SourceTreePanel";
@@ -28,6 +36,7 @@ export function ResultSection({
   searchQuery,
   seedSeverity,
   seedTier,
+  seedLicense,
   onPick,
   onResultsChange,
 }: {
@@ -43,10 +52,13 @@ export function ResultSection({
   seedSeverity?: string;
   /** License tier seeded into the Licenses filter (Overview bar click). */
   seedTier?: LicenseRiskTier | "";
-  /** Route into a section with a filter pre-applied (the Overview risk bars). */
+  /** License id seeded into the Components license filter (Licenses row click). */
+  seedLicense?: string;
+  /** Route into a section with a filter pre-applied (the Overview risk bars,
+   *  a Licenses distribution row). */
   onPick?: (
     section: SectionId,
-    seed: { severity?: Severity; tier?: LicenseRiskTier },
+    seed: { severity?: Severity; tier?: LicenseRiskTier; license?: string },
   ) => void;
   /** An artifact was produced after the scan (the on-demand SPDX export), so
    *  the owner can refresh the result it holds. */
@@ -67,6 +79,7 @@ export function ResultSection({
           total={result.sbom?.components ?? 0}
           truncated={result.sbom?.truncated}
           initialQuery={searchQuery}
+          initialLicense={seedLicense}
         />
       );
 
@@ -86,6 +99,10 @@ export function ResultSection({
         <Licenses
           components={result.sbom?.componentList ?? []}
           initialTier={seedTier}
+          outboundLicense={result.sbom?.outboundLicense}
+          onPickLicense={
+            onPick ? (license) => onPick("components", { license }) : undefined
+          }
         />
       );
 
@@ -110,7 +127,20 @@ export function ResultSection({
         <SourceTreePanel
           scanId={scanId}
           sourceFile={sourceFile}
+          snapshotFile={sourceSnapshotFileName(result)}
           hasLicenses={hasLicenses}
+        />
+      );
+    }
+
+    case "inputSbom": {
+      const inputFile = inputSbomFileName(result);
+      if (!inputFile) return null;
+      return (
+        <InputSbomPanel
+          scanId={scanId}
+          inputFile={inputFile}
+          componentsHref={scanId ? scanHash(scanId, "components") : undefined}
         />
       );
     }

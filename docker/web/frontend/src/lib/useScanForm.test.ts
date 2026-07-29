@@ -31,7 +31,7 @@ describe("UPLOAD_KIND", () => {
 
 describe("ACCEPT", () => {
   it("offers an accept list for every upload kind", () => {
-    expect(Object.keys(ACCEPT).sort()).toEqual(["firmware", "sbom", "zip"]);
+    expect(Object.keys(ACCEPT).sort()).toEqual(["firmware", "package", "sbom", "zip"]);
   });
 
   it("includes the expected representative extensions", () => {
@@ -39,6 +39,11 @@ describe("ACCEPT", () => {
     expect(ACCEPT.zip).toContain(".tar.gz");
     expect(ACCEPT.sbom).toContain(".json");
     expect(ACCEPT.sbom).toContain(".spdx.json");
+    // Measured formats only: a jar is read as a file, a wheel after unpacking.
+    // A gem is absent on purpose — it yielded nothing either way.
+    expect(ACCEPT.package).toContain(".jar");
+    expect(ACCEPT.package).toContain(".whl");
+    expect(ACCEPT.package).not.toContain(".gem");
     expect(ACCEPT.firmware).toContain(".bin");
     expect(ACCEPT.firmware).toContain(".squashfs");
   });

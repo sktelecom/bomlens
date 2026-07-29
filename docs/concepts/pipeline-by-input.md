@@ -47,6 +47,8 @@ An SBOM (CycloneDX or SPDX) received from a supplier or another team — no sour
 
 > Validation is based on the original input before conversion, so SPDX is checked as SPDX. Details are in the [supplier SBOM guide](../guides/supplier-sbom.md).
 
+A Yocto build directory enters here too. Pointing `--target` at one is recognized, and the image SBOM the build published under `tmp/deploy/images/` takes this same path — read by a dedicated parser that keeps the installed package set and the vulnerability verdicts the build recorded, rather than by the generic SPDX conversion.
+
 ---
 
 ## AI model

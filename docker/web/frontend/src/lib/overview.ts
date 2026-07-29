@@ -8,7 +8,7 @@ import { baseTally, splitChecks } from "./conformance";
 import type { SectionId } from "./nav";
 
 export interface AttentionItem {
-  id: "conformance" | "vulns" | "review";
+  id: "malicious" | "conformance" | "vulns" | "review";
   /** How many findings of this kind. */
   count: number;
   /** Badge tone / severity of the item. */
@@ -18,12 +18,21 @@ export interface AttentionItem {
 }
 
 /**
- * Actionable findings, most urgent first: a failed SBOM conformance, then
+ * Actionable findings, most urgent first: known-malicious packages, then a
+ * failed SBOM conformance, then
  * critical/high vulnerabilities, then components flagged for review (vendored /
  * copied-in open source). Returns an empty list when nothing needs attention.
  */
 export function needsAttention(result: DoneEvent): AttentionItem[] {
   const items: AttentionItem[] = [];
+
+  // Known-malicious packages lead everything else. A vulnerability is a flaw to
+  // schedule a fix for; a package published to attack whoever installs it is
+  // already running in the build, so it outranks even a failed conformance.
+  const malicious = result.sbom?.maliciousCount ?? 0;
+  if (malicious > 0) {
+    items.push({ id: "malicious", count: malicious, tone: "critical", target: "components" });
+  }
 
   // Supplier-SBOM review: a failed format conformance leads the list — an
   // incomplete or non-conformant SBOM makes the vuln and license findings below

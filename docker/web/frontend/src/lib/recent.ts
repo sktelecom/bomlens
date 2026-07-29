@@ -9,6 +9,7 @@
  * we never invent a finer type. See the plan's data-honesty constraint.
  */
 import { type RecentScan, SEVERITY_ORDER } from "./api";
+import { IS_STATIC_DEMO } from "./demo";
 
 export interface RecentSummary {
   /** Total stored scans. */
@@ -62,15 +63,21 @@ export function filterRecent(
 }
 
 /**
- * A scan's kind, derived only from honest SBOM signals: `isAiScan` (an
- * ML-model component) wins, otherwise the CycloneDX root component.type the SBOM
- * declared. Unknown/absent types fall back to a generic "sbom" — we never invent
- * a finer type than the data supports.
+ * A scan's kind, derived only from honest signals: `isAiScan` (an ML-model
+ * component) wins, then what the scan was pointed at, then the CycloneDX root
+ * component.type the SBOM declared. Unknown/absent types fall back to a generic
+ * "sbom" — we never invent a finer type than the data supports.
  */
 export type ScanType = "ai" | "source" | "firmware" | "container" | "rootfs" | "sbom";
 
 export function scanType(scan: RecentScan): ScanType {
   if (scan.isAiScan) return "ai";
+  // A submitted SBOM is the one case the root component type gets wrong: a
+  // supplier's document usually declares "application", the same as a source
+  // scan, so an analyzed SBOM was labelled Source. The saved input settles it.
+  // Every other input either matches its component type or has none to conflict
+  // with, so they stay on the SBOM's own declaration.
+  if (scan.inputSource === "sbom-upload") return "sbom";
   switch (scan.componentType) {
     case "firmware":
       return "firmware";
@@ -206,12 +213,21 @@ export function scanComparison(
  * Human "2 hours ago" / "yesterday" / "just now" for a unix-seconds timestamp.
  * `nowMs` is injected (Date.now() in the caller) so the result is deterministic
  * under test. Uses Intl.RelativeTimeFormat, so it localizes for free.
+ *
+ * The demo shows the calendar date instead. Its scans were captured once and
+ * never re-run, so a relative label would age into "9 months ago" and read as
+ * an abandoned deployment — while the date it was actually produced stays true.
  */
 export function formatRelativeTime(
   unixSec: number,
   nowMs: number,
   locale: string,
 ): string {
+  if (IS_STATIC_DEMO) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
+      new Date(unixSec * 1000),
+    );
+  }
   const diffSec = Math.round(unixSec - nowMs / 1000); // negative = past
   const abs = Math.abs(diffSec);
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });

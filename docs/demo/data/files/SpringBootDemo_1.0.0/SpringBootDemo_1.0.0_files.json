@@ -1,0 +1,56 @@
+{
+  "files": [
+    {
+      "path": "src",
+      "type": "directory"
+    },
+    {
+      "path": "src/main",
+      "type": "directory"
+    },
+    {
+      "path": "src/main/java",
+      "type": "directory"
+    },
+    {
+      "path": "src/main/java/com",
+      "type": "directory"
+    },
+    {
+      "path": "src/main/java/com/example",
+      "type": "directory"
+    },
+    {
+      "path": "pom.xml",
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "type": "file"
+    },
+    {
+      "path": "src/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/example/Application.java",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/example/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/.gitkeep",
+      "type": "file"
+    }
+  ]
+}

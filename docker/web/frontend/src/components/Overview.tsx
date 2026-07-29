@@ -1,19 +1,24 @@
 import {
+  Biohazard,
   Boxes,
   CalendarX,
   ChevronRight,
+  Container,
   Cpu,
   Eye,
   FileCheck2,
+  FileJson,
+  FileText,
+  FolderOpen,
   GitBranch,
   type LucideIcon,
   History,
   Package,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { BarList, type BarDatum } from "@/components/ui/barlist";
 import { Card, CardContent } from "@/components/ui/card";
 import type {
   ComponentItem,
@@ -21,11 +26,12 @@ import type {
   RecentScan,
   ResultFile,
   Severity,
+  YoctoVex,
 } from "@/lib/api";
-import { typeGroups } from "@/lib/components";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import { type AttentionItem, needsAttention } from "@/lib/overview";
+import { type ProvenanceKind, provenanceOf } from "@/lib/provenance";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
 import { conformanceCount, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
@@ -42,17 +48,42 @@ const TONE_ICON: Record<AttentionItem["tone"], string> = {
   info: "text-risk-info",
 };
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
+  malicious: Biohazard,
   conformance: FileCheck2,
   vulns: ShieldAlert,
   review: Eye,
 };
 
+/** Icon per provenance kind, so the input reads at a glance. */
+const PROVENANCE_ICON: Record<ProvenanceKind, LucideIcon> = {
+  folder: FolderOpen,
+  yocto: FolderOpen,
+  git: GitBranch,
+  image: Container,
+  file: FileText,
+  sbom: FileJson,
+  model: Cpu,
+};
+
+function ProvenanceIcon({
+  kind,
+  ...props
+}: { kind: ProvenanceKind } & React.ComponentProps<LucideIcon>) {
+  const Icon = PROVENANCE_ICON[kind];
+  return <Icon {...props} />;
+}
+
 /**
  * Decision-first Overview: what needs attention first, then the at-a-glance
- * numbers as jump cards into the detail sections, then the license/type
- * distribution summaries — instead of repeating full tables here. The jump
- * cards sit above the (potentially long) distributions so they stay visible
- * without scrolling.
+ * numbers as jump cards into the detail sections, then the two risk axes
+ * (severity, license classification) — instead of repeating full tables here.
+ * The jump cards sit above the axes so they stay visible without scrolling.
+ *
+ * Only risk axes belong here. A component-type distribution used to sit below
+ * them and was dropped: type is an inventory fact the Components table already
+ * filters on, and as a chart it was mostly one bar (a single-ecosystem SBOM is
+ * all "library") or one bar drowning the rest (a container image is nearly all
+ * "file").
  */
 export function Overview({
   result,
@@ -81,9 +112,32 @@ export function Overview({
   const ai = isAiScan(result);
   const hasConformance = Boolean(result.conformance?.checks?.length);
   const comparison = scanId ? scanComparison(recent, scanId) : null;
+  const provenance = provenanceOf(result.scanConfig);
 
   return (
     <div className="space-y-6">
+      {provenance && (
+        // What was scanned. Sits above the counts because it frames them: the
+        // same "71 components" means something different for a folder on disk
+        // than for an image someone pulled.
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          data-testid="provenance"
+        >
+          <ProvenanceIcon
+            kind={provenance.kind}
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden
+          />
+          <span>{t(provenance.labelKey)}</span>
+          <code
+            className="min-w-0 break-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground"
+            title={provenance.value}
+          >
+            {provenance.value}
+          </code>
+        </div>
+      )}
       {comparison && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>
@@ -182,11 +236,13 @@ export function Overview({
               {attention.map((item) => {
                 const Icon = ATTN_ICON[item.id];
                 const label =
-                  item.id === "conformance"
-                    ? t("overview.attnConformance", { count: item.count })
-                    : item.id === "vulns"
-                      ? t("overview.attnVulns", { count: item.count })
-                      : t("overview.attnReview", { count: item.count });
+                  item.id === "malicious"
+                    ? t("overview.attnMalicious", { count: item.count })
+                    : item.id === "conformance"
+                      ? t("overview.attnConformance", { count: item.count })
+                      : item.id === "vulns"
+                        ? t("overview.attnVulns", { count: item.count })
+                        : t("overview.attnReview", { count: item.count });
                 return (
                   <li key={item.id}>
                     <a
@@ -209,6 +265,8 @@ export function Overview({
         </Card>
       )}
 
+      {result.yoctoVex && <YoctoVexNote vex={result.yoctoVex} />}
+
       {/* The two risk axes side by side; clicking a band routes into its
           section with that filter applied. */}
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
@@ -225,31 +283,45 @@ export function Overview({
           onSelect={onPick ? (tier) => onPick("licenses", { tier }) : undefined}
         />
       </div>
-
-      <TypeSummary components={result.sbom?.componentList ?? []} />
     </div>
   );
 }
 
 /**
- * Component-type distribution. Only shown when the SBOM has more than one type
- * (e.g. Maven's library vs framework split) — a single-ecosystem SBOM is
- * usually all "library", where the chart would carry no signal.
+ * Vulnerability work the Yocto build already did.
+ *
+ * A Yocto SBOM carries bitbake's own CVE verdicts, and on a real image the
+ * patched count dwarfs the open one (measured on core-image-minimal: 12255
+ * patched, 63 not applicable, 0 open). The security panel lists only what is
+ * still open, so without this note "0 vulnerabilities" would read as "nothing
+ * was checked" instead of "the build closed all of them" — the opposite of the
+ * truth. Rendered only for Yocto input; `yoctoVex` is null everywhere else.
  */
-function TypeSummary({ components }: { components: ComponentItem[] }) {
+function YoctoVexNote({ vex }: { vex: YoctoVex }) {
   const { t } = useTranslation();
-  const groups = typeGroups(components);
-  if (groups.length < 2) return null;
-  const items: BarDatum[] = groups.map((g) => ({
-    key: g.type,
-    label: g.type,
-    value: g.count,
-  }));
+  const handled = vex.fixed + vex.notAffected;
+  if (handled === 0) return null;
   return (
-    <div className="space-y-3">
-      <div className="text-sm font-medium">{t("overview.typeSummaryTitle")}</div>
-      <BarList items={items} ariaLabel={t("overview.typeSummaryTitle")} />
-    </div>
+    <Card>
+      <CardContent className="flex items-start gap-3 p-4">
+        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-risk-info" aria-hidden />
+        <div className="space-y-1">
+          <div className="text-sm font-medium">{t("overview.yoctoVex.title")}</div>
+          <p className="text-sm text-muted-foreground">
+            {vex.unresolved > 0
+              ? t("overview.yoctoVex.withOpen", {
+                  fixed: vex.fixed,
+                  notAffected: vex.notAffected,
+                  open: vex.unresolved,
+                })
+              : t("overview.yoctoVex.allHandled", {
+                  fixed: vex.fixed,
+                  notAffected: vex.notAffected,
+                })}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

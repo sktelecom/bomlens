@@ -8,12 +8,14 @@ import {
   downloadAllUrl,
   fileUrl,
   exportSpdx,
+  formSourceOf,
   getCapabilities,
   listScans,
   loadScan,
   stashGitCred,
   startScan,
   uploadFile,
+  SOURCE_TYPES,
   type DoneEvent,
   type ScanHandlers,
   type ScanParams,
@@ -340,5 +342,25 @@ describe("startScan", () => {
     es.emit("done", JSON.stringify({ ok: true, results: [], sbom: null, security: null }));
     es.onerror!();
     expect(h.errors).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Re-scan seeding
+// ---------------------------------------------------------------------------
+describe("formSourceOf", () => {
+  it("leaves every source the picker offers alone", () => {
+    for (const s of SOURCE_TYPES) expect(formSourceOf(s)).toBe(s);
+  });
+
+  // Not an input anyone picks: it is what a picked folder turned out to be. A
+  // re-scan replays the folder, so the form shows the directory input again and
+  // the scanner decides afresh whether it is still a Yocto build directory.
+  it("replays a Yocto build directory as the folder it came from", () => {
+    expect(formSourceOf("yocto-build-dir")).toBe("rootfs-dir");
+  });
+
+  it("keeps the deep scan-target variant, which the server handles", () => {
+    expect(formSourceOf("scan-target-src")).toBe("scan-target-src");
   });
 });

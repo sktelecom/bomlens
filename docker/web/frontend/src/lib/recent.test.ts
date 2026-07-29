@@ -21,6 +21,7 @@ function scan(over: Partial<RecentScan> = {}): RecentScan {
     maxSeverity: null,
     isAiScan: false,
     componentType: null,
+    inputSource: null,
     generatedAt: 0,
     ...over,
   };
@@ -50,6 +51,34 @@ describe("scanType / presentTypes", () => {
     expect(scanType(scan({ componentType: "operating-system" }))).toBe("rootfs");
     expect(scanType(scan({ componentType: "application" }))).toBe("source");
     expect(scanType(scan({ componentType: null }))).toBe("sbom");
+  });
+
+  it("calls a submitted SBOM an SBOM, not the source its root claims to be", () => {
+    // A supplier's document declares "application" at its root, exactly like a
+    // source scan — reading the component type alone labelled it Source.
+    expect(
+      scanType(scan({ inputSource: "sbom-upload", componentType: "application" })),
+    ).toBe("sbom");
+    // A model SBOM someone submitted is still an AI scan; that signal wins.
+    expect(
+      scanType(scan({ inputSource: "sbom-upload", isAiScan: true })),
+    ).toBe("ai");
+  });
+
+  it("leaves every other input on the SBOM's own declaration", () => {
+    expect(
+      scanType(scan({ inputSource: "current-dir", componentType: "application" })),
+    ).toBe("source");
+    expect(
+      scanType(scan({ inputSource: "docker-image", componentType: "container" })),
+    ).toBe("container");
+    expect(
+      scanType(scan({ inputSource: "firmware-upload", componentType: "firmware" })),
+    ).toBe("firmware");
+    // A scan saved before the sidecar existed has no input to read.
+    expect(
+      scanType(scan({ inputSource: null, componentType: "application" })),
+    ).toBe("source");
   });
 
   it("lists distinct present types in display order", () => {

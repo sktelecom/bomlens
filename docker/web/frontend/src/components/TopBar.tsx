@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
@@ -60,9 +61,15 @@ export function TopBar({
   recent = [],
   onDeleteRecent,
 }: TopBarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
+  // would look outside the deployment. It is "/" in a normal build.
   const logo = (
-    <img src="/logo.svg" alt={t("appTitle")} className="h-7 w-auto shrink-0" />
+    <img
+      src={`${import.meta.env.BASE_URL}logo.svg`}
+      alt={t("appTitle")}
+      className="h-7 w-auto shrink-0"
+    />
   );
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -98,7 +105,10 @@ export function TopBar({
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {search}
-        {onRescan && (
+        {/* Re-scan parks the finished scan's config in the form and reruns it,
+            which the demo cannot do. New scan stays: the form itself is worth
+            seeing, and its run button explains why it is disabled. */}
+        {onRescan && !IS_STATIC_DEMO && (
           <Button
             variant="outline"
             size="sm"

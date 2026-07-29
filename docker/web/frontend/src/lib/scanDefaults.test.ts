@@ -94,6 +94,15 @@ describe("suggestIdentity — uploads (zip / firmware / sbom filename fallback)"
     expect(suggestIdentity("sbom-upload", { fileName: "demo_1.0_bom.json" }))
       .toEqual({ project: "demo", version: "1.0" });
   });
+
+  // A Yocto SPDX 2.2 build deploys one <image>-<machine>.rootfs.spdx.tar.zst
+  // and no document, so that archive is what a supplier sends. Its name is the
+  // image and the machine; .rootfs says which artifact, not which project.
+  it("names a Yocto image from the archive it ships as", () => {
+    expect(suggestIdentity("sbom-upload", {
+      fileName: "core-image-minimal-qemux86-64.rootfs.spdx.tar.zst",
+    })).toEqual({ project: "core-image-minimal-qemux86-64" });
+  });
 });
 
 describe("suggestIdentity — directories", () => {

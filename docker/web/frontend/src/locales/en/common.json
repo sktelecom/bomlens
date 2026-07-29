@@ -12,7 +12,9 @@
     "options": "Generation options",
     "advanced": "Advanced",
     "run": "Run scan",
-    "running": "Scanning…"
+    "running": "Scanning…",
+    "demoRunDisabled": "This demo cannot run a scan — it is a static page with no machine behind it.",
+    "demoRunDisabledCta": "Run it on your own code"
   },
   "source": {
     "label": "Scan target",
@@ -20,8 +22,9 @@
     "currentDirPath": "Current folder",
     "currentDirHint": "Scans the source in this folder (mounted as /src). To scan a different folder, run --ui from there.",
     "rootfsDir": "Directory / rootfs",
+    "yoctoBuildDir": "Yocto build directory",
     "rootfsPlaceholder": "centos-rootfs/  (relative to the current folder)",
-    "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. Paths outside the folder are rejected — place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
+    "rootfsHint": "Scans an OS rootfs or any subfolder under the current folder (/src) as a directory. A Yocto build directory is recognized as one, and the image SBOM the build published is analyzed instead of the build tree. Paths outside the folder are rejected — place the rootfs under the launch folder, mount it with --mount, or use a Docker image instead.",
     "scanRoot": "Scan location",
     "scanRootCurrent": "Current folder ({{path}})",
     "scanRootCurrentNoPath": "Current folder",
@@ -59,7 +62,9 @@
     "uploadErrorTooLarge": "The file is too large for the server to accept. Try a smaller archive, or scan the unpacked folder instead.",
     "uploadErrorNetwork": "Could not reach the scan server. Check that it is still running, then try again.",
     "uploadErrorServer": "The server could not process the request. Try again; if it keeps failing, restart the scanner.",
-    "uploadErrorRejected": "The server did not accept the upload. Check the file and try again."
+    "uploadErrorRejected": "The server did not accept the upload. Check the file and try again.",
+    "packageUpload": "Build artifact",
+    "packageUploadHint": "A jar, war, deb, rpm or wheel. An executable jar carries its bundled dependencies, so scanning one gives close to what scanning the source would; a plain library jar carries none and yields nothing."
   },
   "options": {
     "notice": "Notice",
@@ -83,7 +88,9 @@
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "upload": "Upload to a server",
-    "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored."
+    "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored.",
+    "outboundLicense": "Outbound license (optional)",
+    "outboundLicenseHint": "The SPDX id your project ships under, e.g. Apache-2.0. Dependencies whose terms clash with it are then flagged. A source scan cannot infer this, so without it the check stays off."
   },
   "upload": {
     "target": "Destination",
@@ -104,11 +111,11 @@
   },
   "result": {
     "title": "Results",
-    "kindAi": "AI model SBOM",
-    "kindSource": "Source SBOM",
-    "kindImage": "Container image SBOM",
-    "kindFirmware": "Firmware SBOM",
-    "kindRootfs": "Root filesystem SBOM",
+    "kindAi": "AI model",
+    "kindSource": "Source",
+    "kindImage": "Container image",
+    "kindFirmware": "Firmware",
+    "kindRootfs": "Root filesystem",
     "kindAnalyze": "SBOM analysis",
     "kindSbom": "SBOM",
     "succeeded": "Scan complete",
@@ -198,6 +205,7 @@
     "licenseClassTitle": "License classification",
     "licenseClassFilterHint": "Click a class to filter",
     "licenseMore": "+{{count}} more",
+    "licenseRowHint": "Click a license for its components",
     "componentsCount": "{{shown}} of {{total}} components",
     "truncated": "list truncated",
     "noMatch": "No matching rows.",
@@ -245,7 +253,9 @@
     "outdatedReleasesBehind": "{{count}} releases behind",
     "outdatedLastReleased": "released {{date}}",
     "filterOutdated": "Outdated",
-    "colCurrency": "Version currency"
+    "colCurrency": "Version currency",
+    "maliciousBadge": "Malicious package",
+    "maliciousBadgeHint": "Published to attack whoever installs it. Remove it and rotate any credential the build could reach — there is no version to upgrade to."
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -274,6 +284,41 @@
     "loadError": "Could not load the source file tree.",
     "empty": "No source files were scanned.",
     "noLicenseHint": "License details appear when you run a ScanCode (deep-license) scan."
+  },
+  "sourceViewer": {
+    "selectPrompt": "Pick a file to read what was scanned.",
+    "summary": "{{count}} file(s) captured from the scanned tree.",
+    "summaryOmitted": "{{count}} left out (binary, or past the capture limit).",
+    "lines": "{{count}} lines",
+    "truncated": "Shown in part",
+    "truncatedFoot": "The rest of this file went past the capture limit and was not stored.",
+    "showAll": "Show the remaining {{count}} lines",
+    "missingBinary": "No preview — this file is binary, so only its path was recorded.",
+    "missingBudget": "No preview — the capture reached its size limit before this file.",
+    "missingUnknown": "No content was captured for this file.",
+    "symlink": "Symlink",
+    "symlinkTo": "This is a symlink to",
+    "linksSummary": "{{count}} symlinks."
+  },
+  "inputSbom": {
+    "loading": "Loading the submitted SBOM…",
+    "loadError": "Could not load the details of the submitted SBOM.",
+    "intro": "This scan read an SBOM someone else produced. Below is that document as it arrived, before it was converted to CycloneDX for the analysis on the other screens.",
+    "unnamed": "Submitted SBOM",
+    "entries": "{{count}} entries",
+    "componentsHint": "The entries themselves are listed, with filters and risk, under",
+    "field": {
+      "format": "Format",
+      "documentName": "Document name",
+      "created": "Created",
+      "tools": "Produced by",
+      "supplier": "Supplier",
+      "authors": "Authors",
+      "documentId": "Document id",
+      "rootComponent": "Describes",
+      "rootLicense": "Declared license",
+      "purl": "Package URL"
+    }
   },
   "severity": {
     "CRITICAL": "Critical",
@@ -305,9 +350,10 @@
     "sectionsHint": "Run a scan to see result sections here.",
     "group": {
       "inventory": "Inventory",
-      "risk": "Risk & compliance",
       "ai": "AI",
-      "outputs": "Outputs"
+      "outputs": "Outputs",
+      "security": "Security",
+      "compliance": "Compliance"
     },
     "overview": "Overview",
     "components": "Components",
@@ -317,10 +363,15 @@
     "licenses": "Licenses",
     "conformance": "SBOM conformance",
     "models": "Models & datasets",
-    "artifacts": "Artifacts"
+    "artifacts": "Artifacts",
+    "inputSbom": "Submitted SBOM"
   },
   "shell": {
-    "newScan": "New scan"
+    "newScan": "New scan",
+    "demoGetTool": "Get BomLens",
+    "demoBannerTitle": "Read-only demo",
+    "demoBannerBody": "These are real results from a real scan, frozen so you can look around. Scanning, uploading and deleting are turned off here — run BomLens on your own code to produce your own.",
+    "demoBannerCta": "How to run it"
   },
   "search": {
     "placeholder": "Search components, CVEs…",
@@ -363,13 +414,18 @@
     "explore": "Explore",
     "jumpHint": "View {{section}}",
     "depBreakdown": "{{direct}} direct · {{transitive}} transitive",
-    "typeSummaryTitle": "Component types",
+    "yoctoVex": {
+      "title": "Already handled during the build",
+      "allHandled": "Every known CVE on this image was closed while it was built: {{fixed}} patched, {{notAffected}} not applicable. Nothing is left open.",
+      "withOpen": "{{open}} still need attention. The build had already closed the rest: {{fixed}} patched, {{notAffected}} not applicable."
+    },
     "vsPrevious": "vs {{label}}",
     "compDelta": "{{delta}} components",
     "compSame": "no component change",
     "sevUp": "more severe than before",
     "sevDown": "less severe than before",
-    "sevSame": "severity unchanged"
+    "sevSame": "severity unchanged",
+    "attnMalicious": "{{count}} known-malicious package(s) — remove and rotate credentials"
   },
   "models": {
     "loading": "Loading model details…",
@@ -665,12 +721,13 @@
   "crosswalk": {
     "title": "Regulatory crosswalk",
     "disclaimer": "A documentation-preparation aid, not a compliance verdict. This crosswalk covers only the documentation elements an SBOM can carry; obligations it cannot express — bias and fairness assessment, risk management — must be met through separate documents.",
-    "totals": "{{present}} present, {{gap}} gap, {{review}} need review of {{total}} mapped",
+    "totals": "{{present}} present, {{gap}} gap, {{advisory}} advisory, {{review}} need review of {{total}} mapped",
     "thFramework": "Framework",
     "thTotal": "Total",
     "refs": "References:",
     "present": "Present",
     "gap": "Gap",
+    "advisory": "Advisory",
     "review": "Review needed"
   },
   "aiProfile": {
@@ -698,8 +755,6 @@
     "reviewHint": "AI-restrictive terms — human review required.",
     "flagBehavioral": "Behavioral-use",
     "flagNonCommercial": "Non-commercial",
-    "distribution": "License distribution",
-    "clickHint": "Click a license to see its components",
     "tier": {
       "networkCopyleft": "Network copyleft",
       "strongCopyleft": "Strong copyleft",
@@ -707,7 +762,15 @@
       "reviewNeeded": "Review needed",
       "uncategorized": "Uncategorized",
       "permissive": "Permissive"
-    }
+    },
+    "conflictTitle": "Conflicts with your outbound license ({{license}})",
+    "conflictHint": "How each dependency's terms sit against the license you distribute under. A documentation aid — it surfaces combinations that need a person to look, and makes no legal determination.",
+    "conflictIncompatible": "Cannot be met",
+    "conflictConditional": "Depends on how you ship",
+    "conflictUnknown": "Cannot judge",
+    "conflictCompatible": "No conflict",
+    "conflictOffTitle": "Outbound-license conflicts were not checked",
+    "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Re-run with --license <spdx-id> (or set PROJECT_LICENSE) to turn the check on."
   },
   "recent": {
     "title": "Scan management",
@@ -735,7 +798,8 @@
     "emptyOutSbom": "SBOM (CycloneDX)",
     "emptyOutNotice": "Open-source notice",
     "emptyOutSecurity": "Security report",
-    "source": "Delete a file and it leaves this list too."
+    "source": "Delete a file and it leaves this list too.",
+    "demoSubtitle": "Five finished scans — a project's source, a container image, a device firmware image, an AI model, and an SBOM received from a supplier"
   },
   "validation": {
     "required": "Fill in the required fields marked above.",
@@ -746,5 +810,14 @@
     "uploadUrl": "Enter the upload server URL.",
     "uploadToken": "Enter the upload API token.",
     "truscaProjectId": "Enter the TRUSCA project id."
+  },
+  "provenance": {
+    "folder": "Scanned folder",
+    "yocto": "Yocto build directory",
+    "git": "Cloned from",
+    "image": "Container image",
+    "file": "Uploaded file",
+    "sbom": "Received SBOM",
+    "model": "AI model"
   }
 }

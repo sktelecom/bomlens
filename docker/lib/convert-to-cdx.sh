@@ -106,4 +106,24 @@ if [ ! -s "$OUTPUT" ] || ! jq -e '.bomFormat=="CycloneDX"' "$OUTPUT" >/dev/null 
 fi
 
 NCOMP=$(jq '[.components[]?]|length' "$OUTPUT" 2>/dev/null || echo 0)
+
+# A conversion that returns a valid-but-empty CycloneDX is worse than a failure:
+# every later step succeeds, and the report says "no components, no vulnerabilities"
+# — which reads as a clean bill of health rather than a broken read. Catch it by
+# comparing against the package count in the ORIGINAL document. An input that
+# genuinely declares no packages still converts to an empty SBOM without error.
+SRC_PKGS=0
+case "$FORMAT" in
+    SPDX-JSON)
+        SRC_PKGS=$(jq '[.packages[]?] | length' "$INPUT" 2>/dev/null || echo 0) ;;
+    SPDX-3.0)
+        SRC_PKGS=$(jq '[.["@graph"][]? | select(.type == "software_Package")] | length' \
+            "$INPUT" 2>/dev/null || echo 0) ;;
+esac
+if [ "${SRC_PKGS:-0}" -gt 0 ] && [ "${NCOMP:-0}" -eq 0 ]; then
+    echo "[convert] ERROR: the input declares $SRC_PKGS package(s) but the conversion produced none." >&2
+    echo "[convert]        The SBOM was read but its contents were not understood; not continuing with an empty result." >&2
+    exit 1
+fi
+
 echo "[convert] CycloneDX ready: $OUTPUT (components=$NCOMP)"

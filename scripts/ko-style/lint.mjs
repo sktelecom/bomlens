@@ -45,11 +45,14 @@ const SCOPE = [
   "electron",
 ];
 // Kept out of the gate: internal maintainer notes (historical records quote
-// pre-fix wording), the changelog (quotes history), license inventories, and
-// the style guide itself (it must quote the very anti-patterns it bans).
+// pre-fix wording), the changelog (quotes history), license inventories, the
+// style guide itself (it must quote the very anti-patterns it bans), and the
+// demo dataset (scan output the tool generated, not prose anyone wrote — its
+// wording is fixed by the report templates).
 const EXCLUDE = [
   "docs/maintainers",
   "docs/korean-style-guide.md",
+  "docs/demo/data",
   "CHANGELOG.md",
   "THIRD_PARTY_LICENSES.md",
 ];

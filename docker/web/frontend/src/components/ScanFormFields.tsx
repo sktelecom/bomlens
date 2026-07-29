@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { USAGE_CONTEXTS, type UsageContext } from "@/lib/api";
+import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
@@ -197,7 +198,9 @@ export function SourceControls({ state }: { state: ScanFormState }) {
               ? t("source.zipUpload")
               : uploadKind === "sbom"
                 ? t("source.sbomUpload")
-                : t("source.firmwareUpload")}
+                : uploadKind === "package"
+                  ? t("source.packageUpload")
+                  : t("source.firmwareUpload")}
             <RequiredMark />
           </Label>
           <input
@@ -217,6 +220,9 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           )}
           {source === "firmware-upload" && (
             <p className="text-xs text-muted-foreground">{t("source.firmwareHint")}</p>
+          )}
+          {source === "package-upload" && (
+            <p className="text-xs text-muted-foreground">{t("source.packageUploadHint")}</p>
           )}
         </div>
       )}
@@ -352,6 +358,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepCve,
     byteStable,
     setByteStable,
+    outboundLicense,
+    setOutboundLicense,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -359,6 +367,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showIncludeOsv,
     showDeepCve,
     showByteStable,
+    showOutboundLicense,
     capabilities,
     busy,
   } = state;
@@ -435,6 +444,27 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setByteStable}
           disabled={busy}
         />
+      )}
+      {showOutboundLicense && (
+        <div className="space-y-1.5">
+          <label htmlFor="outbound-license" className="text-sm font-medium text-foreground">
+            {t("options.outboundLicense")}
+          </label>
+          <input
+            id="outbound-license"
+            type="text"
+            value={outboundLicense}
+            onChange={(e) => setOutboundLicense(e.target.value)}
+            disabled={busy}
+            placeholder="Apache-2.0"
+            spellCheck={false}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
+            aria-describedby="outbound-license-hint"
+          />
+          <p id="outbound-license-hint" className="text-xs text-muted-foreground">
+            {t("options.outboundLicenseHint")}
+          </p>
+        </div>
       )}
     </div>
   );
@@ -568,8 +598,35 @@ export function FormMessages({ state }: { state: ScanFormState }) {
 
 /** The run / uploading / scanning button. */
 export function RunButton({ state, running }: { state: ScanFormState; running: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { submit, busy, uploading } = state;
+
+  // The demo shows this form so the range of inputs is visible, but running a
+  // scan needs a machine that can build the target. Disable rather than hide:
+  // a missing button reads as a broken page, a disabled one with a reason reads
+  // as a boundary — and the reason is where the install link belongs.
+  if (IS_STATIC_DEMO) {
+    return (
+      <div className="space-y-2">
+        <Button className="w-full" data-testid="run-scan" disabled>
+          <Play className="h-4 w-4" />
+          {t("form.run")}
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          {t("form.demoRunDisabled")}{" "}
+          <a
+            href={demoInstallUrl(i18n.language)}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+          >
+            {t("form.demoRunDisabledCta")}
+          </a>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <Button className="w-full" data-testid="run-scan" onClick={submit} disabled={busy}>
       {uploading ? (

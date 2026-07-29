@@ -281,6 +281,36 @@ LICENSE_CLASS_FIX='(.components) |= (if type=="array" then map(
     + [{name:"bomlens:licenseClass", value: component_license_class}])
 ) else . end)'
 
+# Stamp each component with how its license sits against the project's OUTBOUND
+# license (bomlens:licenseConflict + :why), using the rules in license-compat.json.
+# Unlike licenseClass, which labels one component in isolation, a conflict only
+# exists relative to what the project is distributed under — so this runs only
+# when metadata.component carries a license (declared by the SBOM being analyzed,
+# or set through PROJECT_LICENSE at scan time). With no outbound license nothing
+# is stamped at all: an absent property means "not assessed", never "clean".
+# Verdicts: compatible / conditional / incompatible / unknown. Advisory only —
+# a documentation aid, not a legal determination.
+# Properties are replaced and appended at a fixed position so re-runs and
+# --byte-stable output stay byte-identical.
+COMPAT_FILE="$SCRIPT_DIR/license-compat.json"
+if [ -f "$COMPAT_FILE" ]; then
+    COMPAT_JSON="$(cat "$COMPAT_FILE")"
+else
+    COMPAT_JSON='{}'
+fi
+LICENSE_CONFLICT_FIX='
+  ([ (.metadata.component.licenses // [])[]
+     | (.license.id // .license.name // .expression // "") | select(. != "") ] | first // "") as $outbound
+  | if $outbound == "" or ($compat.matrix == null) then .
+    else (.components) |= (if type=="array" then map(
+      (component_license_conflict($outbound; $compat)) as $c
+      | .properties = (((.properties // [])
+          | map(select(.name != "bomlens:licenseConflict" and .name != "bomlens:licenseConflict:why")))
+          + [{name:"bomlens:licenseConflict", value: $c.verdict},
+             {name:"bomlens:licenseConflict:why", value: $c.why}])
+    ) else . end)
+    end'
+
 if [ "$MODE" = "--stable" ]; then
     # Reproducible build: pin every timestamp (metadata + annotations + tools),
     # drop random serial number. cdxgen also embeds a human-readable build date
@@ -288,7 +318,7 @@ if [ "$MODE" = "--stable" ]; then
     # cdxgen further leaks the random name of the temp virtualenv it builds to
     # resolve python deps (cdxgen-venv-XXXXXX) into component evidence values, so
     # the same input yields a different byte stream each run; pin that suffix too.
-    jq -S --argjson vmap "$VMAP_JSON" "
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "
         ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
@@ -300,6 +330,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
         | ${LICENSE_CLASS_FIX}
+        | ${LICENSE_CONFLICT_FIX}
         | ${FILENAME_FILTER}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
@@ -312,7 +343,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

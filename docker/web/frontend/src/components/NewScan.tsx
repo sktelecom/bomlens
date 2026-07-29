@@ -10,6 +10,7 @@ import {
   Github,
   Lock,
   type LucideIcon,
+  Package,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,8 +51,11 @@ const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = 
   // Not shown as a tile (absent from SOURCE_GROUPS) — a submit-time variant of
   // rootfs-dir. Present only to satisfy the exhaustive SourceType record.
   "scan-target-src": { labelKey: "source.rootfsDir", icon: FolderTree },
+  // Also not a tile: a folder the scanner recognized as a Yocto build directory.
+  "yocto-build-dir": { labelKey: "source.yoctoBuildDir", icon: FolderTree },
   "git-url": { labelKey: "source.gitUrl", icon: Github },
   "zip-upload": { labelKey: "source.zipUpload", icon: FileArchive },
+  "package-upload": { labelKey: "source.packageUpload", icon: Package },
   "docker-image": { labelKey: "source.dockerImage", icon: Box },
   "firmware-upload": { labelKey: "source.firmwareUpload", icon: Cpu },
   "sbom-upload": { labelKey: "source.sbomUpload", icon: FileJson },
@@ -62,7 +66,7 @@ const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = 
 // generate an SBOM for an AI model.
 const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
   { key: "catCode", sources: ["current-dir", "rootfs-dir", "git-url", "zip-upload"] },
-  { key: "catArtifact", sources: ["docker-image", "firmware-upload"] },
+  { key: "catArtifact", sources: ["docker-image", "package-upload", "firmware-upload"] },
   { key: "catSbom", sources: ["sbom-upload"] },
   { key: "catAiModel", sources: ["ai-model"] },
 ];

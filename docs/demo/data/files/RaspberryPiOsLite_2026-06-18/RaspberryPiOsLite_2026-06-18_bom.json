@@ -1,0 +1,911 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "1-CVEBINTOOL-zstd-uncompressed_extract",
+      "name": "CVEBINTOOL-zstd-uncompressed_extract",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "application"
+    },
+    {
+      "bom-ref": "2-busybox",
+      "cpe": "cpe:2.3:a:busybox:busybox:1.37.0:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "busybox",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "busybox"
+      },
+      "type": "library",
+      "version": "1.37.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-only"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "4-dosfstools",
+      "cpe": "cpe:/a:dosfstools_project:dosfstools:4.2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "dosfstools",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "supplier": {
+        "name": "dosfstools project"
+      },
+      "type": "library",
+      "version": "4.2"
+    },
+    {
+      "bom-ref": "5-e2fsprogs",
+      "cpe": "cpe:2.3:a:e2fsprogs_project:e2fsprogs:1.47.2:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "e2fsprogs",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "e2fsprogs project"
+      },
+      "type": "library",
+      "version": "1.47.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-only"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "7-glibc",
+      "cpe": "cpe:2.3:a:gnu:glibc:2.41:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "glibc",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "gnu"
+      },
+      "type": "library",
+      "version": "2.41"
+    },
+    {
+      "bom-ref": "12-ncurses",
+      "cpe": "cpe:/a:gnu:ncurses:6.5",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "ncurses",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "supplier": {
+        "name": "gnu"
+      },
+      "type": "library",
+      "version": "6.5"
+    },
+    {
+      "bom-ref": "9-openssl",
+      "cpe": "cpe:2.3:a:openssl:openssl:3.5.6:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "/usr/bin/openssl"
+          }
+        ]
+      },
+      "name": "openssl",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "openssl"
+      },
+      "type": "library",
+      "version": "3.5.6"
+    },
+    {
+      "bom-ref": "10-pcre2",
+      "cpe": "cpe:2.3:a:pcre:pcre2:10.46:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "pcre2",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "pcre"
+      },
+      "type": "library",
+      "version": "10.46",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:deb/debian/libzstd@1.5.7%2Bdfsg-1?distro=Debian&package-id=1344f92fce0c4167",
+      "cpe": "cpe:2.3:a:facebook:zstandard:1.5.7+dfsg:*:*:*:*:*:*:*",
+      "name": "libzstd",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "elf-binary-package-cataloger"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "deb"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "elf-binary-package-note-json-payload"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libzstd.so.1.5.7"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcName",
+          "value": "libzstd"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcVersion",
+          "value": "1.5.7+dfsg"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcRelease",
+          "value": "1"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "libzstd.so.1.5.7"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "purl": "pkg:deb/Debian/libzstd@1.5.7%2Bdfsg-1?distro=Debian",
+      "type": "library",
+      "version": "1.5.7+dfsg-1",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause OR GPL-2.0-only"
+        }
+      ]
+    },
+    {
+      "bom-ref": "pkg:deb/debian/systemd@257.13-1~deb13u1?distro=Debian&package-id=1394ba5fdbfd1167",
+      "cpe": "cpe:2.3:a:systemd:systemd:257.13-1\\~deb13u1:*:*:*:*:*:*:*",
+      "name": "systemd",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "elf-binary-package-cataloger"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "deb"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "elf-binary-package-note-json-payload"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/bin/udevadm"
+        },
+        {
+          "name": "syft:location:1:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libudev.so.1.7.10"
+        },
+        {
+          "name": "syft:location:2:path",
+          "value": "/usr/lib/aarch64-linux-gnu/systemd/libsystemd-shared-257.so"
+        },
+        {
+          "name": "syft:location:3:path",
+          "value": "/usr/lib/udev/ata_id"
+        },
+        {
+          "name": "syft:location:4:path",
+          "value": "/usr/lib/udev/scsi_id"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcName",
+          "value": "systemd"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcVersion",
+          "value": "257.13"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcRelease",
+          "value": "1~deb13u1"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "purl": "pkg:deb/Debian/systemd@257.13-1~deb13u1?distro=Debian",
+      "type": "library",
+      "version": "257.13-1~deb13u1"
+    },
+    {
+      "bom-ref": "pkg:deb/debian/util-linux@2.41-5?distro=Debian&package-id=f884abfb325fdc79",
+      "cpe": "cpe:2.3:a:kernel:util-linux:2.41:*:*:*:*:*:*:*",
+      "name": "util-linux",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "elf-binary-package-cataloger"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "deb"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "elf-binary-package-note-json-payload"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:util-linux:util_linux:2.41-5:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:util_linux:util-linux:2.41-5:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:util_linux:util_linux:2.41-5:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:util:util-linux:2.41-5:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:cpe23",
+          "value": "cpe:2.3:a:util:util_linux:2.41-5:*:*:*:*:*:*:*"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/usr/bin/findmnt"
+        },
+        {
+          "name": "syft:location:1:path",
+          "value": "/usr/bin/lsblk"
+        },
+        {
+          "name": "syft:location:2:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libblkid.so.1.1.0"
+        },
+        {
+          "name": "syft:location:3:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libmount.so.1.1.0"
+        },
+        {
+          "name": "syft:location:4:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libsmartcols.so.1.1.0"
+        },
+        {
+          "name": "syft:location:5:path",
+          "value": "/usr/lib/aarch64-linux-gnu/libuuid.so.1.3.0"
+        },
+        {
+          "name": "syft:location:6:path",
+          "value": "/usr/sbin/blkid"
+        },
+        {
+          "name": "syft:location:7:path",
+          "value": "/usr/sbin/fsck"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcName",
+          "value": "util-linux"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcVersion",
+          "value": "2.41"
+        },
+        {
+          "name": "aquasecurity:trivy:SrcRelease",
+          "value": "5"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        }
+      ],
+      "purl": "pkg:deb/Debian/util-linux@2.41-5?distro=Debian",
+      "type": "library",
+      "version": "2.41-5"
+    },
+    {
+      "bom-ref": "11-readline",
+      "cpe": "cpe:/a:gnu:readline:8.2",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "/usr/share/readline"
+          }
+        ]
+      },
+      "name": "readline",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "supplier": {
+        "name": "gnu"
+      },
+      "type": "library",
+      "version": "8.2"
+    },
+    {
+      "bom-ref": "13-systemd",
+      "cpe": "cpe:/a:systemd_project:systemd:257",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "/usr/lib/systemd"
+          }
+        ]
+      },
+      "name": "systemd",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "supplier": {
+        "name": "systemd project"
+      },
+      "type": "library",
+      "version": "257"
+    },
+    {
+      "bom-ref": "1b4aa11e919db2d6",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "4dd5699937037a5f0f011060e3cd61e0a8d63b3d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "6bbe81dadf28c8e1c361a3dbc933bcc0347370d85547f678f2ae460b577b1cc4"
+        }
+      ],
+      "name": "usr/bin/findmnt",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "a3665fc4f418915f",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "a1579b3c94d0f4179371f01176ad53948e8513ee"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3e4d8ce4ed9be87f6ce2f28b18bbaec165c19f8e3899c952dfadca74b80e01d1"
+        }
+      ],
+      "name": "usr/bin/lsblk",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "32dd8fdfedbcf016",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "ac187d9ee445049a848f752c28015f56f6bdf2e9"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "9a9631782584d625f84ea09e42b8e945dd65c7df68f9ccb049481b79fa66c7af"
+        }
+      ],
+      "name": "usr/bin/udevadm",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "3913a1820004f96f",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "80c62239228459ed92ab244d966c842a3a46493c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "c2d9e0bb627fce8446505aee24aedee22de2a34f4b8116a314153221ff8ee778"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libblkid.so.1.1.0",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "7a8e2ebfcf47005c",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "a39ddd942e65607b0b567e36da6aa382732908bf"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3e92bbc2903ed7b319ea68c1c53b468c066db854c5ca3178e1d6e868d4a52877"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libmount.so.1.1.0",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "b12802e982a47590",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "aec2b7da1efc5281513067866a3d2d9e54e61c39"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "8cb29b67179fca2ade60a4b125c9b617be37cf7b63e9ea6101b9f1ffb5ef4e88"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libsmartcols.so.1.1.0",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "d38ec90598bdb450",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "ecf1a1857a942815f1bf202dd2e7a36770775f10"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "bcf309a103288b263adfffded7db309ed393643acc5f60e8daf1962103e3a113"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libudev.so.1.7.10",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "6358cc62f151176a",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "66576663d42b491ded20b02dc74a615bf2d3461e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "fb496f44458dc566a03cda9d8d969aeb7a5020ade5ac3738c049161de7d9f91b"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libuuid.so.1.3.0",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "95e18f5a97db8114",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "10d640924669e4de449e4a1bbb22f1e91639492e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "1279c4edfbfb08878b5b7fb40d392c1bdc9b30100d9b7a019d4aefaf10d2046c"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/libzstd.so.1.5.7",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "372ac35afc7e6db5",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "105076c05144c90fcdb46557126c254df3da6d7e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a62b81da3b82a87fd91e5d4a92bf611719b898b098a9327be5b441d965cdf997"
+        }
+      ],
+      "name": "usr/lib/aarch64-linux-gnu/systemd/libsystemd-shared-257.so",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "7b4b8ea69a9fb4b2",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "d7591a64a8e6e5ba003b87929196aeb01d59be90"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "fa3df61e1717f4ee147b902286b4e5e080c3ed398a51848d8a6b800f89ba296c"
+        }
+      ],
+      "name": "usr/lib/udev/ata_id",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "41fa831121453d15",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "0b99d730ad166ed852f8d74d3d8580726acdb0ed"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "4030f56bff9b91644fb01084623a0454ecdc613e4d3c8a560cc0b2d5878c4ec2"
+        }
+      ],
+      "name": "usr/lib/udev/scsi_id",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "21b56a712416ffb6",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "ff6fcfe37a4196b38ef257e474135a5fac606608"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "4ed7e33e7535191237705607ee0ba3624ca5deaef48aaa2fa37014d0979d6858"
+        }
+      ],
+      "name": "usr/sbin/blkid",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "af4a4548b4ae4904",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "6d68fdb498a8e91131e76de98c56dc67e9fb91e2"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "be799ff101c29f2f2c7bd24c213efd04cae977613ae2546989ebe998c49c8456"
+        }
+      ],
+      "name": "usr/sbin/fsck",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        }
+      ],
+      "type": "file"
+    },
+    {
+      "bom-ref": "3-util-linux",
+      "cpe": "cpe:2.3:a:kernel:util-linux:2.41:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "/usr/share/util-linux"
+          }
+        ]
+      },
+      "name": "util-linux",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "util-linux project"
+      },
+      "type": "library",
+      "version": "2.41"
+    },
+    {
+      "bom-ref": "6-zlib",
+      "cpe": "cpe:2.3:a:zlib:zlib:1.2.3:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "zlib",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "zlib"
+      },
+      "type": "library",
+      "version": "1.2.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "Zlib"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "8-zlib",
+      "cpe": "cpe:2.3:a:zlib:zlib:1.3.1:*:*:*:*:*:*:*",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "NotFound"
+          }
+        ]
+      },
+      "name": "zlib",
+      "properties": [
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
+        },
+        {
+          "name": "bomlens:licenseSource",
+          "value": "name-map"
+        }
+      ],
+      "supplier": {
+        "name": "zlib"
+      },
+      "type": "library",
+      "version": "1.3.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "Zlib"
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "component": {
+      "description": "XZ compressed data, checksum CRC64",
+      "name": "2026-06-18-raspios-trixie-arm64-lite.img.xz",
+      "type": "firmware",
+      "version": "2026-06-18"
+    },
+    "timestamp": "2026-07-28T06:35:27Z",
+    "tools": {
+      "components": [
+        {
+          "name": "unblob",
+          "type": "application"
+        },
+        {
+          "name": "syft",
+          "type": "application"
+        },
+        {
+          "name": "cve-bin-tool",
+          "type": "application"
+        }
+      ]
+    }
+  },
+  "specVersion": "1.6",
+  "version": 1
+}

@@ -8,6 +8,7 @@ import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
   describeUploadError,
+  formSourceOf,
   stashGitCred,
   uploadFile,
   type Capabilities,
@@ -22,13 +23,15 @@ import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanD
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
+  "package-upload": "package",
   "sbom-upload": "sbom",
   "firmware-upload": "firmware",
 };
 
 export const ACCEPT: Record<UploadKind, string> = {
   zip: ".zip,.tar.gz,.tgz,.tar.bz2,.tar.xz,.tar",
-  sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json",
+  package: ".jar,.war,.ear,.deb,.rpm,.whl",
+  sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json,.spdx.tar.zst",
   firmware:
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +
     ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
@@ -103,8 +106,12 @@ export function useScanForm({
   // dirty: the seeded identity is deliberate, not a suggestion to replace.
   const [projectDirty, setProjectDirty] = useState(() => Boolean(initialConfig));
   const [versionDirty, setVersionDirty] = useState(() => Boolean(initialConfig));
-  const [source, setSource] = useState<SourceType>(
-    () => initialConfig?.source ?? "current-dir",
+  // A re-scan seeds the input the scan came from. `formSourceOf` maps what a
+  // scan turned out to be (a Yocto build directory) back to the input the form
+  // offers (the folder that was picked), so the seeded form is one the user can
+  // see, edit and submit.
+  const [source, setSource] = useState<SourceType>(() =>
+    initialConfig ? formSourceOf(initialConfig.source) : "current-dir",
   );
   const [target, setTargetRaw] = useState(() => initialConfig?.target ?? "");
   // Extra --mount scan targets (capabilities.scanRoots): the rootfs-dir input
@@ -130,6 +137,11 @@ export function useScanForm({
   // re-scanned, so it can be diffed/checksummed.
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
+  );
+  // Outbound license (SPDX id) switching the license-conflict check on. Free
+  // text, since any SPDX id is valid; empty simply leaves the check off.
+  const [outboundLicense, setOutboundLicense] = useState(
+    () => initialConfig?.license ?? "",
   );
   // Optional upload of the generated SBOM to Dependency-Track or TRUSCA. The
   // server URL and token are never persisted (not in the re-scan sidecar), so a
@@ -204,11 +216,16 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // A received SBOM carries its supplier's own root license and an AI model has
+  // no outbound license of ours, so the field is offered only where we generate
+  // the SBOM and therefore own what it ships under.
+  const showOutboundLicense = !isAnalyze && !isAiModel;
   // Deep CVE matching only applies to an uploaded SBOM we analyze, and only when
   // this environment can run it (grype in-image or the deep-cve sibling).
   const showDeepCve = isAnalyze && Boolean(capabilities.deepCve);
   const showScanOptions =
-    showDeepLicense || showVendored || showIncludeOsv || showByteStable || showDeepCve;
+    showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
+    showOutboundLicense || showDeepCve;
   // Any scan produces an SBOM, so upload is offered for every source.
   const showUpload = true;
   const busy = running || uploading;
@@ -271,12 +288,18 @@ export function useScanForm({
     if (source === "sbom-upload" && file) {
       // The SBOM's own metadata beats filename guessing; fall back to the
       // filename when the file isn't parseable JSON (xml / tag-value SPDX)
-      // or its metadata names nothing.
+      // or its metadata names nothing. A Yocto SPDX 2.2 archive is neither text
+      // nor one document, so it goes straight to the filename rather than
+      // reading a megabyte of compressed tar as a string.
+      if (file.name.toLowerCase().endsWith(".spdx.tar.zst")) {
+        apply(suggestIdentity(source, { fileName: file.name }));
+      } else {
       void file
         .text()
         .then((text) => parseSbomIdentity(text))
         .catch(() => null)
         .then((id) => apply(id ?? suggestIdentity(source, { fileName: file.name })));
+      }
     } else {
       // A selected scan root with no subpath: suggest from its host path (the
       // folder the user actually mounted), not the synthetic container path.
@@ -401,6 +424,8 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      // Outbound license: only where we generate the SBOM (see showOutboundLicense).
+      license: showOutboundLicense ? outboundLicense.trim() : "",
       // AI-model only: grade the assessment against the chosen usage.
       usage: isAiModel && usage ? usage : undefined,
       // Deep CVE matching: SBOM-upload-only opt-in; ignored for any other source.
@@ -442,6 +467,7 @@ export function useScanForm({
     includeOsv, setIncludeOsv,
     deepCve, setDeepCve,
     byteStable, setByteStable,
+    outboundLicense, setOutboundLicense,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
     uploadTarget, setUploadTarget,
@@ -450,7 +476,8 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showScanOptions, showUpload,
+    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showOutboundLicense,
+    showScanOptions, showUpload,
     options, submit,
     capabilities,
   };

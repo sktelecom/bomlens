@@ -53,7 +53,7 @@ ARG SBOM_DEEP_LICENSE=false
 # so shipping the client just makes the web-UI toggle available out of the box.
 ARG SBOM_SCANOSS=true
 # renovate: datasource=pypi depName=scanoss
-ARG SCANOSS_VERSION=1.54.1
+ARG SCANOSS_VERSION=1.54.2
 ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
@@ -102,9 +102,12 @@ ARG WEASYPRINT_VERSION=63.1
 
 # jq (helper scripts), curl/tar (installers), file (binary mode),
 # git (web UI 'GitHub URL' ingestion: server.py clones into a temp source tree).
+# zstd: a Yocto SPDX 2.2 build publishes its package documents as an
+# <image>.spdx.tar.zst beside the image document (parse-yocto-spdx.py reads it
+# through `zstd -dc`; python 3.12's tarfile cannot decompress zstd itself).
 # python3 + pip are already in the python:3.12-slim base (web UI + scancode).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    jq curl wget ca-certificates bash tar file git \
+    jq curl wget ca-certificates bash tar file git zstd \
     && rm -rf /var/lib/apt/lists/*
 
 # syft — image/binary/RootFS scanning (pinned)
@@ -352,6 +355,22 @@ RUN timeout 120 python3 /tmp/build-eol-index.py \
         /usr/local/lib/sbom/eol-data.json \
     || echo "[build] endoflife snapshot skipped; EOL flagging will be inactive at scan time" \
     ; rm -f /tmp/build-eol-index.py
+
+# Bundle an OSV malicious-package snapshot beside enrich-malicious.sh, for the
+# same reason as the EOL bundle above: the check must run OFFLINE at scan time.
+# This one is far heavier to build than the EOL bundle — the source archives are
+# ~275 MB — so it gets its own layer and a much larger timeout, and the reduced
+# index it writes is ~12 MB (232k packages, measured 2026-07-28). Its own layer
+# also means a rebuild that changes nothing else reuses the cached download
+# instead of fetching it again, which matters on the multi-architecture publish
+# where every stage would otherwise pay for it twice.
+# Best-effort in the same way: if the fetch fails no file is written and
+# enrich-malicious.sh skips cleanly at scan time. See build-malicious-index.py.
+COPY build-malicious-index.py /tmp/build-malicious-index.py
+RUN timeout 1200 python3 /tmp/build-malicious-index.py \
+        /usr/local/lib/sbom/malicious-index.json \
+    || echo "[build] OSV malicious snapshot skipped; the check will be inactive at scan time" \
+    ; rm -f /tmp/build-malicious-index.py
 
 WORKDIR /src
 

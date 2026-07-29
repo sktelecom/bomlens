@@ -70,11 +70,11 @@
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
     /* Risk severity — domain meaning fixed (shared with portal). */
-    --risk-critical: #dc2626;
-    --risk-high: #ea580c;
-    --risk-medium: #ca8a04;
-    --risk-low: #2563eb;
-    --risk-info: #71717a;
+    --risk-critical: 220 38 38;
+    --risk-high: 234 88 12;
+    --risk-medium: 202 138 4;
+    --risk-low: 37 99 235;
+    --risk-info: 113 113 122;
   }
 
   /* Dark theme — populated (mirrors the portal's reserved token names). */
@@ -122,11 +122,11 @@
     --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.6), 0 3px 8px -3px rgb(0 0 0 / 0.4);
 
     /* Slightly brighter risk hues read better on the dark canvas. */
-    --risk-critical: #f87171;
-    --risk-high: #fb923c;
-    --risk-medium: #facc15;
-    --risk-low: #60a5fa;
-    --risk-info: #a1a1aa;
+    --risk-critical: 248 113 113;
+    --risk-high: 251 146 60;
+    --risk-medium: 250 204 21;
+    --risk-low: 96 165 250;
+    --risk-info: 161 161 170;
   }
 
   * {

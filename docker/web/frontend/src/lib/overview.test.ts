@@ -28,6 +28,35 @@ describe("needsAttention", () => {
     expect(needsAttention(result())).toEqual([]);
   });
 
+  it("puts malicious packages above everything else", () => {
+    // A vulnerability is a flaw to schedule a fix for; a malicious package is
+    // already running in the build, so it must lead even a failed conformance.
+    const items = needsAttention(
+      result({
+        sbom: { components: 3, componentList: [], maliciousCount: 2 },
+        security: sev({ CRITICAL: 5, TOTAL: 5 }),
+      }),
+    );
+    expect(items[0]).toMatchObject({
+      id: "malicious",
+      count: 2,
+      tone: "critical",
+      target: "components",
+    });
+    expect(items.map((i) => i.id)).toEqual(["malicious", "vulns"]);
+  });
+
+  it("omits the malicious item when the count is absent or zero", () => {
+    // Absent means the check did not run (no bundled snapshot), which must not
+    // render as a reassuring zero.
+    expect(needsAttention(result()).some((i) => i.id === "malicious")).toBe(false);
+    expect(
+      needsAttention(
+        result({ sbom: { components: 1, componentList: [], maliciousCount: 0 } }),
+      ).some((i) => i.id === "malicious"),
+    ).toBe(false);
+  });
+
   it("flags critical+high vulnerabilities and tones critical when any critical", () => {
     const items = needsAttention(result({ security: sev({ CRITICAL: 2, HIGH: 3, TOTAL: 5 }) }));
     expect(items).toHaveLength(1);

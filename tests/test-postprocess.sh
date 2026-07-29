@@ -372,6 +372,187 @@ else
     fail "tier results diverged" "licenses.ts: $(echo "$ts_tier" | tr '\n' ' ') / license-flags.jq: $(echo "$jq_tier" | tr '\n' ' ')"
 fi
 
+echo "== malicious packages: PURL-keyed, version-aware, and silent without a snapshot =="
+# A tiny stand-in for the bundled OSV index. Two shapes matter: an entry with no
+# version list (every published version is malicious — the common case) and one
+# that names versions (only those are).
+cat > "$WORK/mal-index.json" <<'MALJSON'
+{
+  "_snapshot": "2026-01-02",
+  "_ecosystems": ["npm"],
+  "packages": {
+    "pkg:npm/evil-all": "MAL-0000-1",
+    "pkg:npm/evil-some": "MAL-0000-2"
+  },
+  "versions": {
+    "pkg:npm/evil-some": ["2.0.0"]
+  }
+}
+MALJSON
+cat > "$WORK/mal.json" <<'MALSBOM'
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+  "components": [
+    { "type": "library", "name": "evil-all", "version": "1.0.0", "purl": "pkg:npm/evil-all@1.0.0" },
+    { "type": "library", "name": "evil-all", "version": "7.7.7", "purl": "pkg:npm/evil-all@7.7.7" },
+    { "type": "library", "name": "evil-some", "version": "2.0.0", "purl": "pkg:npm/evil-some@2.0.0" },
+    { "type": "library", "name": "evil-some", "version": "1.0.0", "purl": "pkg:npm/evil-some@1.0.0" },
+    { "type": "library", "name": "qualified", "version": "1.0.0", "purl": "pkg:npm/evil-all@1.0.0?arch=x64" },
+    { "type": "library", "name": "evil-all", "version": "1.0.0" },
+    { "type": "library", "name": "honest", "version": "1.0.0", "purl": "pkg:npm/honest@1.0.0" }
+  ]
+}
+MALSBOM
+MALICIOUS_DATA_FILE="$WORK/mal-index.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+mal_of() { jq -r --arg n "$1" --arg v "$2" '[.components[] | select(.name==$n and .version==$v)
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json"; }
+mal_expect() {
+    got=$(mal_of "$1" "$2")
+    [ "$got" = "$3" ] && pass "malicious: $1@$2 -> $3" || fail "malicious: $1@$2 expected $3, got $got"
+}
+# No version list means every version is malicious.
+mal_expect evil-all  1.0.0 true
+mal_expect evil-all  7.7.7 true
+# A version list means only those versions are — the rest are untouched, so the
+# check cannot condemn a package the advisory did not name.
+mal_expect evil-some 2.0.0 true
+mal_expect evil-some 1.0.0 none
+mal_expect honest    1.0.0 none
+# Qualifiers are stripped before the lookup, and a component with no purl is not
+# matched by name — malicious packages are named to resemble real ones, so a
+# name match here would be the wrong tool.
+if [ "$(jq -r '[.components[] | select(.name=="qualified")
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json")" = "true" ]; then
+    pass "malicious: purl qualifiers are stripped before the lookup"
+else
+    fail "qualified purl was not matched" "$(jq -c '.components[4]' "$WORK/mal.json")"
+fi
+if [ "$(jq -r '[.components[] | select(.name=="evil-all" and (has("purl")|not))
+    | ((.properties // [])[] | select(.name=="bomlens:malicious") | .value)] | first // "none"' "$WORK/mal.json")" = "none" ]; then
+    pass "malicious: a component with no purl is never matched by name"
+else
+    fail "a purl-less component was flagged by name" "$(jq -c '.components[5]' "$WORK/mal.json")"
+fi
+# The id and the snapshot date ride along, so a reader can look the advisory up
+# and knows how old the answer is.
+if jq -e '[.components[] | select(.name=="evil-all")
+      | ((.properties // [])[] | select(.name=="bomlens:malicious:id") | .value)] | first == "MAL-0000-1"' \
+      "$WORK/mal.json" >/dev/null 2>&1 \
+   && jq -e '[.components[] | select(.name=="evil-all")
+      | ((.properties // [])[] | select(.name=="bomlens:malicious:source") | .value)] | first == "osv.dev@2026-01-02"' \
+      "$WORK/mal.json" >/dev/null 2>&1; then
+    pass "malicious: advisory id and snapshot date are recorded on the component"
+else
+    fail "malicious id/source properties missing" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
+fi
+# No bundled snapshot: the step is skipped and the SBOM comes back untouched.
+# Stamping nothing is the point — an absent property means "not assessed".
+cp "$WORK/mal.json" "$WORK/mal-before.json"
+MALICIOUS_DATA_FILE="$WORK/does-not-exist.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+if diff -q "$WORK/mal-before.json" "$WORK/mal.json" >/dev/null 2>&1; then
+    pass "no bundled snapshot -> SBOM untouched, scan still succeeds"
+else
+    fail "missing snapshot changed the SBOM"
+fi
+# Re-running must not accumulate duplicate properties (byte-stability).
+MALICIOUS_DATA_FILE="$WORK/mal-index.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal.json" >/dev/null 2>&1
+if [ "$(jq '[.components[0].properties[] | select(.name=="bomlens:malicious")] | length' "$WORK/mal.json")" = "1" ]; then
+    pass "re-running replaces rather than appends the malicious properties"
+else
+    fail "malicious properties duplicated on re-run" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
+fi
+
+echo "== license-conflict: expression parsing and outbound-license verdicts =="
+# The conflict check needs an OUTBOUND license on metadata.component. Every
+# expression below was measured in a real BomLens SBOM, so this pins the cases
+# that actually occur rather than invented ones.
+COMPAT="$LIB/license-compat.json"
+if [ ! -f "$COMPAT" ]; then
+    fail "license-compat.json is missing from docker/lib"
+else
+    cat > "$WORK/lconf.json" <<'LCJSON'
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+  "metadata": { "component": { "type": "application", "name": "app", "version": "1.0",
+                               "licenses": [ { "license": { "id": "Apache-2.0" } } ] } },
+  "components": [
+    { "type": "library", "name": "gpl-dep", "version": "1", "purl": "pkg:maven/x/gpl-dep@1",
+      "licenses": [ { "license": { "id": "GPL-3.0-only" } } ] },
+    { "type": "library", "name": "dual", "version": "1", "purl": "pkg:maven/x/dual@1",
+      "licenses": [ { "expression": "MIT OR Apache-2.0" } ] },
+    { "type": "library", "name": "andexpr", "version": "1", "purl": "pkg:maven/x/andexpr@1",
+      "licenses": [ { "expression": "EPL-1.0 AND LGPL-2.1-only" } ] },
+    { "type": "library", "name": "classpath", "version": "1", "purl": "pkg:maven/x/classpath@1",
+      "licenses": [ { "expression": "EPL-2.0 AND GPL-2.0-with-classpath-exception" } ] },
+    { "type": "library", "name": "twoentries", "version": "1", "purl": "pkg:maven/x/twoentries@1",
+      "licenses": [ { "license": { "id": "EPL-1.0" } }, { "license": { "id": "LGPL-2.1-only" } } ] },
+    { "type": "library", "name": "freetext", "version": "1", "purl": "pkg:maven/x/freetext@1",
+      "licenses": [ { "license": { "name": "Eclipse Public License v. 2.0 OR Eclipse Distribution License v. 1.0" } } ] },
+    { "type": "library", "name": "nolicense", "version": "1", "purl": "pkg:maven/x/nolicense@1" }
+  ]
+}
+LCJSON
+    bash "$LIB/normalize-sbom.sh" "$WORK/lconf.json" >/dev/null 2>&1
+    verdict_of() { jq -r --arg n "$1" '[.components[] | select(.name==$n)
+        | ((.properties // [])[] | select(.name=="bomlens:licenseConflict") | .value)] | first // "none"' "$WORK/lconf.json"; }
+    lc_expect() {
+        got=$(verdict_of "$1")
+        [ "$got" = "$2" ] && pass "license conflict: $1 -> $2" \
+                          || fail "license conflict: $1 expected $2, got $got"
+    }
+    lc_expect gpl-dep     incompatible
+    lc_expect dual        compatible
+    lc_expect andexpr     conditional
+    # The decisive case: an exception clause exists to permit the combination, so
+    # it must never reach "incompatible" (java-maven's jakarta components).
+    lc_expect classpath   conditional
+    lc_expect twoentries  conditional
+    lc_expect freetext    unknown
+    lc_expect nolicense   unknown
+
+    # No outbound license -> no property at all. An absent verdict means "not
+    # assessed"; stamping "compatible" would claim an all-clear nobody checked.
+    jq 'del(.metadata.component.licenses)' "$WORK/lconf.json" \
+        | jq 'del(.components[].properties)' > "$WORK/lconf-nolic.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/lconf-nolic.json" >/dev/null 2>&1
+    if [ "$(jq '[.components[].properties // [] | .[] | select(.name=="bomlens:licenseConflict")] | length' "$WORK/lconf-nolic.json")" = "0" ]; then
+        pass "no outbound license declared -> no licenseConflict property stamped"
+    else
+        fail "licenseConflict was stamped without a declared outbound license"
+    fi
+
+    # Byte-stability: the property must not disturb --stable determinism.
+    cp "$WORK/lconf.json" "$WORK/lcf1.json"; cp "$WORK/lconf.json" "$WORK/lcf2.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/lcf1.json" --stable >/dev/null 2>&1
+    bash "$LIB/normalize-sbom.sh" "$WORK/lcf2.json" --stable >/dev/null 2>&1
+    diff -q "$WORK/lcf1.json" "$WORK/lcf2.json" >/dev/null 2>&1 \
+        && pass "--stable output with licenseConflict is byte-identical across runs" \
+        || fail "licenseConflict stamping broke --byte-stable determinism"
+fi
+
+echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
+# Same contract as the license-class guard above: the SPDX operator patterns and
+# the exception test are hand-mirrored, so extract both sides and diff them.
+jq_ops=$(sed -n '/^def parse_license_expr/,/^def has_license_exception/p' "$LFJ" \
+    | grep -oE 'splits\("[^"]+"' | sed 's/^splits("//; s/"$//; s/\\\\/\\/g' | sort)
+ts_ops=$(sed -n '/^export function parseLicenseExpression/,/^}/p' "$LTS" \
+    | grep -oE 'split\(/[^/]+/i\)' | sed 's:^split(/::; s:/i)$::' | sort)
+if [ -z "$jq_ops" ] || [ -z "$ts_ops" ]; then
+    fail "could not extract the SPDX operator patterns (license-flags.jq / licenses.ts changed shape?)"
+elif [ "$jq_ops" = "$ts_ops" ]; then
+    pass "SPDX operator patterns are identical ($(printf '%s\n' "$jq_ops" | tr '\n' ' '))"
+else
+    fail "SPDX operator patterns diverged between license-flags.jq and licenses.ts" \
+         "$(diff <(printf '%s\n' "$jq_ops") <(printf '%s\n' "$ts_ops") | grep '^[<>]' | sed 's/^</license-flags.jq:/; s/^>/licenses.ts:/')"
+fi
+jq_exc=$(grep -A2 '^def has_license_exception' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g')
+ts_exc=$(sed -n '/^export function hasLicenseException/,/^}/p' "$LTS" | grep -oE '/[^/]*WITH[^/]*/i' | sed 's:^/::; s:/i$::')
+if [ "$jq_exc" = "$ts_exc" ] && [ -n "$jq_exc" ]; then
+    pass "exception-clause patterns match"
+else
+    fail "exception-clause pattern diverged" "license-flags.jq: $jq_exc / licenses.ts: $ts_exc"
+fi
+
 echo "== risk-report: license classification summary drives from the SBOM =="
 # generate-risk-report.sh must add the per-class table and the copyleft driver
 # list (network/strong, up to 10) when the BOM artifact exists, and skip the
@@ -761,6 +942,42 @@ cbt_cvss=$(jq -r '[ .Results[]?.Vulnerabilities[]? | select(.VulnerabilityID=="C
     | ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ] | map(select(.!=null)) | (max // null)) ][0]' "$WORK/sec.json")
 [ "$cbt_cvss" = "7.2" ] && pass "cve-bin-tool CVSS score readable by the report flatten" || fail "cve-bin-tool CVSS='$cbt_cvss', expected 7.2"
 
+echo "== F-3: firmware component names carry no unpack path =="
+# cve-bin-tool names a file it cannot attribute to a package by its full path on
+# disk, which is the throwaway unpack directory. Shipping that puts the scanning
+# machine's temp path into a document meant to be handed to other people. The
+# merge in scan-firmware.sh keeps only the path inside the firmware, which
+# unblob marks with its `<something>_extract/` nesting.
+cat > "$WORK/fw-names.json" <<'JSON'
+{"components":[
+ {"name":"/tmp/tmp.aBcD/extract/fw.img.xz_extract/xz.uncompressed_extract/8388608-545257472.fat_extract/initramfs8_extract/z.zstd_extract/usr/bin/findmnt","type":"file"},
+ {"name":"/usr/lib/libfoo.so.1","type":"file"},
+ {"name":"busybox","version":"1.36.1","type":"library","purl":"pkg:deb/debian/busybox@1.36.1"},
+ {"name":"CVEBINTOOL-zstd-uncompressed_extract","type":"application"},
+ {"name":"","type":"file"}
+]}
+JSON
+# The same expression scan-firmware.sh's comps_of() applies.
+jq -c '[.components[]? | select((.name // "") != "")
+       | .name |= (if test("_extract/") then (split("_extract/") | last)
+                   elif startswith("/") then (split("/") | last)
+                   else . end)]' "$WORK/fw-names.json" > "$WORK/fw-names-out.json"
+
+leaked=$(jq '[.[] | select(.name | test("^/|/tmp/|_extract/"))] | length' "$WORK/fw-names-out.json")
+[ "$leaked" = "0" ] && pass "firmware names: no unpack/absolute path survives" || fail "firmware names: $leaked component(s) still carry a path"
+n1=$(jq -r '.[0].name' "$WORK/fw-names-out.json")
+[ "$n1" = "usr/bin/findmnt" ] && pass "firmware names: path inside the firmware is kept" || fail "firmware names: got '$n1', expected usr/bin/findmnt"
+n2=$(jq -r '.[1].name' "$WORK/fw-names-out.json")
+[ "$n2" = "libfoo.so.1" ] && pass "firmware names: a plain absolute path falls back to its basename" || fail "firmware names: got '$n2', expected libfoo.so.1"
+# A package name must pass through untouched, or dedupe by name@version breaks.
+n3=$(jq -r '.[2].name' "$WORK/fw-names-out.json")
+[ "$n3" = "busybox" ] && pass "firmware names: package names are left alone" || fail "firmware names: package name became '$n3'"
+# The cve-bin-tool marker ends in _extract but has no trailing slash: not a path.
+n4=$(jq -r '.[3].name' "$WORK/fw-names-out.json")
+[ "$n4" = "CVEBINTOOL-zstd-uncompressed_extract" ] && pass "firmware names: a name merely ending in _extract is not truncated" || fail "firmware names: marker became '$n4'"
+cnt=$(jq 'length' "$WORK/fw-names-out.json")
+[ "$cnt" = "4" ] && pass "firmware names: the empty-name component is dropped" || fail "firmware names: kept $cnt components, expected 4"
+
 echo "== D-4: validate-sbom.sh emits a conformance report for clean SPDX Tag-Value =="
 # grep -c exits 1 on zero matches, so the old `grep -cE … || echo 0` appended a
 # second "0" for every empty count. pkg:generic is always 0 in a clean SBOM, so
@@ -816,6 +1033,53 @@ fi
 bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-cf" "supplier" >/dev/null 2>&1
 [ -f "$WORK/spdx3-cf_conformance.json" ] && jq -e '.checks|length>0' "$WORK/spdx3-cf_conformance.json" >/dev/null 2>&1 \
     && pass "SPDX 3.0 produces a conformance report" || fail "SPDX 3.0 conformance not produced"
+
+echo "== conformance: a PURL failure says when the components carry a CPE instead =="
+# The submission criteria require a PURL, so this stays a mandatory failure. What
+# it must not do is read as "unidentified components" when the components are
+# identified another way — the baselines under this row (BSI TR-03183-2 5.2.4,
+# NTIA) accept either identifier. A Yocto image is the case in point: bitbake
+# writes CPEs and never PURLs.
+cat > "$WORK/cpe-only.cdx.json" <<'CEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"timestamp":"2026-01-01T00:00:00Z","tools":{"components":[{"type":"application","name":"t"}]},
+              "component":{"type":"operating-system","name":"img","version":"1.0"}},
+ "components":[
+   {"type":"library","name":"busybox","version":"1.36.1","cpe":"cpe:2.3:a:*:busybox:1.36.1:*:*:*:*:*:*:*"},
+   {"type":"library","name":"libz1","version":"1.3","cpe":"cpe:2.3:a:*:zlib:1.3:*:*:*:*:*:*:*"},
+   {"type":"library","name":"nameless","version":"1.0"}],
+ "dependencies":[{"ref":"busybox","dependsOn":["libz1"]}]}
+CEOF
+bash "$LIB/validate-sbom.sh" "$WORK/cpe-only.cdx.json" "$WORK/cpeonly" "supplier" >/dev/null 2>&1
+cpe_status=$(jq -r '.checks[] | select(.id=="purl") | .status' "$WORK/cpeonly_conformance.json" 2>/dev/null)
+cpe_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/cpeonly_conformance.json" 2>/dev/null)
+[ "$cpe_status" = "fail" ] \
+    && pass "CPE instead of PURL still fails the submission criteria" \
+    || fail "purl check status='$cpe_status' (expected fail)"
+case "$cpe_detail" in
+    *"2 identified by CPE instead"*)
+        pass "the report counts how many components carry a CPE instead" ;;
+    *)  fail "purl detail does not name the CPE-identified components" "$cpe_detail" ;;
+esac
+# The row already carries the baselines that accept either identifier, so a
+# reader can see the verdict is ours and not theirs.
+jq -e '[.checks[] | select(.id=="purl") | .regulations[]?.framework] | index("bsi-tr-03183-2")' \
+    "$WORK/cpeonly_conformance.json" >/dev/null 2>&1 \
+    && pass "the PURL row still cites the baselines that accept CPE" \
+    || fail "purl row lost its regulatory references"
+# An SBOM with neither identifier must say nothing about CPEs.
+cat > "$WORK/no-id.cdx.json" <<'NEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"timestamp":"2026-01-01T00:00:00Z","tools":{"components":[{"type":"application","name":"t"}]},
+              "component":{"type":"application","name":"app","version":"1.0"}},
+ "components":[{"type":"library","name":"a","version":"1"}]}
+NEOF
+bash "$LIB/validate-sbom.sh" "$WORK/no-id.cdx.json" "$WORK/noid" "supplier" >/dev/null 2>&1
+noid_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/noid_conformance.json" 2>/dev/null)
+case "$noid_detail" in
+    *CPE*) fail "a PURL failure with no CPEs mentions CPEs anyway" "$noid_detail" ;;
+    *)     pass "no CPEs, no claim about CPEs" ;;
+esac
 
 echo "== conformance: spec-version range and PURL syntax are mandatory checks =="
 # The SKT submission requirements pin the accepted spec versions (CycloneDX
@@ -1303,6 +1567,649 @@ stprop() { jq -r --arg n "$1" --arg p "$2" '.components[] | select(.name==$n)
 STALENESS_FIXTURE_DIR="$FIX/staleness" python3 "$LIB/enrich-staleness.py" "$WORK/stale.json" >/dev/null 2>&1
 n_latest=$(jq '[.components[] | (.properties // [])[] | select(.name=="bomlens:staleness:latest")] | length' "$WORK/stale.json")
 [ "$n_latest" = "2" ] && pass "enrich-staleness is idempotent (no duplicate props)" || fail "staleness props duplicated: $n_latest latest entries"
+
+echo "== yocto: SPDX 3.0 image SBOM is read for its installed set and VEX verdicts =="
+# parse-yocto-spdx.py exists because syft, the generic converter, reads these
+# documents but returns source files as components and drops every vulnerability.
+# Needs no syft and no Docker — pure stdlib Python over the JSON-LD graph — so
+# unlike the SPDX 3.0 conversion checks below this runs on every CI push.
+python3 "$LIB/parse-yocto-spdx.py" "$FIX/yocto-spdx3-image.json" "$WORK/yocto.cdx.json" "$WORK/yocto" >/dev/null 2>&1
+yrc=$?
+[ "$yrc" = "0" ] && pass "parser accepts a Yocto SPDX 3.0 document" || fail "parser rc=$yrc on the Yocto fixture"
+ynames=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/yocto.cdx.json" 2>/dev/null)
+# The fixture also carries a source tarball; shipping it as a component would
+# claim the image contains build inputs it does not.
+[ "$ynames" = "busybox,libz1" ] \
+    && pass "only primaryPurpose=install packages become components (source tarball dropped)" \
+    || fail "components='$ynames', expected busybox,libz1"
+[ "$(jq '[.components[] | select(.cpe)] | length' "$WORK/yocto.cdx.json")" = "1" ] \
+    && pass "Yocto's own cpe23 identifier is carried over" || fail "cpe not carried over"
+[ "$(jq -r '.components[] | select(.name=="busybox") | .licenses[0].expression' "$WORK/yocto.cdx.json")" = "GPL-2.0-only AND LicenseRef-bzip2-1.0.4" ] \
+    && pass "compound license lands in licenses[].expression" || fail "compound license not preserved"
+[ "$(jq -r '.components[] | select(.name=="libz1") | .licenses[0].license.id' "$WORK/yocto.cdx.json")" = "Zlib" ] \
+    && pass "single license id lands in licenses[].license.id" || fail "single license id not preserved"
+
+# The judgement split is the reason to read these documents: an outside scanner
+# keyed on version alone would report the patched CVE as open.
+[ "$(jq -r '[.judgements.fixed, .judgements.notAffected, .judgements.affected] | join("/")' "$WORK/yocto_yocto_vex.json")" = "1/1/1" ] \
+    && pass "VEX verdicts split into fixed / not-affected / unresolved" \
+    || fail "vex counts=$(jq -c '.judgements' "$WORK/yocto_yocto_vex.json")"
+[ "$(jq -r '[.Results[].Vulnerabilities[].VulnerabilityID] | join(",")' "$WORK/yocto_security_yocto.json")" = "CVE-2022-28391" ] \
+    && pass "only the unjudged CVE reaches the security sidecar" \
+    || fail "sidecar carries $(jq -c '[.Results[].Vulnerabilities[].VulnerabilityID]' "$WORK/yocto_security_yocto.json")"
+
+# Runtime dependency edges. The fixture also carries a build-scoped edge and an
+# edge into the source tarball; neither describes what the image needs to run, so
+# exactly one edge (busybox -> libz1) must survive.
+[ "$(jq '[.dependencies[]?.dependsOn[]?] | length' "$WORK/yocto.cdx.json")" = "1" ] \
+    && pass "only runtime-scoped edges between installed packages become dependencies" \
+    || fail "dependency edges=$(jq -c '[.dependencies[]?]' "$WORK/yocto.cdx.json")"
+# Conformance measures name/version and the graph, so losing document metadata
+# would trade a correct component list for a worse verdict.
+[ "$(jq -r '.metadata.component.name' "$WORK/yocto.cdx.json")" = "core-image-minimal" ] \
+    && pass "root component names the image, not the uploaded filename" \
+    || fail "root component='$(jq -r '.metadata.component.name' "$WORK/yocto.cdx.json")'"
+[ "$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")" = "2026-01-01T00:00:00Z" ] \
+    && pass "document creation time is carried into metadata.timestamp" \
+    || fail "timestamp='$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")'"
+
+# rc=3 means "not mine" and must stay non-fatal: the generic converter handles
+# every other supplier SBOM.
+python3 "$LIB/parse-yocto-spdx.py" "$FIX/good-cyclonedx.json" "$WORK/nope.json" >/dev/null 2>&1
+[ "$?" = "3" ] && pass "non-Yocto input is declined with rc=3 (generic path takes over)" || fail "parser did not decline CycloneDX input"
+
+# Yocto SPDX 2.x writes a near-empty top-level document and puts the real package
+# set in a sibling tarball. Converting it succeeds and finds nothing, so the user
+# must be told where the content is rather than shown an empty successful scan.
+cat > "$WORK/y22.json" <<'YEOF'
+{"spdxVersion":"SPDX-2.2","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"core-image-minimal",
+ "documentNamespace":"http://spdx.org/spdxdocs/bitbake-1234",
+ "creationInfo":{"created":"2026-01-01T00:00:00Z","creators":["Tool: bitbake","Organization: OpenEmbedded"]},
+ "packages":[]}
+YEOF
+y22_msg=$(python3 "$LIB/parse-yocto-spdx.py" "$WORK/y22.json" "$WORK/y22-out.json" 2>&1 >/dev/null)
+y22_rc=$?
+[ "$y22_rc" = "3" ] && echo "$y22_msg" | grep -q "spdx.tar.zst" \
+    && pass "Yocto SPDX 2.x index document names the file that holds the packages" \
+    || fail "SPDX 2.x index not recognised (rc=$y22_rc): $y22_msg"
+
+# With the archive beside it, that same document is readable: the packages come
+# out of the per-document members and the CPEs off the recipes they were built
+# from. The fixture is generated rather than committed so its shape stays
+# checkable — it mirrors create-spdx-2.2.bbclass (openembedded-core): members
+# named <document>.spdx.json, an index.json, CONTAINS for installed packages and
+# OTHER for the runtime documents.
+if command -v zstd >/dev/null 2>&1; then
+    Y22DIR="$WORK/y22bundle"
+    python3 - "$Y22DIR" <<'PYGEN'
+import hashlib, io, json, os, subprocess, sys, tarfile
+
+out_dir = sys.argv[1]
+os.makedirs(out_dir, exist_ok=True)
+stem = "core-image-minimal-qemux86-64.rootfs"
+CREATORS = ["Tool: OpenEmbedded Core create-spdx.bbclass", "Organization: OE ()"]
+
+def doc(name, suffix):
+    return {"spdxVersion": "SPDX-2.2", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
+            "name": name, "documentNamespace": "http://spdx.org/spdxdocs/%s-%s" % (name, suffix),
+            "creationInfo": {"created": "2026-01-02T00:00:00Z", "creators": CREATORS},
+            "packages": [], "relationships": [], "externalDocumentRefs": []}
+
+recipes = {}
+for pn, pv, lic, cpe in [
+    ("busybox", "1.36.1", "GPL-2.0-only AND LicenseRef-bzip2-1.0.4",
+     "cpe:2.3:a:*:busybox:1.36.1:*:*:*:*:*:*:*"),
+    ("zlib", "1.3", "Zlib", "cpe:2.3:a:*:zlib:1.3:*:*:*:*:*:*:*"),
+]:
+    d = doc("recipe-" + pn, "r")
+    d["packages"] = [{"SPDXID": "SPDXRef-Recipe-" + pn, "name": pn, "versionInfo": pv,
+                      "licenseDeclared": lic, "licenseConcluded": "NOASSERTION",
+                      "sourceInfo": "CVEs fixed: CVE-2023-42363",
+                      "externalRefs": [{"referenceCategory": "SECURITY",
+                                        "referenceType": "http://spdx.org/rdf/references/cpe23Type",
+                                        "referenceLocator": cpe}]}]
+    recipes["recipe-" + pn] = d
+
+packages = {}
+for pkg, recipe, pv, lic in [
+    ("busybox", "recipe-busybox", "1.36.1", "GPL-2.0-only AND LicenseRef-bzip2-1.0.4"),
+    ("libz1", "recipe-zlib", "1.3", "Zlib"),
+    # No license of its own: the recipe's has to fill in.
+    ("busybox-syslog", "recipe-busybox", "1.36.1", "NOASSERTION"),
+]:
+    d = doc(pkg, "p")
+    rid = "SPDXRef-Package-" + pkg
+    d["packages"] = [{"SPDXID": rid, "name": pkg, "versionInfo": pv,
+                      "licenseDeclared": lic, "licenseConcluded": "NOASSERTION"}]
+    d["relationships"] = [{"spdxElementId": rid, "relationshipType": "GENERATED_FROM",
+                           "relatedSpdxElement": "DocumentRef-%s:SPDXRef-Recipe-%s"
+                                                  % (recipe, recipe[len("recipe-"):])}]
+    packages[pkg] = d
+
+runtimes = {}
+for pkg in packages:
+    d = doc("runtime-" + pkg, "rt")
+    d["packages"] = [{"SPDXID": "SPDXRef-Runtime-" + pkg, "name": "runtime-" + pkg,
+                      "versionInfo": "1.0", "licenseDeclared": "NOASSERTION"}]
+    runtimes["runtime-" + pkg] = d
+
+image = doc(stem, "i")
+image["packages"] = [{"SPDXID": "SPDXRef-Image", "name": "core-image-minimal", "versionInfo": "1.0"}]
+for pkg, d in packages.items():
+    image["externalDocumentRefs"].append({"externalDocumentId": "DocumentRef-" + pkg,
+                                          "spdxDocument": d["documentNamespace"]})
+    image["relationships"].append({"spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS",
+                                   "relatedSpdxElement": "DocumentRef-%s:SPDXRef-Package-%s" % (pkg, pkg)})
+for rt, d in runtimes.items():
+    image["relationships"].append({"spdxElementId": "SPDXRef-Image", "relationshipType": "OTHER",
+                                   "relatedSpdxElement": "DocumentRef-%s:SPDXRef-DOCUMENT" % rt,
+                                   "comment": "Runtime dependencies"})
+
+with open(os.path.join(out_dir, stem + ".spdx.json"), "w") as fh:
+    json.dump(image, fh, indent=2, sort_keys=True)
+
+all_docs = dict(recipes); all_docs.update(packages); all_docs.update(runtimes); all_docs[stem] = image
+raw, index = io.BytesIO(), {"documents": []}
+with tarfile.open(fileobj=raw, mode="w|") as tar:
+    for name in sorted(all_docs):
+        blob = json.dumps(all_docs[name], sort_keys=True, indent=2).encode()
+        info = tarfile.TarInfo(name + ".spdx.json"); info.size = len(blob)
+        tar.addfile(info, io.BytesIO(blob))
+        index["documents"].append({"filename": info.name, "sha1": hashlib.sha1(blob).hexdigest(),
+                                   "documentNamespace": all_docs[name]["documentNamespace"]})
+    blob = json.dumps(index, sort_keys=True, indent=2).encode()
+    info = tarfile.TarInfo("index.json"); info.size = len(blob)
+    tar.addfile(info, io.BytesIO(blob))
+subprocess.run(["zstd", "-q", "-f", "-o", os.path.join(out_dir, stem + ".spdx.tar.zst"), "-"],
+               input=raw.getvalue(), check=True)
+PYGEN
+    y22b_msg=$(python3 "$LIB/parse-yocto-spdx.py" \
+        "$Y22DIR/core-image-minimal-qemux86-64.rootfs.spdx.json" \
+        "$WORK/y22b.cdx.json" "$WORK/y22b" 2>&1 >/dev/null)
+    y22b_rc=$?
+    [ "$y22b_rc" = "0" ] && pass "an SPDX 2.x image document with its archive is read" \
+        || fail "SPDX 2.x bundle rejected (rc=$y22b_rc): $y22b_msg"
+    y22b_names=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/y22b.cdx.json" 2>/dev/null)
+    # CONTAINS names the installed packages; the runtime documents hang off OTHER
+    # and describe what a package needs, not what shipped.
+    [ "$y22b_names" = "busybox,busybox-syslog,libz1" ] \
+        && pass "the installed set comes from CONTAINS (runtime documents excluded)" \
+        || fail "SPDX 2.x components='$y22b_names'"
+    [ "$(jq -r '.components[] | select(.name=="busybox") | .cpe' "$WORK/y22b.cdx.json")" \
+        = "cpe:2.3:a:*:busybox:1.36.1:*:*:*:*:*:*:*" ] \
+        && pass "the CPE is taken from the recipe the package was generated from" \
+        || fail "SPDX 2.x cpe missing"
+    [ "$(jq -r '.components[] | select(.name=="busybox") | .licenses[0].expression' "$WORK/y22b.cdx.json")" \
+        = "GPL-2.0-only AND LicenseRef-bzip2-1.0.4" ] \
+        && pass "a compound license from the package document is preserved" \
+        || fail "SPDX 2.x compound license lost"
+    # NOASSERTION is not a license: the recipe's expression fills in instead.
+    [ "$(jq -r '.components[] | select(.name=="busybox-syslog") | .licenses[0].expression' "$WORK/y22b.cdx.json")" \
+        = "GPL-2.0-only AND LicenseRef-bzip2-1.0.4" ] \
+        && pass "a package with no license of its own falls back to its recipe" \
+        || fail "SPDX 2.x license fallback missing"
+    [ "$(jq -r '.metadata.component.name' "$WORK/y22b.cdx.json")" = "core-image-minimal" ] \
+        && pass "the image names the root component (SPDX 2.x)" || fail "SPDX 2.x root component wrong"
+    # 2.2 carries no VEX, so no judgement sidecar may be written: an empty one
+    # would claim the build made judgements it never recorded.
+    [ ! -f "$WORK/y22b_yocto_vex.json" ] \
+        && pass "no build-verdict sidecar is invented for SPDX 2.x" \
+        || fail "SPDX 2.x wrote a VEX sidecar"
+    # A real deploy directory holds the archive and nothing else: the image
+    # document is packed inside it, not written beside it (verified against the
+    # published Yocto 5.0.14 artifacts). So the archive has to be readable on its
+    # own, with the image document found by shape rather than by filename.
+    arch_rc=0
+    python3 "$LIB/parse-yocto-spdx.py" \
+        "$Y22DIR/core-image-minimal-qemux86-64.rootfs.spdx.tar.zst" \
+        "$WORK/y22arch.cdx.json" "$WORK/y22arch" >/dev/null 2>&1 || arch_rc=$?
+    [ "$arch_rc" = "0" ] && pass "the archive alone is read, with no image document beside it" \
+        || fail "archive-only input rejected (rc=$arch_rc)"
+    arch_names=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/y22arch.cdx.json" 2>/dev/null)
+    [ "$arch_names" = "busybox,busybox-syslog,libz1" ] \
+        && pass "the archive-only read finds the same installed set" \
+        || fail "archive-only components='$arch_names'"
+    [ "$(jq -r '.metadata.component.name' "$WORK/y22arch.cdx.json")" = "core-image-minimal" ] \
+        && pass "the image inside the archive names the root component" \
+        || fail "archive-only root component wrong"
+    # Reading stops at the documents it came for, which closes the pipe under
+    # zstd and makes it report a write error it was never going to survive. That
+    # is not a failure, and printing it into a scan log would read as one.
+    arch_noise=$(python3 "$LIB/parse-yocto-spdx.py" \
+        "$Y22DIR/core-image-minimal-qemux86-64.rootfs.spdx.tar.zst" \
+        "$WORK/y22noise.cdx.json" "$WORK/y22noise" 2>&1 >/dev/null)
+    case "$arch_noise" in
+        *"Broken pipe"*|*"Write error"*)
+            fail "a successful archive read logs zstd pipe errors" "$arch_noise" ;;
+        *)  pass "a successful archive read logs nothing from zstd" ;;
+    esac
+    # A truncated archive is a real failure, and then zstd's reason is the answer.
+    head -c 200 "$Y22DIR/core-image-minimal-qemux86-64.rootfs.spdx.tar.zst" \
+        > "$WORK/truncated.spdx.tar.zst"
+    trunc_msg=$(python3 "$LIB/parse-yocto-spdx.py" "$WORK/truncated.spdx.tar.zst" \
+        "$WORK/trunc.cdx.json" 2>&1 >/dev/null)
+    case "$trunc_msg" in
+        *zstd*) pass "a truncated archive reports what zstd said about it" ;;
+        *)      fail "a truncated archive hides the reason" "$trunc_msg" ;;
+    esac
+
+    # Without the archive the same document is only an index again.
+    cp "$Y22DIR/core-image-minimal-qemux86-64.rootfs.spdx.json" "$WORK/lonely.spdx.json"
+    lonely_rc=0
+    python3 "$LIB/parse-yocto-spdx.py" "$WORK/lonely.spdx.json" "$WORK/lonely.cdx.json" >/dev/null 2>&1 || lonely_rc=$?
+    [ "$lonely_rc" = "3" ] \
+        && pass "the image document alone still declines, with the archive missing" \
+        || fail "index-only document returned rc=$lonely_rc"
+else
+    echo "  SKIP: SPDX 2.x bundle reading (zstd not installed)"
+fi
+
+echo "== yocto: a build with no SPDX is read from the manifests it did write =="
+# Turning create-spdx on is a build-configuration change the holder of a finished
+# build directory cannot always make. The build recorded what it shipped anyway:
+# the image package manifest, license.manifest and cve-check's report (formats
+# from openembedded-core: rootfs-postcommands, license_image, cve-check).
+MFDIR="$WORK/yocto-manifests"
+mkdir -p "$MFDIR/tmp/deploy/images/qemux86-64" \
+         "$MFDIR/tmp/deploy/licenses/core-image-minimal-qemux86-64-20260720" \
+         "$MFDIR/tmp/log/cve"
+cat > "$MFDIR/tmp/deploy/images/qemux86-64/core-image-minimal-qemux86-64.rootfs.manifest" <<'MEOF'
+base-files core2-64 3.0.14
+busybox core2-64 1.36.1
+busybox-syslog core2-64 1.36.1
+libz1 core2-64 1.3
+MEOF
+cat > "$MFDIR/tmp/deploy/licenses/core-image-minimal-qemux86-64-20260720/license.manifest" <<'LEOF'
+PACKAGE NAME: base-files
+PACKAGE VERSION: 3.0.14
+RECIPE NAME: base-files
+LICENSE: GPL-2.0-only
+
+PACKAGE NAME: busybox
+PACKAGE VERSION: 1.36.1
+RECIPE NAME: busybox
+LICENSE: GPL-2.0-only & bzip2-1.0.4
+
+PACKAGE NAME: busybox-syslog
+PACKAGE VERSION: 1.36.1
+RECIPE NAME: busybox
+LICENSE: GPL-2.0-only
+
+PACKAGE NAME: libz1
+PACKAGE VERSION: 1.3
+RECIPE NAME: zlib
+LICENSE: Zlib
+
+LEOF
+# An image_license.manifest sits beside the real one and describes the image
+# recipe, not its contents; reading it would replace the package list.
+cat > "$MFDIR/tmp/deploy/licenses/core-image-minimal-qemux86-64-20260720/image_license.manifest" <<'IEOF'
+RECIPE NAME: core-image-minimal
+VERSION: 1.0
+LICENSE: MIT
+FILES:
+
+IEOF
+cat > "$MFDIR/tmp/log/cve/cve-summary.json" <<'CEOF'
+{"version":"1","package":[
+ {"name":"busybox","layer":"meta","version":"1.36.1","issue":[
+   {"id":"CVE-2023-42363","status":"Patched","scorev3":"5.5","summary":"awk use-after-free","link":"a"},
+   {"id":"CVE-2022-28391","status":"Unpatched","scorev3":"9.8","summary":"remote code execution","link":"b"},
+   {"id":"CVE-2021-42374","status":"Ignored","scorev3":"5.3","summary":"not applicable here","link":"c"}]},
+ {"name":"zlib","layer":"meta","version":"1.3","issue":[
+   {"id":"CVE-2023-45853","status":"Unpatched","scorev3":"7.5","summary":"integer overflow","link":"d"}]},
+ {"name":"gcc-cross-x86_64","layer":"meta","version":"13.2","issue":[
+   {"id":"CVE-2023-99999","status":"Unpatched","scorev3":"9.9","summary":"build host only","link":"e"}]}
+]}
+CEOF
+mf_rc=0
+python3 "$LIB/parse-yocto-manifests.py" "$MFDIR" "$WORK/mf.cdx.json" "$WORK/mf" >/dev/null 2>&1 || mf_rc=$?
+[ "$mf_rc" = "0" ] && pass "a build directory with manifests but no SPDX is read" \
+    || fail "manifest parser rc=$mf_rc"
+mf_names=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/mf.cdx.json" 2>/dev/null)
+[ "$mf_names" = "base-files,busybox,busybox-syslog,libz1" ] \
+    && pass "the installed set comes from the image package manifest" \
+    || fail "manifest components='$mf_names'"
+[ "$(jq -r '.components[] | select(.name=="busybox") | .licenses[0].expression' "$WORK/mf.cdx.json")" \
+    = "GPL-2.0-only AND bzip2-1.0.4" ] \
+    && pass "license.manifest's Yocto operators are written as SPDX ones" \
+    || fail "license expression not normalized: $(jq -c '.components[]|select(.name=="busybox")|.licenses' "$WORK/mf.cdx.json")"
+[ "$(jq -r '.components[] | select(.name=="libz1") | (.properties[] | select(.name=="bomlens:yocto:recipe") | .value)' "$WORK/mf.cdx.json")" = "zlib" ] \
+    && pass "a package records the recipe it came from when they differ" \
+    || fail "recipe property missing"
+# cve-check is keyed by recipe, so a recipe that built nothing installed — the
+# native and cross tools — must not bring its CVEs into the image's report.
+mf_cves=$(jq -r '[.Results[].Vulnerabilities[].VulnerabilityID] | unique | join(",")' "$WORK/mf_security_yocto.json" 2>/dev/null)
+[ "$mf_cves" = "CVE-2022-28391,CVE-2023-45853" ] \
+    && pass "only CVEs of recipes that shipped a package are reported" \
+    || fail "manifest CVEs='$mf_cves'"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID=="CVE-2022-28391") | .Severity] | unique | join(",")' "$WORK/mf_security_yocto.json")" = "CRITICAL" ] \
+    && pass "the CVSS score becomes the severity the report groups by" \
+    || fail "severity not derived from the score"
+# Patched and Ignored are the build's own judgements and must not be findings.
+[ "$(jq -r '[.judgements.fixed, .judgements.notAffected, .judgements.affected] | join("/")' "$WORK/mf_yocto_vex.json")" = "2/2/3" ] \
+    && pass "cve-check verdicts split into patched / not applicable / unpatched" \
+    || fail "manifest vex counts=$(jq -c '.judgements' "$WORK/mf_yocto_vex.json")"
+[ "$(jq -r '.metadata.component.name' "$WORK/mf.cdx.json")" = "core-image-minimal-qemux86-64" ] \
+    && pass "the image manifest names the root component" \
+    || fail "manifest root='$(jq -r '.metadata.component.name' "$WORK/mf.cdx.json")'"
+
+# The package-to-recipe mapping is not a formality: in real builds most installed
+# packages come from a differently-named recipe (measured — 20 of 36 in the
+# published Scarthgap core-image-minimal, 32 of 57 in a shipped PinePhone modem
+# image). cve-check keys its report by recipe, so without that mapping the CVEs
+# of every such package would be missed. The fixture keeps the shape: three
+# packages, two of them from one recipe under another name.
+mf_recipes=$(jq -r '[.components[] | (.properties[]? | select(.name=="bomlens:yocto:recipe") | .value)] | length' "$WORK/mf.cdx.json")
+[ "${mf_recipes:-0}" -ge 1 ] \
+    && pass "packages whose recipe has another name record it" \
+    || fail "no package recorded a differing recipe name"
+mf_bb=$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID=="CVE-2022-28391") | .PkgName] | sort | join(",")' "$WORK/mf_security_yocto.json")
+[ "$mf_bb" = "busybox,busybox-syslog" ] \
+    && pass "a recipe's CVE reaches every package it produced" \
+    || fail "recipe CVE did not reach all its packages: '$mf_bb'"
+
+# A build with an image manifest but no cve-check run has no verdicts to report,
+# and must not claim otherwise.
+NOCVE="$WORK/yocto-nocve"
+mkdir -p "$NOCVE/tmp/deploy/images/m1"
+printf 'busybox core2-64 1.36.1\n' > "$NOCVE/tmp/deploy/images/m1/img.rootfs.manifest"
+python3 "$LIB/parse-yocto-manifests.py" "$NOCVE" "$WORK/nocve.cdx.json" "$WORK/nocve" >/dev/null 2>&1
+[ ! -f "$WORK/nocve_yocto_vex.json" ] && [ ! -f "$WORK/nocve_security_yocto.json" ] \
+    && pass "no cve-check run means no verdicts and no findings are invented" \
+    || fail "manifest parser invented CVE output without cve-check"
+
+# Nothing to read at all is rc=3, so the caller can say what is missing.
+empty_rc=0
+python3 "$LIB/parse-yocto-manifests.py" "$WORK" "$WORK/none.cdx.json" >/dev/null 2>&1 || empty_rc=$?
+[ "$empty_rc" = "3" ] && pass "a directory with no image manifest declines with rc=3" \
+    || fail "manifest parser rc=$empty_rc on a directory with no manifest"
+
+echo "== convert: a non-empty SBOM never converts to an empty one silently =="
+# A valid-but-empty CycloneDX passes every later step, and the report then reads
+# "no components, no vulnerabilities" — indistinguishable from a clean result.
+cat > "$WORK/pkgs-only.spdx.json" <<'PEOF'
+{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"t",
+ "documentNamespace":"http://example.org/doc",
+ "creationInfo":{"created":"2026-01-01T00:00:00Z","creators":["Tool: test"]},
+ "packages":[{"SPDXID":"SPDXRef-p1","name":"zlib","versionInfo":"1.3.1","downloadLocation":"NOASSERTION"}]}
+PEOF
+if bash "$LIB/convert-to-cdx.sh" "$WORK/pkgs-only.spdx.json" "$WORK/pkgs-only.cdx.json" >/dev/null 2>&1; then
+    [ "$(jq '[.components[]?] | length' "$WORK/pkgs-only.cdx.json")" -gt 0 ] \
+        && pass "a package-bearing SPDX still converts to a non-empty CycloneDX" \
+        || fail "conversion succeeded but produced no components"
+else
+    # No syft in this environment: the guard is what we are testing, and it must
+    # be the thing that refuses, not a crash.
+    pass "conversion refused rather than emitting an empty SBOM (no converter available)"
+fi
+
+echo "== outbound-license: read the declaration out of the project's own manifest =="
+# The licence-conflict check only runs when the SBOM's root component carries a
+# licence, and cdxgen fills that for npm only. detect-project-license.py reads
+# the manifest so a project that already declared its licence the standard way
+# does not have to repeat it with --license. Guessing is the failure mode to
+# guard against: a wrong id produces conflict verdicts against a licence the
+# project never chose, so an unrecognised value must yield nothing.
+DPL="$ROOT_DIR/docker/lib/detect-project-license.py"
+lic_dir="$WORK/lic"
+
+mk_pom() { # mk_pom <dir> <inner-xml>
+    mkdir -p "$1"
+    { echo '<project xmlns="http://maven.apache.org/POM/4.0.0"><artifactId>a</artifactId>'
+      echo "$2"; echo '</project>'; } > "$1/pom.xml"
+}
+
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>Apache-2.0</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: SPDX id read as-is" || fail "pom.xml SPDX id -> '$got'"
+
+# Real POMs mostly spell the licence out rather than using the SPDX id.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>The Apache License, Version 2.0</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: free-text licence name mapped to SPDX" || fail "pom.xml free text -> '$got'"
+
+# URL-only declarations: apache.org's is unambiguous, others are not.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><url>https://www.apache.org/licenses/LICENSE-2.0</url></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "Apache-2.0" ] && pass "pom.xml: apache.org URL alone is enough" || fail "pom.xml url -> '$got'"
+
+# An in-house or unrecognised name must NOT be turned into an SPDX id.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<licenses><license><name>Acme Internal Use Only</name></license></licenses>'
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "pom.xml: an unrecognised licence name yields nothing" || fail "unrecognised name guessed '$got'"
+
+# No <licenses> block at all — the check stays off.
+rm -rf "$lic_dir"; mk_pom "$lic_dir" '<name>x</name>'
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "pom.xml: no declaration yields nothing" || fail "missing declaration produced '$got'"
+
+# package.json / Cargo.toml / pyproject.toml carry the same information.
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+echo '{"name":"a","license":"MIT"}' > "$lic_dir/package.json"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "MIT" ] && pass "package.json: license read" || fail "package.json -> '$got'"
+
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+printf '[package]\nname = "a"\nlicense = "MIT OR Apache-2.0"\n' > "$lic_dir/Cargo.toml"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "MIT OR Apache-2.0" ] && pass "Cargo.toml: SPDX expression kept intact" || fail "Cargo.toml -> '$got'"
+
+rm -rf "$lic_dir"; mkdir -p "$lic_dir"
+printf '[project]\nname = "a"\nlicense = { text = "BSD-3-Clause" }\n' > "$lic_dir/pyproject.toml"
+got=$(python3 "$DPL" "$lic_dir")
+[ "$got" = "BSD-3-Clause" ] && pass "pyproject.toml: PEP 621 table form read" || fail "pyproject.toml -> '$got'"
+
+# A dependency's manifest must never be mistaken for the project's own.
+rm -rf "$lic_dir"; mkdir -p "$lic_dir/node_modules/dep"
+echo '{"name":"root"}' > "$lic_dir/package.json"
+echo '{"name":"dep","license":"GPL-3.0-only"}' > "$lic_dir/node_modules/dep/package.json"
+got=$(python3 "$DPL" "$lic_dir")
+[ -z "$got" ] && pass "vendored manifests are ignored" || fail "picked up a dependency's licence: '$got'"
+
+echo "== source-snapshot: capture the scanned files themselves, within bounds =="
+# The result screens show what a scan FOUND; source-snapshot.py captures what was
+# SCANNED so a reviewer can open the file behind a finding. The scanned tree does
+# not outlive the scan, so the capture has to be right the first time. Guarded
+# here: the exclusions come from the tree listing (never re-derived), binaries and
+# oversized files cannot bloat the artifact, the budget drops are counted rather
+# than silent, and a listing entry can never pull in a file outside the tree.
+SNAP="$ROOT_DIR/docker/lib/source-snapshot.py"
+snap_dir="$WORK/snap"
+rm -rf "$snap_dir"; mkdir -p "$snap_dir/tree/src" "$snap_dir/tree/node_modules/dep" "$snap_dir/out"
+printf 'package main\n' > "$snap_dir/tree/src/main.go"
+printf 'MIT License\n' > "$snap_dir/tree/LICENSE"
+printf '{"name":"acme"}\n' > "$snap_dir/tree/package.json"
+printf 'pruned\n' > "$snap_dir/tree/node_modules/dep/index.js"
+printf 'ELF\0\0\0binary payload\n' > "$snap_dir/tree/src/app.bin"
+python3 -c "import sys; open(sys.argv[1],'w').write('x' * 300000)" "$snap_dir/tree/big.txt"
+ln -s /etc/passwd "$snap_dir/tree/link.txt"
+(
+    cd "$snap_dir/out" || exit 1
+    bash "$LIB/source-file-tree.sh" "$snap_dir/tree" snap_files.json >/dev/null 2>&1
+    python3 "$SNAP" "$snap_dir/tree" snap_files.json snap_source.json >/dev/null 2>&1
+)
+snap_out="$snap_dir/out/snap_source.json"
+if [ -s "$snap_out" ]; then
+    pass "snapshot written for a source tree"
+else
+    fail "no snapshot produced"
+fi
+got=$(jq -r '[.files[].path] | sort | join(",")' "$snap_out" 2>/dev/null)
+[ "$got" = "LICENSE,big.txt,package.json,src/main.go" ] \
+    && pass "text files captured; node_modules pruned by the shared listing" \
+    || fail "unexpected captured set: '$got'"
+got=$(jq -c '[.files[] | select(.path == "src/main.go") | .content]' "$snap_out" 2>/dev/null)
+[ "$got" = '["package main\n"]' ] && pass "content is the real file body, newline included" \
+    || fail "content mismatch: $got"
+got=$(jq -r '.totals.skippedBinary' "$snap_out" 2>/dev/null)
+[ "$got" = "1" ] && pass "binary counted, never embedded" || fail "skippedBinary = '$got', expected 1"
+got=$(jq -r '.files[] | select(.path == "big.txt") | .truncated' "$snap_out" 2>/dev/null)
+[ "$got" = "true" ] && pass "oversized file cut, not dropped" || fail "big.txt truncated = '$got'"
+got=$(jq -r '.files[] | select(.path == "big.txt") | .size' "$snap_out" 2>/dev/null)
+[ "$got" = "300000" ] && pass "the file's real size survives truncation" || fail "big.txt size = '$got'"
+
+# A listing entry must never reach outside the scanned tree — the paths are ours,
+# but a symlink or a crafted entry must still be refused, not read and published.
+cat > "$snap_dir/out/evil_files.json" <<'EOF'
+{"files":[{"path":"../../../etc/passwd","type":"file"},
+          {"path":"/etc/hosts","type":"file"},
+          {"path":"link.txt","type":"file"},
+          {"path":"src/main.go","type":"file"}]}
+EOF
+(
+    cd "$snap_dir/out" || exit 1
+    python3 "$SNAP" "$snap_dir/tree" evil_files.json evil_source.json >/dev/null 2>&1
+)
+got=$(jq -r '[.files[].path] | join(",")' "$snap_dir/out/evil_source.json" 2>/dev/null)
+[ "$got" = "src/main.go" ] \
+    && pass "traversal, absolute path and symlink entries all refused" \
+    || fail "escaped the scanned tree: '$got'"
+
+# A tight budget must keep the evidence a reviewer opens (licence texts, package
+# manifests), account for what it left out, and never store a fragment: the
+# 300 KB file is skipped whole rather than cut down to whatever fits.
+(
+    cd "$snap_dir/out" || exit 1
+    SOURCE_SNAPSHOT_MAX_TOTAL=32 python3 "$SNAP" \
+        "$snap_dir/tree" snap_files.json tiny_source.json >/dev/null 2>&1
+)
+got=$(jq -r '[.files[].path] | sort | join(",")' "$snap_dir/out/tiny_source.json" 2>/dev/null)
+[ "$got" = "LICENSE,package.json" ] \
+    && pass "licence text and manifest win a tight budget" \
+    || fail "budget spent elsewhere: '$got'"
+got=$(jq -r '.totals.skippedBudget' "$snap_dir/out/tiny_source.json" 2>/dev/null)
+[ "${got:-0}" -gt 0 ] && pass "files left out are counted, not silently missing" \
+    || fail "skippedBudget = '$got', expected > 0"
+
+# The caps arrive as `-e NAME=` whether or not the user set them (scan-sbom.sh
+# forwards them unconditionally), so an unset cap is an empty string, not an
+# absent variable. Parsing that as an integer would abort the capture; reading it
+# as zero would silently capture nothing. Both must fall back to the default.
+for bad in "" "abc" "0" "-5"; do
+    (
+        cd "$snap_dir/out" || exit 1
+        SOURCE_SNAPSHOT_MAX_TOTAL="$bad" python3 "$SNAP" \
+            "$snap_dir/tree" snap_files.json cap_source.json >/dev/null 2>&1
+    )
+    got=$(jq -r '.totals.files' "$snap_dir/out/cap_source.json" 2>/dev/null)
+    if [ "${got:-0}" -gt 0 ]; then
+        pass "a malformed cap ('$bad') falls back to the default"
+    else
+        fail "cap '$bad' captured nothing (files=$got)"
+    fi
+done
+
+# Byte-stable: the snapshot carries no timestamp, so re-scanning the same tree
+# reproduces it exactly (the --byte-stable contract the rest of the output keeps).
+(
+    cd "$snap_dir/out" || exit 1
+    python3 "$SNAP" "$snap_dir/tree" snap_files.json again_source.json >/dev/null 2>&1
+)
+if diff -q "$snap_out" "$snap_dir/out/again_source.json" >/dev/null 2>&1; then
+    pass "re-running on the same tree is byte-identical"
+else
+    fail "snapshot is not reproducible"
+fi
+
+echo "== source tree: symlinks are listed, with the target recorded not followed =="
+# A container image or a firmware rootfs is mostly symlinks — an Alpine image has
+# 90 regular files against 334 links, nearly all of them into busybox. Listing
+# only regular files shows a /bin in which none of the commands exist, so links
+# are listed with their destination as the content of the entry.
+link_dir="$WORK/links"
+rm -rf "$link_dir"; mkdir -p "$link_dir/tree/bin" "$link_dir/out"
+printf '#!/bin/sh\necho hi\n' > "$link_dir/tree/bin/busybox"
+ln -s /bin/busybox "$link_dir/tree/bin/cat"
+ln -s busybox "$link_dir/tree/bin/ls"
+ln -s /nowhere/gone "$link_dir/tree/bin/dangling"
+(
+    cd "$link_dir/out" || exit 1
+    bash "$LIB/source-file-tree.sh" "$link_dir/tree" link_files.json >/dev/null 2>&1
+    python3 "$SNAP" "$link_dir/tree" link_files.json link_source.json >/dev/null 2>&1
+)
+got=$(jq -r '[.files[] | select(.type == "symlink") | .path] | sort | join(",")' "$link_dir/out/link_files.json" 2>/dev/null)
+[ "$got" = "bin/cat,bin/dangling,bin/ls" ] \
+    && pass "symlinks appear in the tree, typed as symlink" \
+    || fail "symlink entries were '$got'"
+got=$(jq -r '.files[] | select(.path == "bin/busybox") | .path' "$link_dir/out/link_files.json" 2>/dev/null)
+[ "$got" = "bin/busybox" ] && pass "the real file behind the links is still listed" || fail "regular file missing"
+got=$(jq -r '[.links[] | .path + "->" + .target] | sort | join(",")' "$link_dir/out/link_source.json" 2>/dev/null)
+[ "$got" = "bin/cat->/bin/busybox,bin/dangling->/nowhere/gone,bin/ls->busybox" ] \
+    && pass "link targets recorded verbatim, including a dangling one" \
+    || fail "link targets were '$got'"
+# The link is described, never opened: no symlink may contribute file content.
+got=$(jq -r '[.files[].path] | join(",")' "$link_dir/out/link_source.json" 2>/dev/null)
+[ "$got" = "bin/busybox" ] \
+    && pass "no symlink was followed for its content" \
+    || fail "snapshot captured content through a link: '$got'"
+
+echo "== unpack-scan-target: open an archive, refuse what is not one =="
+# A build artifact is one packed file, so without unpacking there is nothing to
+# show. Archives are opened; an ELF binary is refused with a reason rather than
+# presented as an empty tree.
+UNPACK="$ROOT_DIR/docker/lib/unpack-scan-target.sh"
+arc_dir="$WORK/arc"
+rm -rf "$arc_dir"; mkdir -p "$arc_dir/build/META-INF"
+printf 'Manifest-Version: 1.0\n' > "$arc_dir/build/META-INF/MANIFEST.MF"
+printf 'ELF\0\0binary\n' > "$arc_dir/plain.bin"
+if command -v zip >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+    (cd "$arc_dir/build" && zip -qr "$arc_dir/app.jar" .)
+    got_dir=$(bash "$UNPACK" BINARY "$arc_dir/app.jar" 2>/dev/null)
+    if [ -n "$got_dir" ] && [ -f "$got_dir/META-INF/MANIFEST.MF" ]; then
+        pass "a jar is unpacked into a readable tree"
+    else
+        fail "jar unpack produced '$got_dir'"
+    fi
+    [ -n "$got_dir" ] && rm -rf "$got_dir"
+else
+    pass "jar unpack skipped (no zip/unzip in this environment)"
+fi
+got_dir=$(bash "$UNPACK" BINARY "$arc_dir/plain.bin" 2>/dev/null)
+[ -z "$got_dir" ] \
+    && pass "a non-archive prints no directory rather than an empty tree" \
+    || fail "unpacked a non-archive into '$got_dir'"
+
+echo "== describe-input-sbom: report the supplier's document, not the conversion =="
+# ANALYZE converts every input to CycloneDX, so every result screen describes the
+# conversion. The format the supplier wrote in, the tool behind it and its
+# authorship survive only in this summary, read from the ORIGINAL. Guarded here:
+# all three input families are read, and an unreadable input yields nothing
+# rather than a guess (a wrong "produced by" on a compliance screen is worse
+# than a blank one).
+DESC="$ROOT_DIR/docker/lib/describe-input-sbom.py"
+desc_dir="$WORK/desc"
+mkdir -p "$desc_dir"
+
+python3 "$DESC" "$FIX/good-cyclonedx.json" "$desc_dir/cdx.json" "supplier.cdx.json" >/dev/null 2>&1
+got=$(jq -r '[.format, .specVersion, (.tools | join(";")), (.componentCount | tostring)] | join("|")' "$desc_dir/cdx.json" 2>/dev/null)
+[ "$got" = "CycloneDX|1.5|cdxgen 12.0.0|2" ] \
+    && pass "CycloneDX header read (format, version, tool, count)" \
+    || fail "CycloneDX summary was '$got'"
+got=$(jq -r '.originalName' "$desc_dir/cdx.json" 2>/dev/null)
+[ "$got" = "supplier.cdx.json" ] && pass "the uploaded filename is kept" || fail "originalName = '$got'"
+
+python3 "$DESC" "$FIX/good-spdx.json" "$desc_dir/spdx2.json" >/dev/null 2>&1
+got=$(jq -r '[.format, .specVersion, (.tools | join(";")), .supplier] | join("|")' "$desc_dir/spdx2.json" 2>/dev/null)
+[ "$got" = "SPDX|2.3|syft-1.18.1|Supplier Inc." ] \
+    && pass "SPDX 2.3 creators split into tool and organization" \
+    || fail "SPDX 2.3 summary was '$got'"
+
+# SPDX 3.0 keeps CreationInfo, the tool and the organization in separate @graph
+# nodes that the document only references by id. Reading the header alone yields
+# blanks, so the references must be resolved.
+python3 "$DESC" "$FIX/good-spdx3-jsonld.json" "$desc_dir/spdx3.json" >/dev/null 2>&1
+got=$(jq -r '[.format, (.tools | join(";")), .supplier, .created] | join("|")' "$desc_dir/spdx3.json" 2>/dev/null)
+[ "$got" = "SPDX|test-tool|test-org|2026-01-01T00:00:00Z" ] \
+    && pass "SPDX 3.0 JSON-LD agent references resolved" \
+    || fail "SPDX 3.0 summary was '$got'"
+
+printf 'not an sbom at all\n' > "$desc_dir/junk.txt"
+rm -f "$desc_dir/junk.json"
+python3 "$DESC" "$desc_dir/junk.txt" "$desc_dir/junk.json" >/dev/null 2>&1
+[ ! -f "$desc_dir/junk.json" ] \
+    && pass "an unrecognized input writes no summary rather than a guess" \
+    || fail "wrote a summary for a non-SBOM input"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
