@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>BomLens social card</title>
+<!--
+  Source for docs/images/og-card.png, the Open Graph card used by the docs site
+  (overrides/main.html) and by the repository's social preview setting.
+
+  Render it with:  npm run capture:og   (in docker/web/frontend)
+  which screenshots this file at 1200x630 through
+  tests/ui/og-card.spec.ts. Open this file in a browser to preview it.
+
+  Keep the wording in step with the repository description and the README
+  opening line; keep the URL in step with the repository name.
+-->
+<style>
+  :root {
+    --sk-red: #EA002C;
+    --sk-orange: #F47725;
+    --ink: #16181d;
+    --muted: #6b7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px;
+    height: 630px;
+    background: #ffffff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+  .bar { height: 14px; background: linear-gradient(90deg, var(--sk-red), var(--sk-orange)); }
+  .body { flex: 1; padding: 76px 90px 56px; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .mark { width: 112px; height: 112px; flex: none; }
+  .wordmark {
+    font-size: 76px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--sk-red), var(--sk-orange));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .kicker {
+    margin-top: 10px;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: var(--muted);
+  }
+  .tagline {
+    margin-top: 54px;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.32;
+    color: var(--ink);
+    max-width: 1000px;
+  }
+  .tagline em { font-style: normal; color: var(--sk-red); }
+  .footer { margin-top: auto; font-size: 24px; color: var(--muted); }
+  .footer strong { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="bar"></div>
+  <div class="body">
+    <div class="brand">
+      <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="BomLens">
+        <defs>
+          <linearGradient id="bomlens-mark-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#EA002C"/>
+            <stop offset="1" stop-color="#F47725"/>
+          </linearGradient>
+        </defs>
+        <rect width="48" height="48" rx="11" fill="url(#bomlens-mark-grad)"/>
+        <g transform="translate(12 12)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+          <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+          <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+          <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+          <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+          <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+        </g>
+      </svg>
+      <div>
+        <div class="wordmark">BomLens</div>
+        <div class="kicker">SBOM GENERATOR</div>
+      </div>
+    </div>
+
+    <p class="tagline">
+      A <em>local-first SBOM generator</em> and open-source risk assessor.<br />
+      CycloneDX SBOM, notice, and security report — no SaaS.
+    </p>
+
+    <p class="footer"><strong>github.com/sktelecom/bomlens</strong> &nbsp;·&nbsp; CLI &amp; web UI &nbsp;·&nbsp; Apache-2.0</p>
+  </div>
+</body>
+</html>

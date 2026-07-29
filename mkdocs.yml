@@ -164,6 +164,7 @@ extra:
 exclude_docs: |
   maintainers/
   korean-style-guide.md
+  images/src/
 
 # Validate internal links and heading anchors against the rendered site. Anchors
 # are checked with this config's own pymdownx slugify, so the result matches what
