@@ -203,8 +203,10 @@ RUN if [ "$SBOM_SCANOSS" = "true" ]; then \
 # Firmware unpack + binary identification (opt-in: --build-arg SBOM_FIRMWARE=true).
 #   unblob = MIT (primary unpacker); cve-bin-tool/ubi_reader = GPL (binary ID, UBI).
 #   squashfs-tools/e2fsprogs/p7zip/unar/jefferson/... are the extractor binaries
-#   unblob shells out to; unsquashfs (squashfs-tools) is also the standard-squashfs
-#   fallback used by scan-firmware.sh when unblob's sasquatch handler is absent.
+#   unblob shells out to; two of them are also used directly by scan-firmware.sh
+#   as fallbacks — unsquashfs for standard squashfs when unblob's sasquatch
+#   handler is absent, and 7z for the Windows installer containers (NSIS, Inno
+#   Setup, self-extracting cabinets) that unblob does not unpack at all.
 #   Built only into ghcr.io/sktelecom/sbom-scanner-firmware so the base stays GPL-free.
 #   NOTE: the PyPI `binwalk` 2.x dist is broken (no binwalk.core), so it is NOT
 #   installed; unsquashfs covers the common squashfs case. vendor-modified

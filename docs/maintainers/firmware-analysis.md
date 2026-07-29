@@ -9,7 +9,7 @@
 공급사가 제공한 네트워크 장비 펌웨어 바이너리(`.bin`/`.img`/squashfs 등)를 대상으로 SBOM과 보안취약점, 라이선스를 점검하는 시나리오를 다룹니다.
 
 - 현재: 펌웨어 파일을 그대로 넣으면 거의 검출하지 못해 빈 SBOM이 나옵니다. 이미지에 언팩 도구조차 없습니다.
-- 방향: 먼저 언팩(unblob, 폴백 BANG)으로 가방을 연 뒤, syft로 패키지를, cve-bin-tool로 stripped 바이너리를 식별하고, 두 SBOM을 병합해 기존 후처리(라이선스·CVE·서명)를 재사용합니다. 별도 opt-in 이미지 `sbom-scanner-firmware`로 제공합니다.
+- 방향: 먼저 언팩(unblob, 폴백 unsquashfs와 7z)으로 가방을 연 뒤, syft로 패키지를, cve-bin-tool로 stripped 바이너리를 식별하고, 두 SBOM을 병합해 기존 후처리(라이선스·CVE·서명)를 재사용합니다. 별도 opt-in 이미지 `sbom-scanner-firmware`로 제공합니다.
 - 기대치: 오픈소스 스택으로 검출률 약 60~85%입니다. 상용 도구(Insignary Clarity 등)의 함수 수준 바이너리 핑거프린팅은 알고리즘 자체는 재현 가능하지만, 멀티아키·멀티버전 시그니처 코퍼스가 없어 동등한 정확도에는 미치지 못합니다. 이는 고비용 고도화 트랙(Phase 3)으로 분류합니다.
 
 핵심 원칙은 역할 분리입니다. "가방 열기(언팩)"는 전용 도구에 맡기고, "내용물 식별·라이선스·CVE"는 우리가 이미 가진 도구로 처리합니다.
@@ -55,7 +55,7 @@
 
 ```mermaid
 flowchart LR
-    FW["펌웨어 .bin"] --> UNPACK["① 언팩<br/>unblob (폴백: BANG)"]
+    FW["펌웨어 .bin"] --> UNPACK["① 언팩<br/>unblob (폴백: unsquashfs, 7z)"]
     UNPACK --> ROOTFS[("추출된 rootfs")]
     ROOTFS --> SYFT["② syft dir:<br/>패키지 컴포넌트"]
     ROOTFS --> CVEBIN["③ cve-bin-tool<br/>stripped 바이너리 버전"]
@@ -71,7 +71,7 @@ flowchart LR
 
 | 단계 | 도구 | 라이선스 | 역할 |
 |------|------|----------|------|
-| ① 언팩 | **unblob** (폴백 **BANG**) | MIT (BANG: GPL-3.0) | 펌웨어 압축·파일시스템 해제 → rootfs 추출 |
+| ① 언팩 | **unblob** (폴백 **unsquashfs**, **7z**) | MIT (squashfs-tools: GPL-2.0, p7zip: LGPL-2.1) | 펌웨어 압축·파일시스템 해제 후 rootfs 추출 |
 | ② 패키지 식별 | **syft** | Apache-2.0 | rootfs의 패키지 매니저 DB 기반 컴포넌트 |
 | ③ 바이너리 식별 | **cve-bin-tool** | GPL-3.0 | stripped 정적 바이너리의 버전 문자열 + CVE (CycloneDX 입출력) |
 | ④ 병합 | jq / cyclonedx-cli | MIT/Apache-2.0 | ②③ SBOM을 하나로 합쳐 후처리 입력 단일화 |
@@ -129,11 +129,17 @@ Armijn Hemel(GPL 위반 적발로 유명한 라이선스 컴플라이언스 전�
 
 결론적으로 "라이선스 거장이 만든 도구"라는 기대와 달리 라이선스/CVE 식별 기능은 미완성입니다. 그래서 BANG은 "언팩 폴백"으로만 채택합니다. 라이선스/CVE/SBOM은 우리가 이미 가진 scancode/Trivy/syft가 더 성숙하므로, 그 영역에는 BANG을 쓰지 않습니다.
 
+다만 이 채택은 아직 이행되지 않았습니다. 현재 이미지에 BANG은 들어 있지 않으며, 설치 방법과 호출 형태는 5절에 적어 두었습니다.
+
 ---
 
 ## 5. 구현 설계 — FIRMWARE 모드
 
-> 구현을 마쳤습니다(Phase 1+2). 기존 IMAGE/BINARY/ROOTFS 모드와 동일하게 후처리 이미지 패밀리의 한 모드로 추가하되, 무거운 언팩·바이너리 분석 도구는 별도 opt-in 이미지 `sbom-scanner-firmware`에만 설치합니다. 언팩 폴백은 unblob을 먼저 시도하고, 설치돼 있으면 BANG, 표준 squashfs는 unsquashfs, 정상 설치된 경우 binwalk 순으로 넘어갑니다. 각 단계는 종료코드가 아니라 실제 추출 파일이 나왔는지로 판정합니다.
+> 구현을 마쳤습니다(Phase 1+2). 기존 IMAGE/BINARY/ROOTFS 모드와 동일하게 후처리 이미지 패밀리의 한 모드로 추가하되, 무거운 언팩·바이너리 분석 도구는 별도 opt-in 이미지 `sbom-scanner-firmware`에만 설치합니다. 각 단계는 종료코드가 아니라 실제 추출 파일이 나왔는지로 판정합니다.
+
+실제로 이미지에 들어 있는 언팩 도구는 unblob, unsquashfs, 7z 세 가지입니다. 순서는 unblob, 표준 squashfs일 때 unsquashfs, 그다음 7z입니다. 7z은 unblob이 열지 못하는 Windows 설치 파일(NSIS, Inno Setup, 자동 압축 해제 캐비닛)을 읽으며, 형식을 제대로 모르는 파일에서도 조각을 뜯어내기 때문에 형식을 아는 도구들 뒤에 둡니다.
+
+BANG과 binwalk는 아래 4절에서 채택하기로 했으나 아직 설치돼 있지 않습니다. binwalk는 PyPI 배포본이 깨져 있어 제외했고, BANG은 설치가 Nix 또는 다수의 시스템 의존성과 Kaitai Struct 파서 빌드를 요구해 별도 과제로 남겨 두었습니다. BANG의 실행 진입점은 `bang-scanner`가 아니라 `python3 -m bang.cli scan`이므로, 도입할 때 호출 형태를 함께 고쳐야 합니다.
 
 ### 5.1 `scripts/scan-sbom.sh`
 - `FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/sbom-scanner-firmware:latest}"` 변수 추가.
@@ -150,7 +156,7 @@ Armijn Hemel(GPL 위반 적발로 유명한 라이선스 컴플라이언스 전�
 ```
 scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 ```
-1. `WORK=$(mktemp -d)` (trap으로 cleanup), 언팩: unblob을 우선 시도하고 실패하거나 설치돼 있지 않으면 BANG으로 폴백.
+1. `WORK=$(mktemp -d)` (trap으로 cleanup), 언팩: unblob을 우선 시도하고, 아무 파일도 나오지 않으면 unsquashfs와 7z 순으로 폴백.
 2. rootfs 후보 디렉터리 탐색(없으면 추출 루트 전체).
 3. `syft dir:$ROOTFS -o cyclonedx-json`로 패키지 SBOM을 만듭니다.
 4. (Phase 2) `cve-bin-tool ... --sbom-output ... cyclonedx`로 바이너리 SBOM을 만들고, 같은 패스에서 CVE 보고서(`--format json -o`)도 받습니다. CVE 매칭 경로는 아래 5.6에서 다룹니다.

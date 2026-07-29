@@ -1,0 +1,12 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "components": [
+    {
+      "type": "application",
+      "bom-ref": "1-CVEBINTOOL-extract",
+      "name": "CVEBINTOOL-extract"
+    }
+  ]
+}

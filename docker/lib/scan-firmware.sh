@@ -61,6 +61,11 @@ command -v file >/dev/null 2>&1 && FILE_INFO=$(file -b "$FW" 2>/dev/null || echo
 # --------------------------------------------------------
 has_extracted() { [ -n "$(find "$EXTRACT" -type f -size +0c 2>/dev/null | head -1)" ]; }
 unpacked=0
+# Which unpackers were actually available and run. The failure message used to
+# name the whole chain whether or not a given tool was installed, which sent
+# people looking for a format problem when the tool simply was not there.
+tried=""
+note_tried() { tried="${tried:+$tried, }$1"; }
 
 # Firmware input is attacker-supplied, and unpackers have no built-in bound: a
 # decompression bomb or a malformed/deeply-nested image can spin an extractor
@@ -72,30 +77,41 @@ _tmo() { if command -v timeout >/dev/null 2>&1; then timeout "$FW_UNPACK_TIMEOUT
 
 if command -v unblob >/dev/null 2>&1; then
     echo "[firmware] unpacking with unblob..."
+    note_tried unblob
     _tmo unblob --extract-dir "$EXTRACT" "$FW" >/dev/null 2>&1 || true
-    has_extracted && unpacked=1
-fi
-if [ "$unpacked" = 0 ] && command -v bang-scanner >/dev/null 2>&1; then
-    echo "[firmware] unblob produced nothing; falling back to BANG..."
-    _tmo bang-scanner -f "$FW" -u "$EXTRACT" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
 # squashfs is the most common firmware filesystem; unsquashfs (squashfs-tools)
 # handles standard images even when unblob's sasquatch handler is absent.
 if [ "$unpacked" = 0 ] && command -v unsquashfs >/dev/null 2>&1 && printf '%s' "$FILE_INFO" | grep -qi squashfs; then
     echo "[firmware] falling back to unsquashfs..."
+    note_tried unsquashfs
     _tmo unsquashfs -f -d "$EXTRACT/squashfs-root" "$FW" >/dev/null 2>&1 || true
+    has_extracted && unpacked=1
+fi
+# 7z reads the container formats Windows deliveries arrive in — NSIS and Inno
+# Setup installers, self-extracting cabinets, MSI — none of which unblob unpacks.
+# A supplier's product installer is a common input, and until this fallback ran
+# it produced an empty extraction and therefore an empty SBOM. 7z is already in
+# the image (unblob shells out to it), so this costs nothing. Last in the chain
+# because it will also happily carve fragments out of files it does not really
+# understand; anything the earlier, format-aware unpackers claim wins.
+if [ "$unpacked" = 0 ] && command -v 7z >/dev/null 2>&1; then
+    echo "[firmware] falling back to 7z extraction..."
+    note_tried 7z
+    _tmo 7z x -y -bso0 -bsp0 -o"$EXTRACT/7z-out" -- "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
 if [ "$unpacked" = 0 ] && command -v binwalk >/dev/null 2>&1; then
     echo "[firmware] falling back to binwalk extraction..."
+    note_tried binwalk
     _tmo binwalk --run-as=root --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 \
         || _tmo binwalk --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
 
 if [ "$unpacked" = 0 ]; then
-    echo "[firmware] WARN: no unpacker produced files (unblob/BANG/unsquashfs/binwalk)." >&2
+    echo "[firmware] WARN: no unpacker produced files (tried: ${tried:-none available})." >&2
     echo "[firmware]       Firmware may be encrypted/signed or in an unsupported format; emitting best-effort SBOM." >&2
 fi
 
@@ -229,8 +245,15 @@ fi
 # meant to be handed to other people, and buries the one useful part. unblob
 # names every nesting level `<something>_extract/`, so the text after the last
 # one is the path as it exists inside the firmware — keep exactly that.
+#
+# cve-bin-tool also writes one placeholder component named after the directory it
+# was pointed at (`CVEBINTOOL-extract`), whether or not it identified anything.
+# Shipping it means a scan that found nothing still reports one component, which
+# reads as a result rather than as the empty answer it is. It carries no version,
+# no purl and no CPE, so nothing downstream can use it either. Drop it.
 comps_of() {
     jq -c '[.components[]? | select((.name // "") != "")
+           | select((.name // "") | startswith("CVEBINTOOL-") | not)
            | .name |= (if test("_extract/") then (split("_extract/") | last)
                        elif startswith("/") then (split("/") | last)
                        else . end)]' "$1" 2>/dev/null || echo '[]'

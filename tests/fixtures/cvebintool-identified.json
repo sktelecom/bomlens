@@ -1,0 +1,25 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "components": [
+    {
+      "type": "application",
+      "bom-ref": "1-CVEBINTOOL-extract",
+      "name": "CVEBINTOOL-extract"
+    },
+    {
+      "type": "library",
+      "bom-ref": "2-openssl",
+      "name": "openssl",
+      "version": "1.1.1v",
+      "cpe": "cpe:/a:openssl:openssl:1.1.1v"
+    },
+    {
+      "type": "library",
+      "bom-ref": "3-busybox",
+      "name": "/tmp/tmp.abc/extract/fw.img_extract/usr/bin/busybox",
+      "version": "1.38.0"
+    }
+  ]
+}

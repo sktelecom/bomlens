@@ -185,6 +185,12 @@ jobs:
       - name: Input routing unit tests
         run: bash tests/test-input-routing.sh
 
+      # No Docker: guards the firmware unpack fallback chain and the component
+      # merge. An identification that found nothing must report nothing, rather
+      # than shipping cve-bin-tool's directory-name placeholder as a component.
+      - name: Firmware unpack unit tests
+        run: bash tests/test-firmware-unpack.sh
+
       - name: Output regression snapshots
         run: bash tests/test-snapshot.sh
 
