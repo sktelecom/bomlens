@@ -1,0 +1,120 @@
+{
+  "_comment": [
+    "Exported symbol names -> the component they belong to.",
+    "",
+    "Read by identify-elf-presence.py alongside elf-soname-map.json and",
+    "elf-program-map.json. Those two read a library's SONAME and a program's",
+    "installed name, which only work while the component is still its own file.",
+    "This one reads the symbols an ELF exports, which is what is left when a",
+    "component has been linked into someone else's binary.",
+    "",
+    "Measured need: the Zyxel GS1900-8 notice declares ncurses, readline and",
+    "quagga, and all three are inside one 400 KB executable, bin/cli. No version",
+    "string for any of them survives — the only version-shaped string in the whole",
+    "binary is the symbol-versioning tag GCC_3.0 — so signature identification",
+    "cannot see them and neither can a version-string pass. But the binary exports",
+    "1259 dynamic symbols, because its plugin libraries resolve back into it, and",
+    "46 of them are ncurses internals, 145 readline internals, 18 vtysh entry",
+    "points. The evidence is right there in the dynamic symbol table.",
+    "",
+    "This does not make static linking generally readable. A binary that exports",
+    "nothing tells us nothing: MikroTik's bin/sshfs has FUSE linked in and exports",
+    "no dynamic symbols at all, so FUSE stays unfound. What this reads is the case",
+    "where the symbols survived.",
+    "",
+    "Rules for adding entries:",
+    "  - Prefer a component's internal symbols to its public API. The public API is",
+    "    what a compatible reimplementation also provides: libedit exports readline's",
+    "    rl_* entry points, and tgetent/tputs/tparm belong to every termcap there",
+    "    has ever been. The internals do not travel — libedit has no _rl_dispatch,",
+    "    and only ncurses has _nc_*.",
+    "  - Give several, and require several to match. One shared name is a",
+    "    coincidence; `min` of them together is not. It also survives vendor",
+    "    patching, which is not hypothetical: Zyxel's quagga has cmd_init and",
+    "    vty_out but no vty_init, and carries invented commands beside them.",
+    "  - Only list a symbol seen in a real image. Every symbol below was read out",
+    "    of a binary in the vendor corpus, not recalled from a header file.",
+    "  - No versions, no purl, no CPE. A symbol set says a component is present,",
+    "    never which release it is. These judgements are emitted as presence-only",
+    "    for the same reason the SONAME ones are.",
+    "  - Do not add a component whose SONAME or program name already finds it. The",
+    "    cheaper evidence is also the plainer one for a reader to check.",
+    "  - Names shared with a fork are a naming risk, not a CVE risk, because a",
+    "    presence-only component carries no identifier for an advisory to match.",
+    "    Where a fork exists it is called out below."
+  ],
+
+  "ncurses": {
+    "min": 3,
+    "why": [
+      "_nc_* is ncurses' own internal namespace. tgetent, tgetstr, tputs and tparm",
+      "are the termcap/terminfo API and are shared with every other implementation,",
+      "so none of them appear here.",
+      "Seen in: Zyxel GS1900-8 bin/cli (46 _nc_ symbols)."
+    ],
+    "symbols": [
+      "_nc_setupterm",
+      "_nc_read_termtype",
+      "_nc_free_termtype",
+      "_nc_get_screensize",
+      "_nc_init_keytry",
+      "_nc_trim_sgr0",
+      "_nc_baudrate",
+      "_nc_home_terminfo",
+      "_nc_doalloc",
+      "_nc_delink_entry"
+    ]
+  },
+
+  "readline": {
+    "min": 3,
+    "why": [
+      "GNU readline's internals. The public rl_* entry points and add_history are",
+      "deliberately left out: libedit provides those under a readline-compatible",
+      "façade, and matching on them would report GNU readline for a BSD library.",
+      "_rl_* has no such counterpart.",
+      "Seen in: Zyxel GS1900-8 bin/cli (145 _rl_ symbols)."
+    ],
+    "symbols": [
+      "_rl_dispatch",
+      "_rl_bind_stty_chars",
+      "_rl_enable_keypad",
+      "_rl_abort_internal",
+      "_rl_backspace",
+      "_rl_arg_init",
+      "_rl_any_typein",
+      "_rl_add_macro_char",
+      "_rl_init_line_state",
+      "_rl_erase_entire_line"
+    ]
+  },
+
+  "quagga": {
+    "min": 3,
+    "why": [
+      "vtysh is quagga's integrated shell and ships as part of it, so its entry",
+      "points prove quagga is in the image. The command-library names (cmd_init,",
+      "install_element, vty_out) are listed too because a vendor may build the",
+      "library into a product without vtysh's own main.",
+      "FRRouting forked from quagga and keeps the same symbol names, so an FRR",
+      "image would be reported as quagga. The corpus case is quagga — bin/cli",
+      "carries the string 'Integrated shell for Quagga routing software suite.'",
+      "and bugzilla.quagga.net — and a presence-only component carries no",
+      "identifier, so the cost of the confusion is a wrong name in the notice, not",
+      "a wrong advisory. Recheck the strings before trusting the name.",
+      "Seen in: Zyxel GS1900-8 bin/cli (18 vtysh_ symbols)."
+    ],
+    "symbols": [
+      "vtysh_execute",
+      "vtysh_init_vty",
+      "vtysh_rl_gets",
+      "vtysh_pager_init",
+      "vtysh_config_terminal_cmd",
+      "vtysh_exit_all_cmd",
+      "vtysh_start_shell_cmd",
+      "cmd_init",
+      "install_element",
+      "vty_out"
+    ]
+  }
+}

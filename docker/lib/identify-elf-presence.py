@@ -16,12 +16,21 @@ So this reads structure, not text:
 
   - a shared library file, by its SONAME if it declares one, else its filename
   - an executable under bin/ or sbin/, by the name it is installed under
+  - the symbols an ELF exports, for a component linked into someone else's binary
   - NEEDED entries in other ELFs, counted as corroboration
 
 The name a program is installed under is often not its component: brctl ships in
 bridge-utils, chat and pppd in ppp, hostapd_cli in hostapd, ip and tc in
-iproute2. Both mappings are written out by hand (elf-soname-map.json and
-elf-program-map.json) rather than derived.
+iproute2. All three mappings are written out by hand (elf-soname-map.json,
+elf-program-map.json and elf-symbol-map.json) rather than derived.
+
+The symbol pass exists because the first two only work while a component is
+still its own file. The Zyxel GS1900-8 notice declares ncurses, readline and
+quagga, and all three sit inside one 400 KB executable with no version string
+left for any of them — but it exports 1259 dynamic symbols, among them 46
+ncurses internals, 145 readline internals and 18 vtysh entry points, because its
+plugin libraries resolve back into it. Where the symbols did not survive there is
+still nothing to read: MikroTik's sshfs has FUSE linked in and exports none.
 
 The library file has to be in the image. A NEEDED entry alone is a link-time name
 a vendor is free to reuse, and it leaves nothing for a reader to check: MikroTik
@@ -65,6 +74,10 @@ MAX_FILES = int(os.environ.get("FW_ELF_MAX_FILES", "20000"))
 NEEDED_RE = re.compile(r"\(NEEDED\).*\[([^\]]+)\]")
 SONAME_RE = re.compile(r"\(SONAME\).*\[([^\]]+)\]")
 FILE_RE = re.compile(r"^File: (.*)$")
+# A .dynsym row: "   446: 10006388     4 OBJECT  GLOBAL DEFAULT   23 rl_char_is_quoted_p".
+# -W is passed so the name is never abbreviated to `rl_completion_qu[...]`, which
+# would silently miss every symbol long enough to be worth matching on.
+SYMROW_RE = re.compile(r"^\s*\d+:\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(\S+)\s*$")
 
 # unblob names each nesting level `<something>_extract/`, and the carve pass adds
 # `<image>.extracted/`. The same rootfs routinely lands under both, so one file
@@ -113,32 +126,60 @@ def find_elf_files(root):
     return out, capped
 
 
-def read_dynamic(paths):
-    """path -> {"soname": str|None, "needed": [str]} for every ELF that has a dynamic section."""
+def read_dynamic(paths, watched=frozenset()):
+    """path -> {"soname": str|None, "needed": [str], "syms": set} for every ELF read.
+
+    The dynamic section and the dynamic symbol table come out of one readelf call
+    per batch: asking twice would double the process count over a tree that
+    already runs to thousands of files.
+
+    Only symbols in `watched` are kept. A rootfs of a few hundred ELFs holds
+    hundreds of thousands of symbols, and all but the handful the maps name are
+    of no interest — holding them would be the one place this could grow without
+    bound. For the same reason the output is streamed rather than captured whole.
+    """
     info = {}
+
+    def entry(path):
+        return info.setdefault(path, {"soname": None, "needed": [], "syms": set()})
+
     for i in range(0, len(paths), BATCH):
         chunk = paths[i:i + BATCH]
+        args = ["readelf", "-W", "-d"] + (["--dyn-syms"] if watched else []) + ["--"] + chunk
         try:
-            proc = subprocess.run(["readelf", "-d", "--"] + chunk,
-                                  capture_output=True, text=True, timeout=300)
+            proc = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, text=True)
         except (OSError, subprocess.SubprocessError):
             continue
         # With one file readelf prints no `File:` header, so seed it.
         current = chunk[0] if len(chunk) == 1 else None
-        for line in proc.stdout.splitlines():
-            m = FILE_RE.match(line)
-            if m:
-                current = m.group(1)
-                continue
-            if current is None:
-                continue
-            m = NEEDED_RE.search(line)
-            if m:
-                info.setdefault(current, {"soname": None, "needed": []})["needed"].append(m.group(1))
-                continue
-            m = SONAME_RE.search(line)
-            if m:
-                info.setdefault(current, {"soname": None, "needed": []})["soname"] = m.group(1)
+        try:
+            for line in proc.stdout:
+                line = line.rstrip("\n")
+                m = FILE_RE.match(line)
+                if m:
+                    current = m.group(1)
+                    continue
+                if current is None:
+                    continue
+                m = NEEDED_RE.search(line)
+                if m:
+                    entry(current)["needed"].append(m.group(1))
+                    continue
+                m = SONAME_RE.search(line)
+                if m:
+                    entry(current)["soname"] = m.group(1)
+                    continue
+                if watched:
+                    m = SYMROW_RE.match(line)
+                    if m and m.group(1) in watched:
+                        entry(current)["syms"].add(m.group(1))
+        finally:
+            proc.stdout.close()
+            try:
+                proc.wait(timeout=300)
+            except subprocess.SubprocessError:
+                proc.kill()
     return info
 
 
@@ -167,6 +208,20 @@ def main():
         print("[]")
         return 0
     prog_of = load_map(prog_path, False) or {}
+    sym_map = load_map(os.path.join(here, "elf-symbol-map.json"), False) or {}
+
+    # component -> (set of its symbols, how many have to be present). One name
+    # shared with another project is a coincidence; the threshold is what makes a
+    # match mean something, and what lets a vendor-patched build still be read.
+    sym_rules = {}
+    watched = set()
+    for comp, rule in sym_map.items():
+        syms = set(rule.get("symbols") or [])
+        if not syms:
+            continue
+        need = int(rule.get("min", len(syms)))
+        sym_rules[comp] = (syms, max(1, min(need, len(syms))))
+        watched |= syms
 
     if not os.path.isdir(root):
         print("[]")
@@ -180,11 +235,14 @@ def main():
         print("[]")
         return 0
 
-    dynamic = read_dynamic(paths)
+    dynamic = read_dynamic(paths, watched)
 
-    # component name -> {"files": set, "needed_by": int, "sonames": set}
+    # component name -> {"files": set, "needed_by": int, "sonames": set, "symbols": dict}
     found = {}
     unmapped = {}
+
+    def blank():
+        return {"files": set(), "needed_by": 0, "sonames": set(), "symbols": {}}
 
     def note(key, evidence_path, as_needed, soname):
         comp = name_of.get(key)
@@ -192,7 +250,7 @@ def main():
             if key:
                 unmapped[key] = unmapped.get(key, 0) + 1
             return
-        e = found.setdefault(comp, {"files": set(), "needed_by": 0, "sonames": set()})
+        e = found.setdefault(comp, blank())
         if soname:
             e["sonames"].add(soname)
         if as_needed:
@@ -232,9 +290,7 @@ def main():
                 if is_busybox(path):
                     busybox_applets += 1
                 else:
-                    e = found.setdefault(comp, {"files": set(), "needed_by": 0,
-                                                "sonames": set()})
-                    e["files"].add(rel)
+                    found.setdefault(comp, blank())["files"].add(rel)
 
         if d and d.get("soname"):
             note(stem(d["soname"]), rel, False, d["soname"])
@@ -243,6 +299,18 @@ def main():
             note(stem(os.path.basename(path)), rel, False, os.path.basename(path))
         for lib in (d or {}).get("needed", []):
             note(stem(lib), None, True, lib)
+
+        # A component linked into someone else's binary has no file and no
+        # SONAME left to read, but its symbols can still be exported. Which ones
+        # matched is recorded so a reader can check the call rather than take it.
+        seen_syms = (d or {}).get("syms") or set()
+        if seen_syms:
+            for comp, (want, need) in sym_rules.items():
+                hit = seen_syms & want
+                if len(hit) >= need:
+                    e = found.setdefault(comp, blank())
+                    e["files"].add(rel)
+                    e["symbols"].setdefault(rel, set()).update(hit)
 
     components = []
     needed_only = []
@@ -264,6 +332,13 @@ def main():
             props.append({"name": "bomlens:elfSoname", "value": ", ".join(sorted(e["sonames"]))})
         if e["needed_by"]:
             props.append({"name": "bomlens:elfNeededBy", "value": str(e["needed_by"])})
+        if e["symbols"]:
+            # Name the symbols, not just the count. "matched 6 symbols" cannot be
+            # checked by anyone; "_nc_setupterm in bin/cli" can, and this whole
+            # pass is only worth having if its judgements are checkable.
+            shown = ["%s: %s" % (p, ", ".join(sorted(s)))
+                     for p, s in sorted(e["symbols"].items())]
+            props.append({"name": "bomlens:elfSymbols", "value": "; ".join(shown)})
         components.append({
             "bom-ref": f"elf-presence:{comp}",
             "type": "library",
@@ -275,6 +350,11 @@ def main():
     print(json.dumps(components, ensure_ascii=False))
     print(f"[elf-presence] {len(seen_paths)} distinct ELF file(s) of {len(paths)} found; "
           f"{len(components)} component(s) proved present by structure.", file=sys.stderr)
+    by_symbol = sorted(c for c in found if found[c]["symbols"])
+    if by_symbol:
+        print(f"[elf-presence] {len(by_symbol)} of them were linked into another "
+              f"binary and read from its exported symbols: " + ", ".join(by_symbol),
+              file=sys.stderr)
     if busybox_applets:
         print(f"[elf-presence] {busybox_applets} program name(s) skipped because the "
               f"file is a copy of busybox, which is identified separately.",

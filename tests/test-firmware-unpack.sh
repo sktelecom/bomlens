@@ -467,7 +467,7 @@ fi
 # A string search would report busybox's help text mentioning "readline" as
 # evidence that readline is linked in. The reader must work off the dynamic
 # section instead.
-if grep -q '"readelf", "-d"' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+if grep -qE '"readelf".*"-d"' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
     pass "evidence comes from the ELF dynamic section, not from strings"
 else
     fail "the reader does not read the dynamic section"
@@ -585,6 +585,72 @@ if grep -q 'BusyBox v' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
     pass "a busybox copy under an applet name is not reported as that component"
 else
     fail "a busybox applet copy would be reported as a separate component"
+fi
+
+echo "== a component linked into another binary is read from its symbols =="
+
+# The Zyxel notice declares ncurses, readline and quagga; all three are inside
+# one 400 KB executable with no version string left for any of them, so neither
+# a signature checker nor a version-string pass can see them. The binary exports
+# its dynamic symbols, and those name the components.
+STBL="$ROOT_DIR/docker/lib/elf-symbol-map.json"
+if [ -f "$STBL" ] && jq -e 'to_entries | map(select(.key | startswith("_") | not)) | length > 0' \
+     "$STBL" >/dev/null 2>&1; then
+    pass "the symbol map ships and has entries"
+else
+    fail "elf-symbol-map.json is missing or empty"
+fi
+
+# One shared name is a coincidence. The threshold is what makes a match evidence,
+# and it also has to be reachable — a min above the number of symbols listed
+# would mean the entry can never fire.
+if jq -e 'to_entries | map(select(.key | startswith("_") | not))
+          | all((.value.symbols | length) >= 3
+                and .value.min >= 2
+                and .value.min <= (.value.symbols | length))' "$STBL" >/dev/null 2>&1; then
+    pass "every entry needs several symbols to agree, and can reach its own threshold"
+else
+    fail "an entry matches on too few symbols, or on a threshold it cannot reach"
+fi
+
+# The public API is what a compatible reimplementation also provides: libedit
+# exports readline's rl_* entry points, and tgetent/tputs/tparm belong to every
+# termcap there has ever been. Matching on those would report GNU readline for a
+# BSD library. The internals do not travel.
+for banned in rl_initialize readline add_history tgetent tputs tparm setupterm; do
+    if jq -e --arg s "$banned" '[.[] | select(type == "object") | .symbols[]?] | any(. == $s)' \
+         "$STBL" >/dev/null 2>&1; then
+        fail "the symbol map matches on $banned" \
+             "a compatible reimplementation exports it too"
+    else
+        pass "the symbol map does not match on the shared name $banned"
+    fi
+done
+
+# Same rule as the other two maps: presence, never a version, and no identifier
+# for anything downstream to match against an advisory.
+if jq -e 'to_entries | map(select(.key | startswith("_") | not))
+          | all(.value | has("purl") == false and has("cpe") == false
+                and has("version") == false)' "$STBL" >/dev/null 2>&1; then
+    pass "the symbol map carries no version and no identifier"
+else
+    fail "the symbol map carries a version or an identifier"
+fi
+
+# -W or the long names come back as `rl_completion_qu[...]` and every symbol
+# worth matching on is silently missed.
+if grep -q '"readelf", "-W"' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "symbol names are read unabbreviated"
+else
+    fail "readelf is called without -W" "long symbol names would be truncated"
+fi
+
+# Which symbols matched has to reach the SBOM. A count cannot be checked by
+# anyone; the names and the file they were found in can.
+if grep -q 'bomlens:elfSymbols' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "the matched symbols are recorded as evidence"
+else
+    fail "a symbol judgement lands with no evidence to check"
 fi
 
 echo "== the version-string table is closed, and its CPEs are checked =="
