@@ -9,7 +9,13 @@ site_url: https://sktelecom.github.io/bomlens/
 repo_url: https://github.com/sktelecom/bomlens
 repo_name: sktelecom/bomlens
 edit_uri: edit/main/docs/
-copyright: SK Telecom
+# Rendered in the site footer. The holder is spelled as in NOTICE and README
+# rather than shortened, and the licence is linked because the site is where
+# most readers meet the project and it carried no licence statement at all.
+copyright: >
+  Copyright &copy; 2026 SK Telecom Co., Ltd. ·
+  <a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE">Apache-2.0</a> ·
+  <a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md">Third-party licenses</a>
 
 theme:
   name: material
