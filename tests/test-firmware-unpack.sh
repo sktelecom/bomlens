@@ -187,10 +187,32 @@ else
          "every empty result would then report the same generic cause"
 fi
 
-if grep -q 'sasquatch' "$SCRIPT"; then
-    pass "the unopenable-squashfs case names what is missing"
+# The reason must come from the extractor, not from a guess. Guessing once shipped
+# a message telling readers to find sasquatch when unsquashfs was actually refusing
+# to write an SELinux attribute — a one-flag problem, sent in the wrong direction.
+if awk '/^extract_carved_filesystems\(\) \{/,/^}/' "$SCRIPT" | grep -q '2>"\$err"'; then
+    pass "the extractor's own error output is captured"
 else
-    fail "the unopenable-squashfs case does not say what would fix it"
+    fail "the extractor's error output is discarded" \
+         "the cause can then only be guessed at"
+fi
+
+if awk '/^extract_carved_filesystems\(\) \{/,/^}/' "$SCRIPT" | grep -q 'reason='; then
+    pass "the recorded entry carries the reason, not just the path"
+else
+    fail "no reason is recorded alongside the unopenable image"
+fi
+
+# unsquashfs restores extended attributes by default and treats a refused
+# security.selinux write as fatal, aborting mid-extraction. Both call sites must
+# turn that off or a standard squashfs comes out empty.
+noxattr=$(grep -c 'unsquashfs -no-xattrs' "$SCRIPT")
+total=$(grep -cE '_tmo unsquashfs' "$SCRIPT")
+if [ "$noxattr" -ge 1 ] && [ "$noxattr" -eq "$total" ]; then
+    pass "every unsquashfs call disables extended-attribute restore ($noxattr/$total)"
+else
+    fail "an unsquashfs call still restores extended attributes" \
+         "$noxattr of $total calls pass -no-xattrs; the others abort on SELinux writes"
 fi
 
 # Three branches, so the reader gets a cause rather than a catch-all.

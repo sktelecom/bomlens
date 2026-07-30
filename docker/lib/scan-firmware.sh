@@ -81,12 +81,18 @@ if command -v unblob >/dev/null 2>&1; then
     _tmo unblob --extract-dir "$EXTRACT" "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
+# -no-xattrs, on both call sites below: unsquashfs restores extended attributes
+# by default, and writing security.selinux is not permitted inside the container.
+# It treats that as fatal and aborts mid-extraction, so a perfectly standard
+# squashfs came out empty. The attributes are of no use to us — we read the files,
+# we do not boot them.
+#
 # squashfs is the most common firmware filesystem; unsquashfs (squashfs-tools)
 # handles standard images even when unblob's sasquatch handler is absent.
 if [ "$unpacked" = 0 ] && command -v unsquashfs >/dev/null 2>&1 && printf '%s' "$FILE_INFO" | grep -qi squashfs; then
     echo "[firmware] falling back to unsquashfs..."
     note_tried unsquashfs
-    _tmo unsquashfs -f -d "$EXTRACT/squashfs-root" "$FW" >/dev/null 2>&1 || true
+    _tmo unsquashfs -no-xattrs -f -d "$EXTRACT/squashfs-root" "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
 # 7z reads the container formats Windows deliveries arrive in — NSIS and Inno
@@ -119,25 +125,31 @@ fi
 # ①.5 Extract filesystem images that were carved out but not opened.
 #
 # unblob recognizes a filesystem inside a firmware blob and carves it into its own
-# file, but cannot always extract it: squashfs needs `sasquatch`, which this image
-# does not bundle. That carve still counts as "unblob produced files", so the
-# fallback chain above is skipped and the pipeline goes on to catalog one opaque
-# 4 MB blob. Partial success is worse than failure here, because failure at least
-# reaches the next unpacker.
+# file, but does not always extract it: its squashfs handler shells out to
+# `sasquatch`, which this image does not bundle. The carve still counts as "unblob
+# produced files", so the fallback chain above is skipped and the pipeline goes on
+# to catalog one opaque multi-megabyte blob. Partial success is worse than failure
+# here, because failure at least reaches the next unpacker.
 #
-# Standard squashfs opens with plain unsquashfs, so make a second pass over the
-# extraction tree and unpack any filesystem image still sitting there as a single
-# file. Measured on an OpenWrt rootfs image: 1 component before, 199 after.
+# The carve is recoverable: plain unsquashfs opens a standard image perfectly well
+# (given -no-xattrs, see above). So make a second pass over the extraction tree and
+# unpack any filesystem image still sitting there as a single file. Measured on an
+# OpenWrt rootfs image: 1 component before, 199 after.
 #
 # Only files of at least 256 KiB are probed with `file`, to keep this from running
 # a subprocess per entry on a tree with thousands of small files.
 # --------------------------------------------------------
+# Each entry is one line: "<path inside the firmware><TAB><why the extractor refused>".
+# Keeping the reason is the point. Guessing at the cause once cost a release note
+# that told readers to go find sasquatch when the extractor was in fact refusing
+# to write an SELinux attribute — a one-flag problem. Report what the tool said.
 CARVED_UNOPENED=""
 extract_carved_filesystems() {
-    local img out found=0
+    local img out err reason found=0
     # Returns non-zero when nothing was opened, which is also the right answer when
     # the extractor is absent: the caller's loop reads success as "made progress".
     command -v unsquashfs >/dev/null 2>&1 || return 1
+    err="$WORK/unsquashfs.err"
     while IFS= read -r img; do
         [ -f "$img" ] || continue
         case "$(file -b "$img" 2>/dev/null)" in
@@ -146,19 +158,20 @@ extract_carved_filesystems() {
         esac
         out="$img.extracted"
         [ -e "$out" ] && continue
-        if _tmo unsquashfs -f -d "$out" "$img" >/dev/null 2>&1 \
+        if _tmo unsquashfs -no-xattrs -f -d "$out" "$img" >/dev/null 2>"$err" \
            && [ -n "$(find "$out" -type f -print -quit 2>/dev/null)" ]; then
             echo "[firmware] opened a carved squashfs image: ${img#"$EXTRACT"/}"
             found=1
         else
             rm -rf "$out"
-            # Recorded, not just skipped. A squashfs the standard tool cannot open is
-            # usually a vendor-modified variant, and that is the difference between
-            # "this firmware has nothing in it" and "we could not get in" — which the
-            # reader has to know, because only one of those is theirs to act on.
-            CARVED_UNOPENED="${CARVED_UNOPENED:+$CARVED_UNOPENED }${img#"$EXTRACT"/}"
+            reason=$(grep -m1 -iE 'fatal|error|unsupported|cannot|refus' "$err" 2>/dev/null \
+                     | tr -d '\r' | cut -c1-160)
+            [ -n "$reason" ] || reason="no output produced and the extractor gave no reason"
+            CARVED_UNOPENED="${CARVED_UNOPENED}${img#"$EXTRACT"/}	${reason}
+"
         fi
     done < <(find "$EXTRACT" -type f -size +256k 2>/dev/null)
+    rm -f "$err"
     return $((1 - found))
 }
 
@@ -369,9 +382,11 @@ if [ "${NTOTAL:-0}" -eq 0 ]; then
     echo "[firmware] WARN: no components identified." >&2
     if [ -n "$CARVED_UNOPENED" ]; then
         echo "[firmware]       A filesystem image was found but could not be opened:" >&2
-        for u in $CARVED_UNOPENED; do echo "[firmware]         $u" >&2; done
-        echo "[firmware]       A squashfs that standard unsquashfs rejects is usually a" >&2
-        echo "[firmware]       vendor-modified variant, which needs sasquatch — not bundled." >&2
+        printf '%s' "$CARVED_UNOPENED" | while IFS="$(printf '\t')" read -r path reason; do
+            [ -n "$path" ] || continue
+            echo "[firmware]         $path" >&2
+            echo "[firmware]           $reason" >&2
+        done
     elif [ "$unpacked" = 0 ]; then
         echo "[firmware]       Nothing could be unpacked at all; see the warning above." >&2
     elif [ "${NFILES:-0}" -le 8 ]; then
