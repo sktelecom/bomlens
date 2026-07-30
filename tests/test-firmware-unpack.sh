@@ -668,6 +668,23 @@ fi
 if jq -e 'all(.entries[]; (.pattern | length) > 0 and (.pattern | test("\\(")))' \
      "$TBL" >/dev/null 2>&1; then
     pass "every entry carries its own capturing pattern"
+    # A prerelease is not the release. 0.18-pre1 precedes 0.18, so trimming the
+    # suffix would claim a version the image does not carry — and quietly line the
+    # component up against the wrong advisories.
+    if command -v python3 >/dev/null 2>&1 && python3 - "$TBL" <<'PY'
+import json, re, sys
+t = json.load(open(sys.argv[1]))
+e = next((x for x in t["entries"] if x["name"] == "netkit-ftp"), None)
+if not e:
+    sys.exit(1)
+m = re.search(e["pattern"], "$NetKit: netkit-ftp-0.18-pre1 $")
+sys.exit(0 if m and m.group(1) == "0.18-pre1" else 1)
+PY
+    then
+        pass "a prerelease version is read whole, not trimmed to the release"
+    else
+        fail "the netkit-ftp pattern does not capture 0.18-pre1 intact"
+    fi
 else
     fail "an entry has no pattern, or no capture group for the version"
 fi

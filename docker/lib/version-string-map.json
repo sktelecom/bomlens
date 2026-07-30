@@ -32,6 +32,13 @@
       "where": "Zyxel GS1900-8, bin/arp: `net-tools 1.60`"
     },
     {
+      "name": "netkit-ftp",
+      "pattern": "\\$NetKit:\\s+netkit-ftp-(\\d+\\.\\d+(?:-[A-Za-z0-9]+)?)\\s+\\$",
+      "cpe": "cpe:2.3:a:netkit-ftp:netkit_ftp:*:*:*:*:*:*:*:*",
+      "why": "netkit stamps an RCS keyword of its own, `$NetKit: <package>-<version> $`, which no checker looks for. The whole keyword is matched rather than the bare name so a mention of the package elsewhere cannot stand in for it, and the pattern names ftp specifically because the same keyword form is used by every netkit tool. The prerelease suffix is captured rather than trimmed: 0.18-pre1 precedes 0.18, and reporting it as 0.18 would claim a release the image does not carry. Identity is settled here, unlike net-tools and hydra, so the CPE is attached.",
+      "where": "NETGEAR R7000, usr/sbin/ftp: `$NetKit: netkit-ftp-0.18-pre1 $`"
+    },
+    {
       "name": "hydra",
       "pattern": "\\bHydra/(\\d+\\.\\d+(?:\\.\\d+)?)\\b",
       "cpe": null,
