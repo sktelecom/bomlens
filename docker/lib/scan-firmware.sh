@@ -227,10 +227,38 @@ while [ "$carve_round" -lt 3 ] && extract_carved_filesystems; do
 done
 
 # --------------------------------------------------------
-# ② Locate a rootfs candidate (parent of the first 'etc' dir; else extract root).
+# ② Locate a rootfs candidate (parent of the shallowest 'etc' dir; else extract root).
 # --------------------------------------------------------
+
+# pick_shallowest — reads candidate paths on stdin, writes the one nearest the
+# top of the tree. Ties go to the lower path.
+#
+# Kept separate from the search because the choice, not the search, is where the
+# defect was: the rule used to be "take the first line", which meant taking
+# whatever order the filesystem's readdir gave — neither depth order nor stable
+# across filesystems. MikroTik RouterOS carries four bundled sub-packages under
+# bndl/<name>/nova, and each one looks exactly like a rootfs: bin, etc and lib,
+# the same entries the real root has. One of those came first on the scanner's
+# filesystem, so the scan read two ELF files instead of the image's 423 and
+# reported no components at all, while the same extraction picked the real root
+# on another filesystem. The result depended on where the scan ran.
+#
+# Sibling directories cannot tell the two apart — the bundles carry bin, etc and
+# lib just as the root does. Depth can. Taking input as a list rather than
+# running the search itself is what lets a test hand it the deep candidate first
+# and see that the shallow one still wins.
+pick_shallowest() {
+    awk -F/ '{print NF "\t" $0}' | sort -k1,1n -k2,2 | head -1 | cut -f2-
+}
+
+# shallowest_etc <tree> — the 'etc' directory nearest the top of <tree>, empty if
+# there is none.
+shallowest_etc() {
+    find "$1" -type d -name etc 2>/dev/null | pick_shallowest
+}
+
 ROOTFS="$EXTRACT"
-etc_dir=$(find "$EXTRACT" -type d -name etc 2>/dev/null | head -1)
+etc_dir=$(shallowest_etc "$EXTRACT")
 if [ -n "$etc_dir" ]; then
     ROOTFS=$(dirname "$etc_dir")
     echo "[firmware] rootfs candidate: ${ROOTFS#"$EXTRACT"/} (relative to extract root)"

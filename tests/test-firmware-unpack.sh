@@ -648,6 +648,73 @@ else
     fail "extractor order is wrong or missing" "got: ${order:-none}"
 fi
 
+echo "== the rootfs is the shallowest one, not whichever the filesystem lists first =="
+
+# Lifted from the shipping script for the same reason comps_of is: a copy here
+# would keep passing after the real one changed.
+#
+# pick_shallowest is fed a list rather than left to search a directory, which is
+# what makes these checks worth running. Handed a real tree, the old rule
+# ("take the first line") returns the right answer whenever the filesystem
+# happens to list the root first — it does on macOS — so a directory fixture
+# would pass against the defect it is meant to catch. Feeding the deep candidate
+# first fails the old rule on every platform.
+rootfs_body="$(awk '
+    /^pick_shallowest\(\) \{/ { inside = 1 }
+    inside { print }
+    inside && $0 == "}" { exit }
+' "$SCRIPT")"
+if [ -z "$rootfs_body" ]; then
+    fail "could not lift pick_shallowest out of scan-firmware.sh" "was it renamed?"
+else
+    eval "$rootfs_body"
+
+    # A MikroTik RouterOS image in miniature: bundled sub-packages that carry
+    # bin, etc and lib exactly as the real root does. Nothing but depth tells
+    # them apart, and a bundle came first on the scanner's filesystem, which
+    # cost the whole image's components.
+    got=$(printf '%s\n' \
+        /x/bndl/ppp/nova/etc /x/bndl/wifi/nova/etc /x/bndl/hotspot/nova/etc /x/etc \
+        | pick_shallowest)
+    if [ "$got" = "/x/etc" ]; then
+        pass "the root's own etc wins over a bundle listed before it"
+    else
+        fail "a bundled sub-package was taken for the rootfs" "got ${got:-nothing}"
+    fi
+
+    # Order of arrival must not matter at all; the same set has one answer.
+    got=$(printf '%s\n' /x/etc /x/bndl/ppp/nova/etc | pick_shallowest)
+    if [ "$got" = "/x/etc" ]; then
+        pass "the same set gives the same answer whichever order it arrives in"
+    else
+        fail "the choice depends on input order" "got ${got:-nothing}"
+    fi
+
+    # Ties have to resolve somewhere, and the path is the only ordering left.
+    got=$(printf '%s\n' /x/zzz/etc /x/aaa/etc | pick_shallowest)
+    if [ "$got" = "/x/aaa/etc" ]; then
+        pass "equally deep candidates resolve by path"
+    else
+        fail "a tie between equally deep candidates is unresolved" "got ${got:-nothing}"
+    fi
+
+    # No candidates is a real case (a carved partition with no rootfs); the
+    # caller falls back to the whole tree only when this says nothing.
+    if [ -z "$(printf '' | pick_shallowest)" ]; then
+        pass "no candidates yields nothing to fall back from"
+    else
+        fail "an empty candidate list still named a rootfs"
+    fi
+
+    # The search half has to actually reach the choosing half.
+    if awk '/^shallowest_etc\(\) \{/,/^}/' "$SCRIPT" | grep -q 'pick_shallowest'; then
+        pass "the etc search feeds its candidates through the choice"
+    else
+        fail "shallowest_etc no longer uses pick_shallowest" \
+             "the tested rule is not the one that runs"
+    fi
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]
