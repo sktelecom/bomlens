@@ -1,0 +1,36 @@
+[
+  {
+    "bom-ref": "3-openssl",
+    "type": "library",
+    "name": "openssl",
+    "version": "1.0.2h",
+    "cpe": "cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+    "supplier": { "name": "openssl" },
+    "evidence": { "occurrences": [{ "location": "/usr/bin/openssl" }] }
+  },
+  {
+    "bom-ref": "7-openssl",
+    "type": "library",
+    "name": "openssl",
+    "version": "1.0.2r",
+    "cpe": "cpe:2.3:a:openssl:openssl:1.0.2r:*:*:*:*:*:*:*",
+    "supplier": { "name": "openssl" },
+    "evidence": { "occurrences": [{ "location": "/usr/bin/openssl" }] }
+  },
+  {
+    "bom-ref": "9-zlib",
+    "type": "library",
+    "name": "zlib",
+    "version": "1.2.11",
+    "purl": "pkg:deb/zlib@1.2.11",
+    "cpe": "cpe:2.3:a:zlib:zlib:1.2.11:*:*:*:*:*:*:*"
+  },
+  {
+    "bom-ref": "12-linux_kernel",
+    "type": "library",
+    "name": "linux_kernel",
+    "version": "2.6.19",
+    "cpe": "cpe:/o:linux:linux_kernel:2.6.19",
+    "evidence": { "occurrences": [{ "location": "/lib/modules/2.6.19" }] }
+  }
+]

@@ -337,7 +337,7 @@ else
 fi
 
 # --------------------------------------------------------
-# ④ Merge package + binary components, dedupe by purl (fallback name@version).
+# ④ Merge package + binary components, dedupe by name@version.
 # --------------------------------------------------------
 # Keep only components with a real name (drops syft's empty "os:unknown" noise).
 # A large rootfs (e.g. an OpenWRT ext4 image) yields huge component arrays.
@@ -377,10 +377,64 @@ comps_of() {
 comps_of "$PKG_SBOM" > "$WORK/pkg-comps.json"
 comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
 
+# The two passes find the same component and describe it differently, so the
+# dedupe key cannot be the purl. syft's binary classifier reports
+# `openssl 1.0.2h` as type `application` with `pkg:generic/openssl@1.0.2h`;
+# cve-bin-tool reports the same version as type `library` with a CPE and no purl.
+# Keyed on `.purl // name@version` those land in different groups and both ship —
+# one component counted twice, on every vendor firmware tried (busybox, curl and
+# openssl duplicated on all four that yield components).
+#
+# So key on name@version instead, and keep the two records' fields together: the
+# purl from syft, the CPE from whichever carries one, and both file locations,
+# which usually differ (`/usr/bin/openssl` against `/usr/local/sbin/openssl`).
+#
+# Two guards on that:
+#
+#   Only `library` and `application` are merged. `operating-system` is syft's
+#   distro record — enrich-os-context.py looks for exactly that type to give Trivy
+#   its OS context — and `file` entries are the file listing, not components.
+#   Folding either into a component would lose something downstream reads. Those
+#   are still deduped among themselves, though: the two extraction passes hold the
+#   same rootfs twice, so one file arrives as two identical `file` entries.
+#
+#   A group holding two different purls is left alone. Two packages can share a
+#   name and version and still be different things (the same name from two
+#   ecosystems, say), and nothing here can tell them apart, so they stay separate.
+#
+# The record carrying a purl is the base, because the purl is what the CVE step
+# matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" '
-    ($a[0] + $b[0])
-    | group_by(.purl // ((.name // "") + "@" + (.version // "")))
-    | map(.[0])
+    def merge_group:
+      . as $g
+      | (([$g[] | select(.purl)] + $g) | .[0]) as $base
+      | ($g | map(.hashes // []) | add | unique) as $hashes
+      | ($g | map(.properties // []) | add | unique) as $props
+      | ($g | map(.licenses // []) | add | unique) as $lics
+      | ($g | map(.evidence.occurrences // []) | add | unique) as $occ
+      | $base
+        + ([$g[] | .purl // empty]     | if length > 0 then {purl: .[0]}     else {} end)
+        + ([$g[] | .cpe // empty]      | if length > 0 then {cpe: .[0]}      else {} end)
+        + ([$g[] | .supplier // empty] | if length > 0 then {supplier: .[0]} else {} end)
+        + (if ($hashes | length) > 0 then {hashes: $hashes} else {} end)
+        + (if ($props  | length) > 0 then {properties: $props} else {} end)
+        + (if ($lics   | length) > 0 then {licenses: $lics} else {} end)
+        + (if ($occ    | length) > 0
+           then {evidence: (($base.evidence // {}) + {occurrences: $occ})} else {} end);
+
+    def mergeable: (.type // "library") as $t | $t == "library" or $t == "application";
+
+    ($a[0] + $b[0]) as $all
+    | ([$all[] | select(mergeable | not)]
+       | group_by([((.name // "") | ascii_downcase), (.version // ""),
+                   (.type // ""), (.purl // "")])
+       | map(.[0])) as $keep
+    | ([$all[] | select(mergeable)]
+       | group_by([((.name // "") | ascii_downcase), (.version // "")])
+       | map(if length == 1 or (([.[] | .purl // empty] | unique | length) > 1)
+             then . else [merge_group] end)
+       | add // []) as $merged
+    | ($keep + $merged)
     | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
 ' > "$WORK/merged.json"
 

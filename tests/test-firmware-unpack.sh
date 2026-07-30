@@ -266,6 +266,94 @@ for magic in 68737173 73717368 73687371 71736873; do
     fi
 done
 
+echo "== the two passes' records of one component are merged, not both shipped =="
+
+# syft's binary classifier and cve-bin-tool describe the same component
+# differently: `application` with a purl against `library` with a CPE and none.
+# Keyed on `.purl // name@version` those landed in different groups and both
+# shipped. Measured on the vendor firmware corpus: busybox, curl and openssl were
+# duplicated on every image that yielded components.
+#
+# The filter is lifted out of the shipping script rather than re-implemented.
+merge_filter="$(awk '
+    /^jq -n --slurpfile a "\$WORK\/pkg-comps.json"/ { inside = 1; next }
+    inside && /^'"'"' > "\$WORK\/merged.json"$/ { exit }
+    inside { print }
+' "$SCRIPT")"
+if [ -z "$merge_filter" ]; then
+    echo "[ERROR] could not lift the merge filter out of scan-firmware.sh (was it renamed?)"; exit 1
+fi
+
+merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
+                --slurpfile b "$FIX/merge-bin-comps.json" "$merge_filter")"
+
+n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
+if [ "$n" = "1" ]; then
+    pass "one component described by both passes is reported once"
+else
+    fail "the same component is still reported twice" "openssl 1.0.2h appears $n time(s)"
+fi
+
+# The purl is what the CVE step matches on, so it has to survive the merge; the
+# CPE and the other pass's file location are what a reader checks the claim with.
+one="$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")][0]')"
+if printf '%s' "$one" | jq -e '.purl == "pkg:generic/openssl@1.0.2h" and (.cpe | length) > 0' >/dev/null; then
+    pass "the merged record keeps the purl and the CPE"
+else
+    fail "the merged record lost the purl or the CPE" "$one"
+fi
+
+locs=$(printf '%s' "$one" | jq '[.evidence.occurrences[]?.location] | length')
+if [ "$locs" = "1" ]; then
+    pass "the location only one pass recorded is carried over"
+else
+    fail "an occurrence was dropped or duplicated" "got $locs location(s): $one"
+fi
+
+# Two versions of the same component at the same path are two findings, not one.
+if printf '%s' "$merged" | jq -e 'any(.[]; .name == "openssl" and .version == "1.0.2r")' >/dev/null; then
+    pass "a different version of the same component stays separate"
+else
+    fail "a distinct version was merged away"
+fi
+
+# enrich-os-context.py looks for exactly `operating-system` to give Trivy its OS
+# context. Folding syft's distro record into the busybox binary would remove it.
+os_n=$(printf '%s' "$merged" | jq '[.[] | select(.type == "operating-system")] | length')
+if [ "$os_n" = "1" ]; then
+    pass "the distro record survives the merge"
+else
+    fail "the operating-system component was merged away" \
+         "Trivy loses its OS context; got $os_n"
+fi
+
+# `file` entries are the file listing, not components.
+if printf '%s' "$merged" | jq -e 'any(.[]; .type == "file" and .name == "bin/openssl")' >/dev/null; then
+    pass "file entries are left alone"
+else
+    fail "a file entry was merged into a component"
+fi
+
+# Left alone is not the same as passed through untouched. The two extraction
+# passes hold the same rootfs twice, so one file arrives as two identical `file`
+# entries; excluding them from the merge without deduping them ships both.
+fn=$(printf '%s' "$merged" | jq '[.[] | select(.type == "file" and .name == "bin/openssl")] | length')
+if [ "$fn" = "1" ]; then
+    pass "an identical file entry from both extraction passes is reported once"
+else
+    fail "the same file is reported $fn time(s)" \
+         "types excluded from the merge still have to be deduped among themselves"
+fi
+
+# Same name and version, two different purls: nothing here can tell whether those
+# are one component or two, so they stay separate.
+z=$(printf '%s' "$merged" | jq '[.[] | select(.name == "zlib")] | length')
+if [ "$z" = "2" ]; then
+    pass "two different purls under one name and version are not merged"
+else
+    fail "entries with different purls were merged" "expected 2 zlib entries, got $z"
+fi
+
 echo "== the vendor squashfs variant has an extractor =="
 
 if grep -q 'sasquatch' "$ROOT_DIR/docker/Dockerfile"; then

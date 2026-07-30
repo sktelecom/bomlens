@@ -1,0 +1,49 @@
+[
+  {
+    "bom-ref": "pkg:generic/openssl@1.0.2h?package-id=8ceb2795e4b8d6de",
+    "type": "application",
+    "name": "openssl",
+    "version": "1.0.2h",
+    "purl": "pkg:generic/openssl@1.0.2h",
+    "cpe": "cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+    "properties": [
+      { "name": "syft:package:foundBy", "value": "binary-classifier-cataloger" },
+      { "name": "syft:location:0:path", "value": "/usr/local/sbin/openssl" }
+    ]
+  },
+  {
+    "bom-ref": "os:busybox@1.22.1",
+    "type": "operating-system",
+    "name": "busybox",
+    "version": "1.22.1",
+    "description": "BusyBox v1.22.1",
+    "licenses": [{ "license": { "id": "GPL-2.0-only" } }]
+  },
+  {
+    "bom-ref": "pkg:generic/busybox@1.22.1?package-id=a5f00e5cae9c3e95",
+    "type": "application",
+    "name": "busybox",
+    "version": "1.22.1",
+    "purl": "pkg:generic/busybox@1.22.1",
+    "licenses": [{ "license": { "id": "GPL-2.0-only" } }]
+  },
+  {
+    "bom-ref": "file-bin-openssl",
+    "type": "file",
+    "name": "bin/openssl",
+    "hashes": [{ "alg": "SHA-1", "content": "988336501ec9e57e1b78e6d92148d9882c8e2d96" }]
+  },
+  {
+    "bom-ref": "file-bin-openssl-second-pass",
+    "type": "file",
+    "name": "bin/openssl",
+    "hashes": [{ "alg": "SHA-1", "content": "988336501ec9e57e1b78e6d92148d9882c8e2d96" }]
+  },
+  {
+    "bom-ref": "pkg:apk/zlib@1.2.11",
+    "type": "library",
+    "name": "zlib",
+    "version": "1.2.11",
+    "purl": "pkg:apk/zlib@1.2.11"
+  }
+]
