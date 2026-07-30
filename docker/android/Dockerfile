@@ -1,6 +1,7 @@
 # ========================================================
 # BomLens — Android SDK image (per compileSdk)
-# Image: ghcr.io/sktelecom/sbom-scanner-android-sdk<ANDROID_API>
+# Image: ghcr.io/sktelecom/bomlens-android-sdk<ANDROID_API>
+#        (legacy alias: sbom-scanner-android-sdk<ANDROID_API>, same digest)
 #
 # cdxgen does NOT provide Android-SDK-bundled images and marks Android as
 # "no transitive support" — so Android source (pre-build) cannot be delegated
@@ -21,7 +22,14 @@ ARG CMDLINE_TOOLS=11076708
 
 LABEL org.opencontainers.image.title="BomLens Android SDK"
 LABEL org.opencontainers.image.vendor="SK Telecom"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+# This image holds no BomLens code. Its contents are cdxgen's java image
+# (Apache-2.0) plus Android SDK components installed by sdkmanager, and those
+# are governed by Google's Android Software Development Kit License Agreement,
+# not by Apache-2.0. The label said Apache-2.0, which described neither.
+# LicenseRef- is the SPDX form for a licence with no SPDX identifier.
+LABEL org.opencontainers.image.licenses="Apache-2.0 AND LicenseRef-Android-SDK"
+LABEL org.opencontainers.image.description="cdxgen java image plus Android SDK platform, build-tools, and platform-tools for scanning Android projects. The SDK components are subject to the Android Software Development Kit License Agreement."
+LABEL com.sktelecom.sbom.android-sdk-terms="https://developer.android.com/studio/terms"
 
 USER root
 ENV ANDROID_HOME=/opt/android-sdk

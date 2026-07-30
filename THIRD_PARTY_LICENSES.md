@@ -128,6 +128,21 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 
 Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
 
+## Android SDK images — `ghcr.io/sktelecom/bomlens-android-sdk<API>`
+
+cdxgen publishes no Android-SDK-bearing image and marks Android as having no transitive support, so an Android project cannot be delegated to it. These images add an Android SDK platform on top of cdxgen's java image, one image per `compileSdk` (API 30 through 35). `scan-sbom.sh` detects the project's `compileSdk` and pulls the matching tag; `ANDROID_IMAGE_PREFIX` overrides where it comes from. The legacy `sbom-scanner-android-sdk<API>` name points at the same digest.
+
+They hold no BomLens code, so they are not covered by our Apache-2.0 grant. What they contain:
+
+| Component | Source | Terms |
+|-----------|--------|-------|
+| cdxgen java image (`cdxgen-temurin-java21`, digest-pinned) | https://github.com/CycloneDX/cdxgen | Apache-2.0 |
+| Android SDK command-line tools, platform-tools, `platforms;android-<API>`, `build-tools;<API>.0.0` | Installed by `sdkmanager` from https://dl.google.com/android/repository/ | Android Software Development Kit License Agreement, https://developer.android.com/studio/terms |
+
+The Android SDK is not open source and is not under Apache-2.0. Its terms grant a non-sublicensable licence to use the SDK to develop Android applications (§3.1) and restrict copying and redistribution of the SDK or any part of it, except where a third-party licence requires otherwise (§3.4). Anyone pulling these images is bound by those terms directly, and using the images is not a substitute for accepting them.
+
+Each SDK component carries its own `NOTICE.txt` inside the image (under `/opt/android-sdk/`), which is where the third-party notices for the SDK's own contents live. The `/opt/android-sdk/licenses/` files are acceptance markers written by `sdkmanager`, not licence texts.
+
 ---
 
 *This document is a general compliance summary, not legal advice. The licenses of record are the LICENSE files in each upstream project.*

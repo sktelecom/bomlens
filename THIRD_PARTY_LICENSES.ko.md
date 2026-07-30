@@ -127,6 +127,21 @@ OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 
 > 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
 
+## Android SDK 이미지 — `ghcr.io/sktelecom/bomlens-android-sdk<API>`
+
+cdxgen은 Android SDK를 담은 이미지를 제공하지 않고 Android를 전이 의존성 미지원으로 표시하므로, Android 프로젝트는 cdxgen에 그대로 넘길 수 없습니다. 그래서 cdxgen java 이미지 위에 Android SDK 플랫폼을 얹은 이미지를 `compileSdk`별로 하나씩(API 30~35) 둡니다. `scan-sbom.sh`가 프로젝트의 `compileSdk`를 찾아 맞는 태그를 받아 쓰고, `ANDROID_IMAGE_PREFIX`로 받아올 곳을 바꿀 수 있습니다. 옛 이름 `sbom-scanner-android-sdk<API>`는 같은 다이제스트를 가리킵니다.
+
+이 이미지에는 BomLens 코드가 들어 있지 않아 우리 Apache-2.0 허락의 대상이 아닙니다. 들어 있는 것은 다음과 같습니다.
+
+| 구성요소 | 출처 | 조건 |
+|----------|------|------|
+| cdxgen java 이미지(`cdxgen-temurin-java21`, 다이제스트 고정) | https://github.com/CycloneDX/cdxgen | Apache-2.0 |
+| Android SDK 명령줄 도구, platform-tools, `platforms;android-<API>`, `build-tools;<API>.0.0` | `sdkmanager`가 https://dl.google.com/android/repository/ 에서 설치 | Android Software Development Kit License Agreement, https://developer.android.com/studio/terms |
+
+Android SDK는 오픈소스가 아니며 Apache-2.0이 아닙니다. 약관은 Android 애플리케이션 개발 목적의 사용을 재실시권 없이 허락하고(3.1절), 제3자 라이선스가 요구하는 경우를 빼면 SDK나 그 일부의 복제와 재배포를 제한합니다(3.4절). 이 이미지를 받아 쓰시는 분은 Google 약관을 직접 적용받으며, 이미지를 쓰는 것이 약관 수락을 대신하지 않습니다.
+
+SDK 각 구성요소의 `NOTICE.txt`는 이미지 안 `/opt/android-sdk/` 아래에 그대로 들어 있고, SDK 내용물의 제3자 고지는 거기에 있습니다. `/opt/android-sdk/licenses/`의 파일들은 라이선스 전문이 아니라 `sdkmanager`가 남긴 수락 표시입니다.
+
 ---
 
 *이 문서는 일반적 컴플라이언스 정리이며 법률 자문이 아닙니다. 라이선스는 각 프로젝트의 최신 LICENSE 파일을 기준으로 합니다.*
