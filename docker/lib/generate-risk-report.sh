@@ -66,6 +66,17 @@ sev_count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"
 C=$(sev_count CRITICAL); H=$(sev_count HIGH); M=$(sev_count MEDIUM); L=$(sev_count LOW); U=$(sev_count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
 
+# Components proved present with no version recovered (bomlens:evidenceGrade).
+# They carry no version, purl or CPE, so no vulnerability database can be asked
+# about them. Printing the severity table without saying so lets "0 vulnerabilities"
+# read as covering the whole SBOM when part of it was never eligible to be checked.
+PRESENCE_ONLY=0
+if [ -f "${OUT_PREFIX}_bom.json" ] && jq empty "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
+    PRESENCE_ONLY=$(jq '[.components[]? | select(any(.properties[]?;
+        .name == "bomlens:evidenceGrade" and .value == "presence-only"))] | length' \
+        "${OUT_PREFIX}_bom.json" 2>/dev/null || echo 0)
+fi
+
 # --------------------------------------------------------
 # Report kind: with a conformance artifact this is a SUPPLIER SBOM review
 # (validate an externally-submitted SBOM format); without one it is a
@@ -231,6 +242,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_DL_POLICY=$(kstr risk.deadline_policy)
     P_TH_DEADLINE=$(kstr risk.th_deadline)
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
+    P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_H2_LIC=$(kstr risk.h2_lic)
     P_LIC_NO_NOTICE_MD=$(kstr risk.lic_no_notice_md); P_LIC_NO_NOTICE_HTML=$(kstr risk.lic_no_notice_html)
     P_MD_LIC_COUNT=$(tfmt risk.md_lic_count "$LIC_COUNT" "$OUT_PREFIX")
@@ -287,6 +300,8 @@ else
     P_TH_DEADLINE="Deadline"
     P_VULN_NONE_MD="_No known vulnerabilities, or no security artifact was produced._"
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
+    P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_H2_LIC="License summary"
     P_LIC_NO_NOTICE_MD="_Skipped: no NOTICE artifact was produced._"
     P_LIC_NO_NOTICE_HTML="Skipped: no NOTICE artifact was produced."
@@ -360,6 +375,10 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
     echo ""
+    if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
+        echo "${P_PRESENCE_MD}"
+        echo ""
+    fi
     if [ "$TOTAL" -gt 0 ]; then
         echo "| Severity | CVE | Package | Installed | Fixed | ${P_TH_DEADLINE} |"
         echo "|----------|-----|---------|-----------|-------|-----------|"
@@ -559,6 +578,10 @@ ${P_VULN_NOTE_HTML}
  <span class="pill pill-info">Unknown <span class="count">${U}</span></span>
 </div>
 HTMLSEC
+
+    if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
+        echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
+    fi
 
     if [ "$TOTAL" -gt 0 ]; then
         echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr>"

@@ -979,6 +979,15 @@ def sbom_summary(run_id):
             ),
             "",
         )
+        # Proved present by ELF structure with no version recovered. It carries no
+        # purl and no CPE, so no vulnerability database can be asked about it — a
+        # clean vulnerability result does not cover it, and the row has to say so
+        # rather than look like an ordinary component that happens to lack a
+        # version field.
+        presence_only = any(
+            p.get("name") == "bomlens:evidenceGrade" and p.get("value") == "presence-only"
+            for p in props
+        )
         row = {
             "name": c.get("name") or "",
             "version": c.get("version") or "",
@@ -987,6 +996,7 @@ def sbom_summary(run_id):
             "type": c.get("type") or "",
             "licenses": _component_licenses(c),
             "vendored": vendored,
+            "presenceOnly": presence_only,
             "matchConfidence": match,
             "source": source,
             "copyright": c.get("copyright") or "",
@@ -1275,6 +1285,19 @@ def sbom_summary(run_id):
         "eolCount": eol_count,
         "atRiskCount": at_risk_count,
         "outdatedCount": outdated_count,
+        # Counted over ALL components, not just the capped rows, so the figure is
+        # right on a large SBOM. These have no version and so no advisory can be
+        # looked up for them; the vulnerability panel says "0" about the rest of
+        # the SBOM, not about these.
+        "presenceOnlyCount": sum(
+            1
+            for c in comps
+            if isinstance(c, dict)
+            and any(
+                p.get("name") == "bomlens:evidenceGrade" and p.get("value") == "presence-only"
+                for p in _dicts(c.get("properties"))
+            )
+        ),
     }
     # Outbound license the project declares, and the conflict tally across ALL
     # components. Both omitted when nothing declared it — the UI then explains

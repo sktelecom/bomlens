@@ -138,6 +138,8 @@
     "scanossNoMatchBody": "SCANOSS 검색은 정상 완료됐지만, 소스에 직접 복사된 서드파티 오픈소스를 찾지 못했습니다. 실제로 없거나 OSSKB에 등록되지 않은 코드일 수 있습니다.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "소스에 복사된 오픈소스로 SCANOSS가 식별",
+    "presenceOnlyVersion": "버전 미확인",
+    "presenceOnlyHint": "ELF 구조(라이브러리 파일 또는 NEEDED 항목)로 존재가 확인됐으나 버전 문자열이 남아 있지 않습니다. 버전이 없으면 취약점 데이터베이스에서 조회할 것이 없으므로 취약점 결과가 이 컴포넌트를 다루지 않습니다. 라이선스 고지 의무는 그대로 발생합니다.",
     "vendoredMatch": "일치도 {{pct}}",
     "severityTitle": "심각도 분포",
     "severityFilterHint": "심각도를 클릭하면 필터됩니다",

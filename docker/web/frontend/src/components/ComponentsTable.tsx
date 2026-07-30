@@ -414,8 +414,19 @@ export function ComponentsTable({
                     )}
                   </div>
                 </td>
+                {/* A presence-only row has no version by construction, so an
+                    em dash here would read as a gap in the data rather than as
+                    the finding it is: the component is there, the version is
+                    not recoverable, and no advisory lookup applies to it. */}
                 <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
-                  {c.version || "—"}
+                  {c.version || (c.presenceOnly ? (
+                    <span
+                      className="font-sans text-xs"
+                      title={t("result.presenceOnlyHint")}
+                    >
+                      {t("result.presenceOnlyVersion")}
+                    </span>
+                  ) : "—")}
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{c.type || "—"}</td>
                 {anyScope && (

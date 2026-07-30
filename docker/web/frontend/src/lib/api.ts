@@ -62,6 +62,10 @@ export interface ComponentItem {
   licenses: string[];
   /** Identified by SCANOSS as open source copied (vendored) into the sources. */
   vendored?: boolean;
+  /** Proved present by ELF structure with no version recovered. No version means no
+   *  purl and no CPE, so no vulnerability database can be asked about it — a clean
+   *  vulnerability result does not cover this row. */
+  presenceOnly?: boolean;
   /** SCANOSS file-match confidence (e.g. "100%"), shown read-only on vendored rows. */
   matchConfidence?: string;
   /** Worst severity of the vulnerabilities affecting this component (Risk). */

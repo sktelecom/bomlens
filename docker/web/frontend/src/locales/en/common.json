@@ -138,6 +138,8 @@
     "scanossNoMatchBody": "SCANOSS searched successfully but found no third-party open source copied directly into the source — either there is none, or the code isn't in OSSKB.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
+    "presenceOnlyVersion": "no version",
+    "presenceOnlyHint": "Proved present by the ELF structure (library file or NEEDED entry), but no version string survived. With no version there is nothing to look up in a vulnerability database, so the vulnerability results do not cover this component. The licence obligations still apply.",
     "vendoredMatch": "match {{pct}}",
     "severityTitle": "Severity distribution",
     "severityFilterHint": "Click a severity to filter",

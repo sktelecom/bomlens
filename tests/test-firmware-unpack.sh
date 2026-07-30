@@ -275,17 +275,21 @@ echo "== the two passes' records of one component are merged, not both shipped =
 # duplicated on every image that yielded components.
 #
 # The filter is lifted out of the shipping script rather than re-implemented.
+# The invocation spans several lines (one --slurpfile each) before the quote that
+# opens the filter, so skip forward to that quote rather than assuming line one.
 merge_filter="$(awk '
     /^jq -n --slurpfile a "\$WORK\/pkg-comps.json"/ { inside = 1; next }
-    inside && /^'"'"' > "\$WORK\/merged.json"$/ { exit }
-    inside { print }
+    inside && !started { if ($0 ~ /'"'"'$/) started = 1; next }
+    started && /^'"'"' > "\$WORK\/merged.json"$/ { exit }
+    started { print }
 ' "$SCRIPT")"
 if [ -z "$merge_filter" ]; then
     echo "[ERROR] could not lift the merge filter out of scan-firmware.sh (was it renamed?)"; exit 1
 fi
 
 merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
-                --slurpfile b "$FIX/merge-bin-comps.json" "$merge_filter")"
+                --slurpfile b "$FIX/merge-bin-comps.json" \
+                --slurpfile c <(echo '[]') "$merge_filter")"
 
 n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
 if [ "$n" = "1" ]; then
@@ -352,6 +356,128 @@ if [ "$z" = "2" ]; then
     pass "two different purls under one name and version are not merged"
 else
     fail "entries with different purls were merged" "expected 2 zlib entries, got $z"
+fi
+
+echo "== a component with no version left is still reported, and marked as such =="
+
+# Signature identification only reports what it can read a version out of, so a
+# component whose version string did not survive is missing from the SBOM
+# entirely. On a Zyxel switch that is net-snmp, libradius and libtacplus — three
+# of the seventeen the vendor declares in its own notice.
+with_presence="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
+                       --slurpfile b "$FIX/merge-bin-comps.json" \
+                       --slurpfile c "$FIX/elf-presence-comps.json" "$merge_filter")"
+
+if printf '%s' "$with_presence" | jq -e 'any(.[]; .name == "net-snmp")' >/dev/null; then
+    pass "a component only the ELF structure proves is carried into the SBOM"
+else
+    fail "the presence-only component was dropped" "$with_presence"
+fi
+
+# It has to be marked. Without the grade it is an ordinary row with an empty
+# version field, and a reader takes "0 vulnerabilities" as covering it.
+if printf '%s' "$with_presence" | jq -e '
+      [.[] | select(.name == "net-snmp")][0]
+      | any(.properties[]?; .name == "bomlens:evidenceGrade" and .value == "presence-only")
+   ' >/dev/null; then
+    pass "the presence-only grade survives the merge"
+else
+    fail "the evidence grade was lost" "nothing downstream can then tell the two apart"
+fi
+
+# No version means no purl and no CPE. Attaching either would let a matcher pair
+# the component with some other release's advisories.
+if printf '%s' "$with_presence" | jq -e '
+      [.[] | select(.name == "net-snmp")][0]
+      | (has("version") | not) and (has("purl") | not) and (has("cpe") | not)
+   ' >/dev/null; then
+    pass "a presence-only component carries no version, purl or CPE"
+else
+    fail "a presence-only component carries an identifier" \
+         "a versionless component with an identifier can be matched to the wrong advisory"
+fi
+
+# The evidence is the point: a reader has to be able to check the claim.
+if printf '%s' "$with_presence" | jq -e '
+      [.[] | select(.name == "net-snmp")][0].evidence.occurrences | length > 0
+   ' >/dev/null; then
+    pass "the file that proves it is recorded"
+else
+    fail "no evidence recorded for a presence-only component"
+fi
+
+# openssl is in the ELF list too, but cve-bin-tool read 1.0.2h out of a binary.
+# Reporting both lists openssl twice, once without a version, which reads as two
+# findings when it is one component described twice.
+n=$(printf '%s' "$with_presence" | jq '[.[] | select(.name == "openssl")] | length')
+if [ "$n" = "2" ]; then
+    pass "a presence-only judgement yields to the versioned ones for the same component"
+else
+    fail "presence-only openssl was kept alongside the versioned findings" \
+         "expected the two versioned entries (1.0.2h, 1.0.2r), got $n"
+fi
+
+if printf '%s' "$with_presence" | jq -e '
+      any(.[]; .name == "openssl"
+          and any(.properties[]?; .name == "bomlens:evidenceGrade"))' >/dev/null; then
+    fail "the versioned openssl was marked presence-only"
+else
+    pass "the versioned entries keep their grade"
+fi
+
+echo "== the ELF reader is wired in and its dependency is declared =="
+
+# A NEEDED entry with no library file behind it is a link-time name a vendor is
+# free to reuse, and it leaves a reader nothing to check. MikroTik RouterOS lists
+# `libubox.so` beside its own libumsg, liburadius, libucrypto and libuc++ — its
+# own `libu*` family, not OpenWrt's libubox — and it was reported as ubox with an
+# empty evidence list until the file was made a requirement.
+if grep -q 'if not e\["files"\]' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "a NEEDED entry with no library file behind it is not reported"
+else
+    fail "a bare NEEDED entry can still produce a component" \
+         "the claim would carry no evidence a reader can check"
+fi
+
+
+if [ -x "$ROOT_DIR/docker/lib/identify-elf-presence.py" ] || \
+   [ -f "$ROOT_DIR/docker/lib/identify-elf-presence.py" ]; then
+    pass "the ELF presence reader ships in lib/"
+else
+    fail "identify-elf-presence.py is missing"
+fi
+
+# readelf had been arriving as another package's dependency. That is how a
+# runtime file goes missing from a release without any build step failing.
+if grep -qE '^\s+lzop zstd lz4 liblzo2-2 zlib1g binutils' "$ROOT_DIR/docker/Dockerfile"; then
+    pass "binutils is installed by name, not inherited"
+else
+    fail "binutils is not named in the firmware install list" \
+         "readelf would then be present only by luck"
+fi
+
+if grep -q 'readelf --version' "$ROOT_DIR/docker/Dockerfile"; then
+    pass "the build fails if readelf is not runnable"
+else
+    fail "no build gate on readelf"
+fi
+
+# A string search would report busybox's help text mentioning "readline" as
+# evidence that readline is linked in. The reader must work off the dynamic
+# section instead.
+if grep -q '"readelf", "-d"' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "evidence comes from the ELF dynamic section, not from strings"
+else
+    fail "the reader does not read the dynamic section"
+fi
+
+# The digits in a SONAME are an ABI number. libcrypto.so.1.0.0 is not OpenSSL
+# 1.0.0, and a wrong version draws another component's CVEs.
+if grep -qE '"[^"]*":\s*"[^"]*[0-9]+\.[0-9]+' "$ROOT_DIR/docker/lib/elf-soname-map.json" \
+   | grep -v '_comment'; then
+    fail "the SONAME map carries a version" "filename digits are ABI numbers, not versions"
+else
+    pass "the SONAME map maps names only, never versions"
 fi
 
 echo "== the vendor squashfs variant has an extractor =="

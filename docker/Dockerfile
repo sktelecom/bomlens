@@ -222,10 +222,14 @@ RUN if [ "$SBOM_SCANOSS" = "true" ]; then \
 #   scan reads the boot initramfs and reports one component instead of the system.
 #   Prebuilt .deb (187 KB), so no compiler is pulled in. The build FAILS if the
 #   binary is not runnable afterwards, rather than shipping a silent gap.
+#
+#   binutils is named for readelf, which identify-elf-presence.py reads SONAME and
+#   NEEDED with. It was already arriving as somebody else's dependency, which is
+#   how a runtime file goes missing from a release without any build failing.
 RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       apt-get update && apt-get install -y --no-install-recommends \
         squashfs-tools e2fsprogs p7zip-full unar cpio cabextract \
-        lzop zstd lz4 liblzo2-2 zlib1g \
+        lzop zstd lz4 liblzo2-2 zlib1g binutils \
       && pip3 install --no-cache-dir \
         "unblob==${UNBLOB_VERSION}" \
         "cve-bin-tool==${CVE_BIN_TOOL_VERSION}" \
@@ -237,7 +241,8 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       && rm -rf /var/lib/apt/lists/* \
       && unblob --version && cve-bin-tool --version \
       && command -v sasquatch \
-      && (sasquatch -version 2>&1 | head -1 || true); \
+      && (sasquatch -version 2>&1 | head -1 || true) \
+      && readelf --version | head -1; \
     else \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi

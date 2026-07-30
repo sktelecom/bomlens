@@ -160,8 +160,9 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 2. rootfs 후보 디렉터리 탐색(없으면 추출 루트 전체).
 3. `syft dir:$ROOTFS -o cyclonedx-json`로 패키지 SBOM을 만듭니다.
 4. (Phase 2) `cve-bin-tool ... --sbom-output ... cyclonedx`로 바이너리 SBOM을 만들고, 같은 패스에서 CVE 보고서(`--format json -o`)도 받습니다. CVE 매칭 경로는 아래 5.6에서 다룹니다.
-5. 병합(cyclonedx-cli 또는 jq, purl 기준 dedupe) 결과를 `$OUTPUT_FILE`에 씁니다.
-6. `metadata.component`를 펌웨어 파일명/버전/`file` 출력으로 채움.
+5. `identify-elf-presence.py`로 ELF 구조가 증명하는 컴포넌트를 더합니다(아래 5.7).
+6. 병합(jq, 이름@버전 기준 dedupe) 결과를 `$OUTPUT_FILE`에 씁니다.
+7. `metadata.component`를 펌웨어 파일명/버전/`file` 출력으로 채움.
 
 기존 `docker/lib/*.sh` 스타일(인자 위치, `[prefix]` 로깅, jq, best-effort)을 따릅니다.
 
@@ -201,6 +202,25 @@ docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=t
 
 ---
 
+### 5.7 버전 없는 존재 판정 (`identify-elf-presence.py`)
+
+시그니처 식별은 버전을 읽어낼 수 있는 것만 보고합니다. 그래서 빌드 과정에서 버전 문자열이 남지 않은 컴포넌트는 SBOM에서 통째로 빠집니다. 라이선스 고지 의무는 버전을 묻지 않으므로, 이 구간을 비워 두면 고지문이 실제보다 짧아집니다.
+
+`identify-elf-presence.py`는 ELF 동적 섹션의 SONAME과 NEEDED를 읽어 존재를 판정합니다. 문자열 검색이 아니라 구조를 봅니다. busybox 도움말에 "readline"이 나오는 것은 readline이 링크됐다는 근거가 아니기 때문입니다.
+
+- 근거는 라이브러리 파일이어야 합니다. NEEDED 이름만 있고 파일이 없으면 보고하지 않습니다. 벤더가 같은 이름을 재사용하는 일이 흔하고(MikroTik RouterOS는 자체 `libu*` 계열에 `libubox.so`가 있습니다), 읽는 사람이 확인할 대상도 남지 않습니다.
+- 파일명에서 버전을 만들지 않습니다. SONAME의 숫자는 ABI 번호입니다. `libcrypto.so.1.0.0`은 OpenSSL 1.0.0이 아닙니다.
+- 이름은 `elf-soname-map.json`에서 찾습니다. 매핑이 없는 라이브러리는 로그에 개수와 이름을 남기고 보고하지 않습니다. 기계적으로 `lib` 접두어를 떼면 `libnetsnmp.so.30`이 `netsnmp`가 되지 `net-snmp`가 되지 않습니다.
+- 산출 컴포넌트에는 버전도 PURL도 CPE도 붙이지 않고 `bomlens:evidenceGrade = presence-only` 속성을 답니다. 근거 파일은 `evidence.occurrences`에 남습니다.
+
+이 속성은 아래로 전파됩니다. `scan-firmware.sh`는 같은 이름에 버전 있는 판정이 있으면 존재 판정을 버리고, 남은 개수를 로그에 따로 적습니다. risk 리포트는 취약점 집계표 아래에 몇 개가 조회 대상이 아니었는지 적습니다. 웹 서버는 행마다 `presenceOnly`와 요약의 `presenceOnlyCount`를 내보내고, 웹 UI는 버전 칸에 "버전 미확인"으로 표시합니다. 버전이 없으면 취약점 데이터베이스에 물어볼 것이 없으므로, 이 구분이 없으면 "취약점 0건"이 실제보다 넓은 범위를 덮는 것처럼 읽힙니다.
+
+환경변수로 끄거나 한도를 조절합니다. `FW_ELF_PRESENCE=false`면 단계를 건너뜁니다. `FW_ELF_MAX_FILES`(기본 20000)는 훑을 ELF 파일 수 상한이고, 걸리면 경고를 남깁니다.
+
+`readelf`가 필요합니다. Dockerfile의 펌웨어 opt-in 블록에서 `binutils`를 이름으로 설치하고 `readelf --version`으로 빌드 게이트를 겁니다. 예전에는 다른 패키지에 딸려 들어오고 있었습니다.
+
+---
+
 ## 6. 단계별 로드맵 (Phase)
 
 | Phase | 범위 | 검출 | 미검출 |
@@ -222,7 +242,7 @@ docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=t
 ## 7. 정직한 한계
 
 - 오픈소스 스택 검출률은 약 60~85%이며, 펌웨어 종류와 strip 정도, 언팩 성공 여부에 크게 좌우됩니다.
-- 함수 수준 바이너리 핑거프린팅이 없어서, 상용(Insignary Clarity/Cybellum/Finite State)과 달리 strip·인라인·버전 제거된 컴포넌트는 놓칩니다.
+- 함수 수준 바이너리 핑거프린팅이 없어서, 상용(Insignary Clarity/Cybellum/Finite State)과 달리 strip·인라인·버전 제거된 컴포넌트는 놓칩니다. 동적 링크된 것은 5.7의 존재 판정이 일부 건지지만 버전은 알 수 없고, 정적 링크된 것은 이 방법으로도 닿지 않습니다.
 - 암호화·서명된 펌웨어, 벤더 커스텀·사명 변경 라이브러리는 검출하지 못하거나 부정확합니다.
 - 결과 SBOM은 best-effort 추정이므로, 법적 라이선스 컴플라이언스의 단일 근거로 사용하지 마십시오.
 

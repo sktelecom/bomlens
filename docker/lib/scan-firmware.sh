@@ -337,6 +337,31 @@ else
 fi
 
 # --------------------------------------------------------
+# ③.6 Components the ELF structure proves are present, with no version.
+# --------------------------------------------------------
+# Signature identification only reports what it can read a version out of, so a
+# component whose version string did not survive the build is missing from the
+# SBOM entirely. For a licence obligation the version is not the question: a
+# Zyxel switch ships libnetsnmp.so.30.0.1 and ten binaries that list it as
+# NEEDED, and net-snmp is in there whether or not anything says which release.
+#
+# identify-elf-presence.py reads SONAME and NEEDED out of the dynamic section —
+# structure, not strings, because "readline" in busybox's help text is not
+# evidence that readline is linked in. Everything it emits is versionless and
+# marked `bomlens:evidenceGrade = presence-only`.
+ELF_COMPS="$WORK/elf-comps.json"
+echo '[]' > "$ELF_COMPS"
+if [ "${FW_ELF_PRESENCE:-true}" != "false" ] && command -v readelf >/dev/null 2>&1 \
+   && command -v python3 >/dev/null 2>&1; then
+    echo "[firmware] reading ELF structure for components with no version string..."
+    python3 "$(dirname "$0")/identify-elf-presence.py" "$ROOTFS" > "$WORK/elf-out.json" \
+        || echo '[]' > "$WORK/elf-out.json"
+    if [ -s "$WORK/elf-out.json" ] && jq -e 'type == "array"' "$WORK/elf-out.json" >/dev/null 2>&1; then
+        cp "$WORK/elf-out.json" "$ELF_COMPS"
+    fi
+fi
+
+# --------------------------------------------------------
 # ④ Merge package + binary components, dedupe by name@version.
 # --------------------------------------------------------
 # Keep only components with a real name (drops syft's empty "os:unknown" noise).
@@ -404,7 +429,8 @@ comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
 #
 # The record carrying a purl is the base, because the purl is what the CVE step
 # matches on; the other record only fills in what the base lacks.
-jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" '
+jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
+      --slurpfile c "$ELF_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
@@ -424,7 +450,18 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
 
     def mergeable: (.type // "library") as $t | $t == "library" or $t == "application";
 
-    ($a[0] + $b[0]) as $all
+    def presence_only:
+      any(.properties[]?; .name == "bomlens:evidenceGrade" and .value == "presence-only");
+
+    ($a[0] + $b[0] + $c[0]) as $with_presence
+    # A presence-only judgement next to a versioned one for the same component
+    # says nothing the versioned one does not. Reporting both lists the component
+    # twice, once without a version, which reads as two findings.
+    | ([$with_presence[] | select(presence_only | not) | (.name // "") | ascii_downcase]
+       | unique) as $versioned
+    | [$with_presence[]
+       | select((presence_only and (((.name // "") | ascii_downcase) | IN($versioned[]))) | not)]
+      as $all
     | ([$all[] | select(mergeable | not)]
        | group_by([((.name // "") | ascii_downcase), (.version // ""),
                    (.type // ""), (.purl // "")])
@@ -441,6 +478,11 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
 NPKG=$(jq 'length' "$WORK/pkg-comps.json")
 NBIN=$(jq 'length' "$WORK/bin-comps.json")
 NTOTAL=$(jq 'length' "$WORK/merged.json")
+# Counted separately in the summary line. These carry no version, so they cannot
+# be matched against an advisory; a reader who takes them for ordinary findings
+# would read "no vulnerabilities" as covering them.
+NPRESENCE=$(jq '[.[] | select(any(.properties[]?;
+    .name == "bomlens:evidenceGrade" and .value == "presence-only"))] | length' "$WORK/merged.json")
 
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
@@ -465,6 +507,11 @@ jq -n \
 }' > "$OUTPUT"
 
 echo "[firmware] SBOM written: $OUTPUT (components=${NTOTAL}: packages=${NPKG}, binaries=${NBIN})"
+if [ "${NPRESENCE:-0}" -gt 0 ]; then
+    echo "[firmware] ${NPRESENCE} of those are present with no version recovered." \
+         "They cannot be matched against a vulnerability database — a clean" \
+         "vulnerability result does not cover them."
+fi
 
 # --------------------------------------------------------
 # ④.5 Say why an empty result is empty.
