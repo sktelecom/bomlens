@@ -101,11 +101,21 @@ if jq --argjson cmap "$CMAP" '
     then [ { expression: $s } ]
     else [ { license: { id: $s } } ] end;
 
+  # A producer that identified the component can also have decided that no
+  # identifier is safe for it, and says so with bomlens:cpeUnmapped. Matching on
+  # the name here would overrule that from further away with less information.
+  # Measured: a firmware carries uClibc 1.0.22, which is uClibc-ng, and the name
+  # map turns any component called uclibc into uclibc:uclibc, which would hand it
+  # the advisories of a different project.
+  # (No apostrophes in this block: the whole jq program is single-quoted here.)
+  def cpe_withheld: any((.properties // [])[];
+                        .name == "bomlens:cpeUnmapped" and .value == "true");
+
   (.components) |= (if type=="array" then map(
     (((.name // "") | ascii_downcase)) as $n
     | ($cmap[$n]) as $m
     # (a)+(b) CPE enrichment for whitelisted names with a CPE-safe version.
-    | (if ($m != null) and (safe_ver(.version))
+    | (if ($m != null) and (safe_ver(.version)) and (cpe_withheld | not)
       then
         (upstream_ver(.version)) as $uv
         | ("cpe:2.3:a:" + $m.cpe_vendor + ":" + $m.cpe_product + ":" + $uv + ":*:*:*:*:*:*:*") as $cpe

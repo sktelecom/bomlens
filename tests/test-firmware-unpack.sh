@@ -289,7 +289,7 @@ fi
 
 merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                 --slurpfile b "$FIX/merge-bin-comps.json" \
-                --slurpfile c <(echo '[]') "$merge_filter")"
+                --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') "$merge_filter")"
 
 n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
 if [ "$n" = "1" ]; then
@@ -366,7 +366,8 @@ echo "== a component with no version left is still reported, and marked as such 
 # of the seventeen the vendor declares in its own notice.
 with_presence="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                        --slurpfile b "$FIX/merge-bin-comps.json" \
-                       --slurpfile c "$FIX/elf-presence-comps.json" "$merge_filter")"
+                       --slurpfile c "$FIX/elf-presence-comps.json" \
+                       --slurpfile d <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_presence" | jq -e 'any(.[]; .name == "net-snmp")' >/dev/null; then
     pass "a component only the ELF structure proves is carried into the SBOM"
@@ -478,6 +479,105 @@ if grep -qE '"[^"]*":\s*"[^"]*[0-9]+\.[0-9]+' "$ROOT_DIR/docker/lib/elf-soname-m
     fail "the SONAME map carries a version" "filename digits are ABI numbers, not versions"
 else
     pass "the SONAME map maps names only, never versions"
+fi
+
+echo "== a version cve-bin-tool's checkers do not match is still read =="
+
+# Its checkers want a fixed string and regex per component: a three-digit
+# requirement drops `FFmpeg version 4.1`, a CLI-only marker drops a library build.
+with_verstr="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
+                     --slurpfile b "$FIX/merge-bin-comps.json" \
+                     --slurpfile c "$FIX/elf-presence-comps.json" \
+                     --slurpfile d "$FIX/version-string-comps.json" "$merge_filter")"
+
+if printf '%s' "$with_verstr" | jq -e '
+      any(.[]; .name == "net-tools" and .version == "1.60")' >/dev/null; then
+    pass "a version string form the checkers miss reaches the SBOM"
+else
+    fail "the version-string judgement was dropped" "$with_verstr"
+fi
+
+# The string it was read from, or the claim cannot be checked.
+if printf '%s' "$with_verstr" | jq -e '
+      [.[] | select(.name == "net-tools")][0]
+      | any(.properties[]?; .name == "bomlens:versionEvidence" and (.value | length) > 0)
+   ' >/dev/null; then
+    pass "the matched string is recorded as evidence"
+else
+    fail "no evidence string recorded for a version-string judgement"
+fi
+
+# net-tools has no product anywhere in the NVD CPE index, and five unrelated
+# products are called hydra. Attaching a CPE would hand the component another
+# project's advisories, so the table leaves it off and the SBOM says so.
+if printf '%s' "$with_verstr" | jq -e '
+      [.[] | select(.name == "net-tools")][0]
+      | (has("cpe") | not)
+        and any(.properties[]?; .name == "bomlens:cpeUnmapped" and .value == "true")
+   ' >/dev/null; then
+    pass "a component with no safe identifier carries none, and is marked"
+else
+    fail "an unmapped component was given an identifier or left unmarked"
+fi
+
+# The presence-only uclibc from the ELF pass and the versioned one from here are
+# one component. The versioned judgement wins.
+n=$(printf '%s' "$with_verstr" | jq '[.[] | select(.name == "uclibc")] | length')
+if [ "$n" = "1" ]; then
+    pass "a version found here supersedes the presence-only judgement"
+else
+    fail "uclibc is reported $n time(s)" "the presence-only entry should have yielded"
+fi
+
+if printf '%s' "$with_verstr" | jq -e '
+      [.[] | select(.name == "uclibc")][0] | .version == "0.9.28"' >/dev/null; then
+    pass "the surviving uclibc is the versioned one"
+else
+    fail "the versionless uclibc won over the versioned one"
+fi
+
+echo "== the version-string table is closed, and its CPEs are checked =="
+
+TBL="$ROOT_DIR/docker/lib/version-string-map.json"
+if [ -f "$TBL" ] && jq -e '(.entries | length) > 0' "$TBL" >/dev/null 2>&1; then
+    pass "the version-string table ships and has entries"
+else
+    fail "version-string-map.json is missing or empty"
+fi
+
+# Every entry needs its own anchored pattern. An open `<name> <version>` sweep of
+# a rootfs returns XMP namespaces, HTTP/1.1, netmasks and IP addresses by the
+# hundred — measured on the corpus before the table was written.
+if jq -e 'all(.entries[]; (.pattern | length) > 0 and (.pattern | test("\\(")))' \
+     "$TBL" >/dev/null 2>&1; then
+    pass "every entry carries its own capturing pattern"
+else
+    fail "an entry has no pattern, or no capture group for the version"
+fi
+
+# The reason a CPE is or is not attached has to be written down, or the next
+# person adding an entry guesses.
+if jq -e 'all(.entries[]; (.why | length) > 0 and (.where | length) > 0)' \
+     "$TBL" >/dev/null 2>&1; then
+    pass "every entry records why its CPE decision was made and where it was seen"
+else
+    fail "an entry is missing its why/where note"
+fi
+
+if [ -f "$ROOT_DIR/docker/check-version-string-map.py" ] \
+   && grep -q 'check-version-string-map.py' "$ROOT_DIR/docker/Dockerfile"; then
+    pass "the build checks every CPE in the table against the bundled index"
+else
+    fail "no build gate ties the table's CPEs to the index they are matched against"
+fi
+
+# A version-shaped token inside a cross-toolchain path describes how the firmware
+# was built, not what it ships. A D-Link image records
+# `crosstools-arm-gcc-5.5-linux-4.1-glibc-2.26` in binaries that run against uClibc.
+if grep -q 'TOOLCHAIN = re.compile' "$ROOT_DIR/docker/lib/identify-version-strings.py"; then
+    pass "matches inside cross-toolchain paths are ignored"
+else
+    fail "a build-toolchain path can still be read as a shipped component"
 fi
 
 echo "== the vendor squashfs variant has an extractor =="

@@ -1,0 +1,56 @@
+{
+  "_comment": [
+    "Version strings that cve-bin-tool's signature checkers do not pick up.",
+    "Read by identify-version-strings.py.",
+    "",
+    "cve-bin-tool requires a fixed string and regex per component, and misses a",
+    "component whose binary spells its version some other way — a three-digit",
+    "requirement drops `FFmpeg version 4.1`, a CLI-only marker drops a library",
+    "build. This table adds those forms. It does not replace cve-bin-tool; the",
+    "merge keeps whichever judgement already exists.",
+    "",
+    "The name set is deliberately closed. An open `<name> <version>` pattern over a",
+    "firmware rootfs returns IP addresses, netmasks, XMP namespaces, PDF versions,",
+    "HTTP/1.1 and cross-toolchain paths by the hundred — measured on the corpus",
+    "before this table was written. Every entry below was verified against a real",
+    "extracted tree, and `where` records that.",
+    "",
+    "About `cpe`: null means no CPE is attached, and the component is then worth",
+    "the same as a presence-only judgement for vulnerability purposes. That is the",
+    "honest outcome when the identity is not settled — a wrong CPE hands the",
+    "component another project's advisories. Every non-null vendor:product here",
+    "exists in the bundled NVD CPE index; the Dockerfile fails the build if one",
+    "does not, so the table cannot drift away from the index it is matched against."
+  ],
+
+  "entries": [
+    {
+      "name": "net-tools",
+      "pattern": "\\bnet-tools (\\d+\\.\\d+(?:\\.\\d+)?)\\b",
+      "cpe": null,
+      "why": "No net-tools product exists anywhere in the NVD CPE index, so there is nothing to attach. Reported for the licence obligation only.",
+      "where": "Zyxel GS1900-8, bin/arp: `net-tools 1.60`"
+    },
+    {
+      "name": "hydra",
+      "pattern": "\\bHydra/(\\d+\\.\\d+(?:\\.\\d+)?)\\b",
+      "cpe": null,
+      "why": "Five unrelated products are called hydra in the NVD index (hydrairc, ory, nixos, iohk, hydra_project), and this string is an HTTP `Server:` banner emitted by a web server binary, not the THC-Hydra tool. Any CPE here would hand it another project's advisories. The vendor's own notice declares `hydra`, so the name is reported and the identifier is not.",
+      "where": "Zyxel GS1900-8, bin/boa: `Server: Hydra/0.1.8`"
+    },
+    {
+      "name": "uclibc",
+      "pattern": "\\b(?:lib|ld-)uClibc-(\\d+\\.\\d+(?:\\.\\d+)?)\\.so\\b",
+      "cpe": null,
+      "why": "uClibc names its shared object after the upstream version, which is the one place a filename may be read as one. The CPE is left off because two projects claim the name — uclibc:uclibc ended at 0.9.33 and uclibc-ng_project:uclibc-ng picks up at 1.0 — and deciding between them from a filename alone is a guess.",
+      "where": "Zyxel GS1900-8, lib/libuClibc-0.9.28.so"
+    },
+    {
+      "name": "ffmpeg",
+      "pattern": "\\bFFmpeg version (\\d+\\.\\d+(?:\\.\\d+)?)",
+      "cpe": "cpe:2.3:a:ffmpeg:ffmpeg:{version}:*:*:*:*:*:*:*",
+      "why": "cve-bin-tool's checker wants three digits and so drops the two-digit form this string uses. ffmpeg:ffmpeg is the only sensible product in the index and carries the overwhelming majority of ffmpeg advisories.",
+      "where": "an iOS app bundle, `FFmpeg version 4.1-QtAV`; the file is no longer in the corpus, so this entry is covered by a fixture rather than by a live scan"
+    }
+  ]
+}

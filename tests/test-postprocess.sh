@@ -801,6 +801,29 @@ cp "$WORK/fw.json" "$WORK/fw2.json"
 bash "$LIB/enrich-cpe.sh" "$WORK/fw2.json" >/dev/null 2>&1
 if diff -q "$WORK/fw.json" "$WORK/fw2.json" >/dev/null 2>&1; then pass "enrich-cpe.sh is idempotent"; else fail "second enrich-cpe run changed the SBOM"; fi
 
+# A producer that identified the component can also decide no identifier is safe
+# for it, and marks that with bomlens:cpeUnmapped. Matching on the name here would
+# overrule that from further away with less information. Measured: a firmware
+# carries uClibc 1.0.22, which is uClibc-ng, while the name map turns anything
+# called uclibc into uclibc:uclibc — a different project's advisories.
+cat > "$WORK/withheld.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"library","name":"uclibc","version":"1.0.22",
+   "properties":[{"name":"bomlens:cpeUnmapped","value":"true"}]},
+  {"type":"library","name":"uclibc","version":"0.9.28"}
+]}
+JSON
+bash "$LIB/enrich-cpe.sh" "$WORK/withheld.json" >/dev/null 2>&1
+held=$(jq -r '[.components[]|select(.version=="1.0.22")][0] | has("cpe")' "$WORK/withheld.json")
+[ "$held" = "false" ] && pass "a withheld CPE is not filled in from the name map" \
+  || fail "the name map overrode an explicit no-identifier decision"
+# The marker must not disable enrichment for everything else.
+other=$(jq -r '[.components[]|select(.version=="0.9.28")][0].cpe // "NONE"' "$WORK/withheld.json")
+case "$other" in
+  cpe:2.3:a:uclibc:uclibc:0.9.28:*) pass "an unmarked component is still enriched" ;;
+  *) fail "the withheld marker suppressed enrichment on another component" "got $other" ;;
+esac
+
 echo "== F-1b: OS-context enrichment — synthesize/normalize operating-system for distro matching =="
 OSCTX="$LIB/enrich-os-context.py"
 # (a) rpm/centos SBOM with NO operating-system component: one is synthesized from

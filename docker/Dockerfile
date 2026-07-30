@@ -297,6 +297,8 @@ COPY CVE-DATA-NOTICE.txt /opt/cve-bin-tool-home/CVE-DATA-NOTICE.txt
 ARG NVD_FEED_REPO="https://github.com/fkie-cad/nvd-json-data-feeds"
 COPY build-cpe-index.py /tmp/build-cpe-index.py
 COPY lib/firmware-cpe-match.py /tmp/firmware-cpe-match.py
+COPY lib/version-string-map.json /tmp/version-string-map.json
+COPY check-version-string-map.py /tmp/check-version-string-map.py
 RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       set -e; \
       echo "[build] seeding stub cve.db (cve-bin-tool EmptyCache guard) ..."; \
@@ -316,7 +318,10 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
         echo "[build] ERROR: CPE index looks broken (rows=${rows:-0}, busybox smoke=${nsmoke:-0}). Build aborted."; \
         exit 1; \
       fi; \
-      rm -f /tmp/build-cpe-index.py /tmp/firmware-cpe-match.py /tmp/smoke.json; \
+      echo "[build] checking version-string-map CPEs against the index ..."; \
+      python3 /tmp/check-version-string-map.py /tmp/version-string-map.json "$idx"; \
+      rm -f /tmp/build-cpe-index.py /tmp/firmware-cpe-match.py /tmp/smoke.json \
+            /tmp/version-string-map.json /tmp/check-version-string-map.py; \
     fi
 
 # OWASP AIBOM Generator (opt-in: --build-arg SBOM_AIBOM=true). Generates an AI

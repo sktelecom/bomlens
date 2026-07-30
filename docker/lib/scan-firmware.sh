@@ -362,6 +362,27 @@ if [ "${FW_ELF_PRESENCE:-true}" != "false" ] && command -v readelf >/dev/null 2>
 fi
 
 # --------------------------------------------------------
+# ③.7 Versions spelled in a way cve-bin-tool's checkers do not match.
+# --------------------------------------------------------
+# Its checkers want a fixed string and regex per component: a three-digit
+# requirement drops `FFmpeg version 4.1`, a CLI-only marker drops a library build.
+# identify-version-strings.py adds those forms from a closed table and nothing
+# else — an open `<name> <version>` pattern over a rootfs returns XMP namespaces,
+# `HTTP/1.1`, netmasks and cross-toolchain paths, measured before the table was
+# written. The merge keeps whichever judgement already exists, so this only fills
+# gaps.
+VERSTR_COMPS="$WORK/verstr-comps.json"
+echo '[]' > "$VERSTR_COMPS"
+if [ "${FW_VERSION_STRINGS:-true}" != "false" ] && command -v python3 >/dev/null 2>&1; then
+    echo "[firmware] reading version strings cve-bin-tool's checkers do not match..."
+    python3 "$(dirname "$0")/identify-version-strings.py" "$ROOTFS" > "$WORK/verstr-out.json" \
+        || echo '[]' > "$WORK/verstr-out.json"
+    if [ -s "$WORK/verstr-out.json" ] && jq -e 'type == "array"' "$WORK/verstr-out.json" >/dev/null 2>&1; then
+        cp "$WORK/verstr-out.json" "$VERSTR_COMPS"
+    fi
+fi
+
+# --------------------------------------------------------
 # ④ Merge package + binary components, dedupe by name@version.
 # --------------------------------------------------------
 # Keep only components with a real name (drops syft's empty "os:unknown" noise).
@@ -430,7 +451,7 @@ comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
 # The record carrying a purl is the base, because the purl is what the CVE step
 # matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
-      --slurpfile c "$ELF_COMPS" '
+      --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
@@ -453,7 +474,7 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     def presence_only:
       any(.properties[]?; .name == "bomlens:evidenceGrade" and .value == "presence-only");
 
-    ($a[0] + $b[0] + $c[0]) as $with_presence
+    ($a[0] + $b[0] + $c[0] + $d[0]) as $with_presence
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.

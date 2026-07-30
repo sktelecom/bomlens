@@ -161,8 +161,9 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 3. `syft dir:$ROOTFS -o cyclonedx-json`로 패키지 SBOM을 만듭니다.
 4. (Phase 2) `cve-bin-tool ... --sbom-output ... cyclonedx`로 바이너리 SBOM을 만들고, 같은 패스에서 CVE 보고서(`--format json -o`)도 받습니다. CVE 매칭 경로는 아래 5.6에서 다룹니다.
 5. `identify-elf-presence.py`로 ELF 구조가 증명하는 컴포넌트를 더합니다(아래 5.7).
-6. 병합(jq, 이름@버전 기준 dedupe) 결과를 `$OUTPUT_FILE`에 씁니다.
-7. `metadata.component`를 펌웨어 파일명/버전/`file` 출력으로 채움.
+6. `identify-version-strings.py`로 cve-bin-tool 검사기가 못 맞추는 표기의 버전을 더합니다(아래 5.8).
+7. 병합(jq, 이름@버전 기준 dedupe) 결과를 `$OUTPUT_FILE`에 씁니다.
+8. `metadata.component`를 펌웨어 파일명/버전/`file` 출력으로 채움.
 
 기존 `docker/lib/*.sh` 스타일(인자 위치, `[prefix]` 로깅, jq, best-effort)을 따릅니다.
 
@@ -218,6 +219,23 @@ docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=t
 환경변수로 끄거나 한도를 조절합니다. `FW_ELF_PRESENCE=false`면 단계를 건너뜁니다. `FW_ELF_MAX_FILES`(기본 20000)는 훑을 ELF 파일 수 상한이고, 걸리면 경고를 남깁니다.
 
 `readelf`가 필요합니다. Dockerfile의 펌웨어 opt-in 블록에서 `binutils`를 이름으로 설치하고 `readelf --version`으로 빌드 게이트를 겁니다. 예전에는 다른 패키지에 딸려 들어오고 있었습니다.
+
+### 5.8 표기가 달라 놓친 버전 (`identify-version-strings.py`)
+
+cve-bin-tool의 검사기는 컴포넌트마다 고정된 문자열과 정규식을 요구합니다. 세 자리 버전을 요구해 `FFmpeg version 4.1`을 놓치고, CLI 전용 문자열을 함께 요구해 라이브러리 빌드를 놓칩니다. 이 단계는 그런 표기를 더합니다. cve-bin-tool을 대체하지 않고, 병합이 이미 있는 판정을 그대로 두므로 공백만 메웁니다.
+
+이름 집합은 닫혀 있습니다. 표를 만들기 전에 `<이름> <버전>` 형태를 열어 두고 코퍼스를 훑어 봤더니 빈도순으로 XMP 네임스페이스 URL, `HTTP/1.1`, PDF 버전, 넷마스크, IP 주소, 크로스 툴체인 경로가 나왔습니다. 버전처럼 생긴 문자열이라고 해서 컴포넌트를 가리키지 않습니다. 그래서 `version-string-map.json`의 항목마다 자기 정규식을 들고 있고, 표에 없는 이름은 찾지 않습니다.
+
+같은 측정에서 규칙 두 개가 더 나왔습니다.
+
+- 크로스 툴체인 경로 안의 일치는 무시합니다. D-Link 이미지는 uClibc로 도는 바이너리에 `crosstools-arm-gcc-5.5-linux-4.1-glibc-2.26`을 기록하고, NETGEAR는 `hndtools-arm-linux-2.6.36-uclibc-4.5.3`을 기록합니다. 이것을 컴포넌트로 읽으면 컴파일러를 출하 소프트웨어로 보고하는 잘못을 되풀이합니다.
+- CPE는 표가 주는 경우에만 붙입니다. `net-tools`는 NVD CPE 색인에 제품 자체가 없고, `hydra`라는 이름은 서로 관계없는 제품 다섯 개가 씁니다. 표는 항목마다 CPE를 붙인 이유 또는 붙이지 않은 이유(`why`)와 실제로 본 위치(`where`)를 함께 적습니다.
+
+CPE가 없는 항목은 취약점 용도로는 5.7의 존재 판정과 값이 같습니다. 식별자가 안전하지 않을 때의 정직한 결과이며, 산출물에 `bomlens:cpeUnmapped` 속성으로 밝힙니다.
+
+표의 CPE가 색인과 어긋나지 않게 빌드 게이트를 겁니다. CPE 색인을 만든 직후 `check-version-string-map.py`가 표의 모든 vendor:product를 색인에서 조회하고, 하나라도 0건이면 빌드를 실패시킵니다. 오탈자나 업스트림 제품명 변경으로 표가 조용히 무력해지는 것을 막습니다.
+
+판정마다 일치한 문자열(`bomlens:versionEvidence`)과 파일 경로가 남습니다. 환경변수 `FW_VERSION_STRINGS=false`로 끄고, `FW_VERSTR_MAX_FILES`(기본 20000)와 `FW_VERSTR_MAX_BYTES`(기본 64 MiB)로 한도를 조절합니다.
 
 ---
 

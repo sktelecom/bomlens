@@ -1,0 +1,38 @@
+[
+  {
+    "bom-ref": "version-string:net-tools@1.60",
+    "type": "library",
+    "name": "net-tools",
+    "version": "1.60",
+    "properties": [
+      { "name": "bomlens:identifiedBy", "value": "version-string" },
+      { "name": "bomlens:versionEvidence", "value": "net-tools 1.60" },
+      { "name": "bomlens:cpeUnmapped", "value": "true" }
+    ],
+    "evidence": { "occurrences": [{ "location": "bin/arp" }] }
+  },
+  {
+    "bom-ref": "version-string:uclibc@0.9.28",
+    "type": "library",
+    "name": "uclibc",
+    "version": "0.9.28",
+    "properties": [
+      { "name": "bomlens:identifiedBy", "value": "version-string" },
+      { "name": "bomlens:versionEvidence", "value": "ld-uClibc-0.9.28.so" },
+      { "name": "bomlens:cpeUnmapped", "value": "true" }
+    ],
+    "evidence": { "occurrences": [{ "location": "lib/ld-uClibc-0.9.28.so" }] }
+  },
+  {
+    "bom-ref": "version-string:ffmpeg@4.1",
+    "type": "library",
+    "name": "ffmpeg",
+    "version": "4.1",
+    "cpe": "cpe:2.3:a:ffmpeg:ffmpeg:4.1:*:*:*:*:*:*:*",
+    "properties": [
+      { "name": "bomlens:identifiedBy", "value": "version-string" },
+      { "name": "bomlens:versionEvidence", "value": "FFmpeg version 4.1" }
+    ],
+    "evidence": { "occurrences": [{ "location": "Payload/app/Frameworks/QtAV.framework/QtAV" }] }
+  }
+]
