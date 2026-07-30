@@ -1,0 +1,32 @@
+[
+  {
+    "bom-ref": "elf-presence:net-snmp",
+    "type": "library",
+    "name": "net-snmp",
+    "properties": [
+      { "name": "bomlens:evidenceGrade", "value": "presence-only" },
+      { "name": "bomlens:identifiedBy", "value": "elf-presence" },
+      { "name": "bomlens:elfSoname", "value": "libnetsnmp.so.30, libnetsnmpagent.so.30" },
+      { "name": "bomlens:elfNeededBy", "value": "10" }
+    ],
+    "evidence": {
+      "occurrences": [
+        { "location": "lib/libnetsnmp.so.30.0.1" },
+        { "location": "lib/libnetsnmpagent.so.30.0.1" }
+      ]
+    }
+  },
+  {
+    "bom-ref": "elf-presence:openssl",
+    "type": "library",
+    "name": "openssl",
+    "properties": [
+      { "name": "bomlens:evidenceGrade", "value": "presence-only" },
+      { "name": "bomlens:identifiedBy", "value": "elf-presence" },
+      { "name": "bomlens:elfSoname", "value": "libcrypto.so.1.0.0, libssl.so.1.0.0" }
+    ],
+    "evidence": {
+      "occurrences": [{ "location": "lib/libcrypto.so.1.0.0" }]
+    }
+  }
+]

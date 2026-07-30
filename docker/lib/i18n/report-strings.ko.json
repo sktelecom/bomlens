@@ -175,6 +175,8 @@
   "risk.th_deadline": "대응 기한",
   "risk.vuln_none_md": "_알려진 취약점이 없거나 security 산출물이 없습니다._",
   "risk.vuln_none_html": "알려진 취약점이 없거나 security 산출물이 없습니다.",
+  "risk.presence_only_md": "> 컴포넌트 %s개는 존재만 확인되고 버전을 알아내지 못했습니다. 버전이 없으면 취약점 데이터베이스에 물어볼 수 없으므로, 위 집계는 이 %s개를 다루지 않습니다. 라이선스 고지 의무는 그대로 발생합니다.",
+  "risk.presence_only_html": "컴포넌트 <b>%s개</b>는 존재만 확인되고 버전을 알아내지 못했습니다. 버전이 없으면 취약점 데이터베이스에 물어볼 수 없으므로, 위 집계는 이 %s개를 다루지 않습니다. 라이선스 고지 의무는 그대로 발생합니다.",
   "risk.h2_lic": "라이선스 요약",
   "risk.lic_no_notice_md": "_NOTICE 산출물이 없어 생략합니다._",
   "risk.lic_no_notice_html": "NOTICE 산출물이 없어 생략합니다.",
