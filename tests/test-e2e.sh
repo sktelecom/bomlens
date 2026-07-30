@@ -2,7 +2,7 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# test-e2e.sh — user-perspective end-to-end tests for sbom-tools.
+# test-e2e.sh — user-perspective end-to-end tests for BomLens.
 # Exercises the CLI exactly as a user would: SBOM generation, notice, security
 # report, byte-stable output, image scanning, the web UI, and helper libraries.
 #
@@ -65,7 +65,7 @@ run_source_scan() {
 show_log_if_verbose() { [ "$VERBOSE" = "true" ] && sed 's/^/        /' "$1/_scan.log"; }
 
 echo "=================================================="
-echo " sbom-tools E2E Tests"
+echo " BomLens E2E Tests"
 echo " image: $SCANNER_IMG (present=$have_image, docker=$have_docker)"
 echo "=================================================="
 

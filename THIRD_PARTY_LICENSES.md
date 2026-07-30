@@ -1,10 +1,10 @@
 # Third-Party Licenses
 
-`sbom-tools`(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성과 분석에 쓰는 여러 오픈소스 도구를 Docker 이미지에 번들합니다. 이 문서는 번들 도구의 라이선스 인벤토리와 배포 의무를 정리합니다.
+BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성과 분석에 쓰는 여러 오픈소스 도구를 Docker 이미지에 번들합니다. 이 문서는 번들 도구의 라이선스 인벤토리와 배포 의무를 정리합니다.
 
 ## 컴플라이언스 요지
 
-- `sbom-tools`의 셸 스크립트는 번들 도구를 별도 프로세스로 호출(exec)할 뿐 도구 소스를 수정하지 않습니다. 그래서 GPL/AGPL의 copyleft가 `sbom-tools`의 Apache-2.0 코드로 전파되지 않습니다(FSF 기준: 파이프/CLI/exec = 별개 프로그램, 컨테이너 번들 = mere aggregation).
+- BomLens의 셸 스크립트는 번들 도구를 별도 프로세스로 호출(exec)할 뿐 도구 소스를 수정하지 않습니다. 그래서 GPL/AGPL의 copyleft가 BomLens의 Apache-2.0 코드로 전파되지 않습니다(FSF 기준: 파이프/CLI/exec = 별개 프로그램, 컨테이너 번들 = mere aggregation).
 - 다만 도구 바이너리를 이미지로 재배포하므로, 라이선스 전문과 (GPL 도구의) 대응 소스 접근 경로를 제공합니다. SPDX 라이선스 전문(Apache-2.0, MIT, GPL-2.0, GPL-3.0 등)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 동봉되며, 각 도구의 소스는 아래 표의 Source URL에서 받습니다.
 - AGPL 라이선스 도구는 포함하지 않습니다. 따라서 웹 UI(`--ui`)를 써도 AGPL §13 네트워크 조항은 트리거되지 않습니다.
 - GPL 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어가고, 기본 이미지(`sbom-scanner`)는 permissive-only로 유지됩니다. 다른 opt-in 이미지(`bomlens-aibom`, `bomlens-deep-cve`)도 permissive 도구만 담습니다.
@@ -48,7 +48,7 @@ OFL-1.1 전문은 위 Source의 각 저장소 `OFL.txt`에서 받을 수 있습�
 OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 
 - 전송되는 것은 소스 코드가 아니라 **파일 지문(해시)**뿐입니다.
-- 반환 데이터는 **소프트웨어 식별 목적으로만** 사용할 수 있고, OSSKB 데이터를 **재배포·별도 DB로 캐싱하는 것은 금지**됩니다. `sbom-tools`는 스캔별 SBOM 컴포넌트로만 결과를 내보내므로 이 범위 안입니다.
+- 반환 데이터는 **소프트웨어 식별 목적으로만** 사용할 수 있고, OSSKB 데이터를 **재배포·별도 DB로 캐싱하는 것은 금지**됩니다. BomLens는 스캔별 SBOM 컴포넌트로만 결과를 내보내므로 이 범위 안입니다.
 - 무료·best-effort이며 **요청 빈도 제한(rate limit)**이 있습니다. 구체적 한도 수치는 공개돼 있지 않고, 약관상 재량적입니다(원문: "STF may limit the number or frequency of transactions per user through the OSSKB"). 스캔은 파일마다 지문을 조회하므로, 큰 소스 트리를 반복 스캔하면 스로틀됩니다 — 1회성 식별용입니다. 대량·반복·전사 운용이나 에어갭 환경에서는 `SCANOSS_API_URL`/`SCANOSS_API_KEY`로 SCANOSS 상용 서비스나 자체 호스팅 엔드포인트를 지정하세요.
 - 결과는 "사람 검토가 필요한 식별 힌트"로 제공됩니다(정확도 무보증).
 - 약관 원문: https://www.softwaretransparency.org/terms

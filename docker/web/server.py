@@ -2,7 +2,7 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # Licensed under the Apache License, Version 2.0.
 #
-# server.py — local web UI backend for sbom-tools (Python stdlib only).
+# server.py — local web UI backend for BomLens (Python stdlib only).
 # Runs inside the scanner image and drives /usr/local/bin/run-scan.
 #   GET  /                -> index.html (React SPA)
 #   GET  /capabilities    -> {firmware, docker}: which input types are usable here

@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
- * sbom-tools local UI — design tokens.
+ * BomLens local UI — design tokens.
  *
  * Mirrors TRUSCA's "W11-A" language (Vercel light base + Linear
  * polish) so the two surfaces feel like one product. Unlike the portal,
- * sbom-tools SHIPS a dark theme: the `.dark` block below is fully populated
+ * BomLens SHIPS a dark theme: the `.dark` block below is fully populated
  * (the portal left it as a TODO placeholder).
  *
  * Never reference hex directly in components — use the CSS var / Tailwind

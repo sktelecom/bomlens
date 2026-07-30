@@ -1,5 +1,5 @@
 // swift-tools-version:5.9
-// Minimal SPM example for sbom-tools (pure-Swift deps — resolvable on Linux,
+// Minimal SPM example for BomLens (pure-Swift deps — resolvable on Linux,
 // no iOS-platform/UIKit dependency).
 import PackageDescription
 

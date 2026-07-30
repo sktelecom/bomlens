@@ -3,19 +3,19 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # compare-cdxgen-vs-docker.sh
-# Empirically compares "cdxgen alone (no build tools)" vs "sbom-tools Docker image
+# Empirically compares "cdxgen alone (no build tools)" vs "BomLens Docker image
 # (build tools + dependency resolution)" across a set of fixture projects.
 # Measures three metrics per project: component count, vulnerability count, scan time.
 #
 # Baseline A : official cdxgen image (no language build tools) -> manifest parsing only
-# Variant  B : sbom-tools scanner image -> installs deps, then cdxgen
+# Variant  B : BomLens scanner image -> installs deps, then cdxgen
 #
 # Usage:
 #   ./tests/compare-cdxgen-vs-docker.sh
 # Env:
 #   SBOM_FIXTURES_DIR   project root to scan (default: ~/projects/bd-scan/tests/fixtures/projects,
 #                       falls back to ./examples)
-#   SBOM_SCANNER_IMAGE  sbom-tools image (default: ghcr.io/sktelecom/sbom-scanner:latest)
+#   SBOM_SCANNER_IMAGE  BomLens image (default: ghcr.io/sktelecom/sbom-scanner:latest)
 #   CDXGEN_IMAGE        baseline cdxgen image (default: ghcr.io/cyclonedx/cdxgen:latest)
 set -uo pipefail
 
@@ -89,7 +89,7 @@ for projdir in "${PROJECT_DIRS[@]}"; do
     if [ -f "$tmpA/out_bom.json" ]; then compA=$(comp_count "$tmpA/out_bom.json"); cveA=$(vuln_count "$tmpA/out_bom.json"); fi
     compA=${compA:-0}; cveA=${cveA:-0}; secA=$((eA - sA))
 
-    # ----- Variant B: sbom-tools image (build tools + dependency resolution) -----
+    # ----- Variant B: BomLens image (build tools + dependency resolution) -----
     tmpB="$(mktemp -d "$WORK_ROOT/B.XXXXXX")"; cp -R "$projdir/." "$tmpB/" 2>/dev/null || true
     sB=$(date +%s)
     docker run --rm -v "$tmpB":/src -v "$tmpB":/host-output \

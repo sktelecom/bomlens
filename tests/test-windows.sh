@@ -104,7 +104,7 @@ in_log() { grep -qF -- "$1" "$LOG"; }
 new_proj() { local d="$WORK/proj.$N.$1"; mkdir -p "$d"; echo "$d"; }
 
 echo "=================================================="
-echo " sbom-tools — Windows / no-Docker tests"
+echo " BomLens — Windows / no-Docker tests"
 echo " bash: $(bash --version | head -1)"
 echo " scan: $SCAN"
 echo "=================================================="

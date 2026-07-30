@@ -1,4 +1,4 @@
-module github.com/sktelecom/sbom-tools-example
+module github.com/sktelecom/bomlens-example
 
 go 1.21
 

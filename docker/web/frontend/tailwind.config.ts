@@ -5,7 +5,7 @@ import animate from "tailwindcss-animate";
  * Tailwind config — mirrors TRUSCA's "W11-A" token mapping so the
  * two UIs share one design language. Token VALUES live in src/index.css as CSS
  * custom properties; this file maps them to utility classes. Dark mode IS
- * populated here (sbom-tools ships a dark theme — see index.css `.dark`).
+ * populated here (BomLens ships a dark theme — see index.css `.dark`).
  */
 const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],

@@ -38,7 +38,7 @@ ALL_PROJECTS=(java-maven java-gradle nodejs python go ruby php rust dotnet swift
 if [ -n "${ONLY:-}" ]; then read -r -a PROJECTS <<< "$ONLY"; else PROJECTS=("${ALL_PROJECTS[@]}"); fi
 
 echo "=================================================="
-echo " sbom-tools Examples E2E  (image: $SCANNER_IMG)"
+echo " BomLens Examples E2E  (image: $SCANNER_IMG)"
 echo " projects: ${PROJECTS[*]}"
 echo "=================================================="
 

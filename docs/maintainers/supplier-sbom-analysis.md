@@ -8,12 +8,12 @@
 
 SK텔레콤은 [공급망 보안 가이드](https://sktelecom.github.io/guide/supply-chain/for-suppliers/)로 공급사에 SBOM 제출을 요구하고, [제출 요구사항](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/)을 정의합니다. SKT는 제출된 SBOM을 검증하고, 라이선스와 취약점을 분석한 뒤 위험 보고서를 만들어 공급사에 대응을 요구하는 흐름으로 처리합니다.
 
-이 문서는 sbom-tools를 SBOM 생성기에서 한 걸음 더 나아가, 공급사가 제출한 SBOM을 받아 검증·분석·보고하는 도구로 확장하는 설계를 다룹니다.
+이 문서는 BomLens를 SBOM 생성기에서 한 걸음 더 나아가, 공급사가 제출한 SBOM을 받아 검증·분석·보고하는 도구로 확장하는 설계를 다룹니다.
 
 - 현재: 후처리 파이프라인(`POSTPROCESS` 모드)이 절반을 담당하지만, 임의 SBOM 파일을 입력하는 경로가 없고 요구사항 충족 검증(conformance) 기능이 전무하며 SPDX를 입력하면 라이선스 분석이 안 됩니다.
 - 방향: `--analyze` 진입점에 검증기(`validate-sbom.sh`), SPDX를 CycloneDX로 바꾸는 변환기(`convert-to-cdx.sh`), 위험 보고서(`generate-risk-report.sh`)를 더합니다. 기존 normalize/notice/security 파이프라인은 단일 경로로 손대지 않고 재사용합니다.
 
-역할 경계: sbom-tools는 로컬에서 단일 SBOM을 검증·분석·보고하는 데까지입니다. 전사 등록, triage, 대응 추적, 이력 관리는 SKT 내부 시스템(TOSCA)과 자매 프로젝트 TRUSCA(구 TrustedOSS Portal)의 몫입니다.
+역할 경계: BomLens는 로컬에서 단일 SBOM을 검증·분석·보고하는 데까지입니다. 전사 등록, triage, 대응 추적, 이력 관리는 SKT 내부 시스템(TOSCA)과 자매 프로젝트 TRUSCA(구 TrustedOSS Portal)의 몫입니다.
 
 ---
 
@@ -52,7 +52,7 @@ SKT 검증 프로세스는 세 단계로 나뉩니다.
 
 ## 2. 현재 능력과 갭
 
-| 시나리오 단계 | 현재 sbom-tools | 갭 |
+| 시나리오 단계 | 현재 BomLens | 갭 |
 |---------------|------------------|-----|
 | 임의 SBOM 파일 입력 | `POSTPROCESS` 모드(`entrypoint.sh:93-101`)는 `${PROJECT}_${VERSION}_bom.json` **고정 파일명**만 처리 | ❌ 임의 경로/이름 입력 경로 없음 |
 | ① 포맷/요구사항 검증 | 파일 존재·크기만 확인 | ❌ **conformance 검증 기능 전무** |
