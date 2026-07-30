@@ -126,10 +126,19 @@ jobs:
           # scan-sbom(.bat) -> scan-sbom.sh -> REPO_DIR/docker/lib resolution
           # works after extraction. Omitting source-detect.sh makes even
           # `scan-sbom.sh --help` exit 1 before any scan.
+          # Every bundle carries the same three license documents. Apache-2.0
+          # section 4 asks a redistributor for a copy of the License and the
+          # NOTICE contents, and whoever downloads a bundle becomes one;
+          # THIRD_PARTY_LICENSES.md travels with them because it is where the
+          # NOTICE points for the bundled tools and the GPL source offer.
+          LICENSE_FILES="LICENSE NOTICE THIRD_PARTY_LICENSES.md"
+
           cp scripts/scan-sbom.sh release-assets/
           chmod +x release-assets/scan-sbom.sh
+          # shellcheck disable=SC2086  # word splitting is how the file list expands
           tar -czf release-assets/bomlens-cli-linux.tar.gz \
-            scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh
+            scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
+            $LICENSE_FILES
 
           # Windows runtime bundle: both launchers, the orchestration script,
           # and the host-side lib files above. sbom-ui.bat is self-contained
@@ -137,16 +146,22 @@ jobs:
           # own error messages tell users to double-click it, and the settings
           # example is how a non-CLI user reaches UI_PORT / SBOM_IMAGE_TAR (env
           # vars die on a double-click).
+          # shellcheck disable=SC2086
           zip -r release-assets/bomlens-cli-windows.zip \
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
             scripts/check-setup.bat scripts/bomlens.settings.example.txt \
-            docker/lib/source-detect.sh docker/lib/build-prep.sh
+            docker/lib/source-detect.sh docker/lib/build-prep.sh \
+            $LICENSE_FILES
 
           # Examples
-          tar -czf release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz examples/
+          # shellcheck disable=SC2086
+          tar -czf release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz \
+            examples/ $LICENSE_FILES
 
           # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans)
-          tar -czf release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz scripts/ docker/ examples/ docs/ README.md LICENSE
+          # shellcheck disable=SC2086
+          tar -czf release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz \
+            scripts/ docker/ examples/ docs/ README.md $LICENSE_FILES
 
           # Checksums so downloaders can verify integrity of these assets.
           ( cd release-assets && sha256sum \
@@ -175,7 +190,15 @@ jobs:
             if ! bash "$dir/scripts/scan-sbom.sh" --help >/dev/null 2>"$dir/err"; then
               echo "FAIL: $file — extracted scan-sbom.sh --help exited non-zero:"; cat "$dir/err"; exit 1
             fi
-            echo "OK: $file is self-sufficient"
+            # The extracted bundle must also state its own terms. Checking the
+            # unpacked tree (not the tar/zip argument list) is what catches a
+            # file that was named but never actually packed.
+            for name in LICENSE NOTICE THIRD_PARTY_LICENSES.md; do
+              if [ ! -s "$dir/$name" ]; then
+                echo "FAIL: $file — extracted bundle has no $name"; exit 1
+              fi
+            done
+            echo "OK: $file is self-sufficient and carries its license files"
           done
 
       - name: Upload release assets

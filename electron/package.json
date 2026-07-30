@@ -3,6 +3,7 @@
   "version": "1.9.0",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
   "description": "Double-click desktop app that wraps the BomLens web UI (runs the scanner in Docker).",
   "main": "main.mjs",
   "scripts": {

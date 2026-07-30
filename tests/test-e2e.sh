@@ -1018,6 +1018,30 @@ else
     skip "base-image firmware regression (scanner image not available)"
 fi
 
+# The image redistributes our shell scripts, so it must carry the terms they
+# ship under (Apache-2.0 section 4). tests/check-notice-sync.sh proves the
+# copies under docker/lib/notices/ match the repository root; this proves the
+# build actually lands them in the image, along with the SPDX license texts
+# THIRD_PARTY_LICENSES.md tells readers to look for.
+if [ "$have_image" = 1 ]; then
+    if docker run --rm --entrypoint sh "$SCANNER_IMG" -c '
+            for f in notices/LICENSE notices/NOTICE notices/THIRD_PARTY_LICENSES.md \
+                     licenses/Apache-2.0.txt licenses/MIT.txt; do
+                [ -s "/usr/local/lib/sbom/$f" ] || { echo "missing: $f"; exit 1; }
+            done' >/dev/null 2>&1; then
+        pass "image ships its own LICENSE/NOTICE and the SPDX license texts"
+    else
+        missing="$(docker run --rm --entrypoint sh "$SCANNER_IMG" -c '
+            for f in notices/LICENSE notices/NOTICE notices/THIRD_PARTY_LICENSES.md \
+                     licenses/Apache-2.0.txt licenses/MIT.txt; do
+                [ -s "/usr/local/lib/sbom/$f" ] || echo "$f"
+            done' 2>&1)"
+        fail "image ships its own LICENSE/NOTICE and the SPDX license texts" "missing: $missing"
+    fi
+else
+    skip "image license files (scanner image not available)"
+fi
+
 if [ "$have_fw_image" != 1 ]; then
     skip "firmware scan (firmware image '$FW_IMG' not available — build with --build-arg SBOM_FIRMWARE=true)"
 else

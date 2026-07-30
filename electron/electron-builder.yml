@@ -9,6 +9,18 @@ files:
   - lib/**/*
   - assets/**/*
   - package.json
+# 설치본이 자기 이용 조건을 담고 나가게 한다. Apache-2.0 §4는 재배포자에게 라이선스
+# 사본과 NOTICE 내용을 요구하고, 설치본을 받는 쪽이 재배포자가 된다. files가 아니라
+# extraResources인 이유는 files의 경로가 app 디렉터리(electron/) 기준이라 저장소
+# 루트의 파일에 닿지 못하는 반면, extraResources는 프로젝트 디렉터리 기준이라
+# ../로 올라갈 수 있기 때문이다. 사본을 두지 않으므로 어긋날 여지도 없다.
+extraResources:
+  - from: ../LICENSE
+    to: LICENSE
+  - from: ../NOTICE
+    to: NOTICE
+  - from: ../THIRD_PARTY_LICENSES.md
+    to: THIRD_PARTY_LICENSES.md
 # 백엔드와 React SPA는 스캐너 Docker 이미지가 서빙하므로 사이드카/프론트 동봉이 없다.
 # 서명·공증은 이 파일이 아니라 CI 시크릿으로만 제어된다(desktop.yml) — Windows는
 # WIN_CSC_LINK/WIN_CSC_KEY_PASSWORD, macOS 서명은 CSC_LINK/CSC_KEY_PASSWORD,
@@ -24,6 +36,16 @@ artifactName: BomLens-Setup.${ext}
 win:
   target: nsis
 mac:
+  # 설치본은 Electron(MIT)과 Chromium(BSD-3-Clause 등)도 함께 재배포한다.
+  # Windows 패키지는 electron 배포본의 두 고지가 .exe 옆 최상위에 그대로 남지만
+  # (실측: LICENSE.electron.txt, LICENSES.chromium.html), macOS는 .app 밖에 있던
+  # 이 파일들이 버려져 앱 안에 남지 않는다. 그래서 mac에만 넣는다. Windows에
+  # 넣으면 20MB짜리 Chromium 고지가 설치본에 두 번 들어간다.
+  extraResources:
+    - from: node_modules/electron/dist/LICENSE
+      to: LICENSE.electron
+    - from: node_modules/electron/dist/LICENSES.chromium.html
+      to: LICENSES.chromium.html
   # universal(arm64+x64) 단일 dmg. 주의: CLI에서 타깃을 명시하면 이 arch가
   # 무시되므로 워크플로우와 dist:mac 스크립트도 --universal을 함께 넘긴다.
   target:

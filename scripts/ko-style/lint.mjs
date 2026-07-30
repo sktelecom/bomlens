@@ -55,6 +55,10 @@ const EXCLUDE = [
   "docs/demo/data",
   "CHANGELOG.md",
   "THIRD_PARTY_LICENSES.md",
+  // The image ships byte-identical copies of the root license documents
+  // (tests/check-notice-sync.sh enforces that), so linting them would report
+  // the same lines twice and, worse, invite an edit that breaks the copy.
+  "docker/lib/notices",
 ];
 
 const IGNORE_DIRS = new Set([

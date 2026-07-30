@@ -212,6 +212,9 @@ jobs:
       - name: Docs / tool drift check (flags, env vars, image names, download, output dir)
         run: bash tests/check-docs-drift.sh
 
+      - name: License files shipped in the image match the repository root
+        run: bash tests/check-notice-sync.sh
+
       - name: Examples manifest validation
         run: bash examples/test-all.sh
 
