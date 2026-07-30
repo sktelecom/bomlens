@@ -207,11 +207,13 @@ docker build --secret id=nvd_api_key,env=NVD_API_KEY --build-arg SBOM_FIRMWARE=t
 
 시그니처 식별은 버전을 읽어낼 수 있는 것만 보고합니다. 그래서 빌드 과정에서 버전 문자열이 남지 않은 컴포넌트는 SBOM에서 통째로 빠집니다. 라이선스 고지 의무는 버전을 묻지 않으므로, 이 구간을 비워 두면 고지문이 실제보다 짧아집니다.
 
-`identify-elf-presence.py`는 ELF 동적 섹션의 SONAME과 NEEDED를 읽어 존재를 판정합니다. 문자열 검색이 아니라 구조를 봅니다. busybox 도움말에 "readline"이 나오는 것은 readline이 링크됐다는 근거가 아니기 때문입니다.
+`identify-elf-presence.py`는 두 가지를 읽습니다. ELF 동적 섹션의 SONAME과 NEEDED, 그리고 `bin`·`sbin` 아래 실행 파일이 설치된 이름입니다. 문자열 검색이 아니라 구조와 파일 배치를 봅니다. busybox 도움말에 "readline"이 나오는 것은 readline이 링크됐다는 근거가 아니기 때문입니다.
 
-- 근거는 라이브러리 파일이어야 합니다. NEEDED 이름만 있고 파일이 없으면 보고하지 않습니다. 벤더가 같은 이름을 재사용하는 일이 흔하고(MikroTik RouterOS는 자체 `libu*` 계열에 `libubox.so`가 있습니다), 읽는 사람이 확인할 대상도 남지 않습니다.
+실행 파일 이름은 `elf-program-map.json`에서 컴포넌트로 잇습니다. 설치된 이름이 컴포넌트 이름과 다른 경우가 많습니다. `brctl`은 bridge-utils, `chat`과 `pppd`는 ppp, `hostapd_cli`는 hostapd, `ip`와 `tc`는 iproute2에서 옵니다. `ip`나 `chat`처럼 짧고 흔한 이름이 위험하므로, `bin`·`sbin` 아래의 ELF 실행 파일만 세고 근거 경로를 산출물에 남깁니다. `/bin/telnetd`가 busybox 사본인 이미지는 telnetd가 아니라 busybox를 담고 있는 것이므로, 파일에 `BusyBox v` 문자열이 있으면 세지 않습니다.
+
+- 근거는 실제 파일이어야 합니다. NEEDED 이름만 있고 파일이 없으면 보고하지 않습니다. 벤더가 같은 이름을 재사용하는 일이 흔하고(MikroTik RouterOS는 자체 `libu*` 계열에 `libubox.so`가 있습니다), 읽는 사람이 확인할 대상도 남지 않습니다.
 - 파일명에서 버전을 만들지 않습니다. SONAME의 숫자는 ABI 번호입니다. `libcrypto.so.1.0.0`은 OpenSSL 1.0.0이 아닙니다.
-- 이름은 `elf-soname-map.json`에서 찾습니다. 매핑이 없는 라이브러리는 로그에 개수와 이름을 남기고 보고하지 않습니다. 기계적으로 `lib` 접두어를 떼면 `libnetsnmp.so.30`이 `netsnmp`가 되지 `net-snmp`가 되지 않습니다.
+- 이름은 두 표(`elf-soname-map.json`, `elf-program-map.json`)에서만 찾습니다. 매핑이 없는 라이브러리는 로그에 개수와 이름을 남기고 보고하지 않습니다. 기계적으로 `lib` 접두어를 떼면 `libnetsnmp.so.30`이 `netsnmp`가 되지 `net-snmp`가 되지 않습니다.
 - 산출 컴포넌트에는 버전도 PURL도 CPE도 붙이지 않고 `bomlens:evidenceGrade = presence-only` 속성을 답니다. 근거 파일은 `evidence.occurrences`에 남습니다.
 
 이 속성은 아래로 전파됩니다. `scan-firmware.sh`는 같은 이름에 버전 있는 판정이 있으면 존재 판정을 버리고, 남은 개수를 로그에 따로 적습니다. risk 리포트는 취약점 집계표 아래에 몇 개가 조회 대상이 아니었는지 적습니다. 웹 서버는 행마다 `presenceOnly`와 요약의 `presenceOnlyCount`를 내보내고, 웹 UI는 버전 칸에 "버전 미확인"으로 표시합니다. 버전이 없으면 취약점 데이터베이스에 물어볼 것이 없으므로, 이 구분이 없으면 "취약점 0건"이 실제보다 넓은 범위를 덮는 것처럼 읽힙니다.

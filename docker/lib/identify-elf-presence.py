@@ -14,7 +14,13 @@ NEEDED; net-snmp is in there whether or not anything says which release.
 So this reads structure, not text:
 
   - a shared library file, by its SONAME if it declares one, else its filename
+  - an executable under bin/ or sbin/, by the name it is installed under
   - NEEDED entries in other ELFs, counted as corroboration
+
+The name a program is installed under is often not its component: brctl ships in
+bridge-utils, chat and pppd in ppp, hostapd_cli in hostapd, ip and tc in
+iproute2. Both mappings are written out by hand (elf-soname-map.json and
+elf-program-map.json) rather than derived.
 
 The library file has to be in the image. A NEEDED entry alone is a link-time name
 a vendor is free to reuse, and it leaves nothing for a reader to check: MikroTik
@@ -140,16 +146,26 @@ def main():
         print(__doc__, file=sys.stderr)
         return 2
     root = sys.argv[1]
+    here = os.path.dirname(os.path.abspath(__file__))
     map_path = sys.argv[2] if len(sys.argv) > 2 else \
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "elf-soname-map.json")
+        os.path.join(here, "elf-soname-map.json")
+    prog_path = sys.argv[3] if len(sys.argv) > 3 else \
+        os.path.join(here, "elf-program-map.json")
 
-    try:
-        raw = json.load(open(map_path))
-    except (OSError, ValueError) as exc:
-        print(f"[elf-presence] WARN: cannot read {map_path} ({exc}); skipping", file=sys.stderr)
+    def load_map(path, required):
+        try:
+            raw = json.load(open(path))
+        except (OSError, ValueError) as exc:
+            level = "WARN" if required else "note"
+            print(f"[elf-presence] {level}: cannot read {path} ({exc})", file=sys.stderr)
+            return None
+        return {k: v for k, v in raw.items() if not k.startswith("_")}
+
+    name_of = load_map(map_path, True)
+    if name_of is None:
         print("[]")
         return 0
-    name_of = {k: v for k, v in raw.items() if not k.startswith("_")}
+    prog_of = load_map(prog_path, False) or {}
 
     if not os.path.isdir(root):
         print("[]")
@@ -183,6 +199,17 @@ def main():
         elif evidence_path:
             e["files"].add(evidence_path)
 
+    busybox_applets = 0
+
+    def is_busybox(path):
+        """An image can install `/bin/telnetd` as a copy of busybox. That image is
+        carrying busybox, which is already identified with a version, not telnetd."""
+        try:
+            with open(path, "rb") as f:
+                return b"BusyBox v" in f.read(4 * 1024 * 1024)
+        except OSError:
+            return False
+
     seen_paths = set()
     for path in paths:
         d = dynamic.get(path)
@@ -190,6 +217,24 @@ def main():
         if rel in seen_paths:
             continue
         seen_paths.add(rel)
+
+        # An installed program name is the other half of the evidence. `/bin/dhcpcd`
+        # says dhcpcd is here as plainly as libnetsnmp.so.30 says net-snmp is, and
+        # the name a program is installed under is often not its component:
+        # brctl ships in bridge-utils, chat and pppd in ppp, ip and tc in iproute2.
+        # Only under bin/ or sbin/, so a data file that happens to share a name
+        # cannot stand in for the program.
+        parts = rel.split("/")
+        if len(parts) >= 2 and parts[-2] in ("bin", "sbin"):
+            comp = prog_of.get(parts[-1].lower())
+            if comp:
+                if is_busybox(path):
+                    busybox_applets += 1
+                else:
+                    e = found.setdefault(comp, {"files": set(), "needed_by": 0,
+                                                "sonames": set()})
+                    e["files"].add(rel)
+
         if d and d.get("soname"):
             note(stem(d["soname"]), rel, False, d["soname"])
         elif os.path.basename(path).find(".so") > 0:
@@ -229,6 +274,10 @@ def main():
     print(json.dumps(components, ensure_ascii=False))
     print(f"[elf-presence] {len(seen_paths)} distinct ELF file(s) of {len(paths)} found; "
           f"{len(components)} component(s) proved present by structure.", file=sys.stderr)
+    if busybox_applets:
+        print(f"[elf-presence] {busybox_applets} program name(s) skipped because the "
+              f"file is a copy of busybox, which is identified separately.",
+              file=sys.stderr)
     if needed_only:
         print(f"[elf-presence] {len(needed_only)} mapped name(s) appeared only as a NEEDED "
               f"entry with no library file present, so they were not reported: "

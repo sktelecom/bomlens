@@ -536,6 +536,56 @@ else
     fail "the versionless uclibc won over the versioned one"
 fi
 
+echo "== a program is also evidence of the component that ships it =="
+
+# The plan had these eight down as statically linked or in the bootloader, with
+# neither a string nor a filename to go on. Four of them are standalone binaries
+# sitting in /bin under their own names. The name a program is installed under is
+# often not its component: brctl ships in bridge-utils, chat and pppd in ppp,
+# hostapd_cli in hostapd, ip and tc in iproute2.
+PTBL="$ROOT_DIR/docker/lib/elf-program-map.json"
+if [ -f "$PTBL" ] && jq -e 'to_entries | map(select(.key | startswith("_") | not)) | length > 0' \
+     "$PTBL" >/dev/null 2>&1; then
+    pass "the program-name map ships and has entries"
+else
+    fail "elf-program-map.json is missing or empty"
+fi
+
+for pair in brctl:bridge-utils pppd:ppp hostapd_cli:hostapd ip:iproute2; do
+    k="${pair%%:*}"; v="${pair#*:}"
+    got=$(jq -r --arg k "$k" '.[$k] // "MISSING"' "$PTBL")
+    if [ "$got" = "$v" ]; then
+        pass "$k maps to $v, not to itself"
+    else
+        fail "$k maps to '$got'" "the installed name is not always the component"
+    fi
+done
+
+# No versions here either: nothing about an installed filename gives one.
+if jq -e 'to_entries | map(select(.key | startswith("_") | not))
+          | all(.value | type == "string" and (test("[0-9]+\\.[0-9]") | not))' \
+     "$PTBL" >/dev/null 2>&1; then
+    pass "the program map carries names only, never versions"
+else
+    fail "the program map carries a version"
+fi
+
+# Only under bin/ or sbin/, so a data file sharing a name cannot stand in for the
+# program — `ip`, `tc` and `chat` are ordinary words.
+if grep -q 'parts\[-2\] in ("bin", "sbin")' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "only executables under bin/ or sbin/ are matched by name"
+else
+    fail "any file matching a program name would be counted"
+fi
+
+# An image that installs /bin/telnetd as a copy of busybox is carrying busybox,
+# which is already identified with a version.
+if grep -q 'BusyBox v' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "a busybox copy under an applet name is not reported as that component"
+else
+    fail "a busybox applet copy would be reported as a separate component"
+fi
+
 echo "== the version-string table is closed, and its CPEs are checked =="
 
 TBL="$ROOT_DIR/docker/lib/version-string-map.json"
