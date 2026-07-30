@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Decision-first Overview helpers: what, if anything, needs the reviewer's
  * attention right now. Pure and unit tested so the leading "Needs attention"

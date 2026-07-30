@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Scan-form state and submit logic, extracted so the classic single-column
  * ScanForm and the new two-pane NewScan share one source of truth (validation,

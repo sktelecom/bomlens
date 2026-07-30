@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Loader2, Play, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Desktop-app (Electron) bridge. The desktop shell injects `window.sbomDesktop`
  * via its preload script; in a plain browser it is absent. Only the scan-folder

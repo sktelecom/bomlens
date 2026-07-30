@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * The supplier SBOM as it arrived (`{prefix}_input.json`, written by
  * describe-input-sbom.py before the conversion to CycloneDX).

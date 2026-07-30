@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Cross-section quick search over a finished scan: find a component (by name or
  * purl) or a vulnerability (by CVE id, package or title) from anywhere, without

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Lib test gate — fails when a src/lib module ships without a unit test.
  *

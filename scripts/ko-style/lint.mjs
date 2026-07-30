@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * ko-style lint — Korean translation-ese (번역투) and terminology linter.
  *

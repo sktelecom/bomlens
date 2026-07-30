@@ -1,3 +1,7 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// Adapted from shadcn/ui — Copyright (c) 2023 shadcn, MIT licensed.
+// SPDX-License-Identifier: Apache-2.0 AND MIT
+
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, type ButtonHTMLAttributes } from "react";

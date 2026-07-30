@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Pure helpers for the Recent scans home screen — kept free of React/i18n so
  * the aggregation and time formatting stay unit-testable in isolation (same

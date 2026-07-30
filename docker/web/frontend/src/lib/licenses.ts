@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * License grouping and restriction review for the Licenses section. The review
  * classes (behavioral-use / non-commercial) come from the component's

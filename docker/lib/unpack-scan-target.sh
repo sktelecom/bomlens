@@ -1,5 +1,6 @@
 #!/bin/bash
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
 # unpack-scan-target.sh — materialize a readable copy of a scan target that has

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // container.mjs의 순수 로직 단위 테스트(electron 비의존). 실제 Docker 기동/E2E는
 // Windows에서 tests/windows-e2e-checklist.md와 desktop 워크플로우로 검증한다.
 import assert from "node:assert/strict";

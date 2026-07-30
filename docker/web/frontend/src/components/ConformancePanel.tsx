@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { CircleAlert, CircleCheck, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 

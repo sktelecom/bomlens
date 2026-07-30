@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { test, expect, _electron as electron } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";

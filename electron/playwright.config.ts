@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { defineConfig } from "@playwright/test";
 
 // Boot smoke for the Electron desktop app. Launches the app on the runner's OS

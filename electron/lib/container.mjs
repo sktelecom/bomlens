@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // BomLens UI 컨테이너 수명주기 관리(순수 Node — electron 비의존, 단위 테스트 가능).
 //
 // onot의 lib/sidecar.mjs가 PyInstaller 바이너리를 spawn하는 자리에서, 우리는 Docker로

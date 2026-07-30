@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * The source snapshot (`{prefix}_source.json`, written by source-snapshot.py):
  * the text content of the files a scan looked at, so the result screens can show

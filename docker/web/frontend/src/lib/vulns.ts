@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Sorting for the Vulnerabilities table: by severity then CVSS, or by CVSS
  * then severity. Pure and unit tested so "most severe / highest-scored first"

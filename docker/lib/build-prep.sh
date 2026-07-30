@@ -1,5 +1,6 @@
 #!/bin/sh
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
 # build-prep.sh — run INSIDE a cdxgen image (mounted from host): augment the

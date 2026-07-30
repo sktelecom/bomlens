@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Prefill heuristics for the New scan form: derive a project name — and, only
  * when the source genuinely carries one, a version — from the scan target, so

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // winstate.mjs 단위 테스트(electron 비의존). 저장 파일 파싱의 방어와
 // 모니터 구성 변화 대응(sanitizeBounds)을 검증한다.
 import assert from "node:assert/strict";

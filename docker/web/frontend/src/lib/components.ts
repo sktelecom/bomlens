@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Pure filter/sort logic for the Components table. Kept out of the component so
  * the decision-first behaviour (risk ordering, "has vulns"/"direct only"/"needs

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // pullprogress.mjs의 순수 로직 단위 테스트. 집계 픽스처는 손으로 지어낸 것이 아니라
 // 실제 non-TTY `docker pull alpine:3.19` 출력을 그대로 캡처한 것이다
 // (test/fixtures/docker-pull-nontty.txt) — 형식을 추측하면 파서가 조용히 틀린다.

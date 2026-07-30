@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Derive the scan's current stage from its live log lines. The pipeline emits
  * recognizable markers in order ([1/2] generate → [normalize] → [notice] →

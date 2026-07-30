@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Token lint — fails when a component hardcodes a colour instead of using a
  * design token (CSS var / Tailwind utility). This is the drift guard that keeps

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // docker pull 출력 해석(순수 — electron 비의존, 단위 테스트 가능).
 //
 // 왜 필요한가: 이미지를 받는 동안 상태 화면에는 raw 출력만 흐른다. non-TTY docker pull은

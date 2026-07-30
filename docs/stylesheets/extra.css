@@ -1,4 +1,9 @@
 /*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * Gemini API 문서(Google DevSite) 인상에 맞춘 테마 보정.
  * 헤더는 밝게 두고, SK 브랜드 색은 링크/버튼/강조에만 절제해서 쓴다.
  * 색 값은 [[skt-brand-colors]] 기준.

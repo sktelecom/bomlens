@@ -1,5 +1,6 @@
 @echo off
 REM Copyright 2026 SK Telecom Co., Ltd.
+REM SPDX-License-Identifier: Apache-2.0
 REM Licensed under the Apache License, Version 2.0.
 REM
 REM sbom-ui.bat - launch the BomLens local web UI on Windows.

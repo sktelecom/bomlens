@@ -1,3 +1,6 @@
+# Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
 # spdx-normalize.jq — map a license id/name/expression to an SPDX id for common
 # aliases. Single source of truth shared by generate-notice.sh (NOTICE grouping)
 # and normalize-sbom.sh (bom.json component licenses), so the attribution NOTICE

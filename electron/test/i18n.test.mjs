@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // i18n.mjs의 순수 로직 단위 테스트(electron 비의존). 시작 화면의 실제 렌더는
 // Windows/데스크톱 워크플로우에서 캡처로 확인한다.
 import assert from "node:assert/strict";

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 추가 스캔 폴더 목록의 저장/복원(순수 — electron/fs 비의존, 단위 테스트 가능).
 // userData/scan-mounts.json에 문자열 배열로 저장한다. 파일 손상이나 형식 이탈은
 // 빈 목록으로 되돌린다(다음 실행이 마운트 없이 뜰 뿐이다). fs 입출력은 main.mjs가 한다.

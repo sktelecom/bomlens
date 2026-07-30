@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 시작 로그(순수 — electron 비의존, 단위 테스트 가능).
 //
 // 상태 화면의 진행 로그는 UI로 전환되면 사라진다. 부팅이 이상하게 끝났을 때 사용자에게

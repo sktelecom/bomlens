@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Backend API contract (docker/web/server.py) — kept stable across the UI
  * rebuild. All network access for the app flows through this module so the

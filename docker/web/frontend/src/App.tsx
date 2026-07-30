@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { NextApp } from "./components/NextApp";
 
 // The redesigned shell is now the only UI (the classic flag-gated path was

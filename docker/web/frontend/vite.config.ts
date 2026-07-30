@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
 import path from "node:path";

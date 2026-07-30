@@ -1,3 +1,7 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// Adapted from shadcn/ui — Copyright (c) 2023 shadcn, MIT licensed.
+// SPDX-License-Identifier: Apache-2.0 AND MIT
+
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import {
   forwardRef,

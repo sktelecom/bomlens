@@ -1,3 +1,6 @@
+# Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
 # snapshot-normalize.jq — strip volatile fields from a CycloneDX SBOM so that a
 # committed golden snapshot diffs only on MEANINGFUL changes (specVersion,
 # component set, fields, licenses, cpe/purl). Used by tests/test-snapshot.sh and

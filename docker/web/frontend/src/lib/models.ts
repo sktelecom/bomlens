@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Parse the AI surfaces out of a raw CycloneDX 1.7 ML-BOM (OWASP AIBOM
  * Generator output): the machine-learning-model components with their model

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // boot.mjs의 상태표 단위 테스트(electron 비의존). 실제 전이는 main.mjs가 수행하므로
 // 여기서는 상태 집합과 canRetry/isBusy 판정이 표와 정확히 일치하는지만 검증한다.
 import assert from "node:assert/strict";

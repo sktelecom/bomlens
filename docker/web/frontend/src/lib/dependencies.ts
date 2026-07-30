@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Joins component vulnerability data (from the Components join, Phase 2a) into
  * the dependency views so the graph and tree can mark which packages carry

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 시작 시 새 릴리스 확인(순수 Node — electron 비의존, 단위 테스트 가능).
 // 업데이트 알림은 부가 기능이므로 네트워크 오류, rate limit, 응답 이상은 전부
 // 조용히 무시하고 null을 돌려준다. 부팅을 막거나 오류 화면을 띄우지 않는다.

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { test, type Page } from "@playwright/test";
 
 // Screenshot capture for the docs (run on demand: `npm run capture:ui`, excluded

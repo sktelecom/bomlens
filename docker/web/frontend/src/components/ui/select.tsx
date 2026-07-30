@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { forwardRef, type SelectHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";

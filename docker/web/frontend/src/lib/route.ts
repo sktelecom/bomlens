@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * URL-hash routing for the shell. The hash is the single source of truth for
  * what's on screen, so every navigation element can be a real `<a href>` that

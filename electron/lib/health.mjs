@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // UI 컨테이너 사망 감지 헬스 모니터(순수 — electron/docker 비의존, 단위 테스트 가능).
 //
 // UI 로드 이후에도 컨테이너는 밖에서 죽을 수 있다(docker stop, 엔진 재시작, OOM 등).

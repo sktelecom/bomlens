@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * i18n coverage — fails when the en and ko message catalogues drift apart.
  * Every key present in one locale must exist in the other (DoD: en ≡ ko,

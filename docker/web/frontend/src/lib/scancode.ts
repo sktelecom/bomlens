@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Parse ScanCode Toolkit output (`scancode --license --json-pp`, emitted as
  * `{prefix}_scancode.json` when --deep-license is on) into a directory tree

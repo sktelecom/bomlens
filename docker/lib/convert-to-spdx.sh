@@ -1,5 +1,6 @@
 #!/bin/bash
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
 # convert-to-spdx.sh — export the finished CycloneDX BOM as SPDX 2.3 JSON via

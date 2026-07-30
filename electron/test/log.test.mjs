@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // log.mjs 단위 테스트(electron 비의존). 줄 형식, 실행마다 파일을 새로 쓰는지,
 // 순서 보존, 그리고 파일 오류를 조용히 넘기는지 검증한다.
 import assert from "node:assert/strict";

@@ -1,5 +1,6 @@
 #!/bin/bash
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
 # test-web-ui.sh — No-Docker contract tests for the web UI server (docker/web/server.py).

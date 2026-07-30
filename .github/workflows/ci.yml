@@ -215,6 +215,11 @@ jobs:
       - name: License files shipped in the image match the repository root
         run: bash tests/check-notice-sync.sh
 
+      # Without this, a new file silently arrives untagged and the repository
+      # drifts back to where it was.
+      - name: SPDX license header on every source file
+        run: node scripts/check-license-headers.mjs
+
       - name: Examples manifest validation
         run: bash examples/test-all.sh
 

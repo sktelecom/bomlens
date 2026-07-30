@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 창 위치/크기 기억(순수 — electron 비의존, 단위 테스트 가능).
 //
 // userData/window-state.json에 저장된 창 상태를 다음 실행에서 복원할 때 쓴다.

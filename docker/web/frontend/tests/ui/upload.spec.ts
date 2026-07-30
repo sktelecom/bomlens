@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { test, expect, type Page } from "@playwright/test";
 
 // Exercises the ZIP-upload flow end-to-end in the frontend: selecting the upload

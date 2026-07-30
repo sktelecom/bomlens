@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { defineConfig, devices } from "@playwright/test";
 
 // UI tests drive the built SPA (served by `vite preview`) and stub the backend

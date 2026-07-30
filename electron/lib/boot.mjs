@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 부팅 상태 기계(순수 — electron 비의존, 단위 테스트 가능).
 //
 // main.mjs의 startup()은 원래 1회용이었다. 재시도(다시 시도 버튼)와 컨테이너 사망 감지를

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // @no-unit-test: i18next bootstrap (side-effecting init + re-export); behavior covered by the Playwright i18n suite.
 import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";

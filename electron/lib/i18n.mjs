@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // 데스크톱 시작 화면 문자열의 한국어/영어 사전과 로캘 선택(순수 — electron 비의존, 단위 테스트 가능).
 // 웹 UI(docker/web/frontend, i18next)와 동일한 원칙: 로캘이 ko로 시작하면 한국어, 아니면 영어 폴백.
 // 전역 확장에 맞춰 비한국어 환경에서는 영어로 뜨고, 한국 사용자는 기존 경험을 그대로 유지한다.

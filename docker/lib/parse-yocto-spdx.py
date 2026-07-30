@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
 # parse-yocto-spdx.py — read a Yocto SPDX 3.0 image SBOM and emit CycloneDX plus

@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Minimal toast — no dependency, no portal library. A polite live region at the
  * bottom of the viewport announces transient feedback (link copied, download

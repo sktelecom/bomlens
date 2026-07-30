@@ -47,6 +47,18 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 
 목록이 낡지 않도록 `npm run notices:check`가 생성 파일을 검사합니다. 라이선스를 선언하지 않은 패키지, 전문을 찾지 못한 패키지, copyleft 라이선스가 하나라도 있으면 CI가 실패합니다.
 
+### 웹 UI 컴포넌트 (shadcn/ui에서 가져와 고친 코드)
+
+shadcn/ui는 패키지로 설치하는 라이브러리가 아니라 컴포넌트 코드를 프로젝트에 복사해 쓰는 방식입니다. 그래서 npm 의존성 목록에는 나타나지 않지만 코드는 저장소 안에 있습니다. `docker/web/frontend/src/components/ui/`의 다음 7개 파일이 shadcn/ui의 컴포넌트를 가져와 디자인 토큰과 접근성 요구에 맞게 고친 것입니다.
+
+| 파일 | 원본 |
+|------|------|
+| `badge.tsx`, `button.tsx`, `card.tsx`, `input.tsx`, `label.tsx`, `progress.tsx`, `tabs.tsx` | shadcn/ui (MIT, Copyright (c) 2023 shadcn), https://github.com/shadcn-ui/ui |
+
+일곱 파일에는 원본의 MIT 고지와 우리 수정분의 저작권 표기가 함께 들어 있고, 파일 라이선스는 `SPDX-License-Identifier: Apache-2.0 AND MIT`로 표기했습니다. MIT 전문은 이미지 안 `/usr/local/lib/sbom/licenses/MIT.txt`에 있습니다.
+
+같은 디렉터리의 `barlist.tsx`, `select.tsx`, `state.tsx`, `switch.tsx`는 직접 작성한 것이라 Apache-2.0 단독입니다. `switch.tsx`는 shadcn/ui의 겉모양(트랙과 손잡이 크기)을 참고했을 뿐 구현은 네이티브 체크박스로 따로 작성했습니다.
+
 ### 웹 UI 폰트
 
 웹 UI(`--ui`)는 타이포그래피 일관성과 오프라인·데스크톱(Electron) 동작을 위해 두 글꼴을 `@fontsource`로 번들합니다. 글꼴 파일(woff2)은 빌드 시 웹 SPA에 포함되어 기본 이미지로 함께 배포되며, 외부 폰트 CDN을 호출하지 않습니다.

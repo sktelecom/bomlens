@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 """Report the components a firmware's ELF files prove are present.
 

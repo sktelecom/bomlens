@@ -1,3 +1,6 @@
+# Copyright 2026 SK Telecom Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
 # license-flags.jq — classify a license id/name into an AI-relevant restriction
 # class that a human must review. Single source of truth shared by
 # generate-notice.sh (the "license review" section) and normalize-sbom.sh (the

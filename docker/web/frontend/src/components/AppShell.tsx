@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { type ReactNode, useEffect, useState } from "react";
 
 import { DemoBanner } from "./DemoBanner";

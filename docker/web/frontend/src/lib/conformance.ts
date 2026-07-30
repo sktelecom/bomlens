@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Split and summarize conformance checks for the G7 section: base format checks
  * vs the G7 AI minimum-element checks (ids prefixed "g7-"), the per-cluster

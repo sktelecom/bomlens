@@ -1,3 +1,7 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// Adapted from shadcn/ui — Copyright (c) 2023 shadcn, MIT licensed.
+// SPDX-License-Identifier: Apache-2.0 AND MIT
+
 import { forwardRef, type InputHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";

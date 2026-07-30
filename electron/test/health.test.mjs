@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // health.mjs의 단위 테스트(electron 비의존). 짧은 intervalMs를 주입해 실제 시간으로
 // 몇 틱만 돌리고 onDown 호출 규칙을 검증한다.
 import assert from "node:assert/strict";

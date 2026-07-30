@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 // scanmounts.mjs의 저장 목록 정규화 로직 단위 테스트(fs 비의존).
 import assert from "node:assert/strict";
 import { test } from "node:test";

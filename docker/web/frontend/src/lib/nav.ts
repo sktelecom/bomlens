@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Navigation model for the result shell — the single source of truth for the
  * left rail's sections, their grouping and which ones are AI-only.
