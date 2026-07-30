@@ -499,6 +499,13 @@ jobs:
         run: npm run test:lib-gate
       - name: Unit tests (Vitest) + coverage thresholds
         run: npm run test:coverage
+      # The build emits dist/third-party-licenses.txt from the bundled module
+      # graph. Build here rather than leaning on the Playwright webServer's
+      # build, so the gate runs even when the UI tests are skipped or fail.
+      - name: Build the SPA
+        run: npm run build
+      - name: Third-party notices for the bundled npm packages
+        run: npm run notices:check
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run UI tests (functional + axe)

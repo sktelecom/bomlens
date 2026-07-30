@@ -121,6 +121,9 @@ STATIC_CTYPES = {
     ".woff2": "font/woff2",
     ".map": "application/json",
     ".webmanifest": "application/manifest+json",
+    # third-party-licenses.txt, generated into the bundle at build time. Without
+    # this it would be served as octet-stream and download instead of opening.
+    ".txt": "text/plain; charset=utf-8",
 }
 
 ARTIFACT_SUFFIXES = (

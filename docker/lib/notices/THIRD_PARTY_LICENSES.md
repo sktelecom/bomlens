@@ -26,6 +26,27 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 
 > 데이터: NVD(취약점 출처)는 public domain이며 "NIST/NVD" 출처 표시가 요구됩니다.
 
+### 웹 UI npm 패키지
+
+웹 UI(`--ui`)는 React 단일 페이지 애플리케이션입니다. 빌드 결과에 npm 패키지 코드가 함께 들어가고 그 결과물이 기본 이미지와 데스크톱 설치본으로 배포되므로, MIT와 ISC가 요구하는 저작권·허가 고지가 배포물에 함께 있어야 합니다.
+
+정본은 빌드 시 생성되는 `third-party-licenses.txt`입니다. 번들에 실제로 들어간 패키지만 골라 각 패키지의 라이선스 전문을 그대로 담으며, 웹 UI에서 `/third-party-licenses.txt`로 열 수 있고 이미지 안에서는 `/usr/local/lib/sbom-web/dist/third-party-licenses.txt`에 있습니다. `package.json`의 선언 목록이 아니라 번들 그래프에서 뽑는 이유는 두 목록이 다르기 때문입니다. 선언된 의존성 중 tailwindcss나 typescript처럼 빌드에만 쓰이는 것은 배포물에 들어가지 않고, 반대로 선언되어 설치까지 되었지만 아무 곳에서도 가져다 쓰지 않아 번들에서 빠지는 것도 있습니다.
+
+아래는 현재 번들에 들어가는 23개 패키지입니다. 모두 permissive이며 copyleft는 없습니다.
+
+| 패키지 | 용도 | 라이선스 (SPDX) |
+|--------|------|------------------|
+| react, react-dom, scheduler | UI 렌더링 | MIT |
+| @radix-ui/react-label, react-progress, react-slot, react-primitive, react-context, react-compose-refs | 접근성 있는 기본 컴포넌트 | MIT |
+| cytoscape, cytoscape-dagre, dagre, graphlib, lodash | 의존성 그래프 시각화와 배치 | MIT |
+| i18next, react-i18next, i18next-browser-languagedetector | 한국어·영어 전환 | MIT |
+| class-variance-authority | 컴포넌트 변형 정의 | Apache-2.0 |
+| clsx, tailwind-merge | 클래스 이름 결합 | MIT |
+| lucide-react | 아이콘 | ISC |
+| @fontsource/inter, @fontsource/jetbrains-mono | 글꼴(아래 절 참고) | OFL-1.1 |
+
+목록이 낡지 않도록 `npm run notices:check`가 생성 파일을 검사합니다. 라이선스를 선언하지 않은 패키지, 전문을 찾지 못한 패키지, copyleft 라이선스가 하나라도 있으면 CI가 실패합니다.
+
 ### 웹 UI 폰트
 
 웹 UI(`--ui`)는 타이포그래피 일관성과 오프라인·데스크톱(Electron) 동작을 위해 두 글꼴을 `@fontsource`로 번들합니다. 글꼴 파일(woff2)은 빌드 시 웹 SPA에 포함되어 기본 이미지로 함께 배포되며, 외부 폰트 CDN을 호출하지 않습니다.

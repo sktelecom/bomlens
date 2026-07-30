@@ -2,6 +2,8 @@
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { defineConfig } from "vite";
+// @ts-expect-error -- plain .mjs plugin, no type declarations to import
+import { thirdPartyNotices } from "./scripts/vite-third-party-notices.mjs";
 
 // BomLens local UI. Built to a static SPA (dist/) that docker/web/server.py
 // serves. In dev, proxy the data API to a locally-running server.py (port 8080)
@@ -12,7 +14,10 @@ import { defineConfig } from "vite";
 // at `/`, so a normal build leaves this at the default.
 export default defineConfig({
   base: process.env.BASE_PATH || "/",
-  plugins: [react()],
+  // The notice plugin emits dist/third-party-licenses.txt from the bundled
+  // module graph, so the shipped SPA always carries the terms of the packages
+  // actually inside it.
+  plugins: [react(), thirdPartyNotices()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },
