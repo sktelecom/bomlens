@@ -143,23 +143,49 @@ fi
 # Keeping the reason is the point. Guessing at the cause once cost a release note
 # that told readers to go find sasquatch when the extractor was in fact refusing
 # to write an SELinux attribute — a one-flag problem. Report what the tool said.
+
+# Is this file a squashfs image? Decided on the first four bytes, not on what
+# `file` says.
+#
+# `file` reports a vendor image whose magic is byte-swapped as plain "data", and a
+# Zyxel switch firmware ships exactly that: its whole system lives in an `sqfs.img`
+# starting `71 73 68 73`, which is the big-endian magic `sqsh` with each 16-bit
+# word swapped. Trusting `file` meant walking past a 3.9 MB root filesystem and
+# cataloguing the boot initramfs instead — 1 component out of the 17 the vendor
+# declares in its own notice.
+#
+# The four accepted arrangements are the two endiannesses and their word-swapped
+# forms. Anything else is not a squashfs.
+is_squashfs_image() {
+    case "$(od -A n -t x1 -N 4 "$1" 2>/dev/null | tr -d ' \n')" in
+        68737173|73717368) return 0 ;;  # hsqs / sqsh
+        73687371|71736873) return 0 ;;  # the same two, 16-bit words swapped
+        *) return 1 ;;
+    esac
+}
+
+# Each entry is one line: "<path inside the firmware><TAB><why the extractor refused>".
+# Keeping the reason is the point. Guessing at the cause once cost a release note
+# that told readers to go find sasquatch when the extractor was in fact refusing
+# to write an SELinux attribute — a one-flag problem. Report what the tool said.
 CARVED_UNOPENED=""
 extract_carved_filesystems() {
     local img out err reason found=0
     # Returns non-zero when nothing was opened, which is also the right answer when
-    # the extractor is absent: the caller's loop reads success as "made progress".
-    command -v unsquashfs >/dev/null 2>&1 || return 1
+    # neither extractor is present: the caller's loop reads success as "progress".
+    command -v unsquashfs >/dev/null 2>&1 || command -v sasquatch >/dev/null 2>&1 || return 1
     err="$WORK/unsquashfs.err"
     while IFS= read -r img; do
         [ -f "$img" ] || continue
-        case "$(file -b "$img" 2>/dev/null)" in
-            *Squashfs*) ;;
-            *) continue ;;
-        esac
+        is_squashfs_image "$img" || continue
         out="$img.extracted"
         [ -e "$out" ] && continue
-        if _tmo unsquashfs -no-xattrs -f -d "$out" "$img" >/dev/null 2>"$err" \
-           && [ -n "$(find "$out" -type f -print -quit 2>/dev/null)" ]; then
+        # Standard tool first; sasquatch (a patched unsquashfs) second, because it
+        # is the one that reads the vendor variants — byte-swapped magic, and the
+        # LZMA flavours that predate the mainline format. Nothing is lost by
+        # trying the standard tool first, and its error is the more useful one to
+        # report when both fail.
+        if opened_squashfs "$img" "$out" "$err"; then
             echo "[firmware] opened a carved squashfs image: ${img#"$EXTRACT"/}"
             found=1
         else
@@ -173,6 +199,21 @@ extract_carved_filesystems() {
     done < <(find "$EXTRACT" -type f -size +256k 2>/dev/null)
     rm -f "$err"
     return $((1 - found))
+}
+
+# Try each extractor in turn; succeed only if files actually landed.
+opened_squashfs() {
+    local img="$1" out="$2" err="$3" tool
+    for tool in unsquashfs sasquatch; do
+        command -v "$tool" >/dev/null 2>&1 || continue
+        rm -rf "$out"
+        if _tmo "$tool" -no-xattrs -f -d "$out" "$img" >/dev/null 2>"$err" \
+           && [ -n "$(find "$out" -type f -print -quit 2>/dev/null)" ]; then
+            [ "$tool" = sasquatch ] && echo "[firmware] (standard unsquashfs refused it; sasquatch read it)"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # An image can nest (firmware -> partition -> squashfs), and each pass can expose
@@ -312,8 +353,13 @@ fi
 #
 # Shipping that verbatim puts the scanning machine's temp path into a document
 # meant to be handed to other people, and buries the one useful part. unblob
-# names every nesting level `<something>_extract/`, so the text after the last
-# one is the path as it exists inside the firmware — keep exactly that.
+# names every nesting level `<something>_extract/`, and the second pass above adds
+# `<image>.extracted/`, so the text after the last of either marker is the path as
+# it exists inside the firmware — keep exactly that.
+#
+# Both markers have to be handled, not just unblob's. When only `_extract/` was
+# stripped, the same file appeared twice — once as `bin/openssl` and once as
+# `sqfs.img.extracted/bin/openssl` — because the dedupe key differed.
 #
 # cve-bin-tool also writes one placeholder component named after the directory it
 # was pointed at (`CVEBINTOOL-extract`), whether or not it identified anything.
@@ -323,9 +369,10 @@ fi
 comps_of() {
     jq -c '[.components[]? | select((.name // "") != "")
            | select((.name // "") | startswith("CVEBINTOOL-") | not)
-           | .name |= (if test("_extract/") then (split("_extract/") | last)
-                       elif startswith("/") then (split("/") | last)
-                       else . end)]' "$1" 2>/dev/null || echo '[]'
+           | .name |= (([splits("_extract/|[.]extracted/")] | last) as $tail
+                       | if ($tail | length) > 0 and $tail != . then $tail
+                         elif startswith("/") then (split("/") | last)
+                         else . end)]' "$1" 2>/dev/null || echo '[]'
 }
 comps_of "$PKG_SBOM" > "$WORK/pkg-comps.json"
 comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"

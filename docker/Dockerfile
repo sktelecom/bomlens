@@ -69,6 +69,11 @@ ARG UNBLOB_VERSION=26.3.30
 ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
 ARG UBI_READER_VERSION=0.8.14
+# sasquatch — the patched unsquashfs that reads vendor squashfs variants standard
+# squashfs-tools rejects. GPL-2.0, from the unblob authors, shipped as a prebuilt
+# .deb so nothing is compiled here.
+# renovate: datasource=github-releases depName=onekey-sec/sasquatch
+ARG SASQUATCH_VERSION=sasquatch-v4.5.1-6
 
 # Deep-CVE matching (opt-in image `bomlens-deep-cve`). grype adds a CPE matcher
 # that reaches the NVD-only maven CVEs Trivy misses (older Apache libs keyed in
@@ -209,8 +214,14 @@ RUN if [ "$SBOM_SCANOSS" = "true" ]; then \
 #   Setup, self-extracting cabinets) that unblob does not unpack at all.
 #   Built only into ghcr.io/sktelecom/sbom-scanner-firmware so the base stays GPL-free.
 #   NOTE: the PyPI `binwalk` 2.x dist is broken (no binwalk.core), so it is NOT
-#   installed; unsquashfs covers the common squashfs case. vendor-modified
-#   (non-standard) squashfs still needs sasquatch added on top of this.
+#   installed; unsquashfs covers the common squashfs case.
+#
+#   sasquatch covers what unsquashfs will not touch: a vendor image whose magic is
+#   byte-swapped, and the LZMA flavours that predate the mainline format. A Zyxel
+#   switch firmware keeps its whole system in such an image, and without this the
+#   scan reads the boot initramfs and reports one component instead of the system.
+#   Prebuilt .deb (187 KB), so no compiler is pulled in. The build FAILS if the
+#   binary is not runnable afterwards, rather than shipping a silent gap.
 RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       apt-get update && apt-get install -y --no-install-recommends \
         squashfs-tools e2fsprogs p7zip-full unar cpio cabextract \
@@ -219,8 +230,14 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
         "unblob==${UNBLOB_VERSION}" \
         "cve-bin-tool==${CVE_BIN_TOOL_VERSION}" \
         "ubi_reader==${UBI_READER_VERSION}" \
+      && arch="$(dpkg --print-architecture)" \
+      && curl -fsSL -o /tmp/sasquatch.deb \
+         "https://github.com/onekey-sec/sasquatch/releases/download/${SASQUATCH_VERSION}/sasquatch_1.0_${arch}.deb" \
+      && dpkg -i /tmp/sasquatch.deb && rm -f /tmp/sasquatch.deb \
       && rm -rf /var/lib/apt/lists/* \
-      && unblob --version && cve-bin-tool --version; \
+      && unblob --version && cve-bin-tool --version \
+      && command -v sasquatch \
+      && (sasquatch -version 2>&1 | head -1 || true); \
     else \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
     fi

@@ -55,10 +55,22 @@ echo "== real identifications are kept, and their names cleaned =="
 
 got="$(comps_of "$FIX/cvebintool-identified.json")"
 n=$(printf '%s' "$got" | jq 'length')
-if [ "$n" = "2" ]; then
-    pass "the placeholder is dropped and both real components are kept"
+if [ "$n" = "4" ]; then
+    pass "the placeholder is dropped and the real components are kept"
 else
-    fail "unexpected component count" "expected 2, got $n: $got"
+    fail "unexpected component count" "expected 4, got $n: $got"
+fi
+
+# The second pass names its output `<image>.extracted/`, so the same file arrives
+# both as `bin/openssl` and as `sqfs.img.extracted/bin/openssl`. Strip both that
+# marker and unblob's `_extract/`, or the two survive as separate components with
+# different dedupe keys.
+same=$(printf '%s' "$got" | jq '[.[] | select(.name == "bin/openssl")] | length')
+if [ "$same" = "2" ]; then
+    pass "the second pass's own directory name is stripped too"
+else
+    fail "an .extracted/ prefix survived into a component name" \
+         "both entries should reduce to bin/openssl; got $same of 2"
 fi
 
 if printf '%s' "$got" | jq -e 'any(.[]; .name == "openssl" and .version == "1.1.1v")' >/dev/null; then
@@ -190,7 +202,7 @@ fi
 # The reason must come from the extractor, not from a guess. Guessing once shipped
 # a message telling readers to find sasquatch when unsquashfs was actually refusing
 # to write an SELinux attribute — a one-flag problem, sent in the wrong direction.
-if awk '/^extract_carved_filesystems\(\) \{/,/^}/' "$SCRIPT" | grep -q '2>"\$err"'; then
+if grep -q '2>"\$err"' "$SCRIPT"; then
     pass "the extractor's own error output is captured"
 else
     fail "the extractor's error output is discarded" \
@@ -206,13 +218,15 @@ fi
 # unsquashfs restores extended attributes by default and treats a refused
 # security.selinux write as fatal, aborting mid-extraction. Both call sites must
 # turn that off or a standard squashfs comes out empty.
-noxattr=$(grep -c 'unsquashfs -no-xattrs' "$SCRIPT")
-total=$(grep -cE '_tmo unsquashfs' "$SCRIPT")
-if [ "$noxattr" -ge 1 ] && [ "$noxattr" -eq "$total" ]; then
-    pass "every unsquashfs call disables extended-attribute restore ($noxattr/$total)"
+# Every extractor invocation, including the one that runs the tool through a
+# variable, has to pass the flag — a new call site without it aborts the same way.
+calls=$(grep -cE '_tmo (unsquashfs|sasquatch|"\$tool")' "$SCRIPT")
+noxattr=$(grep -cE '_tmo (unsquashfs|sasquatch|"\$tool") -no-xattrs' "$SCRIPT")
+if [ "$noxattr" -ge 1 ] && [ "$noxattr" -eq "$calls" ]; then
+    pass "every extractor call disables extended-attribute restore ($noxattr/$calls)"
 else
-    fail "an unsquashfs call still restores extended attributes" \
-         "$noxattr of $total calls pass -no-xattrs; the others abort on SELinux writes"
+    fail "an extractor call still restores extended attributes" \
+         "$noxattr of $calls calls pass -no-xattrs; the others abort on SELinux writes"
 fi
 
 # Three branches, so the reader gets a cause rather than a catch-all.
@@ -221,6 +235,52 @@ if [ "${branches:-0}" -ge 3 ]; then
     pass "the diagnostic distinguishes at least three causes"
 else
     fail "the diagnostic does not distinguish the known causes" "found $branches branch(es)"
+fi
+
+echo "== a byte-swapped squashfs is still recognized as one =="
+
+# `file` calls a vendor image with swapped magic plain "data". A Zyxel switch keeps
+# its whole system in such an image, so trusting `file` meant walking past a 3.9 MB
+# root filesystem and cataloguing the boot initramfs instead — 1 component against
+# the 17 the vendor declares in its own notice.
+fn="$(awk '/^is_squashfs_image\(\) \{/,/^}/' "$SCRIPT")"
+if [ -n "$fn" ]; then
+    pass "squashfs detection is a dedicated check"
+else
+    fail "is_squashfs_image is gone"
+fi
+
+if awk '/^extract_carved_filesystems\(\) \{/,/^}/' "$SCRIPT" | grep -q 'file -b'; then
+    fail "the carve pass decides from \`file\` output again" \
+         "a swapped-magic image reports as \"data\" and would be walked past"
+else
+    pass "the carve pass does not depend on \`file\` output"
+fi
+
+# All four arrangements: both endiannesses, each with and without 16-bit word swap.
+for magic in 68737173 73717368 73687371 71736873; do
+    if printf '%s' "$fn" | grep -q "$magic"; then
+        pass "magic $magic accepted"
+    else
+        fail "magic $magic not accepted" "one of the four squashfs arrangements is missing"
+    fi
+done
+
+echo "== the vendor squashfs variant has an extractor =="
+
+if grep -q 'sasquatch' "$ROOT_DIR/docker/Dockerfile"; then
+    pass "sasquatch is installed into the firmware image"
+else
+    fail "sasquatch is not installed" "byte-swapped and LZMA squashfs stay unreadable"
+fi
+
+# Standard tool first: nothing is lost by trying it, and its error is the more
+# useful one to report when both fail.
+order=$(awk '/^opened_squashfs\(\) \{/,/^}/' "$SCRIPT" | grep -oE 'unsquashfs sasquatch|sasquatch unsquashfs' | head -1)
+if [ "$order" = "unsquashfs sasquatch" ]; then
+    pass "the standard extractor is tried before the patched one"
+else
+    fail "extractor order is wrong or missing" "got: ${order:-none}"
 fi
 
 echo

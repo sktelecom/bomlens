@@ -20,6 +20,16 @@
       "bom-ref": "3-busybox",
       "name": "/tmp/tmp.abc/extract/fw.img_extract/usr/bin/busybox",
       "version": "1.38.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "4-openssl-file-a",
+      "name": "bin/openssl"
+    },
+    {
+      "type": "library",
+      "bom-ref": "5-openssl-file-b",
+      "name": "sqfs.img.extracted/bin/openssl"
     }
   ]
 }
