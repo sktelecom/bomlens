@@ -1,3 +1,6 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
 import { test } from "@playwright/test";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

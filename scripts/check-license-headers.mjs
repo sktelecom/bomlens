@@ -28,8 +28,9 @@ const SPDX_ID = "Apache-2.0";
 // Comment syntax per extension. .bat uses REM, which is why it cannot share the
 // hash family; .css has no line comment, so it gets a wrapped block.
 //
-// .html is left out on purpose: the only hand-written one is the SPA shell, and
-// every other tracked .html is a report the scanner generated. So is .json --
+// .html is left out on purpose. Most tracked ones are reports the scanner
+// generated; the hand-written ones (the SPA shell, the social-card render
+// template) are markup whose first line has to be the doctype. So is .json --
 // the format has no comments at all.
 const COMMENT = {
   ".sh": "#", ".py": "#", ".jq": "#",
