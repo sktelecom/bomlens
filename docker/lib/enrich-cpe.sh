@@ -112,8 +112,31 @@ if jq --argjson cmap "$CMAP" '
   def cpe_withheld: any((.properties // [])[];
                         .name == "bomlens:cpeUnmapped" and .value == "true");
 
+  # A Linux kernel module is not a product, and the CPE syft gives it is built
+  # out of the module name: 8021q.ko becomes cpe:2.3:a:8021q:8021q:1.8, and the
+  # 1.8 is the modules own modinfo field rather than a release of anything. Most
+  # of those names match nothing in the index, which is why this has cost nothing
+  # so far, but the collisions are real. A MikroTik image carries a wireguard
+  # module at 1.0.0 and wireguard:wireguard is in the index with rows at 0.5.3;
+  # only the version kept them apart. This project does not attach an identifier
+  # it cannot justify, and there is no reason to keep one either.
+  #
+  # The module itself is kept. It is a real file, its licence is real, and the
+  # kernel it belongs to is reported separately with its own version. What goes
+  # is the guess about its identity, marked the way a producer marks one so
+  # nothing downstream puts it back.
+  def kernel_module: any((.properties // [])[];
+                         .name == "syft:package:type" and .value == "linux-kernel-module");
+
   (.components) |= (if type=="array" then map(
-    (((.name // "") | ascii_downcase)) as $n
+    (if kernel_module and ((.cpe // "") != "")
+     then del(.cpe)
+          | .properties = (((.properties // [])
+              | map(select(.name != "bomlens:cpeUnmapped" and .name != "bomlens:cpeSource")))
+              + [{name:"bomlens:cpeUnmapped", value:"true"},
+                 {name:"bomlens:cpeSource", value:"withheld-kernel-module"}])
+     else . end)
+    | (((.name // "") | ascii_downcase)) as $n
     | ($cmap[$n]) as $m
     # (a)+(b) CPE enrichment for whitelisted names with a CPE-safe version.
     | (if ($m != null) and (safe_ver(.version)) and (cpe_withheld | not)
@@ -137,11 +160,17 @@ if jq --argjson cmap "$CMAP" '
       else . end)
   ) else . end)
 ' "$SBOM" > "$TMP" 2>/dev/null; then
-    N=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:cpeSource"))] | length' "$TMP" 2>/dev/null || echo 0)
+    N=$(jq '[.components[]? | select((.properties // []) | any(
+             .name=="bomlens:cpeSource" and .value != "withheld-kernel-module"))] | length' "$TMP" 2>/dev/null || echo 0)
     L=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:licenseSource"))] | length' "$TMP" 2>/dev/null || echo 0)
+    K=$(jq '[.components[]? | select((.properties // []) | any(
+             .name=="bomlens:cpeSource" and .value=="withheld-kernel-module"))] | length' "$TMP" 2>/dev/null || echo 0)
     mv "$TMP" "$SBOM"
     echo "[cpe] set/normalized a whitelisted cpe:2.3 on ${N} component(s) for CVE matching."
     echo "[cpe] filled a confirmed SPDX license on ${L} previously license-null whitelisted component(s)."
+    if [ "${K:-0}" -gt 0 ]; then
+        echo "[cpe] withheld a name-derived cpe from ${K} Linux kernel module(s); the module name is not a product and the kernel is reported separately."
+    fi
 else
     rm -f "$TMP"
     echo "[cpe] WARN: CPE enrichment jq failed; leaving SBOM unchanged" >&2

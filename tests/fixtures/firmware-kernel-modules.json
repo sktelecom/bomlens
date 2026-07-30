@@ -1,0 +1,47 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "components": [
+    {
+      "type": "library",
+      "name": "wireguard",
+      "version": "1.0.0",
+      "cpe": "cpe:2.3:a:wireguard:wireguard:1.0.0:*:*:*:*:*:*:*",
+      "purl": "pkg:generic/wireguard@1.0.0",
+      "properties": [
+        { "name": "syft:package:type", "value": "linux-kernel-module" },
+        { "name": "syft:metadata:kernelVersion", "value": "5.6.3" },
+        { "name": "syft:location:0:path", "value": "/lib/modules/5.6.3/kernel/net/wireguard/wireguard.ko" }
+      ],
+      "_note": "A MikroTik RouterOS image carries exactly this. wireguard:wireguard is a real product in the NVD index, with rows at 0.5.3; only the version kept the two apart. The CPE is syft's construction from the module name, and the 1.0.0 is the module's own modinfo field."
+    },
+    {
+      "type": "library",
+      "name": "zlib",
+      "version": "1.2.3",
+      "cpe": "cpe:2.3:a:zlib:zlib:1.2.3:*:*:*:*:*:*:*",
+      "purl": "pkg:generic/zlib@1.2.3",
+      "properties": [
+        { "name": "syft:package:type", "value": "linux-kernel-module" },
+        { "name": "syft:location:0:path", "value": "/lib/modules/5.6.3/kernel/lib/zlib/zlib.ko" }
+      ],
+      "_note": "zlib is on the CPE name whitelist, so this one also proves the name map cannot hand an identifier back to a module after the module rule withholds one."
+    },
+    {
+      "type": "library",
+      "name": "busybox",
+      "version": "1.30.1",
+      "properties": [
+        { "name": "syft:package:type", "value": "binary" }
+      ],
+      "_note": "Not a kernel module. Enrichment must still reach it, or the rule has been written too widely."
+    },
+    {
+      "type": "library",
+      "name": "linux_kernel",
+      "version": "5.6.3",
+      "_note": "The kernel the modules belong to, reported on its own. This is why dropping the modules' identifiers loses nothing: the thing that has a real CPE and a real version is here."
+    }
+  ]
+}

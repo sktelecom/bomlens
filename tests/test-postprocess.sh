@@ -749,6 +749,58 @@ total_n=$(jq '[.components[]?] | length' "$WORK/mmerged.json")
 lodash_purl=$(jq -r '.components[] | select((.name|ascii_downcase)=="lodash") | .purl' "$WORK/mmerged.json")
 [ "$lodash_purl" = "pkg:npm/lodash@4.17.21" ] && pass "package-manager identity (pkg:npm) wins over the SCANOSS pkg:github match" || fail "lodash purl='$lodash_purl', expected pkg:npm"
 
+echo "== F-0: a kernel module keeps no name-derived CPE =="
+
+# syft builds a kernel module's CPE out of the module name: 8021q.ko becomes
+# cpe:2.3:a:8021q:8021q:1.8, where the 1.8 is the module's own modinfo field and
+# not a release of anything. Most of those names match nothing, but the
+# collisions are real — a MikroTik image carries a wireguard module at 1.0.0 and
+# wireguard:wireguard is in the index at 0.5.3, so only the version kept them
+# apart. Measured on that image: 304 of its 309 components are kernel modules.
+cp "$FIX/firmware-kernel-modules.json" "$WORK/km.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/km.json" >/dev/null 2>&1
+
+wg_cpe=$(jq -r '.components[] | select(.name=="wireguard") | .cpe // "ABSENT"' "$WORK/km.json")
+[ "$wg_cpe" = "ABSENT" ] \
+    && pass "a module whose name collides with a real product carries no cpe" \
+    || fail "wireguard module kept cpe='$wg_cpe'"
+
+# zlib is on the whitelist, so this also shows the name map cannot hand an
+# identifier back after the module rule withholds one — the same guard that keeps
+# uClibc-ng from being given uclibc's advisories.
+zk_cpe=$(jq -r '.components[] | select(.name=="zlib") | .cpe // "ABSENT"' "$WORK/km.json")
+[ "$zk_cpe" = "ABSENT" ] \
+    && pass "the name map does not put a cpe back on a whitelisted module name" \
+    || fail "zlib module got cpe='$zk_cpe' from the name map"
+
+wg_mark=$(jq -r '.components[] | select(.name=="wireguard")
+                 | [(.properties // [])[] | select(.name=="bomlens:cpeUnmapped") | .value][0] // "ABSENT"' "$WORK/km.json")
+[ "$wg_mark" = "true" ] \
+    && pass "the withheld identifier is marked, not silently dropped" \
+    || fail "wireguard module cpeUnmapped='$wg_mark', expected true"
+
+# The module itself stays. It is a real file with a real licence; what goes is
+# the guess about its identity.
+km_n=$(jq '[.components[]?] | length' "$WORK/km.json")
+[ "$km_n" = "4" ] \
+    && pass "the modules are kept as components, only their identifier is withheld" \
+    || fail "component count changed to $km_n, expected 4"
+
+# Written too widely, this would strip or skip everything else as well.
+bb_km=$(jq -r '.components[] | select(.name=="busybox") | .cpe // "ABSENT"' "$WORK/km.json")
+[ "$bb_km" = "cpe:2.3:a:busybox:busybox:1.30.1:*:*:*:*:*:*:*" ] \
+    && pass "a non-module component is still enriched normally" \
+    || fail "busybox cpe='$bb_km', expected the whitelisted cpe"
+
+# Running the pipeline twice must not change the result or stack properties.
+cp "$WORK/km.json" "$WORK/km.once"
+bash "$LIB/enrich-cpe.sh" "$WORK/km.json" >/dev/null 2>&1
+if diff -q "$WORK/km.once" "$WORK/km.json" >/dev/null 2>&1; then
+    pass "withholding is idempotent across reruns"
+else
+    fail "a second enrichment pass changed the SBOM"
+fi
+
 echo "== F-1: firmware CPE enrichment (Plan 1) — whitelist + version normalization =="
 cp "$FIX/firmware-no-cpe.json" "$WORK/fw.json"
 bash "$LIB/enrich-cpe.sh" "$WORK/fw.json" >/dev/null 2>&1
