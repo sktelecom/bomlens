@@ -128,13 +128,27 @@ def src($c):
 # share-alike duties on redistribution just as a code license does. It is tagged
 # so a reader can tell data from code: the obligations attach to different things
 # (the corpus, not the binary), and the rest of this file is written for software.
-# Linux kernel modules are folded into one line per licence rather than listed
-# individually. A firmware that ships lib/modules can carry hundreds of them —
-# a MikroTik RouterOS image has 304 — and each was arriving as three lines whose
-# source read `pkg:generic/nls_utf8`, a purl syft builds from the module name that
-# leads nowhere. The obligation is discharged by the kernel they were built from,
-# which is listed here in its own right, so the notice says how many there are and
-# which kernel they belong to. Every module remains in the SBOM by name.
+# Two kinds of entry are folded into one line per licence rather than listed
+# individually, because listing them item by item tells a reader nothing they can
+# act on.
+#
+# Linux kernel modules. A firmware that ships lib/modules can carry hundreds of
+# them — a MikroTik RouterOS image has 304 — and each was arriving as three lines
+# whose source read `pkg:generic/nls_utf8`, a purl syft builds from the module
+# name that leads nowhere. The obligation is discharged by the kernel they were
+# built from, which is listed here in its own right, so the notice says how many
+# there are and which kernel they belong to.
+#
+# Catalogued files. A firmware scan records the files it walked as CycloneDX
+# `type: file` components, which is a legitimate inventory but not something a
+# licence notice can speak to: a path is not a project, so there is no name to
+# attribute and no source to point at. Measured across the corpus, 4,649 such
+# entries carry no licence, no purl and no external reference between them, so
+# every one of them landed under NOASSERTION with "holders not captured" beneath
+# it. Ubiquiti UniFi alone contributed 423.
+#
+# Everything folded here remains in the SBOM under its own name. What changes is
+# a document written for a person to act on.
 LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
   def kmod_of($c):
     if any($c.properties[]?;
@@ -142,6 +156,7 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
     then ( [ $c.properties[]? | select(.name == "syft:metadata:kernelVersion") | .value ][0]
            // "unknown version" )
     else null end;
+  def is_file($c): ($c.type // "") == "file";
   [ .components[]?
     | . as $c
     | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)
@@ -149,6 +164,7 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
         copyright: ($c.copyright // null),
         src: (src($c)),
         kmod: (kmod_of($c)),
+        isfile: (is_file($c)),
         lic: (
           ( [ $c.licenses[]?
               | (.license.id // .license.name // .expression)
@@ -157,23 +173,33 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
         )
       }
     | . as $x | $x.lic[] | { key: ., comp: $x.comp, copyright: $x.copyright,
-                             src: $x.src, kmod: $x.kmod }
+                             src: $x.src, kmod: $x.kmod, isfile: $x.isfile }
   ]
   | group_by(.key)
   | map({ license: .[0].key,
-          # The header counts components, not lines. Folding the modules into one
-          # line must not make 191 of them read as one.
-          count: ( ( [ .[] | select(.kmod == null) | { comp, copyright, src } ]
-                     | unique | length )
-                   + ( [ .[] | select(.kmod != null) ] | length ) ),
+          # The header counts components, not lines. Folding 191 modules or 423
+          # file entries into one line must not make them read as one.
+          count: ( ( [ .[] | select(.kmod == null and (.isfile | not))
+                           | { comp, copyright, src } ] | unique | length )
+                   + ( [ .[] | select(.kmod != null) ] | length )
+                   + ( [ .[] | select(.kmod == null and .isfile) ] | length ) ),
           components: (
-            ( [ .[] | select(.kmod == null) | { comp, copyright, src } ] | unique )
+            ( [ .[] | select(.kmod == null and (.isfile | not))
+                    | { comp, copyright, src } ] | unique )
             + ( [ .[] | select(.kmod != null) ]
                 | group_by(.kmod)
                 | map({ comp: ("Linux kernel modules (" + (length | tostring)
                                + "), part of linux_kernel@" + .[0].kmod),
                         copyright: null,
                         src: null }) )
+            # A kernel module is also the more specific description, so it wins
+            # when a component is both; the file branch takes what is left.
+            + ( [ .[] | select(.kmod == null and .isfile) ]
+                | if length == 0 then []
+                  else [ { comp: ("Catalogued files (" + (length | tostring)
+                                  + ") — paths recorded by the scan, listed in the SBOM, not components"),
+                           copyright: null,
+                           src: null } ] end )
             | sort_by(.comp) ) })
   | sort_by(.license)
 ' "$SBOM")

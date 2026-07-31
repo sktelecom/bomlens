@@ -237,6 +237,89 @@ else
         || fail "the kernel the modules point at is missing from the notice"
 fi
 
+echo "== B-4c: NOTICE folds catalogued file entries into one line per licence =="
+
+# A scan records the files it walked as CycloneDX `type: file` components. That is
+# a legitimate inventory but not something a licence notice can speak to: a path
+# is not a project, so there is no name to attribute and no source to point at.
+# Measured across the corpus, 4,649 such entries carry no licence, no purl and no
+# external reference between them — Ubiquiti UniFi alone contributed 423, and
+# every one landed under NOASSERTION with "holders not captured" beneath it.
+cat > "$WORK/filecomp.json" <<'JSON'
+{"components":[
+ {"type":"library","name":"openssl","version":"1.0.2u","purl":"pkg:generic/openssl@1.0.2u",
+  "licenses":[{"license":{"id":"Apache-2.0"}}]},
+ {"type":"file","name":"bin/openssl"},
+ {"type":"file","name":"etc/config/dhcp"},
+ {"type":"file","name":"/target/some-input.jar"},
+ {"type":"file","name":"lib/libz.so","licenses":[{"license":{"id":"Zlib"}}]}
+]}
+JSON
+bash "$LIB/generate-notice.sh" "$WORK/filecomp.json" "$WORK/fc" "FcProj" >/dev/null 2>&1
+FCTXT="$WORK/fc_NOTICE.txt"
+if [ ! -f "$FCTXT" ]; then
+    fail "generate-notice.sh produced no NOTICE for the file-entry fixture"
+else
+    # Three unlicensed file entries share the NOASSERTION group and fold together.
+    if grep -q "Catalogued files (3) — paths recorded by the scan" "$FCTXT"; then
+        pass "unlicensed file entries fold into one line"
+    else
+        fail "file entries were not folded" "$(grep -c '^  - ' "$FCTXT") entries listed"
+    fi
+
+    # The container mount path of the scanned artifact must not survive as a line
+    # of its own; it is the input, not third-party software.
+    if grep -q "^  - /target/some-input.jar$" "$FCTXT"; then
+        fail "the scan target's container path is still listed as a component"
+    else
+        pass "the scanned artifact's own path is not listed as a component"
+    fi
+
+    # Folding lines must not fold the count.
+    if awk '/^License: NOASSERTION$/{f=1;next} f&&/^Components \(3\):$/{ok=1} /^License: /{if(!/^License: NOASSERTION$/)f=0} END{exit !ok}' "$FCTXT"; then
+        pass "the licence header still counts every file entry"
+    else
+        fail "the header count collapsed along with the lines" \
+             "$(grep -A1 '^License: NOASSERTION$' "$FCTXT" | tail -1)"
+    fi
+
+    # A file entry that does carry a licence lands in that licence's group and
+    # folds there, not into NOASSERTION.
+    if awk '/^License: Zlib$/{f=1;next} f&&/Catalogued files \(1\)/{ok=1} /^License: /{if(!/^License: Zlib$/)f=0} END{exit !ok}' "$FCTXT"; then
+        pass "a licensed file entry folds under its own licence"
+    else
+        fail "a licensed file entry did not fold under its own licence"
+    fi
+
+    # Real components are untouched.
+    grep -q "^  - openssl@1.0.2u$" "$FCTXT" \
+        && pass "a real component is listed as before" \
+        || fail "a real component was folded or dropped"
+
+    # An SBOM with no file entries must come out exactly as it did before.
+    cat > "$WORK/nofile.json" <<'JSON'
+{"components":[
+ {"type":"library","name":"openssl","version":"1.0.2u","purl":"pkg:generic/openssl@1.0.2u",
+  "licenses":[{"license":{"id":"Apache-2.0"}}]}
+]}
+JSON
+    bash "$LIB/generate-notice.sh" "$WORK/nofile.json" "$WORK/nf" >/dev/null 2>&1
+    if grep -q "Catalogued files" "$WORK/nf_NOTICE.txt" 2>/dev/null; then
+        fail "a fold line appeared for an SBOM with no file entries"
+    else
+        pass "an SBOM with no file entries gains no fold line"
+    fi
+
+    # Running twice must not change the result.
+    cp "$FCTXT" "$WORK/fc.once"
+    bash "$LIB/generate-notice.sh" "$WORK/filecomp.json" "$WORK/fc" "FcProj" >/dev/null 2>&1
+    if diff -q <(grep -v Generated "$WORK/fc.once") <(grep -v Generated "$FCTXT") >/dev/null 2>&1; then
+        pass "folding is idempotent across reruns"
+    else
+        fail "a second notice run changed the output"
+    fi
+fi
+
 echo "== B-5: NOTICE shows source location + attribution per component =="
 # A component with a vcs externalReference, one with only a purl (registry inferred),
 # and one carrying component.copyright. Source must never be blank when a purl exists,
