@@ -103,13 +103,16 @@ OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 | cve-bin-tool | 3.4 (`CVE_BIN_TOOL_VERSION`) | stripped 바이너리 식별+CVE | **GPL-3.0** | strong | https://github.com/intel/cve-bin-tool |
 | ubi_reader | 0.8.13 (`UBI_READER_VERSION`) | UBI/UBIFS 추출 | **GPL-3.0** | strong | https://github.com/onekey-sec/ubi_reader |
 | squashfs-tools(unsquashfs) | (apt 배포 버전) | 표준 squashfs 추출 폴백 | GPL-2.0+ | strong | https://github.com/plougher/squashfs-tools |
-| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson 등 | (apt 배포 버전) | unblob가 호출하는 추출 바이너리 | GPL-2.0+ / 기타 | strong/various | Debian 패키지 |
+| sasquatch | `sasquatch-v4.5.1-6` (`SASQUATCH_VERSION`) | 표준 unsquashfs가 거부하는 벤더 변형 squashfs 추출 | GPL-2.0 | strong | https://github.com/onekey-sec/sasquatch |
+| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson 등 | (apt 배포 버전) | unblob가 호출하는 추출 바이너리, 그리고 Windows 설치 파일 컨테이너용으로 직접 호출하는 7z | GPL-2.0+ / 기타 | strong/various | Debian 패키지 |
 
-### 폴백·선택 도구 (기본 미설치)
+`scan-firmware.sh`의 언팩 순서는 unblob, `file`이 squashfs로 판정한 파일에 대한 unsquashfs,
+Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk입니다. 잘라내기만 되고 열리지 않은
+파일시스템 이미지는 2차 패스가 unsquashfs와 sasquatch 순으로 다시 엽니다.
 
-- BANG (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh`는 `bang-scanner`가 PATH에 있으면 언팩 폴백으로 사용합니다. 의존성이 무거워 기본 이미지에는 넣지 않으며, 필요할 때 따로 설치하면 자동으로 인식합니다. 언팩 폴백은 unblob, BANG, unsquashfs(squashfs), binwalk 순으로 시도합니다.
+### 이미지에 설치하지 않는 폴백 도구
+
 - binwalk: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 설치하지 않습니다. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 쓰지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
-- sasquatch (GPL-2.0, https://github.com/onekey-sec/sasquatch): 벤더가 변형한 비표준 squashfs 추출용으로 unblob 핸들러가 사용합니다. 표준 squashfs는 `squashfs-tools`(unsquashfs) 폴백으로 충분하므로 기본 이미지에는 넣지 않습니다.
 
 ### GPL 소스 코드 제공 (펌웨어 이미지)
 펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소나 패키지 레지스트리에서 버전을 고정해 받습니다. **GPL 라이선스 전문(GPL-2.0, GPL-3.0)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 함께 배포됩니다.** 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있고, 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다. 소스가 더 필요하면 저장소 이슈로 요청해 주세요.

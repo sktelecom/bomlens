@@ -12,7 +12,7 @@
 #              (Trivy-shaped CVE rows that scan-security.sh merges into _security.json)
 #
 # Pipeline (see docs/firmware-analysis.md §5):
-#   ① unpack   : unblob (preferred) -> BANG / binwalk (fallback)
+#   ① unpack   : unblob (preferred) -> unsquashfs / 7z / binwalk (fallback)
 #   ② packages : syft dir:<rootfs>            -> package-manager components
 #   ③ binaries : cve-bin-tool                 -> stripped static binaries (Phase 2)
 #                + ONLINE CVE matching (NVD/vuln DB) on those binaries (Plan 2):
@@ -56,7 +56,7 @@ FILE_INFO="firmware image"
 command -v file >/dev/null 2>&1 && FILE_INFO=$(file -b "$FW" 2>/dev/null || echo "firmware image")
 
 # --------------------------------------------------------
-# ① Unpack — unblob preferred; BANG, then format-specific extractors, as fallback.
+# ① Unpack — unblob preferred; format-specific extractors as fallback.
 # Each step is gated on whether real files actually landed (exit codes are
 # unreliable: unblob returns 0 even when an extractor dependency is missing).
 # --------------------------------------------------------

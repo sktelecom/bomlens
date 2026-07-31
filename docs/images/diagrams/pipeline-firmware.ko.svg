@@ -13,7 +13,7 @@
 <text x="440.0" y="69.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">.bin / .img.gz / squashfs / …</text>
 <rect x="250" y="128" width="380" height="60" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
 <text x="440.0" y="148.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1c2228">언팩 — 먼저 성공하는 도구 사용</text>
-<text x="440.0" y="173.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">unblob → BANG → unsquashfs → binwalk</text>
+<text x="440.0" y="173.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">unblob → unsquashfs → 7z → binwalk</text>
 <path d="M440,84 L440,128" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 <rect x="310" y="232" width="260" height="44" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
 <text x="440.0" y="254.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1c2228">루트 파일시스템 찾기</text>

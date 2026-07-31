@@ -127,9 +127,19 @@ Armijn Hemel(GPL 위반 적발로 유명한 라이선스 컴플라이언스 전�
 | CVE 식별 | ⚠️ 프로토타입 ("DO NOT USE" 표기) |
 | SBOM(CycloneDX) 출력 | ❌ 없음 |
 
-결론적으로 "라이선스 거장이 만든 도구"라는 기대와 달리 라이선스/CVE 식별 기능은 미완성입니다. 그래서 BANG은 "언팩 폴백"으로만 채택합니다. 라이선스/CVE/SBOM은 우리가 이미 가진 scancode/Trivy/syft가 더 성숙하므로, 그 영역에는 BANG을 쓰지 않습니다.
+결론적으로 "라이선스 거장이 만든 도구"라는 기대와 달리 라이선스/CVE 식별 기능은 미완성입니다. 그래서 처음에는 BANG을 "언팩 폴백"으로만 채택하기로 했습니다. 라이선스/CVE/SBOM은 우리가 이미 가진 scancode/Trivy/syft가 더 성숙하므로, 그 영역에는 BANG을 쓰지 않습니다.
 
-다만 이 채택은 아직 이행되지 않았습니다. 현재 이미지에 BANG은 들어 있지 않으며, 설치 방법과 호출 형태는 5절에 적어 두었습니다.
+### 4.1 언팩 폴백 채택도 철회 (2026-07-31)
+
+이 채택은 이행되지 않은 채로 남아 있었고, 이제 철회합니다. 이미지에 BANG은 들어 있지 않고 앞으로도 넣지 않습니다.
+
+근거는 채택 당시의 전제가 실측으로 무너졌기 때문입니다. 언팩 폴백이 필요하다고 본 근거는 벤더 펌웨어 두 대에서 컴포넌트가 0건이라는 것이었는데, 둘 다 언팩 문제가 아니었습니다. MikroTik RouterOS는 unblob이 이미 587개 파일을 풀어 놓았고 우리 rootfs 선정 코드가 번들 하위 디렉터리를 고른 것이었습니다(PR #582로 수정, 0건에서 310건). TP-Link Archer AX55는 엔트로피가 전 구간 7.9998인 암호화라 어떤 언패커도 열지 못하며 상용 도구도 0건입니다.
+
+지금 코퍼스에서 추출이 실패하는 입력은 없습니다. 컴포넌트가 0건인 것은 TP-Link뿐이고, apk는 964개 파일이 정상으로 풀린 뒤 식별에서 멈춥니다. 즉 BANG이 고쳐 줄 실측된 실패가 하나도 없습니다.
+
+다시 검토할 조건은 하나입니다. unblob이 열지 못하는 실제 입력이 들어오고 그 형식이 BANG이 다루는 목록에 있을 때, 그 입력 하나를 놓고 판단합니다. 그때 호출 형태도 함께 정해야 합니다. 진입점은 `bang-scanner`가 아니라 `python3 -m bang.cli scan`이고, 설치는 Nix 또는 다수의 시스템 의존성과 Kaitai Struct 파서 빌드를 요구합니다. PyPI의 `bang` 패키지는 동명의 다른 프로젝트이므로 설치하면 안 됩니다.
+
+식별 기능을 쓰지 않는다는 위 결론은 그대로입니다. 오히려 근거가 늘었습니다. 정적 링크 때문에 지문 대조가 필요하다고 봤던 Zyxel의 ncurses, readline, quagga는 참조 데이터베이스 없이 동적 심볼만으로 판정했습니다(PR #583).
 
 ---
 
@@ -139,7 +149,7 @@ Armijn Hemel(GPL 위반 적발로 유명한 라이선스 컴플라이언스 전�
 
 실제로 이미지에 들어 있는 언팩 도구는 unblob, unsquashfs, 7z 세 가지입니다. 순서는 unblob, 표준 squashfs일 때 unsquashfs, 그다음 7z입니다. 7z은 unblob이 열지 못하는 Windows 설치 파일(NSIS, Inno Setup, 자동 압축 해제 캐비닛)을 읽으며, 형식을 제대로 모르는 파일에서도 조각을 뜯어내기 때문에 형식을 아는 도구들 뒤에 둡니다.
 
-BANG과 binwalk는 아래 4절에서 채택하기로 했으나 아직 설치돼 있지 않습니다. binwalk는 PyPI 배포본이 깨져 있어 제외했고, BANG은 설치가 Nix 또는 다수의 시스템 의존성과 Kaitai Struct 파서 빌드를 요구해 별도 과제로 남겨 두었습니다. BANG의 실행 진입점은 `bang-scanner`가 아니라 `python3 -m bang.cli scan`이므로, 도입할 때 호출 형태를 함께 고쳐야 합니다.
+binwalk는 PyPI 배포본이 깨져 있어 이미지에 넣지 않았고, PATH에 정상 binwalk가 있으면 마지막 폴백으로 씁니다. BANG은 4.1절에서 채택을 철회했습니다. 그리고 잘라내기만 되고 열리지 않은 파일시스템 이미지를 다시 여는 2차 패스가 있으며, 여기서는 unsquashfs 다음에 sasquatch를 시도합니다. sasquatch는 이미지에 들어 있습니다.
 
 ### 5.1 `scripts/scan-sbom.sh`
 - `FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/sbom-scanner-firmware:latest}"` 변수 추가.
@@ -169,7 +179,7 @@ scan-firmware.sh <firmware_file> <output_sbom.json> <version>
 
 ### 5.4 `docker/Dockerfile`
 - `ARG SBOM_FIRMWARE=false` + `CVE_BIN_TOOL_VERSION`/`UNBLOB_VERSION` 핀.
-- scancode opt-in 블록(`Dockerfile:60-67`) 패턴 그대로, `COPY` 이전에 firmware opt-in RUN 블록 추가(unblob + cve-bin-tool, 폴백 BANG).
+- scancode opt-in 블록(`Dockerfile:60-67`) 패턴 그대로, `COPY` 이전에 firmware opt-in RUN 블록 추가(unblob + cve-bin-tool + sasquatch).
 - `SBOM_FIRMWARE=true`일 때 같은 opt-in 블록에서 cve-bin-tool CVE 데이터베이스를 미리 받아 이미지에 번들합니다(아래 5.6). 이렇게 해야 스캔 시점에 오프라인으로 매칭할 수 있고, 에어갭에서도 동작합니다.
 - 배포는 별도 태그 `sbom-scanner-firmware:latest`로 분리해 경량 기본 이미지를 보호합니다. CVE 데이터베이스(약 0.5~1.5 GB)도 펌웨어 이미지에만 들어갑니다.
 
@@ -245,7 +255,7 @@ CPE가 없는 항목은 취약점 용도로는 5.7의 존재 판정과 값이 �
 
 | Phase | 범위 | 검출 | 미검출 |
 |-------|------|------|--------|
-| **1 (MVP)** | 언팩(unblob+BANG 폴백) + syft dir | opkg/dpkg/apk/rpm 패키지 | stripped 바이너리 |
+| **1 (MVP)** | 언팩(unblob, 폴백 unsquashfs·7z·binwalk) + syft dir | opkg/dpkg/apk/rpm 패키지 | stripped 바이너리 |
 | **2 (목표 범위)** | + cve-bin-tool + SBOM 병합 | busybox/openssl/zlib/dropbear 등 stripped 정적 바이너리의 버전·CVE | 버전 strip된 바이너리, 사명 변경 라이브러리 |
 | **3 (선택·고도화)** | 정확도 향상 트랙 | — | — |
 
@@ -270,7 +280,7 @@ CPE가 없는 항목은 취약점 용도로는 5.7의 존재 판정과 값이 �
 
 ## 8. 라이선스 주의
 
-- 펌웨어 이미지에는 GPL 도구가 들어갑니다. cve-bin-tool(GPL-3.0), BANG(GPL-3.0), unblob이 의존하는 extractor 중 sasquatch(GPL-2.0)와 ubi_reader(GPL-3.0)가 그렇습니다. unblob 본체와 binwalk는 MIT입니다.
+- 펌웨어 이미지에는 GPL 도구가 들어갑니다. cve-bin-tool(GPL-3.0), sasquatch(GPL-2.0), ubi_reader(GPL-3.0), 그리고 unblob이 호출하는 apt 추출 바이너리들이 그렇습니다. unblob 본체와 binwalk는 MIT입니다.
 - 우리 셸 스크립트는 이들을 별도 프로세스로 호출만 하고 수정하지 않으므로, copyleft가 우리 Apache-2.0 코드로 전파되지 않습니다(mere aggregation).
 - 다만 GPL 바이너리를 이미지로 재배포하므로 라이선스 텍스트 동봉과 소스 오퍼 의무가 있습니다.
 - AGPL 도구는 사용하지 않으므로(unblob=MIT 확인), 웹 UI(`--ui`)의 네트워크 조항을 걱정할 일이 없습니다.

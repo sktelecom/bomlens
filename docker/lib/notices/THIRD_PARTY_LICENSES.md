@@ -103,13 +103,17 @@ The versions below match the build ARG defaults in `docker/Dockerfile` (pinned f
 | cve-bin-tool | 3.4 (`CVE_BIN_TOOL_VERSION`) | Identifies stripped binaries and their CVEs | **GPL-3.0** | strong | https://github.com/intel/cve-bin-tool |
 | ubi_reader | 0.8.13 (`UBI_READER_VERSION`) | UBI and UBIFS extraction | **GPL-3.0** | strong | https://github.com/onekey-sec/ubi_reader |
 | squashfs-tools (unsquashfs) | (apt distribution version) | Fallback for standard squashfs extraction | GPL-2.0+ | strong | https://github.com/plougher/squashfs-tools |
-| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson, and others | (apt distribution version) | Extraction binaries invoked by unblob | GPL-2.0+ and others | strong or various | Debian packages |
+| sasquatch | `sasquatch-v4.5.1-6` (`SASQUATCH_VERSION`) | Reads vendor squashfs variants standard unsquashfs refuses | GPL-2.0 | strong | https://github.com/onekey-sec/sasquatch |
+| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson, and others | (apt distribution version) | Extraction binaries invoked by unblob, and 7z directly for Windows installer containers | GPL-2.0+ and others | strong or various | Debian packages |
 
-### Fallback and optional tools (not installed by default)
+The unpacking chain in `scan-firmware.sh` is unblob, then unsquashfs for a file
+`file` reports as squashfs, then 7z for the container formats Windows deliveries
+arrive in, then binwalk. A second pass opens filesystem images that were carved
+out but not extracted, trying unsquashfs and then sasquatch.
 
-- BANG (GPL-3.0, https://github.com/armijnhemel/binaryanalysis-ng): `scan-firmware.sh` uses it as an unpacking fallback when `bang-scanner` is on the PATH. Its dependencies are heavy, so it is not part of the image; install it separately and it is picked up automatically. The unpacking fallback order is unblob, BANG, unsquashfs (squashfs), then binwalk.
+### Fallback tools not installed in the image
+
 - binwalk: the PyPI `binwalk` 2.x distribution is broken (`binwalk.core` is missing), so it is not installed in the image. `scan-firmware.sh` uses a working `binwalk` from the PATH as the last fallback, but standard squashfs is already handled a step earlier by unsquashfs.
-- sasquatch (GPL-2.0, https://github.com/onekey-sec/sasquatch): used by an unblob handler for vendor-modified, non-standard squashfs. Standard squashfs is covered by the `squashfs-tools` (unsquashfs) fallback, so it is not part of the image.
 
 ### GPL source code offer (firmware image)
 

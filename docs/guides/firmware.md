@@ -12,7 +12,7 @@ For the tool selection rationale and the internal design, see the maintainer doc
 
 Firmware is a single file that packs and seals an operating system and dozens of libraries. Feeding a firmware file straight into a normal scan detects almost nothing and yields an empty SBOM. Firmware analysis first unpacks the contents, then identifies components.
 
-1. Unpack the firmware (unblob, with BANG as a fallback) to extract the rootfs.
+1. Unpack the firmware (unblob, falling back to `unsquashfs`, `7z`, then `binwalk`) to extract the rootfs.
 2. Use `syft` to identify components installed by a package manager (opkg, dpkg, apk, rpm).
 3. Use `cve-bin-tool` to find the versions and vulnerabilities of stripped static binaries (busybox, openssl, dropbear, and so on).
 4. Merge the two results into one SBOM, then run the same post-processing as a normal scan (licenses, CVEs, signing).
@@ -71,7 +71,7 @@ OSV (Open Source Vulnerabilities) advisories are not bundled, to keep the redist
 
 ## License note
 
-The firmware image contains GPL tools (cve-bin-tool, BANG, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.
+The firmware image contains GPL tools (cve-bin-tool, sasquatch, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.
 
 ## Limits
 

@@ -31,7 +31,7 @@ Two options apply to source scans only, and both are off by default.
 
 A network-device firmware image (`.bin`, `.img.gz`, squashfs, and more), handled by the opt-in `bomlens-firmware` image. Firmware packs an OS and dozens of libraries into one sealed file, so BomLens first unpacks it, then identifies components in two ways: package-manager metadata with syft, and stripped static binaries with [cve-bin-tool](https://github.com/intel/cve-bin-tool) (which also matches CVEs). The two results merge, and a CPE/SPDX enrichment step fills identifiers for a curated list of well-known OSS (busybox, dropbear, dnsmasq, …) so Trivy and the notice can use them.
 
-Unpacking tries tools in order, using the first that succeeds: [unblob](https://github.com/onekey-sec/unblob) (primary), [BANG](https://github.com/armijnhemel/binaryanalysis-ng), `unsquashfs` for standard squashfs, then `binwalk`.
+Unpacking tries tools in order, using the first that succeeds: [unblob](https://github.com/onekey-sec/unblob) (primary), `unsquashfs` for standard squashfs, `7z` for the container formats Windows deliveries arrive in, then `binwalk`.
 
 ![Firmware flow: unpack, find the root filesystem, scan with syft and cve-bin-tool in parallel, then merge, enrich, and post-process](../images/diagrams/pipeline-firmware.png)
 
@@ -82,7 +82,7 @@ Every analysis tool is open source. The base image is permissive-only; GPL tools
 | SCANOSS (scanoss.py) | Identify vendored OSS via file fingerprints | source (`--identify-vendored`) | MIT | base | [scanoss/scanoss.py](https://github.com/scanoss/scanoss.py) |
 | ScanCode Toolkit | Deep first-party license detection | source (`--deep-license`) | Apache-2.0 | base (opt-in) | [aboutcode-org/scancode-toolkit](https://github.com/aboutcode-org/scancode-toolkit) |
 | unblob | Firmware unpacking (primary) | firmware | MIT | firmware | [onekey-sec/unblob](https://github.com/onekey-sec/unblob) |
-| BANG | Firmware unpacking (fallback) | firmware | GPL-3.0 | firmware (opt) | [armijnhemel/binaryanalysis-ng](https://github.com/armijnhemel/binaryanalysis-ng) |
+| sasquatch | Vendor squashfs variants standard unsquashfs refuses | firmware | GPL-2.0 | firmware (opt) | [onekey-sec/sasquatch](https://github.com/onekey-sec/sasquatch) |
 | cve-bin-tool | Stripped-binary identification + CVE matching | firmware | GPL-3.0 | firmware | [intel/cve-bin-tool](https://github.com/intel/cve-bin-tool) |
 | OWASP AIBOM Generator | ML-BOM from a HuggingFace model card | AI model | Apache-2.0 | aibom | [GenAI-Security-Project/aibom-generator](https://github.com/GenAI-Security-Project/aibom-generator) |
 | Trivy | Vulnerability (CVE) security report | all | Apache-2.0 | base | [aquasecurity/trivy](https://github.com/aquasecurity/trivy) |
