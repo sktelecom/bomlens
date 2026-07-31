@@ -230,6 +230,9 @@ def main():
     # match mean something, and what lets a vendor-patched build still be read.
     sym_rules = {}
     watched = set()
+    # family name -> [(member, marker bytes)]. A fork can keep its parent's symbol
+    # names, so the symbols say the family and the file says which member.
+    sym_variants = {}
     for comp, rule in sym_map.items():
         syms = set(rule.get("symbols") or [])
         if not syms:
@@ -237,6 +240,14 @@ def main():
         need = int(rule.get("min", len(syms)))
         sym_rules[comp] = (syms, max(1, min(need, len(syms))))
         watched |= syms
+        var = rule.get("variants") or {}
+        cands = []
+        for c in var.get("candidates") or []:
+            marks = [m.encode("utf-8", "ignore") for m in (c.get("markers") or [])]
+            if c.get("name") and marks:
+                cands.append((c["name"], marks))
+        if cands:
+            sym_variants[comp] = (cands, var.get("default") or comp)
 
     # soname stem -> [(component, marker bytes)]. Only a stem listed here is ever
     # read for content, and only the library file itself.
@@ -320,6 +331,36 @@ def main():
         except OSError:
             return False
 
+    # A fork that kept its parent's symbol names, reported under the family name
+    # because the file said nothing either way. Counted so the log can say so.
+    variant_undecided = {}
+
+    def which_variant(path, family):
+        """Which member of a symbol family this file is, and the marker that said so.
+
+        A fork can inherit every symbol name it was forked from — FRRouting kept
+        quagga's, down to writing /var/tmp/quagga — so the symbol table names the
+        family and only the file's own wording separates the members. Exactly one
+        candidate may match: a file matching two is not something these markers
+        settle, and one matching none is a build whose wording is unknown. Both
+        fall back to the family name rather than guess."""
+        rule = sym_variants.get(family)
+        if not rule:
+            return family, None
+        cands, default = rule
+        try:
+            with open(path, "rb") as f:
+                blob = f.read(SLOT_READ_BYTES)
+        except OSError:
+            return default, None
+        hit = [(n, m) for n, marks in cands for m in marks if m in blob]
+        names = {n for n, _ in hit}
+        if len(names) == 1:
+            n, m = hit[0]
+            return n, m.decode("utf-8", "replace")
+        variant_undecided[family] = variant_undecided.get(family, 0) + 1
+        return default, None
+
     seen_paths = set()
     for path in paths:
         d = dynamic.get(path)
@@ -374,10 +415,14 @@ def main():
         if seen_syms:
             for comp, (want, need) in sym_rules.items():
                 hit = seen_syms & want
-                if len(hit) >= need:
-                    e = found.setdefault(comp, blank())
-                    e["files"].add(rel)
-                    e["symbols"].setdefault(rel, set()).update(hit)
+                if len(hit) < need:
+                    continue
+                name, marker = which_variant(path, comp)
+                e = found.setdefault(name, blank())
+                e["files"].add(rel)
+                e["symbols"].setdefault(rel, set()).update(hit)
+                if marker:
+                    e["markers"][rel] = marker
 
     components = []
     needed_only = []
@@ -433,6 +478,11 @@ def main():
         print(f"[elf-presence] {sum(slot_open.values())} slot librar(y/ies) matched no "
               f"candidate marker, or more than one, so the slot was left unnamed: "
               f"{detail}", file=sys.stderr)
+    if variant_undecided:
+        detail = ", ".join(f"{k}({n})" for k, n in sorted(variant_undecided.items()))
+        print(f"[elf-presence] {sum(variant_undecided.values())} file(s) matched a symbol "
+              f"family whose members share those names, and carried no marker that "
+              f"tells them apart, so the family name was kept: {detail}", file=sys.stderr)
     by_symbol = sorted(c for c in found if found[c]["symbols"])
     if by_symbol:
         print(f"[elf-presence] {len(by_symbol)} of them were linked into another "

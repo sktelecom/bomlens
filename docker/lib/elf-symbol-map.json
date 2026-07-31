@@ -43,7 +43,6 @@
     "    presence-only component carries no identifier for an advisory to match.",
     "    Where a fork exists it is called out below."
   ],
-
   "ncurses": {
     "min": 3,
     "why": [
@@ -65,7 +64,6 @@
       "_nc_delink_entry"
     ]
   },
-
   "readline": {
     "min": 3,
     "why": [
@@ -88,21 +86,18 @@
       "_rl_erase_entire_line"
     ]
   },
-
   "quagga": {
     "min": 3,
     "why": [
-      "vtysh is quagga's integrated shell and ships as part of it, so its entry",
-      "points prove quagga is in the image. The command-library names (cmd_init,",
-      "install_element, vty_out) are listed too because a vendor may build the",
-      "library into a product without vtysh's own main.",
-      "FRRouting forked from quagga and keeps the same symbol names, so an FRR",
-      "image would be reported as quagga. The corpus case is quagga — bin/cli",
-      "carries the string 'Integrated shell for Quagga routing software suite.'",
-      "and bugzilla.quagga.net — and a presence-only component carries no",
-      "identifier, so the cost of the confusion is a wrong name in the notice, not",
-      "a wrong advisory. Recheck the strings before trusting the name.",
-      "Seen in: Zyxel GS1900-8 bin/cli (18 vtysh_ symbols)."
+      "vtysh is the integrated shell of the quagga family and ships as part of it, so",
+      "its entry points prove a member of that family is in the image. The",
+      "command-library names (cmd_init, install_element, vty_out) are listed too",
+      "because a vendor may build the library into a product without vtysh's own main.",
+      "Which member it is comes from `variants` below rather than from the symbols,",
+      "because FRRouting forked from quagga and kept the names.",
+      "Seen in: Zyxel GS1900-8 bin/cli and Zyxel XGS1210-12 bin/cli (18 vtysh_ symbols",
+      "each); Zyxel XGS1210-12 bin/zebra; a NAT rootfs and an OpenWrt rootfs.zip",
+      "(vtysh, libzebra.so, sbin/zebra)."
     ],
     "symbols": [
       "vtysh_execute",
@@ -115,6 +110,41 @@
       "cmd_init",
       "install_element",
       "vty_out"
-    ]
+    ],
+    "variants": {
+      "why": [
+        "The symbols say the family; the file says which member. FRRouting forked from",
+        "quagga in 2017 and kept its symbol names, its command library and much of its",
+        "wording — an FRR zebra still writes /var/tmp/quagga and 'Allow other processes",
+        "to delete Quagga Routes' — so nothing in the dynamic symbol table separates",
+        "them. Two strings do, and they do not overlap. Measured on Zyxel XGS1210-12,",
+        "which carries both: bin/cli has 'Quagga routing software suite' and",
+        "bugzilla.quagga.net and no FRR marker at all, while bin/zebra has FRRouting",
+        "three times and frr_ once and neither quagga marker. The vendor's own notice",
+        "declares frr and quagga side by side, which is what sent us looking.",
+        "Same rule as the ambiguous-SONAME map: exactly one marker set may match. A",
+        "file matching both is not something these two strings can settle, and a file",
+        "matching neither is a build whose wording we have not seen; both fall back to",
+        "the family name rather than guess a member."
+      ],
+      "default": "quagga",
+      "candidates": [
+        {
+          "name": "frr",
+          "markers": [
+            "FRRouting"
+          ],
+          "where": "Zyxel XGS1210-12 bin/zebra: `FRRouting` (3 occurrences)"
+        },
+        {
+          "name": "quagga",
+          "markers": [
+            "Quagga routing software suite",
+            "bugzilla.quagga.net"
+          ],
+          "where": "Zyxel GS1900-8 and XGS1210-12 bin/cli: `Integrated shell for Quagga routing software suite.`"
+        }
+      ]
+    }
   }
 }

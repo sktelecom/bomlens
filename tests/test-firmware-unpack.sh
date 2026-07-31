@@ -653,6 +653,51 @@ else
     fail "a symbol judgement lands with no evidence to check"
 fi
 
+echo "== a fork that kept its parent's symbols is told apart by the file =="
+
+# FRRouting forked from quagga in 2017 and kept its symbol names, its command
+# library and much of its wording — an FRR zebra still writes /var/tmp/quagga —
+# so nothing in the dynamic symbol table separates them. A Zyxel XGS1210-12
+# carries both and its vendor notice declares both: bin/cli has the quagga
+# markers and no FRR marker, bin/zebra has FRRouting three times and neither
+# quagga marker. Reporting the family name for both would have lost frr.
+if jq -e '.quagga.variants.candidates | length >= 2' "$STBL" >/dev/null 2>&1; then
+    pass "the symbol map records the members of a shared-symbol family"
+else
+    fail "quagga has no variants entry" "an FRR image would be reported as quagga"
+fi
+
+# Each member needs markers of its own and a record of where they were seen.
+if jq -e '.quagga.variants.candidates
+          | all((.name | length) > 0 and (.markers | length) >= 1
+                and (.where | length) > 0)' "$STBL" >/dev/null 2>&1; then
+    pass "every member carries its own markers and where they were seen"
+else
+    fail "a variant member has no marker, no name, or no recorded sighting"
+fi
+
+# The two marker sets must not overlap, or no file could ever be decided.
+if jq -e '[.quagga.variants.candidates[].markers[]] as $all
+          | ($all | length) == ($all | unique | length)' "$STBL" >/dev/null 2>&1; then
+    pass "the members do not share a marker"
+else
+    fail "two members claim the same marker" "no file could be decided"
+fi
+
+# A file matching both, or neither, is not something these markers settle. It
+# keeps the family name rather than picking a member at random.
+if jq -e '.quagga.variants | has("default")' "$STBL" >/dev/null 2>&1; then
+    pass "an undecided file falls back to the family name"
+else
+    fail "the variants entry has no default" "an undecided file would name a member anyway"
+fi
+
+if grep -q 'if len(names) == 1' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "a member is named only when exactly one of them matches"
+else
+    fail "the variant rule does not require a single match"
+fi
+
 echo "== a SONAME that names a slot is settled by the file in it =="
 
 # `libc` says something is the C library, not which one, so elf-soname-map.json
