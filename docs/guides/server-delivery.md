@@ -72,7 +72,7 @@ $SBOM --project mms-relay-bin --version 2.0.0 \
   --all --generate-only
 ```
 
-For what the scan still misses, record the source and version by hand from the build script — for example the openssl release the build pulls in (`openssl 1.1.1za`). For a more precise inventory of statically linked components, you can add binary composition analysis (BDBA) as a complementary check.
+For what the scan still misses, record the source and version by hand from the build script — for example the openssl release the build pulls in (`openssl 1.1.1za`). For a more precise inventory of statically linked components, you can add a binary composition analysis tool as a complementary check.
 
 ## Verify each layer
 
