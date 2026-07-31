@@ -653,6 +653,78 @@ else
     fail "a symbol judgement lands with no evidence to check"
 fi
 
+echo "== a SONAME that names a slot is settled by the file in it =="
+
+# `libc` says something is the C library, not which one, so elf-soname-map.json
+# leaves it out. Three projects fill that slot across the seven vendor images and
+# their licences differ — musl is MIT, glibc and uClibc LGPL — so a notice saying
+# `libc` has not answered the question a notice exists to answer. The library
+# writes its own name inside: MikroTik and Ubiquiti carry `musl libc`, D-Link
+# `GNU C Library`.
+ATBL="$ROOT_DIR/docker/lib/elf-ambiguous-soname-map.json"
+if [ -f "$ATBL" ] && jq -e 'to_entries | map(select(.key | startswith("_") | not)) | length > 0' \
+     "$ATBL" >/dev/null 2>&1; then
+    pass "the slot map ships and has entries"
+else
+    fail "elf-ambiguous-soname-map.json is missing or empty"
+fi
+
+# Every candidate needs a marker to match on and a record of where it was seen.
+if jq -e 'to_entries | map(select(.key | startswith("_") | not))
+          | all((.value.candidates | length) >= 2
+                and all(.value.candidates[];
+                        (.name | length) > 0 and (.marker | length) > 0
+                        and (.where | length) > 0))' "$ATBL" >/dev/null 2>&1; then
+    pass "every candidate carries a marker and where it was seen"
+else
+    fail "a candidate has no marker, no name, or no recorded sighting"
+fi
+
+# Same rule as the other maps: presence, never a version or an identifier.
+if jq -e '[.. | objects | select(has("marker"))]
+          | all(has("version") == false and has("purl") == false and has("cpe") == false)' \
+     "$ATBL" >/dev/null 2>&1; then
+    pass "the slot map carries no version and no identifier"
+else
+    fail "the slot map carries a version or an identifier"
+fi
+
+# uClibc is left out on purpose. Its filename already carries the upstream
+# version, which version-string-map.json reads, and the marker would not settle
+# the identity anyway: uclibc ended at 0.9.33 and uclibc-ng picks up at 1.0, both
+# writing `uClibc`. Adding it would trade a correct answer for an ambiguous one.
+if jq -e '[.. | objects | select(has("marker")) | .marker] | any(test("uclibc"; "i"))' \
+     "$ATBL" >/dev/null 2>&1; then
+    fail "uClibc was added as a slot candidate" \
+         "the filename rule already names it, and the marker cannot separate uclibc from uclibc-ng"
+else
+    pass "uClibc is left to the filename rule that can name its version"
+fi
+
+# One marker or nothing. Two mean the file is not what the SONAME said, none mean
+# the slot holds something unlisted, and neither is a basis for naming anything.
+if grep -q 'len(hit) == 1' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "a slot is named only when exactly one candidate matches"
+else
+    fail "the slot rule does not require a single match" \
+         "an ambiguous file would be reported as one of its candidates"
+fi
+
+# Only listed slots are ever read for content. Without that gate this becomes the
+# open string search the script exists to avoid.
+if grep -q 'cands = slot_rules.get(key)' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "only a listed slot SONAME has its file read"
+else
+    fail "file content is read for SONAMEs that are not listed slots"
+fi
+
+# The marker and its file have to reach the SBOM, or the judgement cannot be checked.
+if grep -q 'bomlens:elfSlotMarker' "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "the matched marker is recorded as evidence"
+else
+    fail "a slot judgement lands with no evidence to check"
+fi
+
 echo "== the version-string table is closed, and its CPEs are checked =="
 
 TBL="$ROOT_DIR/docker/lib/version-string-map.json"

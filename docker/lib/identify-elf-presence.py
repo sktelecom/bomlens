@@ -17,12 +17,22 @@ So this reads structure, not text:
   - a shared library file, by its SONAME if it declares one, else its filename
   - an executable under bin/ or sbin/, by the name it is installed under
   - the symbols an ELF exports, for a component linked into someone else's binary
+  - for a SONAME that names a slot rather than a project, the marker the occupant
+    writes about itself
   - NEEDED entries in other ELFs, counted as corroboration
 
 The name a program is installed under is often not its component: brctl ships in
 bridge-utils, chat and pppd in ppp, hostapd_cli in hostapd, ip and tc in
 iproute2. All three mappings are written out by hand (elf-soname-map.json,
 elf-program-map.json and elf-symbol-map.json) rather than derived.
+
+The slot pass exists because some SONAMEs name a role, not a project. `libc`
+says something is the C library, not which one, and the corpus has three
+different answers across seven images with three different licences. The library
+settles it inside its own file: musl writes `musl libc` into its loader banner,
+glibc writes `GNU C Library`. This is not the string search rejected below —
+structure has already picked the file, and the string only chooses among a closed
+list of candidates for that one slot.
 
 The symbol pass exists because the first two only work while a component is
 still its own file. The Zyxel GS1900-8 notice declares ncurses, readline and
@@ -70,6 +80,11 @@ BATCH = 200
 # files. Stop rather than run unbounded, and say so — a silent cap reads as
 # "everything was looked at".
 MAX_FILES = int(os.environ.get("FW_ELF_MAX_FILES", "20000"))
+
+# How much of a slot library to read looking for its self-identifying marker. The
+# banner sits in the loader's string table, well inside this, and only the handful
+# of files whose SONAME is a listed slot are read at all.
+SLOT_READ_BYTES = 4 * 1024 * 1024
 
 NEEDED_RE = re.compile(r"\(NEEDED\).*\[([^\]]+)\]")
 SONAME_RE = re.compile(r"\(SONAME\).*\[([^\]]+)\]")
@@ -223,6 +238,17 @@ def main():
         sym_rules[comp] = (syms, max(1, min(need, len(syms))))
         watched |= syms
 
+    # soname stem -> [(component, marker bytes)]. Only a stem listed here is ever
+    # read for content, and only the library file itself.
+    slot_map = load_map(os.path.join(here, "elf-ambiguous-soname-map.json"), False) or {}
+    slot_rules = {}
+    for stem_name, rule in slot_map.items():
+        cands = [(c.get("name"), (c.get("marker") or "").encode("utf-8", "ignore"))
+                 for c in (rule.get("candidates") or [])]
+        cands = [(n, m) for n, m in cands if n and m]
+        if cands:
+            slot_rules[stem_name.lower()] = cands
+
     if not os.path.isdir(root):
         print("[]")
         return 0
@@ -242,7 +268,32 @@ def main():
     unmapped = {}
 
     def blank():
-        return {"files": set(), "needed_by": 0, "sonames": set(), "symbols": {}}
+        return {"files": set(), "needed_by": 0, "sonames": set(), "symbols": {},
+                "markers": {}}
+
+    # A slot SONAME whose file named nobody, or named two. Counted so the run log
+    # can say the slot was looked at and left open, rather than saying nothing.
+    slot_open = {}
+
+    def fills_slot(path, key):
+        """For a SONAME that names a slot, ask the file which project fills it.
+
+        Exactly one candidate has to match. Two markers mean the file is not what
+        the SONAME said it was, none means the slot holds something not listed,
+        and neither is a basis for naming a component."""
+        cands = slot_rules.get(key)
+        if not cands:
+            return None, None
+        try:
+            with open(path, "rb") as f:
+                blob = f.read(SLOT_READ_BYTES)
+        except OSError:
+            return None, None
+        hit = [(n, m) for n, m in cands if m in blob]
+        if len(hit) == 1:
+            return hit[0][0], hit[0][1].decode("utf-8", "replace")
+        slot_open[key] = slot_open.get(key, 0) + 1
+        return None, None
 
     def note(key, evidence_path, as_needed, soname):
         comp = name_of.get(key)
@@ -292,12 +343,28 @@ def main():
                 else:
                     found.setdefault(comp, blank())["files"].add(rel)
 
+        # A SONAME that names a slot rather than a project (`libc`) is settled by
+        # the file, which writes its own name inside. Everything else goes to the
+        # name map as before.
+        selfname = None
         if d and d.get("soname"):
-            note(stem(d["soname"]), rel, False, d["soname"])
+            selfname = d["soname"]
         elif os.path.basename(path).find(".so") > 0:
             # A shared library that declares no SONAME still names itself.
-            note(stem(os.path.basename(path)), rel, False, os.path.basename(path))
+            selfname = os.path.basename(path)
+        if selfname:
+            key = stem(selfname)
+            comp, marker = fills_slot(path, key)
+            if comp:
+                e = found.setdefault(comp, blank())
+                e["files"].add(rel)
+                e["sonames"].add(selfname)
+                e["markers"][rel] = marker
+            else:
+                note(key, rel, False, selfname)
         for lib in (d or {}).get("needed", []):
+            # Nothing to read for a NEEDED entry, so a slot name stays unresolved
+            # here and is counted as unmapped, which is what it is.
             note(stem(lib), None, True, lib)
 
         # A component linked into someone else's binary has no file and no
@@ -332,6 +399,12 @@ def main():
             props.append({"name": "bomlens:elfSoname", "value": ", ".join(sorted(e["sonames"]))})
         if e["needed_by"]:
             props.append({"name": "bomlens:elfNeededBy", "value": str(e["needed_by"])})
+        if e["markers"]:
+            # Name the marker and the file it was in. A reader who doubts the
+            # call can open that file and look for that string.
+            props.append({"name": "bomlens:elfSlotMarker",
+                          "value": "; ".join(f"{p}: {m}"
+                                             for p, m in sorted(e["markers"].items()))})
         if e["symbols"]:
             # Name the symbols, not just the count. "matched 6 symbols" cannot be
             # checked by anyone; "_nc_setupterm in bin/cli" can, and this whole
@@ -350,6 +423,16 @@ def main():
     print(json.dumps(components, ensure_ascii=False))
     print(f"[elf-presence] {len(seen_paths)} distinct ELF file(s) of {len(paths)} found; "
           f"{len(components)} component(s) proved present by structure.", file=sys.stderr)
+    by_slot = sorted(c for c in found if found[c]["markers"])
+    if by_slot:
+        print(f"[elf-presence] {len(by_slot)} of them fill a SONAME that names a slot "
+              f"rather than a project, and were read from the marker the library "
+              f"writes about itself: " + ", ".join(by_slot), file=sys.stderr)
+    if slot_open:
+        detail = ", ".join(f"{k}({n})" for k, n in sorted(slot_open.items()))
+        print(f"[elf-presence] {sum(slot_open.values())} slot librar(y/ies) matched no "
+              f"candidate marker, or more than one, so the slot was left unnamed: "
+              f"{detail}", file=sys.stderr)
     by_symbol = sorted(c for c in found if found[c]["symbols"])
     if by_symbol:
         print(f"[elf-presence] {len(by_symbol)} of them were linked into another "

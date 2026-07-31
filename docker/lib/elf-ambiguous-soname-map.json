@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "A SONAME that names a slot rather than a project -> how to tell which project",
+    "is filling it.",
+    "",
+    "Read by identify-elf-presence.py. elf-soname-map.json deliberately leaves",
+    "`libc` out, because the name says only that something is the C library and not",
+    "which one. The corpus shows why that matters: three different projects fill",
+    "that slot across seven vendor images, and their licences differ — musl is MIT,",
+    "glibc is LGPL, uClibc is LGPL. A notice that says `libc` has not answered the",
+    "question a notice exists to answer.",
+    "",
+    "The library names itself inside the file. musl writes `musl libc` into its",
+    "loader banner and glibc writes `GNU C Library`, so the file settles what the",
+    "SONAME could not.",
+    "",
+    "Why this is not the string search identify-elf-presence.py refuses to do. That",
+    "objection is about an unanchored search: `readline` in busybox's help text is",
+    "not evidence readline is linked in, because nothing tied the word to a role.",
+    "Here the structure has already picked the file — this ELF is the C library, by",
+    "its SONAME — and the string only chooses among a closed list of candidates for",
+    "that one slot. Structure names the slot; the string names the occupant. Only a",
+    "SONAME listed here is ever read this way, and only that file is read.",
+    "",
+    "Rules for adding entries:",
+    "  - Add a SONAME only when it genuinely names a slot. `libc` qualifies;",
+    "    `libnetsnmp` does not, and belongs in elf-soname-map.json.",
+    "  - Every marker must be one the project writes about itself, seen in a real",
+    "    image, and recorded in `where`.",
+    "  - Nothing is reported unless exactly one candidate matches. Two markers in",
+    "    one file mean the file is not what we thought, and zero means the slot is",
+    "    filled by something not listed. Both are ambiguity, and ambiguity is",
+    "    reported as nothing rather than as a guess.",
+    "  - Presence only. No version, no purl, no CPE, same as every other judgement",
+    "    this script emits. musl's own version is in its file as a bare `1.1.6` with",
+    "    nothing anchoring it — reading that would need the open pattern the",
+    "    version-string table exists to avoid.",
+    "",
+    "uClibc is deliberately absent. It names its shared object after its upstream",
+    "version (libuClibc-0.9.28.so), which version-string-map.json already reads, and",
+    "the marker would not settle the identity anyway: uclibc:uclibc ended at 0.9.33",
+    "and uclibc-ng_project:uclibc-ng picks up at 1.0, both writing `uClibc`. Adding",
+    "it would trade a correct answer for an ambiguous one."
+  ],
+
+  "libc": {
+    "why": "The C library slot. Filled by musl on MikroTik RouterOS and Ubiquiti UniFi, by glibc on D-Link, and by uClibc on Zyxel and NETGEAR (read from the filename instead, see above).",
+    "candidates": [
+      {
+        "name": "musl",
+        "marker": "musl libc",
+        "where": "MikroTik RouterOS lib/libc.so: `musl libc`; Ubiquiti UniFi AP AC Pro libc.so: `musl libc (mips-sf)`"
+      },
+      {
+        "name": "glibc",
+        "marker": "GNU C Library",
+        "where": "D-Link DIR-X1560, its libc: `GNU C Library`"
+      }
+    ]
+  }
+}
