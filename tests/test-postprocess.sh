@@ -177,6 +177,66 @@ else
     fail "generate-notice.sh did not produce $NOTICE"
 fi
 
+echo "== B-4b: NOTICE folds kernel modules into one line per licence =="
+# A firmware that ships lib/modules can carry hundreds of them — a MikroTik
+# RouterOS image has 304 — and each arrived as three lines whose source read
+# `pkg:generic/nls_utf8`, a purl syft builds from the module name that leads
+# nowhere. Measured on that image: the notice went from 1689 lines to 785.
+cat > "$WORK/km-notice.json" <<'JSON'
+{"components":[
+ {"name":"linux_kernel","version":"5.6.3","licenses":[{"license":{"id":"GPL-2.0-only"}}]},
+ {"name":"e2fsprogs","version":"1.46.5","purl":"pkg:generic/e2fsprogs@1.46.5",
+  "licenses":[{"license":{"id":"GPL-2.0-only"}}]},
+ {"name":"8021q","version":"1.8","purl":"pkg:generic/8021q@1.8",
+  "licenses":[{"license":{"name":"GPL"}}],
+  "properties":[{"name":"syft:package:type","value":"linux-kernel-module"},
+                {"name":"syft:metadata:kernelVersion","value":"5.6.3"}]},
+ {"name":"xt_LOG","purl":"pkg:generic/xt_LOG",
+  "licenses":[{"license":{"name":"GPL"}}],
+  "properties":[{"name":"syft:package:type","value":"linux-kernel-module"},
+                {"name":"syft:metadata:kernelVersion","value":"5.6.3"}]},
+ {"name":"ipheth","purl":"pkg:generic/ipheth",
+  "licenses":[{"license":{"name":"GPL"}}],
+  "properties":[{"name":"syft:package:type","value":"linux-kernel-module"},
+                {"name":"syft:metadata:kernelVersion","value":"5.6.3"}]}
+]}
+JSON
+bash "$LIB/generate-notice.sh" "$WORK/km-notice.json" "$WORK/kmn" "KmProj" >/dev/null 2>&1
+KTXT="$WORK/kmn_NOTICE.txt"
+if [ ! -f "$KTXT" ]; then
+    fail "generate-notice.sh produced no NOTICE for the kernel-module fixture"
+else
+    if grep -q "Linux kernel modules (3), part of linux_kernel@5.6.3" "$KTXT"; then
+        pass "the modules are folded into one line naming their kernel"
+    else
+        fail "kernel modules were not folded" "$(grep -c '^  - ' "$KTXT") entries listed"
+    fi
+
+    # The names syft invents lead nowhere, so they must not appear as sources.
+    if grep -q "pkg:generic/8021q" "$KTXT"; then
+        fail "a module's invented purl is still shown as a source location"
+    else
+        pass "no module is given a source location built from its own name"
+    fi
+
+    # The header counts components, not lines. Folding 3 modules into one line
+    # must not make them read as one component.
+    if awk '/^License: GPL$/{f=1;next} f&&/^Components \(3\):$/{ok=1} /^License: /{if(!/^License: GPL$/)f=0} END{exit !ok}' "$KTXT"; then
+        pass "the licence header still counts every module"
+    else
+        fail "the header count collapsed along with the lines" \
+             "$(grep -A1 '^License: GPL$' "$KTXT" | tail -1)"
+    fi
+
+    # Everything that is not a module is untouched.
+    grep -q "^  - e2fsprogs@1.46.5$" "$KTXT" \
+        && pass "a non-module component is listed as before" \
+        || fail "a non-module component was folded or dropped"
+    grep -q "^  - linux_kernel@5.6.3$" "$KTXT" \
+        && pass "the kernel itself is still listed in its own right" \
+        || fail "the kernel the modules point at is missing from the notice"
+fi
+
 echo "== B-5: NOTICE shows source location + attribution per component =="
 # A component with a vcs externalReference, one with only a purl (registry inferred),
 # and one carrying component.copyright. Source must never be blank when a purl exists,

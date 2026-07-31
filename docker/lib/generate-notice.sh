@@ -128,13 +128,27 @@ def src($c):
 # share-alike duties on redistribution just as a code license does. It is tagged
 # so a reader can tell data from code: the obligations attach to different things
 # (the corpus, not the binary), and the rest of this file is written for software.
+# Linux kernel modules are folded into one line per licence rather than listed
+# individually. A firmware that ships lib/modules can carry hundreds of them —
+# a MikroTik RouterOS image has 304 — and each was arriving as three lines whose
+# source read `pkg:generic/nls_utf8`, a purl syft builds from the module name that
+# leads nowhere. The obligation is discharged by the kernel they were built from,
+# which is listed here in its own right, so the notice says how many there are and
+# which kernel they belong to. Every module remains in the SBOM by name.
 LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
+  def kmod_of($c):
+    if any($c.properties[]?;
+           .name == "syft:package:type" and .value == "linux-kernel-module")
+    then ( [ $c.properties[]? | select(.name == "syft:metadata:kernelVersion") | .value ][0]
+           // "unknown version" )
+    else null end;
   [ .components[]?
     | . as $c
     | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)
                + (if ($c.type // "") == "data" then " [dataset]" else "" end)),
         copyright: ($c.copyright // null),
         src: (src($c)),
+        kmod: (kmod_of($c)),
         lic: (
           ( [ $c.licenses[]?
               | (.license.id // .license.name // .expression)
@@ -142,11 +156,25 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
           | if length == 0 then ["NOASSERTION"] else . end
         )
       }
-    | . as $x | $x.lic[] | { key: ., comp: $x.comp, copyright: $x.copyright, src: $x.src }
+    | . as $x | $x.lic[] | { key: ., comp: $x.comp, copyright: $x.copyright,
+                             src: $x.src, kmod: $x.kmod }
   ]
   | group_by(.key)
   | map({ license: .[0].key,
-          components: ( [ .[] | { comp, copyright, src } ] | unique | sort_by(.comp) ) })
+          # The header counts components, not lines. Folding the modules into one
+          # line must not make 191 of them read as one.
+          count: ( ( [ .[] | select(.kmod == null) | { comp, copyright, src } ]
+                     | unique | length )
+                   + ( [ .[] | select(.kmod != null) ] | length ) ),
+          components: (
+            ( [ .[] | select(.kmod == null) | { comp, copyright, src } ] | unique )
+            + ( [ .[] | select(.kmod != null) ]
+                | group_by(.kmod)
+                | map({ comp: ("Linux kernel modules (" + (length | tostring)
+                               + "), part of linux_kernel@" + .[0].kmod),
+                        copyright: null,
+                        src: null }) )
+            | sort_by(.comp) ) })
   | sort_by(.license)
 ' "$SBOM")
 
@@ -185,7 +213,7 @@ done)
     # Attribution falls back to an honest "not captured" line (never blank) so the
     # notice always names the holder source even when component.copyright is empty.
     echo "$LICENSE_MAP" | jq -r '.[] |
-        "\nLicense: \(.license)\nComponents (\(.components | length)):",
+        "\nLicense: \(.license)\nComponents (\(.count // (.components | length))):",
         (.components[] |
             "  - \(.comp)",
             (if .src then "      Source: \(.src)" else empty end),
@@ -318,7 +346,7 @@ HTMLHEAD
           else "<span class=\"attr none\">Copyright: holders not captured in SBOM — see source</span>" end;
         .[] |
         "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
-        "<p class=\"count\">" + (.components | length | tostring) + " component(s)</p><ul>" +
+        "<p class=\"count\">" + ((.count // (.components | length)) | tostring) + " component(s)</p><ul>" +
         (.components | map("<li>" + (.comp | @html)
             + srchtml(.src)
             + attrhtml(.)
