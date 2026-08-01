@@ -145,9 +145,17 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 
 > 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
 
-## Android SDK 이미지 — `ghcr.io/sktelecom/bomlens-android-sdk<API>`
+## Android SDK 이미지 — 사용자가 직접 빌드, 배포하지 않음
 
-cdxgen은 Android SDK를 담은 이미지를 제공하지 않고 Android를 전이 의존성 미지원으로 표시하므로, Android 프로젝트는 cdxgen에 그대로 넘길 수 없습니다. 그래서 cdxgen java 이미지 위에 Android SDK 플랫폼을 얹은 이미지를 `compileSdk`별로 하나씩(API 30~35) 둡니다. `scan-sbom.sh`가 프로젝트의 `compileSdk`를 찾아 맞는 태그를 받아 쓰고, `ANDROID_IMAGE_PREFIX`로 받아올 곳을 바꿀 수 있습니다. 옛 이름 `sbom-scanner-android-sdk<API>`는 같은 다이제스트를 가리킵니다.
+cdxgen은 Android SDK를 담은 이미지를 제공하지 않고 Android를 전이 의존성 미지원으로 표시하므로, Android 프로젝트는 cdxgen에 그대로 넘길 수 없습니다. 그래서 `docker/android/Dockerfile`이 cdxgen java 이미지 위에 Android SDK 플랫폼을 얹습니다. `compileSdk`별로 이미지 하나입니다.
+
+**이 이미지는 배포하지 않습니다.** Android SDK는 오픈소스가 아니고, 약관이 백업 목적의 복제만 허용하며 제3자 라이선스가 요구하는 경우를 빼고 재배포를 금지합니다([3.4절](https://developer.android.com/studio/terms). 3.5절의 예외는 SDK 안의 오픈소스 구성요소에만 적용됩니다). 이미지를 공개 레지스트리에 올리면 받는 사람 모두에게 SDK를 건네는 셈이고, 그 조항이 지목하는 것이 바로 그것입니다. 그래서 사용자가 한 번 빌드하면서 Android Studio를 설치할 때와 같이 Google 약관을 직접 수락하는 방식으로 둡니다.
+
+```bash
+docker build --build-arg ANDROID_API=35 -t bomlens-android-sdk35 docker/android
+```
+
+`scan-sbom.sh`는 프로젝트의 `compileSdk`를 찾고, 맞는 이미지가 없으면 위 명령을 안내합니다. 다른 곳에서 빌드한 이미지를 쓰려면 `ANDROID_IMAGE_PREFIX`로 지정합니다. 이 방침을 정하기 전인 v1.9.0까지 발행된 `ghcr.io/sktelecom/bomlens-android-sdk<API>` 이미지도 여기에 지정해 쓸 수 있습니다. 이미 나간 릴리스에서 스캔이 깨지지 않도록 그대로 두었을 뿐, 새로 올리지는 않습니다.
 
 이 이미지에는 BomLens 코드가 들어 있지 않아 우리 Apache-2.0 허락의 대상이 아닙니다. 들어 있는 것은 다음과 같습니다.
 
@@ -156,7 +164,7 @@ cdxgen은 Android SDK를 담은 이미지를 제공하지 않고 Android를 전�
 | cdxgen java 이미지(`cdxgen-temurin-java21`, 다이제스트 고정) | https://github.com/CycloneDX/cdxgen | Apache-2.0 |
 | Android SDK 명령줄 도구, platform-tools, `platforms;android-<API>`, `build-tools;<API>.0.0` | `sdkmanager`가 https://dl.google.com/android/repository/ 에서 설치 | Android Software Development Kit License Agreement, https://developer.android.com/studio/terms |
 
-Android SDK는 오픈소스가 아니며 Apache-2.0이 아닙니다. 약관은 Android 애플리케이션 개발 목적의 사용을 재실시권 없이 허락하고(3.1절), 제3자 라이선스가 요구하는 경우를 빼면 SDK나 그 일부의 복제와 재배포를 제한합니다(3.4절). 이 이미지를 받아 쓰시는 분은 Google 약관을 직접 적용받으며, 이미지를 쓰는 것이 약관 수락을 대신하지 않습니다.
+약관은 Android 애플리케이션 개발 목적의 사용을 재실시권 없이 허락합니다(3.1절). 이미지를 넘겨줄 수 없는 또 하나의 이유인데, 재실시권이 없으니 넘겨줄 권리 자체가 없기 때문입니다.
 
 SDK 각 구성요소의 `NOTICE.txt`는 이미지 안 `/opt/android-sdk/` 아래에 그대로 들어 있고, SDK 내용물의 제3자 고지는 거기에 있습니다. `/opt/android-sdk/licenses/`의 파일들은 라이선스 전문이 아니라 `sdkmanager`가 남긴 수락 표시입니다.
 

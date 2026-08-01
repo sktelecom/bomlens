@@ -17,7 +17,12 @@
 CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen language image tag
 # renovate: datasource=docker depName=ghcr.io/cyclonedx/cdxgen
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
-ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-ghcr.io/sktelecom/bomlens-android-sdk}"  # legacy alias: sbom-scanner-android-sdk (same digest)
+# A local name, not a registry one: the Android SDK is not open source and its
+# terms bar redistributing it, so this image is built on the machine that uses
+# it rather than published. scan-sbom.sh prints the build command when it is
+# missing. Point this at a registry to use an image built elsewhere, including
+# the ones published before this changed (ghcr.io/sktelecom/bomlens-android-sdk).
+ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-bomlens-android-sdk}"
 ANDROID_API_DEFAULT="${ANDROID_API_DEFAULT:-34}"
 # cdxgen does not resolve dependency licenses by default, leaving the SBOM (and
 # the NOTICE derived from it) without license data. FETCH_LICENSE=true makes

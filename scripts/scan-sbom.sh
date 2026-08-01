@@ -1120,6 +1120,24 @@ if [ "$MODE" = "SOURCE" ]; then
         API=$(android_api "$SCAN_INPUT_DIR")
         CDX_IMG="${ANDROID_IMAGE_PREFIX}${API}:latest"
         echo "[INFO] Android source detected (compileSdk=$API) -> $CDX_IMG"
+        # The image carries an Android SDK platform, which is not open source:
+        # Google's SDK terms bar redistributing it, so we do not publish this
+        # image and it is built where it is used. Tell the user how rather than
+        # letting `docker run` fail on a missing image.
+        if ! docker image inspect "$CDX_IMG" >/dev/null 2>&1 \
+           && ! docker pull -q "$CDX_IMG" >/dev/null 2>&1; then
+            echo "[ERROR] Android SDK image not found: $CDX_IMG"
+            echo "        It is not published: the Android SDK inside it is not open source,"
+            echo "        and its terms do not allow us to redistribute it. Build it once:"
+            echo ""
+            echo "          docker build --build-arg ANDROID_API=$API \\"
+            echo "            -t $CDX_IMG $REPO_DIR/docker/android"
+            echo ""
+            echo "        Building it means accepting Google's SDK terms yourself:"
+            echo "        https://developer.android.com/studio/terms"
+            echo "        To use an image built elsewhere, set ANDROID_IMAGE_PREFIX."
+            exit 1
+        fi
     else
         CDX_IMG=$(img_for_lang "$LANG_DET")
         echo "[INFO] Language: $LANG_DET -> $CDX_IMG"

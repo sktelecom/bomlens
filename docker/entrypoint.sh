@@ -100,6 +100,16 @@ generate_sbom_cdxgen() {
         api=$(android_api "$src")
         img="${ANDROID_IMAGE_PREFIX}${api}:latest"
         echo "[INFO] Android source (compileSdk=$api) -> $img"
+        # Not a published image — the Android SDK inside it is not open source
+        # and its terms bar redistribution, so it is built where it is used.
+        if ! docker image inspect "$img" >/dev/null 2>&1; then
+            echo "[ERROR] Android SDK image not found: $img"
+            echo "        Build it on the host once, then re-run:"
+            echo "          docker build --build-arg ANDROID_API=$api -t $img docker/android"
+            echo "        (accepting https://developer.android.com/studio/terms), or set"
+            echo "        ANDROID_IMAGE_PREFIX to an image built elsewhere."
+            return 1
+        fi
     else
         img=$(img_for_lang "$lang")
         echo "[INFO] Language: $lang -> $img"
