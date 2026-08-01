@@ -145,7 +145,7 @@ def src($c):
 # attribute and no source to point at. Measured across the corpus, 4,649 such
 # entries carry no licence, no purl and no external reference between them, so
 # every one of them landed under NOASSERTION with "holders not captured" beneath
-# it. Ubiquiti UniFi alone contributed 423.
+# it. One access point image alone contributed 423.
 #
 # Everything folded here remains in the SBOM under its own name. What changes is
 # a document written for a person to act on.

@@ -114,3 +114,7 @@ site/
 .claudeignore
 CLAUDE.md
 scripts/check-doc-style.sh
+
+# Browser-automation scratch output. Accessibility snapshots of whatever pages
+# were open, including vendor download portals, so it should never be staged.
+.playwright-mcp/

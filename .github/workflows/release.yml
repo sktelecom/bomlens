@@ -158,9 +158,14 @@ jobs:
           tar -czf release-assets/bomlens-examples-${{ needs.create-release.outputs.version }}.tar.gz \
             examples/ $LICENSE_FILES
 
-          # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans)
+          # Complete package (includes docker/ so the host has build-prep.sh for CLI source scans).
+          # docs/maintainers/ is excluded: those are internal decision records
+          # written for whoever works on the tool, not documentation for whoever
+          # downloads it, and packaging docs/ wholesale had been shipping them
+          # into every release asset.
           # shellcheck disable=SC2086
           tar -czf release-assets/bomlens-${{ needs.create-release.outputs.version }}.tar.gz \
+            --exclude='docs/maintainers' \
             scripts/ docker/ examples/ docs/ README.md $LICENSE_FILES
 
           # Checksums so downloaders can verify integrity of these assets.

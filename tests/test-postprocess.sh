@@ -243,7 +243,7 @@ echo "== B-4c: NOTICE folds catalogued file entries into one line per licence ==
 # a legitimate inventory but not something a licence notice can speak to: a path
 # is not a project, so there is no name to attribute and no source to point at.
 # Measured across the corpus, 4,649 such entries carry no licence, no purl and no
-# external reference between them — Ubiquiti UniFi alone contributed 423, and
+# external reference between them — one access point image alone contributed 423, and
 # every one landed under NOASSERTION with "holders not captured" beneath it.
 cat > "$WORK/filecomp.json" <<'JSON'
 {"components":[
