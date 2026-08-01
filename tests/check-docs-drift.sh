@@ -28,7 +28,6 @@
 #   - an English page and its .ko.md mirror passing different scan-sbom.sh flags
 #   - a pinned-tag example that is not the newest release (stale advice)
 #
-# Maintainer notes under docs/maintainers/ are excluded — they are not user-followed.
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,7 +59,7 @@ CODE_IMG="$(
 # --- Docs in scope: user-facing guides only --------------------------------
 DOCS=()
 while IFS= read -r f; do DOCS+=("$f"); done \
-    < <(find docs -name '*.md' -not -path 'docs/maintainers/*' | sort)
+    < <(find docs -name '*.md' | sort)
 for f in README.md docker/README.md examples/*/README.md; do
     [ -f "$f" ] && DOCS+=("$f")
 done

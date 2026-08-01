@@ -38,9 +38,8 @@
 # link to an installed package, so filtering by recipe name is unnecessary: reading
 # only the hasAssociatedVulnerability edges of installed packages excludes them.
 #
-# Measured against published Yocto artifacts, not only fixtures (the procedure is
-# in docs/maintainers/yocto-validation.md, and the numbers are what a change here
-# has to keep):
+# Measured against published Yocto artifacts, not only fixtures. These numbers
+# are what a change here has to keep:
 #   3.0 document, Scarthgap core-image-minimal   35 packages, 12255 fixed / 63 not-affected / 0 open
 #   3.0 document, Walnascar 5.2.4 core-image-minimal  39 packages = its manifest, 9 / 63 / 0
 #   2.2 archive,  Scarthgap 5.0.14 core-image-minimal 36 packages = its manifest,

@@ -6,7 +6,6 @@ description: 외부에서 받은 SBOM(CycloneDX/SPDX)이 요구사항을 충족�
 
 협력사나 다른 팀에서 받은 SBOM(JSON)이 요구사항을 충족하는지 검증하는 방법을 설명합니다. 검증에 이어 라이선스와 취약점을 분석하고, 위험 보고서까지 만듭니다. 소스 코드가 없어도 SBOM 파일 하나만 있으면 됩니다.
 
-설계 배경과 검증 로직의 내부 동작은 메인테이너용 [공급사 제출 SBOM 검증·분석](https://github.com/sktelecom/bomlens/blob/main/docs/maintainers/supplier-sbom-analysis.md) 문서를 참고하세요.
 
 ## 언제 쓰나
 

@@ -11,7 +11,7 @@
  * front-matter, and table rows.
  *
  * Scope (SCOPE below): the published docs and READMEs. Internal maintainer
- * notes (docs/maintainers/), the changelog, license inventories, and
+ * the changelog, license inventories, and
  * generated artifacts are deliberately out of scope.
  *
  * severity: S1 = clear error, S2 = strong recommendation, S3 = advisory.
@@ -53,7 +53,6 @@ const SCOPE = [
 // demo dataset (scan output the tool generated, not prose anyone wrote — its
 // wording is fixed by the report templates).
 const EXCLUDE = [
-  "docs/maintainers",
   "docs/korean-style-guide.md",
   "docs/demo/data",
   "CHANGELOG.md",
