@@ -9,7 +9,15 @@ invoked at arm's length (as separate processes), and remain under their own
 respective licenses. A full inventory of bundled tools, their licenses, and
 the corresponding source locations is provided in THIRD_PARTY_LICENSES.md.
 
-The base image (ghcr.io/sktelecom/sbom-scanner) bundles only permissively
-licensed tools (Apache-2.0 / MIT). GPL-licensed tools, when used, are isolated
-in a separate opt-in image (ghcr.io/sktelecom/sbom-scanner-firmware); see
-THIRD_PARTY_LICENSES.md for the GPL source offer.
+The tools BomLens installs into its base image (ghcr.io/sktelecom/bomlens) are
+permissively licensed (Apache-2.0 / MIT). The heavy unpacking and binary-analysis
+tools that are themselves GPL-licensed are isolated in a separate opt-in image
+(ghcr.io/sktelecom/bomlens-firmware).
+
+Every image, the base one included, is built on a Debian-based Python image and
+therefore also contains Debian system packages under the GNU GPL (versions 2 and
+3), the GNU LGPL, and other licenses — bash, coreutils, grep, sed, tar, gzip and
+git among them. That is inherent to any Linux base image and is not specific to
+this project. Each package's license and copyright statement is preserved inside
+the image at /usr/share/doc/<package>/copyright, and directions to the
+corresponding source for all of them are in THIRD_PARTY_LICENSES.md.

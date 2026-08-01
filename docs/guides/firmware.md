@@ -71,7 +71,7 @@ OSV (Open Source Vulnerabilities) advisories are not bundled, to keep the redist
 
 ## License note
 
-The firmware image contains GPL tools (cve-bin-tool, sasquatch, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md). The GPL tools live only in this firmware image; the base image stays permissive-only.
+The firmware image contains GPL tools (cve-bin-tool, sasquatch, and some extractors that unblob depends on). The shell scripts only invoke them as separate processes, so copyleft does not propagate into our code, but redistributing GPL binaries in an image carries the obligation to include the license texts and offer the source. For the full inventory, see [Bundled tool licenses](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md). The GPL analysis tools live only in this firmware image. Every image including the base one is Debian-based, though, so all of them also carry GPL system packages; source directions for those are in the same document.
 
 ## Limits
 

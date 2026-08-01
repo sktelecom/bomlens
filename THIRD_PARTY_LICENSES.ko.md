@@ -10,9 +10,10 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 - 다만 도구 바이너리를 이미지로 재배포하므로, 라이선스 전문과 (GPL 도구의) 대응 소스 접근 경로를 제공합니다. SPDX 라이선스 전문(Apache-2.0, MIT, GPL-2.0, GPL-3.0 등)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 동봉되며, 각 도구의 소스는 아래 표의 Source URL에서 받습니다.
 - BomLens 자신의 이용 조건도 배포물에 함께 나갑니다. 이미지에서는 `/usr/local/lib/sbom/notices/`에 `LICENSE`와 `NOTICE`, 이 문서가 들어 있고, 릴리스 번들에서는 압축을 풀면 최상위에, 데스크톱 설치본에서는 앱 리소스 폴더에 있습니다. 이미지나 번들을 다시 배포하실 때 이 파일들을 함께 전달하시면 Apache-2.0 §4의 요구가 충족됩니다.
 - AGPL 라이선스 도구는 포함하지 않습니다. 따라서 웹 UI(`--ui`)를 써도 AGPL §13 네트워크 조항은 트리거되지 않습니다.
-- GPL 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어가고, 기본 이미지(`bomlens`)는 permissive-only로 유지됩니다. 다른 opt-in 이미지(`bomlens-aibom`, `bomlens-deep-cve`)도 permissive 도구만 담습니다.
+- GPL 라이선스 분석 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어갑니다. 기본 이미지(`bomlens`)와 다른 opt-in 이미지(`bomlens-aibom`, `bomlens-deep-cve`)에 BomLens가 설치하는 도구는 permissive 라이선스입니다.
+- 기본 이미지를 포함한 모든 이미지는 `python:3.12-slim` 위에 빌드되므로, GPL과 LGPL을 비롯한 여러 라이선스의 Debian 시스템 패키지도 함께 들어 있습니다. 리눅스 기반 이미지라면 어디나 해당하는 성질이고 GPL이 없는 베이스 이미지는 없습니다. 무엇이 들어 있고 소스는 어디서 받는지는 아래 [모든 이미지의 Debian 패키지](#모든-이미지의-debian-패키지)를 보세요.
 
-## 기본 이미지 — `ghcr.io/sktelecom/bomlens` (permissive-only)
+## 기본 이미지 — `ghcr.io/sktelecom/bomlens` (BomLens가 설치하는 도구, Debian 베이스는 아래 참조)
 
 | 도구 | 용도 | 라이선스 (SPDX) | Source |
 |------|------|------------------|--------|
@@ -21,7 +22,7 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 | Trivy | 보안 취약점 스캔 | Apache-2.0 | https://github.com/aquasecurity/trivy |
 | trivy-db | 취약점 DB | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM 서명 | Apache-2.0 | https://github.com/sigstore/cosign |
-| scancode-toolkit | 정밀 라이선스(opt-in) | Apache-2.0 (데이터셋 일부 CC-BY-4.0 등) | https://github.com/aboutcode-org/scancode-toolkit |
+| scancode-toolkit | 정밀 라이선스 검출. 빌드 시 opt-in(`SBOM_DEEP_LICENSE=true`)이며 기본값 `false`로 빌드되는 **발행 이미지에는 들어 있지 않습니다** | Apache-2.0 (데이터셋 일부 CC-BY-4.0 등) | https://github.com/aboutcode-org/scancode-toolkit |
 | scanoss (scanoss.py) | vendored 오픈소스 식별(기본 포함, 끄려면 `SBOM_SCANOSS=false`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI 모델 SBOM 생성(opt-in `SBOM_AIBOM`, 별도 이미지 `bomlens-aibom`; HuggingFace API 호출) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |
 | jq | SBOM 가공(헬퍼) | MIT (일부 컴포넌트 BSD/ICU/Lucent) | https://github.com/jqlang/jq |
@@ -101,10 +102,23 @@ OSSKB API(운영: Software Transparency Foundation) 이용 시 약관 제약:
 |------|------|------|------------------|----------|--------|
 | unblob | 26.3.30 (`UNBLOB_VERSION`) | 펌웨어 언팩(주) | MIT | permissive | https://github.com/onekey-sec/unblob |
 | cve-bin-tool | 3.4 (`CVE_BIN_TOOL_VERSION`) | stripped 바이너리 식별+CVE | **GPL-3.0** | strong | https://github.com/intel/cve-bin-tool |
-| ubi_reader | 0.8.13 (`UBI_READER_VERSION`) | UBI/UBIFS 추출 | **GPL-3.0** | strong | https://github.com/onekey-sec/ubi_reader |
-| squashfs-tools(unsquashfs) | (apt 배포 버전) | 표준 squashfs 추출 폴백 | GPL-2.0+ | strong | https://github.com/plougher/squashfs-tools |
+| ubi_reader | 0.8.14 (`UBI_READER_VERSION`) | UBI/UBIFS 추출 | **GPL-3.0** | strong | https://github.com/onekey-sec/ubi_reader |
 | sasquatch | `sasquatch-v4.5.1-6` (`SASQUATCH_VERSION`) | 표준 unsquashfs가 거부하는 벤더 변형 squashfs 추출 | GPL-2.0 | strong | https://github.com/onekey-sec/sasquatch |
-| e2fsprogs, p7zip, unar, cpio, cabextract, jefferson 등 | (apt 배포 버전) | unblob가 호출하는 추출 바이너리, 그리고 Windows 설치 파일 컨테이너용으로 직접 호출하는 7z | GPL-2.0+ / 기타 | strong/various | Debian 패키지 |
+| jefferson | 0.4.7 (pip, unblob가 끌어옴) | JFFS2 추출 | MIT | permissive | https://github.com/onekey-sec/jefferson |
+
+그 위에 얹히는 Debian 패키지입니다. 버전은 발행된 이미지에서 실측한 값입니다.
+
+| 패키지 | 버전 | 용도 | 라이선스(SPDX) |
+|--------|------|------|----------------|
+| squashfs-tools(unsquashfs) | 1:4.6.1-1 | 표준 squashfs 추출 폴백 | GPL-2.0+ |
+| binutils | 2.44-3 | ELF 구성요소 식별에 쓰는 `readelf` | GPL-3.0+ |
+| e2fsprogs | 1.47.2-3+b11 | ext 파일시스템 추출 | GPL-2.0 |
+| cpio | 2.15+dfsg-2 | 아카이브 추출 | GPL-3.0+ |
+| cabextract | 1.11-2 | Windows 설치 파일 컨테이너 추출 | GPL-2.0+ |
+| lzop, lz4, liblzo2-2 | 1.04-2, 1.10.0-4, 2.10-3+b1 | 언패커가 호출하는 압축 코덱 | GPL-2.0+ |
+| p7zip / 7zip, unar | (apt 배포 버전) | 7z와 벤더 컨테이너 형식 | LGPL-2.1+ 및 기타 |
+
+이들의 대응 소스는 Debian 소스 패키지입니다. [모든 이미지의 Debian 패키지](#모든-이미지의-debian-패키지)를 보세요.
 
 `scan-firmware.sh`의 언팩 순서는 unblob, `file`이 squashfs로 판정한 파일에 대한 unsquashfs,
 Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk입니다. 잘라내기만 되고 열리지 않은
@@ -114,8 +128,10 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 
 - binwalk: PyPI `binwalk` 2.x 배포본이 손상(`binwalk.core` 누락)되어 이미지에 설치하지 않습니다. `scan-firmware.sh`는 PATH에 정상 `binwalk`가 있으면 최후 폴백으로 쓰지만, 표준 squashfs는 그 전 단계인 unsquashfs가 처리합니다.
 
-### GPL 소스 코드 제공 (펌웨어 이미지)
-펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소나 패키지 레지스트리에서 버전을 고정해 받습니다. **GPL 라이선스 전문(GPL-2.0, GPL-3.0)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 함께 배포됩니다.** 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있고, 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다. 소스가 더 필요하면 저장소 이슈로 요청해 주세요.
+### 펌웨어 도구의 GPL 소스 코드
+펌웨어 이미지에 들어가는 GPL 도구는 모두 공개 저장소나 패키지 레지스트리에서 버전을 고정해 받습니다. **GPL 라이선스 전문(GPL-2.0, GPL-3.0)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 함께 배포됩니다.** 이미지에 설치된 것과 같은 버전의 소스 코드는 위 표의 Source URL(해당 버전 태그/릴리스)에서 그대로 받을 수 있고, 펌웨어 이미지에는 이 문서의 위치가 `com.sktelecom.sbom.gpl-source-offer` 라벨로 박혀 있습니다.
+
+상류 릴리스가 아니라 Debian 패키지로 설치되는 도구(squashfs-tools, e2fsprogs, cpio, cabextract 등)는 아래 [모든 이미지의 Debian 패키지](#모든-이미지의-debian-패키지)가 다룹니다. Debian 바이너리의 대응 소스는 상류 태그가 아니라 Debian 소스 패키지이기 때문입니다.
 
 ## deep-cve 이미지 — `ghcr.io/sktelecom/bomlens-deep-cve` (permissive, opt-in)
 
@@ -144,6 +160,52 @@ cdxgen은 Android SDK를 담은 이미지를 제공하지 않고 Android를 전�
 Android SDK는 오픈소스가 아니며 Apache-2.0이 아닙니다. 약관은 Android 애플리케이션 개발 목적의 사용을 재실시권 없이 허락하고(3.1절), 제3자 라이선스가 요구하는 경우를 빼면 SDK나 그 일부의 복제와 재배포를 제한합니다(3.4절). 이 이미지를 받아 쓰시는 분은 Google 약관을 직접 적용받으며, 이미지를 쓰는 것이 약관 수락을 대신하지 않습니다.
 
 SDK 각 구성요소의 `NOTICE.txt`는 이미지 안 `/opt/android-sdk/` 아래에 그대로 들어 있고, SDK 내용물의 제3자 고지는 거기에 있습니다. `/opt/android-sdk/licenses/`의 파일들은 라이선스 전문이 아니라 `sdkmanager`가 남긴 수락 표시입니다.
+
+## 데스크톱 설치본 — Electron과 Chromium
+
+데스크톱 설치본(`BomLens-Setup.exe`, `BomLens-Setup.dmg`)은 앱을 Electron 런타임과 함께 묶으므로, 그 안의 Electron과 Chromium 빌드도 함께 재배포합니다.
+
+| 구성요소 | 라이선스(SPDX) | 고지 파일 |
+|----------|----------------|-----------|
+| Electron | MIT | `LICENSE.electron` |
+| Chromium과 그 안의 제3자 코드 | BSD-3-Clause 외 다수 | `LICENSES.chromium.html` |
+
+Chromium의 제3자 구성요소에는 FFmpeg를 비롯한 LGPL-2.1+ 코드가 있습니다. Electron은 FFmpeg를 정적 링크하지 않고 별도 공유 라이브러리(Windows `libffmpeg.dll`, macOS `libffmpeg.dylib`)로 배포하는데, 이것이 LGPL의 재링크 요건이 요구하는 형태입니다.
+
+BomLens 자신의 이용 조건도 설치본과 함께 나갑니다. `LICENSE`, `NOTICE`, 그리고 이 문서가 앱 리소스 폴더에 들어갑니다(`electron/electron-builder.yml`).
+
+## 모든 이미지의 Debian 패키지
+
+BomLens의 모든 이미지는 Debian 기반인 `python:3.12-slim` 위에 빌드됩니다. 그래서 위에 적은 도구들 외에 Debian 시스템 패키지도 함께 들어 있고, 그 대부분이 카피레프트입니다. 기본 이미지의 패키지 128개 가운데 백 개 넘는 수가 GPL이나 LGPL 조건을 답니다. bash, coreutils, grep, sed, gzip, findutils, wget, tar가 GPL-3.0+이고 git과 mawk가 GPL-2.0, GNU C 라이브러리가 LGPL-2.1+입니다. GPL이 없는 리눅스 베이스 이미지는 없습니다. Alpine은 BusyBox가 GPL-2.0이고 glibc 계열 이미지는 모두 LGPL을 담습니다. 이 프로젝트의 선택이 아니라 컨테이너 이미지 일반의 성질입니다.
+
+BomLens는 이 패키지들에 어떤 패치도 하지 않습니다. `apt-get`으로 설치해 별도 프로세스로 호출할 뿐이므로, 대응 소스는 수정되지 않은 Debian 소스 패키지입니다.
+
+가지고 계신 이미지의 패키지와 정확한 버전을 모두 뽑으려면 이렇게 합니다.
+
+```bash
+docker run --rm --entrypoint dpkg-query ghcr.io/sktelecom/bomlens:latest \
+  -W -f='${Package} ${Version} ${Architecture}\n'
+```
+
+각 패키지의 라이선스와 저작권 표시는 이미지 안 `/usr/share/doc/<패키지>/copyright`에 그대로 보존돼 있습니다.
+
+### Debian 패키지의 소스
+
+위에서 확인한 버전의 대응 소스는 Debian 소스 아카이브에서 받습니다.
+
+```
+https://snapshot.debian.org/
+```
+
+`deb.debian.org`가 아니라 `snapshot.debian.org`를 쓰는 이유는, 정확한 버전으로 주소를 지정할 수 있고 지난 버전을 계속 보관하기 때문입니다. 그래서 언제 빌드된 이미지에 대해서도 이 안내가 유효합니다. 이미지 안에서라면 다음도 같습니다.
+
+```bash
+apt-get source <패키지>=<버전>
+```
+
+### 서면 제공 의사표시 (GPL-2.0 구성요소)
+
+이 이미지들에 들어 있는 GNU General Public License 버전 2 구성요소에 대해, SK Telecom Co., Ltd.는 이미지를 받으신 날로부터 3년간, 누구에게나 대응 소스 코드의 완전한 기계 판독 가능 사본을 배포 실비를 넘지 않는 비용으로 제공합니다. https://github.com/sktelecom/bomlens/issues 에 이슈를 열어 요청해 주세요.
 
 ---
 
