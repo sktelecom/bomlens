@@ -165,6 +165,30 @@ for run in "${RUNS[@]}"; do
     # folder and its zip too, or the demo would publish more than the app does.
     find "$SRC/$run" -maxdepth 1 -type f ! -name '*.md' ! -name '.*' \
         -exec cp {} "$DEST/files/$run/" \;
+
+    # The file-content snapshot is dropped unless the scan read the operator's
+    # own source tree. For an image or a firmware upload the snapshot holds the
+    # verbatim contents of someone else's files — an nginx capture carried
+    # 136 of them, ca-certificates.crt and the X11 Compose tables among them —
+    # and publishing those to a docs site redistributes them stripped of the
+    # notices their licences ask for. Locally the snapshot is the point of the
+    # viewer and stays; what changes is only what this demo publishes. The
+    # `_files.json` listing is kept either way, so the viewer still shows what
+    # the scan walked, the same as the Raspberry Pi OS capture already did.
+    keep_snapshot="$(python3 - "$DEST/scan-$run.json" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        cfg = json.load(fh).get("scanConfig") or {}
+    print("1" if cfg.get("source") == "current-dir" else "0")
+except Exception:
+    print("0")
+PY
+)"
+    if [ "$keep_snapshot" != "1" ]; then
+        rm -f "$DEST/files/$run/"*_source.json
+    fi
+
     (cd "$DEST/files" && zip -qr "$run.zip" "$run")
 
     # Keep the listings honest about what was copied: a name left in results[]
