@@ -1,0 +1,65 @@
+name: Publication terms
+
+# Keeps commercial product names and measurements taken against those products
+# out of what we publish. Split from ci.yml rather than added to it because the
+# PR title and body need the `edited` trigger, and putting `edited` on the main
+# workflow would re-run the whole suite every time someone fixes a typo in a
+# description.
+#
+# The rule and the reasoning behind it are in scripts/check-publication-terms.sh.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, edited ]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check publication terms
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The commit-message check needs the PR's commits and their merge
+          # base, which a shallow clone does not have.
+          fetch-depth: 0
+
+      - name: Check tracked files
+        run: bash scripts/check-publication-terms.sh
+
+      - name: Check the commit messages this PR adds
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/check-publication-terms.sh --commits "$BASE_SHA..$HEAD_SHA"
+
+      - name: Check the PR title and body
+        if: github.event_name == 'pull_request'
+        env:
+          # Through the environment rather than interpolated into the script:
+          # a title is untrusted input and would otherwise be evaluated by the
+          # shell.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" > "$RUNNER_TEMP/pr-text.txt"
+          bash scripts/check-publication-terms.sh --text "$RUNNER_TEMP/pr-text.txt"
+
+      - name: Self-test — the checker must actually trip
+        run: |
+          # A gate that silently stops matching is worse than no gate, so prove
+          # it still fires on text it is supposed to reject.
+          fixture="$RUNNER_TEMP/publication-terms-selftest.txt"
+          printf 'recall against the commercial reference is 40/50\n' > "$fixture"
+          if bash scripts/check-publication-terms.sh --text "$fixture" >/dev/null 2>&1; then
+            echo "FAIL: the self-test fixture did not trip the checker."
+            exit 1
+          fi
+          echo "✅ the checker still rejects a comparison figure"
