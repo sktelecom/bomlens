@@ -14,8 +14,8 @@
 # Usage:
 #   ./tests/compare-cdxgen-vs-docker.sh
 # Env:
-#   SBOM_FIXTURES_DIR   project root to scan (default: ~/projects/bd-scan/tests/fixtures/projects,
-#                       falls back to ./examples)
+#   SBOM_FIXTURES_DIR   project root to scan; falls back to ./examples when unset
+#                       or when the directory does not exist
 #   SBOM_SCANNER_IMAGE  BomLens image (default: ghcr.io/sktelecom/sbom-scanner:latest)
 #   CDXGEN_IMAGE        baseline cdxgen image (default: ghcr.io/cyclonedx/cdxgen:latest)
 set -uo pipefail
@@ -30,7 +30,7 @@ rm -rf "$WORK_ROOT"; mkdir -p "$WORK_ROOT"
 
 SCANNER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
 CDXGEN_IMAGE="${CDXGEN_IMAGE:-ghcr.io/cyclonedx/cdxgen:latest}"
-FIXTURES_DIR="${SBOM_FIXTURES_DIR:-$HOME/projects/bd-scan/tests/fixtures/projects}"
+FIXTURES_DIR="${SBOM_FIXTURES_DIR:-$SCRIPT_DIR/../examples}"
 
 if [ ! -d "$FIXTURES_DIR" ]; then
     echo "[WARN] fixtures dir not found: $FIXTURES_DIR — falling back to examples/"
