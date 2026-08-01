@@ -60,8 +60,10 @@ ARG TARGETARCH=amd64
 # renovate: datasource=github-tags depName=docker/cli extractVersion=^v(?<version>.+)$
 ARG DOCKER_CLI_VERSION=27.5.1
 
-# Firmware analysis (opt-in image `sbom-scanner-firmware`). GPL tools are isolated
-# here so the base image stays permissive-only; see THIRD_PARTY_LICENSES.md.
+# Firmware analysis (opt-in image `sbom-scanner-firmware`). The GPL analysis
+# tools are isolated here so the base image carries only permissively licensed
+# tools of our own choosing — its Debian base contributes GPL system packages
+# either way, as every Linux image does; see THIRD_PARTY_LICENSES.md.
 ARG SBOM_FIRMWARE=false
 # renovate: datasource=pypi depName=unblob
 ARG UNBLOB_VERSION=26.3.30

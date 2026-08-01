@@ -222,7 +222,8 @@ jobs:
 
   # ---------------------------------------------------------------
   # (3) Firmware image — base + GPL unpack/ID tools (opt-in build).
-  #     Published separately so the base image stays permissive-only.
+  #     Published separately so the base image installs no GPL tool of its own
+  #     (its Debian base carries GPL system packages regardless).
   # ---------------------------------------------------------------
   build-firmware:
     name: Build firmware image
