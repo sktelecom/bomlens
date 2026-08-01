@@ -35,7 +35,7 @@ BomLens는 여러 입력을 받습니다. 소스코드, 펌웨어, 받은 SBOM, 
 
 ![펌웨어 흐름: 언팩 후 루트 파일시스템을 찾아 syft와 cve-bin-tool로 병렬 스캔하고 병합·보강을 거쳐 후처리한다](../images/diagrams/pipeline-firmware.ko.png)
 
-> 펌웨어 도구는 GPL 계열이라 `bomlens-firmware` 이미지에만 들어가고, 기본 이미지는 permissive 라이선스만 유지합니다. [펌웨어 가이드](../guides/firmware.ko.md)와 그 한계를 참고하세요.
+> 펌웨어 도구는 GPL 계열이라 `bomlens-firmware` 이미지에만 들어가고 기본 이미지에는 설치하지 않습니다. [펌웨어 가이드](../guides/firmware.ko.md)와 그 한계를 참고하세요.
 
 ---
 
@@ -73,7 +73,7 @@ HuggingFace 모델 id(`org/model`)이며, opt-in `bomlens-aibom` 이미지가 �
 
 ## 사용 오픈소스 도구
 
-분석 도구는 모두 오픈소스입니다. 기본 이미지는 permissive 라이선스만 담고, GPL 도구는 opt-in `bomlens-firmware` 이미지에, AI 생성기는 `bomlens-aibom`에 격리합니다.
+분석 도구는 모두 오픈소스입니다. 기본 이미지에 설치하는 도구는 permissive 라이선스이고, GPL 도구는 opt-in `bomlens-firmware` 이미지에, AI 생성기는 `bomlens-aibom`에 격리합니다. 리눅스 이미지가 다 그렇듯 모든 이미지가 Debian 베이스의 GPL 시스템 패키지를 함께 담고 있으며, 이는 [번들 도구 라이선스](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.ko.md)에 정리돼 있습니다.
 
 | 도구 | 역할 | 입력 | 라이선스 | 이미지 | 프로젝트 |
 |------|------|------|----------|--------|----------|
