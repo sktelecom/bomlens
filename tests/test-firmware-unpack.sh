@@ -530,6 +530,57 @@ else
     fail "uclibc is reported $n time(s)" "the presence-only entry should have yielded"
 fi
 
+# The two passes do not always spell a component the same way. A library is read
+# from its SONAME, so the structural pass calls it what the file is called, while
+# a signature checker calls it what the project is called. Measured on an Extreme
+# EXOS image: `expat` from the ELF pass stood beside `libexpat 2.5.0`, and `zstd`
+# beside `zstandard 1.5.2` — the versionless judgement surviving is exactly what
+# the rule above exists to prevent, and comparing the names as written missed it.
+forms_in="$(jq -n '[
+  {type:"library", name:"expat",
+   properties:[{name:"bomlens:evidenceGrade", value:"presence-only"}]},
+  {type:"library", name:"zstd",
+   properties:[{name:"bomlens:evidenceGrade", value:"presence-only"}]},
+  {type:"library", name:"openssl",
+   properties:[{name:"bomlens:evidenceGrade", value:"presence-only"}]}
+]')"
+forms_versioned="$(jq -n '[
+  {type:"library", name:"libexpat", version:"2.5.0"},
+  {type:"library", name:"zstandard", version:"1.5.2"},
+  {type:"library", name:"busybox", version:"1.35.0"}
+]')"
+forms_out="$(jq -n --slurpfile a <(echo "$forms_versioned") \
+                   --slurpfile b <(echo "$forms_in") \
+                   --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') "$merge_filter")"
+
+for pair in expat:libexpat zstd:zstandard; do
+    bare="${pair%%:*}"; full="${pair#*:}"
+    n=$(printf '%s' "$forms_out" | jq --arg n "$bare" '[.[] | select(.name == $n)] | length')
+    if [ "$n" = "0" ]; then
+        pass "a presence-only $bare yields to the versioned $full"
+    else
+        fail "$bare survived beside $full" "the same component is reported twice"
+    fi
+done
+
+# The versioned entries themselves must not be touched by the comparison.
+if printf '%s' "$forms_out" | jq -e '
+      ([.[] | select(.name == "libexpat" and .version == "2.5.0")] | length) == 1
+      and ([.[] | select(.name == "zstandard" and .version == "1.5.2")] | length) == 1' >/dev/null; then
+    pass "the versioned entries keep the names their producers gave them"
+else
+    fail "a versioned entry was renamed or dropped"
+fi
+
+# Written too loosely this would swallow a genuine presence-only finding. openssl
+# is present only without a version here, and nothing versioned matches it.
+if printf '%s' "$forms_out" | jq -e '
+      [.[] | select(.name == "openssl")] | length == 1' >/dev/null; then
+    pass "a presence-only component with no versioned counterpart survives"
+else
+    fail "a presence-only component was dropped with nothing to yield to"
+fi
+
 if printf '%s' "$with_verstr" | jq -e '
       [.[] | select(.name == "uclibc")][0] | .version == "0.9.28"' >/dev/null; then
     pass "the surviving uclibc is the versioned one"

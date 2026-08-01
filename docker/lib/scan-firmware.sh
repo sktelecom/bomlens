@@ -503,14 +503,42 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     def presence_only:
       any(.properties[]?; .name == "bomlens:evidenceGrade" and .value == "presence-only");
 
+    # The names two passes give one component differ by more than case. A library
+    # is read from its SONAME, so the structural pass calls it what the file is
+    # called, while a signature checker calls it what the project is called: the
+    # same expat arrives as `expat` from one and `libexpat` from the other, and
+    # zstd as `zstd` and `zstandard`. Comparing the names as written leaves the
+    # versionless judgement standing beside the versioned one, which is the very
+    # thing the rule below exists to prevent.
+    #
+    # So compare on a form that ignores the difference: lowercase, drop a leading
+    # `lib`, and drop punctuation. Only for deciding whether the same component is
+    # already known with a version — the component keeps the name its producer
+    # gave it.
+    # Where the two names are not forms of each other but different names for the
+    # same project, only a written-down pair settles it. Kept closed and short:
+    # a loose rule (say, prefix matching) would join libz and libzip. Each pair
+    # below is one this repository already treats as one component somewhere else.
+    #   zstd/zstandard  cpe-name-map.json maps both `zstd` and `libzstd` onto the
+    #                   product `zstandard`. Seen on Extreme EXOS 33.6, where the
+    #                   ELF pass read `zstd` from libzstd.so and the signature
+    #                   checker reported `zstandard 1.5.2`.
+    def name_alias:
+      { "zstandard": "zstd" } as $alias | $alias[.] // .;
+
+    def name_form:
+      ((. // "") | ascii_downcase | gsub("[^a-z0-9]"; ""))
+      | if startswith("lib") and (length > 3) then .[3:] else . end
+      | name_alias;
+
     ($a[0] + $b[0] + $c[0] + $d[0]) as $with_presence
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.
-    | ([$with_presence[] | select(presence_only | not) | (.name // "") | ascii_downcase]
+    | ([$with_presence[] | select(presence_only | not) | (.name // "") | name_form]
        | unique) as $versioned
     | [$with_presence[]
-       | select((presence_only and (((.name // "") | ascii_downcase) | IN($versioned[]))) | not)]
+       | select((presence_only and (((.name // "") | name_form) | IN($versioned[]))) | not)]
       as $all
     | ([$all[] | select(mergeable | not)]
        | group_by([((.name // "") | ascii_downcase), (.version // ""),
