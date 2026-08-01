@@ -93,7 +93,6 @@ Using the OSSKB API (operated by the Software Transparency Foundation) comes wit
 
 This is a separate opt-in image that isolates the heavy unpacking and binary-analysis tools together with their GPL components.
 Build: `docker build --build-arg SBOM_FIRMWARE=true -t bomlens-firmware ./docker`.
-The design is described in [docs/maintainers/firmware-analysis.md](docs/maintainers/firmware-analysis.md).
 
 The versions below match the build ARG defaults in `docker/Dockerfile` (pinned for supply-chain hygiene; overridable through the ARG).
 

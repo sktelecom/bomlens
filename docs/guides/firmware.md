@@ -6,8 +6,6 @@ description: Unpack network-device firmware binaries (.bin, squashfs, and more) 
 
 How to identify components and check the SBOM, licenses, and vulnerabilities in a network-device firmware binary (`.bin`, `.img`, squashfs, and so on). Use it when you only have the binary and no source, such as firmware received from a supplier.
 
-For the tool selection rationale and the internal design, see the maintainer doc [Firmware analysis](https://github.com/sktelecom/bomlens/blob/main/docs/maintainers/firmware-analysis.md) (Korean).
-
 ## How it works
 
 Firmware is a single file that packs and seals an operating system and dozens of libraries. Feeding a firmware file straight into a normal scan detects almost nothing and yields an empty SBOM. Firmware analysis first unpacks the contents, then identifies components.
@@ -76,7 +74,7 @@ The firmware image contains GPL tools (cve-bin-tool, sasquatch, and some extract
 ## Limits
 
 - The open-source tool stack detects roughly 60–85% of components, and the result depends heavily on the firmware type, how aggressively it is stripped, and whether unpacking succeeds.
-- Without function-level binary fingerprinting, unlike commercial tools, stripped or inlined components and binaries with version strings removed are missed.
+- Without function-level binary fingerprinting, stripped or inlined components and binaries with version strings removed are missed.
 - Statically linked libraries, vendor-modified squashfs, encrypted or signed firmware, and renamed libraries go undetected or are misidentified.
 - The resulting SBOM is a best-effort estimate, so do not use it as the sole basis for legal license compliance.
 

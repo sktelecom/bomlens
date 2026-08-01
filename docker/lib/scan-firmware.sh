@@ -11,7 +11,7 @@
 #            <out_prefix>_security_cvebintool.json
 #              (Trivy-shaped CVE rows that scan-security.sh merges into _security.json)
 #
-# Pipeline (see docs/firmware-analysis.md §5):
+# Pipeline:
 #   ① unpack   : unblob (preferred) -> unsquashfs / 7z / binwalk (fallback)
 #   ② packages : syft dir:<rootfs>            -> package-manager components
 #   ③ binaries : cve-bin-tool                 -> stripped static binaries (Phase 2)
