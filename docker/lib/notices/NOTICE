@@ -9,6 +9,16 @@ invoked at arm's length (as separate processes), and remain under their own
 respective licenses. A full inventory of bundled tools, their licenses, and
 the corresponding source locations is provided in THIRD_PARTY_LICENSES.md.
 
+This product also bundles reduced snapshots of third-party data so that its
+offline checks need no network access at scan time: end-of-life dates from
+endoflife.date (MIT), and malicious-package advisories from the OSV bulk
+archives, whose MAL- records are published by the OpenSSF Package Analysis
+project (ossf/malicious-packages, Apache-2.0). The firmware image additionally
+carries a CPE applicability index derived from the U.S. National Vulnerability
+Database, with its own attribution and notices in CVE-DATA-NOTICE.txt beside it.
+Neither project endorses or certifies this product. Details are in
+THIRD_PARTY_LICENSES.md.
+
 The tools BomLens installs into its base image (ghcr.io/sktelecom/bomlens) are
 permissively licensed (Apache-2.0 / MIT). The heavy unpacking and binary-analysis
 tools that are themselves GPL-licensed are isolated in a separate opt-in image

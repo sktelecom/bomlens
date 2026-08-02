@@ -29,6 +29,19 @@ BomLens (Apache-2.0) keeps its own code in shell scripts and bundles several ope
 
 Data: NVD, the vulnerability source, is public domain and requires attribution to "NIST/NVD".
 
+### Bundled data snapshots
+
+Two datasets are fetched once at image-build time and shipped inside the base image so the offline checks that read them need no network access at scan time. The build scripts that fetch them are deleted from the image afterwards, so the attribution is recorded here instead.
+
+| Data | Bundled at | Source | License |
+|------|-----------|--------|---------|
+| End-of-life dates | `/usr/local/lib/sbom/eol-data.json`, `eol-purl-map.json` | [endoflife.date](https://endoflife.date), read from its public API | MIT |
+| Malicious package advisories | `/usr/local/lib/sbom/malicious-index.json` | OSV bulk archives (`osv-vulnerabilities.storage.googleapis.com`). The `MAL-` records they carry are published by the OpenSSF Package Analysis project, [ossf/malicious-packages](https://github.com/ossf/malicious-packages) | Apache-2.0 (upstream advisory repository) |
+
+Neither dataset is reproduced whole. Each is reduced to what the check actually reads — a product's end-of-life dates, or a PURL keyed to its advisory id — and the snapshot date travels with it, both in the bundled file and on every component the check flags (`bomlens:eol:source`, `bomlens:malicious:source`). Neither project endorses or certifies BomLens, and the bundled data is provided as is.
+
+The CPE applicability index in the firmware image comes from NVD rather than either of these, and its attribution and notices ship beside it inside that image as `CVE-DATA-NOTICE.txt`.
+
 ### Web UI npm packages
 
 The web UI (`--ui`) is a React single-page application. npm package code is compiled into the build output, and that output is redistributed inside the base image and the desktop installer, so the copyright and permission notices MIT and ISC ask for have to travel with it.
