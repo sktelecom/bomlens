@@ -1145,6 +1145,190 @@ else
     fail "the extra-root cap does not say when it truncated the scan"
 fi
 
+echo "== each component says which container image it came from =="
+
+# The membership is the point. A library present somewhere in a switch image and
+# the same library present in the routing daemon's container are different facts,
+# and the vendor's own declaration records the second one, a scope per component.
+#
+# The fixture is a store in miniature, built so that the one indirection this can
+# get wrong is load-bearing: an image config names its layers by diff_id, the
+# directory the files sit in is named by cache-id, and only layerdb joins the two.
+# The two strings here share nothing, so an implementation that matched diff_ids
+# against the paths syft recorded would attribute nothing at all.
+MEMBER="$ROOT_DIR/docker/lib/container-membership.py"
+if [ ! -f "$MEMBER" ]; then
+    fail "container-membership.py is missing" "the store's components cannot be attributed"
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+    STORE="$(mktemp -d)"
+    IMG="$STORE/image/overlay2"
+    mkdir -p "$IMG/imagedb/content/sha256" "$IMG/layerdb/sha256"
+    A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    B=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    # Two images over three layers: one base they share, one of their own each.
+    cat > "$IMG/repositories.json" <<EOF
+{"Repositories": {
+  "app-one": {"app-one:1.0": "sha256:$A", "app-one:latest": "sha256:$A"},
+  "app-two": {"app-two:2.0": "sha256:$B", "app-two:latest": "sha256:$B"}}}
+EOF
+    echo '{"rootfs":{"diff_ids":["sha256:d1","sha256:d2"]}}' \
+        > "$IMG/imagedb/content/sha256/$A"
+    echo '{"rootfs":{"diff_ids":["sha256:d1","sha256:d3"]}}' \
+        > "$IMG/imagedb/content/sha256/$B"
+    n=0
+    for pair in d1:LAYERBASE d2:LAYERONE d3:LAYERTWO; do
+        n=$((n + 1))
+        mkdir -p "$IMG/layerdb/sha256/chain$n" "$STORE/overlay2/${pair#*:}/diff"
+        printf 'sha256:%s\n' "${pair%%:*}" > "$IMG/layerdb/sha256/chain$n/diff"
+        printf '%s\n' "${pair#*:}" > "$IMG/layerdb/sha256/chain$n/cache-id"
+    done
+
+    # A syft run over that store: one package in the shared base and one in each
+    # image's own layer. Paths are relative to the store, the way syft records
+    # them when pointed at a directory.
+    cat > "$STORE/store.cdx.json" <<'EOF'
+{"bomFormat":"CycloneDX","components":[
+ {"type":"library","name":"shared-lib","version":"1.0","properties":[
+   {"name":"syft:location:0:path","value":"/overlay2/LAYERBASE/diff/usr/lib/libshared.so"}]},
+ {"type":"library","name":"one-only","version":"2.0","properties":[
+   {"name":"syft:location:0:path","value":"/overlay2/LAYERONE/diff/usr/bin/one"}]},
+ {"type":"library","name":"two-only","version":"3.0","properties":[
+   {"name":"syft:location:0:path","value":"/overlay2/LAYERTWO/diff/usr/bin/two"}]},
+ {"type":"library","name":"nowhere","version":"4.0","properties":[
+   {"name":"syft:location:0:path","value":"/engine-id"}]}]}
+EOF
+    out="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+
+    imgs_of() {
+        printf '%s' "$out" | jq -r --arg n "$1" '
+            [.components[] | select(.name == $n)
+             | .properties[]? | select(.name == "bomlens:container:image") | .value]
+            | sort | join(",")'
+    }
+
+    if [ "$(imgs_of shared-lib)" = "app-one@1.0,app-two@2.0" ]; then
+        pass "a package in a shared base layer belongs to every image built on it"
+    else
+        fail "a shared base layer's package was attributed to the wrong set" \
+             "got: $(imgs_of shared-lib)"
+    fi
+
+    if [ "$(imgs_of one-only)" = "app-one@1.0" ] \
+       && [ "$(imgs_of two-only)" = "app-two@2.0" ]; then
+        pass "a package in one image's own layer belongs to that image alone"
+    else
+        fail "a package was attributed to an image that does not carry its layer" \
+             "one-only: $(imgs_of one-only); two-only: $(imgs_of two-only)"
+    fi
+
+    # Nothing outside a layer may be attributed. A file at the store's root
+    # belongs to the store, not to any image built from it.
+    if [ -z "$(imgs_of nowhere)" ]; then
+        pass "a file that is not in a layer is attributed to no image"
+    else
+        fail "a file outside every layer was given an image" "got: $(imgs_of nowhere)"
+    fi
+
+    # The layer is what makes the membership checkable: it names the directory the
+    # files were read out of, so a reader can go and look.
+    got="$(printf '%s' "$out" | jq -r '
+        [.components[] | select(.name == "shared-lib")
+         | .properties[]? | select(.name == "bomlens:container:layer") | .value] | join(",")')"
+    if [ "$got" = "LAYERBASE" ]; then
+        pass "the layer a component was read from is recorded as evidence"
+    else
+        fail "the layer behind a membership is not recorded" "got: ${got:-nothing}"
+    fi
+
+    # The images themselves, at the version the vendor uses. A store tags each
+    # image twice, with the build's version and as `latest`; a purl reading
+    # @latest says nothing and would not match any declaration.
+    got="$(printf '%s' "$out" | jq -r '
+        [.components[] | select(.type == "container") | .purl] | sort | join(",")')"
+    if [ "$got" = "pkg:oci/app-one@1.0,pkg:oci/app-two@2.0" ]; then
+        pass "each image is a component at its real version, not at latest"
+    else
+        fail "the container components are missing or versioned as latest" "got: ${got:-none}"
+    fi
+
+    # Attribution is an addition, never a filter: every component that arrived
+    # still has to leave.
+    if [ "$(printf '%s' "$out" | jq '[.components[] | select(.type != "container")] | length')" = "4" ]; then
+        pass "no component is dropped on the way through"
+    else
+        fail "a component was lost during attribution" \
+             "got $(printf '%s' "$out" | jq '[.components[] | select(.type != "container")] | length') of 4"
+    fi
+
+    # One repository name can hold two images. Reporting the repository as one
+    # component would name one version, hide the other, and hand the hidden
+    # image's layer to the one that was kept.
+    C=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    python3 - "$IMG" "$A" "$C" <<'EOF'
+import json, sys
+img, a, c = sys.argv[1], sys.argv[2], sys.argv[3]
+index = json.load(open(img + "/repositories.json"))
+index["Repositories"]["app-one"]["app-one:1.1"] = "sha256:" + c
+json.dump(index, open(img + "/repositories.json", "w"))
+json.dump({"rootfs": {"diff_ids": ["sha256:d1", "sha256:d3"]}},
+          open(img + "/imagedb/content/sha256/" + c, "w"))
+EOF
+    two="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+    got="$(printf '%s' "$two" | jq -r '
+        [.components[] | select(.type == "container") | .purl] | sort | join(",")')"
+    if [ "$got" = "pkg:oci/app-one@1.0,pkg:oci/app-one@1.1,pkg:oci/app-two@2.0" ]; then
+        pass "a repository holding two images yields two components"
+    else
+        fail "two images under one repository name were collapsed into one" "got: $got"
+    fi
+    got="$(printf '%s' "$two" | jq -r '
+        [.components[] | select(.name == "two-only")
+         | .properties[]? | select(.name == "bomlens:container:image") | .value]
+        | sort | join(",")')"
+    if [ "$got" = "app-one@1.1,app-two@2.0" ]; then
+        pass "the second image under that name gets its own layer's components"
+    else
+        fail "the second image's layer was attributed to the wrong image" "got: $got"
+    fi
+
+    # A store that is only partly there is the normal case for a firmware
+    # extraction, and it must cost the memberships, not the components.
+    rm -rf "$IMG/layerdb"
+    part="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+    n_comp="$(printf '%s' "$part" | jq '[.components[] | select(.type != "container")] | length')"
+    n_img="$(printf '%s' "$part" | jq '[.components[] | select(any(.properties[]?;
+                 .name == "bomlens:container:image"))] | length')"
+    if [ "$n_comp" = "4" ] && [ "$n_img" = "0" ]; then
+        pass "a store missing its layer index loses the memberships, not the components"
+    else
+        fail "an incomplete store did not degrade cleanly" \
+             "components $n_comp of 4, attributed $n_img (expected 0)"
+    fi
+
+    # And a directory that is not a store at all leaves the document alone.
+    rm -rf "$STORE/image"
+    plain="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+    if [ "$(printf '%s' "$plain" | jq '[.components[] | select(.type == "container")] | length')" = "0" ] \
+       && [ "$(printf '%s' "$plain" | jq '.components | length')" = "4" ]; then
+        pass "a directory that is not a container store is handed back untouched"
+    else
+        fail "a non-store directory was treated as one"
+    fi
+    rm -rf "$STORE"
+fi
+
+# The scan must not lose the store's components when attribution fails, and the
+# only way to guarantee that is to keep the original until the new file is known
+# good.
+if awk '/container-membership.py/,/^        fi$/' "$SCRIPT" | grep -q 'attributed.json'; then
+    pass "attribution replaces the store's SBOM only after it is checked"
+else
+    fail "attribution writes over the store's SBOM in place" \
+         "a failure there would drop every component the store contributed"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

@@ -396,6 +396,32 @@ if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
                  "its contents are not in the SBOM." >&2
             echo '{"components":[]}' > "$WORK/extra/$extra_scanned.cdx.json"
         fi
+        # Say which container each of those components belongs to, and list the
+        # images themselves. On a switch OS that membership is most of what a
+        # reader needs — a library present in the routing daemon's container is a
+        # different fact from one present somewhere in the image — and the vendor's
+        # own declaration records exactly that, one scope per component.
+        #
+        # Best-effort, and deliberately so: a store whose layout differs from the
+        # one the script reads yields fewer memberships and no error, because the
+        # components still belong in the SBOM without them.
+        if [ "${FW_CONTAINER_MEMBERSHIP:-true}" != "false" ] \
+           && command -v python3 >/dev/null 2>&1 \
+           && [ -f "$(dirname "$0")/container-membership.py" ]; then
+            if python3 "$(dirname "$0")/container-membership.py" \
+                    "$extra_root" "$WORK/extra/$extra_scanned.cdx.json" \
+                    > "$WORK/extra/$extra_scanned.attributed.json" \
+               && [ -s "$WORK/extra/$extra_scanned.attributed.json" ] \
+               && jq -e 'has("components")' \
+                    "$WORK/extra/$extra_scanned.attributed.json" >/dev/null 2>&1; then
+                mv "$WORK/extra/$extra_scanned.attributed.json" \
+                   "$WORK/extra/$extra_scanned.cdx.json"
+            else
+                echo "[firmware] WARN: could not attribute the store's components to" \
+                     "container images; they are in the SBOM without that attribution." >&2
+                rm -f "$WORK/extra/$extra_scanned.attributed.json"
+            fi
+        fi
     done < <(extra_scan_roots)
     if [ "$extra_skipped" -gt 0 ]; then
         echo "[firmware] WARN: ${extra_skipped} more container image store(s) were found and NOT read." >&2
