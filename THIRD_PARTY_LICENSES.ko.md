@@ -29,6 +29,19 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 
 > 데이터: NVD(취약점 출처)는 public domain이며 "NIST/NVD" 출처 표시가 요구됩니다.
 
+### 동봉된 데이터 스냅샷
+
+두 가지 데이터를 이미지 빌드 시점에 한 번 받아 기본 이미지 안에 함께 넣습니다. 이 데이터를 읽는 검사가 스캔 시점에 네트워크 없이 동작해야 하기 때문입니다. 데이터를 받아 오는 빌드 스크립트는 빌드가 끝나면 이미지에서 지워지므로, 출처는 이 문서에 남깁니다.
+
+| 데이터 | 이미지 내 경로 | 출처 | 라이선스 |
+|--------|---------------|------|----------|
+| 지원 종료 날짜 | `/usr/local/lib/sbom/eol-data.json`, `eol-purl-map.json` | [endoflife.date](https://endoflife.date)의 공개 API | MIT |
+| 악성 패키지 권고문 | `/usr/local/lib/sbom/malicious-index.json` | OSV 벌크 아카이브(`osv-vulnerabilities.storage.googleapis.com`). 그 안의 `MAL-` 레코드는 OpenSSF Package Analysis 프로젝트가 [ossf/malicious-packages](https://github.com/ossf/malicious-packages)에 발행합니다 | Apache-2.0 (원 권고문 저장소) |
+
+두 데이터 모두 원본을 그대로 복제하지 않습니다. 검사가 실제로 읽는 부분만 남깁니다. 제품별 지원 종료 날짜, 또는 PURL과 그에 대응하는 권고문 식별자입니다. 스냅샷 날짜는 동봉 파일과 검사가 표시한 각 컴포넌트에 함께 기록됩니다(`bomlens:eol:source`, `bomlens:malicious:source`). 두 프로젝트 모두 BomLens를 보증하거나 인증하지 않으며, 동봉 데이터는 있는 그대로 제공됩니다.
+
+펌웨어 이미지의 CPE 대응 인덱스는 이 둘이 아니라 NVD에서 온 것으로, 출처 표시와 고지는 해당 이미지 안에 `CVE-DATA-NOTICE.txt`로 함께 들어갑니다.
+
 ### 웹 UI npm 패키지
 
 웹 UI(`--ui`)는 React 단일 페이지 애플리케이션입니다. 빌드 결과에 npm 패키지 코드가 함께 들어가고 그 결과물이 기본 이미지와 데스크톱 설치본으로 배포되므로, MIT와 ISC가 요구하는 저작권·허가 고지가 배포물에 함께 있어야 합니다.
