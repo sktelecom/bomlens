@@ -79,7 +79,24 @@ BATCH = 200
 # A firmware rootfs is attacker-supplied and can hold an arbitrary number of
 # files. Stop rather than run unbounded, and say so — a silent cap reads as
 # "everything was looked at".
-MAX_FILES = int(os.environ.get("FW_ELF_MAX_FILES", "20000"))
+def cap(name, default):
+    """A positive integer from the environment, or the default.
+
+    The caller forwards these as `-e NAME=` whether or not the user set one, so
+    an unset cap arrives as an empty string rather than as an absent variable —
+    and `int("")` raises. Anything that is not a positive integer falls back to
+    the default: a cap is a safety limit, and a malformed one must not stop the
+    pass or, worse, be read as zero and silently examine nothing. The same
+    helper guards the snapshot caps in source-snapshot.py, for the same reason.
+    """
+    raw = os.environ.get(name, "")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+MAX_FILES = cap("FW_ELF_MAX_FILES", 20000)
 
 # How much of a slot library to read looking for its self-identifying marker. The
 # banner sits in the loader's string table, well inside this, and only the handful

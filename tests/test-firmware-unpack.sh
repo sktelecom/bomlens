@@ -488,6 +488,45 @@ PY
     fi
 fi
 
+echo "== a cap the warning tells you to raise can actually be raised =="
+
+# Both identification passes bound how many files they read, and both say so when
+# they stop: "raise FW_VERSTR_MAX_FILES to cover the rest." That advice was false
+# — scan-sbom.sh forwarded the presentation caps to the container and not these
+# two, so the variable a reader set on the command line never arrived and the pass
+# stopped in the same place as before. Measured on a switch OS image of some
+# 38,000 files, where the version-string pass covered barely half of them.
+for v in FW_VERSTR_MAX_FILES FW_VERSTR_MAX_BYTES FW_ELF_MAX_FILES; do
+    if grep -q -- "-e $v=" "$ROOT_DIR/scripts/scan-sbom.sh"; then
+        pass "$v reaches the container"
+    else
+        fail "$v is never forwarded" \
+             "the warning naming it tells the reader to do something that does nothing"
+    fi
+done
+
+# Those variables are forwarded as `-e NAME=` whether or not anyone set one, so an
+# unset cap arrives as an empty string. A bare int("") raises, which would abort
+# the pass on every scan rather than fall back to the default.
+for f in identify-version-strings identify-elf-presence; do
+    if grep -q 'def cap(name, default)' "$ROOT_DIR/docker/lib/$f.py"; then
+        pass "$f falls back when a cap arrives empty or malformed"
+    else
+        fail "$f reads its cap with a bare int()" \
+             "an unset cap arrives as an empty string and would abort the pass"
+    fi
+done
+
+# And the helper has to behave: empty and zero fall back, a real value is used.
+cap_probe="$ROOT_DIR/tests/fixtures/cap-probe.py"
+if [ -f "$cap_probe" ] && command -v python3 >/dev/null 2>&1; then
+    if python3 "$cap_probe" "$ROOT_DIR/docker/lib/identify-version-strings.py" >/dev/null 2>&1; then
+        pass "an empty or zero cap falls back, a real one is honoured"
+    else
+        fail "the cap helper does not behave as documented"
+    fi
+fi
+
 # readelf had been arriving as another package's dependency. That is how a
 # runtime file goes missing from a release without any build step failing.
 if grep -qE '^\s+lzop zstd lz4 liblzo2-2 zlib1g binutils' "$ROOT_DIR/docker/Dockerfile"; then

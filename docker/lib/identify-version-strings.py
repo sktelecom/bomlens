@@ -54,8 +54,25 @@ MARKER = re.compile(r".*(?:_extract/|\.extracted/)")
 
 # A firmware rootfs is attacker-supplied. Bound both the file count and the size of
 # any single file, and say when a bound was hit — a silent cap reads as full coverage.
-MAX_FILES = int(os.environ.get("FW_VERSTR_MAX_FILES", "20000"))
-MAX_BYTES = int(os.environ.get("FW_VERSTR_MAX_BYTES", str(64 * 1024 * 1024)))
+def cap(name, default):
+    """A positive integer from the environment, or the default.
+
+    The caller forwards these as `-e NAME=` whether or not the user set one, so
+    an unset cap arrives as an empty string rather than as an absent variable —
+    and `int("")` raises. Anything that is not a positive integer falls back to
+    the default: a cap is a safety limit, and a malformed one must not stop the
+    pass or, worse, be read as zero and silently examine nothing. The same
+    helper guards the snapshot caps in source-snapshot.py, for the same reason.
+    """
+    raw = os.environ.get(name, "")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+MAX_FILES = cap("FW_VERSTR_MAX_FILES", 20000)
+MAX_BYTES = cap("FW_VERSTR_MAX_BYTES", 64 * 1024 * 1024)
 
 
 def load_entries(path):
