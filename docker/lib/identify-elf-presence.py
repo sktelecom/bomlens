@@ -161,9 +161,18 @@ def read_dynamic(paths, watched=frozenset()):
     for i in range(0, len(paths), BATCH):
         chunk = paths[i:i + BATCH]
         args = ["readelf", "-W", "-d"] + (["--dyn-syms"] if watched else []) + ["--"] + chunk
+        # errors="replace": readelf prints what it finds, and what it finds is
+        # attacker-supplied. A symbol name or a section string that is not valid
+        # UTF-8 made the decode raise, and the exception escaped the whole pass —
+        # so one stray byte anywhere in a rootfs cost every judgement in the
+        # image, not just the file it came from. Measured on a switch OS image of
+        # some 38,000 files: the pass died and reported nothing. A byte that does
+        # not decode cannot be part of a symbol name we match on, so replacing it
+        # loses nothing the maps could have used.
         try:
             proc = subprocess.Popen(args, stdout=subprocess.PIPE,
-                                    stderr=subprocess.DEVNULL, text=True)
+                                    stderr=subprocess.DEVNULL,
+                                    text=True, errors="replace")
         except (OSError, subprocess.SubprocessError):
             continue
         # With one file readelf prints no `File:` header, so seed it.

@@ -449,6 +449,45 @@ else
     fail "identify-elf-presence.py is missing"
 fi
 
+# readelf prints what it finds, and what it finds is attacker-supplied. A symbol
+# name or section string that is not valid UTF-8 made the decode raise, and the
+# exception escaped the whole pass — so one stray byte anywhere in a rootfs cost
+# every judgement in the image, not just the file it came from. Measured on a
+# switch OS image of some 38,000 files: the pass died and reported nothing.
+if grep -qE 'text=True, *errors="replace"|errors="replace", *text=True' \
+     "$ROOT_DIR/docker/lib/identify-elf-presence.py"; then
+    pass "undecodable bytes in the reader's input do not abort the pass"
+else
+    fail "the ELF reader decodes strictly" \
+         "one non-UTF-8 byte anywhere in the rootfs loses every judgement"
+fi
+
+# The behaviour, not just the flag: a stream carrying a byte that is not valid
+# UTF-8 must be read to the end rather than raising partway.
+if command -v python3 >/dev/null 2>&1; then
+    if python3 - <<'PY'
+import subprocess, sys, tempfile, os
+fd, p = tempfile.mkstemp()
+os.write(fd, b"File: x\nsym \xff\xfe bad\nFile: y\n")
+os.close(fd)
+try:
+    proc = subprocess.Popen(["cat", p], stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True, errors="replace")
+    n = sum(1 for _ in proc.stdout)
+    proc.wait()
+    sys.exit(0 if n == 3 else 1)
+except UnicodeDecodeError:
+    sys.exit(1)
+finally:
+    os.unlink(p)
+PY
+    then
+        pass "a stream with an undecodable byte is read to the end"
+    else
+        fail "reading stopped at the undecodable byte"
+    fi
+fi
+
 # readelf had been arriving as another package's dependency. That is how a
 # runtime file goes missing from a release without any build step failing.
 if grep -qE '^\s+lzop zstd lz4 liblzo2-2 zlib1g binutils' "$ROOT_DIR/docker/Dockerfile"; then
