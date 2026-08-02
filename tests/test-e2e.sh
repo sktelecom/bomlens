@@ -81,6 +81,27 @@ else
     fail "--help lists new flags"
 fi
 
+# The help was printed from an unquoted heredoc, so bash read the backticks in
+# it as a command substitution: `--help` ran `docker save` with no argument,
+# printed that tool's usage error to stderr, and left the hole where the words
+# had been ("a  tar is scanned as the image it is"). Help text is text; it must
+# not run anything. Both halves are checked because either alone passes while
+# the defect stands — the words come back if the backticks are simply deleted,
+# and stderr goes quiet on a machine with no docker installed.
+if [ -z "$(bash "$SCAN" --help 2>&1 1>/dev/null)" ]; then
+    pass "--help writes nothing to stderr"
+else
+    fail "--help writes to stderr" \
+         "$(bash "$SCAN" --help 2>&1 1>/dev/null | head -1)"
+fi
+
+if bash "$SCAN" --help 2>/dev/null | grep -q '`docker save`'; then
+    pass "--help keeps the text inside its backticks"
+else
+    fail "--help lost the text inside its backticks" \
+         "a command substitution ate it; the heredoc delimiter must be quoted"
+fi
+
 if ! bash "$SCAN" --generate-only >/dev/null 2>&1; then
     pass "missing --project/--version exits non-zero"
 else

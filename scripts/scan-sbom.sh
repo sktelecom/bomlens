@@ -143,8 +143,16 @@ while [[ "$#" -gt 0 ]]; do
         --ui) UI_MODE="true" ;;
         --mount) UI_MOUNTS+=("$2"); shift ;;
         --help)
-            cat << EOF
-Usage: $0 --project <name> --version <ver> [OPTIONS]
+            # The delimiter is quoted so the block is literal text. It is not:
+            # the help describes a `docker save` tar, and an unquoted heredoc
+            # read those backticks as a command substitution — `--help` ran
+            # `docker save` with no argument, printed its usage error to stderr,
+            # and left a hole in its own text ("a  tar is scanned as..."). The
+            # block interpolates nothing, so quoting costs nothing.
+            # The one line that needs the script's own name is printed
+            # outside the block, so the block itself can stay literal.
+            echo "Usage: $0 --project <name> --version <ver> [OPTIONS]"
+            cat << 'EOF'
 
 Options:
   --project <name>       Project name (required)
