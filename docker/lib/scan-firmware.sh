@@ -266,6 +266,63 @@ else
     echo "[firmware] no rootfs marker found; scanning whole extraction tree"
 fi
 
+# --------------------------------------------------------
+# ②.5 Filesystems the image carries beside the one picked as rootfs.
+#
+# One image can hold several filesystems side by side, and the rule above reads
+# exactly one of them. A network switch image shows what that costs. SONiC ships
+# its root filesystem, a whole Docker data directory and a per-platform driver
+# archive as three siblings inside one `fs.zip`; the root filesystem is the one
+# with the shallowest `etc`, so the Docker data directory — 67 layer trees, and
+# every routing, telemetry and ASIC daemon the switch runs — was never read.
+#
+# Measured against the vendor's own CycloneDX declaration for that image: reading
+# the root filesystem alone accounts for 5,846 of the 7,472 libraries it declares,
+# and reading the Docker data directory as well accounts for 1,325 more (78.2% to
+# 96.0%).
+#
+# So the catalog step takes a set of roots rather than one. The extra roots are
+# found here.
+# --------------------------------------------------------
+
+# docker_data_dirs — every Docker data directory under the extraction tree, one
+# per line as "<path><TAB><storage driver>".
+#
+# Recognised by the image index Docker keeps of what it holds,
+# `image/<driver>/repositories.json`, and not by the name of the archive the
+# directory arrived in: a rule keyed on `dockerfs.tar.gz` would work on one
+# vendor's images and no others. The index is also what makes the result
+# checkable — on the SONiC image it names 28 images, and all 28 appear in the
+# vendor's declaration.
+docker_data_dirs() {
+    local index driver root
+    while IFS= read -r index; do
+        [ -f "$index" ] || continue
+        driver=$(basename "$(dirname "$index")")
+        root=$(dirname "$(dirname "$(dirname "$index")")")
+        # The driver directory holding the layer trees is a sibling of `image/`
+        # and carries the same name. No directory, no layers to read.
+        [ -d "$root/$driver" ] || continue
+        printf '%s\t%s\n' "$root" "$driver"
+    done < <(find "$EXTRACT" -type f -name repositories.json -path '*/image/*' 2>/dev/null)
+}
+
+# extra_scan_roots — trees to catalog besides ROOTFS, one path per line.
+extra_scan_roots() {
+    local root driver
+    while IFS="$(printf '\t')" read -r root driver; do
+        [ -n "$root" ] || continue
+        # Data that lives *inside* the rootfs is already read: syft's package
+        # catalogers match their evidence files at any depth, so a
+        # /var/lib/docker under the root filesystem is covered by the scan of
+        # ROOTFS. Only a filesystem sitting beside it is missed. Skipping it here
+        # is also what keeps this change from touching an image that keeps its
+        # containers in the ordinary place.
+        case "$root/" in "$ROOTFS"/*) continue ;; esac
+        printf '%s\n' "$root"
+    done < <(docker_data_dirs)
+}
+
 # File tree + content snapshot for the web UI. The extracted rootfs is in this
 # script's temp dir and is removed on EXIT, so both are emitted here while it
 # exists. They land in the caller's working dir (where the entrypoint collects
@@ -292,6 +349,58 @@ echo "[firmware] syft: cataloging packages under rootfs..."
 if ! syft "dir:$ROOTFS" -o cyclonedx-json@1.6 > "$PKG_SBOM" 2>/dev/null; then
     echo "[firmware] WARN: syft directory scan failed; continuing without package components." >&2
     echo '{"components":[]}' > "$PKG_SBOM"
+fi
+
+# ③.1 The same cataloger over the filesystems found beside the rootfs.
+#
+# Only the package cataloger runs here, not the binary passes below. Two reasons,
+# both measured on the SONiC image. The layer trees are Debian package
+# installations, so the package databases already carry every version the
+# signature and structural passes would go looking for. And the package pass over
+# the whole Docker data directory costs 37 seconds against the hour the rest of
+# this scan takes, whereas cve-bin-tool's signature walk is the expensive stage
+# and would be re-run over 67 more trees. FW_EXTRA_ROOTS=false turns the extra
+# roots off altogether.
+#
+# One `syft dir:` over the data directory rather than one per layer tree: it
+# finds the same packages in less than half the time (1,993 distinct name and
+# version pairs in 37s, against 1,983 in 100s), and each component keeps the
+# layer it was read from in its `syft:location:*:path` property, so nothing about
+# where a finding came from is lost. Merging the layers into one tree first would
+# be closer to what Docker does at runtime, but it needs the layers materialized;
+# on this image it would change nothing, because not one of the 67 layers deletes
+# a file from a layer below it (no `.wh.*` entries at all).
+EXTRA_COMPS="$WORK/extra-comps.json"
+echo '[]' > "$EXTRA_COMPS"
+# Firmware input is attacker-supplied and `repositories.json` is a file anyone can
+# write, so nothing in the image bounds how many of these there are. Cap the
+# count, and say so when the cap is what stopped us rather than reading a subset
+# in silence.
+FW_MAX_EXTRA_ROOTS="${FW_MAX_EXTRA_ROOTS:-16}"
+extra_scanned=0
+extra_skipped=0
+if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
+    mkdir -p "$WORK/extra"
+    while IFS= read -r extra_root; do
+        [ -n "$extra_root" ] || continue
+        if [ "$extra_scanned" -ge "$FW_MAX_EXTRA_ROOTS" ]; then
+            extra_skipped=$((extra_skipped + 1))
+            continue
+        fi
+        extra_scanned=$((extra_scanned + 1))
+        echo "[firmware] syft: cataloging a container image store beside the rootfs:" \
+             "${extra_root#"$EXTRACT"/}"
+        if ! syft "dir:$extra_root" -o cyclonedx-json@1.6 \
+                > "$WORK/extra/$extra_scanned.cdx.json" 2>/dev/null; then
+            echo "[firmware] WARN: syft failed on ${extra_root#"$EXTRACT"/};" \
+                 "its contents are not in the SBOM." >&2
+            echo '{"components":[]}' > "$WORK/extra/$extra_scanned.cdx.json"
+        fi
+    done < <(extra_scan_roots)
+    if [ "$extra_skipped" -gt 0 ]; then
+        echo "[firmware] WARN: ${extra_skipped} more container image store(s) were found and NOT read." >&2
+        echo "[firmware]       FW_MAX_EXTRA_ROOTS is ${FW_MAX_EXTRA_ROOTS}; raise it to include them." >&2
+    fi
 fi
 
 BIN_SBOM="$WORK/bin.cdx.json"
@@ -451,6 +560,13 @@ comps_of() {
 }
 comps_of "$PKG_SBOM" > "$WORK/pkg-comps.json"
 comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
+if [ "$extra_scanned" -gt 0 ] \
+   && [ -n "$(find "$WORK/extra" -name '*.cdx.json' -print -quit 2>/dev/null)" ]; then
+    for extra_out in "$WORK/extra"/*.cdx.json; do
+        [ -f "$extra_out" ] || continue
+        comps_of "$extra_out"
+    done | jq -s 'add // []' > "$EXTRA_COMPS"
+fi
 
 # The two passes find the same component and describe it differently, so the
 # dedupe key cannot be the purl. syft's binary classifier reports
@@ -480,7 +596,8 @@ comps_of "$BIN_SBOM" > "$WORK/bin-comps.json"
 # The record carrying a purl is the base, because the purl is what the CVE step
 # matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
-      --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" '
+      --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" \
+      --slurpfile e "$EXTRA_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
@@ -531,7 +648,10 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
       | if startswith("lib") and (length > 3) then .[3:] else . end
       | name_alias;
 
-    ($a[0] + $b[0] + $c[0] + $d[0]) as $with_presence
+    # The extra roots come last so that a record from the rootfs stays the base of
+    # a merged group: the rootfs is the filesystem the device actually boots, and
+    # its judgement is the one to keep when two roots describe one component.
+    ($a[0] + $b[0] + $c[0] + $d[0] + $e[0]) as $with_presence
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.
@@ -555,6 +675,7 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
 
 NPKG=$(jq 'length' "$WORK/pkg-comps.json")
 NBIN=$(jq 'length' "$WORK/bin-comps.json")
+NEXTRA=$(jq 'length' "$EXTRA_COMPS")
 NTOTAL=$(jq 'length' "$WORK/merged.json")
 # Counted separately in the summary line. These carry no version, so they cannot
 # be matched against an advisory; a reader who takes them for ordinary findings
@@ -585,6 +706,14 @@ jq -n \
 }' > "$OUTPUT"
 
 echo "[firmware] SBOM written: $OUTPUT (components=${NTOTAL}: packages=${NPKG}, binaries=${NBIN})"
+# Reported separately from `packages`, and before dedupe, because the two numbers
+# answer different questions: how much the container store contributed, and how
+# much of it was already known from the rootfs. On the SONiC image the store
+# yields 8,357 records that reduce to 1,513 components the rootfs did not have.
+if [ "$extra_scanned" -gt 0 ]; then
+    echo "[firmware] ${extra_scanned} container image store(s) beside the rootfs were read" \
+         "and contributed ${NEXTRA} record(s) before dedupe."
+fi
 if [ "${NPRESENCE:-0}" -gt 0 ]; then
     echo "[firmware] ${NPRESENCE} of those are present with no version recovered." \
          "They cannot be matched against a vulnerability database — a clean" \

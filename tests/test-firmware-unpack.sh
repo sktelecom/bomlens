@@ -290,7 +290,8 @@ fi
 
 merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                 --slurpfile b "$FIX/merge-bin-comps.json" \
-                --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') "$merge_filter")"
+                --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
+                --slurpfile e <(echo '[]') "$merge_filter")"
 
 n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
 if [ "$n" = "1" ]; then
@@ -368,7 +369,8 @@ echo "== a component with no version left is still reported, and marked as such 
 with_presence="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                        --slurpfile b "$FIX/merge-bin-comps.json" \
                        --slurpfile c "$FIX/elf-presence-comps.json" \
-                       --slurpfile d <(echo '[]') "$merge_filter")"
+                       --slurpfile d <(echo '[]') \
+                       --slurpfile e <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_presence" | jq -e 'any(.[]; .name == "net-snmp")' >/dev/null; then
     pass "a component only the ELF structure proves is carried into the SBOM"
@@ -496,7 +498,8 @@ echo "== a cap the warning tells you to raise can actually be raised =="
 # two, so the variable a reader set on the command line never arrived and the pass
 # stopped in the same place as before. Measured on a switch OS image of some
 # 38,000 files, where the version-string pass covered barely half of them.
-for v in FW_VERSTR_MAX_FILES FW_VERSTR_MAX_BYTES FW_ELF_MAX_FILES; do
+for v in FW_VERSTR_MAX_FILES FW_VERSTR_MAX_BYTES FW_ELF_MAX_FILES \
+         FW_EXTRA_ROOTS FW_MAX_EXTRA_ROOTS; do
     if grep -q -- "-e $v=" "$ROOT_DIR/scripts/scan-sbom.sh"; then
         pass "$v reaches the container"
     else
@@ -567,7 +570,8 @@ echo "== a version cve-bin-tool's checkers do not match is still read =="
 with_verstr="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                      --slurpfile b "$FIX/merge-bin-comps.json" \
                      --slurpfile c "$FIX/elf-presence-comps.json" \
-                     --slurpfile d "$FIX/version-string-comps.json" "$merge_filter")"
+                     --slurpfile d "$FIX/version-string-comps.json" \
+                     --slurpfile e <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_verstr" | jq -e '
       any(.[]; .name == "net-tools" and .version == "1.60")' >/dev/null; then
@@ -629,7 +633,8 @@ forms_versioned="$(jq -n '[
 ]')"
 forms_out="$(jq -n --slurpfile a <(echo "$forms_versioned") \
                    --slurpfile b <(echo "$forms_in") \
-                   --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') "$merge_filter")"
+                   --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
+                   --slurpfile e <(echo '[]') "$merge_filter")"
 
 for pair in expat:libexpat zstd:zstandard; do
     bare="${pair%%:*}"; full="${pair#*:}"
@@ -1042,6 +1047,102 @@ else
         fail "shallowest_etc no longer uses pick_shallowest" \
              "the tested rule is not the one that runs"
     fi
+fi
+
+echo "== a filesystem sitting beside the rootfs is found, and one inside it is not =="
+
+# The defect: the scan read one filesystem per image. A switch image that ships
+# its root filesystem and a container image store as siblings had the store's
+# contents — every daemon the switch runs — missing from the SBOM entirely.
+#
+# Both halves of the rule are checked, because both can be got wrong in a way that
+# still looks right. Recognising the store by the archive's name would pass on the
+# one vendor whose archive is called dockerfs.tar.gz and no others; and offering up
+# a store that lives *under* the rootfs would scan the same files twice, since the
+# package catalogers already match their evidence files at any depth.
+roots_body="$(awk '
+    /^docker_data_dirs\(\) \{/ { inside = 1 }
+    inside { print }
+    inside && $0 == "}" { exit }
+' "$SCRIPT")
+$(awk '
+    /^extra_scan_roots\(\) \{/ { inside = 1 }
+    inside { print }
+    inside && $0 == "}" { exit }
+' "$SCRIPT")"
+if ! printf '%s' "$roots_body" | grep -q 'extra_scan_roots()'; then
+    fail "could not lift the extra-root search out of scan-firmware.sh" "was it renamed?"
+else
+    eval "$roots_body"
+
+    TREE="$(mktemp -d)"
+    # A SONiC installer in miniature: the root filesystem and the container image
+    # store are siblings, neither inside the other. The store's directory is
+    # deliberately not named after any archive, so only the image index can
+    # identify it.
+    mkdir -p "$TREE/fs.zip_extract/fs.squashfs_extract/etc"
+    mkdir -p "$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract/image/overlay2"
+    mkdir -p "$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract/overlay2/aaa/diff/etc"
+    echo '{"Repositories":{"docker-lldp":{}}}' \
+        > "$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract/image/overlay2/repositories.json"
+
+    # Read by the two functions lifted out of the shipping script above. The
+    # linter cannot follow a use through the eval that defined them.
+    # shellcheck disable=SC2034
+    EXTRACT="$TREE"
+    # shellcheck disable=SC2034
+    ROOTFS="$TREE/fs.zip_extract/fs.squashfs_extract"
+    want="$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract"
+    got="$(extra_scan_roots)"
+    if [ "$got" = "$want" ]; then
+        pass "the container image store beside the rootfs is offered for cataloging"
+    else
+        fail "the sibling container image store was not found" "got ${got:-nothing}"
+    fi
+
+    # Same tree, plus a store where an ordinary Linux install keeps it. syft reads
+    # that one already as part of the rootfs, so offering it again is duplicate
+    # work — and this is the case that decides whether every other firmware in the
+    # corpus keeps the output it has today.
+    mkdir -p "$TREE/fs.zip_extract/fs.squashfs_extract/var/lib/docker/image/overlay2"
+    mkdir -p "$TREE/fs.zip_extract/fs.squashfs_extract/var/lib/docker/overlay2/bbb/diff"
+    echo '{"Repositories":{}}' \
+        > "$TREE/fs.zip_extract/fs.squashfs_extract/var/lib/docker/image/overlay2/repositories.json"
+    got="$(extra_scan_roots)"
+    if [ "$got" = "$want" ]; then
+        pass "a store inside the rootfs is left to the rootfs scan"
+    else
+        fail "a store under the rootfs was offered for a second scan" "got ${got:-nothing}"
+    fi
+
+    # An index with no layer directory beside it describes nothing readable.
+    rm -rf "$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract/overlay2"
+    got="$(extra_scan_roots)"
+    if [ -z "$got" ]; then
+        pass "an image index with no layer directory yields nothing to scan"
+    else
+        fail "a store with no layer directory was still offered" "got $got"
+    fi
+
+    # An image carrying no containers at all must come out exactly as before.
+    rm -rf "$TREE/fs.zip_extract/blob_extract" \
+           "$TREE/fs.zip_extract/fs.squashfs_extract/var"
+    got="$(extra_scan_roots)"
+    if [ -z "$got" ]; then
+        pass "an image with no container store adds no roots"
+    else
+        fail "an extra root appeared on an image with no container store" "got $got"
+    fi
+    rm -rf "$TREE"
+fi
+
+# The cap has to be visible when it fires. A silently truncated read reports the
+# same way a complete one does, and the reader has no way to tell them apart.
+if grep -q 'FW_MAX_EXTRA_ROOTS is ' "$SCRIPT" \
+   && grep -q 'were found and NOT read' "$SCRIPT"; then
+    pass "reaching the extra-root cap is reported, not silent"
+else
+    fail "the extra-root cap does not say when it truncated the scan"
 fi
 
 echo

@@ -12,6 +12,10 @@ Firmware is a single file that packs and seals an operating system and dozens of
 
 1. Unpack the firmware (unblob, falling back to `unsquashfs`, `7z`, then `binwalk`) to extract the rootfs.
 2. Use `syft` to identify components installed by a package manager (opkg, dpkg, apk, rpm).
+   An image can carry more than one filesystem. When a container image store sits beside the
+   rootfs instead of inside it — the usual layout on a switch OS, where most of what runs is in
+   a container — its layers are cataloged as well. Set `FW_EXTRA_ROOTS=false` to read only the
+   rootfs.
 3. Use `cve-bin-tool` to find the versions and vulnerabilities of stripped static binaries (busybox, openssl, dropbear, and so on).
 4. Merge the two results into one SBOM, then run the same post-processing as a normal scan (licenses, CVEs, signing).
 
