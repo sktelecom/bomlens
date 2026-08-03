@@ -1290,6 +1290,46 @@ else
 fi
 
 # --------------------------------------------------------
+# Group 4d: a closed upload server (requires image)
+# --------------------------------------------------------
+# Uploading is on unless --generate-only is passed, so anyone running without an
+# upload server hits this path. curl's own exit code used to end the run with no
+# explanation, which read as a failed scan even though the artifacts were all
+# written. Port 9 (discard) is closed inside the container, so the connection is
+# refused with no network access and no waiting.
+section "Closed upload server"
+if [ "$have_image" != 1 ]; then
+    skip "closed upload server (scanner image not available)"
+else
+    w="$(mktemp -d "$WORK_ROOT/upfail.XXXXXX")"
+    cp "$REPO/tests/fixtures/good-spdx.json" "$w/" 2>/dev/null
+    up_rc=0
+    ( cd "$w" && API_URL="http://127.0.0.1:9" API_KEY="test-key" \
+        SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "upfail" --version "1.0" --analyze good-spdx.json ) > "$w/_scan.log" 2>&1 || up_rc=$?
+
+    [ "$up_rc" = "1" ] \
+        && pass "closed upload server exits 1 (not curl's own code)" \
+        || fail "closed upload server exits 1 (not curl's own code)" "exit=$up_rc"
+    grep -q '\[ERROR\] Upload to http://127.0.0.1:9 did not complete' "$w/_scan.log" \
+        && pass "the error names the server that could not be reached" \
+        || fail "the error names the server that could not be reached" "$(tail -5 "$w/_scan.log")"
+    grep -q -- '--generate-only' "$w/_scan.log" \
+        && pass "the error says how to scan without uploading" \
+        || fail "the error says how to scan without uploading"
+    # The point of the fix: a failed upload must not cost the reader the scan.
+    # Analyze output lands flat or in a per-run subfolder depending on the run, so
+    # accept either rather than pinning one layout.
+    up_bom="$(ls "$w"/upfail_1.0_bom.json "$w"/upfail_1.0/upfail_1.0_bom.json 2>/dev/null | head -n1)"
+    if [ -n "$up_bom" ] && jq -e '.bomFormat=="CycloneDX"' "$up_bom" >/dev/null 2>&1; then
+        pass "the SBOM is still written when the upload fails"
+    else
+        fail "the SBOM is still written when the upload fails" "$(ls -R "$w" 2>&1 | head -6)"
+    fi
+    rm -rf "$w"
+fi
+
+# --------------------------------------------------------
 # Group 5: web UI E2E (requires image + docker)
 # --------------------------------------------------------
 section "Web UI E2E"

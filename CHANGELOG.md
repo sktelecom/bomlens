@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A scan that cannot reach the upload server now says so and keeps its artifacts. It used to end on the transport's own exit code with nothing but a warning, which read as a failed scan even though every file had been written. The message names the server and says how to scan without uploading. A reply that carries no status code is reported the same way instead of ending the run mid-comparison.
+
 ## [v1.10.0] - 2026-08-03
 
 ### Added

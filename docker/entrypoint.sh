@@ -896,6 +896,20 @@ if [ "${UPLOAD_ENABLED:-true}" = "false" ]; then
     exit 0
 fi
 
+# curl exits non-zero when the request never completes — connection refused, DNS
+# failure, timeout. Under `set -e` that ended the run with curl's own exit code
+# and no explanation, so a closed upload server looked like a failed scan even
+# though every artifact had already been written. Report what happened, say the
+# artifacts are fine, and exit 1 like the HTTP-rejected path does.
+report_unreachable_upload() {
+    local rc="$1" url="$2"
+    [ "$rc" -eq 0 ] && return 0
+    echo "[ERROR] Upload to $url did not complete (curl exit $rc: no response)."
+    echo "[INFO] The artifacts listed above are complete and were saved."
+    echo "[INFO] Use --generate-only to skip the upload, or set API_URL to a server that is up."
+    exit 1
+}
+
 if [ "${UPLOAD_TARGET:-dependency-track}" = "trusca" ]; then
     echo "[2/2] Uploading to TRUSCA..."
     if [ -z "$API_URL" ] || [ -z "$API_KEY" ] || [ -z "${TRUSCA_PROJECT_ID:-}" ]; then
@@ -903,11 +917,13 @@ if [ "${UPLOAD_TARGET:-dependency-track}" = "trusca" ]; then
     fi
     # The ingest endpoint accepts the already-generated CycloneDX SBOM and runs
     # the back half of TRUSCA's scan pipeline (components + trivy + findings).
-    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/v1/projects/$TRUSCA_PROJECT_ID/sbom-ingest" \
+    CURL_RC=0
+    RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 -X POST "$API_URL/v1/projects/$TRUSCA_PROJECT_ID/sbom-ingest" \
         -H "Authorization: Bearer $API_KEY" \
         -F "sbom=@$OUTPUT_FILE" \
         -F "ref=${TRUSCA_REF:-main}" \
-        -F "release=${TRUSCA_RELEASE:-$PROJECT_VERSION}")
+        -F "release=${TRUSCA_RELEASE:-$PROJECT_VERSION}") || CURL_RC=$?
+    report_unreachable_upload "$CURL_RC" "$API_URL"
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
     BODY=$(echo "$RESPONSE" | sed '$d')
     # A successful ingest is accepted asynchronously (202 + queued scan id). We
@@ -930,15 +946,22 @@ fi
 if ! curl -s --max-time 5 "$API_URL/api/version" > /dev/null 2>&1; then
     echo "[WARN] Cannot reach Dependency Track at $API_URL."
 fi
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/api/v1/bom" \
+CURL_RC=0
+RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 -X POST "$API_URL/api/v1/bom" \
     -H "Content-Type: multipart/form-data" \
     -H "X-Api-Key: $API_KEY" \
     -F "autoCreate=true" \
     -F "projectName=$PROJECT_NAME" \
     -F "projectVersion=$PROJECT_VERSION" \
-    -F "bom=@$OUTPUT_FILE")
+    -F "bom=@$OUTPUT_FILE") || CURL_RC=$?
+report_unreachable_upload "$CURL_RC" "$API_URL"
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 BODY=$(echo "$RESPONSE" | sed '$d')
+# A response that is not a status line at all (proxy banner, truncated body)
+# would make the numeric comparison below abort the script instead of reporting.
+if ! [[ "$HTTP_CODE" =~ ^[0-9]+$ ]]; then
+    echo "[ERROR] Upload to $API_URL returned no status code."; echo "Response: $BODY"; exit 1
+fi
 if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] && echo "$BODY" | grep -q "token"; then
     echo "[SUCCESS] Upload complete!"
 else
