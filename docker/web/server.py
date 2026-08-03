@@ -803,6 +803,12 @@ def _epss_kev_map(run_id):
     return data if isinstance(data, dict) else {}
 
 
+# Names the kernel arrives under: `linux_kernel` from a signature checker,
+# `kernel` from an opkg or rpm database, `linux-kernel` from a reference tool's
+# vocabulary. Kept in step with the same list in docker/lib/scan-security.sh.
+_KERNEL_PKG_NAMES = ("linux_kernel", "linux-kernel", "kernel", "linux")
+
+
 def security_summary(run_id):
     p = run_file(run_id, "_security.json")
     if not p or not os.path.isfile(p):
@@ -815,11 +821,23 @@ def security_summary(run_id):
     priority = _epss_kev_map(run_id)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
+    kernel = 0
     for r in (data.get("Results") or []):
         for v in (r.get("Vulnerabilities") or []):
             s = (v.get("Severity") or "UNKNOWN").upper()
             if s not in sev:
                 s = "UNKNOWN"
+            # Kernel advisories are counted on their own, matching the generated
+            # report. A rootfs carries one kernel and an old one carries thousands
+            # of advisories (measured: 5,262 and 5,032 on two consumer routers),
+            # nearly all for subsystems the image never compiled in. Mixed into
+            # the totals they make a device with two real criticals read like one
+            # with two thousand. The same closed name list as scan-security.sh —
+            # the kernel arrives under different names depending on which pass
+            # found it.
+            if (v.get("PkgName") or "").lower() in _KERNEL_PKG_NAMES:
+                kernel += 1
+                continue
             sev[s] += 1
             if len(vulns) < MAX_VULN_ROWS:
                 score, vector = _cvss_best(v)
@@ -848,6 +866,10 @@ def security_summary(run_id):
                 vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
+    # Reported, but on its own line: a number the reader should see without it
+    # moving the severity figures the screen is built around.
+    if kernel:
+        sev["kernelCount"] = kernel
     # scan-security.sh records a failed engine run as ScanError; surface it so
     # consumers can tell "scan failed" from a genuine zero-findings result.
     err = data.get("ScanError")

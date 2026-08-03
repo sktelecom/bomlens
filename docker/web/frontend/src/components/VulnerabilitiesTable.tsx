@@ -208,6 +208,15 @@ export function VulnerabilitiesTable({ security, initialQuery, initialSeverity }
         selected={severityFilter as Severity | ""}
         onSelect={(s) => setSeverityFilter((f) => (f === s ? "" : s))}
       />
+      {security.kernelCount ? (
+        // Kernel advisories are reported but kept out of the figures above. An
+        // old kernel carries thousands, nearly all for subsystems the image
+        // never compiled in, and the SBOM cannot tell which — so counting them
+        // here would bury the findings this screen exists to show.
+        <p className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
+          {t("result.kernelAdvisories", { count: security.kernelCount })}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <Input
           value={query}

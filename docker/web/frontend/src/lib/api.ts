@@ -218,6 +218,11 @@ export type SecuritySummary = Record<Severity, number> & {
   /** Engine failure message when the scan did not complete (scan-security.sh
    *  ScanError). Present => the counts above understate the real exposure. */
   scanError?: string;
+  /** Advisories filed against the kernel, counted apart from the severity figures
+   *  above and from TOTAL. An old kernel carries thousands of them, nearly all
+   *  for subsystems the image never compiled in, so mixing them in would make a
+   *  device with two real criticals read like one with two thousand. */
+  kernelCount?: number;
 };
 
 /** One conformance check (base format requirement or a G7 AI minimum element). */

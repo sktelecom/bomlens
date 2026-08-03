@@ -257,7 +257,8 @@
     "filterOutdated": "Outdated",
     "colCurrency": "Version currency",
     "maliciousBadge": "Malicious package",
-    "maliciousBadgeHint": "Published to attack whoever installs it. Remove it and rotate any credential the build could reach — there is no version to upgrade to."
+    "maliciousBadgeHint": "Published to attack whoever installs it. Remove it and rotate any credential the build could reach — there is no version to upgrade to.",
+    "kernelAdvisories": "{{count}} kernel advisories are reported in the security report and are not counted above. Most advisories against a kernel are for subsystems a device never compiled in, and the SBOM cannot tell which."
   },
   "deps": {
     "loading": "Loading dependencies…",

@@ -999,6 +999,54 @@ then
 else
     fail "currency summary produced wrong values (see assertion above)"
 fi
+echo "== kernel advisories are counted apart from the severity figures =="
+
+# A rootfs carries one kernel, and an old one carries thousands of advisories
+# (measured: 5,262 and 5,032 on two consumer routers). Nearly all are for
+# subsystems that image never compiled in, and the SBOM cannot tell which. Mixed
+# into the totals they make a device with two real criticals read like one with
+# two thousand, so they are reported on their own line instead.
+cat > "$OUT/kern_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-K1","Severity":"CRITICAL","PkgName":"linux_kernel","InstalledVersion":"2.6.19"},
+  {"VulnerabilityID":"CVE-K2","Severity":"HIGH","PkgName":"kernel","InstalledVersion":"4.4.153"},
+  {"VulnerabilityID":"CVE-K3","Severity":"HIGH","PkgName":"linux-kernel","InstalledVersion":"4.4.153"},
+  {"VulnerabilityID":"CVE-R1","Severity":"CRITICAL","PkgName":"openssl","InstalledVersion":"1.0.2"},
+  {"VulnerabilityID":"CVE-R2","Severity":"LOW","PkgName":"linux-pam","InstalledVersion":"1.3"}
+]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+sm = server.security_summary("kern_1.0")
+# The three kernel rows are counted on their own and are out of the figures.
+assert sm["kernelCount"] == 3, sm
+assert sm["CRITICAL"] == 1 and sm["HIGH"] == 0 and sm["LOW"] == 1, sm
+assert sm["TOTAL"] == 2, sm
+ids = {v["id"] for v in sm["vulnerabilities"]}
+assert ids == {"CVE-R1", "CVE-R2"}, ids
+# A name that merely starts with "linux" is not the kernel — linux-pam is a real
+# component with its own advisories and must stay in the table.
+assert any(v["pkg"] == "linux-pam" for v in sm["vulnerabilities"]), sm["vulnerabilities"]
+# No kernel rows means no extra field, so the shape does not change for the
+# overwhelming majority of scans.
+import json, pathlib
+out = pathlib.Path(os.environ["SBOM_OUTPUT_DIR"])
+(out / "nokern_1.0_security.json").write_text(json.dumps(
+    {"Results": [{"Vulnerabilities": [
+        {"VulnerabilityID": "CVE-X", "Severity": "LOW", "PkgName": "zlib",
+         "InstalledVersion": "1.2"}]}]}))
+sm2 = server.security_summary("nokern_1.0")
+assert "kernelCount" not in sm2, sm2
+PY
+then
+    pass "kernel advisories are counted apart and other linux-* packages are not"
+else
+    fail "kernel advisory separation is wrong (see assertion above)"
+fi
+rm -f "$OUT"/kern_1.0_* "$OUT"/nokern_1.0_*
+
 echo "== EPSS / KEV enrichment join (security_summary) =="
 # The raw _security.json has no EPSS/KEV; scan-security.sh writes them as a
 # sidecar map. security_summary must join them onto the matching CVE rows.

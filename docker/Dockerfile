@@ -315,14 +315,20 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       rows="$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from cpe_match").fetchone()[0])' "$idx" 2>/dev/null || echo 0)"; \
       printf '%s' '{"components":[{"type":"application","name":"busybox","version":"1.30.1","cpe":"cpe:/a:busybox:busybox:1.30.1"}]}' > /tmp/smoke.json; \
       nsmoke="$(python3 /tmp/firmware-cpe-match.py /tmp/smoke.json "$idx" 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"; \
-      echo "[build] CPE index: rows=${rows:-0}, busybox-1.30.1 smoke CVEs=${nsmoke:-0} ($(du -h "$idx" | cut -f1))"; \
-      if [ "${rows:-0}" -lt 500000 ] || [ "${nsmoke:-0}" -lt 1 ]; then \
-        echo "[build] ERROR: CPE index looks broken (rows=${rows:-0}, busybox smoke=${nsmoke:-0}). Build aborted."; \
+      # The kernel is filed by NVD under CPE part `o`, and the index keeps only \
+      # part `a` plus a closed list of `o` pairs. It is the one component every \
+      # rootfs carries, so a build that dropped it would return nothing for all \
+      # of them — check it here rather than finding out on a scan. \
+      printf '%s' '{"components":[{"type":"application","name":"linux_kernel","version":"4.4.153","cpe":"cpe:/a:linux:linux_kernel:4.4.153"}]}' > /tmp/smoke-kernel.json; \
+      nkernel="$(python3 /tmp/firmware-cpe-match.py /tmp/smoke-kernel.json "$idx" 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"; \
+      echo "[build] CPE index: rows=${rows:-0}, busybox-1.30.1 smoke CVEs=${nsmoke:-0}, linux_kernel-4.4.153 smoke CVEs=${nkernel:-0} ($(du -h "$idx" | cut -f1))"; \
+      if [ "${rows:-0}" -lt 500000 ] || [ "${nsmoke:-0}" -lt 1 ] || [ "${nkernel:-0}" -lt 1 ]; then \
+        echo "[build] ERROR: CPE index looks broken (rows=${rows:-0}, busybox smoke=${nsmoke:-0}, kernel smoke=${nkernel:-0}). Build aborted."; \
         exit 1; \
       fi; \
       echo "[build] checking version-string-map CPEs against the index ..."; \
       python3 /tmp/check-version-string-map.py /tmp/version-string-map.json "$idx"; \
-      rm -f /tmp/build-cpe-index.py /tmp/firmware-cpe-match.py /tmp/smoke.json \
+      rm -f /tmp/build-cpe-index.py /tmp/firmware-cpe-match.py /tmp/smoke.json /tmp/smoke-kernel.json \
             /tmp/version-string-map.json /tmp/check-version-string-map.py; \
     fi
 

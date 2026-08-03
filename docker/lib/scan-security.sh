@@ -146,6 +146,28 @@ FINDINGS=$(jq -r '
   | unique_by([ (if .purl != "" then .purl else .pkg end), .id ])
 ' "$JSON" 2>/dev/null || echo '[]')
 
+# --- The kernel is counted separately -----------------------------------------
+#
+# A rootfs carries one kernel, and an old one carries thousands of advisories:
+# measured on two consumer router images, 5,262 and 5,032 CVEs against a single
+# component. Nearly all of them are for subsystems that image never compiled in,
+# and there is no way to tell which from the SBOM. Left in the table they bury
+# every finding a reader can act on, and left in the severity totals they make a
+# device with two real criticals read the same as one with two thousand.
+#
+# So they are reported, but on their own: a count in the summary and a list of
+# their own, out of the table and out of the totals. The names are a closed list,
+# matched exactly — the kernel arrives under different names depending on which
+# pass found it (`linux_kernel` from a signature checker, `kernel` from an opkg
+# database, `linux-kernel` from a reference tool's vocabulary).
+KERNEL_FINDINGS=$(echo "$FINDINGS" | jq '
+  [ .[] | select((.pkg // "" | ascii_downcase)
+                 | IN("linux_kernel", "linux-kernel", "kernel", "linux")) ]')
+FINDINGS=$(echo "$FINDINGS" | jq '
+  [ .[] | select(((.pkg // "" | ascii_downcase)
+                  | IN("linux_kernel", "linux-kernel", "kernel", "linux")) | not) ]')
+KERNEL_TOTAL=$(echo "$KERNEL_FINDINGS" | jq 'length')
+
 # --- Priority enrichment (best-effort, network) -------------------------------
 # EPSS = probability the CVE is exploited in the wild (FIRST.org, 0..1).
 # KEV  = the CVE is on CISA's Known Exploited Vulnerabilities list (actively
@@ -214,6 +236,13 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "- Priority order: KEV first, then severity, then EPSS (exploit probability)."
         echo ""
     fi
+    if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
+        echo "- Kernel advisories: **${KERNEL_TOTAL}**, listed separately below and not"
+        echo "  included in the counts above. Most advisories against a kernel are for"
+        echo "  subsystems a given device never compiled in, and the SBOM cannot tell which,"
+        echo "  so counting them here would bury the findings this report exists to show."
+        echo ""
+    fi
     if [ "$TOTAL" -gt 0 ]; then
         echo "## Findings"
         echo ""
@@ -234,6 +263,21 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "_Scan failed — no results were produced._"
     else
         echo "_No known vulnerabilities found._"
+    fi
+    if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
+        echo ""
+        echo "## Kernel advisories"
+        echo ""
+        echo "These are the advisories filed against the kernel this image carries. They"
+        echo "are here rather than in the table above because a kernel accumulates"
+        echo "thousands of them and most concern subsystems a given device never built."
+        echo "Read them against the kernel configuration, not as a list to work through."
+        echo ""
+        echo "| Severity | CVSS | CVE | Package | Installed | Fixed |"
+        echo "|----------|-----:|-----|---------|-----------|-------|"
+        echo "$KERNEL_FINDINGS" | jq -r 'sort_by(
+            {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
+            "| \(.severity) | \(.cvss // "") | \(.id) | \(.pkg) | \(.version) | \(.fixed) |"'
     fi
 } > "$MD"
 
@@ -334,6 +378,9 @@ HTMLHEAD
         ERR_HTML=$(printf '%s' "$SCAN_ERR" | jq -Rr '@html')
         echo "<div class=\"note\"><b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure.<br><code>${ERR_HTML}</code></div>"
     fi
+    if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
+        echo "<div class=\"note\"><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</div>"
+    fi
 
     if [ "$TOTAL" -gt 0 ]; then
         echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>KEV</th><th>CVSS</th><th>EPSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr>"
@@ -353,6 +400,18 @@ HTMLHEAD
         echo "<p>Scan failed &mdash; no results were produced.</p>"
     else
         echo "<p>No known vulnerabilities found.</p>"
+    fi
+    if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
+        echo "<h2>Kernel advisories</h2>"
+        echo "<p class=\"meta\">Advisories filed against the kernel this image carries. Read them against the kernel configuration, not as a list to work through: a kernel accumulates thousands and most concern subsystems a given device never built.</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>CVSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th></tr>"
+        echo "$KERNEL_FINDINGS" | jq -r 'sort_by(
+            {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
+            "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
+            "<td class=\"num\">" + ((.cvss // "")|tostring|@html) + "</td>" +
+            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td></tr>"'
+        echo "</table></div>"
     fi
     echo "</body></html>"
 } > "$HTML"

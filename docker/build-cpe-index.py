@@ -70,8 +70,26 @@ def iter_cve_files(feed_dir):
                     yield f.path
 
 
+# CPE entries whose part is `o` (an operating system) that the index carries
+# anyway, as (vendor, product) pairs.
+#
+# The index otherwise keeps only part `a`, because a firmware scan identifies
+# applications and libraries and the operating-system entries are noise for it.
+# The Linux kernel is the exception that matters: every rootfs carries one, the
+# identifiers we produce for it say `linux:linux_kernel`, and NVD files the
+# kernel's advisories under part `o` — so the lookup returned nothing at all for
+# the one component every image has.
+#
+# Deliberately a closed pair list rather than "keep part o". Opening the part
+# would pull in every distro and appliance OS entry, most of which no firmware
+# scan can attribute to anything, and the index is loaded into every scan.
+_OS_PARTS_KEPT = (("linux", "linux_kernel"),)
+
+
 def rows_from_cve(path):
-    """Extract application-part vulnerable cpeMatch rows from one CVE JSON."""
+    """Extract vulnerable cpeMatch rows from one CVE JSON.
+
+    Part `a` (application) plus the closed list of part `o` pairs above."""
     try:
         with open(path) as fh:
             doc = json.load(fh)
@@ -88,10 +106,12 @@ def rows_from_cve(path):
                 if not m.get("vulnerable"):
                     continue
                 fields = (m.get("criteria") or "").split(":")
-                # cpe:2.3:a:vendor:product:version:...
-                if len(fields) < 6 or fields[1] != "2.3" or fields[2] != "a":
+                # cpe:2.3:<part>:vendor:product:version:...
+                if len(fields) < 6 or fields[1] != "2.3":
                     continue
                 vendor, product, ver = fields[3], fields[4], fields[5]
+                if fields[2] != "a" and (vendor, product) not in _OS_PARTS_KEPT:
+                    continue
                 vsi = m.get("versionStartIncluding")
                 vse = m.get("versionStartExcluding")
                 vei = m.get("versionEndIncluding")
