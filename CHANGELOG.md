@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Firmware analysis opens more of what an image carries. Besides a container image store, a second filesystem with its own package database and an interpreter's installed library set are now cataloged when they sit beside the root filesystem rather than inside it. Each is recognized by the record of what is installed in it, not by a directory name. On one switch OS this reports 53 Python packages that were present in the image and absent from the SBOM, and on another 20 platform packages. Across the eleven firmware images measured, nothing that was reported before is reported differently now.
+
 ### Fixed
 
 - A scan that cannot reach the upload server now says so and keeps its artifacts. It used to end on the transport's own exit code with nothing but a warning, which read as a failed scan even though every file had been written. The message names the server and says how to scan without uploading. A reply that carries no status code is reported the same way instead of ending the run mid-comparison.

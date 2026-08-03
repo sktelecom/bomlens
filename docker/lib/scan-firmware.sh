@@ -307,10 +307,65 @@ docker_data_dirs() {
     done < <(find "$EXTRACT" -type f -name repositories.json -path '*/image/*' 2>/dev/null)
 }
 
-# extra_scan_roots — trees to catalog besides ROOTFS, one path per line.
+# package_db_roots — filesystem roots beside the rootfs that carry an OS package
+# database, one per line.
+#
+# Keyed on the database file rather than on a directory name, for the same reason
+# the container store is keyed on its index: what an archive is called says
+# nothing about what it holds. The list is closed — these are the databases syft
+# reads to enumerate an installed system — so a tree is only opened when it holds
+# a record of what is installed in it.
+package_db_roots() {
+    local db root
+    while IFS= read -r db; do
+        # Longest path first: /x/usr/lib/opkg/status must yield /x, not /x/usr.
+        case "$db" in
+            */var/lib/dpkg/status)      root="${db%/var/lib/dpkg/status}" ;;
+            */lib/apk/db/installed)     root="${db%/lib/apk/db/installed}" ;;
+            */var/lib/rpm/Packages)     root="${db%/var/lib/rpm/Packages}" ;;
+            */var/lib/rpm/rpmdb.sqlite) root="${db%/var/lib/rpm/rpmdb.sqlite}" ;;
+            */var/lib/opkg/status)      root="${db%/var/lib/opkg/status}" ;;
+            */usr/lib/opkg/status)      root="${db%/usr/lib/opkg/status}" ;;
+            */lib/opkg/status)          root="${db%/lib/opkg/status}" ;;
+            *) continue ;;
+        esac
+        [ -n "$root" ] || continue
+        printf '%s\t%s\n' "$root" "package-db"
+    done < <(find "$EXTRACT" -type f \
+        \( -path '*/var/lib/dpkg/status' -o -path '*/lib/apk/db/installed' \
+           -o -path '*/var/lib/rpm/Packages' -o -path '*/var/lib/rpm/rpmdb.sqlite' \
+           -o -path '*/var/lib/opkg/status' -o -path '*/usr/lib/opkg/status' \
+           -o -path '*/lib/opkg/status' \) 2>/dev/null)
+}
+
+# language_package_roots — trees beside the rootfs whose installed packages are
+# recorded in per-package metadata directories instead of a system database.
+#
+# Measured on one switch OS: 53 Python packages sat in a `site-packages` that is a
+# sibling of the root filesystem, six of them named in the vendor's own
+# declaration. The interpreter's own directory name is required, so this opens an
+# installed library set and not any directory that happens to hold metadata.
+language_package_roots() {
+    local info parent
+    while IFS= read -r info; do
+        parent="$(dirname "$info")"
+        case "$(basename "$parent")" in
+            site-packages|dist-packages) printf '%s\t%s\n' "$parent" "language-packages" ;;
+        esac
+    done < <(find "$EXTRACT" -type d \
+        \( -name '*.dist-info' -o -name '*.egg-info' \) 2>/dev/null)
+}
+
+# extra_scan_roots — trees to catalog besides ROOTFS, one "<path><TAB><kind>" per
+# line. The kind decides what is done with the result, so it travels with the path.
 extra_scan_roots() {
-    local root driver
-    while IFS="$(printf '\t')" read -r root driver; do
+    {
+        docker_data_dirs | while IFS="$(printf '\t')" read -r root _driver; do
+            [ -n "$root" ] && printf '%s\t%s\n' "$root" "container-store"
+        done
+        package_db_roots
+        language_package_roots
+    } | while IFS="$(printf '\t')" read -r root kind; do
         [ -n "$root" ] || continue
         # Data that lives *inside* the rootfs is already read: syft's package
         # catalogers match their evidence files at any depth, so a
@@ -319,8 +374,16 @@ extra_scan_roots() {
         # is also what keeps this change from touching an image that keeps its
         # containers in the ordinary place.
         case "$root/" in "$ROOTFS"/*) continue ;; esac
-        printf '%s\n' "$root"
-    done < <(docker_data_dirs)
+        printf '%s\t%s\n' "$root" "$kind"
+    done \
+      | sort -u \
+      | awk -F'\t' '
+          # Sorted output puts a parent before anything under it, so a tree
+          # already offered swallows the trees inside it. Without this a container
+          # store would be read once as a store and again once per layer, since
+          # every Debian layer carries its own package database.
+          { for (i = 1; i <= n; i++) if (index($1 "/", kept[i] "/") == 1) next
+            kept[++n] = $1; print }'
 }
 
 # File tree + content snapshot for the web UI. The extracted rootfs is in this
@@ -381,14 +444,20 @@ extra_scanned=0
 extra_skipped=0
 if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
     mkdir -p "$WORK/extra"
-    while IFS= read -r extra_root; do
+    while IFS="$(printf '\t')" read -r extra_root extra_kind; do
         [ -n "$extra_root" ] || continue
         if [ "$extra_scanned" -ge "$FW_MAX_EXTRA_ROOTS" ]; then
             extra_skipped=$((extra_skipped + 1))
             continue
         fi
         extra_scanned=$((extra_scanned + 1))
-        echo "[firmware] syft: cataloging a container image store beside the rootfs:" \
+        case "$extra_kind" in
+            container-store)   extra_what="a container image store" ;;
+            package-db)        extra_what="a filesystem with its own package database" ;;
+            language-packages) extra_what="an installed set of language packages" ;;
+            *)                 extra_what="a tree" ;;
+        esac
+        echo "[firmware] syft: cataloging $extra_what beside the rootfs:" \
              "${extra_root#"$EXTRACT"/}"
         if ! syft "dir:$extra_root" -o cyclonedx-json@1.6 \
                 > "$WORK/extra/$extra_scanned.cdx.json" 2>/dev/null; then
@@ -405,7 +474,12 @@ if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
         # Best-effort, and deliberately so: a store whose layout differs from the
         # one the script reads yields fewer memberships and no error, because the
         # components still belong in the SBOM without them.
-        if [ "${FW_CONTAINER_MEMBERSHIP:-true}" != "false" ] \
+        #
+        # Only a container store has containers to attribute to. The other kinds of
+        # tree have no layer database, so asking would warn about a layout that was
+        # never there.
+        if [ "$extra_kind" = "container-store" ] \
+           && [ "${FW_CONTAINER_MEMBERSHIP:-true}" != "false" ] \
            && command -v python3 >/dev/null 2>&1 \
            && [ -f "$(dirname "$0")/container-membership.py" ]; then
             if python3 "$(dirname "$0")/container-membership.py" \
@@ -424,7 +498,7 @@ if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
         fi
     done < <(extra_scan_roots)
     if [ "$extra_skipped" -gt 0 ]; then
-        echo "[firmware] WARN: ${extra_skipped} more container image store(s) were found and NOT read." >&2
+        echo "[firmware] WARN: ${extra_skipped} more tree(s) beside the rootfs were found and NOT read." >&2
         echo "[firmware]       FW_MAX_EXTRA_ROOTS is ${FW_MAX_EXTRA_ROOTS}; raise it to include them." >&2
     fi
 fi

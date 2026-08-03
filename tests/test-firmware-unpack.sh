@@ -1060,16 +1060,17 @@ echo "== a filesystem sitting beside the rootfs is found, and one inside it is n
 # one vendor whose archive is called dockerfs.tar.gz and no others; and offering up
 # a store that lives *under* the rootfs would scan the same files twice, since the
 # package catalogers already match their evidence files at any depth.
-roots_body="$(awk '
-    /^docker_data_dirs\(\) \{/ { inside = 1 }
-    inside { print }
-    inside && $0 == "}" { exit }
-' "$SCRIPT")
-$(awk '
-    /^extra_scan_roots\(\) \{/ { inside = 1 }
-    inside { print }
-    inside && $0 == "}" { exit }
-' "$SCRIPT")"
+lift_fn() {
+    awk -v fn="$1" '
+        $0 ~ "^" fn "\\(\\) \\{" { inside = 1 }
+        inside { print }
+        inside && $0 == "}" { exit }
+    ' "$SCRIPT"
+}
+roots_body="$(lift_fn docker_data_dirs)
+$(lift_fn package_db_roots)
+$(lift_fn language_package_roots)
+$(lift_fn extra_scan_roots)"
 if ! printf '%s' "$roots_body" | grep -q 'extra_scan_roots()'; then
     fail "could not lift the extra-root search out of scan-firmware.sh" "was it renamed?"
 else
@@ -1092,7 +1093,7 @@ else
     EXTRACT="$TREE"
     # shellcheck disable=SC2034
     ROOTFS="$TREE/fs.zip_extract/fs.squashfs_extract"
-    want="$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract"
+    want="$TREE/fs.zip_extract/blob_extract/gzip.uncompressed_extract	container-store"
     got="$(extra_scan_roots)"
     if [ "$got" = "$want" ]; then
         pass "the container image store beside the rootfs is offered for cataloging"
@@ -1132,6 +1133,61 @@ else
         pass "an image with no container store adds no roots"
     else
         fail "an extra root appeared on an image with no container store" "got $got"
+    fi
+
+    # A second filesystem beside the rootfs, identified by the record of what is
+    # installed in it rather than by a container index. One vendor ships its root
+    # filesystem and a second install as siblings; without this the second one is
+    # absent from the SBOM the same way the container store was.
+    mkdir -p "$TREE/fs.zip_extract/second_extract/var/lib/dpkg"
+    : > "$TREE/fs.zip_extract/second_extract/var/lib/dpkg/status"
+    got="$(extra_scan_roots)"
+    if [ "$got" = "$TREE/fs.zip_extract/second_extract	package-db" ]; then
+        pass "a filesystem with its own package database is offered for cataloging"
+    else
+        fail "the sibling filesystem was not found by its package database" "got ${got:-nothing}"
+    fi
+
+    # The same rootfs has a package database too, and it is already read.
+    mkdir -p "$TREE/fs.zip_extract/fs.squashfs_extract/var/lib/dpkg"
+    : > "$TREE/fs.zip_extract/fs.squashfs_extract/var/lib/dpkg/status"
+    got="$(extra_scan_roots)"
+    if [ "$got" = "$TREE/fs.zip_extract/second_extract	package-db" ]; then
+        pass "the rootfs is not offered to itself for a second scan"
+    else
+        fail "the rootfs was offered as an extra root" "got ${got:-nothing}"
+    fi
+
+    # Language packages recorded per package instead of in a system database. This
+    # is the measured case: an interpreter's library set beside the rootfs, whose
+    # packages the vendor declares and the scan did not report.
+    SP="$TREE/fs.zip_extract/tools_extract/lib/python3.10/site-packages"
+    mkdir -p "$SP/flask-2.3.3.dist-info"
+    got="$(extra_scan_roots | grep -c 'language-packages')"
+    if [ "$got" = "1" ]; then
+        pass "an installed set of language packages beside the rootfs is offered"
+    else
+        fail "the sibling language packages were not found" "matched $got"
+    fi
+    # Metadata outside an interpreter's own directory is not a library set, and
+    # opening any directory that holds a *.dist-info would scan arbitrary trees.
+    mkdir -p "$TREE/fs.zip_extract/docs_extract/notes-1.0.dist-info"
+    if [ "$(extra_scan_roots | grep -c 'language-packages')" = "1" ]; then
+        pass "metadata outside an interpreter directory is left alone"
+    else
+        fail "a directory holding metadata was opened without being a library set"
+    fi
+
+    # A tree inside one already offered must not be read twice. Every Debian layer
+    # in a container store carries its own package database, so without this the
+    # store is read once as a store and again once per layer.
+    mkdir -p "$TREE/fs.zip_extract/second_extract/rootfs/var/lib/dpkg"
+    : > "$TREE/fs.zip_extract/second_extract/rootfs/var/lib/dpkg/status"
+    if [ "$(extra_scan_roots | grep -c 'package-db')" = "1" ]; then
+        pass "a tree inside one already offered is not offered again"
+    else
+        fail "a nested tree was offered on top of the tree containing it" \
+             "$(extra_scan_roots)"
     fi
     rm -rf "$TREE"
 fi

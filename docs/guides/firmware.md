@@ -12,10 +12,13 @@ Firmware is a single file that packs and seals an operating system and dozens of
 
 1. Unpack the firmware (unblob, falling back to `unsquashfs`, `7z`, then `binwalk`) to extract the rootfs.
 2. Use `syft` to identify components installed by a package manager (opkg, dpkg, apk, rpm).
-   An image can carry more than one filesystem. When a container image store sits beside the
-   rootfs instead of inside it — the usual layout on a switch OS, where most of what runs is in
-   a container — its layers are cataloged as well. Set `FW_EXTRA_ROOTS=false` to read only the
-   rootfs. Each component then records the container image it belongs to in
+   An image can carry more than one filesystem, and a tree sitting beside the rootfs rather
+   than inside it is cataloged too. Three kinds are recognized, each by the record of what is
+   installed in it rather than by its directory name: a container image store, identified by
+   the image index Docker keeps (the usual layout on a switch OS, where most of what runs is in
+   a container); a second filesystem carrying its own package database; and an interpreter's
+   installed library set, such as a Python `site-packages`. Set `FW_EXTRA_ROOTS=false` to read
+   only the rootfs. Components from a container store record the image they belong to in
    `bomlens:container:image`, and the images themselves appear as `container`
    components.
 3. Use `cve-bin-tool` to find the versions and vulnerabilities of stripped static binaries (busybox, openssl, dropbear, and so on).
