@@ -54,10 +54,15 @@ export function ProgressLog({
   // Determinate phases (e.g. the firmware CVE DB download) report a real
   // percent — use it. Otherwise there is no real percentage from the backend, so
   // approximate from log volume while running, then snap to 100% on completion.
+  //
+  // The percent is checked, not assumed: the same progress channel also carries
+  // an image pull, which reports layer counts and no percent at all (a non-TTY
+  // `docker pull` prints none), so a phase check alone would read undefined here.
+  const percent = progress?.percent;
   const determinate =
-    status === "running" && progress?.phase === "cvedb";
+    status === "running" && progress?.phase === "cvedb" && typeof percent === "number";
   const value = determinate
-    ? Math.min(100, Math.max(0, progress!.percent))
+    ? Math.min(100, Math.max(0, percent))
     : status === "running"
       ? stageProgress(logs)
       : 100;
