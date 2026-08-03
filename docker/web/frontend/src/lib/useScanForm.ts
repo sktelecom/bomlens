@@ -33,7 +33,7 @@ export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
 
 export const ACCEPT: Record<UploadKind, string> = {
   zip: ".zip,.tar.gz,.tgz,.tar.bz2,.tar.xz,.tar",
-  package: ".jar,.war,.ear,.deb,.rpm,.whl",
+  package: ".jar,.war,.ear,.deb,.rpm,.whl,.exe,.msi,.dmg",
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json,.spdx.tar.zst",
   firmware:
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +

@@ -469,6 +469,45 @@ is_firmware() {
 }
 
 # ---------------------------------------------------------------------------
+# Formats that only give up their contents once unpacked
+#
+# A file target that is not firmware goes to BINARY mode, which reads the file
+# itself with the signature checkers and never unpacks it. For an installer or an
+# app package that is almost nothing: the components are inside, not in the outer
+# file. Measured on a desktop media player's own downloads — the Windows
+# installer yields 1 component read as a file and 39 once unpacked, the macOS disk
+# image 0 and 25.
+#
+# Unpacking is the firmware path (unblob and the identifiers behind it), so these
+# formats are routed there when that image is available. The list is closed and
+# each entry was measured, because the reverse case exists: an RPM yields 1
+# component in BINARY mode and 0 through the firmware path, since syft reads the
+# package header directly and unpacking throws that header away. A blanket rule
+# would have made that worse.
+#
+# Recognition is by content, not by extension. `file` reports a Windows installer
+# as a PE executable and a macOS disk image by its compression, and an extension
+# is what an arbitrary uploader controls.
+needs_unpacking() {
+    local f="$1" lower magic
+    lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+        *.exe|*.msi|*.dmg) : ;;
+        *) return 1 ;;
+    esac
+    command -v file >/dev/null 2>&1 || return 1
+    magic=$(file -b "$f" 2>/dev/null)
+    case "$magic" in
+        # Windows installers: PE executables, and the MSI/Inno container formats.
+        *"PE32"*|*"MS Windows"*|*"Composite Document File"*) return 0 ;;
+        # macOS disk images: the payload is compressed, and `file` names the
+        # compression rather than the container.
+        *"bzip2 compressed"*|*"zlib compressed"*|*"Apple Disk Image"*) return 0 ;;
+    esac
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Yocto build directory
 #
 # A Yocto build publishes its SPDX SBOM next to the image it produced, under
@@ -901,7 +940,26 @@ elif [ -n "$MODEL" ]; then
     [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${MODEL##*/}"
 elif [ -n "$TARGET" ]; then
     if [ -f "$TARGET" ]; then
-        if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then MODE="FIRMWARE"; else MODE="BINARY"; fi
+        if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then
+            MODE="FIRMWARE"
+        elif needs_unpacking "$TARGET"; then
+            # The unpacking path needs the opt-in firmware image. When it is here,
+            # use it; when it is not, read the file as before and say what was and
+            # was not looked at, so a near-empty result is not read as the answer.
+            if docker image inspect "$FIRMWARE_IMAGE" >/dev/null 2>&1; then
+                echo "[INFO] $(basename "$TARGET") is a packaged installer; unpacking it to read what is inside."
+                MODE="FIRMWARE"
+            else
+                MODE="BINARY"
+                echo "[WARN] $(basename "$TARGET") is a packaged installer. It was read as a single file"
+                echo "       without unpacking, so only components with a version string in the outer"
+                echo "       file can be found. Unpacking needs the firmware image:"
+                echo "         docker pull $FIRMWARE_IMAGE"
+                echo "       Then run the same command again."
+            fi
+        else
+            MODE="BINARY"
+        fi
     elif [ -d "$TARGET" ] && [ "$FORCE_FIRMWARE" != "true" ] && is_yocto_build_dir "$TARGET"; then
         # A Yocto build already knows what it put in the image; read that rather
         # than walking the build tree. Joins the ANALYZE path below with the

@@ -64,7 +64,7 @@
     "uploadErrorServer": "서버가 요청을 처리하지 못했습니다. 다시 시도하고, 계속 실패하면 스캐너를 재시작해 주세요.",
     "uploadErrorRejected": "서버가 업로드를 받지 않았습니다. 파일을 확인하고 다시 시도해 주세요.",
     "packageUpload": "빌드 산출물",
-    "packageUploadHint": "jar, war, deb, rpm, whl 파일입니다. 실행 가능한 jar에는 내장된 의존성이 함께 들어 있어 소스를 스캔한 것과 비슷한 결과가 나오고, 의존성이 없는 라이브러리 jar는 결과가 비어 나옵니다."
+    "packageUploadHint": "jar, war, deb, rpm, whl 파일이거나 Windows·macOS 설치 파일입니다. 실행 가능한 jar에는 내장된 의존성이 함께 들어 있어 소스를 스캔한 것과 비슷한 결과가 나오고, 의존성이 없는 라이브러리 jar는 결과가 비어 나옵니다. 설치 파일은 먼저 압축을 풉니다. 구성요소가 바깥 파일이 아니라 안에 들어 있기 때문입니다."
   },
   "options": {
     "notice": "고지문",

@@ -141,6 +141,102 @@ else
     pass "manifest.json alone does not make an archive a container image"
 fi
 
+echo "== an installer is recognized as needing to be unpacked =="
+
+# A file target that is not firmware goes to BINARY mode, which reads the file
+# itself and never unpacks it. For an installer that is almost nothing: the
+# components are inside. Measured on a desktop media player's own downloads —
+# the Windows installer yields 1 component read as a file and 39 unpacked, the
+# macOS disk image 0 and 25.
+#
+# The reverse case is why the list is closed and each entry measured: an RPM
+# yields 1 component read as a file and 0 unpacked, because syft reads the
+# package header directly and unpacking throws that header away.
+eval "$(extract_fn needs_unpacking)"
+
+# `file` reports a Windows installer as a PE executable. A bare MZ stub is not
+# enough — it reads as a plain DOS executable — so the fixture carries the pointer
+# at 0x3C and the PE header it points at, which is what makes a real installer
+# report PE32.
+python3 - "$WORK/setup.exe" <<'MKEXE'
+import struct, sys
+d = bytearray(b"MZ" + b"\x00" * 0x3a)
+d[0x3c:0x40] = struct.pack("<I", 0x40)
+d += b"PE\x00\x00"
+d += struct.pack("<HHIIIHH", 0x014c, 1, 0, 0, 0, 0xe0, 0x0102)   # COFF header
+d += struct.pack("<HBB", 0x010b, 14, 0)                          # PE32 optional header
+d += b"\x00" * 200
+open(sys.argv[1], "wb").write(bytes(d))
+MKEXE
+if needs_unpacking "$WORK/setup.exe"; then
+    pass "a Windows installer is routed to the unpacking path"
+else
+    fail "a Windows installer was left to be read as a single file" \
+         "file says: $(file -b "$WORK/setup.exe" 2>/dev/null)"
+fi
+
+# A macOS disk image: `file` names the compression, not the container, so the
+# magic check has to accept that rather than look for "Apple Disk Image" only.
+printf 'hello disk image payload, compressed below\n' > "$WORK/payload"
+bzip2 -c "$WORK/payload" > "$WORK/App.dmg"
+if needs_unpacking "$WORK/App.dmg"; then
+    pass "a macOS disk image is routed to the unpacking path"
+else
+    fail "a macOS disk image was left to be read as a single file" \
+         "file says: $(file -b "$WORK/App.dmg" 2>/dev/null)"
+fi
+
+# The extension alone must not decide it. An uploader controls the name, and a
+# text file called .exe is not an installer.
+printf 'just text, not an executable\n' > "$WORK/notreally.exe"
+if needs_unpacking "$WORK/notreally.exe"; then
+    fail "the extension alone routed a text file to the unpacking path"
+else
+    pass "content decides, not the extension"
+fi
+
+# Formats that are better read as a file stay that way. An RPM measured worse
+# through the unpacking path, so it must not be caught by this rule.
+printf '\355\253\356\333\003\000\000\000' > "$WORK/pkg.rpm"
+head -c 512 /dev/zero >> "$WORK/pkg.rpm"
+if needs_unpacking "$WORK/pkg.rpm"; then
+    fail "an RPM was routed to the unpacking path, where it yields less"
+else
+    pass "an RPM is still read as a file, which is where it yields more"
+fi
+
+# Firmware still wins: is_firmware runs first in the dispatcher, and a .bin must
+# not depend on this rule to reach the firmware path.
+eval "$(extract_fn is_firmware)"
+printf 'hsqs' > "$WORK/fw.bin"
+head -c 512 /dev/zero >> "$WORK/fw.bin"
+if is_firmware "$WORK/fw.bin"; then
+    pass "firmware recognition is unchanged and still decides first"
+else
+    fail "a squashfs .bin is no longer recognized as firmware"
+fi
+
+# The dispatcher must consult the rule, and must not send an installer to the
+# unpacking path when the image that does the unpacking is absent.
+if grep -q 'elif needs_unpacking "$TARGET"' "$SCRIPT"; then
+    pass "the dispatcher consults the rule"
+else
+    fail "the dispatcher does not consult needs_unpacking" \
+         "the tested rule is not the one that runs"
+fi
+if awk '/elif needs_unpacking/,/^        else$/' "$SCRIPT" | grep -q 'docker image inspect "\$FIRMWARE_IMAGE"'; then
+    pass "the unpacking path is taken only when the image that unpacks is present"
+else
+    fail "an installer is routed to the unpacking path without checking for the image" \
+         "the scan would fail instead of reading the file as before"
+fi
+if awk '/elif needs_unpacking/,/^        else$/' "$SCRIPT" | grep -q 'docker pull'; then
+    pass "the fallback says how to get the image that unpacks"
+else
+    fail "the fallback does not say how to unpack" \
+         "a near-empty result would read as the answer"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

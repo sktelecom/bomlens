@@ -102,7 +102,13 @@ UPLOAD_EXTS = {
     # — see the routing in the package-upload branch. Formats that stayed at
     # zero either way (ruby gems, double-compressed) are deliberately absent, as
     # is .apk, which names both an Android and an Alpine package.
-    "package": (".jar", ".war", ".ear", ".deb", ".rpm", ".whl"),
+    # .exe/.msi/.dmg are installers: the components are inside, not in the outer
+    # file, so they are unpacked through the firmware path rather than read as a
+    # file (see the package-upload branch). Measured on a desktop media player's
+    # own downloads — the Windows installer yields 1 component read as a file and
+    # 39 unpacked, the macOS disk image 0 and 25.
+    "package": (".jar", ".war", ".ear", ".deb", ".rpm", ".whl",
+                ".exe", ".msi", ".dmg"),
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
                  ".trx", ".chk", ".fw", ".rom", ".dlf",
                  # Compressed firmware images (unblob unpacks these), e.g. the
@@ -3374,6 +3380,26 @@ class Handler(BaseHTTPRequestHandler):
                     mode = "ROOTFS"
                     env["MODE"] = "ROOTFS"
                     env["TARGET_DIR"] = cleanup_dir
+                elif up.lower().endswith((".exe", ".msi", ".dmg")):
+                    # An installer read as a single file yields almost nothing:
+                    # what it carries is inside. Unpacking is the firmware path,
+                    # so route it there — in this image when the tools are built
+                    # in, otherwise as a sibling container. When neither is
+                    # available, fall back to reading the file and say so, rather
+                    # than returning a near-empty result as if it were the answer.
+                    if firmware_usable():
+                        mode = "FIRMWARE"
+                        env["MODE"] = "FIRMWARE"
+                        env["TARGET_FILE"] = up
+                    else:
+                        mode = "BINARY"
+                        env["MODE"] = "BINARY"
+                        env["TARGET_FILE"] = up
+                        sse("log", json.dumps(
+                            "▶ %s is a packaged installer. It was read as a single file "
+                            "without unpacking, so only components with a version string in "
+                            "the outer file can be found. Unpacking needs Docker and the "
+                            "firmware image." % os.path.basename(up)))
                 else:
                     mode = "BINARY"
                     env["MODE"] = "BINARY"

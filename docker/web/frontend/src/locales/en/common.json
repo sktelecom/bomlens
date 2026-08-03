@@ -64,7 +64,7 @@
     "uploadErrorServer": "The server could not process the request. Try again; if it keeps failing, restart the scanner.",
     "uploadErrorRejected": "The server did not accept the upload. Check the file and try again.",
     "packageUpload": "Build artifact",
-    "packageUploadHint": "A jar, war, deb, rpm or wheel. An executable jar carries its bundled dependencies, so scanning one gives close to what scanning the source would; a plain library jar carries none and yields nothing."
+    "packageUploadHint": "A jar, war, deb, rpm or wheel, or a Windows or macOS installer. An executable jar carries its bundled dependencies, so scanning one gives close to what scanning the source would; a plain library jar carries none and yields nothing. An installer is unpacked first, because what it carries is inside rather than in the outer file."
   },
   "options": {
     "notice": "Notice",

@@ -131,6 +131,11 @@ done
 # electron-builder pins a versionless artifact name; the permanent
 # releases/latest/download URL only resolves if the docs use that exact name.
 # Any *.exe/*.dmg installer named in a guide must use that canonical base.
+#
+# Lines that scan a file are excluded. A guide now also names an installer as a
+# thing to scan (`--target installer.exe`), which is somebody else's file and has
+# no reason to carry our artifact name. Excluding by the scan flag keeps the check
+# on the download references it was written for.
 # shellcheck disable=SC2016  # the ${ext} in the grep pattern is a literal
 art="$(grep -oE 'artifactName:[[:space:]]*[A-Za-z0-9.${}-]+' electron/electron-builder.yml 2>/dev/null | head -1 | awk '{print $2}')"
 art_base="${art%%.\$\{ext\}}"
@@ -142,7 +147,8 @@ if [ -n "$art_base" ] && [ "$art_base" != "$art" ]; then
             echo "  DRIFT[download]: docs name installer '$name', but electron-builder ships '${art_base}.{exe,dmg}'"
             FAIL=$((FAIL + 1))
         fi
-    done < <(grep -rhoE '[A-Za-z0-9][A-Za-z0-9._*-]*\.(exe|dmg)' "${DOCS[@]}" 2>/dev/null | sort -u)
+    done < <(grep -rhv -- '--target' "${DOCS[@]}" 2>/dev/null \
+             | grep -oE '[A-Za-z0-9][A-Za-z0-9._*-]*\.(exe|dmg)' | sort -u)
 fi
 
 # --- Check 6: Windows output folder -----------------------------------------
