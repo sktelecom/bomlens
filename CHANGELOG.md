@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The result screens show what a scan looked at. The Source tree section pairs the file list with the file itself, for source trees, directory and rootfs scans, firmware, container images and archives. The capture is bounded — text only, per-file and total size caps — and says what it left out and why.
 - A scan of someone else's SBOM now describes that document: its format and spec version, name and identifier, creation time, producing tool and the supplier it names, read before conversion. Fields the supplier left empty are omitted rather than shown blank.
 - The Overview says what was scanned, and the left rail names the way out of a scan.
+- Firmware analysis, AI-model SBOMs and deep CVE matching each need their own image, and the web UI and desktop app now offer to download it before the feature is used, with the download size and a count of the layers done. An unpulled image is still fetched on first use, and that download reports layer counts too.
+- Installers are unpacked instead of read as a single file: `.exe`, `.msi` and `.dmg`, in the CLI and as a web-UI upload. What such a file carries is inside it, so the components were not visible before. Unpacking uses the opt-in firmware image; without it the file is read as before and the scan says what it looked at and what unpacking needs.
+- Kernel advisories are matched. The bundled CPE index now also carries the Linux kernel, which every root filesystem holds. They are reported apart from the severity figures and in a list of their own, because a kernel accumulates thousands of advisories and most concern subsystems a given device never built.
 - OS-context synthesis covers Debian/Ubuntu and Alpine packages as well as rpm, so OS packages in a supplier SBOM or rootfs scan get distro vulnerability matches.
 - The documentation site's demo covers a container image, an AI model and a firmware image.
 
@@ -39,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web UI corrections: the licence list is back in the Licenses section, the rail no longer clips "SBOM conformance", a scan is typed by what it scanned rather than by its SBOM's root, the risk colour tokens work with an opacity modifier, the licence distribution tint is softer, the regulatory crosswalk shows its advisory count, the result subtitle drops a redundant word, and the demo's install link follows the UI language.
 - A CPE upstream-version pattern was wrong, and the message about a PURL failure now says when the components carry a CPE instead. The unpack path no longer leaks into firmware component names, and zstd's broken-pipe noise stays out of the scan log.
 - The demo bundle and the release assets no longer publish the contents of other people's files or the scratch directories a build leaves behind.
+- `--help` no longer runs a command while printing its own text, and the words it dropped are back.
+- Vulnerability matching by CPE covers every component that carries one, not just those the signature pass identified, and reaches the components a purl cannot serve. Version comparison is stricter: release prefixes such as `go1.25.6` and `v0.37.0` are read as the numbers they are, and a value that cannot be compared as a version no longer satisfies every advisory bound.
 
 ## [v1.9.0] - 2026-07-25
 
