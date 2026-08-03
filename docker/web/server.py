@@ -804,8 +804,8 @@ def _epss_kev_map(run_id):
 
 
 # Names the kernel arrives under: `linux_kernel` from a signature checker,
-# `kernel` from an opkg or rpm database, `linux-kernel` from a reference tool's
-# vocabulary. Kept in step with the same list in docker/lib/scan-security.sh.
+# `kernel` from an opkg or rpm database, and `linux-kernel` or `linux` from an
+# advisory feed. Kept in step with the same list in docker/lib/scan-security.sh.
 _KERNEL_PKG_NAMES = ("linux_kernel", "linux-kernel", "kernel", "linux")
 
 

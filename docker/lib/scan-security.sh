@@ -158,8 +158,8 @@ FINDINGS=$(jq -r '
 # So they are reported, but on their own: a count in the summary and a list of
 # their own, out of the table and out of the totals. The names are a closed list,
 # matched exactly — the kernel arrives under different names depending on which
-# pass found it (`linux_kernel` from a signature checker, `kernel` from an opkg
-# database, `linux-kernel` from a reference tool's vocabulary).
+# pass found it: `linux_kernel` from a signature checker, `kernel` from an opkg or
+# rpm database, and `linux-kernel` or `linux` from an advisory feed.
 KERNEL_FINDINGS=$(echo "$FINDINGS" | jq '
   [ .[] | select((.pkg // "" | ascii_downcase)
                  | IN("linux_kernel", "linux-kernel", "kernel", "linux")) ]')
