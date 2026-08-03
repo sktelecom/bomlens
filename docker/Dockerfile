@@ -83,7 +83,7 @@ ARG SASQUATCH_VERSION=sasquatch-v4.5.1-6
 # (~1.8 GB), so it is kept out of the base image. Apache-2.0.
 ARG SBOM_DEEP_CVE=false
 # renovate: datasource=github-releases depName=anchore/grype
-ARG GRYPE_VERSION=v0.112.0
+ARG GRYPE_VERSION=v0.116.1
 
 # AI SBOM generation (opt-in image `bomlens-aibom`). owasp-aibom-generator is
 # Apache-2.0 and fetches HuggingFace model-card metadata over the network at scan
