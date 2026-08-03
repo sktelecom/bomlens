@@ -1329,6 +1329,73 @@ else
          "a failure there would drop every component the store contributed"
 fi
 
+echo "== a version is compared as a number, and an uncomparable one matches nothing =="
+
+# The CPE index records version bounds as plain numbers, while projects write
+# releases with prefixes (the Go toolchain's `go1.25.6`, a Go module's `v0.37.0`).
+# A bound holds only when both sides can be compared as versions.
+if command -v python3 >/dev/null 2>&1; then
+    if python3 - "$ROOT_DIR/docker/lib/firmware-cpe-match.py" <<'CPEPY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("m", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+# A prefixed version compares as the number it is.
+assert m.vcmp("go1.25.6", "1.25.6") == 0, m.vcmp("go1.25.6", "1.25.6")
+assert m.vcmp("v0.37.0", "0.37.0") == 0
+assert m.vcmp("go1.24.0", "1.25.0") < 0
+assert m.vcmp("v1.2.0", "1.1.9") > 0
+
+# A bounded range rejects a version above it, prefix or not.
+assert m.in_range("go1.25.6", None, "1.20.0", 1, "1.24.0", 0) is False
+assert m.in_range("go1.22.0", None, "1.20.0", 1, "1.24.0", 0) is True
+assert m.in_range("v0.99.0", None, None, None, "0.40.0", 0) is False
+
+# Only `go`/`v` immediately before a digit are dropped. A version is not a
+# free-text field: stripping more would match releases that are genuinely
+# different.
+assert m._strip_version_prefix("vendor-1.0") == "vendor-1.0"
+assert m._strip_version_prefix("golang1.2") == "golang1.2"
+assert m._strip_version_prefix("v1.0") == "1.0"
+assert m._strip_version_prefix("go1.0") == "1.0"
+assert m._strip_version_prefix(None) is None
+
+# An advisory with no bounds at all still means every version, which is NVD's
+# own way of saying so and must not be broken by the above.
+assert m.in_range("1.0", None, None, None, None, None) is True
+
+# A value that is not a version matches nothing. UNKNOWN is what this pipeline
+# writes when no version was recovered.
+assert m.usable_version("UNKNOWN") is False
+assert m.usable_version("unknown") is False
+assert m.usable_version("-") is False
+assert m.usable_version("") is False
+assert m.usable_version(None) is False
+assert m.in_range("UNKNOWN", None, "1.0", 1, "2.0", 0) is False
+assert m.in_range("UNKNOWN", None, None, None, None, None) is False
+
+# Real release forms stay usable: letter suffixes and Debian epochs included.
+for v in ("1.0.2h", "2:9.1.1230-2", "1.7.1", "4.9.2-1", "0.11.0"):
+    assert m.usable_version(v), v
+CPEPY
+    then
+        pass "a prefixed version compares as its number, and a bounded range still bounds"
+    else
+        fail "version prefix handling is wrong (see assertion above)"
+    fi
+else
+    echo "  SKIP: python3 not available"
+fi
+
+# The matching runs over the merged component set, so a component named by any
+# pass is offered to it.
+if awk '/^# ④.6 CPE -> CVE matching/,/^fi$/' "$SCRIPT" | grep -q 'merged.json'; then
+    pass "CPE matching reads the merged component set"
+else
+    fail "CPE matching does not read the merged set"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

@@ -68,7 +68,22 @@ def _key(v):
     return toks
 
 
+# Release prefixes that are not part of the number. The Go toolchain writes
+# `go1.25.6` and Go modules write `v0.37.0`; NVD records both bounds as plain
+# numbers, so the prefix is dropped before comparing.
+#
+# Only these two, and only immediately before a digit. A version is not a
+# free-text field to normalize — dropping more would match releases that are
+# genuinely different.
+_VERSION_PREFIX_RE = re.compile(r"^(?:go|v)(?=[0-9])")
+
+
+def _strip_version_prefix(v):
+    return _VERSION_PREFIX_RE.sub("", v.strip()) if isinstance(v, str) else v
+
+
 def vcmp(a, b):
+    a, b = _strip_version_prefix(a), _strip_version_prefix(b)
     if _CBTVersion is not None:
         try:
             va, vb = _CBTVersion(a), _CBTVersion(b)
@@ -82,13 +97,33 @@ def vcmp(a, b):
     return (ka > kb) - (ka < kb)
 
 
+# Whether a string can be compared as a version at all. A version has to contain
+# a digit, which admits every real release form (letter suffixes like 1.0.2h,
+# Debian epochs like 2:9.1) and rejects the placeholders this pipeline uses when
+# no version was recovered: UNKNOWN, -, * and the empty string.
+#
+# A comparison that cannot be made is never a match. Both the version and the
+# bound must be comparable for a bound to hold.
+_HAS_DIGIT_RE = re.compile(r"[0-9]")
+
+
+def usable_version(v):
+    return isinstance(v, str) and _HAS_DIGIT_RE.search(v) is not None
+
+
 def in_range(v, exact, vstart, vs_incl, vend, ve_incl):
+    if not usable_version(v):
+        return False
     if exact is not None:
-        return vcmp(v, exact) == 0
+        return usable_version(exact) and vcmp(v, exact) == 0
     ok = True
     if vstart is not None:
+        if not usable_version(vstart):
+            return False
         ok = ok and (vcmp(v, vstart) >= 0 if vs_incl else vcmp(v, vstart) > 0)
     if vend is not None:
+        if not usable_version(vend):
+            return False
         ok = ok and (vcmp(v, vend) <= 0 if ve_incl else vcmp(v, vend) < 0)
     # No exact version and no bounds -> the CPE marks every version vulnerable.
     return ok
@@ -115,7 +150,9 @@ def main():
         vendor, product, cpe_ver = parsed
         # Prefer the component's own version; fall back to the CPE's version field.
         version = comp.get("version") or (cpe_ver if cpe_ver not in ("*", "-", "") else None)
-        if not version:
+        # A placeholder is not a version, so a presence-only judgement (reported
+        # without one) is matched against nothing.
+        if not usable_version(version):
             continue
         seen = set()
         for row in conn.execute(

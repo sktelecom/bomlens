@@ -482,19 +482,11 @@ if command -v cve-bin-tool >/dev/null 2>&1; then
         echo '{"components":[]}' > "$BIN_SBOM"
     fi
 
-    # ③.5 CPE -> CVE matching against the bundled NVD index. firmware-cpe-match.py
-    # reads the identified components' CPEs and emits cve-bin-tool-shaped rows into
-    # $CVE_JSON, which step ⑤ reshapes into the sidecar (downstream contract kept).
+    # CPE -> CVE matching runs over the merged component set, in step ④.6 below.
     if [ "$CVE_BIN_TOOL_MODE" = "components-only" ]; then
         echo "[firmware] CVE_BIN_TOOL_MODE=components-only: skipping CVE matching."
-    elif [ -f "$FW_CPE_INDEX" ] && command -v python3 >/dev/null 2>&1; then
-        python3 "$(dirname "$0")/firmware-cpe-match.py" "$BIN_SBOM" "$FW_CPE_INDEX" \
-            > "$CVE_JSON" 2>/dev/null || echo '[]' > "$CVE_JSON"
-    else
+    elif [ ! -f "$FW_CPE_INDEX" ]; then
         echo "[firmware] WARN: no CPE index at $FW_CPE_INDEX; emitting component-only (no CVEs)." >&2
-    fi
-    if [ ! -s "$CVE_JSON" ] || ! jq empty "$CVE_JSON" >/dev/null 2>&1; then
-        echo '[]' > "$CVE_JSON"
     fi
 else
     echo "[firmware] cve-bin-tool not installed; skipping binary identification (Phase 2)."
@@ -698,6 +690,34 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     | ($keep + $merged)
     | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
 ' > "$WORK/merged.json"
+
+# --------------------------------------------------------
+# ④.6 CPE -> CVE matching against the bundled NVD index.
+#
+# Every pass that names a component can attach a CPE — the signature checkers do,
+# and enrich-cpe.sh fills more from its curated table — and a CPE is all this index
+# needs, so the whole merged set is offered to it.
+#
+# The rows land in $CVE_JSON, which step ⑤ reshapes into the sidecar that
+# scan-security.sh merges; the downstream contract is unchanged. A component with
+# no usable version is skipped by the matcher itself.
+if [ "$CVE_BIN_TOOL_MODE" != "components-only" ] && [ -f "$FW_CPE_INDEX" ] \
+   && command -v python3 >/dev/null 2>&1; then
+    # Components the purl path cannot serve: those with no purl, and those with a
+    # `pkg:generic` one, which names no ecosystem. Those are what this index is for.
+    #
+    # A component with a real purl is left to the purl path, which keys on the
+    # ecosystem. A CPE for a language package is derived from its name, and two
+    # projects that share a name do not share a version line.
+    jq -n --slurpfile c "$WORK/merged.json" '{components: [
+        $c[0][] | select(((.purl // "") == "") or ((.purl // "") | startswith("pkg:generic")))
+    ]}' > "$WORK/cpe-in.json"
+    python3 "$(dirname "$0")/firmware-cpe-match.py" "$WORK/cpe-in.json" "$FW_CPE_INDEX" \
+        > "$CVE_JSON" 2>/dev/null || echo '[]' > "$CVE_JSON"
+fi
+if [ ! -s "$CVE_JSON" ] || ! jq empty "$CVE_JSON" >/dev/null 2>&1; then
+    echo '[]' > "$CVE_JSON"
+fi
 
 NPKG=$(jq 'length' "$WORK/pkg-comps.json")
 NBIN=$(jq 'length' "$WORK/bin-comps.json")
