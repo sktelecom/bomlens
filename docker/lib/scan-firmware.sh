@@ -684,6 +684,12 @@ fi
 #   A group holding two different purls is left alone. Two packages can share a
 #   name and version and still be different things (the same name from two
 #   ecosystems, say), and nothing here can tell them apart, so they stay separate.
+#   A purl written by container-membership.py does not count towards that: it is
+#   this pipeline's reading of which distribution a container runs, not a second
+#   ecosystem's claim, and it is deliberately shorter than the one syft writes for
+#   the same package in the rootfs (the architecture is not in the SBOM to copy).
+#   Counting it would split every package installed in both the rootfs and a
+#   container into one component per container.
 #
 # The record carrying a purl is the base, because the purl is what the CVE step
 # matches on; the other record only fills in what the base lacks.
@@ -708,6 +714,8 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
            then {evidence: (($base.evidence // {}) + {occurrences: $occ})} else {} end);
 
     def mergeable: (.type // "library") as $t | $t == "library" or $t == "application";
+
+    def synthesized_purl: any(.properties[]?; .name == "bomlens:purlSource");
 
     def presence_only:
       any(.properties[]?; .name == "bomlens:evidenceGrade" and .value == "presence-only");
@@ -758,7 +766,9 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
        | map(.[0])) as $keep
     | ([$all[] | select(mergeable)]
        | group_by([((.name // "") | ascii_downcase), (.version // "")])
-       | map(if length == 1 or (([.[] | .purl // empty] | unique | length) > 1)
+       | map(if length == 1
+                or (([.[] | select(synthesized_purl | not) | .purl // empty]
+                     | unique | length) > 1)
              then . else [merge_group] end)
        | add // []) as $merged
     | ($keep + $merged)
@@ -783,8 +793,18 @@ if [ "$CVE_BIN_TOOL_MODE" != "components-only" ] && [ -f "$FW_CPE_INDEX" ] \
     # A component with a real purl is left to the purl path, which keys on the
     # ecosystem. A CPE for a language package is derived from its name, and two
     # projects that share a name do not share a version line.
+    #
+    # A purl synthesized from a container layer's os-release is the exception, and
+    # stays offered here. It was written to reach the distribution advisories,
+    # which is a different question from what this index answers, and the two
+    # disagree: measured on one switch OS, giving `snmp` and `pkgconf` a purl and
+    # taking them out of this pass cost four CVEs that nothing else reported.
+    # Whatever both find is deduplicated on (component, CVE) where the results
+    # meet, so offering a component to both costs nothing.
     jq -n --slurpfile c "$WORK/merged.json" '{components: [
-        $c[0][] | select(((.purl // "") == "") or ((.purl // "") | startswith("pkg:generic")))
+        $c[0][] | select(((.purl // "") == "")
+                         or ((.purl // "") | startswith("pkg:generic"))
+                         or (any(.properties[]?; .name == "bomlens:purlSource")))
     ]}' > "$WORK/cpe-in.json"
     python3 "$(dirname "$0")/firmware-cpe-match.py" "$WORK/cpe-in.json" "$FW_CPE_INDEX" \
         > "$CVE_JSON" 2>/dev/null || echo '[]' > "$CVE_JSON"

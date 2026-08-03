@@ -360,6 +360,70 @@ else
     fail "entries with different purls were merged" "expected 2 zlib entries, got $z"
 fi
 
+# A purl written from a container layer's own os-release is shorter than the one
+# syft writes for the same package in the rootfs, because the architecture is not
+# in the SBOM to copy. Counted as a second purl it would split every package
+# installed in both the rootfs and a container into one component per container:
+# measured on one switch OS, 5,619 entries where 192 belonged.
+store_merge="$(jq -n \
+    --slurpfile a "$FIX/merge-pkg-comps.json" \
+    --slurpfile b <(echo '[]') --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
+    --slurpfile e '/dev/stdin' "$merge_filter" <<'EOF'
+[{"type":"library","name":"openssl","version":"1.0.2h",
+  "purl":"pkg:deb/debian/openssl@1.0.2h?distro=debian-13",
+  "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
+                {"name":"bomlens:container:image","value":"app-one@1.0"}]},
+ {"type":"library","name":"openssl","version":"1.0.2h",
+  "purl":"pkg:deb/debian/openssl@1.0.2h?distro=debian-13",
+  "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
+                {"name":"bomlens:container:image","value":"app-two@2.0"}]},
+ {"type":"library","name":"only-in-container","version":"1.0",
+  "purl":"pkg:deb/debian/only-in-container@1.0?distro=debian-13",
+  "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
+                {"name":"bomlens:container:image","value":"app-one@1.0"}]},
+ {"type":"library","name":"only-in-container","version":"1.0",
+  "purl":"pkg:deb/debian/only-in-container@1.0?distro=debian-13",
+  "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
+                {"name":"bomlens:container:image","value":"app-two@2.0"}]}]
+EOF
+)"
+n=$(printf '%s' "$store_merge" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
+if [ "$n" = "1" ]; then
+    pass "a package in the rootfs and in containers stays one component"
+else
+    fail "a package was split once per container" "openssl 1.0.2h appears $n time(s)"
+fi
+
+# The rootfs is the filesystem the device boots, so its record stays the base of
+# the group and the identifier read off the rootfs is the one that ships.
+got="$(printf '%s' "$store_merge" | jq -r '
+    [.[] | select(.name == "openssl" and .version == "1.0.2h")][0].purl')"
+if [ "$got" = "pkg:generic/openssl@1.0.2h" ]; then
+    pass "the merged record keeps syft's purl over the synthesized one"
+else
+    fail "the synthesized purl displaced syft's" "got $got"
+fi
+
+# Every container the package was found in still has to be readable off it.
+imgs=$(printf '%s' "$store_merge" | jq '[.[] | select(.name == "openssl")
+    | .properties[]? | select(.name == "bomlens:container:image")] | length')
+if [ "$imgs" = "2" ]; then
+    pass "the merged record still names every container the package is in"
+else
+    fail "a container membership was lost in the merge" "got $imgs of 2"
+fi
+
+# A package that only exists inside containers keeps the purl written for it —
+# that identifier is the only thing the vulnerability step can match on.
+n=$(printf '%s' "$store_merge" | jq '[.[] | select(.name == "only-in-container")] | length')
+got="$(printf '%s' "$store_merge" | jq -r '[.[] | select(.name == "only-in-container")][0].purl')"
+if [ "$n" = "1" ] && [ "$got" = "pkg:deb/debian/only-in-container@1.0?distro=debian-13" ]; then
+    pass "a package found only in containers is reported once, with its purl"
+else
+    fail "a container-only package lost its identifier or was duplicated" \
+         "$n entr(y/ies), purl $got"
+fi
+
 echo "== a component with no version left is still reported, and marked as such =="
 
 # Signature identification only reports what it can read a version out of, so a
@@ -1383,6 +1447,172 @@ if awk '/container-membership.py/,/^        fi$/' "$SCRIPT" | grep -q 'attribute
 else
     fail "attribution writes over the store's SBOM in place" \
          "a failure there would drop every component the store contributed"
+fi
+
+echo "== a deb read out of a layer gets the purl its distribution decides =="
+
+# syft writes a deb's purl only when it knows the distribution, and it looks for
+# that in /etc/os-release at the root of what it was pointed at. A store keeps
+# each image's files under <driver>/<cache-id>/diff/, so every deb read out of one
+# arrives with no purl — and the vulnerability step keys on the purl, so those
+# packages are matched against nothing. Measured on one switch OS: 192 packages
+# with no purl; with the purl written from the layer's own os-release, the scan
+# reports 1,000 advisories it did not report before.
+if [ ! -f "$MEMBER" ]; then
+    fail "container-membership.py is missing" "layer debs cannot be identified"
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+    STORE="$(mktemp -d)"
+    IMG="$STORE/image/overlay2"
+    mkdir -p "$IMG/imagedb/content/sha256" "$IMG/layerdb/sha256"
+    ONE=1111111111111111111111111111111111111111111111111111111111111111
+    TWO=2222222222222222222222222222222222222222222222222222222222222222
+    THREE=3333333333333333333333333333333333333333333333333333333333333333
+    cat > "$IMG/repositories.json" <<EOF
+{"Repositories": {
+  "deb-one":  {"deb-one:1.0": "sha256:$ONE"},
+  "deb-two":  {"deb-two:2.0": "sha256:$TWO"},
+  "nodistro": {"nodistro:3.0": "sha256:$THREE"}}}
+EOF
+    echo '{"rootfs":{"diff_ids":["sha256:e1","sha256:e2"]}}' \
+        > "$IMG/imagedb/content/sha256/$ONE"
+    echo '{"rootfs":{"diff_ids":["sha256:e3","sha256:e4"]}}' \
+        > "$IMG/imagedb/content/sha256/$TWO"
+    echo '{"rootfs":{"diff_ids":["sha256:e5"]}}' \
+        > "$IMG/imagedb/content/sha256/$THREE"
+    n=0
+    for pair in e1:BASEONE e2:APPONE e3:BASETWO e4:APPTWO e5:PLAIN; do
+        n=$((n + 1))
+        mkdir -p "$IMG/layerdb/sha256/link$n" "$STORE/overlay2/${pair#*:}/diff/etc"
+        printf 'sha256:%s\n' "${pair%%:*}" > "$IMG/layerdb/sha256/link$n/diff"
+        printf '%s\n' "${pair#*:}" > "$IMG/layerdb/sha256/link$n/cache-id"
+    done
+    # Two images on two Debian releases, and one that does not say what it runs.
+    printf 'ID=debian\nVERSION_ID="13"\n' > "$STORE/overlay2/BASEONE/diff/etc/os-release"
+    printf 'ID=debian\nVERSION_ID="14"\n' > "$STORE/overlay2/BASETWO/diff/etc/os-release"
+
+    cat > "$STORE/store.cdx.json" <<'EOF'
+{"bomFormat":"CycloneDX","components":[
+ {"type":"library","name":"bash","version":"5.2.37-2+b9","properties":[
+   {"name":"syft:package:type","value":"deb"},
+   {"name":"syft:location:0:path","value":"/overlay2/APPONE/diff/var/lib/dpkg/status"}]},
+ {"type":"library","name":"libssl3","version":"3.0.15-1","properties":[
+   {"name":"syft:package:type","value":"deb"},
+   {"name":"syft:metadata:source","value":"openssl"},
+   {"name":"syft:metadata:sourceVersion","value":"3.0.15"},
+   {"name":"syft:location:0:path","value":"/overlay2/APPONE/diff/var/lib/dpkg/status"}]},
+ {"type":"library","name":"curl","version":"8.0","purl":"pkg:deb/debian/curl@8.0?arch=amd64",
+  "properties":[
+   {"name":"syft:package:type","value":"deb"},
+   {"name":"syft:location:0:path","value":"/overlay2/APPONE/diff/var/lib/dpkg/status"}]},
+ {"type":"library","name":"pylib","version":"1.0","properties":[
+   {"name":"syft:package:type","value":"python"},
+   {"name":"syft:location:0:path","value":"/overlay2/APPONE/diff/usr/lib/x.dist-info/METADATA"}]},
+ {"type":"library","name":"shared","version":"1.0","properties":[
+   {"name":"syft:package:type","value":"deb"},
+   {"name":"syft:location:0:path","value":"/overlay2/APPONE/diff/var/lib/dpkg/status"},
+   {"name":"syft:location:1:path","value":"/overlay2/APPTWO/diff/var/lib/dpkg/status"}]},
+ {"type":"library","name":"plain","version":"1.0","properties":[
+   {"name":"syft:package:type","value":"deb"},
+   {"name":"syft:location:0:path","value":"/overlay2/PLAIN/diff/var/lib/dpkg/status"}]}]}
+EOF
+    out="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+    purl_of() {
+        printf '%s' "$out" | jq -r --arg n "$1" \
+            '.components[] | select(.name == $n) | .purl // "(none)"'
+    }
+
+    if [ "$(purl_of bash)" = "pkg:deb/debian/bash@5.2.37-2%2Bb9?distro=debian-13" ]; then
+        pass "a deb with no purl gets one from the os-release in its image's layers"
+    else
+        fail "the layer's distribution was not turned into a purl" "got $(purl_of bash)"
+    fi
+
+    # Trivy matches a distribution advisory on the SOURCE package (libssl3 is
+    # fixed by an openssl advisory) and the normalize stage reads that out of the
+    # `upstream` qualifier, so a purl without it identifies the wrong thing.
+    if [ "$(purl_of libssl3)" = "pkg:deb/debian/libssl3@3.0.15-1?distro=debian-13&upstream=openssl%403.0.15" ]; then
+        pass "the source package syft recorded travels in the purl's upstream qualifier"
+    else
+        fail "the source package is missing from the synthesized purl" "got $(purl_of libssl3)"
+    fi
+
+    # An identifier syft wrote is evidence; one written here is a reading of the
+    # store. Overwriting the first with the second would lose the architecture and
+    # move the component to a different purl than the rootfs scan gives it.
+    if [ "$(purl_of curl)" = "pkg:deb/debian/curl@8.0?arch=amd64" ]; then
+        pass "a purl syft already wrote is left alone"
+    else
+        fail "an existing purl was overwritten" "got $(purl_of curl)"
+    fi
+
+    # Only deb packages are decided by the distribution. A Python package in the
+    # same layer is identified by its own metadata, wherever it is installed.
+    if [ "$(purl_of pylib)" = "(none)" ]; then
+        pass "a package that is not a deb is not given a distribution's purl"
+    else
+        fail "a non-deb component was identified as one" "got $(purl_of pylib)"
+    fi
+
+    # The same package in two images on different releases: the store says it is
+    # in both and nothing there says which build this copy is.
+    if [ "$(purl_of shared)" = "(none)" ]; then
+        pass "a package spanning two distributions is left unidentified"
+    else
+        fail "a package was assigned one of two possible distributions" "got $(purl_of shared)"
+    fi
+
+    # An image that never says what it runs yields no purl, rather than borrowing
+    # the distribution of some other image in the same store.
+    if [ "$(purl_of plain)" = "(none)" ]; then
+        pass "an image with no os-release does not borrow another image's distribution"
+    else
+        fail "a distribution was borrowed from an unrelated image" "got $(purl_of plain)"
+    fi
+
+    # os-release is allowed to live in /usr/lib, and a layer above the base
+    # replaces the one below it the way the running container would see it.
+    mkdir -p "$STORE/overlay2/APPONE/diff/usr/lib"
+    printf 'ID=debian\nVERSION_ID="13.5"\n' \
+        > "$STORE/overlay2/APPONE/diff/usr/lib/os-release"
+    out="$(python3 "$MEMBER" "$STORE" "$STORE/store.cdx.json" 2>/dev/null)"
+    if [ "$(purl_of bash)" = "pkg:deb/debian/bash@5.2.37-2%2Bb9?distro=debian-13.5" ]; then
+        pass "a higher layer's os-release wins, and /usr/lib is read as well as /etc"
+    else
+        fail "the upper layer's os-release was not read" "got $(purl_of bash)"
+    fi
+    rm -rf "$STORE"
+fi
+
+echo "== the bundled CPE index is still offered what was identified from a layer =="
+
+# The index answers a different question from the distribution advisories, and
+# the two disagree. Writing a purl for a container's deb moved it onto the purl
+# path and out of this one, which cost four CVEs on a switch OS — `snmp` and
+# `pkgconf` were reported by the index alone. Components are offered to both;
+# whatever both find is deduplicated on (component, CVE) further downstream.
+cpe_in_filter="$(awk '
+    /^    jq -n --slurpfile c "\$WORK\/merged.json" / { inside = 1; sub(/^[^\x27]*\x27/, ""); }
+    inside { print }
+    inside && /cpe-in.json/ { exit }
+' "$SCRIPT" | sed "s|\x27 > \"\$WORK/cpe-in.json\"||")"
+if [ -z "$cpe_in_filter" ]; then
+    fail "could not lift the CPE index input filter out of scan-firmware.sh" "was it renamed?"
+else
+    offered="$(jq -n --slurpfile c /dev/stdin "$cpe_in_filter" <<'EOF' | jq -r '[.components[].name] | sort | join(",")'
+[{"name":"no-purl","version":"1.0","cpe":"cpe:2.3:a:x:no-purl:1.0:*:*:*:*:*:*:*"},
+ {"name":"generic","version":"1.0","purl":"pkg:generic/generic@1.0"},
+ {"name":"real-purl","version":"1.0","purl":"pkg:deb/debian/real-purl@1.0?arch=amd64&distro=debian-13"},
+ {"name":"from-layer","version":"1.0","purl":"pkg:deb/debian/from-layer@1.0?distro=debian-13",
+  "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"}]}]
+EOF
+)"
+    if [ "$offered" = "from-layer,generic,no-purl" ]; then
+        pass "a purl written from a layer keeps the component on the CPE index path"
+    else
+        fail "the CPE index input no longer holds what it needs" "offered: ${offered:-nothing}"
+    fi
 fi
 
 echo "== a version is compared as a number, and an uncomparable one matches nothing =="

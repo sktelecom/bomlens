@@ -20,7 +20,10 @@ Firmware is a single file that packs and seals an operating system and dozens of
    installed library set, such as a Python `site-packages`. Set `FW_EXTRA_ROOTS=false` to read
    only the rootfs. Components from a container store record the image they belong to in
    `bomlens:container:image`, and the images themselves appear as `container`
-   components.
+   components. A package installed by `dpkg` inside a container is identified by the
+   distribution the container runs, read from the `os-release` in its own layers, so that
+   the vulnerability step has something to match it against; those carry
+   `bomlens:purlSource`.
 3. Use `cve-bin-tool` to find the versions and vulnerabilities of stripped static binaries (busybox, openssl, dropbear, and so on).
 4. Merge the two results into one SBOM, then run the same post-processing as a normal scan (licenses, CVEs, signing).
 
