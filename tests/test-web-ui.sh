@@ -377,6 +377,115 @@ else
     fail "sibling dispatch guard failed (see assertion above)"
 fi
 
+echo "== a per-feature image can be pulled ahead of time, with progress =="
+
+# Firmware/AI/deep-CVE each live in their own image, pulled on the feature's first
+# use. That used to be a multi-minute stall in the middle of a scan with only raw
+# `docker pull` lines to show. The tests below hold the contract the UI reads.
+if python3 - "$SERVER" <<'PULLPY'
+import importlib.util, pathlib, sys
+spec = importlib.util.spec_from_file_location("server", sys.argv[1])
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+
+# A request names a feature, never an image reference. The reference comes from
+# the server's own environment, so no request can make the daemon pull something
+# else. `scanner` is not a key: every published image carries syft, so the SPDX
+# fallback never runs and UI for it could not be exercised.
+keys = set(server._pullable_images())
+assert keys == {"firmware", "aibom", "deep-cve"}, keys
+assert server._pullable_images()["firmware"] == server.FIRMWARE_IMAGE
+
+# Layer counting, read from a real non-TTY transcript. A non-TTY `docker pull`
+# prints no byte totals and no percentage, so layer counts are the only honest
+# unit; the total counts every layer id that appears, because docker omits
+# "Pulling fs layer" for a layer it already has.
+transcript = (pathlib.Path(sys.argv[1]).parents[2] / "tests" / "fixtures"
+              / "docker-pull-nontty.txt").read_text().splitlines()
+prog = server.PullProgress()
+snaps = [x for x in (prog.feed(line) for line in transcript) if x is not None]
+assert snaps, "no progress was reported for a real pull transcript"
+final = prog.snapshot()
+assert final["total"] > 0 and final["complete"] <= final["total"], final
+# feed() reports only on a real change, so a caller can emit one event per change.
+assert all(a != b for a, b in zip(snaps, snaps[1:])), snaps
+# A line that is not a layer status is not progress; it stays a log line.
+assert server.PullProgress().feed("Digest: sha256:abc") is None
+
+# Failure reasons come back as keys the UI translates, and the specific signals
+# win over the general ones (a proxy doing TLS interception shows up as x509).
+assert server.classify_pull_failure("", "timeout") == "timeout"
+assert server.classify_pull_failure("no space left on device") == "disk"
+assert server.classify_pull_failure("dial tcp: lookup ghcr.io") == "dns"
+assert server.classify_pull_failure("x509: certificate signed by unknown authority") == "proxy"
+assert server.classify_pull_failure("pull access denied") == "auth"
+assert server.classify_pull_failure("something else entirely") == "unknown"
+
+# An invalid reference is refused before it reaches a command line.
+logs = []
+code, reason = server._pull_image("-v/etc:/etc", logs.append)
+assert code == -1 and reason == "unknown", (code, reason)
+assert any("invalid image reference" in x for x in logs), logs
+
+# The pull runs through _stream_cmd, and a cancel callback reaches it — closing
+# the stream must stop the download rather than run it to the end.
+seen = {}
+def fake_stream(args, on_log, on_progress=None, cancel=None, container=None, env=None):
+    seen["args"] = args
+    seen["cancel"] = cancel
+    for line in ["17a39c0ba978: Pulling fs layer", "17a39c0ba978: Pull complete",
+                 "Status: Downloaded newer image"]:
+        on_log(line)
+    return 0
+server._stream_cmd = fake_stream
+logs, progs = [], []
+code, reason = server._pull_image("ghcr.io/x/y:1", logs.append, on_progress=progs.append,
+                                  cancel=lambda: False)
+assert code == 0 and reason is None, (code, reason)
+assert seen["args"] == ["docker", "pull", "ghcr.io/x/y:1"], seen["args"]
+assert seen["cancel"] is not None, "cancel was not forwarded to the pull"
+assert progs and progs[-1]["total"] >= 1, progs
+# Layer lines went to progress, not to the log; other lines stayed logs.
+assert "Status: Downloaded newer image" in logs, logs
+assert not any("Pull complete" in x for x in logs), logs
+PULLPY
+then
+    pass "the pull reader counts layers, classifies failures and keeps the image set closed"
+else
+    fail "per-feature image pull contract failed (see assertion above)"
+fi
+
+# The two endpoints the UI calls. Both take a feature key; an unknown key is a
+# 400 rather than a pull of something unexpected.
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/image-status?image=firmware")
+if [ "$code" = "200" ]; then
+    pass "/image-status answers for a known feature key"
+else
+    fail "/image-status did not answer for a known key" "got $code"
+fi
+
+body=$(curl -s "$BASE/image-status?image=firmware")
+if printf '%s' "$body" | grep -q '"present"'; then
+    pass "/image-status reports whether the image is already there"
+else
+    fail "/image-status has no present field" "$body"
+fi
+
+for ep in image-status pull-stream; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$ep?image=scanner")
+    if [ "$code" = "400" ]; then
+        pass "/$ep refuses a key that is not in the set"
+    else
+        fail "/$ep accepted an out-of-set key" "got $code"
+    fi
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$ep?image=ghcr.io/evil/x:1")
+    if [ "$code" = "400" ]; then
+        pass "/$ep refuses a raw image reference"
+    else
+        fail "/$ep accepted a raw image reference" "got $code"
+    fi
+done
+
 echo "== path traversal is blocked =="
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/file?name=../../etc/passwd")
 [ "$code" = "404" ] && pass "/file blocks path traversal (404)" || fail "/file traversal returned $code (expected 404)"

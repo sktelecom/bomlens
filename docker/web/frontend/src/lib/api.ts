@@ -535,7 +535,13 @@ export interface ScanParams {
 /** A determinate progress update (e.g. CVE database download). */
 export interface ScanProgress {
   phase: string;
-  percent: number;
+  /** Percent, for a phase that can report one (the firmware CVE DB download). */
+  percent?: number;
+  /** Layer counts, for an image pull. A non-TTY `docker pull` prints no byte
+   *  totals and no percentage, so layers are the only honest unit and a percent
+   *  here would be invented. */
+  complete?: number;
+  total?: number;
 }
 
 export interface ScanHandlers {
@@ -544,6 +550,76 @@ export interface ScanHandlers {
   onError: (message?: string) => void;
   /** Optional determinate progress (e.g. firmware CVE DB download). */
   onProgress?: (p: ScanProgress) => void;
+}
+
+/** A per-feature image: whether it is already on this machine, and how many
+ *  bytes the pull would download. Firmware/AI/deep-CVE each live in their own
+ *  image; the download size is the compressed one the registry reports, which is
+ *  not the installed size (the manifest carries no such number). */
+export interface ImageStatus {
+  image: string;
+  present: boolean;
+  downloadBytes?: number;
+}
+
+export type PullImageKey = "firmware" | "aibom" | "deep-cve";
+
+export async function fetchImageStatus(key: PullImageKey): Promise<ImageStatus | null> {
+  try {
+    const res = await fetch(`/image-status?image=${encodeURIComponent(key)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as ImageStatus;
+  } catch {
+    return null;
+  }
+}
+
+export interface PullHandlers {
+  onLog?: (line: string) => void;
+  onProgress?: (p: { complete: number; total: number }) => void;
+  onDone: (d: { ok: boolean; reason?: string; alreadyPresent?: boolean }) => void;
+}
+
+/** Pull a per-feature image, reporting layer progress. Returns a stop function:
+ *  closing the stream stops the download, and the layers already fetched stay in
+ *  the daemon's cache, so starting again resumes rather than restarting. */
+export function pullImage(key: PullImageKey, handlers: PullHandlers): () => void {
+  const es = new EventSource(`/pull-stream?image=${encodeURIComponent(key)}`);
+  es.addEventListener("log", (e) => {
+    try {
+      handlers.onLog?.(String(JSON.parse((e as MessageEvent).data)));
+    } catch {
+      /* ignore malformed log */
+    }
+  });
+  es.addEventListener("progress", (e) => {
+    try {
+      const p = JSON.parse((e as MessageEvent).data) as ScanProgress;
+      if (typeof p.total === "number" && typeof p.complete === "number") {
+        handlers.onProgress?.({ complete: p.complete, total: p.total });
+      }
+    } catch {
+      /* ignore malformed progress */
+    }
+  });
+  const finish = (d: { ok: boolean; reason?: string; alreadyPresent?: boolean }) => {
+    es.close();
+    handlers.onDone(d);
+  };
+  es.addEventListener("busy", () => {
+    /* the done event carries the reason; nothing extra to do here */
+  });
+  es.addEventListener("done", (e) => {
+    try {
+      finish(JSON.parse((e as MessageEvent).data));
+    } catch {
+      finish({ ok: false, reason: "unknown" });
+    }
+  });
+  es.onerror = () => finish({ ok: false, reason: "unknown" });
+  return () => {
+    es.close();
+  };
 }
 
 export interface Capabilities {
@@ -853,7 +929,12 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     const data = (e as MessageEvent).data;
     try {
       const p = JSON.parse(data) as ScanProgress;
-      if (typeof p.percent === "number") handlers.onProgress?.(p);
+      // Two shapes reach this channel: a percent (firmware CVE DB) and layer
+      // counts (an image pull). Accept either, and still drop anything with
+      // neither so a malformed event cannot render as 0%.
+      if (typeof p.percent === "number" || typeof p.total === "number") {
+        handlers.onProgress?.(p);
+      }
     } catch {
       /* ignore malformed progress */
     }

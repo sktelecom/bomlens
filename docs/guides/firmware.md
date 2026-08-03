@@ -31,6 +31,8 @@ docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 
 This image is the default, so adding `--firmware` pulls it without any extra setting. To use a different tag, set the environment variable `SBOM_FIRMWARE_IMAGE`.
 
+In the web UI and the desktop app you do not have to run that command: the firmware input offers a Download now button with the download size, and shows how many layers are done while it runs. Without it the image is still pulled on the first firmware scan, so the only difference is whether the wait happens before the scan or inside it.
+
 ## Running it
 
 Firmware analysis needs the firmware image (above), whether you use the web UI or the CLI.

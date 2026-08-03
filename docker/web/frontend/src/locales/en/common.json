@@ -821,5 +821,20 @@
     "file": "Uploaded file",
     "sbom": "Received SBOM",
     "model": "AI model"
+  },
+  "image": {
+    "ready": "The image for this input is already downloaded.",
+    "download": "Download now",
+    "downloadSize": "about {{size}} GB to download",
+    "pullingStart": "Starting the download…",
+    "pullingLayers": "Downloading — {{complete}} of {{total}} layers done",
+    "failed": {
+      "timeout": "The download stopped making progress and was cancelled. Check the network and try again.",
+      "disk": "The download ran out of disk space. Free some space and try again.",
+      "dns": "The registry could not be resolved. Check the network or DNS settings.",
+      "proxy": "The connection was refused or intercepted, which usually means a proxy or a corporate certificate. Ask whoever runs the network.",
+      "auth": "The registry refused the download for lack of permission.",
+      "unknown": "The download failed. The log above says what docker reported."
+    }
   }
 }

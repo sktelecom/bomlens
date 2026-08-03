@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { SiblingImagePanel } from "@/components/SiblingImagePanel";
 import { Switch } from "@/components/ui/switch";
 import { USAGE_CONTEXTS, type UsageContext } from "@/lib/api";
 import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
@@ -268,17 +269,17 @@ function UsageContextSelect({ state }: { state: ScanFormState }) {
  *  base UI image), the dedicated image is pulled on the first scan — a large,
  *  one-time download. Shown only when the selected source needs it. */
 function SiblingPullNotice({ state }: { state: ScanFormState }) {
-  const { t } = useTranslation();
   const { source, capabilities } = state;
-  const needsPull =
-    (source === "firmware-upload" && capabilities.firmwareSibling) ||
-    (source === "ai-model" && capabilities.aibomSibling);
-  if (!needsPull) return null;
-  return (
-    <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
-      {t("source.siblingPullNotice")}
-    </div>
-  );
+  const imageKey =
+    source === "firmware-upload" && capabilities.firmwareSibling
+      ? ("firmware" as const)
+      : source === "ai-model" && capabilities.aibomSibling
+        ? ("aibom" as const)
+        : null;
+  if (!imageKey) return null;
+  // The panel adds the download button and layer progress to the same notice, so
+  // the wait happens before the scan rather than inside it.
+  return <SiblingImagePanel imageKey={imageKey} />;
 }
 
 /** Whether a HuggingFace credential reached this container, which decides
@@ -434,9 +435,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           {/* Deep CVE runs via a sibling container here, so the first run pulls
               the (large) deep-cve image — say so only once the toggle is on. */}
           {deepCve && capabilities.deepCveSibling && (
-            <div className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
-              {t("source.siblingPullNotice")}
-            </div>
+            <SiblingImagePanel imageKey="deep-cve" />
           )}
         </div>
       )}

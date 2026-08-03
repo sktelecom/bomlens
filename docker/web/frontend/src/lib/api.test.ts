@@ -22,6 +22,7 @@ import {
   type DoneEvent,
   type ScanHandlers,
   type ScanParams,
+  type ScanProgress,
 } from "./api";
 
 // ---------------------------------------------------------------------------
@@ -236,12 +237,12 @@ function handlers(): ScanHandlers & {
   logs: string[];
   done: DoneEvent[];
   errors: (string | undefined)[];
-  progress: { phase: string; percent: number }[];
+  progress: ScanProgress[];
 } {
   const logs: string[] = [];
   const done: DoneEvent[] = [];
   const errors: (string | undefined)[] = [];
-  const progress: { phase: string; percent: number }[] = [];
+  const progress: ScanProgress[] = [];
   return {
     logs, done, errors, progress,
     onLog: (l) => logs.push(l),
@@ -301,8 +302,26 @@ describe("startScan", () => {
     const es = FakeEventSource.last!;
     es.emit("progress", JSON.stringify({ phase: "cve-db", percent: 42 }));
     es.emit("progress", "garbage");
-    es.emit("progress", JSON.stringify({ phase: "x" })); // no percent
+    es.emit("progress", JSON.stringify({ phase: "x" })); // neither percent nor layers
     expect(h.progress).toEqual([{ phase: "cve-db", percent: 42 }]);
+  });
+
+  // The progress channel carries two shapes: a percent (firmware CVE DB) and
+  // layer counts (an image pull, which has no percent to report because a
+  // non-TTY `docker pull` prints none). Widening it for the second must not
+  // drop the first — the filter used to require a numeric percent, so a careless
+  // widening either loses the CVE-DB bar or lets a malformed event render as 0%.
+  it("forwards layer-count progress alongside percent progress", () => {
+    const h = handlers();
+    startScan(PARAMS, h);
+    const es = FakeEventSource.last!;
+    es.emit("progress", JSON.stringify({ phase: "pull", complete: 2, total: 5 }));
+    es.emit("progress", JSON.stringify({ phase: "cve-db", percent: 7 }));
+    es.emit("progress", JSON.stringify({ phase: "pull" })); // no counts either
+    expect(h.progress).toEqual([
+      { phase: "pull", complete: 2, total: 5 },
+      { phase: "cve-db", percent: 7 },
+    ]);
   });
 
   it("delivers the done event and closes the stream", () => {

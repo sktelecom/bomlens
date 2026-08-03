@@ -32,6 +32,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import threading
 import urllib.parse
 import zipfile
 from datetime import datetime
@@ -2212,7 +2213,12 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # shows up in the live log rather than as a silent stall.
     if not _sibling_image_present(image):
         on_log("[ui] pulling %s (first run is large; one-time download)..." % image)
-        _stream_cmd(["docker", "pull", image], on_log)
+        # Through the same reader the pre-pull endpoint uses, so this path also
+        # reports layer counts instead of stalling with only raw pull lines.
+        _pull_image(image, on_log,
+                    on_progress=(lambda snap: on_progress({"phase": "pull", **snap}))
+                    if on_progress is not None else None,
+                    cancel=cancel)
 
     on_log("[ui] launching %s in a sibling container (%s)..." % (mode.lower(), image))
     # Pass the assembled env (os.environ + extra_env) to the docker-run process so
@@ -2267,7 +2273,7 @@ def convert_bom_to_spdx(bom_path, spdx_path, stable, on_log):
         return -1
     if not _sibling_image_present(image):
         on_log("[ui] pulling %s (one-time download)..." % image)
-        _stream_cmd(["docker", "pull", image], on_log)
+        _pull_image(image, on_log)
     return _stream_cmd([
         "docker", "run", "--rm",
         "--volumes-from", self_cid,
@@ -2275,6 +2281,184 @@ def convert_bom_to_spdx(bom_path, spdx_path, stable, on_log):
         "--entrypoint", "bash", image,
         "/usr/local/lib/sbom/convert-to-spdx.sh",
     ] + args, on_log)
+
+
+# --------------------------------------------------------------------------
+# Pulling a per-feature image, with progress
+#
+# Firmware analysis, AI-model SBOMs and deep CVE matching each live in their own
+# image rather than in this one: the firmware tools are GPL-family, and the AI
+# dependencies are heavy. Those images are pulled on the feature's first use,
+# which used to mean a multi-minute stall in the middle of a scan with only raw
+# `docker pull` lines to show for it. The endpoints below let the UI pull one
+# ahead of time and show how far it has got, and the same progress reading is
+# applied to the first-use pull so that path is no longer a silent wait either.
+#
+# The keys are a closed set. A request names a feature, never an image reference:
+# the reference comes from this server's own environment, so no request can make
+# the daemon pull something else.
+# --------------------------------------------------------------------------
+def _pullable_images():
+    """Feature key -> image reference, from server env only.
+
+    `scanner` is deliberately absent. SPDX conversion falls back to the scanner
+    image, but every published image is built from the one Dockerfile and carries
+    syft, so spdx_convert_capable() is true in every shipped arrangement and the
+    fallback never runs. A key with no arrangement that reaches it would be UI
+    that cannot be tested; the set is closed, so it can be added if one appears.
+    """
+    return {"firmware": FIRMWARE_IMAGE, "aibom": AIBOM_IMAGE, "deep-cve": DEEP_CVE_IMAGE}
+
+
+# A layer status line from `docker pull`. Ported from electron/lib/pullprogress.mjs
+# (the desktop app's start screen), which the frontend cannot import: the SPA and
+# the Electron app are separate packages, and the line arrives here as a child
+# process line anyway. The two must agree, so both are tested against the same
+# captured transcript (tests/fixtures/docker-pull-nontty.txt).
+#
+# Only layer counts are reported. A non-TTY `docker pull` prints no byte totals
+# and no percentage — those belong to the TTY progress bar — so a percentage here
+# would be invented. Total layers are counted from every layer id that appears,
+# not from "Pulling fs layer" lines, because docker omits that line for layers it
+# already has. Completion is decided by the pull's exit code, not by the count.
+_PULL_LAYER_RE = re.compile(r"^([0-9a-f]{6,}):\s+(.+?)\s*$")
+_PULL_DONE_STATUSES = ("Pull complete", "Already exists")
+
+
+class PullProgress:
+    """Accumulates layer statuses. feed() returns a snapshot only when the count
+    changed, so a caller can emit one event per real change."""
+
+    def __init__(self):
+        self._layers = {}
+        self._last = ""
+
+    def snapshot(self):
+        complete = sum(1 for st in self._layers.values() if st in _PULL_DONE_STATUSES)
+        return {"complete": complete, "total": len(self._layers)}
+
+    def feed(self, line):
+        m = _PULL_LAYER_RE.match(str(line))
+        if m is None:
+            return None
+        # A TTY progress bar can reach us when someone pipes a console log in;
+        # drop the "[===>   ] 12MB/120MB" tail and keep the status name.
+        status = re.sub(r"\s*\[.*$", "", m.group(2)).strip()
+        self._layers[m.group(1)] = status
+        snap = self.snapshot()
+        key = "%d/%d" % (snap["complete"], snap["total"])
+        if key == self._last:
+            return None
+        self._last = key
+        return snap
+
+
+# Why a pull failed, as a key the UI translates. Ported from the same module.
+# Order matters: the specific signals (disk, name resolution) are checked before
+# the general ones, because a proxy performing TLS interception shows up as x509
+# and a corporate proxy refusing the connection as 403 or proxyconnect.
+def classify_pull_failure(log_tail="", reason="exit"):
+    if reason == "timeout":
+        return "timeout"
+    s = str(log_tail)
+    if re.search(r"no space left on device|disk quota exceeded", s, re.I):
+        return "disk"
+    if re.search(r"no such host|dial tcp: lookup|name resolution"
+                 r"|Temporary failure in name resolution", s, re.I):
+        return "dns"
+    if re.search(r"proxyconnect|x509|certificate signed by unknown authority"
+                 r"|certificate is not trusted|\b403\b|Forbidden|tls: (?:bad|failed)", s, re.I):
+        return "proxy"
+    if re.search(r"unauthorized|authentication required|pull access denied|denied:", s, re.I):
+        return "auth"
+    return "unknown"
+
+
+# How much of the pull log to keep for classify_pull_failure. A full pull log can
+# run to megabytes.
+_PULL_LOG_TAIL = 4096
+
+# One pull per image at a time. ThreadingHTTPServer serves each request on its own
+# thread, so without this two clicks would run two pulls of the same image. The
+# daemon de-duplicates the layer downloads, so nothing breaks either way — there
+# is simply no reason to run it twice.
+_pull_lock = threading.Lock()
+_pull_active = set()
+
+
+def _pull_image(image, on_log, on_progress=None, cancel=None):
+    """Pull an image, reporting layer progress. Returns (exit code, failure key).
+
+    The failure key is None on success. Log lines that are not layer status lines
+    pass through to on_log, so the existing live-log behaviour is unchanged for
+    anything the progress reader does not recognise.
+    """
+    if not _valid_image_ref(image):
+        on_log("[ui] refusing to pull: invalid image reference")
+        return -1, "unknown"
+    prog = PullProgress()
+    tail = []
+
+    def line(text):
+        tail.append(text)
+        if sum(len(x) for x in tail) > _PULL_LOG_TAIL:
+            del tail[0]
+        snap = prog.feed(text) if on_progress is not None else None
+        if snap is not None:
+            on_progress(snap)
+        else:
+            on_log(text)
+
+    code = _stream_cmd(["docker", "pull", image], line, cancel=cancel)
+    if code == 0:
+        return 0, None
+    return code, classify_pull_failure("\n".join(tail), "exit")
+
+
+# Compressed download size for an image, read from the registry manifest, or None.
+#
+# This is the number of bytes the user waits for, which is what they need before
+# deciding to start. It is NOT the installed size: the manifest carries compressed
+# layer sizes only, and the on-disk size after extraction is not derivable from
+# them. Measured on the published images: firmware downloads 0.42 GB and installs
+# 1.81 GB, the AI image downloads 3.76 GB and installs 10.8 GB. So the UI says
+# what the download is and does not guess at the rest.
+#
+# Cached because it is a network round trip; the value for a tag changes only when
+# the tag is republished, and a stale value costs a wrong size estimate, not a
+# wrong action.
+_download_size_cache = {}
+
+
+def _image_download_bytes(image):
+    if image in _download_size_cache:
+        return _download_size_cache[image]
+    size = None
+    if _valid_image_ref(image) and shutil.which("docker"):
+        try:
+            r = subprocess.run(["docker", "manifest", "inspect", "--verbose", image],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=30)
+            if r.returncode == 0:
+                data = json.loads(r.stdout.decode("utf-8", "replace"))
+                entries = data if isinstance(data, list) else [data]
+                for e in entries:
+                    desc = (e.get("Descriptor") or {})
+                    plat = (desc.get("platform") or {})
+                    # A multi-arch tag lists every platform; the one that matters is
+                    # the one this daemon would pull. amd64/linux is the published
+                    # platform (the registry publishes amd64 only).
+                    if plat and plat.get("architecture") not in (None, "amd64"):
+                        continue
+                    layers = ((e.get("SchemaV2Manifest") or {}).get("layers") or [])
+                    total = sum(int(l.get("size") or 0) for l in layers)
+                    if total > 0:
+                        size = total
+                        break
+        except (OSError, ValueError, subprocess.SubprocessError):
+            size = None
+    _download_size_cache[image] = size
+    return size
 
 
 def _sibling_image_present(image):
@@ -2395,6 +2579,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_scan(urllib.parse.parse_qs(parsed.query))
         elif path == "/scan-stream":
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
+        elif path == "/image-status":
+            self._image_status(urllib.parse.parse_qs(parsed.query))
+        elif path == "/pull-stream":
+            self._pull_stream(urllib.parse.parse_qs(parsed.query))
         else:
             self._serve_static(path)
 
@@ -2652,6 +2840,77 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    # ---- per-feature image: status and pull (SSE) ----
+    #
+    # Kept out of /capabilities on purpose. That response is fetched on every app
+    # load and adds no subprocess calls today; and its value would go stale the
+    # moment a pull finished, since nothing re-fetches it.
+    def _image_status(self, qs):
+        key = ((qs.get("image") or [""])[0]).strip()
+        images = _pullable_images()
+        if key not in images:
+            self._send(400, json.dumps({"error": "unknown image"}))
+            return
+        image = images[key]
+        out = {"image": image, "present": _sibling_image_present(image)}
+        size = _image_download_bytes(image) if not out["present"] else None
+        if size:
+            out["downloadBytes"] = size
+        self._send(200, json.dumps(out))
+
+    def _pull_stream(self, qs):
+        key = ((qs.get("image") or [""])[0]).strip()
+        images = _pullable_images()
+        if key not in images:
+            self._send(400, json.dumps({"error": "unknown image"}))
+            return
+        # The reference is this server's own env value for the requested feature,
+        # never the request string.
+        image = images[key]
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        disconnected = [False]
+
+        def sse(event, payload):
+            try:
+                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                disconnected[0] = True
+
+        if _sibling_image_present(image):
+            sse("done", json.dumps({"ok": True, "image": image, "alreadyPresent": True}))
+            return
+
+        with _pull_lock:
+            if image in _pull_active:
+                sse("busy", json.dumps({"image": image}))
+                sse("done", json.dumps({"ok": False, "image": image, "reason": "busy"}))
+                return
+            _pull_active.add(image)
+        try:
+            sse("log", json.dumps("[ui] pulling %s ..." % image))
+            # Closing the stream stops the pull. Layers already fetched stay in the
+            # daemon's cache, so pressing the button again resumes rather than
+            # starting over.
+            code, reason = _pull_image(
+                image,
+                lambda ln: sse("log", json.dumps(ln)),
+                on_progress=lambda snap: sse("progress", json.dumps({"phase": "pull", **snap})),
+                cancel=lambda: disconnected[0],
+            )
+        finally:
+            with _pull_lock:
+                _pull_active.discard(image)
+        if code == 0:
+            sse("done", json.dumps({"ok": True, "image": image}))
+        else:
+            sse("done", json.dumps({"ok": False, "image": image, "reason": reason}))
 
     # ---- scan stream (SSE) ----
     def _scan_stream(self, qs):
