@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.10.1] - 2026-08-04
+
 ### Added
 
 - Firmware analysis opens more of what an image carries. Besides a container image store, a second filesystem with its own package database and an interpreter's installed library set are now cataloged when they sit beside the root filesystem rather than inside it. Each is recognized by the record of what is installed in it, not by a directory name. Set `FW_EXTRA_ROOTS=false` to read only the root filesystem.
@@ -532,7 +534,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.1...HEAD
+[v1.10.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.1
+[v1.10.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.0
 [v1.9.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.9.0
 [v1.8.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.3
 [v1.8.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.8.2
