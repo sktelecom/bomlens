@@ -1804,6 +1804,93 @@ else
     rm -rf "$IPA"
 fi
 
+echo "== the dependency graph survives the merge instead of being dropped =="
+
+# syft reads what each package depends on out of the package database and writes
+# it beside the components. The merge took component arrays only, so the graph
+# never reached the SBOM and the conformance report reported "0 edges" as a
+# required failure — which read as a limit of reading an unpacked image and was
+# in fact this. Measured on one root filesystem: 8,158 components, 317 of them
+# with a dependency recorded.
+CARRY="$ROOT_DIR/docker/lib/carry-dependencies.py"
+if [ ! -f "$CARRY" ]; then
+    fail "carry-dependencies.py is missing" "the SBOM ships without a dependency graph"
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+    DEPW="$(mktemp -d)"
+    cat > "$DEPW/merged.json" <<'EOF'
+[{"bom-ref":"kept","type":"library","name":"openssl","version":"3.0.1"},
+ {"bom-ref":"survivor","type":"library","name":"zlib","version":"1.3"},
+ {"bom-ref":"lonely","type":"library","name":"solo","version":"1.0"}]
+EOF
+    # What a pass produced before the merge: one reference that survives as it is,
+    # one whose record was merged into another, and one whose component is gone.
+    cat > "$DEPW/src.json" <<'EOF'
+{"components":[
+  {"bom-ref":"kept","type":"library","name":"openssl","version":"3.0.1"},
+  {"bom-ref":"merged-away","type":"library","name":"zlib","version":"1.3"},
+  {"bom-ref":"dropped","type":"library","name":"gone","version":"9.9"}],
+ "dependencies":[
+  {"ref":"kept","dependsOn":["merged-away","dropped"]},
+  {"ref":"dropped","dependsOn":["kept"]},
+  {"ref":"merged-away","dependsOn":[]}]}
+EOF
+    out="$(python3 "$CARRY" "$DEPW/merged.json" "$DEPW/src.json" 2>/dev/null)"
+
+    got="$(printf '%s' "$out" | jq -r '[.[] | "\(.ref)->\(.dependsOn | join("+"))"] | sort | join(",")')"
+    if [ "$got" = "kept->survivor" ]; then
+        pass "a reference is followed to the record that survived the merge"
+    else
+        fail "the graph was not carried across correctly" "got: ${got:-nothing}"
+    fi
+
+    # A reference to a component that is not in the SBOM makes the document
+    # invalid for a reader that resolves them — worse than a missing edge.
+    if printf '%s' "$out" | jq -e 'all(.[]; all(.dependsOn[]; . != "dropped"))' >/dev/null \
+       && printf '%s' "$out" | jq -e 'all(.[]; .ref != "dropped")' >/dev/null; then
+        pass "an edge whose endpoint did not survive is dropped, not left dangling"
+    else
+        fail "a dangling reference reached the dependency graph"
+    fi
+
+    # Two records that turned out to be one must not become a self-loop.
+    cat > "$DEPW/self.json" <<'EOF'
+{"components":[
+  {"bom-ref":"one","type":"library","name":"openssl","version":"3.0.1"},
+  {"bom-ref":"two","type":"library","name":"openssl","version":"3.0.1"}],
+ "dependencies":[{"ref":"one","dependsOn":["two"]}]}
+EOF
+    if [ "$(python3 "$CARRY" "$DEPW/merged.json" "$DEPW/self.json" 2>/dev/null | jq 'length')" = "0" ]; then
+        pass "two records of one component do not become a dependency on itself"
+    else
+        fail "the merge produced a self-referencing edge"
+    fi
+
+    # More than one pass contributes, and an edge named by both is one edge.
+    cat > "$DEPW/second.json" <<'EOF'
+{"components":[{"bom-ref":"kept","type":"library","name":"openssl","version":"3.0.1"},
+               {"bom-ref":"survivor","type":"library","name":"zlib","version":"1.3"}],
+ "dependencies":[{"ref":"kept","dependsOn":["survivor"]}]}
+EOF
+    n=$(python3 "$CARRY" "$DEPW/merged.json" "$DEPW/src.json" "$DEPW/second.json" 2>/dev/null \
+        | jq '[.[].dependsOn[]] | length')
+    if [ "$n" = "1" ]; then
+        pass "the same edge from two passes is reported once"
+    else
+        fail "an edge was duplicated across passes" "got $n"
+    fi
+    rm -rf "$DEPW"
+fi
+
+# The graph has to reach the document, not just be computed.
+if grep -q 'dependencies: \$deps\[0\]' "$SCRIPT"; then
+    pass "the SBOM carries the dependency graph it computed"
+else
+    fail "the computed dependency graph is not written to the SBOM" \
+         "the conformance report would keep reporting 0 edges"
+fi
+
 echo "== a version is compared as a number, and an uncomparable one matches nothing =="
 
 # The CPE index records version bounds as plain numbers, while projects write

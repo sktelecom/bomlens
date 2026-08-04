@@ -855,8 +855,27 @@ NTOTAL=$(jq 'length' "$WORK/merged.json")
 NPRESENCE=$(jq '[.[] | select(any(.properties[]?;
     .name == "bomlens:evidenceGrade" and .value == "presence-only"))] | length' "$WORK/merged.json")
 
+# What each package depends on is read out of the package database by syft and
+# written beside the components. The merge takes component arrays only, so the
+# graph was being dropped and the conformance report read the result as a limit
+# of reading an unpacked image. Carried across here, with every reference followed
+# to the record that survived the merge.
+DEPS_JSON="$WORK/dependencies.json"
+echo '[]' > "$DEPS_JSON"
+if command -v python3 >/dev/null 2>&1 \
+   && [ -f "$(dirname "$0")/carry-dependencies.py" ]; then
+    # shellcheck disable=SC2046
+    if python3 "$(dirname "$0")/carry-dependencies.py" "$WORK/merged.json" \
+            "$PKG_SBOM" $(find "$WORK/extra" -name '*.cdx.json' 2>/dev/null | sort) \
+            > "$WORK/deps-out.json" 2>/dev/null \
+       && jq -e 'type == "array"' "$WORK/deps-out.json" >/dev/null 2>&1; then
+        cp "$WORK/deps-out.json" "$DEPS_JSON"
+    fi
+fi
+
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
+    --slurpfile deps "$DEPS_JSON" \
     --arg name "$(basename "$FW")" \
     --arg version "$VERSION" \
     --arg desc "$FILE_INFO" \
@@ -875,7 +894,8 @@ jq -n \
     component: { type: "firmware", name: $name, version: $version, description: $desc }
   },
   components: $comps[0]
-}' > "$OUTPUT"
+}
++ (if ($deps[0] | length) > 0 then {dependencies: $deps[0]} else {} end)' > "$OUTPUT"
 
 echo "[firmware] SBOM written: $OUTPUT (components=${NTOTAL}: packages=${NPKG}, binaries=${NBIN})"
 # Reported separately from `packages`, and before dedupe, because the two numbers
