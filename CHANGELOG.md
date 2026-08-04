@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A component whose release could not be read is no longer reported as if its version were known. The scanner writes `UNKNOWN` in that case — a kernel module with no version in its metadata, a Go binary built without module information — and carrying it through made the conformance report count those components as versioned. The field is removed now and the component is marked as present with its version not established. On one switch OS this moves 3,581 components out of the "version known" count, where they never belonged. Which components are reported, and which vulnerabilities, is unchanged.
+
 - A firmware SBOM now carries the dependency graph. What each installed package depends on is read out of the package database, but the step that assembles the SBOM from several identification passes took only the components, so the graph was dropped and the conformance report failed its transitive-dependency row on every firmware scan. References are followed to the record that survived the merge, and an edge whose endpoint did not survive is dropped rather than left pointing at nothing. The SPDX export carries it too.
 
 ## [v1.10.1] - 2026-08-04

@@ -1274,6 +1274,77 @@ bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-cf" "sup
 [ -f "$WORK/spdx3-cf_conformance.json" ] && jq -e '.checks|length>0' "$WORK/spdx3-cf_conformance.json" >/dev/null 2>&1 \
     && pass "SPDX 3.0 produces a conformance report" || fail "SPDX 3.0 conformance not produced"
 
+echo "== UNKNOWN is not carried as if it were a version =="
+
+# syft writes `UNKNOWN` where it recognised a component but could not read what
+# release it is — a kernel module with no version in its modinfo, a Go binary
+# built without module metadata. Carried through, the conformance check that
+# measures name-and-version coverage counts the component as versioned, so a scan
+# that knows the release of none of its 3,575 kernel modules reported full
+# coverage for them.
+cat > "$WORK/unknown-ver.cdx.json" <<'UVEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"firmware","name":"fw","version":"1"}},
+ "components":[
+  {"type":"library","name":"3c59x","version":"UNKNOWN","purl":"pkg:generic/3c59x",
+   "cpe":"cpe:2.3:a:x:3c59x:*:*:*:*:*:*:*:*"},
+  {"type":"library","name":"lowercase","version":"unknown"},
+  {"type":"library","name":"real","version":"1.2.3","purl":"pkg:npm/real@1.2.3"},
+  {"type":"library","name":"already-graded","version":"UNKNOWN",
+   "properties":[{"name":"bomlens:evidenceGrade","value":"elf-presence"}]}]}
+UVEOF
+bash "$LIB/normalize-sbom.sh" "$WORK/unknown-ver.cdx.json" >/dev/null 2>&1
+
+if jq -e '[.components[] | select(.version != null and (.version | ascii_downcase) == "unknown")] | length == 0' \
+   "$WORK/unknown-ver.cdx.json" >/dev/null; then
+    pass "a placeholder version is removed rather than shipped as a version"
+else
+    fail "UNKNOWN is still carried in a version field"
+fi
+
+# Present, release not established — the grade the rest of the pipeline already
+# uses for exactly this.
+got=$(jq -r '[.components[] | select(.name == "3c59x") | .properties[]
+    | select(.name == "bomlens:evidenceGrade") | .value] | join(",")' "$WORK/unknown-ver.cdx.json")
+if [ "$got" = "presence-only" ]; then
+    pass "the component is marked as present with no version established"
+else
+    fail "the component lost its version without saying why" "grade: ${got:-none}"
+fi
+
+# The identifiers never held the placeholder and must survive untouched.
+got=$(jq -r '[.components[] | select(.name == "3c59x") | .purl, .cpe] | join(" ")' "$WORK/unknown-ver.cdx.json")
+if [ "$got" = "pkg:generic/3c59x cpe:2.3:a:x:3c59x:*:*:*:*:*:*:*:*" ]; then
+    pass "the identifiers the component does carry are left alone"
+else
+    fail "an identifier was changed along with the version" "got: $got"
+fi
+
+if jq -e '[.components[] | select(.name == "real") | .version] == ["1.2.3"]' \
+   "$WORK/unknown-ver.cdx.json" >/dev/null; then
+    pass "a real version is untouched"
+else
+    fail "a real version was removed"
+fi
+
+# A pass that already said how it identified the component keeps its own word.
+got=$(jq -r '[.components[] | select(.name == "already-graded") | .properties[]
+    | select(.name == "bomlens:evidenceGrade") | .value] | join(",")' "$WORK/unknown-ver.cdx.json")
+if [ "$got" = "elf-presence" ]; then
+    pass "a grade an identification pass already recorded is not overwritten"
+else
+    fail "an existing evidence grade was replaced" "got: $got"
+fi
+
+# The point of the change: coverage now counts what is actually known.
+bash "$LIB/validate-sbom.sh" "$WORK/unknown-ver.cdx.json" "$WORK/uv" "supplier" >/dev/null 2>&1
+got=$(jq -r '.checks[] | select(.id=="name-version") | .detail' "$WORK/uv_conformance.json")
+if [ "$got" = "1/4" ]; then
+    pass "name-and-version coverage counts only the versions that are known"
+else
+    fail "coverage still counts the placeholder as a version" "detail: $got"
+fi
+
 echo "== SPDX export: the containers a firmware holds reach the SPDX file too =="
 
 # syft's converter writes a package for what it counts as software and drops the

@@ -97,6 +97,28 @@ FILENAME_FILTER='(.components) |= (if type=="array" then map(
 # ecosystems where multiple versions of one package legitimately coexist
 # (npm/maven diamond deps) are untouched; the $used graph guard keeps any component
 # that is actually referenced. Also strips the dropped refs from the dependency graph.
+# `UNKNOWN` is not a version. syft writes it where it recognised a component but
+# could not read what release it is — a kernel module with no version in its
+# modinfo, a Go binary built without module metadata. Carried through, it reads as
+# an answer: the conformance check that measures name-and-version coverage counts
+# the component as versioned, so a scan that knows the release of none of its 3,575
+# kernel modules reports full coverage for them. Anything that compares versions
+# has the same problem, since `UNKNOWN` compares as a string like any other.
+#
+# The field is removed and the component marked with the grade the rest of the
+# pipeline already uses for this: present, version not established. Nothing is
+# lost — the component still ships, and the identifiers it does carry (the purl
+# and CPE never contain the placeholder) are untouched.
+UNKNOWN_VERSION_FIX='
+(.components) |= (if type=="array" then map(
+  if ((.version // "") | ascii_downcase) == "unknown"
+  then del(.version)
+       | (if any(.properties[]?; .name == "bomlens:evidenceGrade")
+          then . else .properties = ((.properties // [])
+            + [{name: "bomlens:evidenceGrade", value: "presence-only"}]) end)
+  else . end)
+else . end)'
+
 PYRANGE_DEDUP='
   ( [ .components[]?
       | select(((.purl // "") | startswith("pkg:pypi/"))
@@ -344,7 +366,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
