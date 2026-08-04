@@ -47,6 +47,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | Yocto build directory | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | same + conformance report |
 | Build artifact (`.jar`, `.deb`, …) | BINARY | `$SBOM --target app.jar --all --generate-only` | same |
 | Installer (`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | same |
+| Mobile app (`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | same |
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 | AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 

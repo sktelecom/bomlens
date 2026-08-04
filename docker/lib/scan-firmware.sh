@@ -592,6 +592,23 @@ if [ "${FW_ELF_PRESENCE:-true}" != "false" ] && command -v readelf >/dev/null 2>
 fi
 
 # --------------------------------------------------------
+# ③.65 The libraries an app package declares about itself.
+# --------------------------------------------------------
+# An app written in Kotlin or Java alone carries no package database and no native
+# library, so every source above reads nothing out of it. Gradle leaves the list
+# anyway, one file per library under META-INF, and that is a record of what was
+# built in rather than a string found in a binary.
+ANDROID_COMPS="$WORK/android-comps.json"
+echo '[]' > "$ANDROID_COMPS"
+if [ "${FW_ANDROID_LIBS:-true}" != "false" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$(dirname "$0")/identify-android-libraries.py" "$ROOTFS" \
+        > "$WORK/android-out.json" || echo '[]' > "$WORK/android-out.json"
+    if [ -s "$WORK/android-out.json" ] && jq -e 'type == "array"' "$WORK/android-out.json" >/dev/null 2>&1; then
+        cp "$WORK/android-out.json" "$ANDROID_COMPS"
+    fi
+fi
+
+# --------------------------------------------------------
 # ③.7 Versions spelled in a way cve-bin-tool's checkers do not match.
 # --------------------------------------------------------
 # Its checkers want a fixed string and regex per component: a three-digit
@@ -695,7 +712,7 @@ fi
 # matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
       --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" \
-      --slurpfile e "$EXTRA_COMPS" '
+      --slurpfile e "$EXTRA_COMPS" --slurpfile f "$ANDROID_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
@@ -751,7 +768,7 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     # The extra roots come last so that a record from the rootfs stays the base of
     # a merged group: the rootfs is the filesystem the device actually boots, and
     # its judgement is the one to keep when two roots describe one component.
-    ($a[0] + $b[0] + $c[0] + $d[0] + $e[0]) as $with_presence
+    ($a[0] + $b[0] + $c[0] + $d[0] + $f[0] + $e[0]) as $with_presence
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.

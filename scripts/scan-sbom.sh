@@ -484,7 +484,7 @@ is_firmware() {
 # app package that is almost nothing: the components are inside, not in the outer
 # file. Measured on a desktop media player's own downloads — the Windows
 # installer yields 1 component read as a file and 39 once unpacked, the macOS disk
-# image 0 and 25.
+# image 0 and 25 — and on an Android app, 0 and 54.
 #
 # Unpacking is the firmware path (unblob and the identifiers behind it), so these
 # formats are routed there when that image is available. The list is closed and
@@ -500,7 +500,7 @@ needs_unpacking() {
     local f="$1" lower magic
     lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
     case "$lower" in
-        *.exe|*.msi|*.dmg) : ;;
+        *.exe|*.msi|*.dmg|*.apk|*.ipa) : ;;
         *) return 1 ;;
     esac
     command -v file >/dev/null 2>&1 || return 1
@@ -511,6 +511,13 @@ needs_unpacking() {
         # macOS disk images: the payload is compressed, and `file` names the
         # compression rather than the container.
         *"bzip2 compressed"*|*"zlib compressed"*|*"Apple Disk Image"*) return 0 ;;
+        # Mobile app packages are zip containers. `file` calls an app package a
+        # zip or, when it reads the manifest first, a Java archive. The extension
+        # is what says this zip is an app; the magic only confirms it is a zip and
+        # not something renamed to look like one. Measured on one Android app: 0
+        # components read as a single file, 54 once unpacked.
+        *"Zip archive"*|*"Java archive"*)
+            case "$lower" in *.apk|*.ipa) return 0 ;; esac ;;
     esac
     return 1
 }
@@ -954,12 +961,16 @@ elif [ -n "$TARGET" ]; then
             # The unpacking path needs the opt-in firmware image. When it is here,
             # use it; when it is not, read the file as before and say what was and
             # was not looked at, so a near-empty result is not read as the answer.
+            case "$(printf '%s' "$TARGET" | tr '[:upper:]' '[:lower:]')" in
+                *.apk|*.ipa) packed_kind="an app package" ;;
+                *)           packed_kind="a packaged installer" ;;
+            esac
             if docker image inspect "$FIRMWARE_IMAGE" >/dev/null 2>&1; then
-                echo "[INFO] $(basename "$TARGET") is a packaged installer; unpacking it to read what is inside."
+                echo "[INFO] $(basename "$TARGET") is $packed_kind; unpacking it to read what is inside."
                 MODE="FIRMWARE"
             else
                 MODE="BINARY"
-                echo "[WARN] $(basename "$TARGET") is a packaged installer. It was read as a single file"
+                echo "[WARN] $(basename "$TARGET") is $packed_kind. It was read as a single file"
                 echo "       without unpacking, so only components with a version string in the outer"
                 echo "       file can be found. Unpacking needs the firmware image:"
                 echo "         docker pull $FIRMWARE_IMAGE"

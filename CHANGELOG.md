@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Firmware analysis opens more of what an image carries. Besides a container image store, a second filesystem with its own package database and an interpreter's installed library set are now cataloged when they sit beside the root filesystem rather than inside it. Each is recognized by the record of what is installed in it, not by a directory name. Set `FW_EXTRA_ROOTS=false` to read only the root filesystem.
 
+- An Android or iOS app package is now unpacked and read instead of being treated as one file, and the libraries an Android app declares about itself are identified. Gradle records each library that ships in the package under `META-INF`, one file per library holding its version, which gives a Maven coordinate the vulnerability step can use. Pass the `.apk` or `.ipa` as the target; the opt-in firmware image does the unpacking, and without it the scan says so.
+
 ### Fixed
 
 - An SPDX export of a firmware scan now carries the container images the device holds and the distribution it runs. The converter writes a package only for what it counts as software, so both were absent, and so was the record of which container each package belongs to. They are packages in the SPDX file now, and the membership is a `CONTAINS` relationship. Which software the two formats list is unchanged.

@@ -291,7 +291,7 @@ fi
 merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                 --slurpfile b "$FIX/merge-bin-comps.json" \
                 --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-                --slurpfile e <(echo '[]') "$merge_filter")"
+                --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
 
 n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
 if [ "$n" = "1" ]; then
@@ -368,7 +368,7 @@ fi
 store_merge="$(jq -n \
     --slurpfile a "$FIX/merge-pkg-comps.json" \
     --slurpfile b <(echo '[]') --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-    --slurpfile e '/dev/stdin' "$merge_filter" <<'EOF'
+    --slurpfile e '/dev/stdin' --slurpfile f <(echo '[]') "$merge_filter" <<'EOF'
 [{"type":"library","name":"openssl","version":"1.0.2h",
   "purl":"pkg:deb/debian/openssl@1.0.2h?distro=debian-13",
   "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
@@ -434,7 +434,7 @@ with_presence="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                        --slurpfile b "$FIX/merge-bin-comps.json" \
                        --slurpfile c "$FIX/elf-presence-comps.json" \
                        --slurpfile d <(echo '[]') \
-                       --slurpfile e <(echo '[]') "$merge_filter")"
+                       --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_presence" | jq -e 'any(.[]; .name == "net-snmp")' >/dev/null; then
     pass "a component only the ELF structure proves is carried into the SBOM"
@@ -635,7 +635,7 @@ with_verstr="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                      --slurpfile b "$FIX/merge-bin-comps.json" \
                      --slurpfile c "$FIX/elf-presence-comps.json" \
                      --slurpfile d "$FIX/version-string-comps.json" \
-                     --slurpfile e <(echo '[]') "$merge_filter")"
+                     --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_verstr" | jq -e '
       any(.[]; .name == "net-tools" and .version == "1.60")' >/dev/null; then
@@ -698,7 +698,7 @@ forms_versioned="$(jq -n '[
 forms_out="$(jq -n --slurpfile a <(echo "$forms_versioned") \
                    --slurpfile b <(echo "$forms_in") \
                    --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-                   --slurpfile e <(echo '[]') "$merge_filter")"
+                   --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
 
 for pair in expat:libexpat zstd:zstandard; do
     bare="${pair%%:*}"; full="${pair#*:}"
@@ -1613,6 +1613,82 @@ EOF
     else
         fail "the CPE index input no longer holds what it needs" "offered: ${offered:-nothing}"
     fi
+fi
+
+echo "== an app package's own record of its libraries is read =="
+
+# An app written in Kotlin or Java alone carries no package database and no
+# native library, so every other identification pass reads nothing out of it.
+# Measured on one app: 964 files unpacked, 0 components — while the package
+# carried a list of 55 libraries the whole time, one file each under META-INF.
+ANDROID="$ROOT_DIR/docker/lib/identify-android-libraries.py"
+if [ ! -f "$ANDROID" ]; then
+    fail "identify-android-libraries.py is missing" "an app package yields nothing"
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+    APP="$(mktemp -d)"
+    mkdir -p "$APP/META-INF" "$APP/assets/META-INF" "$APP/res"
+    printf '1.8.0\n' > "$APP/META-INF/androidx.activity_activity-ktx.version"
+    printf '1.7.0'   > "$APP/META-INF/androidx.appcompat_appcompat.version"
+    # Gradle writes its own task description here when a build never resolves the
+    # value. Shipping that as a version is worse than leaving the library out.
+    printf "task ':arch:core:core-runtime:writeVersionFile' property 'version'\n" \
+        > "$APP/META-INF/androidx.arch.core_core-runtime.version"
+    # No `_`, so there is no artifact to name.
+    printf '2.0\n' > "$APP/META-INF/nogroup.version"
+    # Same file name, somewhere that is not the record Gradle writes.
+    printf '9.9\n' > "$APP/res/androidx.fake_fake.version"
+    out="$(python3 "$ANDROID" "$APP" 2>/dev/null)"
+
+    got="$(printf '%s' "$out" | jq -r '[.[] | .purl] | sort | join(",")')"
+    want="pkg:maven/androidx.activity/activity-ktx@1.8.0,pkg:maven/androidx.appcompat/appcompat@1.7.0"
+    if [ "$got" = "$want" ]; then
+        pass "each declared library becomes a component at its Maven coordinate"
+    else
+        fail "the package's own library list was not read" "got: ${got:-nothing}"
+    fi
+
+    if printf '%s' "$out" | jq -e 'any(.[]; .version | test("task|property")) | not' >/dev/null; then
+        pass "a file holding prose instead of a version yields no component"
+    else
+        fail "a Gradle task description was shipped as a version"
+    fi
+
+    if printf '%s' "$out" | jq -e 'any(.[]; .name == "nogroup") | not' >/dev/null; then
+        pass "a version file that names no artifact is left alone"
+    else
+        fail "a file with no artifact in its name became a component"
+    fi
+
+    # The evidence is the directory, not the file name: `META-INF` is where the
+    # build records what it put in, and a file of the same name elsewhere is not
+    # that record.
+    if printf '%s' "$out" | jq -e 'any(.[]; .name == "fake") | not' >/dev/null; then
+        pass "a version file outside META-INF is not read as a declaration"
+    else
+        fail "a file outside the build's own record was read as one"
+    fi
+
+    # The coordinate is the identifier the vulnerability step keys on, so the
+    # group has to survive the split at the first underscore.
+    got="$(printf '%s' "$out" | jq -r '[.[] | select(.name == "activity-ktx") | .group][0]')"
+    if [ "$got" = "androidx.activity" ]; then
+        pass "the group and the artifact are split at the right underscore"
+    else
+        fail "the Maven coordinate was split wrong" "group came out as $got"
+    fi
+
+    # A nested app package (an app inside an installer, an app's own bundle) keeps
+    # its record in a META-INF of its own, wherever it lands in the tree.
+    mkdir -p "$APP/inner/base/META-INF"
+    printf '1.6.8\n' > "$APP/inner/base/META-INF/androidx.compose.runtime_runtime.version"
+    if [ "$(python3 "$ANDROID" "$APP" 2>/dev/null | jq 'length')" = "3" ]; then
+        pass "a record nested deeper in the tree is read too"
+    else
+        fail "only the top-level META-INF was read"
+    fi
+    rm -rf "$APP"
 fi
 
 echo "== a version is compared as a number, and an uncomparable one matches nothing =="

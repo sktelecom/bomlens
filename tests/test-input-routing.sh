@@ -195,6 +195,37 @@ else
     pass "content decides, not the extension"
 fi
 
+# An app package holds its components inside, the same as an installer, and a
+# supplier submitting one gives the file and nothing else. Read as a single file
+# it yields nothing at all: 0 components against 54 once unpacked.
+if command -v zip >/dev/null 2>&1; then
+    mkdir -p "$WORK/apkroot/META-INF"
+    printf '1.8.0\n' > "$WORK/apkroot/META-INF/androidx.activity_activity.version"
+    (cd "$WORK/apkroot" && zip -q -r "$WORK/app.apk" .)
+    cp "$WORK/app.apk" "$WORK/app.ipa"
+    if needs_unpacking "$WORK/app.apk"; then
+        pass "an Android app package is routed to the unpacking path"
+    else
+        fail "an app package was read as a single file" \
+             "file says: $(file -b "$WORK/app.apk" 2>/dev/null)"
+    fi
+    if needs_unpacking "$WORK/app.ipa"; then
+        pass "an iOS app package is routed to the unpacking path"
+    else
+        fail "an iOS app package was read as a single file"
+    fi
+    # The extension is what says this zip is an app, so an ordinary zip must not
+    # be dragged along with it — a source archive has its own path.
+    cp "$WORK/app.apk" "$WORK/plain.zip"
+    if needs_unpacking "$WORK/plain.zip"; then
+        fail "an ordinary zip was routed to the unpacking path"
+    else
+        pass "an ordinary zip keeps the path it had"
+    fi
+else
+    echo "  SKIP: zip not available for the app package checks"
+fi
+
 # Formats that are better read as a file stay that way. An RPM measured worse
 # through the unpacking path, so it must not be caught by this rule.
 printf '\355\253\356\333\003\000\000\000' > "$WORK/pkg.rpm"
