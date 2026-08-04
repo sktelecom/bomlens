@@ -270,14 +270,40 @@ SKIP 2건은 정상이다 — SmartScreen 클릭(자동화 불가, Phase 6으로
 `taskkill` 그레이스풀 종료 미관측(컨테이너 정리는 다음 기동의 `cleanupOrphans`가
 보장하며 단위 테스트가 이를 덮는다).
 
-### Phase 6 — 수동 GUI 체크 (~15분)
+### Phase 6 — GUI 체크 (~15분)
+
+**먼저 자동화되는 것부터 걷어낸다.** 화면 검증을 통째로 수작업으로 돌리기 쉬운데,
+절반은 Playwright로 처리된다. 아래 두 가지를 먼저 돌리고 남는 것만 손으로 한다.
+
+```bash
+# (a) 시작 화면 ko/en 렌더링 — 실제 화면을 PNG로 남긴다.
+#     주의: docs/images/desktop-startup*.png(추적 파일)를 덮어쓴다.
+#     증빙만 필요하면 끝나고 git checkout -- docs/images/ 로 되돌릴 것.
+cd electron && SBOM_CAPTURE=1 npx playwright test capture
+```
+
+(b) **앱 창이 컨테이너 UI를 실제로 부르는지** — Phase 5까지의 단언은 전부
+`curl`/API 레벨이라, Electron 창이 `http://127.0.0.1:<port>`를 띄우는지는 아무도
+보지 않는다. `_electron.launch()`로 앱을 띄우고 `win.url()`이 `127.0.0.1`로 바뀔
+때까지 기다린 뒤 `win.screenshot()`을 찍으면 확인된다(첫 기동이라 Docker가 필요하고
+2~4분 걸린다). v1.10.0에서 `http://127.0.0.1:64699/` 이동과 한국어 스캔 화면
+렌더링을 확인했다.
+
+> **브라우저 자동화로 localhost를 열려 하지 말 것** — 사내 PC의 Chrome은
+> `localhost` / `127.0.0.1` / `[::1]` 어느 형태로도 로컬 UI에 붙지 못한다(오류 페이지).
+> 같은 순간 `curl`은 200을 받고, PAC 파일 첫 규칙은 `localhost`를 `DIRECT`로 명시
+> 허용하며 `InsecurePrivateNetworkRequestsAllowed=1`이다. 즉 프록시 설정 문제가
+> 아니라 Chrome 경로의 별도 보안 계층이며, **Electron은 영향을 받지 않는다.**
+> 제품 결함이 아니니 여기서 시간을 쓰지 말고 위 (b)로 검증할 것.
+
+남는 수동 항목 — 네이티브 창이라 자동화가 원천적으로 불가능하다:
 
 1. `BomLens-Setup.exe` 더블클릭 → SmartScreen "Windows가 PC를 보호했습니다" →
    **추가 정보 → 실행**이 동작하는지 (서명이 없으므로 이 경고는 정상이다)
 2. 설치 마법사 완주 — `oneClick=false`라 설치 경로를 바꿀 수 있어야 하고, 시작 메뉴
    바로가기가 생겨야 한다
 3. 앱에 실제 ZIP을 **드래그드롭** → 스캔 → NOTICE.html / txt 다운로드 버튼으로 내려받기
-4. 기본 한국어 화면 확인, `SBOM_LANG=en`으로 영어 화면 확인
+4. (위 (a)/(b)로 이미 덮인다 — 스크린샷에서 문구가 어색하거나 잘리지 않았는지만 눈으로 본다)
 5. CLI 배포 경로 — `scripts\check-setup.bat` 더블클릭이 전 항목 `[O]`로 완주하는지,
    `scripts\sbom-ui.bat` 더블클릭이 브라우저로 localhost:8080을 여는지, 결과가
    `%USERPROFILE%\sbom-output\{Project}_{Version}\`에 떨어지는지
