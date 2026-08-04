@@ -1462,23 +1462,48 @@ jq '.components += [
   {"type":"library","name":"scoped","version":"7.0.0","purl":"pkg:npm/@babel/core@7.0.0"},
   {"type":"library","name":"scoped-enc","version":"20.1.0","purl":"pkg:npm/%40types/node@20.1.0"},
   {"type":"library","name":"gin","version":"v1.8.1","purl":"pkg:golang/github.com/gin-gonic/gin@v1.8.1"},
-  {"type":"library","name":"glibc","version":"2.17","purl":"pkg:rpm/centos/glibc@2.17-317.el7?arch=x86_64"}
+  {"type":"library","name":"glibc","version":"2.17","purl":"pkg:rpm/centos/glibc@2.17-317.el7?arch=x86_64"},
+  {"type":"library","name":"noversion","version":"1.0","purl":"pkg:npm/noversion"}
 ]' "$FIX/good-cyclonedx.json" > "$WORK/purl-ok.json"
 bash "$LIB/validate-sbom.sh" "$WORK/purl-ok.json" "$WORK/pok" "supplier" >/dev/null 2>&1
 pok=$(jq -r '"\(.result)/\(.checks[] | select(.id=="purl-syntax") | .status)"' "$WORK/pok_conformance.json")
 [ "$pok" = "pass/pass" ] && pass "scoped npm / golang / rpm-qualifier PURLs are accepted" || fail "valid PURL shapes rejected: $pok"
 
-# Malformed PURLs (colon coordinates, missing @version, raw space) must fail
-# with the offenders listed. They still carry a purl, so the coverage check
-# stays green — only the new syntax check may catch them.
+# Malformed PURLs (colon coordinates, raw space) must fail with the offenders
+# listed. They still carry a purl, so the coverage check stays green — only the
+# new syntax check may catch them.
 jq '.components += [
   {"type":"library","name":"commons-lang3","version":"3.12.0","purl":"commons-lang3:3.12.0"},
-  {"type":"library","name":"noversion","version":"1.0","purl":"pkg:npm/noversion"},
   {"type":"library","name":"spacey","version":"1.0","purl":"pkg:npm/bad name@1.0"}
 ]' "$FIX/good-cyclonedx.json" > "$WORK/purl-bad.json"
 bash "$LIB/validate-sbom.sh" "$WORK/purl-bad.json" "$WORK/pbad" "supplier" >/dev/null 2>&1
 pb_stat=$(jq -r '.checks[] | select(.id=="purl-syntax") | "\(.status) \(.detail)"' "$WORK/pbad_conformance.json")
-[ "$pb_stat" = "fail 3 malformed" ] && pass "malformed PURLs fail the syntax check (3 offenders)" || fail "purl-syntax check: '$pb_stat', expected 'fail 3 malformed'"
+[ "$pb_stat" = "fail 2 malformed" ] && pass "malformed PURLs fail the syntax check (2 offenders)" || fail "purl-syntax check: '$pb_stat', expected 'fail 2 malformed'"
+
+# A PURL with no version is a valid PURL — the version is optional in the spec —
+# and reporting it as a syntax error sent readers looking for broken syntax that
+# was not there. Measured on a switch OS: 3,581 identifiers, nearly all
+# `pkg:generic/<kernel module>`, failed a check about spelling for a reason that
+# has nothing to do with spelling. That the version is missing is a real gap and
+# the checks that own it still say so.
+jq '.components = [
+  {"type":"library","name":"mod","purl":"pkg:generic/3c59x"}
+] + .components' "$FIX/good-cyclonedx.json" > "$WORK/purl-nover.json"
+bash "$LIB/validate-sbom.sh" "$WORK/purl-nover.json" "$WORK/pnv" "supplier" >/dev/null 2>&1
+nv_syntax=$(jq -r '.checks[] | select(.id=="purl-syntax") | .status' "$WORK/pnv_conformance.json")
+nv_name=$(jq -r '.checks[] | select(.id=="name-version") | .status' "$WORK/pnv_conformance.json")
+nv_generic=$(jq -r '.checks[] | select(.id=="no-generic") | .status' "$WORK/pnv_conformance.json")
+if [ "$nv_syntax" = "pass" ]; then
+    pass "a PURL without a version is not reported as a syntax error"
+else
+    fail "a versionless PURL still fails the syntax check" "status=$nv_syntax"
+fi
+if [ "$nv_name" = "fail" ] && [ "$nv_generic" = "warn" ]; then
+    pass "the missing version and the untraceable identifier are still reported"
+else
+    fail "the gap stopped being reported by the checks that own it" \
+         "name-version=$nv_name, no-generic=$nv_generic"
+fi
 jq -e '.checks[] | select(.id=="purl-syntax") | .missing | index("commons-lang3:3.12.0")' "$WORK/pbad_conformance.json" >/dev/null \
     && pass "purl-syntax missing list names the offending PURL" || fail "purl-syntax missing list lacks commons-lang3:3.12.0"
 pb_cov=$(jq -r '.checks[] | select(.id=="purl") | .status' "$WORK/pbad_conformance.json")

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The conformance report no longer calls a package identifier without a version malformed. The version is optional in the identifier format, so a syntax check has nothing to say about a missing one, and two other rows already report it — one as a required failure, one as a warning that the identifier cannot be traced. A firmware image whose kernel modules carry versionless identifiers was failing a syntax row that had nothing to do with syntax.
+
 - An SPDX export of a firmware scan now carries the container images the device holds and the distribution it runs. The converter writes a package only for what it counts as software, so both were absent, and so was the record of which container each package belongs to. They are packages in the SPDX file now, and the membership is a `CONTAINS` relationship. Which software the two formats list is unchanged.
 
 - Packages installed inside a container carried by a firmware image are now matched against vulnerability data. A package database read out of a container layer gives a name and a version but no package identifier, because the identifier depends on which distribution the container runs and that is recorded inside the layer rather than at the root of what was scanned. The distribution is now read from the layer and the identifier written from it, including the source package the advisories are keyed on. Which components a scan reports is unchanged.

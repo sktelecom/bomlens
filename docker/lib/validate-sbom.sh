@@ -46,11 +46,21 @@ CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6}"
 AI_CYCLONEDX_SPEC_VERSIONS="${AI_CYCLONEDX_SPEC_VERSIONS:-$CYCLONEDX_SPEC_VERSIONS 1.7}"
 SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3 SPDX-3.0}"
 
-# Practical PURL shape gate (purl-spec): pkg:type/[namespace/]name@version
+# Practical PURL shape gate (purl-spec): pkg:type/[namespace/]name[@version]
 # [?qualifiers][#subpath]. The segment charset tolerates the unencoded '@'
-# some tools emit for npm scopes; spaces, colon coordinates, a missing 'pkg:'
-# prefix and a missing '@version' are offenders.
-PURL_SYNTAX_REGEX='^pkg:[a-z][a-z0-9.+-]*(/[A-Za-z0-9._%~@+-]+)+@[A-Za-z0-9._%~+:-]+(\?[A-Za-z0-9._%~+=&:,/-]+)?(#[A-Za-z0-9._%~+/-]+)?$'
+# some tools emit for npm scopes; spaces, colon coordinates and a missing 'pkg:'
+# prefix are offenders.
+#
+# The version is optional here because it is optional in the spec. Requiring it
+# made this check report a syntax error for an identifier that has none —
+# measured on a switch OS, 3,581 of them, nearly all `pkg:generic/<kernel
+# module>` — and a missing version is not a malformed identifier. That a version
+# is missing is worth reporting, and two other checks already do: `name-version`
+# fails on it as a required row, and `no-generic` warns that the identifier
+# cannot be traced. Counting the same gap a third time, under the name of a
+# different defect, told a reader to go looking for broken syntax that was not
+# there.
+PURL_SYNTAX_REGEX='^pkg:[a-z][a-z0-9.+-]*(/[A-Za-z0-9._%~@+-]+)+(@[A-Za-z0-9._%~+:-]+)?(\?[A-Za-z0-9._%~+=&:,/-]+)?(#[A-Za-z0-9._%~+/-]+)?$'
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[validate] SBOM file not found: $SBOM" >&2
@@ -179,7 +189,7 @@ cdx_checks() {
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
-       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
+       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (graph edges)\", required:true,
@@ -367,7 +377,7 @@ spdx_json_checks() {
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
-       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/name@version)\", required:true,
+       {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)\", required:true,
@@ -398,7 +408,7 @@ spdx_tv_checks() {
     deps=$(g 'Relationship:.*(DEPENDS_ON|DEPENDENCY_OF)'); lics=$(g '^PackageLicenseConcluded:'); hashes=$(g '^PackageChecksum:')
     verpat=$(printf '%s' "$SPDX_SPEC_VERSIONS" | sed 's/\./\\./g; s/ /|/g')
     specok=$(g "^SPDXVersion: *($verpat) *\$")
-    purlok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:[a-z][a-z0-9.+-]*/[^ ]+@[^ ]+ *$')
+    purlok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:[a-z][a-z0-9.+-]*/[^ ]+ *$')
     jq -cn \
        --argjson ts "$ts" --argjson tools "$tools" --argjson names "$names" \
        --argjson vers "$vers" --argjson purls "$purls" --argjson generic "$generic" \
@@ -412,7 +422,7 @@ spdx_tv_checks() {
       {id:"name-version", label:"PackageName + PackageVersion present", required:true, status:(if $names>0 and $vers>=$names then "pass" else "fail" end), detail:"names=\($names), versions=\($vers)", missing:[]},
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:"Traceable PURL (no pkg:generic, advisory)", required:false, status:(if $generic==0 then "pass" else "warn" end), detail:"\($generic) untraceable", missing:[]},
-      {id:"purl-syntax", label:"PURL syntax (pkg:type/name@version)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
+      {id:"purl-syntax", label:"PURL syntax (pkg:type/[namespace/]name)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
       {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
       {id:"hash", label:"Checksums present (recommended)", required:false, status:(if $hashes>0 then "pass" else "warn" end), detail:"\($hashes) checksum(s)", missing:[]}
