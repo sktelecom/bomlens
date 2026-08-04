@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An SPDX export of a firmware scan now carries the container images the device holds and the distribution it runs. The converter writes a package only for what it counts as software, so both were absent, and so was the record of which container each package belongs to. They are packages in the SPDX file now, and the membership is a `CONTAINS` relationship. Which software the two formats list is unchanged.
+
 - Packages installed inside a container carried by a firmware image are now matched against vulnerability data. A package database read out of a container layer gives a name and a version but no package identifier, because the identifier depends on which distribution the container runs and that is recorded inside the layer rather than at the root of what was scanned. The distribution is now read from the layer and the identifier written from it, including the source package the advisories are keyed on. Which components a scan reports is unchanged.
 
 - A scan that cannot reach the upload server now says so and keeps its artifacts. It used to end on the transport's own exit code with nothing but a warning, which read as a failed scan even though every file had been written. The message names the server and says how to scan without uploading. A reply that carries no status code is reported the same way instead of ending the run mid-comparison.

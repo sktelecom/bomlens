@@ -11,6 +11,12 @@
 # properties) has no SPDX equivalent and does not carry over — the SPDX file is
 # a format conversion, not a second source of truth.
 #
+# What SPDX does have a place for is carried across afterwards: syft's converter
+# writes a package only for what it counts as software, which leaves out the
+# container images a firmware holds and the distribution it runs. SPDX has a
+# relationship for a package that holds other packages, so those go in as
+# packages and the membership as CONTAINS (spdx-containers.py).
+#
 # Usage: convert-to-spdx.sh <input_cyclonedx.json> <output_spdx.json> [--stable]
 #   --stable  pin creationInfo.created and the random documentNamespace UUID so
 #             repeated runs are byte-identical (mirrors normalize-sbom.sh --stable).
@@ -53,6 +59,15 @@ if [ -n "$DOC_NAME" ]; then
     else
         rm -f "$TMP"
     fi
+fi
+
+# Best-effort, and after the rename so the document is otherwise final: the SPDX
+# file is an additional artifact and the scan has already produced everything else
+# by now, so a failure here costs the memberships rather than the run.
+SPDX_CONTAINERS="$(cd "$(dirname "$0")" && pwd)/spdx-containers.py"
+if [ -f "$SPDX_CONTAINERS" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$SPDX_CONTAINERS" "$INPUT" "$OUTPUT" \
+        || echo "[spdx] WARN: containers were not carried into the SPDX file." >&2
 fi
 
 if [ "$MODE" = "--stable" ]; then

@@ -1274,6 +1274,130 @@ bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-cf" "sup
 [ -f "$WORK/spdx3-cf_conformance.json" ] && jq -e '.checks|length>0' "$WORK/spdx3-cf_conformance.json" >/dev/null 2>&1 \
     && pass "SPDX 3.0 produces a conformance report" || fail "SPDX 3.0 conformance not produced"
 
+echo "== SPDX export: the containers a firmware holds reach the SPDX file too =="
+
+# syft's converter writes a package for what it counts as software and drops the
+# rest, so the container images a firmware carries and the distribution it runs
+# did not reach the SPDX export, and neither did which container each package
+# belongs to. On a switch OS that is most of what a reader needs, and a reader who
+# asked for SPDX was getting the CycloneDX document minus its answer.
+cat > "$WORK/spdxc-in.cdx.json" <<'CDXEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"firmware","name":"switch","version":"1.0"}},
+ "components":[
+  {"type":"library","name":"libssl","version":"3.0.1","purl":"pkg:deb/debian/libssl@3.0.1",
+   "properties":[{"name":"bomlens:container:image","value":"routing@2.0"}]},
+  {"type":"library","name":"shared","version":"1.0","purl":"pkg:deb/debian/shared@1.0",
+   "properties":[{"name":"bomlens:container:image","value":"routing@2.0"},
+                 {"name":"bomlens:container:image","value":"telemetry@3.0"}]},
+  {"type":"library","name":"rootfs-only","version":"1.0","purl":"pkg:deb/debian/rootfs-only@1.0"},
+  {"type":"library","name":"not-in-spdx","version":"9.9","purl":"pkg:deb/debian/not-in-spdx@9.9",
+   "properties":[{"name":"bomlens:container:image","value":"routing@2.0"}]},
+  {"type":"container","name":"routing","version":"2.0","purl":"pkg:oci/routing@2.0","bom-ref":"c1"},
+  {"type":"container","name":"telemetry","version":"3.0","purl":"pkg:oci/telemetry@3.0","bom-ref":"c2"},
+  {"type":"operating-system","name":"debian","version":"13","bom-ref":"os1"}]}
+CDXEOF
+# What syft's converter leaves behind: the three libraries it recognized, and
+# nothing else. `not-in-spdx` stands for a component the converter dropped.
+cat > "$WORK/spdxc.spdx.json" <<'SPDXEOF'
+{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"switch-1.0",
+ "creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: syft"]},
+ "packages":[
+  {"SPDXID":"SPDXRef-Package-libssl","name":"libssl","versionInfo":"3.0.1",
+   "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                    "referenceLocator":"pkg:deb/debian/libssl@3.0.1"}]},
+  {"SPDXID":"SPDXRef-Package-shared","name":"shared","versionInfo":"1.0",
+   "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                    "referenceLocator":"pkg:deb/debian/shared@1.0"}]},
+  {"SPDXID":"SPDXRef-Package-rootfs-only","name":"rootfs-only","versionInfo":"1.0"}],
+ "relationships":[
+  {"spdxElementId":"SPDXRef-DOCUMENT","relatedSpdxElement":"SPDXRef-Package-libssl",
+   "relationshipType":"DESCRIBES"}]}
+SPDXEOF
+python3 "$LIB/spdx-containers.py" "$WORK/spdxc-in.cdx.json" "$WORK/spdxc.spdx.json" 2>/dev/null
+
+n=$(jq '[.packages[] | select(.name == "routing" or .name == "telemetry")] | length' "$WORK/spdxc.spdx.json")
+if [ "$n" = "2" ]; then
+    pass "each container image becomes an SPDX package"
+else
+    fail "the container images did not reach the SPDX file" "found $n of 2"
+fi
+
+# The distribution is a package the document describes, the same as in CycloneDX
+# where enrich-os-context.py needs it as its own component.
+if jq -e '[.packages[] | select(.name == "debian" and .versionInfo == "13")] | length == 1' \
+   "$WORK/spdxc.spdx.json" >/dev/null; then
+    pass "the distribution reaches the SPDX file as a package"
+else
+    fail "the operating system was dropped from the SPDX file"
+fi
+
+# SPDX says a package holding other packages with CONTAINS, which is the
+# membership this scan establishes.
+got=$(jq -r '[.relationships[]
+    | select(.relationshipType == "CONTAINS" and (.spdxElementId | startswith("SPDXRef-Package-container-routing")))
+    | .relatedSpdxElement] | sort | join(",")' "$WORK/spdxc.spdx.json")
+if [ "$got" = "SPDXRef-Package-libssl,SPDXRef-Package-shared" ]; then
+    pass "a package is related to the container it belongs to"
+else
+    fail "the container membership is missing from the SPDX file" "got: ${got:-nothing}"
+fi
+
+# A package in two containers belongs to both, and saying so twice is the only
+# way SPDX can carry that.
+n=$(jq '[.relationships[] | select(.relationshipType == "CONTAINS"
+    and .relatedSpdxElement == "SPDXRef-Package-shared"
+    and (.spdxElementId | startswith("SPDXRef-Package-container-")))] | length' "$WORK/spdxc.spdx.json")
+if [ "$n" = "2" ]; then
+    pass "a package in two containers is related to both"
+else
+    fail "a membership was lost for a package in more than one container" "got $n of 2"
+fi
+
+# The two documents have to keep listing the same software. A component the
+# converter left out is not added back through the relationship.
+if jq -e '[.relationships[] | select(.relatedSpdxElement | test("not-in-spdx"))] | length == 0' \
+   "$WORK/spdxc.spdx.json" >/dev/null \
+   && jq -e '[.packages[] | select(.name == "not-in-spdx")] | length == 0' \
+      "$WORK/spdxc.spdx.json" >/dev/null; then
+    pass "a component the converter dropped is not resurrected as a relationship"
+else
+    fail "a component missing from the SPDX packages was related anyway"
+fi
+
+# A package that is only in the rootfs is in no container, and must not be
+# related to one.
+if jq -e '[.relationships[] | select(.relatedSpdxElement == "SPDXRef-Package-rootfs-only"
+    and (.spdxElementId | startswith("SPDXRef-Package-container-")))] | length == 0' \
+   "$WORK/spdxc.spdx.json" >/dev/null; then
+    pass "a package outside every container is related to none"
+else
+    fail "a rootfs package was placed inside a container"
+fi
+
+# The added packages are part of what the document is about, like every other one.
+if jq -e '[.relationships[] | select(.spdxElementId == "SPDXRef-Package-libssl"
+    and .relationshipType == "CONTAINS")] | length == 3' "$WORK/spdxc.spdx.json" >/dev/null; then
+    pass "the document's root contains the images and the distribution"
+else
+    fail "the added packages hang off nothing the document describes"
+fi
+
+# A scan with no containers leaves the SPDX file exactly as the converter wrote it.
+jq '{spdxVersion, SPDXID, name, packages, relationships}' "$WORK/spdxc.spdx.json" > /dev/null
+cat > "$WORK/plain.cdx.json" <<'PLAINEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "components":[{"type":"library","name":"libssl","version":"3.0.1"}]}
+PLAINEOF
+cp "$FIX/good-spdx.json" "$WORK/plain.spdx.json"
+before="$(jq -S . "$WORK/plain.spdx.json")"
+python3 "$LIB/spdx-containers.py" "$WORK/plain.cdx.json" "$WORK/plain.spdx.json" 2>/dev/null
+if [ "$before" = "$(jq -S . "$WORK/plain.spdx.json")" ]; then
+    pass "an SBOM with no containers leaves the SPDX file untouched"
+else
+    fail "the SPDX file was rewritten for a scan that has no containers"
+fi
+
 echo "== conformance: a PURL failure says when the components carry a CPE instead =="
 # The submission criteria require a PURL, so this stays a mandatory failure. What
 # it must not do is read as "unidentified components" when the components are

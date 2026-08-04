@@ -23,7 +23,9 @@ Firmware is a single file that packs and seals an operating system and dozens of
    components. A package installed by `dpkg` inside a container is identified by the
    distribution the container runs, read from the `os-release` in its own layers, so that
    the vulnerability step has something to match it against; those carry
-   `bomlens:purlSource`.
+   `bomlens:purlSource`. An SPDX export keeps this: the images and the
+   distribution are packages there, and the membership is a `CONTAINS`
+   relationship.
 3. Use `cve-bin-tool` to find the versions and vulnerabilities of stripped static binaries (busybox, openssl, dropbear, and so on).
 4. Merge the two results into one SBOM, then run the same post-processing as a normal scan (licenses, CVEs, signing).
 
