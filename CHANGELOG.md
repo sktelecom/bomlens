@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Firmware analysis opens more of what an image carries. Besides a container image store, a second filesystem with its own package database and an interpreter's installed library set are now cataloged when they sit beside the root filesystem rather than inside it. Each is recognized by the record of what is installed in it, not by a directory name. Set `FW_EXTRA_ROOTS=false` to read only the root filesystem.
 
+- The frameworks an iOS app ships are now identified. A package holds one bundle per framework, each stating its name and version, and those are read as components. A framework that is the app's own code split into a bundle is marked with `bomlens:appOwnedFramework` rather than dropped, because the identifier that decides it is written by hand and can be spelled in a way the rule misses. No package identifier is written, since nothing in the bundle says which ecosystem the framework came from.
+
 - An Android or iOS app package is now unpacked and read instead of being treated as one file, and the libraries an Android app declares about itself are identified. Gradle records each library that ships in the package under `META-INF`, one file per library holding its version, which gives a Maven coordinate the vulnerability step can use. Pass the `.apk` or `.ipa` as the target; the opt-in firmware image does the unpacking, and without it the scan says so.
 
 ### Fixed

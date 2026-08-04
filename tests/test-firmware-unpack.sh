@@ -1691,6 +1691,119 @@ else
     rm -rf "$APP"
 fi
 
+echo "== an iOS package's frameworks are read from what each one states =="
+
+# An iOS package has no package database and its binaries are Mach-O, which the
+# ELF reader does not open, so nothing above finds anything in one. What it does
+# carry is a bundle per shipped framework, each stating its name and version.
+# Measured on four packages: a supplier's app ships CocoaLumberjack 3.0.0 and two
+# more frameworks, and three public apps ship OpenSSL at an exact version — all
+# previously reported as nothing.
+IOS="$ROOT_DIR/docker/lib/identify-ios-frameworks.py"
+if [ ! -f "$IOS" ]; then
+    fail "identify-ios-frameworks.py is missing" "an iOS package yields nothing"
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+    IPA="$(mktemp -d)"
+    APPDIR="$IPA/Payload/Demo.app"
+    mkdir -p "$APPDIR/Frameworks"
+    plist() {
+        # $1 = destination directory, rest = key/value pairs
+        local dest="$1"; shift
+        {
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+            printf '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+            printf '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            printf '<plist version="1.0"><dict>\n'
+            while [ "$#" -ge 2 ]; do
+                printf '  <key>%s</key><string>%s</string>\n' "$1" "$2"
+                shift 2
+            done
+            printf '</dict></plist>\n'
+        } > "$dest/Info.plist"
+    }
+    plist "$APPDIR" CFBundleIdentifier com.example.demo CFBundleShortVersionString 1.0
+    mkdir -p "$APPDIR/Frameworks/OpenSSL.framework"
+    plist "$APPDIR/Frameworks/OpenSSL.framework" \
+        CFBundleName OpenSSL CFBundleIdentifier com.github.krzyzanowskim.OpenSSL \
+        CFBundleShortVersionString 3.3.3001
+    # A bundle can be named one thing and hold another, so the directory name is
+    # the fallback and not the answer.
+    mkdir -p "$APPDIR/Frameworks/CydiaSubstrate.framework"
+    plist "$APPDIR/Frameworks/CydiaSubstrate.framework" \
+        CFBundleName ElleKit CFBundleIdentifier libellekit.dylib \
+        CFBundleShortVersionString 1.1.3
+    # Swift Package Manager puts a build hash in the name, in the bundle as well
+    # as in the directory. It identifies one build, not a component.
+    mkdir -p "$APPDIR/Frameworks/KeychainAccess_2B8FF55066FFBF8C_PackageProduct.framework"
+    plist "$APPDIR/Frameworks/KeychainAccess_2B8FF55066FFBF8C_PackageProduct.framework" \
+        CFBundleName KeychainAccess_2B8FF55066FFBF8C_PackageProduct \
+        CFBundleIdentifier keychainaccess.KeychainAccess CFBundleShortVersionString 1.0
+    # The app's own code, split into a framework rather than brought in.
+    mkdir -p "$APPDIR/Frameworks/DemoCore.framework"
+    plist "$APPDIR/Frameworks/DemoCore.framework" \
+        CFBundleName DemoCore CFBundleIdentifier com.example.demo.DemoCore \
+        CFBundleShortVersionString 1.0
+    # States no version at all.
+    mkdir -p "$APPDIR/Frameworks/Silent.framework"
+    plist "$APPDIR/Frameworks/Silent.framework" CFBundleName Silent
+    out="$(python3 "$IOS" "$IPA" 2>/dev/null)"
+    ios_names="$(printf '%s' "$out" | jq -r '[.[] | "\(.name)@\(.version)"] | sort | join(",")')"
+
+    if [ "$ios_names" = "DemoCore@1.0,ElleKit@1.1.3,KeychainAccess@1.0,OpenSSL@3.3.3001" ]; then
+        pass "each shipped framework becomes a component at the version it states"
+    else
+        fail "the package's frameworks were not read as stated" "got: ${ios_names:-nothing}"
+    fi
+
+    # `CydiaSubstrate.framework` holding ElleKit is the measured case.
+    if printf '%s' "$out" | jq -e 'any(.[]; .name == "ElleKit")' >/dev/null; then
+        pass "the name comes from the bundle, not from the directory it sits in"
+    else
+        fail "a framework was named after its directory"
+    fi
+
+    # The hash identifies one build. Keeping it would make the same library a new
+    # component on every rebuild.
+    if printf '%s' "$out" | jq -e 'any(.[]; .name == "KeychainAccess")' >/dev/null; then
+        pass "a Swift Package Manager build hash is not part of the name"
+    else
+        fail "the build hash stayed in the component name"
+    fi
+
+    # Marked, not dropped: the rule reads a hand-written identifier and one of the
+    # four packages measured spells it without the separator, so it misses there.
+    owned="$(printf '%s' "$out" | jq -r '[.[] | select(any(.properties[];
+        .name == "bomlens:appOwnedFramework")) | .name] | join(",")')"
+    if [ "$owned" = "DemoCore" ]; then
+        pass "a framework that is the app's own code is marked, and still reported"
+    else
+        fail "the app-owned mark is wrong" "marked: ${owned:-none}"
+    fi
+
+    # A framework in the package that states no version is a different answer from
+    # a framework that is not there, so the count is said out loud.
+    if python3 "$IOS" "$IPA" 2>&1 >/dev/null | grep -q "1 framework(s) stated no version"; then
+        pass "a framework that states no version is reported as left out"
+    else
+        fail "a framework with no version was dropped silently"
+    fi
+
+    # An app extension carries its own frameworks, and they ship in the package
+    # just the same.
+    mkdir -p "$APPDIR/PlugIns/Share.appex/Frameworks/Alamofire.framework"
+    plist "$APPDIR/PlugIns/Share.appex/Frameworks/Alamofire.framework" \
+        CFBundleName Alamofire CFBundleIdentifier org.alamofire.Alamofire \
+        CFBundleShortVersionString 5.9.1
+    if python3 "$IOS" "$IPA" 2>/dev/null | jq -e 'any(.[]; .name == "Alamofire")' >/dev/null; then
+        pass "a framework under an app extension is read too"
+    else
+        fail "only the top-level Frameworks directory was read"
+    fi
+    rm -rf "$IPA"
+fi
+
 echo "== a version is compared as a number, and an uncomparable one matches nothing =="
 
 # The CPE index records version bounds as plain numbers, while projects write

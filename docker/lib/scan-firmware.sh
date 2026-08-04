@@ -594,17 +594,32 @@ fi
 # --------------------------------------------------------
 # ③.65 The libraries an app package declares about itself.
 # --------------------------------------------------------
-# An app written in Kotlin or Java alone carries no package database and no native
-# library, so every source above reads nothing out of it. Gradle leaves the list
-# anyway, one file per library under META-INF, and that is a record of what was
-# built in rather than a string found in a binary.
-ANDROID_COMPS="$WORK/android-comps.json"
-echo '[]' > "$ANDROID_COMPS"
-if [ "${FW_ANDROID_LIBS:-true}" != "false" ] && command -v python3 >/dev/null 2>&1; then
-    python3 "$(dirname "$0")/identify-android-libraries.py" "$ROOTFS" \
-        > "$WORK/android-out.json" || echo '[]' > "$WORK/android-out.json"
-    if [ -s "$WORK/android-out.json" ] && jq -e 'type == "array"' "$WORK/android-out.json" >/dev/null 2>&1; then
-        cp "$WORK/android-out.json" "$ANDROID_COMPS"
+# An app carries no package database, and the passes above read nothing out of one:
+# an Android app written in Kotlin or Java alone has no native library at all, and
+# an iOS app's binaries are Mach-O, which the ELF reader does not open. Each
+# platform keeps its own record of what it ships — Gradle writes one file per
+# library under META-INF, and an iOS package holds one bundle per framework with
+# its version in its own Info.plist — and that is a record of what was built in
+# rather than a string found in a binary.
+APP_COMPS="$WORK/app-comps.json"
+echo '[]' > "$APP_COMPS"
+if command -v python3 >/dev/null 2>&1; then
+    : > "$WORK/app-parts.json"
+    if [ "${FW_ANDROID_LIBS:-true}" != "false" ]; then
+        python3 "$(dirname "$0")/identify-android-libraries.py" "$ROOTFS" \
+            >> "$WORK/app-parts.json" || true
+    fi
+    if [ "${FW_IOS_FRAMEWORKS:-true}" != "false" ]; then
+        python3 "$(dirname "$0")/identify-ios-frameworks.py" "$ROOTFS" \
+            >> "$WORK/app-parts.json" || true
+    fi
+    # Each pass prints one array; a run that failed printed nothing, and that is
+    # what `add // []` here has to survive.
+    if [ -s "$WORK/app-parts.json" ] \
+       && jq -s 'map(select(type == "array")) | add // []' "$WORK/app-parts.json" \
+            > "$WORK/app-out.json" 2>/dev/null \
+       && jq -e 'type == "array"' "$WORK/app-out.json" >/dev/null 2>&1; then
+        cp "$WORK/app-out.json" "$APP_COMPS"
     fi
 fi
 
@@ -712,7 +727,7 @@ fi
 # matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
       --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" \
-      --slurpfile e "$EXTRA_COMPS" --slurpfile f "$ANDROID_COMPS" '
+      --slurpfile e "$EXTRA_COMPS" --slurpfile f "$APP_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
