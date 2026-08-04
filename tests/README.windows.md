@@ -246,37 +246,25 @@ powershell -ExecutionPolicy Bypass -File C:\projects\bomlens\tests\windows-verif
 
 **통과 기준**: 종료 코드 0. SKIP으로 남은 GUI 항목은 Phase 6에서 수동 보완한다.
 
-> **알려진 실패 — SPDX 단언 (하네스 버그, 제품 결함 아님)**
+> **SPDX는 스캔 산출물이 아니다** — 결과 목록에 `_bom.spdx.json`이 없는 것이 정상이다.
+> `docker/web/server.py`가 못박아 둔다: "No GENERATE_SPDX: SPDX is exported on demand
+> after the scan"(2166행), "The UI does not decide SPDX before a scan (the pipeline
+> always writes CycloneDX); the user asks for the conversion from the results
+> screen"(2262행). 웹 UI에서 SPDX는 결과 화면에서 `GET /spdx-export?id=<rid>`로
+> **사후 변환**하는 것이고, 스캔 전에 고르는 옵션이 아니다. CLI의 `--spdx`와는
+> 경로가 다르다.
 >
-> 현재 이 스크립트는 반드시 `[FAIL]` 1건을 낸다:
->
-> ```
-> [FAIL] 결과에 _bom.spdx.json이 없습니다(spdx=true인데)
-> ```
->
-> 417행이 스캔 쿼리에 `spdx=true`를 붙이고 434행이 `_bom.spdx.json`을 단언하는데,
-> **서버에는 그런 쿼리 파라미터가 없다.** `docker/web/server.py`가 명시한다 —
-> "No GENERATE_SPDX: SPDX is exported on demand after the scan"(2166행),
-> "The UI does not decide SPDX before a scan (the pipeline always writes
-> CycloneDX); the user asks for the conversion from the results screen"(2262행).
-> 웹 UI에서 SPDX는 결과 화면에서 `GET /spdx-export`로 **사후 변환**하는 것이고,
-> 스캔 전에 고르는 옵션이 아니다. CLI의 `--spdx`와는 경로가 다르다.
->
-> 즉 이 단언은 UI 경로에서 **구조적으로 통과할 수 없다.** 5e81fbf(#437)에서
-> 들어온 뒤 고쳐지지 않았는데, 이 하네스가 CI에 없고 실물 Windows PC에서만
-> 도는 탓에 드러날 기회가 없었다.
->
-> 고치기 전까지는 이 FAIL 1건만 있고 나머지가 전부 PASS이면 **Phase 5는 합격으로
-> 판정**한다. 다른 항목이 하나라도 FAIL이면 합격이 아니다.
->
-> 올바른 검증은 스캔 후 `GET /spdx-export?rid=<id>`를 호출해 SPDX-2.3 문서가
-> 생성되는지 보는 것이다. `capabilities.spdxExport`가 false면 이 이미지에서
-> 변환이 불가능하다는 뜻이니 그때는 SKIP이 맞다.
+> 이 하네스는 한때 스캔 쿼리에 `spdx=true`를 붙이고(서버가 읽지 않는 파라미터)
+> 결과에 SPDX가 있으리라 단언해, UI 경로에서 **구조적으로 통과할 수 없었다.**
+> 5e81fbf(#437)에서 들어와 오래 남아 있었는데, 이 하네스가 CI에 없고 실물 Windows
+> PC에서만 도는 탓에 드러날 기회가 없었다. 지금은 `/spdx-export`를 실제로 호출해
+> 변환 결과를 검증한다.
 
-실측 기준선(v1.10.0, 2026-08-04): 위 SPDX 1건을 제외하고 설치·버전 스탬프·부팅·
-이미지 풀·UI 컨테이너·업로드 스캔·CycloneDX 산출·언인스톨까지 전부 PASS.
-`hostDir`는 드라이브 경로, `bomFormat=CycloneDX specVersion=1.6` 확인.
-종료 후 설치 폴더·시작 메뉴 바로가기·출력 폴더·라벨 컨테이너가 모두 정리됐다.
+실측 기준선(v1.10.0, 2026-08-04): **FAIL 0건**. 설치·버전 스탬프·부팅·이미지 풀·
+UI 컨테이너·업로드 스캔·CycloneDX 산출·SPDX 사후 변환·언인스톨까지 전부 PASS.
+`hostDir`는 드라이브 경로, `bomFormat=CycloneDX specVersion=1.6`,
+변환된 문서는 `spdxVersion=SPDX-2.3`. 종료 후 설치 폴더·시작 메뉴 바로가기·
+출력 폴더·라벨 컨테이너가 모두 정리됐다.
 
 SKIP 2건은 정상이다 — SmartScreen 클릭(자동화 불가, Phase 6으로 이월)과
 `taskkill` 그레이스풀 종료 미관측(컨테이너 정리는 다음 기동의 `cleanupOrphans`가
@@ -327,13 +315,12 @@ cd /c/projects/bomlens && GH_TOKEN=$(gh auth token) bash scripts/verify-release.
 | 2 | `npm test` / `test:smoke` exit 0 | `electron\test-results\` |
 | 3 | exit 0, `[FAIL]` 0 | 콘솔, 작업 폴더 `%USERPROFILE%\sbom-smoke-*` (자동 삭제) |
 | 4 | 체크섬 일치, 크기 정상 | `%TEMP%\bomlens-rel` |
-| 5 | SPDX 단언 1건 외 FAIL 0 (위 "알려진 실패" 참고) | 콘솔 + `%APPDATA%\sbom-generator-desktop\startup.log` |
+| 5 | exit 0, 버전 스탬프 일치 | 콘솔 + `%APPDATA%\sbom-generator-desktop\startup.log` |
 | 6 | 체크리스트 전 항목 확인, 캡처 저장 | `-OutDir` 지정 폴더 |
 | 7 | exit 0 | 콘솔 |
 
-**전체 판정**: Phase 1~4 exit 0, Phase 5는 알려진 SPDX 단언 외 FAIL 0, **그리고**
-Phase 6 체크리스트 완료 = 합격. 그 밖의 FAIL이 1건이라도 있으면 해당 Phase 로그
-전문을 첨부해 이슈화한다.
+**전체 판정**: Phase 1~5 전부 exit 0 **그리고** Phase 6 체크리스트 완료 = 합격.
+FAIL이 1건이라도 있으면 해당 Phase 로그 전문을 첨부해 이슈화한다.
 
 **Phase 5 시작 전 정리** — `%APPDATA%\sbom-generator-desktop\startup.log`가 남아
 있으면 지우거나 폴더째 옮긴다. Phase 2의 Playwright 실행도 같은 경로에

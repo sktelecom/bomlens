@@ -399,7 +399,7 @@ if ($dockerOk -and (Test-Path $script:InstallExe)) {
                     Failed "capabilities 조회 실패: $($_.Exception.Message)"
                 }
 
-                # 5d. 실제 스캔(no-cli.md의 ZIP 업로드 경로) — upload → scan-stream(SPDX 포함).
+                # 5d. 실제 스캔(no-cli.md의 ZIP 업로드 경로) — upload → scan-stream → SPDX 사후 변환.
                 $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
                 if (-not $curl -and $healthy) {
                     Skip 'curl.exe가 없어 스캔 e2e를 건너뜁니다(최신 Windows에는 기본 포함).'
@@ -414,7 +414,7 @@ if ($dockerOk -and (Test-Path $script:InstallExe)) {
                         Failed "업로드가 토큰을 반환하지 않았습니다: $upRaw"
                     } else {
                         Pass '소스 ZIP 업로드 성공(토큰 수신)'
-                        $qs = "project=$proj&version=$ver&source=zip-upload&token=$token&spdx=true&security=false"
+                        $qs = "project=$proj&version=$ver&source=zip-upload&token=$token&security=false"
                         $sse = Get-NativeOut { curl.exe -fsS -N --max-time 300 "$base/scan-stream?$qs" }
                         $donePayload = Get-DonePayload -Raw $sse
                         if (-not $donePayload) {
@@ -429,9 +429,11 @@ if ($dockerOk -and (Test-Path $script:InstallExe)) {
                             } else {
                                 Pass "스캔 완료 — done.ok=true, mode=$($done.mode)"
                                 $names = @($done.results | ForEach-Object { $_.name })
-                                # 산출물 단언: CycloneDX SBOM(필수), SPDX(필수, spdx=true), NOTICE(기대).
+                                # 산출물 단언: CycloneDX SBOM(필수), NOTICE(기대). SPDX는 여기에
+                                # 없는 것이 정상이다 — 웹 UI는 스캔 중에 SPDX를 만들지 않고
+                                # (server.py: "No GENERATE_SPDX"), 사용자가 결과 화면에서
+                                # 요청할 때 GET /spdx-export로 사후 변환한다. 아래에서 따로 검증한다.
                                 if ($names -match '_bom\.json$') { Pass 'CycloneDX SBOM 산출물 확인(_bom.json)' } else { Failed "결과에 _bom.json이 없습니다: $($names -join ', ')" }
-                                if ($names -match '_bom\.spdx\.json$') { Pass 'SPDX 산출물 확인(_bom.spdx.json)' } else { Failed "결과에 _bom.spdx.json이 없습니다(spdx=true인데): $($names -join ', ')" }
                                 if ($names -match '_NOTICE\.') { Pass '고지문 산출물 확인(_NOTICE.*)' } else { Skip "결과에 _NOTICE가 없습니다: $($names -join ', ')" }
 
                                 # 호스트 출력 폴더에 실제 파일이 떨어졌는지(마운트 왕복 검증).
@@ -445,15 +447,40 @@ if ($dockerOk -and (Test-Path $script:InstallExe)) {
                                         if ($bom.bomFormat -eq 'CycloneDX') { Pass "SBOM bomFormat=CycloneDX (specVersion=$($bom.specVersion))" }
                                         else { Failed "SBOM bomFormat이 CycloneDX가 아닙니다: $($bom.bomFormat)" }
                                     } catch { Failed "호스트 SBOM 파싱 실패: $($_.Exception.Message)" }
-                                    # SPDX 내용 최소 단언.
+                                    # SPDX 사후 변환 — 결과 화면의 내려받기 버튼이 치는 경로를
+                                    # 그대로 호출한다. 변환은 이미지 안의 syft로, 그게 없으면
+                                    # 시블링 스캐너 컨테이너로 넘어가므로(server.py의
+                                    # spdx_convert_usable) Windows에서 소켓 경로까지 함께 검증된다.
                                     $hostSpdx = Join-Path $runDir "${prefix}_bom.spdx.json"
-                                    if (Test-Path $hostSpdx) {
+                                    if (-not $caps.spdxExport) {
+                                        Skip 'SPDX 변환을 제공하지 않는 이미지입니다(capabilities.spdxExport=false).'
+                                    } else {
+                                        $exp = $null; $expErr = $null; $expCode = $null
                                         try {
-                                            $spdx = Get-Content $hostSpdx -Raw -Encoding UTF8 | ConvertFrom-Json
-                                            if ($spdx.spdxVersion -eq 'SPDX-2.3') { Pass "SPDX spdxVersion=SPDX-2.3" }
-                                            else { Failed "SPDX spdxVersion이 SPDX-2.3이 아닙니다: $($spdx.spdxVersion)" }
-                                        } catch { Failed "호스트 SPDX 파싱 실패: $($_.Exception.Message)" }
-                                    } else { Skip "호스트에 SPDX 파일이 없습니다: $hostSpdx" }
+                                            $exp = Invoke-RestMethod -Uri "$base/spdx-export?id=$($done.id)" -TimeoutSec 300
+                                        } catch {
+                                            $expErr = $_.Exception.Message
+                                            if ($_.Exception.Response) { $expCode = [int]$_.Exception.Response.StatusCode }
+                                        }
+                                        if ($expCode -eq 503) {
+                                            Skip 'SPDX 변환을 쓸 수 없는 환경입니다(503) — 이미지에 syft가 없고 docker 소켓도 없습니다.'
+                                        } elseif (-not $exp) {
+                                            Failed "GET /spdx-export 실패(status=$expCode): $expErr"
+                                        } elseif ($exp.name -notmatch '_bom\.spdx\.json$') {
+                                            Failed "spdx-export가 SPDX 파일명을 반환하지 않았습니다: '$($exp.name)'"
+                                        } else {
+                                            Pass "SPDX 사후 변환 성공(GET /spdx-export) — $($exp.name)"
+                                            if (Test-Path $hostSpdx) {
+                                                try {
+                                                    $spdx = Get-Content $hostSpdx -Raw -Encoding UTF8 | ConvertFrom-Json
+                                                    if ($spdx.spdxVersion -eq 'SPDX-2.3') { Pass "SPDX spdxVersion=SPDX-2.3" }
+                                                    else { Failed "SPDX spdxVersion이 SPDX-2.3이 아닙니다: $($spdx.spdxVersion)" }
+                                                } catch { Failed "호스트 SPDX 파싱 실패: $($_.Exception.Message)" }
+                                            } else {
+                                                Failed "변환은 성공했다는데 호스트에 SPDX가 없습니다(마운트 왕복 실패): $hostSpdx"
+                                            }
+                                        }
+                                    }
                                 } else {
                                     Failed "호스트 출력 폴더에 SBOM 파일이 없습니다(마운트/파일 공유 의심): $hostBom"
                                 }
