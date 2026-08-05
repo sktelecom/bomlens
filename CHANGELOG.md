@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.10.2] - 2026-08-05
+
 ### Added
 
 - A desktop application's codec plugins now yield the libraries linked into them. A player ships each codec as a plugin that links the library statically, so the library is not a file of its own and nothing catalogs it — but the library stamps its own name and version into the plugin. Four such stamps are read now: a subtitle codec, a Dirac codec, the Theora reference library, and the runtime compiler the Dirac plugin carries inside it. Only the Theora entry carries a vulnerability identifier; the other three name products that exist in the vulnerability index as something else entirely, and attaching those would hand a codec another project's advisories.
@@ -546,7 +548,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.2...HEAD
+[v1.10.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.2
 [v1.10.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.1
 [v1.10.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.0
 [v1.9.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.9.0
