@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A desktop application's codec plugins now yield the libraries linked into them. A player ships each codec as a plugin that links the library statically, so the library is not a file of its own and nothing catalogs it — but the library stamps its own name and version into the plugin. Four such stamps are read now: a subtitle codec, a Dirac codec, the Theora reference library, and the runtime compiler the Dirac plugin carries inside it. Only the Theora entry carries a vulnerability identifier; the other three name products that exist in the vulnerability index as something else entirely, and attaching those would hand a codec another project's advisories.
+
 ### Fixed
+
+- A firmware image shipped as a zip can now be uploaded through the web UI. Vendors commonly distribute firmware that way and the CLI has always unpacked it, but the upload form refused the extension while accepting every other compressed form, so a scan the CLI could run had no path through the UI at all.
 
 - A component whose release could not be read is no longer reported as if its version were known. The scanner writes `UNKNOWN` in that case — a kernel module with no version in its metadata, a Go binary built without module information — and carrying it through made the conformance report count those components as versioned. The field is removed now and the component is marked as present with its version not established. On one switch OS this moves 3,581 components out of the "version known" count, where they never belonged. Which components are reported, and which vulnerabilities, is unchanged.
 
