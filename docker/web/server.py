@@ -112,8 +112,12 @@ UPLOAD_EXTS = {
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
                  ".trx", ".chk", ".fw", ".rom", ".dlf",
                  # Compressed firmware images (unblob unpacks these), e.g. the
-                 # OpenWRT *.img.gz releases.
-                 ".gz", ".tgz", ".tar", ".xz", ".bz2", ".lzma", ".zst"),
+                 # OpenWRT *.img.gz releases. .zip belongs here because that is
+                 # how most vendors ship a firmware download — D-Link, NETGEAR,
+                 # TP-Link, Tenda and Zyxel images all arrive as one. The CLI has
+                 # always taken them; leaving the extension out here meant the
+                 # same file the CLI scans was refused by the upload form.
+                 ".gz", ".tgz", ".tar", ".xz", ".bz2", ".lzma", ".zst", ".zip"),
 }
 
 # Content types for the static SPA bundle.

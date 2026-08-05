@@ -735,6 +735,22 @@ c_kind=$(curl -s -o /dev/null -w '%{http_code}' -F "file=@$WORK/sample.zip" "$BA
 c_ext=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=zip" -F "file=@$WORK/payload.txt" "$BASE/upload?kind=zip")
 [ "$c_ext" = "415" ] && pass "wrong extension rejected (415)" || fail ".txt as zip returned $c_ext (expected 415)"
 
+# Most vendors ship a firmware download as a zip, and the CLI has always taken
+# one. The upload form used to refuse the same file because the extension was
+# missing from the firmware list, so a scan the CLI could run had no path
+# through the UI at all.
+cp "$WORK/sample.zip" "$WORK/vendor-firmware.zip"
+c_fw=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=firmware" \
+       -F "file=@$WORK/vendor-firmware.zip" "$BASE/upload?kind=firmware")
+[ "$c_fw" = "200" ] && pass "a zip is accepted as firmware, as the CLI accepts it" \
+    || fail "a firmware zip returned $c_fw (expected 200)" \
+            "the CLI scans vendor firmware shipped as .zip; the form must not refuse it"
+# The list stays a list, though — an arbitrary extension is still refused.
+c_fw_bad=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=firmware" \
+           -F "file=@$WORK/payload.txt" "$BASE/upload?kind=firmware")
+[ "$c_fw_bad" = "415" ] && pass "a .txt is still refused as firmware (415)" \
+    || fail ".txt as firmware returned $c_fw_bad (expected 415)"
+
 # A Yocto SPDX 2.2 build deploys one <image>.spdx.tar.zst and no document, so
 # that archive is the only SBOM such a build can hand over. It has to be
 # uploadable, while a bare zstd tarball stays out.
