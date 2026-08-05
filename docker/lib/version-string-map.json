@@ -58,6 +58,34 @@
       "cpe": "cpe:2.3:a:ffmpeg:ffmpeg:{version}:*:*:*:*:*:*:*",
       "why": "cve-bin-tool's checker wants three digits and so drops the two-digit form this string uses. ffmpeg:ffmpeg is the only sensible product in the index and carries the overwhelming majority of ffmpeg advisories.",
       "where": "an iOS app bundle, `FFmpeg version 4.1-QtAV`; the file is no longer in the corpus, so this entry is covered by a fixture rather than by a live scan"
+    },
+    {
+      "name": "libkate",
+      "pattern": "\\blibkate (\\d+\\.\\d+(?:\\.\\d+)?) \\(",
+      "cpe": null,
+      "why": "A media player bundles the Kate codec as a plugin and the library stamps its own name and version inside it. No Xiph kate product exists in the NVD index; the `kde:kate` there is a text editor, and attaching it would hand a subtitle codec another project's advisories. The trailing `(` anchors on the release-name suffix the library always emits, so a bare mention of the name cannot stand in for the stamp.",
+      "where": "VLC 3.0.23 for Windows, plugins/codec/libkate_plugin.dll: `libkate 0.4.1 (Tiger)`"
+    },
+    {
+      "name": "schroedinger",
+      "pattern": "\\bSchroedinger (\\d+\\.\\d+\\.\\d+)\\b",
+      "cpe": null,
+      "why": "The Dirac codec library stamps its version in the plugin that links it. Nothing named schroedinger exists in the NVD index, so no identifier is attached. Three digits are required because the same binary also carries a truncated `Schroedinger 1.0.` used to build the string, and a two-digit form would report that as a version.",
+      "where": "VLC 3.0.23 for Windows, plugins/codec/libschroedinger_plugin.dll: `Schroedinger 1.0.11`"
+    },
+    {
+      "name": "libtheora",
+      "pattern": "\\bXiph\\.Org libtheora (\\d+\\.\\d+(?:\\.\\d+)?)\\b",
+      "cpe": "cpe:2.3:a:xiph:theora:{version}:*:*:*:*:*:*:*",
+      "why": "The Theora reference library stamps a full banner with its vendor, name, version and release date. Identity is settled — xiph:theora is the only theora product in the index that is this library (itheora is a web player) — so the CPE is attached. The vendor prefix is part of the pattern because `theora` alone appears throughout the plugin as a format name.",
+      "where": "VLC 3.0.23 for Windows, plugins/codec/libtheora_plugin.dll: `Xiph.Org libtheora 1.1 20090822 (Thusnelda)`"
+    },
+    {
+      "name": "orc",
+      "pattern": "\\borc-(\\d+\\.\\d+\\.\\d+) debug init\\b",
+      "cpe": null,
+      "why": "The Oil Runtime Compiler ships inside the Dirac codec plugin rather than as its own file, and the only version it states is in a debug-init message. `apache:orc` in the NVD index is a columnar file format, an unrelated project that happens to share the name, so nothing is attached. The whole message is matched because a bare `orc-<version>` would collide with any path or filename carrying those three letters.",
+      "where": "VLC 3.0.23 for Windows, plugins/codec/libschroedinger_plugin.dll: `orc-0.4.33 debug init`"
     }
   ]
 }

@@ -1,0 +1,14 @@
+/builds/videolan/vlc/extras/package/win32/../../../modules/codec/kate.c
+we have all headers, initialize libkate for decoding
+libkate 0.4.1 (Tiger)
+kate bitstream 0.7
+Xiph.Org libtheora 1.1 20090822 (Thusnelda)
+this bitstream does not contain Theora video data
+sout-theora-quality
+Schroedinger 1.0.
+Schroedinger 1.0.11
+Dirac video decoder using libschroedinger
+orc-0.4.33 debug init
+ @0.4.33
+Licensed under the terms of the GNU Lesser General Public License, version 2.1 or later.
+GCC: (GNU) 6.4.0

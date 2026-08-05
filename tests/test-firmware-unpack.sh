@@ -594,6 +594,48 @@ if [ -f "$cap_probe" ] && command -v python3 >/dev/null 2>&1; then
     fi
 fi
 
+echo "== a version-string pattern reads its own stamp and nothing that resembles it =="
+
+# The table is closed precisely because a loose pattern reads version-shaped text
+# everywhere. Two sample files hold the strings a media player's codec plugins
+# actually carry, and ten that look like them but are something else: a text
+# editor of the same name, a columnar file format of the same name, a two-digit
+# form the binary builds its string from, a format name without the vendor stamp.
+# Both halves have to hold — reading none of the real four is as wrong as reading
+# any of the ten.
+verstr_dir="$ROOT_DIR/tests/fixtures/verstr-samples"
+if [ -d "$verstr_dir" ] && command -v python3 >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    verstr_out="$(python3 "$ROOT_DIR/docker/lib/identify-version-strings.py" \
+                  "$verstr_dir" "$ROOT_DIR/docker/lib/version-string-map.json" 2>/dev/null)"
+    for want in "libkate 0.4.1" "libtheora 1.1" "schroedinger 1.0.11" "orc 0.4.33"; do
+        nm="${want% *}"; ver="${want#* }"
+        if printf '%s' "$verstr_out" | jq -e --arg n "$nm" --arg v "$ver" \
+            'any(.[]; .name == $n and .version == $v)' >/dev/null 2>&1; then
+            pass "$nm is read from its own stamp as $ver"
+        else
+            fail "$nm $ver was not read from the sample stamp" "$verstr_out"
+        fi
+    done
+    # Every judgement must come from the file holding real stamps. A hit in the
+    # look-alike file means a pattern reaches text that is not a version stamp.
+    if printf '%s' "$verstr_out" | jq -e \
+        'all(.[]; .evidence.occurrences[0].location | test("codec-plugin"))' >/dev/null 2>&1; then
+        pass "nothing is read out of the look-alike strings"
+    else
+        fail "a pattern matched text that only resembles a version stamp" "$verstr_out"
+    fi
+    # The theora entry is the one carrying a CPE, and a wrong one hands a codec
+    # another project's advisories. xiph:theora is checked against the bundled
+    # index at build time; here we only hold it to the vendor it was verified as.
+    if printf '%s' "$verstr_out" | jq -e \
+        'any(.[]; .name == "libtheora" and ((.cpe // "") | test("^cpe:2.3:a:xiph:theora:")))' \
+        >/dev/null 2>&1; then
+        pass "libtheora carries the xiph CPE and not another project's"
+    else
+        fail "libtheora lost its CPE or carries the wrong vendor" "$verstr_out"
+    fi
+fi
+
 # readelf had been arriving as another package's dependency. That is how a
 # runtime file goes missing from a release without any build step failing.
 if grep -qE '^\s+lzop zstd lz4 liblzo2-2 zlib1g binutils' "$ROOT_DIR/docker/Dockerfile"; then
