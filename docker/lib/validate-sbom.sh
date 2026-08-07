@@ -125,14 +125,22 @@ cdx_checks() {
     | (if (\$t|type)==\"array\" then (\$t|length)
        elif (\$t|type)==\"object\" then (((\$t.components//[])+(\$t.services//[]))|length)
        else 0 end) as \$tools
-    | ([ \$c[] | select(.type != \"data\") ]) as \$pkg
+    | ([ \$c[] | select(.type != \"data\" and .type != \"file\") ]) as \$pkg
     | (\$pkg|length) as \$ptot
+    | ([ \$c[] | select(.type == \"file\") ]) as \$file
+    | (\$file|length) as \$ftot
     # name+version and purl coverage are package questions, so they are measured
-    # over \$pkg (everything except type \"data\") rather than every component. A
-    # data component — a training dataset, say — has no package version and no
-    # purl type to carry: purl defines none for a dataset. Counting them would
-    # fail an otherwise complete SBOM for a field that cannot exist. License and
-    # checksum coverage below still count them, because those they can carry.
+    # over \$pkg (every component except type \"data\" and type \"file\") rather
+    # than every component. A data component — a training dataset, say — has no
+    # package version and no purl type to carry: purl defines none for a dataset.
+    # A file component is the same case seen from the other side: a binary or
+    # firmware scan enumerates the delivered files, and purl defines no type for a
+    # file on disk either. Counting either would fail an otherwise complete SBOM
+    # for a field that cannot exist — a firmware SBOM whose packages are all
+    # identified still read as 10% PURL coverage because its file inventory sat in
+    # the denominator. Files are not exempt from identification: the file-identifier
+    # check below measures the intrinsic identifier they DO carry, a hash. License
+    # and checksum coverage still count every component, because those they can carry.
     | ([ \$pkg[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$pkg[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
     # Packages that carry a CPE where they carry no PURL. The submission criteria
@@ -141,6 +149,12 @@ cdx_checks() {
     # and the regulatory baselines under this row (BSI 5.2.4, NTIA) accept either.
     # A Yocto image is the case in point: bitbake writes CPEs, never PURLs.
     | ([ \$pkg[] | select((.purl==null) and ((.cpe // \"\") != \"\")) ] | length) as \$cpe_only
+    # File components carry no purl, so their identifier is the hash the scanner
+    # computed over the file itself. The CISA 2026 minimum elements accept an
+    # intrinsic identifier in that role alongside PURL and CPE, so this is what
+    # \"identified\" means for a file and the coverage is measured on its own.
+    | ([ \$file[] | select((.hashes // []) | length > 0) ] | length) as \$fhash_ok
+    | ([ \$file[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]) as \$miss_fid
     | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
     | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
     | (\$okvers | split(\" \")) as \$vers
@@ -177,15 +191,36 @@ cdx_checks() {
        {id:\"top-component\", label:\"Top-level component name+version\", required:true,
         status:(if ((\$top.name//\"\")|length)>0 and ((\$top.version//\"\")|length)>0 then \"pass\" else \"fail\" end),
         detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")), missing:[]},
+       # An empty package set fails. With no packages the two checks below have
+       # nothing to measure, and reporting that as \"0/0, met\" would hand a clean
+       # bill to an SBOM that identified nothing at all — a binary scan that
+       # recovered only a file listing used to read as 100% name+version coverage
+       # and pass. The submission criteria require identified packages because the
+       # default vulnerability matching keys on their PURLs, and a file inventory
+       # supports none of that however complete it is. A warn would not do: a warn
+       # on a mandatory check leaves the overall verdict at pass. The two empty
+       # cases are told apart in the detail, not in the status, so the supplier
+       # reads whether their SBOM listed files only or listed nothing.
        {id:\"name-version\", label:\"Component name+version coverage (100%)\", required:true,
-        status:(if (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\", missing:(\$miss_nv[0:\$cap])},
+        status:(if \$ptot==0 then \"fail\"
+                elif (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
+        detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
+                                   else \"no components to measure\" end)
+                else \"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\" end),
+        missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if \$ptot==0 or pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
-        detail:(if \$ptot==0 then \"no packages to measure\"
+        status:(if \$ptot==0 then \"fail\"
+                elif pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
+        detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
+                                   else \"no components to measure\" end)
                 else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\"
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
+       {id:\"file-identifier\", label:\"File component identifier coverage (hash, >= \(\$fieldmin)%, recommended)\", required:false,
+        status:(if \$ftot==0 or pct(\$fhash_ok;\$ftot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        detail:(if \$ftot==0 then \"no file components\"
+                else \"\(pct(\$fhash_ok;\$ftot))% (\(\$fhash_ok)/\(\$ftot))\" end),
+        missing:(\$miss_fid[0:\$cap])},
        {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
         status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
@@ -666,12 +701,16 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif ($en|test("^Component creator coverage ")) then ($C["conformance.label.creator"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           elif ($en|test("^Component filename coverage ")) then ($C["conformance.label.filename"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           elif ($en|test("^Source or distribution URI coverage ")) then ($C["conformance.label.artifact_uri"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^File component identifier coverage ")) then ($C["conformance.label.file_identifier"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           else ($C["conformance.label_exact"][$en] // $en) end;
         def ldetail($d):
           if $d=="present" then $C["conformance.detail.present"]
           elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
           elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
           elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
+          elif $d=="no package components (file inventory only)" then $C["conformance.detail.files_only"]
+          elif $d=="no components to measure" then $C["conformance.detail.no_components"]
+          elif $d=="no file components" then $C["conformance.detail.no_files"]
           elif $d=="nothing to measure" then $C["conformance.detail.nothing"]
           elif $d=="requires inspecting the delivered files (no automated source in this scan)" then $C["conformance.detail.file_props_review"]
           elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]

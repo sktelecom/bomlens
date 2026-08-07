@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A binary or firmware SBOM is no longer marked short on fields its file entries cannot carry. Such a scan lists the delivered files alongside the packages it identified, and a file on disk has no package version and no PURL type, yet every one of them sat in the denominator of the name/version and PURL coverage checks. A firmware image whose packages were all identified reported 10% PURL coverage on that basis, and a binary reported 39 of 415 components named. Measured over the packages alone, the same two SBOMs report 18% and 39 of 39. Files are still expected to be identified, by the identifier they do carry: a new recommended check reports how many of them have a hash, and names the ones that do not.
+
+- An SBOM that enumerates no package at all now fails instead of passing. With an empty package set the coverage checks had nothing to measure and reported full coverage, so a scan that recovered only a file listing could be reported as meeting the submission criteria in full. The two empty cases are told apart in the report: a file inventory with no packages, and an SBOM with no components of any kind.
+
 ## [v1.10.2] - 2026-08-05
 
 ### Added

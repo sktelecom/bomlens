@@ -1621,6 +1621,59 @@ bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/
 tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
 [ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
 
+echo "== conformance: file components are judged by hash, not by PURL =="
+# A binary or firmware scan enumerates the delivered files as type "file"
+# components. They carry no PURL and no package version — purl defines no type for
+# a file on disk — so counting them in the package coverage denominators failed
+# SBOMs for a field that cannot exist: a firmware SBOM whose packages were all
+# identified read as 10% PURL coverage because 14 file entries sat in the
+# denominator. Files still have to be identified, by the intrinsic identifier they
+# do carry, so file-identifier measures hash coverage over them.
+FILE_C='{"type":"file","name":"usr/lib/libfoo.so.1","hashes":[{"alg":"SHA-256","content":"aa"}]}'
+jq --argjson f "$FILE_C" '.components += [$f, ($f | .name = "usr/bin/bar")]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/conf-files.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-files.json" "$WORK/cf" "supplier" >/dev/null 2>&1
+cf=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/cf_conformance.json")
+[ "$cf" = "pass/pass/pass" ] \
+    && pass "file components no longer drag down package name/PURL coverage" \
+    || fail "adding file components broke a clean SBOM" "result/name-version/purl = $cf"
+cf_fid=$(jq -r '.checks[] | select(.id=="file-identifier") | "\(.status)|\(.detail)"' "$WORK/cf_conformance.json")
+[ "$cf_fid" = "pass|100% (2/2)" ] \
+    && pass "file-identifier measures hash coverage over the file components" \
+    || fail "file-identifier: '$cf_fid', expected pass|100% (2/2)"
+# A file component with no hash carries no identifier at all: PURL is undefined
+# for it and the hash is gone, so nothing keys it to anything. Advisory for now.
+jq --argjson f "$FILE_C" '.components += [$f | del(.hashes)]' "$FIX/good-cyclonedx.json" > "$WORK/conf-nohash.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-nohash.json" "$WORK/cn" "supplier" >/dev/null 2>&1
+cn=$(jq -r '.checks[] | select(.id=="file-identifier") | "\(.status)|\(.detail)"' "$WORK/cn_conformance.json")
+cn_res=$(jq -r '.result' "$WORK/cn_conformance.json")
+{ [ "$cn" = "warn|0% (0/1)" ] && [ "$cn_res" = "pass" ]; } \
+    && pass "an unhashed file component warns without failing the submission" \
+    || fail "unhashed file component: check='$cn' result='$cn_res', expected warn|0% (0/1) and pass"
+jq -e '.checks[] | select(.id=="file-identifier") | .missing | index("usr/lib/libfoo.so.1")' "$WORK/cn_conformance.json" >/dev/null \
+    && pass "file-identifier names the unidentified file" || fail "file-identifier missing list lacks the offending file"
+# The denominator fix must not become an escape hatch. An SBOM that enumerates
+# ONLY files identified no package, so it cannot answer the question the
+# submission criteria exist to answer (vulnerability matching keys on PURL).
+# Reporting the empty denominator as 0/0 met would pass it; it must fail, and the
+# detail has to say which of the two empty cases it is.
+jq '.components = [.components[] | select(.type=="file")]' "$WORK/conf-files.json" > "$WORK/conf-fileonly.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-fileonly.json" "$WORK/co" "supplier" >/dev/null 2>&1
+co=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/co_conformance.json")
+[ "$co" = "fail/fail/fail" ] \
+    && pass "an SBOM of files only fails: it identified no package" \
+    || fail "file-only SBOM: result/name-version/purl = $co, expected fail/fail/fail" \
+            "the empty package denominator must not read as full coverage"
+co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conformance.json")
+[ "$co_detail" = "no package components (file inventory only)" ] \
+    && pass "the file-only case is named in the detail" || fail "file-only detail: '$co_detail'"
+jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
+ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.detail)"' "$WORK/ce_conformance.json")
+[ "$ce" = "fail/no components to measure" ] \
+    && pass "an SBOM with no components at all fails and says so" \
+    || fail "empty SBOM: '$ce', expected fail/no components to measure"
+
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
 # `pip install`) emits BOTH the requirements.txt range lower bound (flask@2.0,

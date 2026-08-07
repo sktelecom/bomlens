@@ -43,6 +43,7 @@
   "conformance.label.creator": "구성요소 작성자 포함률 (%n%% 이상, 권장)",
   "conformance.label.filename": "구성요소 파일명 포함률 (%n%% 이상, 권장)",
   "conformance.label.artifact_uri": "소스 또는 배포 URI 포함률 (%n%% 이상, 권장)",
+  "conformance.label.file_identifier": "파일 구성요소 식별자 포함률 (해시, %n%% 이상, 권장)",
   "conformance.label_exact": {
     "Timestamp (metadata.timestamp)": "타임스탬프 (metadata.timestamp)",
     "Tool info (metadata.tools)": "도구 정보 (metadata.tools)",
@@ -69,6 +70,9 @@
   },
   "conformance.detail.present": "있음",
   "conformance.detail.no_packages": "측정할 패키지 없음",
+  "conformance.detail.files_only": "패키지 구성요소 없음 (파일 목록만)",
+  "conformance.detail.no_components": "측정할 구성요소 없음",
+  "conformance.detail.no_files": "파일 구성요소 없음",
   "conformance.detail.nothing": "측정할 대상 없음",
   "conformance.detail.file_props_review": "배포 파일을 직접 확인해야 함 (이번 스캔에는 자동 수집 경로 없음)",
   "conformance.detail.not_present": "SBOM에 없음",
