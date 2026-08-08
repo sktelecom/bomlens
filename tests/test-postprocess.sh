@@ -1737,6 +1737,29 @@ bash "$LIB/stamp-document-metadata.sh" "$WORK/art-keep.json" FIRMWARE "$WORK/art
 keep=$(jq -r '[.metadata.component.hashes[] | .alg] | join(",")' "$WORK/art-keep.json")
 [ "$keep" = "SHA-512" ] && pass "an existing target-component hash is not overwritten" || fail "existing hash replaced: '$keep'"
 
+echo "== conformance: a signature delivered beside the SBOM is not silently a gap =="
+# The signing this tool offers is detached — the signature is a file next to the
+# SBOM — and this report reads one file, so it cannot see one. Saying only "not
+# present" would read as unsigned to someone whose supplier did sign. The row
+# carries the note instead, and a signature carried inside the document is still
+# read and credited.
+bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sg" "supplier" >/dev/null 2>&1
+sg=$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | "\(.status)|\((.reviewGuide.how // "") | length > 0)"' "$WORK/sg_conformance.json")
+[ "$sg" = "warn|true" ] && pass "an unsigned-looking SBOM carries the note about detached signatures" || fail "signature row: '$sg'"
+jq '.signature = {"algorithm":"ES256","value":"MEUCIQD"}' "$FIX/good-cyclonedx.json" > "$WORK/sg-signed.json"
+bash "$LIB/validate-sbom.sh" "$WORK/sg-signed.json" "$WORK/sgs" "supplier" >/dev/null 2>&1
+sgs=$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | .status' "$WORK/sgs_conformance.json")
+[ "$sgs" = "pass" ] && pass "a signature inside the document is read and credited" || fail "in-document signature: '$sgs'"
+# The note has to reach the markdown too: that is the copy that gets pasted into
+# a ticket, and it used to render only in the HTML.
+grep -q "^## What needs a person" "$WORK/sg_conformance.md" \
+    && pass "the review notes render in the markdown report" || fail "markdown has no review section"
+grep -q "detached signature" "$WORK/sg_conformance.md" \
+    && pass "the signature note is one of them" || fail "markdown review section omits the signature note"
+REPORT_LANG=ko bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sgk" "supplier" >/dev/null 2>&1
+grep -q "^## 사람이 확인할 항목" "$WORK/sgk_conformance.md" \
+    && pass "the Korean report renders the section too" || fail "ko markdown has no review section"
+
 echo "== conformance: the 2026 SBOM minimum elements are measured on every SBOM =="
 # The baseline applies to all software, not to a subset, so its registry declares
 # no condition and is measured wherever a CycloneDX SBOM is. Advisory throughout

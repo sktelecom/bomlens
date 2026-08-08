@@ -1,0 +1,56 @@
+{
+  "note": "Per-element guidance for the 2026 SBOM minimum elements, keyed by element id (docker/lib/cisa-registry.json), same convention as g7-guidance.json. 'map' carries the CycloneDX fragment that would satisfy an element the SBOM does not; 'review' carries what a person has to establish for an element no scan can answer. This is a documentation aid: validate-sbom.sh attaches it to a check for the report and it never changes a status or the overall result. Fragments carry CycloneDX field names, so they are not localized; review notes are. An element carries a fragment or a review note, not both: the report shows one panel per row, and for a signature the thing worth saying is that a detached one is not visible here.",
+  "map": {
+    "cisa-sbom-author": {
+      "snippet": "\"metadata\": {\n  \"authors\": [ { \"name\": \"Example Manufacturing Co., Ltd.\" } ]\n}",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_authors"
+    },
+    "cisa-sbom-generation-context": {
+      "snippet": "\"metadata\": {\n  \"lifecycles\": [ { \"phase\": \"post-build\" } ]\n}",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_lifecycles"
+    },
+    "cisa-sbom-tool-version": {
+      "snippet": "\"metadata\": {\n  \"tools\": { \"components\": [\n    { \"type\": \"application\", \"name\": \"Example Scanner\", \"version\": \"3.1.0\" }\n  ] }\n}",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_tools"
+    },
+    "cisa-component-producer": {
+      "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"version\": \"1.2.3\",\n  \"publisher\": \"The Example Project\"\n} ]",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_publisher"
+    },
+    "cisa-component-hash-value": {
+      "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"hashes\": [ { \"alg\": \"SHA-256\", \"content\": \"3b7c…\" } ]\n} ]",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_hashes"
+    },
+    "cisa-explicit-unknowns": {
+      "snippet": "\"metadata\": {\n  \"properties\": [\n    { \"name\": \"bomlens:undeclared-fields\", \"value\": \"unknown-to-author\" }\n  ]\n}",
+      "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_properties"
+    }
+  },
+  "review": {
+    "cisa-sbom-author-signature": {
+      "how": "A signature delivered beside the SBOM rather than inside it does not appear here, because this report reads one file. If the SBOM arrived with a detached signature, verify it against the sender's key before treating the contents as theirs, and record that you did. A signature carried inside the document is read automatically and this row will say so.",
+      "how_ko": "SBOM 안이 아니라 파일 옆에 따로 온 서명은 이 보고서에 나타나지 않습니다. 보고서가 파일 하나만 읽기 때문입니다. 분리 서명과 함께 받았다면 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다. 문서 안에 담긴 서명은 자동으로 읽히며 그 경우 이 행에 표시됩니다.",
+      "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+    },
+    "cisa-coverage": {
+      "how": "Establish that the SBOM lists every component making up the software, transitive dependencies included. No tool can confirm this from the document alone — the document cannot show what was left out of it. Compare it against the build's own dependency resolution, or against the manifests the software is built from.",
+      "how_ko": "SBOM이 소프트웨어를 이루는 구성요소를 이행 의존성까지 빠짐없이 담았는지 확인합니다. 문서만 보고는 어떤 도구도 판정할 수 없습니다. 문서는 자기가 빠뜨린 것을 보여 주지 못하기 때문입니다. 빌드가 실제로 해석한 의존성이나 빌드에 쓰인 매니페스트와 대조합니다.",
+      "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+    },
+    "cisa-accommodation-of-updates": {
+      "how": "Establish that there is a way to correct SBOM data after it has been published, and that corrections go out promptly. This is a practice of the organisation issuing the SBOM, not a field in it.",
+      "how_ko": "발행한 SBOM 데이터를 나중에 정정할 방법이 있고 정정본이 지체 없이 나가는지 확인합니다. 문서 안의 필드가 아니라 SBOM을 발행하는 조직의 관행에 대한 항목입니다.",
+      "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+    },
+    "cisa-distribution-and-delivery": {
+      "how": "Establish that whoever needs the SBOM can get it promptly, and that any access control keeps unauthorized parties out without blocking authorized ones or preventing the data from being loaded into their security tools.",
+      "how_ko": "SBOM이 필요한 쪽이 지체 없이 받을 수 있는지, 접근 통제가 권한 없는 쪽을 막되 권한 있는 쪽의 수신이나 보안 도구로의 반입까지 막지는 않는지 확인합니다.",
+      "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+    },
+    "cisa-frequency": {
+      "how": "Establish that each software version or update has an SBOM of its own, and that a revised SBOM is issued when the component data changes or an error in it is found.",
+      "how_ko": "소프트웨어 버전이나 업데이트마다 자기 SBOM이 있는지, 구성요소 데이터가 바뀌거나 오류를 발견했을 때 정정본을 다시 내는지 확인합니다.",
+      "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+    }
+  }
+}

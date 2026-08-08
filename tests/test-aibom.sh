@@ -959,7 +959,9 @@ echo "== G7 fill-in guidance: informational only (result + G7 count unchanged) =
 G7_GUIDANCE="$WORK/nope.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/confg" "x" >/dev/null 2>&1
 rg_with=$(jq -r '.result' "$CONF"); rg_without=$(jq -r '.result' "$WORK/confg_conformance.json")
 [ "$rg_with" = "$rg_without" ] && pass "result identical with/without the guidance ($rg_with)" || fail "result changed: with=$rg_with without=$rg_without"
-gcount=$(jq '[.checks[] | select(has("guidance"))] | length' "$WORK/confg_conformance.json")
+# Scoped to G7 rows: each baseline carries its own guidance file, and disabling
+# one must not be measured by whether another still has hers.
+gcount=$(jq '[.checks[] | select((.id|startswith("g7-")) and has("guidance"))] | length' "$WORK/confg_conformance.json")
 [ "$gcount" = "0" ] && pass "no guidance file -> no guidance keys (graceful)" || fail "guidance present despite a disabled registry ($gcount)"
 g7g_with=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$CONF")
 g7g_without=$(jq '[.checks[]|select(.id|startswith("g7-"))]|length' "$WORK/confg_conformance.json")

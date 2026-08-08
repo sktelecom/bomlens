@@ -383,34 +383,39 @@ registry_checks() {
     echo "$out"
 }
 
-# G7 checks: the registry evaluation above, plus the fill-in guidance that is
-# specific to this baseline. Kept apart so the evaluator stays about evaluating.
+# Attach a baseline's guidance to its evaluated checks (best-effort): the fragment
+# that would satisfy an element, so the report can answer "how do I close this gap"
+# and not only "this is missing", and the note for an element a person has to
+# establish. Attached only where a mapping exists, and like the crosswalk it never
+# changes a status or the result.
+#
+# The regulatory crosswalk used to be joined per baseline. It now runs once over
+# the whole check array (see join_crosswalk below) so the plain CycloneDX checks
+# carry their CRA / BSI references too.
+# $1: evaluated checks (JSON array). $2: guidance file. $3: name for the warning.
+join_guidance() {
+    local checks="$1" guide="$2" what="$3"
+    if [ ! -f "$guide" ]; then echo "$checks"; return; fi
+    local joined
+    if joined=$(printf '%s' "$checks" | jq -c --slurpfile g "$guide" '
+        (($g[0].map) // {}) as $m
+        | (($g[0].review) // {}) as $r
+        | map(if $m[.id] then . + {guidance: $m[.id]} else . end)
+        | map(if $r[.id] then . + {reviewGuide: $r[.id]} else . end)' 2>/dev/null); then
+        echo "$joined"
+    else
+        echo "[validate] WARN: $what guidance join failed; continuing without it." >&2
+        echo "$checks"
+    fi
+}
+
+# G7 checks: the registry evaluation above, plus the guidance for that baseline.
+# Kept apart so the evaluator stays about evaluating.
 g7_ai_checks() {
     local out
     out=$(registry_checks "${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}" "G7")
     [ "$out" = "[]" ] && { echo "[]"; return; }
-    # The regulatory crosswalk used to be joined here, over the G7 elements only.
-    # It now runs once over the whole check array (see join_crosswalk below) so the
-    # plain CycloneDX checks carry their CRA / NTIA references too.
-    #
-    # Join the fill-in guidance (best-effort): the CycloneDX fragment
-    # that would satisfy each element, so the report can answer "how do I close
-    # this gap" and not just "this is missing". Attached only where a mapping
-    # exists, and like the crosswalk it never changes a status or the result.
-    local guide="${G7_GUIDANCE:-$(dirname "$0")/g7-guidance.json}"
-    if [ -f "$guide" ]; then
-        local gjoined
-        if gjoined=$(printf '%s' "$out" | jq -c --slurpfile g "$guide" '
-            (($g[0].map) // {}) as $m
-            | (($g[0].review) // {}) as $r
-            | map(if $m[.id] then . + {guidance: $m[.id]} else . end)
-            | map(if $r[.id] then . + {reviewGuide: $r[.id]} else . end)' 2>/dev/null); then
-            out="$gjoined"
-        else
-            echo "[validate] WARN: G7 guidance join failed; continuing without it." >&2
-        fi
-    fi
-    echo "$out"
+    join_guidance "$out" "${G7_GUIDANCE:-$(dirname "$0")/g7-guidance.json}" "G7"
 }
 
 spdx_json_checks() {
@@ -554,6 +559,7 @@ case "$FORMAT" in
         CISA_REG="${CISA_REGISTRY:-$(dirname "$0")/cisa-registry.json}"
         if registry_applies "$CISA_REG"; then
             CISA=$(registry_checks "$CISA_REG" "CISA")
+            CISA=$(join_guidance "$CISA" "${CISA_GUIDANCE:-$(dirname "$0")/cisa-guidance.json}" "CISA")
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$CISA" | jq -cs 'add')
             echo "[validate] added the 2026 SBOM minimum-element checks"
         fi
@@ -844,6 +850,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_FLAG=$(kstr aiprofile.th_flag); C_LIC_NONE=$(kstr aiprofile.lic_none_html)
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
+    C_H2_REVIEW=$(kstr conformance.h2_review); C_REVIEW_INTRO=$(kstr conformance.review_intro)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
     C_REF=$(kstr conformance.reference); C_REF="${C_REF%% *}"   # "참고:" prefix
@@ -872,6 +879,7 @@ else
     C_H2_G7CHK="G7 minimum elements"
     C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
     C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
+    C_H2_REVIEW="What needs a person"; C_REVIEW_INTRO="Items no scan can settle, and what to establish for each."
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
     C_YES="yes"; C_NO="no"
@@ -969,6 +977,22 @@ fi
             "```",
             "",
             "\($ref) \(.guidance.docUrl)",
+            ""'
+    fi
+    # What needs a person: the same notes the HTML shows, for readers of the
+    # markdown — which is the copy that gets pasted into a ticket. Same condition,
+    # so the two renderings cannot drift into saying different things.
+    if echo "$RCHECKS" | jq -e 'any(.[]; (.reviewGuide // null) != null and .status != "pass")' >/dev/null; then
+        echo "## ${C_H2_REVIEW}"
+        echo ""
+        echo "${C_REVIEW_INTRO}"
+        echo ""
+        echo "$RCHECKS" | jq -r --arg ref "$C_REF" '.[] | select((.reviewGuide // null) != null and .status != "pass") |
+            "### \(.label)",
+            "",
+            .reviewGuide.how,
+            "",
+            "\($ref) \(.reviewGuide.docUrl)",
             ""'
     fi
 } > "$MD"
@@ -1103,7 +1127,7 @@ HTMLHEAD
                           + ((.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
                      else "" end)
                   + "</details>"
-             elif ((.reviewGuide // null) != null and (.source // "")=="na")
+             elif ((.reviewGuide // null) != null and .status != "pass")
              then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
                   + "<p>" + (.reviewGuide.how|@html) + "</p>"
                   + (if ((.reviewGuide.docUrl // "")|startswith("http"))
