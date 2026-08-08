@@ -71,7 +71,6 @@
   "conformance.detail.present": "있음",
   "conformance.detail.no_packages": "측정할 패키지 없음",
   "conformance.detail.files_only": "패키지 구성요소 없음 (파일 목록만)",
-  "conformance.detail.no_components": "측정할 구성요소 없음",
   "conformance.detail.no_files": "파일 구성요소 없음",
   "conformance.detail.nothing": "측정할 대상 없음",
   "conformance.detail.file_props_review": "배포 파일을 직접 확인해야 함 (이번 스캔에는 자동 수집 경로 없음)",

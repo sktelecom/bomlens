@@ -191,28 +191,30 @@ cdx_checks() {
        {id:\"top-component\", label:\"Top-level component name+version\", required:true,
         status:(if ((\$top.name//\"\")|length)>0 and ((\$top.version//\"\")|length)>0 then \"pass\" else \"fail\" end),
         detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")), missing:[]},
-       # An empty package set fails. With no packages the two checks below have
-       # nothing to measure, and reporting that as \"0/0, met\" would hand a clean
-       # bill to an SBOM that identified nothing at all — a binary scan that
-       # recovered only a file listing used to read as 100% name+version coverage
-       # and pass. The submission criteria require identified packages because the
-       # default vulnerability matching keys on their PURLs, and a file inventory
-       # supports none of that however complete it is. A warn would not do: a warn
-       # on a mandatory check leaves the overall verdict at pass. The two empty
-       # cases are told apart in the detail, not in the status, so the supplier
-       # reads whether their SBOM listed files only or listed nothing.
+       # Nothing to measure is not a coverage failure, EXCEPT when the packages
+       # went missing because this check stopped counting file components. A
+       # binary scan that recovered only a file listing identified no package, and
+       # the submission criteria exist to answer questions that need one — the
+       # default vulnerability matching keys on PURLs, and a file inventory
+       # supports none of it however complete. Reporting that as \"0/0, met\" would
+       # pass an SBOM that named nothing.
+       #
+       # An SBOM with no components at all, or one whose components are all data,
+       # keeps the earlier behaviour: both checks agree and neither complains,
+       # because there the empty denominator is not something an exclusion here
+       # created. A dataset carries no purl and no package version by definition,
+       # and an SBOM listing only datasets is a legitimate one to submit.
        {id:\"name-version\", label:\"Component name+version coverage (100%)\", required:true,
-        status:(if \$ptot==0 then \"fail\"
+        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"pass\" end)
                 elif (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
-        detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
-                                   else \"no components to measure\" end)
+        detail:(if \$ptot==0 and \$ftot>0 then \"no package components (file inventory only)\"
                 else \"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\" end),
         missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if \$ptot==0 then \"fail\"
+        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"pass\" end)
                 elif pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
-                                   else \"no components to measure\" end)
+                                   else \"no packages to measure\" end)
                 else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\"
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
@@ -709,7 +711,6 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
           elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
           elif $d=="no package components (file inventory only)" then $C["conformance.detail.files_only"]
-          elif $d=="no components to measure" then $C["conformance.detail.no_components"]
           elif $d=="no file components" then $C["conformance.detail.no_files"]
           elif $d=="nothing to measure" then $C["conformance.detail.nothing"]
           elif $d=="requires inspecting the delivered files (no automated source in this scan)" then $C["conformance.detail.file_props_review"]

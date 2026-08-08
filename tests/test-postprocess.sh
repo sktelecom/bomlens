@@ -1667,12 +1667,25 @@ co=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.status)/\(.chec
 co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conformance.json")
 [ "$co_detail" = "no package components (file inventory only)" ] \
     && pass "the file-only case is named in the detail" || fail "file-only detail: '$co_detail'"
+# The failure above is narrow on purpose: it fires when the denominator emptied
+# because file components stopped being counted, and nowhere else. An SBOM with no
+# components at all, or one whose components are all data, keeps the behaviour an
+# earlier fix established — the two checks agree and neither complains, because a
+# dataset has no purl and no package version to begin with and an SBOM listing only
+# datasets is legitimate to submit. Widening the failure to every empty denominator
+# would report those as uncovered, which is the same false alarm in a new place.
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
-ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.detail)"' "$WORK/ce_conformance.json")
-[ "$ce" = "fail/no components to measure" ] \
-    && pass "an SBOM with no components at all fails and says so" \
-    || fail "empty SBOM: '$ce', expected fail/no components to measure"
+ce=$(jq -r '"\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/ce_conformance.json")
+[ "$ce" = "pass/pass" ] \
+    && pass "an SBOM with no components at all is not reported as uncovered" \
+    || fail "empty SBOM: name-version/purl = $ce, expected pass/pass"
+jq '.components = [.components[] | select(.type=="data")]' "$FIX/aibom-datasets-1_7.json" > "$WORK/conf-dataonly.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-dataonly.json" "$WORK/cd" "supplier" >/dev/null 2>&1
+cd_st=$(jq -r '"\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/cd_conformance.json")
+[ "$cd_st" = "pass/pass" ] \
+    && pass "an SBOM of datasets only is not reported as uncovered" \
+    || fail "data-only SBOM: name-version/purl = $cd_st, expected pass/pass"
 
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
