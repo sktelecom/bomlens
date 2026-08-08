@@ -34,6 +34,15 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# The image's own release, so an SBOM this pipeline generates can name the tool
+# version that produced it — an SBOM minimum element. The publish workflow passes
+# the image's version tag: the release version on a tagged build, `latest` on a
+# build from main, which is what the reader pulled either way. A local build leaves
+# it empty and the SBOM reports the version as unknown, which is what the minimum
+# elements ask for when no version identifier is available.
+ARG BOMLENS_VERSION=
+ENV BOMLENS_VERSION=${BOMLENS_VERSION}
+
 # Pinned tool versions (supply-chain hygiene). The `# renovate:` comments let
 # Renovate (renovate.json customManagers) track each upstream and open bump PRs;
 # Dependabot cannot see these ARG-pinned, curl/pip-installed tools. See
@@ -71,6 +80,12 @@ ARG UNBLOB_VERSION=26.3.30
 ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
 ARG UBI_READER_VERSION=0.8.14
+# The firmware SBOM names the tools that produced it, and a tool name without a
+# version tells a reader nothing about which build ran. Carry the pins forward as
+# ENV so scan-firmware.sh states them exactly instead of parsing --version output.
+ENV BOMLENS_SYFT_VERSION=${SYFT_VERSION} \
+    BOMLENS_UNBLOB_VERSION=${UNBLOB_VERSION} \
+    BOMLENS_CVE_BIN_TOOL_VERSION=${CVE_BIN_TOOL_VERSION}
 # sasquatch — the patched unsquashfs that reads vendor squashfs variants standard
 # squashfs-tools rejects. GPL-2.0, from the unblob authors, shipped as a prebuilt
 # .deb so nothing is compiled here.

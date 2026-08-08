@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Every generated SBOM now records at which lifecycle phase it was produced, and with which tool at which version. A scan that reads source manifests is marked `pre-build` and one that reads a built artifact — an image, a binary, a firmware image, a root filesystem, a model — is marked `post-build`, which is the distinction a reader needs to know what the component data can mean. BomLens names itself among the tools that produced the document, alongside the scanners it drove, and a tool whose version was not recorded now says so instead of leaving the field empty. A merged SBOM claims no phase, because its inputs may each have had a different one.
+
+- `--sbom-author` (or `SBOM_AUTHOR`) records the organisation or person that generated the SBOM. This is the entity running the scan, which is neither the tool nor the author of the software being scanned, and nothing in a scan can discover it. Left unset, the field is omitted rather than filled with a placeholder — and the generator's own default, which named the SBOM tool's publisher as the document's author, is no longer carried through.
+
 ### Fixed
 
 - A binary or firmware SBOM is no longer marked short on fields its file entries cannot carry. Such a scan lists the delivered files alongside the packages it identified, and a file on disk has no package version and no PURL type, yet every one of them sat in the denominator of the name/version and PURL coverage checks. A firmware image whose packages were all identified reported 10% PURL coverage on that basis, and a binary reported 39 of 415 components named. Measured over the packages alone, the same two SBOMs report 18% and 39 of 39. Files are still expected to be identified, by the identifier they do carry: a new recommended check reports how many of them have a hash, and names the ones that do not.

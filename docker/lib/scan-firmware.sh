@@ -879,7 +879,10 @@ jq -n \
     --arg name "$(basename "$FW")" \
     --arg version "$VERSION" \
     --arg desc "$FILE_INFO" \
-    --arg ts "$GEN_AT" '
+    --arg ts "$GEN_AT" \
+    --arg unblobv "${BOMLENS_UNBLOB_VERSION:-unknown}" \
+    --arg syftv "${BOMLENS_SYFT_VERSION:-unknown}" \
+    --arg cvebtv "${BOMLENS_CVE_BIN_TOOL_VERSION:-unknown}" '
 {
   bomFormat: "CycloneDX",
   specVersion: "1.6",
@@ -887,9 +890,9 @@ jq -n \
   metadata: {
     timestamp: $ts,
     tools: { components: [
-      { type: "application", name: "unblob" },
-      { type: "application", name: "syft" },
-      { type: "application", name: "cve-bin-tool" }
+      { type: "application", name: "unblob", version: $unblobv },
+      { type: "application", name: "syft", version: $syftv },
+      { type: "application", name: "cve-bin-tool", version: $cvebtv }
     ] },
     component: { type: "firmware", name: $name, version: $version, description: $desc }
   },

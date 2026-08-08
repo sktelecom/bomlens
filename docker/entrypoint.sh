@@ -588,6 +588,23 @@ case "$SCAN_MODE" in
         ;;
 esac
 
+# ========================================================
+# Record who generated this SBOM, with what, and at which lifecycle phase — the
+# document-level fields the 2026 SBOM minimum elements ask every SBOM to carry.
+# See stamp-document-metadata.sh for what each one means and why ANALYZE is the
+# one mode left out (it converts a supplier's document; we did not author it).
+#
+# Listed mode by mode rather than as "everything except ANALYZE": a mode added
+# later that also takes a supplier's SBOM as input would otherwise be stamped by
+# default and quietly claim authorship of it. The script warns about a mode it has
+# no phase for, so a new scan mode shows up in the log instead of passing silently.
+# ========================================================
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS|ROOTFS|IMAGE|BINARY|FIRMWARE|AIBOM|MERGE)
+        run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
+        ;;
+esac
+
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable
 else

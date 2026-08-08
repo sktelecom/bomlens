@@ -154,6 +154,58 @@ else
     pass "stamp fails closed on invalid JSON (exit != 0)"
 fi
 
+echo "== document metadata: generation context, author, and the tool that produced the SBOM =="
+# The 2026 SBOM minimum elements ask an SBOM to say at which lifecycle phase it was
+# generated, who generated it, and with which tool at which version. None of the
+# three was recorded, and two of them were recorded WRONG by the generators: cdxgen
+# names its own publisher as the document author, and writes `build` as the phase of
+# a scan that read source manifests.
+DOC='{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+  "metadata":{"timestamp":"2026-01-01T00:00:00Z",
+    "lifecycles":[{"phase":"build"}],
+    "authors":[{"name":"OWASP Foundation"}],
+    "tools":{"components":[{"type":"application","name":"cdxgen","version":"12.7.0"}]},
+    "component":{"type":"application","name":"App","version":"1.0"}},
+  "components":[]}'
+printf '%s' "$DOC" > "$WORK/doc-src.json"
+BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-src.json" SOURCE >/dev/null 2>&1
+ds=$(jq -rc '"\(.metadata.lifecycles)|\(.metadata|has("authors"))|\([.metadata.tools.components[]|"\(.name)@\(.version)"]|join(","))"' "$WORK/doc-src.json")
+[ "$ds" = '[{"phase":"pre-build"}]|false|cdxgen@12.7.0,BomLens@9.9.9' ] \
+    && pass "a source scan records pre-build, drops the generator's authorship claim, and names BomLens" \
+    || fail "source document metadata: $ds"
+# The author is the entity operating the tool, which only the caller knows.
+printf '%s' "$DOC" > "$WORK/doc-auth.json"
+SBOM_AUTHOR="SK Telecom Co., Ltd." BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
+da=$(jq -rc '"\(.metadata.lifecycles[0].phase)|\(.metadata.authors[0].name)"' "$WORK/doc-auth.json")
+[ "$da" = 'post-build|SK Telecom Co., Ltd.' ] \
+    && pass "a firmware scan records post-build and the declared author" || fail "declared author: $da"
+# Running twice must not append a second BomLens entry (the pipeline may restamp).
+BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
+dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
+[ "$dcount" = "1" ] && pass "restamping does not duplicate the tool entry" || fail "BomLens listed ${dcount}x after two runs"
+# A tool entry with no version says nothing about which build ran; the minimum
+# elements ask for it to be stated as unknown instead of omitted. Same for BomLens
+# itself in a local build with no version baked in.
+printf '%s' "$DOC" | jq '.metadata.tools = [{"vendor":"anchore","name":"syft"}]' > "$WORK/doc-legacy.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-legacy.json" BINARY >/dev/null 2>&1
+dl=$(jq -rc '[.metadata.tools[]|"\(.name)@\(.version)"]|join(",")' "$WORK/doc-legacy.json")
+[ "$dl" = 'syft@unknown,BomLens@unknown' ] \
+    && pass "missing tool versions are stated as unknown, in the legacy tools array too" || fail "legacy tools: $dl"
+# MERGE combines SBOMs generated at whatever phase each input was, so the merged
+# document cannot claim one — it must not inherit a phase by accident.
+printf '%s' "$DOC" | jq 'del(.metadata.lifecycles)' > "$WORK/doc-merge.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-merge.json" MERGE >/dev/null 2>&1
+dm=$(jq -rc '"\(.metadata|has("lifecycles"))|\([.metadata.tools.components[]|.name]|join(","))"' "$WORK/doc-merge.json")
+[ "$dm" = 'false|cdxgen,BomLens' ] \
+    && pass "a merged SBOM claims no lifecycle phase but still names the tool" || fail "merge document metadata: $dm"
+# Invalid input is a defect, not a condition to tolerate: fail closed like stamp-metadata.
+printf 'not json{' > "$WORK/doc-bad.json"
+if bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-bad.json" SOURCE >/dev/null 2>&1; then
+    fail "document metadata stamp exited 0 on invalid JSON (should fail closed)"
+else
+    pass "document metadata stamp fails closed on invalid JSON (exit != 0)"
+fi
+
 echo "== B-4: NOTICE dedupes license texts and normalizes Expat to MIT =="
 cp "$FIX/license-aliases.json" "$WORK/l.json"
 bash "$LIB/generate-notice.sh" "$WORK/l.json" "$WORK/notice" "FixtureProj" >/dev/null 2>&1

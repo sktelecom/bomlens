@@ -88,6 +88,7 @@ jobs:
           # the flag). The Dockerfile default stays false for lean local builds.
           build-args: |
             SBOM_SCANOSS=true
+            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -244,6 +245,7 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_FIRMWARE=true
+            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=firmware
@@ -308,6 +310,7 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_AIBOM=true
+            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=aibom
@@ -371,6 +374,7 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_DEEP_CVE=true
+            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=deep-cve
