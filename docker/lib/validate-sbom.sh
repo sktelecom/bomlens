@@ -263,12 +263,24 @@ cdx_checks() {
       ]" "$SBOM"
 }
 
-# G7 AI SBOM minimum-element checks (appended for CycloneDX SBOMs that carry a
-# machine-learning-model component). Data-driven: the 7 clusters / 50 elements of
-# the G7 "SBOM for AI — Minimum Elements" live in docker/lib/g7-registry.json,
-# each mapped to a CycloneDX presence expression (cdxPath) and a data-source tag
-# (auto/inferred/declared/na). All checks are recommended (required:false) — G7 is
-# non-binding. Elements with no automated source (cdxPath null, source "na" —
+# Registry-driven minimum-element checks. A registry is a declarative file listing
+# the elements of one baseline, each mapped to a CycloneDX expression and a
+# data-source tag (auto/inferred/declared/na); docker/lib/g7-registry.json holds
+# the 7 clusters / 50 elements of the G7 "SBOM for AI — Minimum Elements".
+#
+# The registry declares three things about itself, so a second baseline can be
+# added as data rather than as another copy of this evaluator:
+#   subject      — jq expression selecting the components per-element coverage is
+#                  measured over. G7 measures over model components; a baseline
+#                  about software components measures over those instead.
+#   subjectLabel — what one of them is called in the report ("model component").
+#   required     — per element. An unsatisfied element fails when the baseline
+#                  makes it mandatory and warns when it does not. Every G7 element
+#                  is advisory (G7 is non-binding), so nothing there fails.
+# All three have defaults that reproduce the G7 behaviour exactly, so a registry
+# that declares none of them behaves as this evaluator always did.
+#
+# Elements with no automated source (cdxPath null, source "na" —
 # system data flows, security controls, KPI benchmarks, dataset sensitivity) are
 # surfaced as "requires human review" rather than silently omitted, so the report
 # shows the full 50-element picture and which slice the tool actually covers.
@@ -290,42 +302,72 @@ cdx_checks() {
 #                 the offender list and an "N/M model component(s)" detail otherwise
 #                 (an any-model check would hide non-compliant models in a
 #                 multi-model supplier SBOM).
-g7_ai_checks() {
-    local reg="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+# Does this registry have anything to say about this SBOM? The registry answers,
+# through an `appliesWhen` jq boolean over the SBOM; a registry that declares none
+# applies to everything.
+#
+# Only a clean false means "does not apply" (jq -e exits 1 on a false or null
+# result). A broken expression exits with something else, and that answers as
+# APPLIES on purpose: a registry we cannot read is a defect, and the way a defect
+# gets reported is registry_checks running and failing loudly. Returning "does not
+# apply" there would delete the whole baseline from the report without a word.
+# $1: registry file.
+registry_applies() {
+    local reg="$1"
+    [ -f "$reg" ] || return 1
+    local when rc
+    when=$(jq -r '.appliesWhen // "true"' "$reg" 2>/dev/null) || return 0
+    jq -e "$when" "$SBOM" >/dev/null 2>&1; rc=$?
+    [ "$rc" -eq 1 ] && return 1
+    return 0
+}
+
+# $1: registry file. $2: display name used in the warnings this prints.
+registry_checks() {
+    local reg="$1" what="$2"
     if [ ! -f "$reg" ]; then
-        echo "[validate] WARN: G7 registry not found at $reg; skipping G7 checks." >&2
+        echo "[validate] WARN: $what registry not found at $reg; skipping $what checks." >&2
         echo "[]"
         return
     fi
     local prog
     prog=$(jq -r '
-        "([.components[]? | select(.type==\"machine-learning-model\")]) as $models | ["
+        ((.subject // "[.components[]? | select(.type==\"machine-learning-model\")]")) as $subject
+        | ((.subjectLabel // "model component")) as $slabel
+        | ((.emptySubjectDetail // "no machine-learning-model components")) as $sempty
+        | "(" + $subject + ") as $subjects | ["
         + ([ .clusters[] as $c | $c.elements[] |
             "{id:" + (.id|@json)
             + ",label:" + (.label|@json)
-            + ",required:false"
+            + ",required:" + ((.required // false)|tojson)
             + ",cluster:" + ($c.id|@json)
             + ",source:" + (.source|@json)
             + ",role:" + ((.role // "")|@json)
             + ",_present:(" + (if (.source=="na" or (.cdxPath==null)) then "null" else "(try (" + .cdxPath + ") catch false)" end) + ")"
             + ",_missing:(" + (if (.missingPath==null) then "null" else "(try (" + .missingPath + ") catch null)" end) + ")"
-            + ",_mtot:($models|length)"
+            + ",_stot:($subjects|length)"
+            + ",_slabel:" + ($slabel|@json)
+            + ",_sempty:" + ($sempty|@json)
             + ",_ev:(" + (if (.evidencePath==null) then "[]" else "(try (" + .evidencePath + ") catch [])" end) + ")"
             + "}"
         ] | join(",")) + "]"
     ' "$reg") || { echo "[]"; return; }
 
     # Fold appended to the same program (single jq run — see header comment).
+    # An element the SBOM does not satisfy fails when the baseline requires it and
+    # warns when the baseline only recommends it. "Requires human review" is not a
+    # verdict either way: the SBOM may well satisfy it, and no check here can tell.
     local fold='
         | map(
-            (if .source=="na" then {status:"warn", detail:"requires human review (no automated source)", missing:[]}
+            (if .required then "fail" else "warn" end) as $unmet
+            | (if .source=="na" then {status:"warn", detail:"requires human review (no automated source)", missing:[]}
              elif ._missing != null then
-               (._mtot) as $t | (._missing|length) as $m |
-               (if $t==0 then {status:"warn", detail:"no machine-learning-model components", missing:[]}
-                elif $m==0 then {status:"pass", detail:"\($t)/\($t) model component(s)", missing:[]}
-                else {status:"warn", detail:"\($t - $m)/\($t) model component(s)", missing:(._missing[0:$cap])} end)
+               (._stot) as $t | (._missing|length) as $m |
+               (if $t==0 then {status:"warn", detail:._sempty, missing:[]}
+                elif $m==0 then {status:"pass", detail:"\($t)/\($t) \(._slabel)(s)", missing:[]}
+                else {status:$unmet, detail:"\($t - $m)/\($t) \(._slabel)(s)", missing:(._missing[0:$cap])} end)
              elif ._present==true then {status:"pass", detail:"present", missing:[]}
-             elif ._present==false then {status:"warn", detail:"not present in the SBOM", missing:[]}
+             elif ._present==false then {status:$unmet, detail:"not present in the SBOM", missing:[]}
              else {status:"warn", detail:"requires human review (no automated source)", missing:[]} end) as $s
             | {id, label, required, status:$s.status, detail:$s.detail, missing:$s.missing,
                evidence: ((._ev // []) | unique | .[0:$cap]),
@@ -333,11 +375,20 @@ g7_ai_checks() {
         )'
     local out
     if ! out=$(jq -c --argjson cap "$MISSING_CAP" "${prog}${fold}" "$SBOM" 2>&1); then
-        echo "[validate] WARN: G7 registry evaluation failed; G7 checks skipped this run." >&2
+        echo "[validate] WARN: $what registry evaluation failed; $what checks skipped this run." >&2
         echo "[validate]   $out" >&2
         echo "[]"
         return
     fi
+    echo "$out"
+}
+
+# G7 checks: the registry evaluation above, plus the fill-in guidance that is
+# specific to this baseline. Kept apart so the evaluator stays about evaluating.
+g7_ai_checks() {
+    local out
+    out=$(registry_checks "${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}" "G7")
+    [ "$out" = "[]" ] && { echo "[]"; return; }
     # The regulatory crosswalk used to be joined here, over the G7 elements only.
     # It now runs once over the whole check array (see join_crosswalk below) so the
     # plain CycloneDX checks carry their CRA / NTIA references too.
@@ -479,13 +530,22 @@ case "$FORMAT" in
         if jq -e '[.components[]? | select(.type=="machine-learning-model")] | length > 0' "$SBOM" >/dev/null 2>&1; then
             IS_AI=true
         fi
+        # Whether a registry applies to THIS SBOM is the registry's own statement
+        # (appliesWhen, a jq boolean; absent means always), not a rule spelled out
+        # here. The G7 registry declares the AI condition, so this reads the same
+        # as the AI test above for it — and a baseline that applies to every SBOM
+        # can be added without another branch in this file. The spec-version range
+        # stays keyed off IS_AI: that is about which CycloneDX versions we accept,
+        # not about which baseline we measure against.
         if [ "$IS_AI" = true ]; then
             CHECKS=$(cdx_checks "$AI_CYCLONEDX_SPEC_VERSIONS")
+        else
+            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+        fi
+        if registry_applies "${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"; then
             G7=$(g7_ai_checks)
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$G7" | jq -cs 'add')
             echo "[validate] AI SBOM detected -> added G7 minimum-element checks"
-        else
-            CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
         fi
         ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;

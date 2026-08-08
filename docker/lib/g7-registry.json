@@ -1,6 +1,10 @@
 {
+  "appliesWhen": "[.components[]? | select(.type==\"machine-learning-model\")] | length > 0",
+  "subject": "[.components[]? | select(.type==\"machine-learning-model\")]",
+  "subjectLabel": "model component",
+  "emptySubjectDetail": "no machine-learning-model components",
   "spec": "G7 Software Bill of Materials for AI — Minimum Elements (BSI/ACN et al., 2026-05)",
-  "note": "Declarative map of the 50 G7 minimum elements (7 clusters) to CycloneDX 1.7 ML-BOM checks. Read by validate-sbom.sh's registry evaluator, which binds $models = the machine-learning-model components once per run. Element shapes: 'cdxPath' is a jq boolean over the whole SBOM (pass / not present); 'missingPath' is a jq expression (may use $models) returning the names of model components MISSING the element — per-model coverage, so one unlicensed model in a multi-model SBOM warns with the offender listed instead of passing on any-model presence; when both are null the element has no automated source and is surfaced as 'requires human review'. 'source' records where a satisfied value comes from: auto (read directly), inferred (derived from signals), declared (present only if a human/manifest supplied it), na (no automated source). 'role' is informational — the party the G7 text names as the provider — NOT a required/optional gate (the G7 document defines no per-role required matrix). Openness (open weight/architecture/data/training) is not a separate G7 element; the spec lists it as an example facet of 'Model license', so g7-model-openness is grouped under models and tied to the license element; it accepts either openness:* properties (written by enrich-aibom.sh) or a prose declaration anywhere in the SBOM, so supplier SBOMs that state openness in text still count.",
+  "note": "Declarative map of the 50 G7 minimum elements (7 clusters) to CycloneDX 1.7 ML-BOM checks. Read by validate-sbom.sh's registry evaluator, which binds $subjects = the components the registry declares as its subject (here machine-learning-model components) once per run. Element shapes: 'cdxPath' is a jq boolean over the whole SBOM (pass / not present); 'missingPath' is a jq expression (may use $subjects) returning the names of model components MISSING the element — per-model coverage, so one unlicensed model in a multi-model SBOM warns with the offender listed instead of passing on any-model presence; when both are null the element has no automated source and is surfaced as 'requires human review'. 'source' records where a satisfied value comes from: auto (read directly), inferred (derived from signals), declared (present only if a human/manifest supplied it), na (no automated source). 'role' is informational — the party the G7 text names as the provider — NOT a required/optional gate (the G7 document defines no per-role required matrix). Openness (open weight/architecture/data/training) is not a separate G7 element; the spec lists it as an example facet of 'Model license', so g7-model-openness is grouped under models and tied to the license element; it accepts either openness:* properties (written by enrich-aibom.sh) or a prose declaration anywhere in the SBOM, so supplier SBOMs that state openness in text still count.",
   "clusters": [
     {
       "id": "metadata",
@@ -182,7 +186,7 @@
           "label_ko": "모델 이름",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select((.name // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select((.name // \"\") == \"\") | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-id",
@@ -190,8 +194,8 @@
           "label_ko": "모델 식별자",
           "role": "sbom-author",
           "source": "auto",
-          "missingPath": "[ $models[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $models[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique"
+          "missingPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $subjects[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique"
         },
         {
           "id": "g7-model-version",
@@ -199,7 +203,7 @@
           "label_ko": "모델 버전",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-timestamp",
@@ -207,7 +211,7 @@
           "label_ko": "모델 타임스탬프",
           "role": "model-producer",
           "source": "inferred",
-          "missingPath": "[ $models[] | select(((.properties // []) | map(.name // \"\") | any(test(\"timestamp|created\";\"i\"))) | not) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.properties // []) | map(.name // \"\") | any(test(\"timestamp|created\";\"i\"))) | not) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-producer",
@@ -215,7 +219,7 @@
           "label_ko": "모델 제작자",
           "role": "model-producer",
           "source": "inferred",
-          "missingPath": "[ $models[] | select(((.publisher // \"\") == \"\") and ((.supplier // null) == null) and ((.manufacturer // null) == null)) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.publisher // \"\") == \"\") and ((.supplier // null) == null) and ((.manufacturer // null) == null)) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-description",
@@ -223,7 +227,7 @@
           "label_ko": "모델 설명",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select((.description // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select((.description // \"\") == \"\") | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-hash-value",
@@ -231,7 +235,7 @@
           "label_ko": "모델 해시 값",
           "role": "sbom-author",
           "source": "auto",
-          "missingPath": "[ $models[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-hash-alg",
@@ -239,8 +243,8 @@
           "label_ko": "모델 해시 알고리즘",
           "role": "sbom-author",
           "source": "auto",
-          "missingPath": "[ $models[] | select(([.hashes[]? | select((.alg // \"\") != \"\")] | length) == 0) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $models[] | .hashes[]? | .alg | select(. != null and . != \"\") ] | unique"
+          "missingPath": "[ $subjects[] | select(([.hashes[]? | select((.alg // \"\") != \"\")] | length) == 0) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $subjects[] | .hashes[]? | .alg | select(. != null and . != \"\") ] | unique"
         },
         {
           "id": "g7-model-card",
@@ -248,8 +252,8 @@
           "label_ko": "모델 속성 (모델 카드)",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select((.modelCard.modelParameters // null) == null) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $models[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique"
+          "missingPath": "[ $subjects[] | select((.modelCard.modelParameters // null) == null) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $subjects[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique"
         },
         {
           "id": "g7-model-io",
@@ -257,7 +261,7 @@
           "label_ko": "모델 입출력 속성",
           "role": "model-producer",
           "source": "inferred",
-          "missingPath": "[ $models[] | select(((.modelCard.modelParameters.inputs // null) == null) and ((.modelCard.modelParameters.outputs // null) == null)) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.modelCard.modelParameters.inputs // null) == null) and ((.modelCard.modelParameters.outputs // null) == null)) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-training",
@@ -265,7 +269,7 @@
           "label_ko": "모델 학습 속성",
           "role": "model-producer",
           "source": "inferred",
-          "missingPath": "[ $models[] | select(((.modelCard.modelParameters // {}) | (has(\"datasets\") or has(\"modelArchitecture\") or has(\"architectureFamily\"))) | not) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.modelCard.modelParameters // {}) | (has(\"datasets\") or has(\"modelArchitecture\") or has(\"architectureFamily\"))) | not) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "g7-model-license",
@@ -273,8 +277,8 @@
           "label_ko": "모델 라이선스",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select(((.licenses // []) | length) == 0) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $models[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique"
+          "missingPath": "[ $subjects[] | select(((.licenses // []) | length) == 0) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $subjects[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique"
         },
         {
           "id": "g7-model-openness",
@@ -282,8 +286,8 @@
           "label_ko": "모델 라이선스 — 공개성 (가중치/구조/데이터/학습)",
           "role": "model-producer",
           "source": "inferred",
-          "cdxPath": "(([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) ] | length) > 0) or (([ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ] | length) > 0)",
-          "evidencePath": "([ $models[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) | \"\\(.name)=\\(.value)\" ] + [ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ]) | unique"
+          "cdxPath": "(([ $subjects[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) ] | length) > 0) or (([ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ] | length) > 0)",
+          "evidencePath": "([ $subjects[] | (.properties // [])[]? | select((.name // \"\") | startswith(\"openness:\")) | \"\\(.name)=\\(.value)\" ] + [ .. | strings | select(test(\"open[ _-]?(weight|architecture|data|training)\";\"i\")) ]) | unique"
         },
         {
           "id": "g7-model-extref",
@@ -291,7 +295,7 @@
           "label_ko": "모델 외부 참조",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $models[] | select(((.externalReferences // []) | length) == 0) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.externalReferences // []) | length) == 0) | (.name // \"(unnamed)\") ]"
         }
       ]
     },

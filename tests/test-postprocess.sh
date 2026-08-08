@@ -1673,6 +1673,52 @@ bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/
 tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
 [ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
 
+echo "== conformance: a registry declares its own subject, wording, and what is mandatory =="
+# The evaluator used to hardcode three things that belong to the G7 baseline: every
+# element is advisory, coverage is measured over model components, and the report
+# says "model component". A baseline whose elements are mandatory and whose subject
+# is ordinary software components could not be expressed at all. It is declared now,
+# and these assertions are what stops the defaults from creeping back in.
+cat > "$WORK/reg-mandatory.json" <<'REG'
+{
+  "subject": "[.components[]? | select(.type==\"library\")]",
+  "subjectLabel": "library",
+  "emptySubjectDetail": "no libraries",
+  "clusters": [
+    { "id": "demo", "name": "Demo", "elements": [
+      { "id": "demo-required-missing", "label": "Required and absent", "required": true,
+        "source": "auto", "cdxPath": "(.metadata.nothingHere // null) != null" },
+      { "id": "demo-advisory-missing", "label": "Advisory and absent", "required": false,
+        "source": "auto", "cdxPath": "(.metadata.nothingHere // null) != null" },
+      { "id": "demo-required-coverage", "label": "Required per subject", "required": true,
+        "source": "auto",
+        "missingPath": "[ $subjects[] | select((.description // \"\") == \"\") | .name ]" }
+    ] }
+  ]
+}
+REG
+G7_REGISTRY="$WORK/reg-mandatory.json" bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/rg" "supplier" >/dev/null 2>&1
+rg_req=$(jq -r '.checks[] | select(.id=="demo-required-missing") | .status' "$WORK/rg_conformance.json")
+rg_adv=$(jq -r '.checks[] | select(.id=="demo-advisory-missing") | .status' "$WORK/rg_conformance.json")
+{ [ "$rg_req" = "fail" ] && [ "$rg_adv" = "warn" ]; } \
+    && pass "an unmet element fails when the registry requires it and warns when it does not" \
+    || fail "registry required/advisory: required=$rg_req advisory=$rg_adv, expected fail/warn"
+rg_res=$(jq -r '.result' "$WORK/rg_conformance.json")
+[ "$rg_res" = "fail" ] && pass "a failed mandatory registry element moves the overall result" || fail "overall result '$rg_res' despite a mandatory registry failure"
+# The subject is the registry's, not the evaluator's: good-cyclonedx.json carries
+# libraries and no model at all, so a model-fixed denominator would have reported
+# "no machine-learning-model components" and passed on an empty set.
+rg_cov=$(jq -r '.checks[] | select(.id=="demo-required-coverage") | .detail' "$WORK/rg_conformance.json")
+case "$rg_cov" in
+    *"library(s)") pass "coverage is measured over the declared subject, in the declared wording" ;;
+    *) fail "registry subject/wording: detail='$rg_cov', expected an N/M library(s) count" ;;
+esac
+# And when the declared subject is empty, the registry's own wording says so.
+jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/reg-nosubj.json"
+G7_REGISTRY="$WORK/reg-mandatory.json" bash "$LIB/validate-sbom.sh" "$WORK/reg-nosubj.json" "$WORK/rn" "supplier" >/dev/null 2>&1
+rn=$(jq -r '.checks[] | select(.id=="demo-required-coverage") | .detail' "$WORK/rn_conformance.json")
+[ "$rn" = "no libraries" ] && pass "an empty subject set is reported in the registry's wording" || fail "empty subject detail: '$rn', expected 'no libraries'"
+
 echo "== conformance: file components are judged by hash, not by PURL =="
 # A binary or firmware scan enumerates the delivered files as type "file"
 # components. They carry no PURL and no package version — purl defines no type for
