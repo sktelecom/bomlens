@@ -1704,9 +1704,38 @@ jq '.components = [{"type":"library","name":"marked","properties":[{"name":"boml
     "$WORK/undecl.json" > "$WORK/undecl-ver.json"
 bash "$LIB/validate-sbom.sh" "$WORK/undecl-ver.json" "$WORK/udv" "supplier" >/dev/null 2>&1
 udv=$(jq -r '.checks[] | select(.id=="cisa-component-version") | "\(.detail)|\(.missing|join(","))"' "$WORK/udv_conformance.json")
-[ "$udv" = "1/2 component(s)|silent" ] \
+# Three, not two: the target component is a subject of these elements too.
+[ "$udv" = "2/3 component(s)|silent" ] \
     && pass "a version marked as not established counts as stated, an unmarked one does not" \
     || fail "component-version with an evidence grade: '$udv'"
+
+echo "== document metadata: the hash of what was actually scanned =="
+# The minimum elements define the component hash over an executable component
+# artifact. For a binary or a firmware image that artifact is one file, so its
+# hash goes on the component the SBOM is about and a recipient can tell whether
+# their copy is the copy this SBOM describes.
+printf 'firmware image bytes' > "$WORK/art.img"
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+  "metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"firmware","name":"art.img","version":"1.0"}},
+  "components":[]}' > "$WORK/art.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/art.json" FIRMWARE "$WORK/art.img" >/dev/null 2>&1
+art_got=$(jq -r '[.metadata.component.hashes[] | "\(.alg):\(.content)"] | join(",")' "$WORK/art.json")
+art_want="SHA-256:$( (sha256sum "$WORK/art.img" 2>/dev/null || shasum -a 256 "$WORK/art.img") | cut -d' ' -f1)"
+[ "$art_got" = "$art_want" ] && pass "the scanned artifact's hash lands on the target component" || fail "artifact hash: got '$art_got' want '$art_want'"
+# A scan whose target is not a file has no artifact to hash. Inventing one would
+# put a value in a field the guidance defines as the hash of an artifact.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+  "metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"application","name":"app","version":"1.0"}},
+  "components":[]}' > "$WORK/art-src.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/art-src.json" SOURCE >/dev/null 2>&1
+jq -e '(.metadata.component.hashes // []) | length == 0' "$WORK/art-src.json" >/dev/null \
+    && pass "a scan with no single artifact records no hash for one" || fail "a source scan invented a target-component hash"
+# A hash another scanner already recorded is left alone: it was looking at the
+# same artifact and may have used a different algorithm.
+jq '.metadata.component.hashes = [{"alg":"SHA-512","content":"pre-existing"}]' "$WORK/art.json" > "$WORK/art-keep.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/art-keep.json" FIRMWARE "$WORK/art.img" >/dev/null 2>&1
+keep=$(jq -r '[.metadata.component.hashes[] | .alg] | join(",")' "$WORK/art-keep.json")
+[ "$keep" = "SHA-512" ] && pass "an existing target-component hash is not overwritten" || fail "existing hash replaced: '$keep'"
 
 echo "== conformance: the 2026 SBOM minimum elements are measured on every SBOM =="
 # The baseline applies to all software, not to a subset, so its registry declares
@@ -1734,14 +1763,22 @@ ci_na=$(jq -r '[.checks[] | select((.id|startswith("cisa-")) and .source=="na") 
 jq '.components = [{"type":"file","name":"usr/lib/libfoo.so","hashes":[{"alg":"SHA-256","content":"aa"}]}]' \
     "$FIX/good-cyclonedx.json" > "$WORK/ci-file.json"
 bash "$LIB/validate-sbom.sh" "$WORK/ci-file.json" "$WORK/cif" "supplier" >/dev/null 2>&1
-cif=$(jq -r '.checks[] | select(.id=="cisa-component-identifiers") | "\(.status)|\(.detail)"' "$WORK/cif_conformance.json")
-[ "$cif" = "pass|1/1 component(s)" ] \
-    && pass "a hash counts as the identifier where no PURL or CPE can exist" || fail "cisa identifiers on a file component: '$cif'"
+cif=$(jq -r '[.checks[] | select(.id=="cisa-component-identifiers") | .missing[]] | join(",")' "$WORK/cif_conformance.json")
+[ "$cif" = "supplier-app" ] \
+    && pass "a hash counts as the identifier where no PURL or CPE can exist" \
+    || fail "cisa identifiers on a file component: missing='$cif', expected only the unidentified target component"
 # The crosswalk rolls this baseline up under its own framework. The 2021 mappings
 # used to sit on the base checks; leaving them there would count the same
 # requirement twice, once per row.
 ci_fw=$(jq -r '[.regulatoryCrosswalk.frameworks[] | select(.id=="us-sbom-minimum-elements") | "\(.total)"] | join("")' "$WORK/ci_conformance.json")
 [ "$ci_fw" = "23" ] && pass "the crosswalk rolls up 23 requirements, one per element" || fail "crosswalk total for the US baseline: '$ci_fw', expected 23"
+# The data fields describe the target component as well as the subcomponents
+# enumerated under it, so the component the SBOM is about is measured with the
+# rest. Leaving it out let an unnamed, unidentified root pass unmentioned.
+ci_subj=$(jq -r '.checks[] | select(.id=="cisa-component-name") | .detail' "$WORK/ci_conformance.json")
+[ "$ci_subj" = "3/3 component(s)" ] \
+    && pass "the target component is measured alongside its subcomponents" \
+    || fail "cisa subject set: name coverage '$ci_subj', expected 3/3 (2 components + the target)"
 ci_dup=$(jq -r '[.checks[] | select((.id|startswith("cisa-")|not)) | select((.regulations // [])[] | .framework=="us-sbom-minimum-elements") | .id] | join(",")' "$WORK/ci_conformance.json")
 [ -z "$ci_dup" ] && pass "no base check double-counts against the same baseline" || fail "base checks still mapped to the US baseline: $ci_dup"
 

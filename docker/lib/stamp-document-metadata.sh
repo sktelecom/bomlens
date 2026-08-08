@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
-# stamp-document-metadata.sh — record who generated this SBOM, with what, and at
-# which point in the software lifecycle.
+# stamp-document-metadata.sh — record who generated this SBOM, with what, at which
+# point in the software lifecycle, and what exactly was scanned.
 #
-# Usage: stamp-document-metadata.sh <sbom.json> <scan_mode>
+# Usage: stamp-document-metadata.sh <sbom.json> <scan_mode> [<scanned_artifact>]
 #
 # These are document-level facts about the SBOM itself, not about the software it
 # describes, which is why they live here rather than in stamp-metadata.sh (that
@@ -23,6 +23,7 @@ set -e
 
 SBOM="$1"
 MODE="$2"
+ARTIFACT="${3:-}"
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[docmeta] SBOM file not found: $SBOM" >&2
@@ -91,11 +92,36 @@ TOOL_VERSION="${BOMLENS_VERSION:-}"
 # to know why a particular license is missing gets the same answer either way.
 UNDECLARED_POLICY="unknown-to-author"
 
+# The hash of the thing that was actually scanned, recorded on the component the
+# SBOM is about. The minimum elements define this field over an executable
+# component artifact, and for a binary or a firmware image that artifact is one
+# file — the one named on the command line. A recipient can hash their copy and
+# tell whether it is the copy this SBOM describes.
+#
+# Only for scans whose target IS a file. A source tree has no artifact yet, a
+# container image is layers rather than a file, and an installed OS package is a
+# set of files spread across a root filesystem with no single one to hash. Making
+# something up for those would put a value in a field the guidance defines as the
+# hash of an artifact; where no artifact is in reach it says to record that the
+# value is unknown, which the undeclared-fields statement above already does.
+ARTIFACT_SHA256=""
+if [ -n "$ARTIFACT" ] && [ -f "$ARTIFACT" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        ARTIFACT_SHA256=$(sha256sum "$ARTIFACT" 2>/dev/null | cut -d" " -f1)
+    elif command -v shasum >/dev/null 2>&1; then
+        ARTIFACT_SHA256=$(shasum -a 256 "$ARTIFACT" 2>/dev/null | cut -d" " -f1)
+    fi
+    if [ -z "$ARTIFACT_SHA256" ]; then
+        echo "[docmeta] WARN: could not hash $ARTIFACT; the target component will carry no hash." >&2
+    fi
+fi
+
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg author "$SBOM_AUTHOR" \
       --arg toolver "$TOOL_VERSION" \
-      --arg undeclared "$UNDECLARED_POLICY" '
+      --arg undeclared "$UNDECLARED_POLICY" \
+      --arg artifactsha "$ARTIFACT_SHA256" '
     # A tool entry with no version tells the reader nothing about which build
     # produced the SBOM, so an absent one is stated as unknown rather than left
     # out. Both shapes of metadata.tools are in play: CycloneDX 1.5 replaced the
@@ -126,6 +152,11 @@ if jq --arg lifecycle "$LIFECYCLE" \
     | (if $author != ""
        then .metadata.authors = [{name: $author}]
        else (.metadata) |= del(.authors) end)
+    # An existing hash is left alone: a scanner that already recorded one was
+    # looking at the same artifact and may have used a different algorithm.
+    | (if $artifactsha != "" and (((.metadata.component.hashes // []) | length) == 0)
+       then .metadata.component.hashes = [{alg: "SHA-256", content: $artifactsha}]
+       else . end)
     | (.metadata.properties) = (((.metadata.properties // [])
         | map(select((.name // "") != "bomlens:undeclared-fields")))
         + [{name: "bomlens:undeclared-fields", value: $undeclared}])
@@ -137,5 +168,5 @@ else
     exit 1
 fi
 
-echo "[docmeta] tool=BomLens@${TOOL_VERSION}${LIFECYCLE:+, lifecycle=$LIFECYCLE}${SBOM_AUTHOR:+, author=$SBOM_AUTHOR}: $SBOM"
+echo "[docmeta] tool=BomLens@${TOOL_VERSION}${LIFECYCLE:+, lifecycle=$LIFECYCLE}${SBOM_AUTHOR:+, author=$SBOM_AUTHOR}${ARTIFACT_SHA256:+, sha256=${ARTIFACT_SHA256%"${ARTIFACT_SHA256#????????}"}…}: $SBOM"
 [ -n "$SBOM_AUTHOR" ] || echo "[docmeta] no SBOM author declared (set SBOM_AUTHOR or pass --sbom-author to name the entity that generated this SBOM)"

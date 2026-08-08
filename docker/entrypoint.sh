@@ -599,8 +599,15 @@ esac
 # default and quietly claim authorship of it. The script warns about a mode it has
 # no phase for, so a new scan mode shows up in the log instead of passing silently.
 # ========================================================
+#
+# The scanned artifact is passed where the target IS a file, so its hash lands on
+# the component the SBOM is about. BINARY and FIRMWARE are the two such modes; the
+# others scan a tree, an image or an existing document, none of which is one file.
 case "$SCAN_MODE" in
-    SOURCE|POSTPROCESS|ROOTFS|IMAGE|BINARY|FIRMWARE|AIBOM|MERGE)
+    BINARY|FIRMWARE)
+        run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$TARGET_FILE"
+        ;;
+    SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
         ;;
 esac

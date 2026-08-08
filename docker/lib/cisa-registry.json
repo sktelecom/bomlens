@@ -1,6 +1,6 @@
 {
   "spec": "2026 Minimum Elements for a Software Bill of Materials (CISA/NSA/FBI with 15 international partners, v2.1, 2026-07-29), which replaces the NTIA minimum elements of 2021",
-  "subject": "[.components[]?]",
+  "subject": "[.metadata.component // empty] + [.components[]?]",
   "subjectLabel": "component",
   "emptySubjectDetail": "no components",
   "note": "Declarative map of the 2026 SBOM minimum elements — 17 data fields and 6 practices — to CycloneDX checks, read by validate-sbom.sh's registry evaluator. Read docker/lib/g7-registry.json's note for the element shapes; this registry uses the same ones, with all components as its subject rather than model components. Every element is advisory (required is absent, so false). The baseline draws no such line itself, and promoting these would not add information: the guidance accepts an explicit statement that a value is unknown in place of the value, the document now carries that statement, and a check that every SBOM satisfies by declaration tells a reader nothing. What is worth reading is how much of each field the scan actually established, which is what the coverage details report. The six practices are about how an organisation operates rather than about the document, so they carry no automated source and surface as human review; the exception is machine-processable data, which the format detection has already established by the time this runs.",
@@ -128,7 +128,7 @@
           "label": "Component hash algorithm",
           "label_ko": "구성요소 해시 알고리즘",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select(((.hashes // []) | length) > 0) | select([ (.hashes // [])[] | select((.alg // \"\") == \"\") ] | length > 0) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.hashes // []) | length) > 0) | select((([ (.hashes // [])[] | select(((.alg // \"\") | ascii_downcase) | test(\"^(md5|sha-?1|sha-?(224|256|384|512)|sha3-(256|384|512)|blake2b-(256|384|512)|blake3)$\")) ] | length) != ((.hashes // []) | length))) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "cisa-component-dependency-relationship",

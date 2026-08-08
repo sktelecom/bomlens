@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A binary or firmware SBOM now records the hash of the file that was scanned, on the component the SBOM is about. A recipient can hash their copy and tell whether it is the copy the SBOM describes. Scans with no single artifact — a source tree, a container image, an installed OS package spread across a root filesystem — record no hash rather than one computed over something that is not the artifact.
+
+- The conformance report measures the target component alongside the components enumerated under it. The 2026 minimum elements describe their data fields over both, and measuring only the enumerated ones let an unidentified root pass without mention. The component hash algorithm is now checked against the recognized algorithm names rather than only for being non-empty, since a digest labelled with something unrecognized cannot be recomputed.
+
 - A generated SBOM now states why a field is empty when it is empty. The 2026 minimum elements ask an author to distinguish a value they could not establish from one they are withholding, and a scan only ever produces the first — it writes what it managed to read and has no second set of findings to hold back. The statement is made once for the document rather than repeated on every empty field, which on a firmware image would mean thousands of properties saying the same thing. The conformance element that asks for it is measured automatically now instead of being left to a human reader, so a received SBOM that says nothing about its absences is reported as a gap.
 
 - A component whose version the scan could not establish is no longer counted twice. Such a component is already marked as present with its version unestablished, and that marking is exactly the statement the minimum elements ask for, so the component-version element reads it instead of listing the component as missing the field.
