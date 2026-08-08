@@ -247,6 +247,9 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
           {fromRegistry ? <SourceBadge source={check.source} /> : null}
+          {check.detail && !notMet ? (
+            <span className="text-xs tabular-nums text-muted-foreground">{check.detail}</span>
+          ) : null}
           <span className="sr-only">{t(key)}</span>
         </div>
         {regText ? (
@@ -254,10 +257,13 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             <span className="font-medium">{t("crosswalk.refs")}</span> {regText}
           </div>
         ) : null}
-        {check.detail ? (
+        {check.detail && notMet ? (
           <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{check.detail}</div>
         ) : null}
-        {what ? (
+        {what && notMet ? (
+          // Only where there is something to do. A met element's description is
+          // read once and then re-read on every visit: forty of them turned a
+          // list a reader scans into a page a reader scrolls.
           <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{what}</div>
         ) : null}
         {notMet && (check.missing?.length ?? 0) > 0 ? (
@@ -279,17 +285,24 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           </div>
         ) : null}
         {evidence.length > 0 ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-            <span className="font-medium">{t("g7.evidence")}</span>
-            {evidence.map((e, i) => (
-              <code
-                key={`${e}-${i}`}
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
-              >
-                {e}
-              </code>
-            ))}
-          </div>
+          // Folded: the values that satisfied an element are worth having, and
+          // worth having on request. Open by default they made every met row as
+          // tall as an unmet one.
+          <details className="mt-1">
+            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+              {t("g7.evidence")}
+            </summary>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+              {evidence.map((e, i) => (
+                <code
+                  key={`${e}-${i}`}
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                >
+                  {e}
+                </code>
+              ))}
+            </div>
+          </details>
         ) : null}
         {fix ? (
           <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">

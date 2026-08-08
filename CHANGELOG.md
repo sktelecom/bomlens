@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A conformance element that is already met is one line. Its description and the values that satisfied it are folded away rather than dropped, because a reader who has just been told the element is met is not reading either again. Measured on an AI SBOM, the section went from 12,999 to 11,379 pixels — the elements that need attention had been sharing the page with forty that did not.
+
 - The conformance screen leads with what blocks the SBOM. A line at the top says how many mandatory checks failed, how many advisory elements are short, and how many need a person, and the mandatory checks themselves now come first — they used to sit below every advisory row, which on an AI SBOM meant the bottom of a page twelve thousand pixels long. The rail badge counts the mandatory checks too, so it means the same thing on every scan instead of showing AI coverage on one and every-check passes on another.
 
 - The 2026 SBOM minimum elements are their own block on that screen, grouped the way the guidance groups them, and their rows carry what the AI elements have carried all along: how the value was established, the fragment that would satisfy it, and — for the elements no scan can settle — what a person has to check. They had been rendering as three bare lines in the middle of the format list, because a row only did any of that for elements whose id began "g7-". Each of the 23 elements also has a plain-language description of what it is and what would satisfy it, in English and Korean.

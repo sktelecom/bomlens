@@ -947,6 +947,14 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // The verdict line leads the panel, so what blocks the SBOM is not at the end
   // of a page that runs to twelve thousand pixels on an AI scan.
   await expect(page.getByText(/mandatory check/)).toBeVisible();
+  // A met element is one line: title, badge, figure. Its description and the
+  // values that satisfied it are still there, folded, because a reader who has
+  // already been told the element is met is not reading either again. Forty of
+  // them open by default is what made the page long enough to be a problem.
+  const met = page.getByRole("listitem").filter({ hasText: "SBOM timestamp" }).first();
+  await expect(met.getByText("SBOM timestamp is the date")).toHaveCount(0);
+  const unmet = page.getByRole("listitem").filter({ hasText: "SBOM generation context" }).first();
+  await expect(unmet.getByText(/lifecycle phase|생성/)).toBeVisible();
   await expect(page.getByText("Model license — openness (weight/architecture/data/training)")).toBeVisible();
 
   // AI compliance summary card (from aiProfile) is at the top of the section.
