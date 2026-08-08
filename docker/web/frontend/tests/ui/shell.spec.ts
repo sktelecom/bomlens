@@ -964,12 +964,18 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByText("Regulatory coverage")).toBeVisible();
 
   // Regulatory crosswalk sub-block (from conformance.regulatoryCrosswalk). Exact,
+  // The framework row opens to the requirements it counted. The elements were
+  // already in the payload and nothing read them, so the table stated four
+  // numbers and left the reader to work out which requirement each one was.
+  const fwRow = page.locator("details", { has: page.getByText("EU AI Act — Annex IV") }).first();
+  await fwRow.getByRole("group").or(fwRow).first().click();
+  await expect(fwRow.getByRole("listitem").first()).toBeVisible();
   // so it matches the block heading and not the panel intro, which also mentions
   // the regulatory crosswalk.
   await expect(page.getByText("Regulatory crosswalk", { exact: true })).toBeVisible();
   await expect(page.getByText("EU AI Act — Annex IV").first()).toBeVisible();
   await expect(page.getByText("Korean AI Framework Act").first()).toBeVisible();
-  await expect(page.getByText("Annex IV(1)")).toBeVisible(); // a mapped regulation ref
+  await expect(page.getByText("Annex IV(1)").first()).toBeVisible(); // a mapped regulation ref
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

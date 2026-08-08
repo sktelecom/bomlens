@@ -154,7 +154,29 @@ function CrosswalkBlock({
               {crosswalk.frameworks.map((fw) => (
                 <tr key={fw.id} className="border-b last:border-0 align-top">
                   <td className="py-1.5 pr-3">
-                    <div className="text-foreground">{fw.title}</div>
+                    {/* The counts said how many requirements were met and left
+                        the reader to work out which. The rows are already in the
+                        payload; folding them under the framework answers the
+                        question the table raises. */}
+                    <details>
+                      <summary className="cursor-pointer text-foreground">{fw.title}</summary>
+                      <ul className="mt-1 space-y-0.5">
+                        {fw.elements.map((el, i) => {
+                          const { Icon, color } = statusOf(el.status);
+                          return (
+                            <li key={`${el.label}-${i}`} className="flex items-start gap-1.5 text-xs">
+                              <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} aria-hidden />
+                              <span className="text-muted-foreground">
+                                {el.label}
+                                {el.refs.length > 0 ? (
+                                  <span className="text-muted-foreground"> — {el.refs.join(" · ")}</span>
+                                ) : null}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
                     <div className="text-xs text-muted-foreground">{fw.source}</div>
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The regulatory crosswalk's framework row opens to the requirements it counted. The table stated four numbers per framework and left the reader to work out which requirement each one was; the rows were already in the payload and nothing read them.
+
 - A conformance element that is already met is one line. Its description and the values that satisfied it are folded away rather than dropped, because a reader who has just been told the element is met is not reading either again. Measured on an AI SBOM, the section went from 12,999 to 11,379 pixels — the elements that need attention had been sharing the page with forty that did not.
 
 - The conformance screen leads with what blocks the SBOM. A line at the top says how many mandatory checks failed, how many advisory elements are short, and how many need a person, and the mandatory checks themselves now come first — they used to sit below every advisory row, which on an AI SBOM meant the bottom of a page twelve thousand pixels long. The rail badge counts the mandatory checks too, so it means the same thing on every scan instead of showing AI coverage on one and every-check passes on another.
