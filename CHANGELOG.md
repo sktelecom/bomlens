@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The conformance report now measures an SBOM against the 2026 SBOM minimum elements — 17 data fields and 6 practices, published by CISA, the NSA and the FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA, replacing the NTIA elements of 2021. Every CycloneDX SBOM is measured, not only AI ones. The elements are advisory and none of them changes the pass or fail verdict, which stays with the submission criteria. Five of the six practices describe how an organisation operates rather than what a document contains, so they are surfaced as needing human review instead of being scored or quietly dropped.
+
+- What counts as identifying a component is wider under this baseline than under the submission criteria: a PURL, a CPE, or an intrinsic identifier such as a hash. A firmware file entry that carries only a hash is identified here even though the submission criteria still ask for a PURL, so the report can say both things at once instead of only the stricter one.
+
+- The regulatory crosswalk's US baseline was rewritten for the 2026 document. It previously mapped the 2021 elements onto the format checks; those mappings moved to the new elements, so a requirement is counted once rather than once per row.
+
 - Every generated SBOM now records at which lifecycle phase it was produced, and with which tool at which version. A scan that reads source manifests is marked `pre-build` and one that reads a built artifact — an image, a binary, a firmware image, a root filesystem, a model — is marked `post-build`, which is the distinction a reader needs to know what the component data can mean. BomLens names itself among the tools that produced the document, alongside the scanners it drove, and a tool whose version was not recorded now says so instead of leaving the field empty. A merged SBOM claims no phase, because its inputs may each have had a different one.
 
 - `--sbom-author` (or `SBOM_AUTHOR`) records the organisation or person that generated the SBOM. This is the entity running the scan, which is neither the tool nor the author of the software being scanned, and nothing in a scan can discover it. Left unset, the field is omitted rather than filled with a placeholder — and the generator's own default, which named the SBOM tool's publisher as the document's author, is no longer carried through.

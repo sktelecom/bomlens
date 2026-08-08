@@ -1673,6 +1673,43 @@ bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/
 tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
 [ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
 
+echo "== conformance: the 2026 SBOM minimum elements are measured on every SBOM =="
+# The baseline applies to all software, not to a subset, so its registry declares
+# no condition and is measured wherever a CycloneDX SBOM is. Advisory throughout
+# for now: the guidance lets an absent value be stated as unknown, and until that
+# notation exists, requiring a field would fail SBOMs for values they may
+# legitimately not have.
+bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/ci" "supplier" >/dev/null 2>&1
+ci_n=$(jq '[.checks[] | select(.id|startswith("cisa-"))] | length' "$WORK/ci_conformance.json")
+[ "$ci_n" = "23" ] && pass "all 23 elements (17 data fields + 6 practices) are reported" || fail "cisa elements: $ci_n, expected 23"
+ci_req=$(jq '[.checks[] | select((.id|startswith("cisa-")) and .required)] | length' "$WORK/ci_conformance.json")
+ci_res=$(jq -r '.result' "$WORK/ci_conformance.json")
+{ [ "$ci_req" = "0" ] && [ "$ci_res" = "pass" ]; } \
+    && pass "the elements are advisory and do not move the verdict" \
+    || fail "cisa mandatory=$ci_req result=$ci_res, expected 0 and pass"
+# The practices describe how an organisation operates, which no scan can read.
+# Surfaced as review rather than dropped, so the report shows the whole baseline
+# and which part of it a tool can answer.
+ci_na=$(jq -r '[.checks[] | select((.id|startswith("cisa-")) and .source=="na") | .id] | sort | join(",")' "$WORK/ci_conformance.json")
+[ "$ci_na" = "cisa-accommodation-of-updates,cisa-coverage,cisa-distribution-and-delivery,cisa-explicit-unknowns,cisa-frequency" ] \
+    && pass "the five practices with no automated source are surfaced as review" || fail "cisa review set: $ci_na"
+# What this baseline accepts as an identifier is wider than the submission
+# criteria: PURL or CPE, and an intrinsic identifier such as a hash. A file
+# component carries only the last of those, and it is identified all the same.
+jq '.components = [{"type":"file","name":"usr/lib/libfoo.so","hashes":[{"alg":"SHA-256","content":"aa"}]}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/ci-file.json"
+bash "$LIB/validate-sbom.sh" "$WORK/ci-file.json" "$WORK/cif" "supplier" >/dev/null 2>&1
+cif=$(jq -r '.checks[] | select(.id=="cisa-component-identifiers") | "\(.status)|\(.detail)"' "$WORK/cif_conformance.json")
+[ "$cif" = "pass|1/1 component(s)" ] \
+    && pass "a hash counts as the identifier where no PURL or CPE can exist" || fail "cisa identifiers on a file component: '$cif'"
+# The crosswalk rolls this baseline up under its own framework. The 2021 mappings
+# used to sit on the base checks; leaving them there would count the same
+# requirement twice, once per row.
+ci_fw=$(jq -r '[.regulatoryCrosswalk.frameworks[] | select(.id=="us-sbom-minimum-elements") | "\(.total)"] | join("")' "$WORK/ci_conformance.json")
+[ "$ci_fw" = "23" ] && pass "the crosswalk rolls up 23 requirements, one per element" || fail "crosswalk total for the US baseline: '$ci_fw', expected 23"
+ci_dup=$(jq -r '[.checks[] | select((.id|startswith("cisa-")|not)) | select((.regulations // [])[] | .framework=="us-sbom-minimum-elements") | .id] | join(",")' "$WORK/ci_conformance.json")
+[ -z "$ci_dup" ] && pass "no base check double-counts against the same baseline" || fail "base checks still mapped to the US baseline: $ci_dup"
+
 echo "== conformance: a registry declares its own subject, wording, and what is mandatory =="
 # The evaluator used to hardcode three things that belong to the G7 baseline: every
 # element is advisory, coverage is measured over model components, and the report

@@ -164,7 +164,7 @@ The conformance report links each check that maps to a regulation to the specifi
 Two frameworks cover every analyzed SBOM, AI or not:
 
 - EU Cyber Resilience Act — via BSI TR-03183-2, the German technical guideline written for CRA compliance and the most detailed public SBOM field specification (the CRA itself names no data fields). TR-03183-2 is a national guideline, and the European harmonized standard that will carry the binding wording is still a draft.
-- NTIA minimum elements — the seven SBOM data fields published under US Executive Order 14028 (2021). Federal SBOM collection has since been narrowed to agency-level, risk-based decisions, but the fields remain the practical baseline that individual agencies ask for.
+- US SBOM minimum elements — the 17 data fields and 6 practices of the 2026 minimum elements, published by CISA, the NSA and the FBI with fifteen international partners and replacing the NTIA elements of 2021. Federal SBOM collection has since been narrowed to agency-level, risk-based decisions, but the fields remain the practical baseline that individual agencies ask for.
 
 For an AI SBOM, two more frameworks map onto the G7 elements:
 

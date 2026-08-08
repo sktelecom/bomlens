@@ -33,144 +33,483 @@
     "us-sbom-minimum-elements": {
       "title": "US SBOM minimum elements",
       "title_ko": "미국 SBOM 최소 요소",
-      "short": "NTIA",
-      "short_ko": "NTIA",
-      "source": "Executive Order 14028 §4; NTIA \"The Minimum Elements For a Software Bill of Materials\" (2021-07-12)",
+      "short": "CISA 2026",
+      "short_ko": "CISA 2026",
+      "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
       "granularity": "data field",
-      "note": "Executive Order 14028 directed the Department of Commerce to publish the minimum elements of an SBOM; NTIA did so in July 2021, and the seven data fields below come from that report. Status caveat: federal procurement no longer mandates SBOM collection across the board. Executive Order 14306 (June 2025) removed the vendor SBOM-submission provisions added by EO 14144, and OMB memorandum M-26-05 (January 2026) rescinded the self-attestation and SBOM-collection requirements in favour of agency-level, risk-based decisions. Individual agencies still require SBOMs in procurement, so the fields remain the practical baseline. CISA published a draft update in August 2025 (comment period closed 2025-10-03) that adds component hash, license, tool name and generation context; this mapping tracks the 2021 elements until that revision is final."
+      "note": "This document replaces the NTIA minimum elements of 2021 rather than amending them. It carries 17 data fields and 6 practices; the fields map to the checks below, and the practices that describe how an organisation operates carry no automated source and are surfaced as human review. Ten fields are new since 2021 — SBOM author signature, data format name and version, generation context, tool name and version, SBOM version, component hash value and algorithm, and component license — and one element, access control, was removed and folded into distribution and delivery. Status caveat: federal procurement no longer mandates SBOM collection across the board. Executive Order 14306 (June 2025) removed the vendor SBOM-submission provisions added by EO 14144, and OMB memorandum M-26-05 (January 2026) rescinded the self-attestation and SBOM-collection requirements in favour of agency-level, risk-based decisions. Individual agencies still require SBOMs in procurement, so the fields remain the practical baseline."
     }
   },
   "map": {
     "spec-version": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 4", "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Automation Support", "basis": "the SBOM must use an automation-capable format (SPDX, CycloneDX or SWID)" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 4",
+        "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+"
+      }
     ],
     "timestamp": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.1", "basis": "required SBOM-level field: date and time of the SBOM data compilation" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Timestamp", "basis": "the date and time the SBOM was assembled" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.1",
+        "basis": "required SBOM-level field: date and time of the SBOM data compilation"
+      }
     ],
     "tools": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.1", "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Author of SBOM Data", "basis": "the entity that created the SBOM data for this component" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.1",
+        "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL"
+      }
     ],
     "top-component": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.1", "basis": "the primary component the SBOM describes has to be identifiable" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.1",
+        "basis": "the primary component the SBOM describes has to be identifiable"
+      }
     ],
     "name-version": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: component name and component version" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Component Name / Version", "basis": "the name and version assigned to each unit of software" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component fields: component name and component version"
+      }
     ],
     "purl": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.4", "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Other Unique Identifiers", "basis": "identifiers that serve as a look-up key for relevant databases" }
-    ],
-    "purl-syntax": [
-      { "framework": "us-sbom-minimum-elements", "ref": "Other Unique Identifiers", "basis": "an identifier only serves as a database look-up key if it parses" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.4",
+        "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist"
+      }
     ],
     "transitive": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.1; 5.2.2", "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Dependency Relationship", "basis": "the relationship between an upstream component and its dependencies" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.1; 5.2.2",
+        "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum"
+      }
     ],
     "license": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the distribution licence under which the component may be used" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component field: the distribution licence under which the component may be used"
+      }
     ],
     "hash": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: a cryptographic checksum of the deployable component" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component field: a cryptographic checksum of the deployable component"
+      }
     ],
     "hash-algorithm": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the deployable-component checksum is specified as SHA-512" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "the deployable-component checksum is specified as SHA-512"
+      }
     ],
     "component-creator": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL" },
-      { "framework": "us-sbom-minimum-elements", "ref": "Supplier Name", "basis": "the name of the entity that creates, defines and identifies the component" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL"
+      }
     ],
     "component-filename": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the actual filename of the component" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component field: the actual filename of the component"
+      }
     ],
     "artifact-uri": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.4", "basis": "additional fields: the source code URI and the URI of the deployable form, required where they exist" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.4",
+        "basis": "additional fields: the source code URI and the URI of the deployable form, required where they exist"
+      }
     ],
     "file-properties": [
-      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file" }
+      {
+        "framework": "bsi-tr-03183-2",
+        "ref": "Section 5.2.2",
+        "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file"
+      }
     ],
     "g7-slp-name": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "general description: what the AI system is and its intended purpose" },
-      { "framework": "kr-ai-framework-act", "ref": "제31조", "basis": "transparency: the system must be identifiable as AI-operated to users" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "general description: what the AI system is and its intended purpose"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제31조",
+        "basis": "transparency: the system must be identifiable as AI-operated to users"
+      }
     ],
     "g7-slp-app-area": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "intended purpose and application area of the system" },
-      { "framework": "kr-ai-framework-act", "ref": "제33조", "basis": "whether the system is high-impact AI is judged by its application area" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "intended purpose and application area of the system"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제33조",
+        "basis": "whether the system is high-impact AI is judged by its application area"
+      }
     ],
     "g7-slp-io": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "how the system interacts with hardware/software and its input-output surface" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "how the system interacts with hardware/software and its input-output surface"
+      }
     ],
     "g7-slp-data-flow": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "description of how data moves through and around the system" },
-      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data flows are an input to the fundamental-rights impact assessment" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "description of how data moves through and around the system"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제35조",
+        "basis": "data flows are an input to the fundamental-rights impact assessment"
+      }
     ],
     "g7-slp-data-usage": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "how data is used by the system" },
-      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data usage informs the fundamental-rights impact assessment" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "how data is used by the system"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제35조",
+        "basis": "data usage informs the fundamental-rights impact assessment"
+      }
     ],
     "g7-model-description": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "general description of the model" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "general description of the model"
+      }
     ],
     "g7-model-card": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(b)-(c)", "basis": "design specifications, algorithmic logic and system architecture" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(b)-(c)",
+        "basis": "design specifications, algorithmic logic and system architecture"
+      }
     ],
     "g7-model-io": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(3)", "basis": "capabilities and limitations of the model's functioning (input-output behaviour)" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(3)",
+        "basis": "capabilities and limitations of the model's functioning (input-output behaviour)"
+      }
     ],
     "g7-model-training": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "training methodologies, techniques and the training datasets used" },
-      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: lifecycle risk identification covers how the model was trained" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "training methodologies, techniques and the training datasets used"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제32조",
+        "basis": "safety: lifecycle risk identification covers how the model was trained"
+      }
     ],
     "g7-ds-name": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "the datasets (datasheets) the model was trained on" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "the datasets (datasheets) the model was trained on"
+      }
     ],
     "g7-ds-description": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "description of the training data and its main characteristics" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "description of the training data and its main characteristics"
+      }
     ],
     "g7-ds-content": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "what the training data contains (scope and main characteristics)" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "what the training data contains (scope and main characteristics)"
+      }
     ],
     "g7-ds-provenance": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "provenance of the data: where it came from and how it was acquired and selected" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "provenance of the data: where it came from and how it was acquired and selected"
+      }
     ],
     "g7-ds-statistics": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "main characteristics of the data (statistical properties)" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "main characteristics of the data (statistical properties)"
+      }
     ],
     "g7-ds-sensitivity": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "data characteristics including sensitive or personal data" },
-      { "framework": "kr-ai-framework-act", "ref": "제35조", "basis": "data sensitivity is central to the fundamental-rights impact assessment" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "data characteristics including sensitive or personal data"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제35조",
+        "basis": "data sensitivity is central to the fundamental-rights impact assessment"
+      }
     ],
     "g7-ds-license": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(d)", "basis": "how the training data was acquired (rights to use it)" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(d)",
+        "basis": "how the training data was acquired (rights to use it)"
+      }
     ],
     "g7-kpi-operational": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(g)", "basis": "validation and testing metrics for accuracy and robustness; performance-metric appropriateness" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(g)",
+        "basis": "validation and testing metrics for accuracy and robustness; performance-metric appropriateness"
+      }
     ],
     "g7-kpi-security": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity measures and their metrics" },
-      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: security metrics feed the risk-management system" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(h)",
+        "basis": "cybersecurity measures and their metrics"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제32조",
+        "basis": "safety: security metrics feed the risk-management system"
+      }
     ],
     "g7-sec-vulns": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity: known vulnerabilities affecting the system" },
-      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: monitoring and responding to AI-related risks" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(h)",
+        "basis": "cybersecurity: known vulnerabilities affecting the system"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제32조",
+        "basis": "safety: monitoring and responding to AI-related risks"
+      }
     ],
     "g7-sec-controls": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(h)", "basis": "cybersecurity controls built into the system" },
-      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: risk-mitigation controls across the lifecycle" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(h)",
+        "basis": "cybersecurity controls built into the system"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제32조",
+        "basis": "safety: risk-mitigation controls across the lifecycle"
+      }
     ],
     "g7-sec-policy": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(5)", "basis": "risk-management system (Article 9) documentation" },
-      { "framework": "kr-ai-framework-act", "ref": "제32조", "basis": "safety: the required risk-management framework" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(5)",
+        "basis": "risk-management system (Article 9) documentation"
+      },
+      {
+        "framework": "kr-ai-framework-act",
+        "ref": "제32조",
+        "basis": "safety: the required risk-management framework"
+      }
     ],
     "g7-infra-software": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(2)(c)", "basis": "software components and computational resources used" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(2)(c)",
+        "basis": "software components and computational resources used"
+      }
     ],
     "g7-infra-hardware": [
-      { "framework": "eu-ai-act", "ref": "Annex IV(1)", "basis": "the hardware on which the system runs" }
+      {
+        "framework": "eu-ai-act",
+        "ref": "Annex IV(1)",
+        "basis": "the hardware on which the system runs"
+      }
+    ],
+    "cisa-sbom-author": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Author",
+        "basis": "the name of the entity that creates the SBOM data for the target component"
+      }
+    ],
+    "cisa-sbom-author-signature": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Author Signature",
+        "basis": "a digital signature attributable to the SBOM author"
+      }
+    ],
+    "cisa-sbom-format-name": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Data Format Name",
+        "basis": "the name of the data format used to represent the SBOM data"
+      }
+    ],
+    "cisa-sbom-format-version": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Data Format Version",
+        "basis": "the version of the data format named above"
+      }
+    ],
+    "cisa-sbom-generation-context": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Generation Context",
+        "basis": "the lifecycle phase and data available when the SBOM was generated, such as before or after build"
+      }
+    ],
+    "cisa-sbom-timestamp": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Timestamp",
+        "basis": "the date and time of the most recent update to the SBOM data, following RFC 9557"
+      }
+    ],
+    "cisa-sbom-tool-name": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Tool Name",
+        "basis": "the tool the SBOM author used to generate or amend the SBOM"
+      }
+    ],
+    "cisa-sbom-tool-version": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Tool Version",
+        "basis": "the version of that tool, stated as unknown when no identifier is available"
+      }
+    ],
+    "cisa-sbom-version": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "SBOM Version",
+        "basis": "an identifier distinguishing this SBOM from earlier iterations for the same component and version"
+      }
+    ],
+    "cisa-component-name": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Name",
+        "basis": "the name the component producer assigned to the component"
+      }
+    ],
+    "cisa-component-version": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Version",
+        "basis": "the producer's version identifier, stated as unknown when none was provided"
+      }
+    ],
+    "cisa-component-producer": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Producer",
+        "basis": "the entity that creates, defines and identifies the component; replaces the 2021 element Supplier Name"
+      }
+    ],
+    "cisa-component-identifiers": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Identifiers",
+        "basis": "at least one software identifier such as PURL or CPE, or an intrinsic one such as a hash"
+      }
+    ],
+    "cisa-component-license": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component License",
+        "basis": "the identifiers for the licenses under which the component is available"
+      }
+    ],
+    "cisa-component-hash-value": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Hash Value",
+        "basis": "the hash of the executable component artifact, stated as unknown when the artifact is out of reach"
+      }
+    ],
+    "cisa-component-hash-algorithm": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Hash Algorithm",
+        "basis": "the algorithm that produced the hash, named by its IANA hash function textual name"
+      }
+    ],
+    "cisa-component-dependency-relationship": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Component Dependency Relationship",
+        "basis": "the relationship between two components where one is necessary for the operation of the other"
+      }
+    ],
+    "cisa-machine-processable-data": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Machine-Processable Data",
+        "basis": "the SBOM uses a widely used, open, machine-processable format"
+      }
+    ],
+    "cisa-coverage": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Coverage",
+        "basis": "information for every component making up the target software, including transitive dependencies, with no minimum depth"
+      }
+    ],
+    "cisa-accommodation-of-updates": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Accommodation of Updates to SBOM Data",
+        "basis": "corrections and updates to published SBOM data are accommodated and issued promptly"
+      }
+    ],
+    "cisa-distribution-and-delivery": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Distribution and Delivery",
+        "basis": "the SBOM is available promptly to those who need it, with access controls that do not block authorized parties"
+      }
+    ],
+    "cisa-explicit-unknowns": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Explicitly Identifying Unknown Information",
+        "basis": "a value that is absent is stated as unknown to the author or as withheld, and the two are distinguished"
+      }
+    ],
+    "cisa-frequency": [
+      {
+        "framework": "us-sbom-minimum-elements",
+        "ref": "Frequency",
+        "basis": "each software version or update has an associated SBOM, and a corrected SBOM is reissued when data changes"
+      }
     ]
   }
 }

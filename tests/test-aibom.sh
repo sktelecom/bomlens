@@ -314,8 +314,11 @@ echo "== a broken registry fails loudly, not silently =="
 sed 's/length > 0/length >(BROKEN/' "$LIB/g7-registry.json" > "$WORK/broken-reg.json"
 BRLOG=$(G7_REGISTRY="$WORK/broken-reg.json" bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf4" "broken" 2>&1)
 grep -q "G7 registry evaluation failed" <<<"$BRLOG" && pass "broken registry warns on stderr" || fail "no loud warning for a broken registry"
-bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) base=\([.checks[]|select(.id|startswith("g7-")|not)]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
-[ "$bshape" = "g7=0 base=17 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
+# Counted per source, so a second registry's elements do not read as base checks:
+# the point is that a broken G7 registry costs the report its G7 section and
+# nothing else.
+bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) cisa=\([.checks[]|select(.id|startswith("cisa-"))]|length) base=\([.checks[]|select((.id|startswith("g7-")|not) and (.id|startswith("cisa-")|not))]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
+[ "$bshape" = "g7=0 cisa=23 base=17 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
 
 echo "== legacy CycloneDX tools array does not false-negative the tool checks =="
 # metadata.tools as a bare array (pre-1.5 shape) used to hard-error inside the

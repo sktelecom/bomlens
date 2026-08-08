@@ -547,6 +547,16 @@ case "$FORMAT" in
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$G7" | jq -cs 'add')
             echo "[validate] AI SBOM detected -> added G7 minimum-element checks"
         fi
+        # The 2026 SBOM minimum elements apply to all software, so this registry
+        # declares no condition and is measured on every CycloneDX SBOM. Its
+        # elements are advisory and none of them moves the verdict; the submission
+        # criteria above remain the thing that decides pass or fail.
+        CISA_REG="${CISA_REGISTRY:-$(dirname "$0")/cisa-registry.json}"
+        if registry_applies "$CISA_REG"; then
+            CISA=$(registry_checks "$CISA_REG" "CISA")
+            CHECKS=$(printf '%s\n%s' "$CHECKS" "$CISA" | jq -cs 'add')
+            echo "[validate] added the 2026 SBOM minimum-element checks"
+        fi
         ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;
     SPDX-3.0)
@@ -745,13 +755,20 @@ RXW="$XW_SUMMARY"
 if [ "$REPORT_LANG" = "ko" ]; then
     HTML_LANG="ko"
     REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+    # Registry rows are labelled from the registry that declares them, so a
+    # baseline added later is translated by shipping label_ko with its elements
+    # and nothing here needs to know its id prefix. The catalog below stays for
+    # the checks this file writes itself, whose labels carry a threshold or a
+    # spec version and so cannot be looked up whole.
+    REG_CISA="${CISA_REGISTRY:-$(dirname "$0")/cisa-registry.json}"
+    [ -f "$REG_CISA" ] || REG_CISA="$REG"
     # Localize per-row label + detail into a render copy (status/missing/guidance/
     # evidence/regulations untouched, so the render loops below are unchanged).
-    RCHECKS=$(printf '%s' "$CHECKS" | jq -c --slurpfile cat "$KO_CAT" --slurpfile reg "$REG" '
+    RCHECKS=$(printf '%s' "$CHECKS" | jq -c --slurpfile cat "$KO_CAT" --slurpfile reg "$REG" --slurpfile reg2 "$REG_CISA" '
       ($cat[0]) as $C
-      | ([ $reg[0].clusters[].elements[] | {(.id): .label_ko} ] | add) as $RK
+      | (([ ($reg[0], $reg2[0]) | .clusters[].elements[] | select(.label_ko != null) | {(.id): .label_ko} ] | add) // {}) as $RK
       | def llabel($id; $en):
-          if ($id|startswith("g7-")) then ($RK[$id] // $en)
+          if ($RK[$id] != null) then $RK[$id]
           elif ($en|test("^Spec version \\(CycloneDX ")) then ($C["conformance.label.spec_cdx"] | gsub("%v%"; ($en|capture("^Spec version \\(CycloneDX (?<v>.+)\\)$").v)))
           elif ($en|test("^Spec version \\(")) then ($C["conformance.label.spec_other"] | gsub("%v%"; ($en|capture("^Spec version \\((?<v>.+)\\)$").v)))
           elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
@@ -777,6 +794,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
           elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]
           elif $d=="not CycloneDX or SPDX" then $C["conformance.detail.not_cdx_spdx"]
           elif $d=="could not evaluate" then $C["conformance.detail.could_not_eval"]
+          elif $d=="no components" then $C["conformance.detail.no_subject_components"]
+          elif ($d|test("^[0-9]+/[0-9]+ component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.subject_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
           elif ($d|test("^[0-9]+/[0-9]+ model component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.model_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
           elif ($d|test("^[0-9]+ tool\\(s\\)$")) then ($C["conformance.detail.tool"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ edge\\(s\\)$")) then ($C["conformance.detail.edge"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
