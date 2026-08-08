@@ -1,0 +1,5 @@
+# Pinned build dependencies for the MkDocs documentation site.
+# Used by .github/workflows/docs.yml. Bump versions deliberately.
+mkdocs-material==9.7.6
+mkdocs-static-i18n==1.3.1
+mkdocs-redirects==1.2.3
