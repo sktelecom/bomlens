@@ -39,10 +39,15 @@ export default defineConfig({
       include: ["src/lib/**/*.ts"],
       exclude: ["src/lib/**/*.test.ts"],
       reporter: ["text-summary", "json-summary"],
+      // Re-baselined for Vitest 4: its v8 provider remaps coverage through the
+      // AST rather than counting raw v8 ranges, so the same tests over the same
+      // code measure lower — branches 82% -> 69.38%, functions 88% -> 81.79%.
+      // Nothing stopped being tested. These sit just under the new measurement,
+      // as the old ones sat just under the old.
       thresholds: {
         lines: 75,
-        functions: 88,
-        branches: 82,
+        functions: 80,
+        branches: 68,
         statements: 75,
       },
     },
