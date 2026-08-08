@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The conformance report's regulatory crosswalk states how many requirements an SBOM fails, as its own column. The table carried present, gap and review, so a failure fell outside all three and the columns did not add up to the total. The four counts now account for every mapped requirement, and a regression test holds them to it.
+
 - The conformance report explains what a person still has to check, and does so in the markdown as well as the HTML. The signing this tool offers is detached — the signature is a file beside the SBOM — and a report that reads one file cannot see it, so that row now says as much instead of reading as unsigned. A signature carried inside the document is still read and credited. The same notes cover the four practices no scan can settle: whether the SBOM covers everything, how corrections are issued, how it reaches the people who need it, and how often it is reissued.
 
 - A binary or firmware SBOM now records the hash of the file that was scanned, on the component the SBOM is about. A recipient can hash their copy and tell whether it is the copy the SBOM describes. Scans with no single artifact — a source tree, a container image, an installed OS package spread across a root filesystem — record no hash rather than one computed over something that is not the artifact.

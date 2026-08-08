@@ -339,6 +339,10 @@ registry_checks() {
         + ([ .clusters[] as $c | $c.elements[] |
             "{id:" + (.id|@json)
             + ",label:" + (.label|@json)
+            # Carried on the check itself, not only looked up when this file
+            # renders Korean: a consumer of the JSON contract (the web UI) has no
+            # registry to look it up in.
+            + ",label_ko:" + ((.label_ko // "")|@json)
             + ",required:" + ((.required // false)|tojson)
             + ",cluster:" + ($c.id|@json)
             + ",source:" + (.source|@json)
@@ -369,7 +373,8 @@ registry_checks() {
              elif ._present==true then {status:"pass", detail:"present", missing:[]}
              elif ._present==false then {status:$unmet, detail:"not present in the SBOM", missing:[]}
              else {status:"warn", detail:"requires human review (no automated source)", missing:[]} end) as $s
-            | {id, label, required, status:$s.status, detail:$s.detail, missing:$s.missing,
+            | {id, label, label_ko, required, status:$s.status, detail:$s.detail,
+               missing:$s.missing,
                evidence: ((._ev // []) | unique | .[0:$cap]),
                cluster, source, role}
         )'
@@ -661,11 +666,17 @@ if [ -f "$XWALK_FILE" ]; then
             $fw | to_entries[] | .key as $fid | .value as $meta
             | ($rows | map(select((.regulations // []) | any(.framework==$fid)))) as $frows
             | select(($frows|length) > 0)
+            # `failed` is stated rather than left to arithmetic. It used to be
+            # absent, and every reader of these four numbers had to work it out as
+            # total - present - gap - review — which the web UI did, under the
+            # heading "advisory". The most serious category was being displayed
+            # under the mildest name.
             | { id: $fid, title: ($meta.title // $fid), source: ($meta.source // ""),
                 total:   ($frows|length),
                 present: ($frows | map(select(.status=="pass")) | length),
                 gap:     ($frows | map(select(.status=="warn" and ((.source//"")!="na"))) | length),
                 review:  ($frows | map(select((.source//"")=="na")) | length),
+                failed:  ($frows | map(select(.status=="fail")) | length),
                 elements:($frows | map({id, label, status, source, detail,
                             refs: [ (.regulations // [])[] | select(.framework==$fid) | .ref ]})) }
           ] }' 2>/dev/null) || XW_SUMMARY='{"frameworks":[],"disclaimer":""}'
@@ -845,6 +856,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_H2_CLUSTERS=$(kstr aiprofile.h2_clusters); C_TH_CLUSTER=$(kstr aiprofile.th_cluster)
     C_TH_PRESENT=$(kstr aiprofile.th_present); C_TH_GAP=$(kstr aiprofile.th_gap)
     C_TH_REVIEWCNT=$(kstr aiprofile.th_review); C_TH_TOTAL=$(kstr aiprofile.th_total)
+    C_TH_FAILED=$(kstr crosswalk.th_failed)
     C_H2_LIC=$(kstr aiprofile.h2_lic); C_TH_COMP=$(kstr aiprofile.th_component)
     C_TH_VER=$(kstr aiprofile.th_version); C_TH_LIC=$(kstr aiprofile.th_license)
     C_TH_FLAG=$(kstr aiprofile.th_flag); C_LIC_NONE=$(kstr aiprofile.lic_none_html)
@@ -872,6 +884,7 @@ else
     C_H2_SUBMIT="SBOM format requirements"
     C_H2_CLUSTERS="G7 minimum elements by cluster"
     C_TH_CLUSTER="Cluster"; C_TH_PRESENT="Present"; C_TH_GAP="Gap"; C_TH_REVIEWCNT="Review"; C_TH_TOTAL="Total"
+    C_TH_FAILED="Failed"
     C_H2_LIC="Licenses flagged for review"
     C_TH_COMP="Component"; C_TH_VER="Version"; C_TH_LIC="License"; C_TH_FLAG="Flag"
     C_LIC_NONE="No components carry an AI behavioral-use or non-commercial license flag."
@@ -923,10 +936,10 @@ fi
     if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
         echo "## ${C_H2_XWALK}"
         echo ""
-        echo "| ${C_TH_FRAMEWORK} | ${C_TH_PRESENT} | ${C_TH_GAP} | ${C_TH_REVIEWCNT} | ${C_TH_TOTAL} |"
-        echo "|-----------|:-------:|:---:|:------:|:-----:|"
+        echo "| ${C_TH_FRAMEWORK} | ${C_TH_PRESENT} | ${C_TH_GAP} | ${C_TH_FAILED} | ${C_TH_REVIEWCNT} | ${C_TH_TOTAL} |"
+        echo "|-----------|:-------:|:---:|:------:|:------:|:-----:|"
         echo "$RXW" | jq -r '.frameworks[] |
-            "| \(.title | gsub("[|\n]";" ")) | \(.present) | \(.gap) | \(.review) | \(.total) |"'
+            "| \(.title | gsub("[|\n]";" ")) | \(.present) | \(.gap) | \(.failed // 0) | \(.review) | \(.total) |"'
         echo ""
         echo "$RXW" | jq -r '.frameworks[] | "- \(.title | gsub("[|\n]";" ")) — \(.source | gsub("[|\n]";" "))"'
         echo ""
@@ -1172,11 +1185,12 @@ HTMLHEAD
     # same labels, statuses and details as the table one screen up.
     if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
         echo "<h2>${C_H2_XWALK}</h2>"
-        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_FRAMEWORK}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
+        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_FRAMEWORK}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_FAILED}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
         echo "$RXW" | jq -r '.frameworks[] |
             "<tr><td>" + (.title|@html)
             + "<br><span class=\"meta\">" + (.source|@html) + "</span></td>"
             + "<td>" + (.present|tostring) + "</td><td>" + (.gap|tostring) + "</td>"
+            + "<td>" + ((.failed // 0)|tostring) + "</td>"
             + "<td>" + (.review|tostring) + "</td><td>" + (.total|tostring) + "</td></tr>"'
         echo "</table></div>"
         echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"

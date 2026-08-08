@@ -256,6 +256,24 @@ export interface ConformanceCheck {
    *  mapping; absent on base format checks and on runs generated before the
    *  guidance registry existed. Informational — never changes a status. */
   guidance?: G7GuidanceRef;
+  /** What a person has to establish for this element, when no scan can settle it
+   *  or when it is checkable in a form this report cannot see (a signature
+   *  delivered beside the SBOM rather than inside it). The .md and .html reports
+   *  have shown these all along. */
+  reviewGuide?: ReviewGuideRef;
+  /** The Korean label the registry declares for this element. The rest of this
+   *  contract stays English by design, so the translation rides alongside `label`
+   *  rather than replacing it. Empty for checks whose label carries a threshold
+   *  or a spec version and so cannot be looked up whole. */
+  labelKo?: string;
+}
+
+/** What a person has to establish for one element. */
+export interface ReviewGuideRef {
+  how?: string;
+  howKo?: string;
+  /** Authoritative documentation (absolute https URL). */
+  docUrl?: string;
 }
 
 /** Fill-in guidance for one G7 element. */
@@ -299,6 +317,10 @@ export interface CrosswalkFramework {
   present: number;
   gap: number;
   review: number;
+  /** Requirements this SBOM fails outright. Stated by the report; a consumer
+   *  deriving it as total - present - gap - review gets the number right and the
+   *  name wrong, which is what the panel used to do under the heading "advisory". */
+  failed: number;
   elements: CrosswalkElement[];
 }
 

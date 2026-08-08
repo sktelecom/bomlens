@@ -1228,7 +1228,14 @@ assert isinstance(xw, dict), ("no regulatoryCrosswalk", type(xw))
 assert xw.get("disclaimer"), "crosswalk disclaimer missing"
 fws = xw.get("frameworks") or []
 assert len(fws) >= 1, "no crosswalk frameworks"
-assert {"id", "title", "source", "total", "present", "gap", "review", "elements"} <= set(fws[0]), fws[0]
+assert {"id", "title", "source", "total", "present", "gap", "review", "failed",
+        "elements"} <= set(fws[0]), fws[0]
+# The four counts have to account for every mapped requirement. They did not:
+# `failed` was absent and the only consumer worked it out as a remainder, then
+# labelled that remainder "advisory" — so a failure was displayed as the mildest
+# category there is.
+for fw in fws:
+    assert fw["present"] + fw["gap"] + fw["failed"] + fw["review"] == fw["total"], fw
 el = fws[0]["elements"][0]
 assert {"label", "status", "source", "refs"} <= set(el), el
 # The per-check mapping is preserved as {framework, ref, basis}.
@@ -1243,6 +1250,22 @@ assert {"framework", "ref", "basis"} <= set(reg), reg
 base_mapped = [x for x in base if x.get("regulations")]
 assert len(base_mapped) >= 1, "base format checks should carry crosswalk mappings"
 assert {"framework", "ref", "basis"} <= set(base_mapped[0]["regulations"][0]), base_mapped[0]
+# The Korean label a registry declares for its element rides alongside the English
+# one. The contract itself stays English (asserted elsewhere); this is what lets a
+# client render the row in Korean without translating the contract.
+assert all("labelKo" in x for x in checks), "labelKo not exposed"
+assert any(x["labelKo"] for x in g7), "no G7 element carries its Korean label"
+cisa = [x for x in checks if x["id"].startswith("cisa-")]
+assert len(cisa) >= 20, ("the 2026 minimum elements should be measured too", len(cisa))
+assert any(x["labelKo"] for x in cisa), "no CISA element carries its Korean label"
+# What a person has to establish, for the elements no scan can settle and for the
+# one checkable in a form this report cannot see (a detached signature). The .md
+# and .html reports have carried these all along; the UI could not see them.
+guided = [x for x in checks if x.get("reviewGuide")]
+assert len(guided) >= 1, "reviewGuide not exposed"
+assert {"how", "howKo", "docUrl"} <= set(guided[0]["reviewGuide"]), guided[0]
+assert any(x["id"] == "cisa-sbom-author-signature" for x in guided), (
+    "the detached-signature note is the one a reader most needs")
 PY
     then
         pass "conformance_summary exposes the full G7 checklist with cluster/source/crosswalk"

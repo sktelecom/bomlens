@@ -126,6 +126,7 @@
   "aiprofile.th_gap": "미충족",
   "aiprofile.th_review": "검토",
   "aiprofile.th_total": "합계",
+  "crosswalk.th_failed": "실패",
   "aiprofile.h2_crosswalk": "규제 대응표",
   "aiprofile.th_framework": "프레임워크",
   "aiprofile.th_mapped": "대응",

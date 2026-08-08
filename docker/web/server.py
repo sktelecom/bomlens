@@ -1465,6 +1465,13 @@ def conformance_summary(run_id):
             # badge how each element was satisfied. Dropped here => dropped from UI.
             "cluster": str(c.get("cluster") or ""),
             "source": str(c.get("source") or ""),
+            # The Korean label the registry declares for this element. The JSON
+            # contract stays English — that is deliberate and tested — so the
+            # translation rides alongside rather than replacing it, and a client
+            # rendering in Korean picks it up. Empty for the checks the scripts
+            # write themselves, whose labels carry a threshold or a spec version
+            # and so cannot be looked up whole.
+            "labelKo": str(c.get("label_ko") or ""),
         }
         # Any check can carry a regulatory-crosswalk mapping (validate-sbom.sh
         # joins docker/lib/regulation-crosswalk.json by check id): the named
@@ -1503,6 +1510,19 @@ def conformance_summary(run_id):
                 doc_url = ""
             if snippet or doc_url:
                 row["guidance"] = {"snippet": snippet, "docUrl": doc_url}
+        # What a person has to establish for an element no scan can settle, and for
+        # one that is checkable in a form this report cannot see — a signature
+        # delivered beside the SBOM rather than inside it. The .md and .html
+        # reports have carried these since they existed; the UI could not.
+        rg = c.get("reviewGuide")
+        if isinstance(rg, dict):
+            how = str(rg.get("how") or "")[:MAX_GUIDANCE_SNIPPET]
+            how_ko = str(rg.get("how_ko") or "")[:MAX_GUIDANCE_SNIPPET]
+            rg_url = str(rg.get("docUrl") or "")
+            if not rg_url.startswith("https://"):
+                rg_url = ""
+            if how or how_ko:
+                row["reviewGuide"] = {"how": how, "howKo": how_ko, "docUrl": rg_url}
         checks.append(row)
     out = {
         "result": data.get("result", "unknown"),
@@ -1550,6 +1570,10 @@ def _crosswalk_view(xwalk):
             "present": int(fw.get("present") or 0),
             "gap": int(fw.get("gap") or 0),
             "review": int(fw.get("review") or 0),
+            # Stated by the report rather than inferred from the other three. A
+            # consumer working it out as total - present - gap - review gets the
+            # right number and the wrong name for it.
+            "failed": int(fw.get("failed") or 0),
             "elements": elements,
         })
         if len(frameworks) >= MAX_CROSSWALK_FRAMEWORKS:
@@ -1602,6 +1626,10 @@ def ai_profile_summary(run_id):
             "present": int(fw.get("present") or 0),
             "gap": int(fw.get("gap") or 0),
             "review": int(fw.get("review") or 0),
+            # Stated by the report rather than inferred from the other three. A
+            # consumer working it out as total - present - gap - review gets the
+            # right number and the wrong name for it.
+            "failed": int(fw.get("failed") or 0),
         })
     out = {
         "conformanceResult": str(data.get("conformanceResult") or "unknown"),
