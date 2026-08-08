@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A generated SBOM now states why a field is empty when it is empty. The 2026 minimum elements ask an author to distinguish a value they could not establish from one they are withholding, and a scan only ever produces the first — it writes what it managed to read and has no second set of findings to hold back. The statement is made once for the document rather than repeated on every empty field, which on a firmware image would mean thousands of properties saying the same thing. The conformance element that asks for it is measured automatically now instead of being left to a human reader, so a received SBOM that says nothing about its absences is reported as a gap.
+
+- A component whose version the scan could not establish is no longer counted twice. Such a component is already marked as present with its version unestablished, and that marking is exactly the statement the minimum elements ask for, so the component-version element reads it instead of listing the component as missing the field.
+
 - The conformance report now measures an SBOM against the 2026 SBOM minimum elements — 17 data fields and 6 practices, published by CISA, the NSA and the FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA, replacing the NTIA elements of 2021. Every CycloneDX SBOM is measured, not only AI ones. The elements are advisory and none of them changes the pass or fail verdict, which stays with the submission criteria. Five of the six practices describe how an organisation operates rather than what a document contains, so they are surfaced as needing human review instead of being scored or quietly dropped.
 
 - What counts as identifying a component is wider under this baseline than under the submission criteria: a PURL, a CPE, or an intrinsic identifier such as a hash. A firmware file entry that carries only a hash is identified here even though the submission criteria still ask for a PURL, so the report can say both things at once instead of only the stricter one.

@@ -3,7 +3,7 @@
   "subject": "[.components[]?]",
   "subjectLabel": "component",
   "emptySubjectDetail": "no components",
-  "note": "Declarative map of the 2026 SBOM minimum elements — 17 data fields and 6 practices — to CycloneDX checks, read by validate-sbom.sh's registry evaluator. Read docker/lib/g7-registry.json's note for the element shapes; this registry uses the same ones, with all components as its subject rather than model components. Every element is advisory (required is absent, so false): the baseline itself draws no such line, but promoting a field to mandatory here fails an SBOM for a value it may legitimately not have, and the guidance gives the way out — state that the information is unknown. Nothing writes that statement yet, so the promotion waits for the notation that makes it expressible. The six practices are about how an organisation operates rather than about the document, so they carry no automated source and surface as human review; the exception is machine-processable data, which the format detection has already established by the time this runs.",
+  "note": "Declarative map of the 2026 SBOM minimum elements — 17 data fields and 6 practices — to CycloneDX checks, read by validate-sbom.sh's registry evaluator. Read docker/lib/g7-registry.json's note for the element shapes; this registry uses the same ones, with all components as its subject rather than model components. Every element is advisory (required is absent, so false). The baseline draws no such line itself, and promoting these would not add information: the guidance accepts an explicit statement that a value is unknown in place of the value, the document now carries that statement, and a check that every SBOM satisfies by declaration tells a reader nothing. What is worth reading is how much of each field the scan actually established, which is what the coverage details report. The six practices are about how an organisation operates rather than about the document, so they carry no automated source and surface as human review; the exception is machine-processable data, which the format detection has already established by the time this runs.",
   "clusters": [
     {
       "id": "cisa-metadata",
@@ -92,7 +92,7 @@
           "label": "Component version",
           "label_ko": "구성요소 버전",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select((.version // \"\") == \"\") | select([ (.properties // [])[] | select((.name // \"\") == \"bomlens:evidenceGrade\") ] | length == 0) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "cisa-component-producer",
@@ -173,7 +173,8 @@
           "id": "cisa-explicit-unknowns",
           "label": "Explicitly identifying unknown information",
           "label_ko": "미상 정보의 명시",
-          "source": "na"
+          "source": "auto",
+          "cdxPath": "[ (.metadata.properties // [])[] | select(((.name // \"\") | endswith(\"undeclared-fields\")) and ((.value // \"\") != \"\")) ] | length > 0"
         },
         {
           "id": "cisa-frequency",

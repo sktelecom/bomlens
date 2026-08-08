@@ -1673,6 +1673,41 @@ bash "$LIB/validate-sbom.sh" "$WORK/tv-depof.spdx" "$WORK/tvd" "supplier" >/dev/
 tvd=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/tvd_conformance.json")
 [ "$tvd" = "pass" ] && pass "Tag-Value DEPENDENCY_OF counts as a transitive edge" || fail "Tag-Value transitive (DEPENDENCY_OF): '$tvd', expected pass"
 
+echo "== document metadata: why an empty field is empty =="
+# The guidance asks the author to say which of two things an absence means — the
+# author does not know the value, or the author is holding it back. A scan only
+# ever produces the first, and says so once for the document rather than once per
+# empty field: the claim is identical for all of them, and repeating it across a
+# firmware image's components would add thousands of properties saying nothing new.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+  "metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"application","name":"App","version":"1.0"}},
+  "components":[]}' > "$WORK/undecl.json"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/undecl.json" SOURCE >/dev/null 2>&1
+ud=$(jq -r '[.metadata.properties[] | select(.name=="bomlens:undeclared-fields") | .value] | join(",")' "$WORK/undecl.json")
+[ "$ud" = "unknown-to-author" ] && pass "the document states that its empty fields are unknown, not withheld" || fail "undeclared-fields policy: '$ud'"
+bash "$LIB/stamp-document-metadata.sh" "$WORK/undecl.json" SOURCE >/dev/null 2>&1
+ud_n=$(jq '[.metadata.properties[] | select(.name=="bomlens:undeclared-fields")] | length' "$WORK/undecl.json")
+[ "$ud_n" = "1" ] && pass "restamping does not repeat the statement" || fail "policy property appears ${ud_n}x after two runs"
+# The conformance element that asks for this reads it, so an SBOM that says
+# nothing about its absences is told so rather than left unmeasured.
+bash "$LIB/validate-sbom.sh" "$WORK/undecl.json" "$WORK/ud" "supplier" >/dev/null 2>&1
+ud_chk=$(jq -r '.checks[] | select(.id=="cisa-explicit-unknowns") | "\(.status)|\(.source)"' "$WORK/ud_conformance.json")
+[ "$ud_chk" = "pass|auto" ] && pass "a declared policy satisfies the explicit-unknowns element" || fail "explicit-unknowns on a stamped SBOM: '$ud_chk'"
+jq 'del(.metadata.properties)' "$WORK/undecl.json" > "$WORK/undecl-none.json"
+bash "$LIB/validate-sbom.sh" "$WORK/undecl-none.json" "$WORK/udn" "supplier" >/dev/null 2>&1
+udn_chk=$(jq -r '.checks[] | select(.id=="cisa-explicit-unknowns") | .status' "$WORK/udn_conformance.json")
+[ "$udn_chk" = "warn" ] && pass "an SBOM that says nothing about its absences is reported as a gap" || fail "explicit-unknowns without a policy: '$udn_chk'"
+# A component version the scan could not establish is already marked, and that
+# marking is the statement the guidance asks for. Counting it as missing would
+# report the same fact twice and under-report coverage.
+jq '.components = [{"type":"library","name":"marked","properties":[{"name":"bomlens:evidenceGrade","value":"presence-only"}]},{"type":"library","name":"silent"}]' \
+    "$WORK/undecl.json" > "$WORK/undecl-ver.json"
+bash "$LIB/validate-sbom.sh" "$WORK/undecl-ver.json" "$WORK/udv" "supplier" >/dev/null 2>&1
+udv=$(jq -r '.checks[] | select(.id=="cisa-component-version") | "\(.detail)|\(.missing|join(","))"' "$WORK/udv_conformance.json")
+[ "$udv" = "1/2 component(s)|silent" ] \
+    && pass "a version marked as not established counts as stated, an unmarked one does not" \
+    || fail "component-version with an evidence grade: '$udv'"
+
 echo "== conformance: the 2026 SBOM minimum elements are measured on every SBOM =="
 # The baseline applies to all software, not to a subset, so its registry declares
 # no condition and is measured wherever a CycloneDX SBOM is. Advisory throughout
@@ -1691,8 +1726,8 @@ ci_res=$(jq -r '.result' "$WORK/ci_conformance.json")
 # Surfaced as review rather than dropped, so the report shows the whole baseline
 # and which part of it a tool can answer.
 ci_na=$(jq -r '[.checks[] | select((.id|startswith("cisa-")) and .source=="na") | .id] | sort | join(",")' "$WORK/ci_conformance.json")
-[ "$ci_na" = "cisa-accommodation-of-updates,cisa-coverage,cisa-distribution-and-delivery,cisa-explicit-unknowns,cisa-frequency" ] \
-    && pass "the five practices with no automated source are surfaced as review" || fail "cisa review set: $ci_na"
+[ "$ci_na" = "cisa-accommodation-of-updates,cisa-coverage,cisa-distribution-and-delivery,cisa-frequency" ] \
+    && pass "the four practices with no automated source are surfaced as review" || fail "cisa review set: $ci_na"
 # What this baseline accepts as an identifier is wider than the submission
 # criteria: PURL or CPE, and an intrinsic identifier such as a hash. A file
 # component carries only the last of those, and it is identified all the same.

@@ -79,10 +79,23 @@ SBOM_AUTHOR="${SBOM_AUTHOR:-}"
 TOOL_VERSION="${BOMLENS_VERSION:-}"
 [ -n "$TOOL_VERSION" ] || TOOL_VERSION="unknown"
 
+# Why a minimum-element field is empty when it is empty. The guidance asks the
+# author to say which of two things an absence means: the author does not know the
+# value, or the author knows it and is holding it back. A scan only ever produces
+# the first. It reads what it can reach and writes what it read; it has no second
+# set of findings to withhold, and there is no switch here that would drop one.
+#
+# Stated once for the document rather than once per empty field. The claim is the
+# same for every one of them, and repeating it across the components of a firmware
+# image would add thousands of properties saying nothing new. A reader who wants
+# to know why a particular license is missing gets the same answer either way.
+UNDECLARED_POLICY="unknown-to-author"
+
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg author "$SBOM_AUTHOR" \
-      --arg toolver "$TOOL_VERSION" '
+      --arg toolver "$TOOL_VERSION" \
+      --arg undeclared "$UNDECLARED_POLICY" '
     # A tool entry with no version tells the reader nothing about which build
     # produced the SBOM, so an absent one is stated as unknown rather than left
     # out. Both shapes of metadata.tools are in play: CycloneDX 1.5 replaced the
@@ -113,6 +126,9 @@ if jq --arg lifecycle "$LIFECYCLE" \
     | (if $author != ""
        then .metadata.authors = [{name: $author}]
        else (.metadata) |= del(.authors) end)
+    | (.metadata.properties) = (((.metadata.properties // [])
+        | map(select((.name // "") != "bomlens:undeclared-fields")))
+        + [{name: "bomlens:undeclared-fields", value: $undeclared}])
     ' "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"
 else
