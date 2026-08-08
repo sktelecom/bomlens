@@ -8,12 +8,25 @@ import {
   baseTally,
   clusterOf,
   crosswalkTotals,
+  dedupeMissing,
   elementCoverage,
   g7Tally,
   groupG7ByCluster,
+  missingOverflow,
   profileCard,
+  sortByAttention,
   splitChecks,
+  verdictTally,
 } from "./conformance";
+
+/** Object-shaped builder for the cases that vary more than one field. */
+const chk = (o: Partial<ConformanceCheck> & { id: string }): ConformanceCheck => ({
+  label: o.id,
+  required: false,
+  status: "warn",
+  detail: "",
+  ...o,
+});
 
 const check = (
   id: string,
@@ -145,18 +158,102 @@ describe("baseTally", () => {
   });
 });
 
+describe("splitChecks (three baselines)", () => {
+  it("separates the checks the scripts write from each registry's elements", () => {
+    const split = splitChecks([
+      chk({ id: "purl" }),
+      chk({ id: "cisa-component-license", cluster: "cisa-component" }),
+      chk({ id: "g7-model-license", cluster: "models" }),
+    ]);
+    expect(split.base.map((c) => c.id)).toEqual(["purl"]);
+    expect(split.cisa.map((c) => c.id)).toEqual(["cisa-component-license"]);
+    expect(split.g7.map((c) => c.id)).toEqual(["g7-model-license"]);
+  });
+});
+
+describe("sortByAttention", () => {
+  it("puts failures first, then gaps, then review items, then what is met", () => {
+    const sorted = sortByAttention([
+      chk({ id: "d", status: "pass" }),
+      chk({ id: "c", status: "warn", source: "na" }),
+      chk({ id: "b", status: "warn" }),
+      chk({ id: "a", status: "fail" }),
+    ]);
+    expect(sorted.map((c) => c.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("is stable inside a status, so the registry's own order survives", () => {
+    const sorted = sortByAttention([
+      chk({ id: "first", status: "warn" }),
+      chk({ id: "second", status: "warn" }),
+    ]);
+    expect(sorted.map((c) => c.id)).toEqual(["first", "second"]);
+  });
+});
+
+describe("dedupeMissing", () => {
+  it("collapses a repeated name and says how many times it appeared", () => {
+    expect(dedupeMissing(["zlib", "systemd", "zlib"])).toEqual([
+      { name: "zlib", count: 2 },
+      { name: "systemd", count: 1 },
+    ]);
+  });
+});
+
+describe("missingOverflow", () => {
+  it("reports how many offenders the list left out", () => {
+    // 14 of 31 met => 17 missing, of which 3 are listed.
+    expect(missingOverflow(chk({ id: "cisa-x", detail: "14/31 component(s)", missing: ["a", "b", "c"] }))).toBe(14);
+  });
+
+  it("is zero when the list is complete or the detail carries no count", () => {
+    expect(missingOverflow(chk({ id: "cisa-y", detail: "2/3 component(s)", missing: ["a"] }))).toBe(0);
+    expect(missingOverflow(chk({ id: "cisa-z", detail: "present", missing: [] }))).toBe(0);
+  });
+});
+
+describe("verdictTally", () => {
+  it("counts the verdict from the mandatory checks alone", () => {
+    const v = verdictTally([
+      chk({ id: "purl", required: true, status: "fail" }),
+      chk({ id: "tools", required: true, status: "pass" }),
+      chk({ id: "cisa-a", status: "warn" }),
+      chk({ id: "cisa-b", status: "warn", source: "na" }),
+      chk({ id: "cisa-c", status: "pass" }),
+    ]);
+    expect(v).toEqual({
+      mandatoryFailed: 1,
+      mandatoryTotal: 2,
+      mandatoryPassed: 1,
+      advisoryGap: 1,
+      review: 1,
+    });
+  });
+});
+
 describe("crosswalkTotals", () => {
-  it("sums the coverage counts across frameworks", () => {
+  it("sums the coverage counts across frameworks, failures included", () => {
     expect(
       crosswalkTotals([
-        { total: 5, present: 3, gap: 1, review: 1 },
-        { total: 4, present: 2, gap: 2, review: 0 },
+        { total: 5, present: 3, gap: 1, review: 1, failed: 0 },
+        { total: 4, present: 2, gap: 1, review: 0, failed: 1 },
       ]),
-    ).toEqual({ total: 9, present: 5, gap: 3, review: 1, advisory: 0 });
+    ).toEqual({ total: 9, present: 5, gap: 2, review: 1, failed: 1 });
+  });
+
+  // The failure count is read, not derived. It used to be computed as the
+  // remainder and shown under the heading "advisory", which put the most serious
+  // category under the mildest name on the page.
+  it("reads failed from the framework rather than inferring a remainder", () => {
+    expect(crosswalkTotals([{ total: 4, present: 1, gap: 1, review: 1, failed: 1 }]).failed).toBe(1);
+  });
+
+  it("treats a report generated before the field existed as zero failures", () => {
+    expect(crosswalkTotals([{ total: 3, present: 3, gap: 0, review: 0 }]).failed).toBe(0);
   });
 
   it("is all-zero for no frameworks", () => {
-    expect(crosswalkTotals([])).toEqual({ total: 0, present: 0, gap: 0, review: 0, advisory: 0 });
+    expect(crosswalkTotals([])).toEqual({ total: 0, present: 0, gap: 0, review: 0, failed: 0 });
   });
 });
 
@@ -205,7 +302,7 @@ describe("profileCard", () => {
       licenseBehavioral: 1,
       licenseNonCommercial: 1,
       frameworkCount: 2,
-      crosswalk: { total: 14, present: 8, gap: 4, review: 2, advisory: 0 },
+      crosswalk: { total: 14, present: 8, gap: 4, review: 2, failed: 0 },
     });
   });
 });

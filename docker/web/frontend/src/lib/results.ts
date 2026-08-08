@@ -7,7 +7,7 @@
  * Pure functions, unit tested — the rail's adaptation depends on them.
  */
 import type { DoneEvent } from "./api";
-import { baseTally, g7Tally, splitChecks } from "./conformance";
+import { verdictTally } from "./conformance";
 import { EMPTY_SCAN, type ScanContext, type SectionId } from "./nav";
 
 /** The generated CycloneDX SBOM artifact, if present (drives the graph view). */
@@ -78,17 +78,21 @@ export function isAiScan(result: DoneEvent): boolean {
 }
 
 /**
- * Conformance coverage as a `passed/total` string, mirroring the panel
- * headlines: G7 `present/autoTotal` when the scan has G7 AI checks, otherwise
- * the base format tally. Undefined when there is nothing to count, so both
- * the rail badge and the overview tile can simply omit it.
+ * Conformance coverage as a `passed/total` string: the mandatory checks, which
+ * are the ones that decide the verdict. Undefined when there is nothing to
+ * count, so both the rail badge and the overview tile can simply omit it.
+ *
+ * It used to mean two different things depending on the scan. An AI scan showed
+ * G7 coverage, everything else showed passes over every check advisory ones
+ * included — so the same badge read "20/41" on one scan and "15/40" on another
+ * while neither number said whether the SBOM was acceptable. The advisory
+ * baselines have their own headlines inside the panel; the badge answers the
+ * question a badge is asked.
  */
 export function conformanceCount(result: DoneEvent): string | undefined {
-  const { base, g7 } = splitChecks(result.conformance?.checks ?? []);
-  const g7t = g7Tally(g7);
-  if (g7t.autoTotal > 0) return `${g7t.present}/${g7t.autoTotal}`;
-  const baseT = baseTally(base);
-  if (baseT.total > 0) return `${baseT.passed}/${baseT.total}`;
+  const checks = result.conformance?.checks ?? [];
+  const v = verdictTally(checks);
+  if (v.mandatoryTotal > 0) return `${v.mandatoryPassed}/${v.mandatoryTotal}`;
   return undefined;
 }
 

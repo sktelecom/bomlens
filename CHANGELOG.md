@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The conformance screen leads with what blocks the SBOM. A line at the top says how many mandatory checks failed, how many advisory elements are short, and how many need a person, and the mandatory checks themselves now come first — they used to sit below every advisory row, which on an AI SBOM meant the bottom of a page twelve thousand pixels long. The rail badge counts the mandatory checks too, so it means the same thing on every scan instead of showing AI coverage on one and every-check passes on another.
+
+- The 2026 SBOM minimum elements are their own block on that screen, grouped the way the guidance groups them, and their rows carry what the AI elements have carried all along: how the value was established, the fragment that would satisfy it, and — for the elements no scan can settle — what a person has to check. They had been rendering as three bare lines in the middle of the format list, because a row only did any of that for elements whose id began "g7-". Each of the 23 elements also has a plain-language description of what it is and what would satisfy it, in English and Korean.
+
+### Fixed
+
+- The regulatory crosswalk no longer reports failures as advisories. The table showed four counts and derived one of them as the remainder of the other three, which is the failure count; it was labelled "advisory", so the most serious category appeared under the mildest name on the page.
+
 - The conformance report's regulatory crosswalk states how many requirements an SBOM fails, as its own column. The table carried present, gap and review, so a failure fell outside all three and the columns did not add up to the total. The four counts now account for every mapped requirement, and a regression test holds them to it.
 
 - The conformance report explains what a person still has to check, and does so in the markdown as well as the HTML. The signing this tool offers is detached — the signature is a file beside the SBOM — and a report that reads one file cannot see it, so that row now says as much instead of reading as unsigned. A signature carried inside the document is still read and credited. The same notes cover the four practices no scan can settle: whether the SBOM covers everything, how corrections are issued, how it reaches the people who need it, and how often it is reissued.

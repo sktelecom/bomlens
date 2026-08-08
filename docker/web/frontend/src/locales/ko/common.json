@@ -718,20 +718,117 @@
       "g7-kpi-operational": {
         "what": "모델의 운영 성능 지표입니다.",
         "fix": "modelCard.quantitativeAnalysis.performanceMetrics를 설정하세요."
+      },
+      "cisa-sbom-author": {
+        "what": "이 SBOM을 생성한 주체. 스캔을 실행한 조직이나 사람이며 도구가 아닙니다.",
+        "fix": "--sbom-author(또는 SBOM_AUTHOR)로 정식 명칭을 지정하면 metadata.authors에 기록됩니다."
+      },
+      "cisa-sbom-author-signature": {
+        "what": "SBOM 작성자에게 귀속되는 디지털 서명으로, 문서 안에 담긴 것.",
+        "fix": "문서 자체에 서명하거나, 파일 옆에 따로 온 서명을 검증하고 검증 사실을 기록해 둡니다."
+      },
+      "cisa-sbom-format-name": {
+        "what": "이 SBOM이 쓰인 데이터 형식의 이름.",
+        "fix": "통용되는 형식으로 출력합니다. CycloneDX에서는 bomFormat이 이름을 담습니다."
+      },
+      "cisa-sbom-format-version": {
+        "what": "그 데이터 형식의 버전.",
+        "fix": "형식이 아직 유지하는 버전을 specVersion에 적습니다."
+      },
+      "cisa-sbom-generation-context": {
+        "what": "이 SBOM이 기술하는 생애주기 단계. 구성요소 데이터가 무엇을 뜻할 수 있는지를 정합니다.",
+        "fix": "metadata.lifecycles를 설정합니다. 매니페스트를 읽었으면 pre-build, 빌드 산출물을 읽었으면 post-build입니다."
+      },
+      "cisa-sbom-timestamp": {
+        "what": "SBOM 데이터를 마지막으로 바꾼 시각.",
+        "fix": "RFC 9557 형식으로 metadata.timestamp를 설정합니다."
+      },
+      "cisa-sbom-tool-name": {
+        "what": "작성자가 SBOM을 생성하거나 수정하는 데 쓴 도구.",
+        "fix": "metadata.tools에 도구를 정식 명칭으로 적습니다."
+      },
+      "cisa-sbom-tool-version": {
+        "what": "그 도구의 어느 빌드가 돌았는지. 없으면 도구 이름만으로는 알 수 있는 것이 적습니다.",
+        "fix": "도구 항목마다 버전을 적거나, 알 수 없으면 미상임을 밝힙니다."
+      },
+      "cisa-sbom-version": {
+        "what": "같은 구성요소·버전에 대한 이 SBOM이 몇 번째 판인지.",
+        "fix": "문서 버전을 설정합니다. 이 최소 요소를 따르는 첫 발행본은 1입니다."
+      },
+      "cisa-component-name": {
+        "what": "생산자가 각 구성요소에 붙인 이름.",
+        "fix": "모든 구성요소에 이름을 답니다."
+      },
+      "cisa-component-version": {
+        "what": "각 구성요소의 버전. 취약점 매칭이 이 값을 키로 씁니다.",
+        "fix": "모든 구성요소에 버전을 적거나, 존재는 확인했고 버전은 확정하지 못했다고 표시합니다."
+      },
+      "cisa-component-producer": {
+        "what": "각 구성요소를 만든 주체. 문제가 생겼을 때 연락할 지점입니다.",
+        "fix": "publisher, supplier, authors, manufacturer 중 하나를 채우거나 출처 미상임을 밝힙니다."
+      },
+      "cisa-component-identifiers": {
+        "what": "구성요소를 다른 데이터베이스와 연결하는 식별자 하나 이상.",
+        "fix": "구성요소마다 PURL이나 CPE를 답니다. 둘 다 있을 수 없는 파일은 해시가 식별자입니다."
+      },
+      "cisa-component-license": {
+        "what": "각 구성요소가 배포되는 라이선스.",
+        "fix": "SPDX 식별자로 licenses를 채우거나 라이선스 미상임을 밝힙니다."
+      },
+      "cisa-component-hash-value": {
+        "what": "각 실행 가능 산출물의 해시. 받는 쪽이 자기 사본을 검증할 수 있게 합니다.",
+        "fix": "산출물에 접근할 수 있으면 hashes를 채우고, 접근할 수 없으면 미상임을 밝힙니다."
+      },
+      "cisa-component-hash-algorithm": {
+        "what": "각 해시를 만든 알고리즘. 알고리즘 없는 해시는 다시 계산해 볼 수 없습니다.",
+        "fix": "해시마다 알고리즘 이름을 IANA 등록명으로 적습니다."
+      },
+      "cisa-component-dependency-relationship": {
+        "what": "어느 구성요소가 어느 것을 필요로 하는지. 영향 범위를 답할 수 있게 하는 그래프입니다.",
+        "fix": "이행 의존성까지 포함해 의존 관계를 기록합니다."
+      },
+      "cisa-machine-processable-data": {
+        "what": "SBOM이 도구가 읽을 수 있는 통용 개방 형식으로 되어 있는지.",
+        "fix": "한 도구만 읽는 형식 대신 CycloneDX나 SPDX로 전달합니다."
+      },
+      "cisa-coverage": {
+        "what": "SBOM이 소프트웨어의 구성요소를 이행 의존성까지 빠짐없이 담았는지."
+      },
+      "cisa-accommodation-of-updates": {
+        "what": "발행한 SBOM 데이터를 정정할 수 있고 정정본이 지체 없이 나가는지."
+      },
+      "cisa-distribution-and-delivery": {
+        "what": "필요한 쪽이 SBOM을 받을 수 있는지, 접근 통제가 권한 있는 쪽까지 막지는 않는지."
+      },
+      "cisa-explicit-unknowns": {
+        "what": "빈 필드가 왜 비었는지 밝히는지. 작성자가 모르는 것인지, 알지만 뺀 것인지.",
+        "fix": "문서 전체에 대해 한 번 밝힙니다. 스캔은 앞의 경우만 만들므로 이 파이프라인이 그렇게 적습니다."
+      },
+      "cisa-frequency": {
+        "what": "소프트웨어 버전마다 자기 SBOM이 있는지, 데이터가 바뀌면 정정본을 다시 내는지."
       }
-    }
+    },
+    "verdictFailed": "필수 검사 {{count}}건 실패",
+    "verdictFailed_one": "필수 검사 1건 실패",
+    "verdictFailed_zero": "필수 검사 실패 없음",
+    "verdictGap": "권고 미비 {{count}}건",
+    "verdictReview": "사람이 확인할 항목 {{count}}건",
+    "baseMandatory": "필수 {{passed}}/{{total}} 통과",
+    "missingMore": "외 {{count}}개",
+    "needsPerson": "확인할 것:"
   },
   "crosswalk": {
     "title": "규제 대응표",
     "disclaimer": "규정 준수 판정이 아니라 문서 준비를 돕는 자료입니다. 이 대응표는 SBOM이 담을 수 있는 문서화 항목만 다루며, 공정성·편향 평가나 위험관리처럼 SBOM으로 표현할 수 없는 의무는 별도 문서로 이행해야 합니다.",
-    "totals": "매핑된 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 권고 {{advisory}}개, 검토 필요 {{review}}개",
+    "totals": "매핑된 {{total}}개 중 충족 {{present}}개, 미비 {{gap}}개, 실패 {{failed}}개, 검토 필요 {{review}}개",
     "thFramework": "프레임워크",
     "thTotal": "합계",
     "refs": "참조:",
     "present": "충족",
     "gap": "미비",
     "advisory": "권고",
-    "review": "검토 필요"
+    "review": "검토 필요",
+    "failed": "실패"
   },
   "aiProfile": {
     "title": "AI 준수 개요",
@@ -836,6 +933,15 @@
       "proxy": "연결이 거부되거나 중간에서 가로채였습니다. 프록시나 사내 인증서 문제일 때 이렇게 나타납니다. 네트워크 담당자에게 문의해 주세요.",
       "auth": "권한이 없어 레지스트리가 받기를 거부했습니다.",
       "unknown": "받기에 실패했습니다. 위 로그에 docker가 보고한 내용이 있습니다."
+    }
+  },
+  "cisa": {
+    "subtitle": "2026 SBOM 최소 요소",
+    "allAdvisory": "여기 항목은 권고입니다. 적합·부적합 판정은 위의 제출 요건이 정합니다.",
+    "cluster": {
+      "cisa-metadata": "SBOM 메타데이터",
+      "cisa-component": "구성요소 데이터",
+      "cisa-practices": "운영 원칙"
     }
   }
 }

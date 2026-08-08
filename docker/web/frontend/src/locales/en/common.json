@@ -718,20 +718,117 @@
       "g7-kpi-operational": {
         "what": "Operational performance KPIs of the model.",
         "fix": "Set modelCard.quantitativeAnalysis.performanceMetrics."
+      },
+      "cisa-sbom-author": {
+        "what": "The entity that generated this SBOM — the organisation or person running the scan, not the tool.",
+        "fix": "Pass --sbom-author (or SBOM_AUTHOR) so metadata.authors names the entity, using its full name."
+      },
+      "cisa-sbom-author-signature": {
+        "what": "A digital signature attributable to the SBOM author, carried inside the document.",
+        "fix": "Sign the document itself, or verify the signature delivered beside it and record that you did."
+      },
+      "cisa-sbom-format-name": {
+        "what": "The name of the data format this SBOM is written in.",
+        "fix": "Emit a recognized format; bomFormat carries the name in CycloneDX."
+      },
+      "cisa-sbom-format-version": {
+        "what": "The version of that data format.",
+        "fix": "Set specVersion to a version the format still maintains."
+      },
+      "cisa-sbom-generation-context": {
+        "what": "The lifecycle phase this SBOM describes — what its component data can mean.",
+        "fix": "Set metadata.lifecycles: a scan of source manifests is pre-build, a scan of a built artifact is post-build."
+      },
+      "cisa-sbom-timestamp": {
+        "what": "When the SBOM data was last changed.",
+        "fix": "Set metadata.timestamp, following RFC 9557."
+      },
+      "cisa-sbom-tool-name": {
+        "what": "The tool the author used to generate or amend the SBOM.",
+        "fix": "List the tool in metadata.tools, by its full name."
+      },
+      "cisa-sbom-tool-version": {
+        "what": "Which build of that tool ran — without it the tool name says little.",
+        "fix": "Give every tool entry a version, or state that the version is unknown."
+      },
+      "cisa-sbom-version": {
+        "what": "Which iteration of this SBOM this is, for the same component and version.",
+        "fix": "Set the document version; the first published SBOM under these elements is 1."
+      },
+      "cisa-component-name": {
+        "what": "The name the producer assigned to each component.",
+        "fix": "Give every component a name."
+      },
+      "cisa-component-version": {
+        "what": "Each component's version, which is what vulnerability matching keys on.",
+        "fix": "Give every component a version, or mark it as present with the version not established."
+      },
+      "cisa-component-producer": {
+        "what": "Who created each component — the point of contact when something is wrong with it.",
+        "fix": "Set publisher, supplier, authors or manufacturer, or state that the provenance is unknown."
+      },
+      "cisa-component-identifiers": {
+        "what": "At least one identifier that keys a component to other databases.",
+        "fix": "Give each component a PURL or a CPE; a file that can have neither is identified by its hash."
+      },
+      "cisa-component-license": {
+        "what": "The licenses each component is available under.",
+        "fix": "Set licenses with SPDX identifiers, or state that the license is unknown."
+      },
+      "cisa-component-hash-value": {
+        "what": "The hash of each executable component artifact, so a recipient can verify their copy.",
+        "fix": "Add hashes where the artifact is in reach; where it is not, state that the value is unknown."
+      },
+      "cisa-component-hash-algorithm": {
+        "what": "Which algorithm produced each hash — a digest with no algorithm cannot be recomputed.",
+        "fix": "Name the algorithm on every hash, using its IANA hash function textual name."
+      },
+      "cisa-component-dependency-relationship": {
+        "what": "Which component needs which — the graph that makes an impact question answerable.",
+        "fix": "Record the dependency edges, transitive ones included."
+      },
+      "cisa-machine-processable-data": {
+        "what": "The SBOM is in a widely used, open format a tool can read.",
+        "fix": "Deliver CycloneDX or SPDX rather than a format only one tool understands."
+      },
+      "cisa-coverage": {
+        "what": "Whether the SBOM lists every component of the software, transitive ones included."
+      },
+      "cisa-accommodation-of-updates": {
+        "what": "Whether published SBOM data can be corrected, and corrections issued promptly."
+      },
+      "cisa-distribution-and-delivery": {
+        "what": "Whether whoever needs the SBOM can get it, without access control blocking authorized readers."
+      },
+      "cisa-explicit-unknowns": {
+        "what": "Whether an empty field says why it is empty: unknown to the author, or withheld.",
+        "fix": "State the policy once for the document — this pipeline writes it, since a scan only ever produces the first case."
+      },
+      "cisa-frequency": {
+        "what": "Whether each software version has its own SBOM, and a corrected one is reissued when data changes."
       }
-    }
+    },
+    "verdictFailed": "{{count}} mandatory checks failed",
+    "verdictFailed_one": "1 mandatory check failed",
+    "verdictFailed_zero": "No mandatory check failed",
+    "verdictGap": "{{count}} advisory short",
+    "verdictReview": "{{count}} need a person",
+    "baseMandatory": "{{passed}}/{{total}} mandatory passed",
+    "missingMore": "and {{count}} more",
+    "needsPerson": "What to establish:"
   },
   "crosswalk": {
     "title": "Regulatory crosswalk",
     "disclaimer": "A documentation-preparation aid, not a compliance verdict. This crosswalk covers only the documentation elements an SBOM can carry; obligations it cannot express — bias and fairness assessment, risk management — must be met through separate documents.",
-    "totals": "{{present}} present, {{gap}} gap, {{advisory}} advisory, {{review}} need review of {{total}} mapped",
+    "totals": "{{present}} present, {{gap}} gap, {{failed}} failed, {{review}} need review of {{total}} mapped",
     "thFramework": "Framework",
     "thTotal": "Total",
     "refs": "References:",
     "present": "Present",
     "gap": "Gap",
     "advisory": "Advisory",
-    "review": "Review needed"
+    "review": "Review needed",
+    "failed": "Failed"
   },
   "aiProfile": {
     "title": "AI compliance profile",
@@ -836,6 +933,15 @@
       "proxy": "The connection was refused or intercepted, which usually means a proxy or a corporate certificate. Ask whoever runs the network.",
       "auth": "The registry refused the download for lack of permission.",
       "unknown": "The download failed. The log above says what docker reported."
+    }
+  },
+  "cisa": {
+    "subtitle": "2026 SBOM minimum elements",
+    "allAdvisory": "Advisory here: these do not change the pass or fail verdict, which the submission requirements above decide.",
+    "cluster": {
+      "cisa-metadata": "SBOM metadata",
+      "cisa-component": "Component data",
+      "cisa-practices": "Practices and processes"
     }
   }
 }

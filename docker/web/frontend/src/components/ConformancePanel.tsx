@@ -13,12 +13,18 @@ import type {
   ConformanceSummary,
 } from "@/lib/api";
 import {
-  baseTally,
+  CISA_CLUSTER_ORDER,
   crosswalkTotals,
-  g7Tally,
+  dedupeMissing,
+  groupByCluster,
   groupG7ByCluster,
+  isRegistryCheck,
+  missingOverflow,
   profileCard,
+  registryTally,
+  sortByAttention,
   splitChecks,
+  verdictTally,
 } from "@/lib/conformance";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +132,7 @@ function CrosswalkBlock({
             {t("crosswalk.totals", {
               present: totals.present,
               gap: totals.gap,
-              advisory: totals.advisory,
+              failed: totals.failed,
               review: totals.review,
               total: totals.total,
             })}
@@ -136,12 +142,12 @@ function CrosswalkBlock({
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
-                <th className="py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
-                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
-                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
-                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.advisory")}</th>
-                <th className="py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.review")}</th>
-                <th className="py-1.5 pl-2 text-right font-medium tabular-nums">{t("crosswalk.thTotal")}</th>
+                <th className="whitespace-nowrap py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
+                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
+                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
+                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.failed")}</th>
+                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.review")}</th>
+                <th className="whitespace-nowrap py-1.5 pl-2 text-right font-medium tabular-nums">{t("crosswalk.thTotal")}</th>
               </tr>
             </thead>
             <tbody>
@@ -153,7 +159,7 @@ function CrosswalkBlock({
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.gap}</td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.total - fw.present - fw.gap - fw.review}</td>
+                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.failed ?? 0}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.review}</td>
                   <td className="py-1.5 pl-2 text-right tabular-nums text-foreground">{fw.total}</td>
                 </tr>
@@ -191,24 +197,42 @@ function SourceBadge({ source }: { source?: string }) {
 function CheckRow({ check }: { check: ConformanceCheck }) {
   const { t, i18n } = useTranslation();
   const { Icon, color, key } = statusOf(check.status);
-  // G7 checks carry a plain-language "what this is" line, a "how to satisfy"
-  // hint when not yet met, and (on the pass side) the actual SBOM values that
-  // satisfied it. Base format checks have none of these (defaultValue "").
-  const isG7 = check.id.startsWith("g7-");
-  const what = isG7 ? t(`g7.help.${check.id}.what`, { defaultValue: "" }) : "";
-  // Regulatory references ride with the requirement they belong to (both G7 and
-  // base checks): "BSI TR-03183-2 Section 5.2.2 · NTIA Supplier Name". The
-  // crosswalk section stays a per-framework roll-up rather than reprinting these.
+  // A registry check carries a cluster, a data source, and — where the locale has
+  // one — a plain-language "what this is" line and a "how to satisfy" hint. This
+  // used to be gated on the id starting with "g7-", which meant the 2026 minimum
+  // elements were rendered as three bare lines while the block above them showed
+  // the same kind of element in full. The gate is what the check IS, not what it
+  // is called: the checks the scripts write themselves carry no cluster.
   const isKo = (i18n.language ?? "").startsWith("ko");
+  const fromRegistry = isRegistryCheck(check);
+  const what = fromRegistry
+    ? t(`g7.help.${check.id}.what`, { defaultValue: "" })
+    : "";
+  // Regulatory references ride with the requirement they belong to: "BSI
+  // TR-03183-2 Section 5.2.2 · CISA 2026 Component Producer". The crosswalk
+  // section stays a per-framework roll-up rather than reprinting these.
   const regText = (check.regulations ?? [])
     .map((r) => `${(isKo ? r.short_ko : r.short) || r.framework} ${r.ref}`)
     .join(" · ");
   const notMet = check.status !== "pass";
   const fix =
-    isG7 && notMet ? t(`g7.help.${check.id}.fix`, { defaultValue: "" }) : "";
+    fromRegistry && notMet
+      ? t(`g7.help.${check.id}.fix`, { defaultValue: "" })
+      : "";
   // Evidence: the real values pulled from the SBOM (purl, license id, hash alg…)
   // — shown only when the element is present, so it reads as "met with these".
-  const evidence = isG7 && !notMet ? (check.evidence ?? []) : [];
+  const evidence = fromRegistry && !notMet ? (check.evidence ?? []) : [];
+  // What a person has to establish. Shown for an element no scan can settle, and
+  // for one that is checkable in a form this report cannot see — a signature
+  // delivered beside the SBOM reads as "not present" without it.
+  const reviewHow = notMet
+    ? (isKo ? check.reviewGuide?.howKo || check.reviewGuide?.how : check.reviewGuide?.how) ?? ""
+    : "";
+  // The registry's own Korean label, when the reader is reading Korean. The
+  // contract stays English; this is the translation riding alongside it.
+  const label = (isKo && check.labelKo) || check.label;
+  const missing = dedupeMissing(check.missing ?? []);
+  const overflow = missingOverflow(check);
   // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
   // so the CLI artifacts and this panel show the same fragment. Runs from before
   // the guidance registry carry none.
@@ -218,11 +242,11 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
       <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-foreground">{check.label}</span>
+          <span className="text-foreground">{label}</span>
           {check.required ? (
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
-          {isG7 ? <SourceBadge source={check.source} /> : null}
+          {fromRegistry ? <SourceBadge source={check.source} /> : null}
           <span className="sr-only">{t(key)}</span>
         </div>
         {regText ? (
@@ -241,14 +265,17 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           // license) — the count in detail says how many, this names them.
           <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             <span className="font-medium">{t("g7.missing")}</span>
-            {(check.missing ?? []).map((m, i) => (
+            {missing.map(({ name, count }: { name: string; count: number }) => (
               <code
-                key={`${m}-${i}`}
+                key={name}
                 className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
               >
-                {m}
+                {count > 1 ? `${name} ×${count}` : name}
               </code>
             ))}
+            {overflow > 0 ? (
+              <span className="tabular-nums">{t("g7.missingMore", { count: overflow })}</span>
+            ) : null}
           </div>
         ) : null}
         {evidence.length > 0 ? (
@@ -269,13 +296,23 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             <span className="font-medium">{t("g7.howToFix")}</span> {fix}
           </div>
         ) : null}
-        {fix && guidance?.snippet ? (
-          <div className="mt-1">
-            <div className="text-xs font-medium text-muted-foreground">{t("g7.example")}</div>
+        {reviewHow ? (
+          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">
+            <span className="font-medium">{t("g7.needsPerson")}</span> {reviewHow}
+          </div>
+        ) : null}
+        {notMet && guidance?.snippet ? (
+          // Folded away: a page that shows every fragment open runs to twelve
+          // thousand pixels, and the fragment is only wanted once a reader has
+          // decided to act on that row.
+          <details className="mt-1">
+            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+              {t("g7.example")}
+            </summary>
             <pre className="mt-0.5 overflow-x-auto rounded-md bg-muted px-2.5 py-2 text-[11px] leading-relaxed text-foreground">
               <code className="font-mono">{guidance.snippet}</code>
             </pre>
-          </div>
+          </details>
         ) : null}
         {guidance?.docUrl ? (
           <a
@@ -312,10 +349,12 @@ export function ConformancePanel({
     return <EmptyState>{t("g7.empty")}</EmptyState>;
   }
 
-  const { base, g7 } = splitChecks(checks);
-  const g7t = g7Tally(g7);
+  const { base, cisa, g7 } = splitChecks(checks);
+  const g7t = registryTally(g7);
   const g7groups = groupG7ByCluster(g7);
-  const baseT = baseTally(base);
+  const cisaT = registryTally(cisa);
+  const cisaGroups = groupByCluster(cisa, CISA_CLUSTER_ORDER);
+  const verdict = verdictTally(checks);
   const pass = conformance.result === "pass";
 
   return (
@@ -333,7 +372,85 @@ export function ConformancePanel({
             requirements, not regulatory compliance — so the section title is not
             read as a compliance verdict. */}
         <p className="max-w-3xl text-sm text-muted-foreground">{t("g7.panelIntro")}</p>
+        {/* What blocks this SBOM, before anything else. The mandatory checks
+            decide the verdict on their own — an advisory baseline can be wholly
+            unmet without changing it — and they used to sit below every advisory
+            row, which on an AI SBOM meant the bottom of a very long page. */}
+        <p className="text-sm text-foreground">
+          <span className="font-medium">
+            {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
+          </span>
+          {verdict.advisoryGap > 0 ? (
+            <span className="text-muted-foreground">
+              {" · "}
+              {t("g7.verdictGap", { count: verdict.advisoryGap })}
+            </span>
+          ) : null}
+          {verdict.review > 0 ? (
+            <span className="text-muted-foreground">
+              {" · "}
+              {t("g7.verdictReview", { count: verdict.review })}
+            </span>
+          ) : null}
+        </p>
       </div>
+
+      {base.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <div className="text-sm font-semibold text-foreground">{t("g7.formatTitle")}</div>
+            <span className="text-xs text-muted-foreground">
+              {t("g7.baseMandatory", {
+                passed: verdict.mandatoryPassed,
+                total: verdict.mandatoryTotal,
+              })}
+            </span>
+          </div>
+          <ul className="divide-y rounded-md border">
+            {sortByAttention(base).map((c) => (
+              <CheckRow key={c.id} check={c} />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {conformance.regulatoryCrosswalk &&
+      conformance.regulatoryCrosswalk.frameworks.length > 0 ? (
+        <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
+      ) : null}
+
+      {cisa.length > 0 && (
+        <Card>
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <div className="text-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
+              <div className="text-2xl font-semibold tabular-nums text-foreground">
+                {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
+              </div>
+              {cisaT.review > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  · {t("g7.review", { count: cisaT.review })}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("cisa.allAdvisory")}</p>
+            <div className="space-y-4">
+              {cisaGroups.map((group) => (
+                <div key={group.cluster} className="space-y-2">
+                  <div className="text-xs font-semibold text-foreground">
+                    {t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                  </div>
+                  <ul className="divide-y rounded-md border">
+                    {sortByAttention(group.checks).map((c) => (
+                      <CheckRow key={c.id} check={c} />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {aiProfile ? <AiProfileCard profile={aiProfile} /> : null}
 
@@ -375,26 +492,7 @@ export function ConformancePanel({
         </Card>
       )}
 
-      {conformance.regulatoryCrosswalk &&
-      conformance.regulatoryCrosswalk.frameworks.length > 0 ? (
-        <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
-      ) : null}
 
-      {base.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <div className="text-sm font-semibold text-foreground">{t("g7.formatTitle")}</div>
-            <span className="text-xs text-muted-foreground">
-              {t("g7.basePassed", { passed: baseT.passed, total: baseT.total })}
-            </span>
-          </div>
-          <ul className="divide-y rounded-md border">
-            {base.map((c) => (
-              <CheckRow key={c.id} check={c} />
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

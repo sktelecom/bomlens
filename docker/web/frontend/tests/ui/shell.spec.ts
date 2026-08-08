@@ -789,6 +789,9 @@ const AI_DONE = {
       { id: "g7-model-hash-value", label: "Model hash value", required: false, status: "warn", detail: "0/1 model component(s)", cluster: "models", source: "auto" },
       { id: "g7-model-openness", label: "Model license — openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM", cluster: "models", source: "inferred" },
       { id: "g7-ds-name", label: "Dataset name", required: false, status: "pass", detail: "2 dataset reference(s)", cluster: "dp", source: "auto" },
+      { id: "cisa-sbom-timestamp", label: "SBOM timestamp", labelKo: "SBOM 생성 시각", required: false, status: "pass", detail: "present", cluster: "cisa-metadata", source: "auto" },
+      { id: "cisa-sbom-generation-context", label: "SBOM generation context", labelKo: "SBOM 생성 시점", required: false, status: "warn", detail: "not present in the SBOM", cluster: "cisa-metadata", source: "auto", guidance: { snippet: "\"lifecycles\": [ { \"phase\": \"post-build\" } ]", docUrl: "https://cyclonedx.org/docs/1.6/json/#metadata_lifecycles" } },
+      { id: "cisa-coverage", label: "Coverage", labelKo: "포함 범위", required: false, status: "warn", detail: "requires human review (no automated source)", cluster: "cisa-practices", source: "na", reviewGuide: { how: "Establish that the SBOM lists every component.", howKo: "SBOM이 구성요소를 빠짐없이 담았는지 확인합니다.", docUrl: "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" } },
     ],
     // Detailed crosswalk (present only for AI SBOMs) — per-framework element
     // rollup with the mapped documentation obligations. source + elements[] are
@@ -914,21 +917,36 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await stubAiAndRun(page);
   // The coverage figure surfaces before entering the section: as the rail badge
   // and as the overview jump-card value (both from conformanceCount).
-  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toContainText("6/8");
-  await expect(page.locator("main").getByText("6/8")).toBeVisible();
+  // The badge counts the mandatory checks — the ones that decide the verdict —
+  // so it means the same thing on every scan. It used to show G7 coverage here
+  // and all-check passes elsewhere, two answers to two different questions.
+  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toContainText("1/1");
+  await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
 
   // Headline tally comes straight from the check statuses: 6 of 8 auto-covered,
   // 2 advisory and 1 needing human review (the source:"na" element).
   await expect(page.getByText("6/8 present")).toBeVisible();
   await expect(page.getByText(/2 advisory/)).toBeVisible();
-  await expect(page.getByText(/1 need review/)).toBeVisible();
+  await expect(page.getByText(/1 need review/).first()).toBeVisible();
   // G7 checks are grouped into their clusters (headers rendered).
   await expect(page.getByText("Models", { exact: true })).toBeVisible();
   // The na element carries a "Review needed" provenance badge.
   await expect(page.getByText("Review needed").first()).toBeVisible();
   // Base checks are split out under their own heading.
   await expect(page.getByText("Format conformance")).toBeVisible();
+  // The 2026 minimum elements are their own block, grouped by cluster, and their
+  // rows carry what every other registry row carries: a provenance badge, the
+  // fill-in fragment, the note for what a person has to establish. They used to
+  // render as three bare lines inside the format list, because the row only did
+  // any of that for ids beginning "g7-".
+  await expect(page.getByText("2026 SBOM minimum elements")).toBeVisible();
+  await expect(page.getByText("Practices and processes")).toBeVisible();
+  await expect(page.getByText("What to establish:")).toBeVisible();
+  await expect(page.getByText("Establish that the SBOM lists every component.")).toBeVisible();
+  // The verdict line leads the panel, so what blocks the SBOM is not at the end
+  // of a page that runs to twelve thousand pixels on an AI scan.
+  await expect(page.getByText(/mandatory check/)).toBeVisible();
   await expect(page.getByText("Model license — openness (weight/architecture/data/training)")).toBeVisible();
 
   // AI compliance summary card (from aiProfile) is at the top of the section.

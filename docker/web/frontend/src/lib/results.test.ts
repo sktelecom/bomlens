@@ -159,14 +159,15 @@ describe("sectionCounts", () => {
     expect(counts.licenses).toBeUndefined();
   });
 
-  it("carries the conformance coverage as a badge", () => {
+  it("carries the mandatory conformance coverage as a badge", () => {
     const counts = sectionCounts(
       makeResult({
         conformance: {
           result: "pass",
           checks: [
+            check({ id: "purl", required: true, status: "pass" }),
+            check({ id: "transitive", required: true, status: "fail" }),
             check({ id: "g7-a", status: "pass", source: "auto" }),
-            check({ id: "g7-b", status: "warn", source: "auto" }),
           ],
         },
       }),
@@ -181,23 +182,26 @@ function check(over: Partial<ConformanceCheck>): ConformanceCheck {
 }
 
 describe("conformanceCount", () => {
-  it("tallies G7 present over the automatable total", () => {
+  // One meaning, whatever the scan. The badge used to show G7 coverage on an AI
+  // scan and every-check passes on any other, so the same badge answered two
+  // different questions and neither was "is this SBOM acceptable".
+  it("counts the mandatory checks and ignores the advisory baselines", () => {
     const result = makeResult({
       conformance: {
-        result: "pass",
+        result: "fail",
         checks: [
-          check({ id: "purl", required: true }), // base check, ignored when G7 exists
+          check({ id: "purl", required: true, status: "pass" }),
+          check({ id: "transitive", required: true, status: "fail" }),
           check({ id: "g7-a", status: "pass", source: "auto" }),
-          check({ id: "g7-b", status: "pass", source: "inferred" }),
-          check({ id: "g7-c", status: "warn", source: "auto" }),
-          check({ id: "g7-d", status: "warn", source: "na" }), // review-only, excluded
+          check({ id: "g7-b", status: "warn", source: "auto" }),
+          check({ id: "cisa-a", status: "warn", source: "na" }),
         ],
       },
     });
-    expect(conformanceCount(result)).toBe("2/3");
+    expect(conformanceCount(result)).toBe("1/2");
   });
 
-  it("falls back to the base format tally when there are no G7 checks", () => {
+  it("counts the mandatory checks when there is no advisory baseline at all", () => {
     const result = makeResult({
       conformance: {
         result: "fail",
