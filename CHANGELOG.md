@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.10.3] - 2026-08-08
+
 ### Added
 
 - The regulatory crosswalk's framework row opens to the requirements it counted. The table stated four numbers per framework and left the reader to work out which requirement each one was; the rows were already in the payload and nothing read them.
