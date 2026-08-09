@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-07-28T21:24:23Z",
+  "generatedAt": "2026-08-09T02:22:05Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -19,13 +19,6 @@
           "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Automation Support",
-          "basis": "the SBOM must use an automation-capable format (SPDX, CycloneDX or SWID)",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -43,13 +36,6 @@
           "basis": "required SBOM-level field: date and time of the SBOM data compilation",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Timestamp",
-          "basis": "the date and time the SBOM was assembled",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -67,13 +53,6 @@
           "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Author of SBOM Data",
-          "basis": "the entity that created the SBOM data for this component",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -108,13 +87,6 @@
           "basis": "required per-component fields: component name and component version",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Component Name / Version",
-          "basis": "the name and version assigned to each unit of software",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -132,15 +104,17 @@
           "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Other Unique Identifiers",
-          "basis": "identifiers that serve as a look-up key for relevant databases",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
+    },
+    {
+      "id": "file-identifier",
+      "label": "File component identifier coverage (hash, >= 80%, recommended)",
+      "required": false,
+      "status": "pass",
+      "detail": "no file components",
+      "missing": [],
+      "regulations": []
     },
     {
       "id": "no-generic",
@@ -153,20 +127,12 @@
     },
     {
       "id": "purl-syntax",
-      "label": "PURL syntax (pkg:type/name@version)",
+      "label": "PURL syntax (pkg:type/[namespace/]name)",
       "required": true,
       "status": "pass",
       "detail": "0 malformed",
       "missing": [],
-      "regulations": [
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Other Unique Identifiers",
-          "basis": "an identifier only serves as a database look-up key if it parses",
-          "short": "NTIA",
-          "short_ko": "NTIA"
-        }
-      ]
+      "regulations": []
     },
     {
       "id": "transitive",
@@ -182,13 +148,6 @@
           "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Dependency Relationship",
-          "basis": "the relationship between an upstream component and its dependencies",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -257,13 +216,6 @@
           "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL",
           "short": "BSI TR-03183-2",
           "short_ko": "BSI TR-03183-2"
-        },
-        {
-          "framework": "us-sbom-minimum-elements",
-          "ref": "Supplier Name",
-          "basis": "the name of the entity that creates, defines and identifies the component",
-          "short": "NTIA",
-          "short_ko": "NTIA"
         }
       ]
     },
@@ -318,6 +270,617 @@
           "short_ko": "BSI TR-03183-2"
         }
       ]
+    },
+    {
+      "id": "cisa-sbom-author",
+      "label": "SBOM author",
+      "label_ko": "SBOM 작성자",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "declared",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"authors\": [ { \"name\": \"Example Manufacturing Co., Ltd.\" } ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_authors"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Author",
+          "basis": "the name of the entity that creates the SBOM data for the target component",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-author-signature",
+      "label": "SBOM author signature",
+      "label_ko": "SBOM 작성자 서명",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "declared",
+      "role": "",
+      "reviewGuide": {
+        "how": "A signature delivered beside the SBOM rather than inside it does not appear here, because this report reads one file. If the SBOM arrived with a detached signature, verify it against the sender's key before treating the contents as theirs, and record that you did. A signature carried inside the document is read automatically and this row will say so.",
+        "how_ko": "SBOM 안이 아니라 파일 옆에 따로 온 서명은 이 보고서에 나타나지 않습니다. 보고서가 파일 하나만 읽기 때문입니다. 분리 서명과 함께 받았다면 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다. 문서 안에 담긴 서명은 자동으로 읽히며 그 경우 이 행에 표시됩니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Author Signature",
+          "basis": "a digital signature attributable to the SBOM author",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-format-name",
+      "label": "SBOM data format name",
+      "label_ko": "SBOM 데이터 형식 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Data Format Name",
+          "basis": "the name of the data format used to represent the SBOM data",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-format-version",
+      "label": "SBOM data format version",
+      "label_ko": "SBOM 데이터 형식 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Data Format Version",
+          "basis": "the version of the data format named above",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-generation-context",
+      "label": "SBOM generation context",
+      "label_ko": "SBOM 생성 시점",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"lifecycles\": [ { \"phase\": \"post-build\" } ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_lifecycles"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Generation Context",
+          "basis": "the lifecycle phase and data available when the SBOM was generated, such as before or after build",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-timestamp",
+      "label": "SBOM timestamp",
+      "label_ko": "SBOM 생성 시각",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Timestamp",
+          "basis": "the date and time of the most recent update to the SBOM data, following RFC 9557",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-tool-name",
+      "label": "SBOM tool name",
+      "label_ko": "SBOM 생성 도구 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Tool Name",
+          "basis": "the tool the SBOM author used to generate or amend the SBOM",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-tool-version",
+      "label": "SBOM tool version",
+      "label_ko": "SBOM 생성 도구 버전",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"tools\": { \"components\": [\n    { \"type\": \"application\", \"name\": \"Example Scanner\", \"version\": \"3.1.0\" }\n  ] }\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_tools"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Tool Version",
+          "basis": "the version of that tool, stated as unknown when no identifier is available",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-sbom-version",
+      "label": "SBOM version",
+      "label_ko": "SBOM 문서 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Version",
+          "basis": "an identifier distinguishing this SBOM from earlier iterations for the same component and version",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-name",
+      "label": "Component name",
+      "label_ko": "구성요소 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "40/40 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Name",
+          "basis": "the name the component producer assigned to the component",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-version",
+      "label": "Component version",
+      "label_ko": "구성요소 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "40/40 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Version",
+          "basis": "the producer's version identifier, stated as unknown when none was provided",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-producer",
+      "label": "Component producer",
+      "label_ko": "구성요소 생산자",
+      "required": false,
+      "status": "warn",
+      "detail": "32/40 component(s)",
+      "missing": [
+        "FlaskDataService",
+        "click",
+        "Flask",
+        "itsdangerous",
+        "Jinja2",
+        "MarkupSafe",
+        "platformdirs",
+        "Werkzeug"
+      ],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"version\": \"1.2.3\",\n  \"publisher\": \"The Example Project\"\n} ]",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_publisher"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Producer",
+          "basis": "the entity that creates, defines and identifies the component; replaces the 2021 element Supplier Name",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-identifiers",
+      "label": "Component identifiers",
+      "label_ko": "구성요소 식별자",
+      "required": false,
+      "status": "warn",
+      "detail": "39/40 component(s)",
+      "missing": [
+        "FlaskDataService"
+      ],
+      "evidence": [
+        "pkg:pypi/annotated-types@0.8.0",
+        "pkg:pypi/black@23.12.1",
+        "pkg:pypi/blinker@1.9.0",
+        "pkg:pypi/certifi@2026.7.22",
+        "pkg:pypi/charset-normalizer@3.4.9",
+        "pkg:pypi/click@8.1.7",
+        "pkg:pypi/coverage@7.15.2",
+        "pkg:pypi/flake8@6.1.0",
+        "pkg:pypi/flask@3.0.0",
+        "pkg:pypi/greenlet@3.5.4",
+        "pkg:pypi/idna@3.18",
+        "pkg:pypi/iniconfig@2.3.0",
+        "pkg:pypi/itsdangerous@2.2.0",
+        "pkg:pypi/jinja2@3.1.6",
+        "pkg:pypi/markupsafe@3.0.3",
+        "pkg:pypi/mccabe@0.7.0",
+        "pkg:pypi/mypy-extensions@1.1.0",
+        "pkg:pypi/numpy@1.26.2",
+        "pkg:pypi/packaging@26.2",
+        "pkg:pypi/pandas@2.1.4",
+        "pkg:pypi/pathspec@1.1.1",
+        "pkg:pypi/platformdirs@4.11.0",
+        "pkg:pypi/pluggy@1.6.0",
+        "pkg:pypi/pycodestyle@2.11.1",
+        "pkg:pypi/pydantic-core@2.14.5",
+        "pkg:pypi/pydantic@2.5.2",
+        "pkg:pypi/pyflakes@3.1.0",
+        "pkg:pypi/pytest-cov@4.1.0",
+        "pkg:pypi/pytest@7.4.3",
+        "pkg:pypi/python-dateutil@2.9.0.post0",
+        "pkg:pypi/python-dotenv@1.0.0",
+        "pkg:pypi/pytz@2026.3.post1",
+        "pkg:pypi/requests@2.31.0",
+        "pkg:pypi/six@1.17.0",
+        "pkg:pypi/sqlalchemy@2.0.23",
+        "pkg:pypi/typing-extensions@4.16.0",
+        "pkg:pypi/tzdata@2026.3",
+        "pkg:pypi/urllib3@2.1.0",
+        "pkg:pypi/werkzeug@3.0.1"
+      ],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Identifiers",
+          "basis": "at least one software identifier such as PURL or CPE, or an intrinsic one such as a hash",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-license",
+      "label": "Component license",
+      "label_ko": "구성요소 라이선스",
+      "required": false,
+      "status": "warn",
+      "detail": "38/40 component(s)",
+      "missing": [
+        "FlaskDataService",
+        "mypy-extensions"
+      ],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component License",
+          "basis": "the identifiers for the licenses under which the component is available",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-hash-value",
+      "label": "Component hash value",
+      "label_ko": "구성요소 해시 값",
+      "required": false,
+      "status": "warn",
+      "detail": "39/40 component(s)",
+      "missing": [
+        "FlaskDataService"
+      ],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"hashes\": [ { \"alg\": \"SHA-256\", \"content\": \"3b7c…\" } ]\n} ]",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_hashes"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Hash Value",
+          "basis": "the hash of the executable component artifact, stated as unknown when the artifact is out of reach",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-hash-algorithm",
+      "label": "Component hash algorithm",
+      "label_ko": "구성요소 해시 알고리즘",
+      "required": false,
+      "status": "pass",
+      "detail": "40/40 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Hash Algorithm",
+          "basis": "the algorithm that produced the hash, named by its IANA hash function textual name",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-component-dependency-relationship",
+      "label": "Component dependency relationship",
+      "label_ko": "구성요소 의존 관계",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Dependency Relationship",
+          "basis": "the relationship between two components where one is necessary for the operation of the other",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-machine-processable-data",
+      "label": "Machine-processable data",
+      "label_ko": "기계 판독 가능 데이터",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Machine-Processable Data",
+          "basis": "the SBOM uses a widely used, open, machine-processable format",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-coverage",
+      "label": "Coverage",
+      "label_ko": "포함 범위",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that the SBOM lists every component making up the software, transitive dependencies included. No tool can confirm this from the document alone — the document cannot show what was left out of it. Compare it against the build's own dependency resolution, or against the manifests the software is built from.",
+        "how_ko": "SBOM이 소프트웨어를 이루는 구성요소를 이행 의존성까지 빠짐없이 담았는지 확인합니다. 문서만 보고는 어떤 도구도 판정할 수 없습니다. 문서는 자기가 빠뜨린 것을 보여 주지 못하기 때문입니다. 빌드가 실제로 해석한 의존성이나 빌드에 쓰인 매니페스트와 대조합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Coverage",
+          "basis": "information for every component making up the target software, including transitive dependencies, with no minimum depth",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-accommodation-of-updates",
+      "label": "Accommodation of updates to SBOM data",
+      "label_ko": "SBOM 데이터 갱신 수용",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that there is a way to correct SBOM data after it has been published, and that corrections go out promptly. This is a practice of the organisation issuing the SBOM, not a field in it.",
+        "how_ko": "발행한 SBOM 데이터를 나중에 정정할 방법이 있고 정정본이 지체 없이 나가는지 확인합니다. 문서 안의 필드가 아니라 SBOM을 발행하는 조직의 관행에 대한 항목입니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Accommodation of Updates to SBOM Data",
+          "basis": "corrections and updates to published SBOM data are accommodated and issued promptly",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-distribution-and-delivery",
+      "label": "Distribution and delivery",
+      "label_ko": "배포와 전달",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that whoever needs the SBOM can get it promptly, and that any access control keeps unauthorized parties out without blocking authorized ones or preventing the data from being loaded into their security tools.",
+        "how_ko": "SBOM이 필요한 쪽이 지체 없이 받을 수 있는지, 접근 통제가 권한 없는 쪽을 막되 권한 있는 쪽의 수신이나 보안 도구로의 반입까지 막지는 않는지 확인합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Distribution and Delivery",
+          "basis": "the SBOM is available promptly to those who need it, with access controls that do not block authorized parties",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-explicit-unknowns",
+      "label": "Explicitly identifying unknown information",
+      "label_ko": "미상 정보의 명시",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"properties\": [\n    { \"name\": \"bomlens:undeclared-fields\", \"value\": \"unknown-to-author\" }\n  ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_properties"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Explicitly Identifying Unknown Information",
+          "basis": "a value that is absent is stated as unknown to the author or as withheld, and the two are distinguished",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
+    },
+    {
+      "id": "cisa-frequency",
+      "label": "Frequency",
+      "label_ko": "갱신 주기",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that each software version or update has an SBOM of its own, and that a revised SBOM is issued when the component data changes or an error in it is found.",
+        "how_ko": "소프트웨어 버전이나 업데이트마다 자기 SBOM이 있는지, 구성요소 데이터가 바뀌거나 오류를 발견했을 때 정정본을 다시 내는지 확인합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Frequency",
+          "basis": "each software version or update has an associated SBOM, and a corrected SBOM is reissued when data changes",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ]
     }
   ],
   "regulatoryCrosswalk": {
@@ -331,6 +894,7 @@
         "present": 11,
         "gap": 2,
         "review": 1,
+        "failed": 0,
         "elements": [
           {
             "id": "spec-version",
@@ -477,90 +1041,241 @@
       {
         "id": "us-sbom-minimum-elements",
         "title": "US SBOM minimum elements",
-        "source": "Executive Order 14028 §4; NTIA \"The Minimum Elements For a Software Bill of Materials\" (2021-07-12)",
-        "total": 8,
-        "present": 8,
-        "gap": 0,
-        "review": 0,
+        "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
+        "total": 23,
+        "present": 11,
+        "gap": 8,
+        "review": 4,
+        "failed": 0,
         "elements": [
           {
-            "id": "spec-version",
-            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6)",
+            "id": "cisa-sbom-author",
+            "label": "SBOM author",
             "status": "pass",
-            "source": null,
-            "detail": "CycloneDX 1.6",
+            "source": "declared",
+            "detail": "present",
             "refs": [
-              "Automation Support"
+              "SBOM Author"
             ]
           },
           {
-            "id": "timestamp",
-            "label": "Timestamp (metadata.timestamp)",
-            "status": "pass",
-            "source": null,
-            "detail": "2026-07-28T04:14:38Z",
+            "id": "cisa-sbom-author-signature",
+            "label": "SBOM author signature",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
             "refs": [
-              "Timestamp"
+              "SBOM Author Signature"
             ]
           },
           {
-            "id": "tools",
-            "label": "Tool info (metadata.tools)",
+            "id": "cisa-sbom-format-name",
+            "label": "SBOM data format name",
             "status": "pass",
-            "source": null,
-            "detail": "1 tool(s)",
+            "source": "auto",
+            "detail": "present",
             "refs": [
-              "Author of SBOM Data"
+              "SBOM Data Format Name"
             ]
           },
           {
-            "id": "name-version",
-            "label": "Component name+version coverage (100%)",
+            "id": "cisa-sbom-format-version",
+            "label": "SBOM data format version",
             "status": "pass",
-            "source": null,
-            "detail": "39/39",
+            "source": "auto",
+            "detail": "present",
             "refs": [
-              "Component Name / Version"
+              "SBOM Data Format Version"
             ]
           },
           {
-            "id": "purl",
-            "label": "PURL coverage (>= 90%)",
-            "status": "pass",
-            "source": null,
-            "detail": "100% (39/39)",
+            "id": "cisa-sbom-generation-context",
+            "label": "SBOM generation context",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
             "refs": [
-              "Other Unique Identifiers"
+              "SBOM Generation Context"
             ]
           },
           {
-            "id": "purl-syntax",
-            "label": "PURL syntax (pkg:type/name@version)",
+            "id": "cisa-sbom-timestamp",
+            "label": "SBOM timestamp",
             "status": "pass",
-            "source": null,
-            "detail": "0 malformed",
+            "source": "auto",
+            "detail": "present",
             "refs": [
-              "Other Unique Identifiers"
+              "SBOM Timestamp"
             ]
           },
           {
-            "id": "transitive",
-            "label": "Transitive dependencies (graph edges)",
+            "id": "cisa-sbom-tool-name",
+            "label": "SBOM tool name",
             "status": "pass",
-            "source": null,
-            "detail": "52 edge(s)",
+            "source": "auto",
+            "detail": "present",
             "refs": [
-              "Dependency Relationship"
+              "SBOM Tool Name"
             ]
           },
           {
-            "id": "component-creator",
-            "label": "Component creator coverage (>= 80%, recommended)",
-            "status": "pass",
-            "source": null,
-            "detail": "82% (32/39)",
+            "id": "cisa-sbom-tool-version",
+            "label": "SBOM tool version",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
             "refs": [
-              "Supplier Name"
+              "SBOM Tool Version"
+            ]
+          },
+          {
+            "id": "cisa-sbom-version",
+            "label": "SBOM version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Version"
+            ]
+          },
+          {
+            "id": "cisa-component-name",
+            "label": "Component name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "40/40 component(s)",
+            "refs": [
+              "Component Name"
+            ]
+          },
+          {
+            "id": "cisa-component-version",
+            "label": "Component version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "40/40 component(s)",
+            "refs": [
+              "Component Version"
+            ]
+          },
+          {
+            "id": "cisa-component-producer",
+            "label": "Component producer",
+            "status": "warn",
+            "source": "auto",
+            "detail": "32/40 component(s)",
+            "refs": [
+              "Component Producer"
+            ]
+          },
+          {
+            "id": "cisa-component-identifiers",
+            "label": "Component identifiers",
+            "status": "warn",
+            "source": "auto",
+            "detail": "39/40 component(s)",
+            "refs": [
+              "Component Identifiers"
+            ]
+          },
+          {
+            "id": "cisa-component-license",
+            "label": "Component license",
+            "status": "warn",
+            "source": "auto",
+            "detail": "38/40 component(s)",
+            "refs": [
+              "Component License"
+            ]
+          },
+          {
+            "id": "cisa-component-hash-value",
+            "label": "Component hash value",
+            "status": "warn",
+            "source": "auto",
+            "detail": "39/40 component(s)",
+            "refs": [
+              "Component Hash Value"
+            ]
+          },
+          {
+            "id": "cisa-component-hash-algorithm",
+            "label": "Component hash algorithm",
+            "status": "pass",
+            "source": "auto",
+            "detail": "40/40 component(s)",
+            "refs": [
+              "Component Hash Algorithm"
+            ]
+          },
+          {
+            "id": "cisa-component-dependency-relationship",
+            "label": "Component dependency relationship",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Component Dependency Relationship"
+            ]
+          },
+          {
+            "id": "cisa-machine-processable-data",
+            "label": "Machine-processable data",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Machine-Processable Data"
+            ]
+          },
+          {
+            "id": "cisa-coverage",
+            "label": "Coverage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Coverage"
+            ]
+          },
+          {
+            "id": "cisa-accommodation-of-updates",
+            "label": "Accommodation of updates to SBOM data",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Accommodation of Updates to SBOM Data"
+            ]
+          },
+          {
+            "id": "cisa-distribution-and-delivery",
+            "label": "Distribution and delivery",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Distribution and Delivery"
+            ]
+          },
+          {
+            "id": "cisa-explicit-unknowns",
+            "label": "Explicitly identifying unknown information",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Explicitly Identifying Unknown Information"
+            ]
+          },
+          {
+            "id": "cisa-frequency",
+            "label": "Frequency",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Frequency"
             ]
           }
         ]

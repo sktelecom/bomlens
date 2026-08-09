@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.72.0"
   },
-  "ReportID": "019faab6-6c9f-75d3-8156-1edc40cb8798",
-  "CreatedAt": "2026-07-28T21:51:49.919387284Z",
+  "ReportID": "019fe453-62d1-7c85-aea8-c78a815f9d74",
+  "CreatedAt": "2026-08-09T02:21:37.873825643Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1407,7 +1407,7 @@
             "BOMRef": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.16.0?type=jar"
           },
           "InstalledVersion": "2.16.0",
-          "FixedVersion": "2.18.8, 2.21.4, 2.22.1",
+          "FixedVersion": "2.18.8, 2.21.4",
           "Status": "fixed",
           "SeveritySource": "ghsa",
           "PrimaryURL": "https://github.com/advisories/GHSA-r7wm-3cxj-wff9",
@@ -1438,7 +1438,7 @@
             "https://github.com/FasterXML/jackson-core/security/advisories/GHSA-r7wm-3cxj-wff9"
           ],
           "PublishedDate": "2026-07-21T21:58:53Z",
-          "LastModifiedDate": "2026-07-21T21:58:53Z"
+          "LastModifiedDate": "2026-08-03T20:30:41Z"
         },
         {
           "VulnerabilityID": "GHSA-72hv-8253-57qq",
@@ -1479,7 +1479,7 @@
             "https://github.com/FasterXML/jackson-core/security/advisories/GHSA-72hv-8253-57qq"
           ],
           "PublishedDate": "2026-02-28T02:01:05Z",
-          "LastModifiedDate": "2026-04-07T16:30:17Z"
+          "LastModifiedDate": "2026-08-03T20:32:01Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54512",
@@ -1612,6 +1612,12 @@
             "https://access.redhat.com/errata/RHSA-2026:44065",
             "https://access.redhat.com/errata/RHSA-2026:44066",
             "https://access.redhat.com/errata/RHSA-2026:44271",
+            "https://access.redhat.com/errata/RHSA-2026:48095",
+            "https://access.redhat.com/errata/RHSA-2026:48151",
+            "https://access.redhat.com/errata/RHSA-2026:50846",
+            "https://access.redhat.com/errata/RHSA-2026:50847",
+            "https://access.redhat.com/errata/RHSA-2026:50848",
+            "https://access.redhat.com/errata/RHSA-2026:50849",
             "https://access.redhat.com/security/cve/CVE-2026-54513",
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
@@ -1635,7 +1641,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-07-23T12:18:26.847Z"
+          "LastModifiedDate": "2026-08-06T13:18:20.053Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -4847,6 +4853,244 @@
           "LastModifiedDate": "2026-06-17T09:22:40.307Z"
         },
         {
+          "VulnerabilityID": "CVE-2026-41848",
+          "VendorIDs": [
+            "GHSA-659m-px2c-25wj"
+          ],
+          "PkgID": "org.springframework:spring-core:6.1.1",
+          "PkgName": "org.springframework:spring-core",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar",
+            "UID": "c692fc20c2dde492",
+            "BOMRef": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41848",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:e3fb2202cc318023e37370ed142002c3ec421d65d11a37cf7af1cf93eb0c4c45",
+          "Title": "spring-framework: Spring Framework: Regular Expression Denial of Service in AntPathMatcher",
+          "Description": "Applications may be vulnerable to a Regular Expression Denial of Service (ReDoS) attack if an attacker is able to provide a pattern which is then directly or indirectly supplied to one of the following methods in AntPathMatcher: match(String pattern, String path), matchStart(String pattern, String path), extractUriTemplateVariables(String pattern, String path).\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-1333"
+          ],
+          "VendorSeverity": {
+            "ghsa": 1,
+            "nvd": 3,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.7
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41848",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/12b44f2545a1bec6150c7a05e66092c732597a94",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41848",
+            "https://spring.io/security/cve-2026-41848",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41848"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.94Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41850",
+          "VendorIDs": [
+            "GHSA-r5w3-xv2f-j59q"
+          ],
+          "PkgID": "org.springframework:spring-expression:6.1.1",
+          "PkgName": "org.springframework:spring-expression",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
+            "UID": "75bc438455d1c4f",
+            "BOMRef": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41850",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:e7c293653ec053ada4b704f8cbff4d4f14a10716d5bbc2d4405f2d9d92d37108",
+          "Title": "spring-framework: Spring Framework: Denial of Service via specially crafted SpEL expressions",
+          "Description": "Applications that evaluate user-supplied Spring Expression Language (SpEL) expressions are vulnerable to an Algorithmic Denial of Service (DoS). By providing a specially crafted expression, an attacker can trigger excessive resource consumption during evaluation, leading to application degradation or unavailability.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-407"
+          ],
+          "VendorSeverity": {
+            "ghsa": 3,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41850",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41850",
+            "https://spring.io/security/cve-2026-41850",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41850"
+          ],
+          "PublishedDate": "2026-06-09T05:16:37.177Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41851",
+          "VendorIDs": [
+            "GHSA-wxpp-56q6-5pcg"
+          ],
+          "PkgID": "org.springframework:spring-expression:6.1.1",
+          "PkgName": "org.springframework:spring-expression",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
+            "UID": "75bc438455d1c4f",
+            "BOMRef": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41851",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:6eeeef516fb5b8f08a09b568cc8666f325ba3958039d556cb1a236820ccc038a",
+          "Title": "Spring Framework: Spring Framework: Denial of Service via unbounded cache growth in SpEL evaluation",
+          "Description": "Applications which accept user-supplied Spring Expression Language (SpEL) expressions may be vulnerable to a Denial of Service (DoS) attack if the evaluation of a SpEL expression triggers unbounded cache growth.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-770"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "nvd": 3,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 5.3
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 5.3
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41851",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/2c18c33ce0f89bf718c184190cfb7ed49b4276fb",
+            "https://github.com/spring-projects/spring-framework/commit/76a36dfd707cddbe7118a81c2e055b36501d2cff",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41851",
+            "https://spring.io/security/cve-2026-41851",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41851"
+          ],
+          "PublishedDate": "2026-06-09T05:16:37.297Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41852",
+          "VendorIDs": [
+            "GHSA-9f52-rjqv-25qv"
+          ],
+          "PkgID": "org.springframework:spring-expression:6.1.1",
+          "PkgName": "org.springframework:spring-expression",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
+            "UID": "75bc438455d1c4f",
+            "BOMRef": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41852",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:7eb1155dac67920dccdd8fd8107d84f3259027fe44a44743e19f39e7efab301b",
+          "Title": "spring-framework: org.springframework/spring-expression: Spring Framework: SpEL vulnerability allows unintended application logic invocation",
+          "Description": "A vulnerability in Spring Expression Language (SpEL) evaluation logic allows for arbitrary zero-argument method invocation, even within restricted or read-only contexts, which may allow an attacker to invoke unintended application logic.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-863"
+          ],
+          "VendorSeverity": {
+            "ghsa": 1,
+            "nvd": 2,
+            "redhat": 1
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.7
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41852",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41852",
+            "https://spring.io/security/cve-2026-41852",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41852"
+          ],
+          "PublishedDate": "2026-06-09T05:16:37.407Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
           "VulnerabilityID": "CVE-2024-22243",
           "VendorIDs": [
             "GHSA-ccgv-vj62-xf9h"
@@ -5304,6 +5548,123 @@
           "LastModifiedDate": "2026-06-17T07:41:06.397Z"
         },
         {
+          "VulnerabilityID": "CVE-2026-41842",
+          "VendorIDs": [
+            "GHSA-x23c-287f-qqv5"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41842",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:24f07a1c6abd270db627aeb765f64d2df9138016dbe15fb1c390a140669a5504",
+          "Title": "spring-framework: Spring Framework: Denial of Service when resolving static resources",
+          "Description": "Spring MVC and WebFlux applications are vulnerable to Denial of Service (DoS) attacks when resolving static resources.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-400"
+          ],
+          "VendorSeverity": {
+            "ghsa": 3,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41842",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41842",
+            "https://spring.io/security/cve-2026-41842",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41842"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.203Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41845",
+          "VendorIDs": [
+            "GHSA-3chg-m5w7-qfv5"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41845",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:11dfc68c4f0fcd87a8f64165fea97acb18cb23b92616377144cdfad05f693e00",
+          "Title": "org.springframework: Spring Framework: Cross-site scripting (XSS) via incorrect JavaScript escaping",
+          "Description": "Due to incorrect escaping, the use of JavaScriptUtils.javaScriptEscape() may lead to JavaScript code injection in the browser, potentially resulting in a cross-site scripting (XSS) vulnerability.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-79"
+          ],
+          "VendorSeverity": {
+            "ghsa": 3,
+            "nvd": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:L/A:N",
+              "V3Score": 7.1
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "V3Score": 6.1
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:L/A:N",
+              "V3Score": 7.1
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41845",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/86d99790dbaa8ce6bb1087ef92844d0abfdab015",
+            "https://github.com/spring-projects/spring-framework/commit/a1826b725c29fbb175fa7b4fc005aa3d78c32015",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41845",
+            "https://spring.io/security/cve-2026-41845",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41845"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.557Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
           "VulnerabilityID": "CVE-2025-41242",
           "VendorIDs": [
             "GHSA-r936-gwx5-v52f"
@@ -5464,6 +5825,289 @@
           ],
           "PublishedDate": "2026-04-29T12:16:18.62Z",
           "LastModifiedDate": "2026-06-17T10:20:21.627Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41841",
+          "VendorIDs": [
+            "GHSA-mq64-j8f9-9gcj"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41841",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:b8eb8c6b8e34efcfe6abe40aabf0205e7e9b469888a762c7f4cb2ab97409f525",
+          "Title": "Spring MVC and WebFlux applications are vulnerable to Information Disc ...",
+          "Description": "Spring MVC and WebFlux applications are vulnerable to Information Disclosure attacks when resolving static resources.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-524"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41841",
+            "https://spring.io/security/cve-2026-41841"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.087Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41843",
+          "VendorIDs": [
+            "GHSA-72pg-x5f8-j25j"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41843",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:a1b053d7bf2d471da97bee83a40ace290780ab49a7a2e8b403326d056670a8f7",
+          "Title": "spring-webflux: spring-webmvc: Spring Framework: Information Disclosure via Path Traversal",
+          "Description": "Spring MVC and WebFlux applications are vulnerable to Path Traversal attacks when resolving static resources.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-22"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 5.9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41843",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/3aaec987651cf82fd4ed7e0ed9b3deddcdf58853",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41843",
+            "https://spring.io/security/cve-2026-41843",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41843"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.32Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41844",
+          "VendorIDs": [
+            "GHSA-h3qp-gqrc-q736"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41844",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:34672bdd3042d18627859f9d0ab00df0315fadf2f03071dabd333e9c86101726",
+          "Title": "Spring Framework: Spring Framework: Open Redirect via crafted link",
+          "Description": "A Spring MVC or Spring WebFlux application which configures a mapping for \"/**\" where the view name is not explicitly specified allows an attacker to craft a link resulting in a 302 redirect to an arbitrary external host via the redirect: prefix.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-601"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "nvd": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:N",
+              "V3Score": 4.2
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "V3Score": 6.1
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:N",
+              "V3Score": 4.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41844",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/3aaec987651cf82fd4ed7e0ed9b3deddcdf58853",
+            "https://github.com/spring-projects/spring-framework/commit/7add5243b9db13a9f8e765c8ab8545c8e8fe606b",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41844",
+            "https://spring.io/security/cve-2026-41844",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41844"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.44Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41846",
+          "VendorIDs": [
+            "GHSA-957g-f97v-vppc"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41846",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:cee102fe584c2a1ff5b62fbd1e649d0cf3c442bc86d3d7b6a02ffe3f9a6228fd",
+          "Title": "Spring Framework: Spring Framework: Cross-site scripting (XSS) via user-supplied values in JSP form tags",
+          "Description": "Spring MVC applications which accept user-supplied values in the cssClass, cssErrorClass, or cssStyle attributes of JSP form tags allow arbitrary HTML/JavaScript code injection, potentially resulting in a cross-site scripting (XSS) vulnerability.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-79"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "nvd": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:L/A:N",
+              "V3Score": 5.9
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "V3Score": 6.1
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:H/A:N",
+              "V3Score": 6.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41846",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/commit/1829b42b9c45e780c268dd17863d9198d62154d3",
+            "https://github.com/spring-projects/spring-framework/commit/e8f10244e3859e8bb5b6be3823c9bbea2c130573",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41846",
+            "https://spring.io/security/cve-2026-41846",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41846"
+          ],
+          "PublishedDate": "2026-06-09T05:16:36.693Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41853",
+          "VendorIDs": [
+            "GHSA-cjpg-rgq5-fr37"
+          ],
+          "PkgID": "org.springframework:spring-webmvc:6.1.1",
+          "PkgName": "org.springframework:spring-webmvc",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+            "UID": "786c44f71fc78650",
+            "BOMRef": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+          },
+          "InstalledVersion": "6.1.1",
+          "FixedVersion": "7.0.8, 6.2.19",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41853",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:5d6c7f6805890faf0254e1796bdfc0a569c246f331cce70dfda2305b6d454ef8",
+          "Title": "Spring Framework: Spring Framework: Request smuggling vulnerability in Spring MVC and WebFlux",
+          "Description": "Spring MVC and WebFlux applications are vulnerable to Multipart request smuggling attacks.\n\nAffected versions:\nSpring Framework 7.0.0 through 7.0.7; 6.2.0 through 6.2.18; 6.1.0 through 6.1.27; 5.3.0 through 5.3.48.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-444"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41853",
+            "https://github.com/spring-projects/spring-framework",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v6.2.19",
+            "https://github.com/spring-projects/spring-framework/releases/tag/v7.0.8",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41853",
+            "https://spring.io/security/cve-2026-41853",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41853"
+          ],
+          "PublishedDate": "2026-06-09T05:16:37.523Z",
+          "LastModifiedDate": "2026-07-23T08:10:00.137Z"
         },
         {
           "VulnerabilityID": "CVE-2026-22735",

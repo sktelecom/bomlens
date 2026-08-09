@@ -1,30 +1,4 @@
 {
-  "annotations": [
-    {
-      "annotator": {
-        "component": {
-          "authors": [
-            {
-              "name": "OWASP Foundation"
-            }
-          ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.7.0",
-          "group": "@cyclonedx",
-          "name": "cdxgen",
-          "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.7.0",
-          "type": "application",
-          "version": "12.7.0"
-        }
-      },
-      "bom-ref": "metadata-annotations",
-      "subjects": [
-        "pkg:pypi/app@latest"
-      ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, July 28, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'app'. This SBOM contains 39 dynamically instrumented library components discovered during process execution tracing. These libraries were loaded at runtime and mapped back to system packages.",
-      "timestamp": "2026-07-28T04:14:38Z"
-    }
-  ],
   "bomFormat": "CycloneDX",
   "components": [
     {
@@ -6994,49 +6968,23 @@
       }
     ],
     "component": {
-      "bom-ref": "pkg:pypi/app@latest",
-      "group": "",
+      "licenses": [],
       "name": "FlaskDataService",
+      "purl": "",
       "type": "application",
       "version": "3.2.0"
     },
-    "lifecycles": [
-      {
-        "phase": "build"
-      }
-    ],
-    "properties": [
-      {
-        "name": "cdx:bom:componentTypes",
-        "value": "pypi"
-      },
-      {
-        "name": "cdx:bom:componentSrcFiles",
-        "value": "requirements.txt"
-      }
-    ],
     "timestamp": "2026-07-28T04:14:38Z",
     "tools": {
       "components": [
         {
-          "authors": [
-            {
-              "name": "OWASP Foundation"
-            }
-          ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.7.0",
-          "group": "@cyclonedx",
-          "name": "cdxgen",
-          "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.7.0",
-          "type": "application",
-          "version": "12.7.0"
+          "name": "cdxgen 12.7.0",
+          "type": "application"
         }
       ]
     }
   },
   "serialNumber": "urn:uuid:a0305b45-b107-46ff-ad6d-8976fe91b0df",
-  "services": [],
   "specVersion": "1.6",
   "version": 1
 }

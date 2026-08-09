@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.72.0"
   },
-  "ReportID": "019faab2-a282-7a42-9414-682f2031bf27",
-  "CreatedAt": "2026-07-28T21:47:41.570676363Z",
+  "ReportID": "019fe453-c5c2-7031-9855-78319fa51a28",
+  "CreatedAt": "2026-08-09T02:22:03.202018182Z",
   "ArtifactName": "NginxRuntimeImage_1.24-alpine_bom.json",
   "ArtifactType": "cyclonedx",
   "Metadata": {
@@ -2408,7 +2408,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-15467"
           ],
           "PublishedDate": "2026-01-27T16:16:14.257Z",
-          "LastModifiedDate": "2026-07-28T13:17:14.747Z"
+          "LastModifiedDate": "2026-08-03T13:16:42.843Z"
         },
         {
           "VulnerabilityID": "CVE-2025-69421",
@@ -5045,7 +5045,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-15467"
           ],
           "PublishedDate": "2026-01-27T16:16:14.257Z",
-          "LastModifiedDate": "2026-07-28T13:17:14.747Z"
+          "LastModifiedDate": "2026-08-03T13:16:42.843Z"
         },
         {
           "VulnerabilityID": "CVE-2025-69421",

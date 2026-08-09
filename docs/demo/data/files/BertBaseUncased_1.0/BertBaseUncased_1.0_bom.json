@@ -285,15 +285,15 @@
         },
         {
           "name": "cdx:huggingface:downloads",
-          "value": "95783043"
+          "value": "118763604"
         },
         {
           "name": "cdx:huggingface:downloadsAllTime",
-          "value": "3101631529"
+          "value": "3155370476"
         },
         {
           "name": "cdx:huggingface:likes",
-          "value": "2714"
+          "value": "2729"
         },
         {
           "name": "cdx:huggingface:gated",
@@ -766,20 +766,31 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-04:14:01@1.0",
+      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-09-02:19:06@1.0",
       "description": "Generating SBOM for google-bert/bert-base-uncased",
       "manufacturer": {
         "name": "OWASP AIBOM Generator"
       },
-      "name": "job-2026-07-28-04:14:01",
-      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-07-28-04:14:01@1.0",
+      "name": "job-2026-08-09-02:19:06",
+      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-09-02:19:06@1.0",
       "supplier": {
         "name": "OWASP AIBOM Generator"
       },
       "type": "application",
       "version": "1.0"
     },
-    "timestamp": "2026-07-28T04:14:01+00:00",
+    "lifecycles": [
+      {
+        "phase": "post-build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "bomlens:undeclared-fields",
+        "value": "unknown-to-author"
+      }
+    ],
+    "timestamp": "2026-08-09T02:19:06+00:00",
     "tools": {
       "components": [
         {
@@ -790,11 +801,17 @@
           "name": "owasp-aibom-generator",
           "type": "application",
           "version": "1.0.2"
+        },
+        {
+          "name": "BomLens",
+          "publisher": "SK Telecom",
+          "type": "application",
+          "version": "1.10.3"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:468ae427-009a-49cb-8ac1-6f39c1f861ef",
+  "serialNumber": "urn:uuid:f1224d59-9fda-4eff-8f6b-8f60fe4177db",
   "specVersion": "1.7",
   "version": 1
 }

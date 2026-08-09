@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.72.0"
   },
-  "ReportID": "019faa9d-78c2-769a-a95b-5a1e9778a56e",
-  "CreatedAt": "2026-07-28T21:24:34.626437984Z",
+  "ReportID": "019fe454-12aa-71d3-8ca3-2a7601715e9f",
+  "CreatedAt": "2026-08-09T02:22:22.89012168Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1060,72 +1060,6 @@
           "LastModifiedDate": "2026-06-17T10:26:50.207Z"
         },
         {
-          "VulnerabilityID": "CVE-2026-32274",
-          "VendorIDs": [
-            "GHSA-3936-cmfr-pm3m"
-          ],
-          "PkgID": "black@23.12.1",
-          "PkgName": "black",
-          "PkgIdentifier": {
-            "PURL": "pkg:pypi/black@23.12.1",
-            "UID": "c6028d59de0e9024",
-            "BOMRef": "pkg:pypi/black@23.12.1"
-          },
-          "InstalledVersion": "23.12.1",
-          "FixedVersion": "26.3.1",
-          "Status": "fixed",
-          "SeveritySource": "ghsa",
-          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-32274",
-          "DataSource": {
-            "ID": "ghsa",
-            "Name": "GitHub Security Advisory pip",
-            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
-          },
-          "Fingerprint": "sha256:27a6f9713d4633bb14e84db9544b3552ef8b69646bbd89e5b98670627f71bd54",
-          "Title": "black: Black: Arbitrary file writes from unsanitized user input in cache file name",
-          "Description": "Black is the uncompromising Python code formatter. Prior to 26.3.1, Black writes a cache file, the name of which is computed from various formatting options. The value of the --python-cell-magics option was placed in the filename without sanitization, which allowed an attacker who controls the value of this argument to write cache files to arbitrary file system locations. Fixed in Black 26.3.1.",
-          "Severity": "HIGH",
-          "CweIDs": [
-            "CWE-22"
-          ],
-          "VendorSeverity": {
-            "ghsa": 3,
-            "nvd": 3,
-            "redhat": 3
-          },
-          "CVSS": {
-            "ghsa": {
-              "V40Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N",
-              "V40Score": 8.7
-            },
-            "nvd": {
-              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
-              "V3Score": 7.5
-            },
-            "redhat": {
-              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
-              "V3Score": 7.5
-            }
-          },
-          "References": [
-            "https://access.redhat.com/errata/RHSA-2026:10184",
-            "https://access.redhat.com/errata/RHSA-2026:13545",
-            "https://access.redhat.com/errata/RHSA-2026:13553",
-            "https://access.redhat.com/security/cve/CVE-2026-32274",
-            "https://bugzilla.redhat.com/show_bug.cgi?id=2447111",
-            "https://github.com/psf/black",
-            "https://github.com/psf/black/commit/4937fe6cf241139ddbfc16b0bdbb5b422798909d",
-            "https://github.com/psf/black/pull/5038",
-            "https://github.com/psf/black/releases/tag/26.3.1",
-            "https://github.com/psf/black/security/advisories/GHSA-3936-cmfr-pm3m",
-            "https://nvd.nist.gov/vuln/detail/CVE-2026-32274",
-            "https://security.access.redhat.com/data/csaf/v2/vex/2026/cve-2026-32274.json",
-            "https://www.cve.org/CVERecord?id=CVE-2026-32274"
-          ],
-          "PublishedDate": "2026-03-12T20:16:06.35Z",
-          "LastModifiedDate": "2026-07-15T02:19:53.963Z"
-        },
-        {
           "VulnerabilityID": "CVE-2024-21503",
           "VendorIDs": [
             "GHSA-fj7x-q9j7-g6q6"
@@ -1852,6 +1786,7 @@
             "https://access.redhat.com/errata/RHSA-2026:4466",
             "https://access.redhat.com/errata/RHSA-2026:4467",
             "https://access.redhat.com/errata/RHSA-2026:44696",
+            "https://access.redhat.com/errata/RHSA-2026:51357",
             "https://access.redhat.com/errata/RHSA-2026:5459",
             "https://access.redhat.com/errata/RHSA-2026:6287",
             "https://access.redhat.com/errata/RHSA-2026:6292",
@@ -1884,7 +1819,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-21441"
           ],
           "PublishedDate": "2026-01-07T22:15:44.04Z",
-          "LastModifiedDate": "2026-07-27T13:16:53.487Z"
+          "LastModifiedDate": "2026-08-07T12:17:16.323Z"
         },
         {
           "VulnerabilityID": "CVE-2026-44431",
@@ -1956,7 +1891,7 @@
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/security/advisories/GHSA-qccp-gfcp-xxvc",
             "https://linux.oracle.com/cve/CVE-2026-44431.html",
-            "https://linux.oracle.com/errata/ELSA-2026-36732.html",
+            "https://linux.oracle.com/errata/ELSA-2026-49927.html",
             "https://lists.debian.org/debian-lts-announce/2026/06/msg00040.html",
             "https://nvd.nist.gov/vuln/detail/CVE-2026-44431",
             "https://ubuntu.com/security/notices/USN-8379-1",
