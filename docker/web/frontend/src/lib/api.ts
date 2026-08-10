@@ -245,6 +245,12 @@ export interface ConformanceCheck {
    *  manifest supplied it), "na" (no automated source — human review needed).
    *  Empty/absent for base format checks. */
   source?: string;
+  /** "not-applicable" when the document gives this check nothing to judge — what
+   *  it measures is absent (no packages, no files, no parts to relate). Carries
+   *  source "na" as well, since there is no automated verdict either way, but it
+   *  is not a review item: a reviewer has nothing to look at. Such a check leaves
+   *  the coverage denominator instead of counting as met or as a gap. */
+  naKind?: string;
   /** Regulatory documentation obligations this G7 element maps to (validate-sbom.sh
    *  joins docker/lib/regulation-crosswalk.json, keyed by check id). Present only on
    *  the ~half of G7 checks with a defensible correspondence; absent otherwise.

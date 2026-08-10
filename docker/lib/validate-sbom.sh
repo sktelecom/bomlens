@@ -205,13 +205,18 @@ cdx_checks() {
        # created. A dataset carries no purl and no package version by definition,
        # and an SBOM listing only datasets is a legitimate one to submit.
        {id:\"name-version\", label:\"Component name+version coverage (100%)\", required:true,
-        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"pass\" end)
+        source:(if \$ptot==0 and \$ftot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ptot==0 and \$ftot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"warn\" end)
                 elif (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
-        detail:(if \$ptot==0 and \$ftot>0 then \"no package components (file inventory only)\"
+        detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
+                                   else \"no packages to measure\" end)
                 else \"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\" end),
         missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"pass\" end)
+        source:(if \$ptot==0 and \$ftot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ptot==0 and \$ftot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"warn\" end)
                 elif pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
                                    else \"no packages to measure\" end)
@@ -219,7 +224,9 @@ cdx_checks() {
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
        {id:\"file-identifier\", label:\"File component identifier coverage (hash, >= \(\$fieldmin)%, recommended)\", required:false,
-        status:(if \$ftot==0 or pct(\$fhash_ok;\$ftot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$ftot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ftot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ftot==0 then \"warn\" elif pct(\$fhash_ok;\$ftot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$ftot==0 then \"no file components\"
                 else \"\(pct(\$fhash_ok;\$ftot))% (\(\$fhash_ok)/\(\$ftot))\" end),
         missing:(\$miss_fid[0:\$cap])},
@@ -230,33 +237,51 @@ cdx_checks() {
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (graph edges)\", required:true,
-        status:(if \$dep_edges>0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$dep_edges) edge(s)\", missing:[]},
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$dep_edges>0 then \"pass\" elif \$tot==0 then \"warn\" else \"fail\" end),
+        detail:(if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
+                else \"\(\$dep_edges) edge(s)\" end), missing:[]},
        {id:\"license\", label:\"License coverage (>= \(\$licmin)%, recommended)\", required:false,
-        status:(if pct(\$lic_ok;\$tot) >= \$licmin then \"pass\" else \"warn\" end),
-        detail:\"\(pct(\$lic_ok;\$tot))% (\(\$lic_ok)/\(\$tot))\", missing:[]},
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot>0 and pct(\$lic_ok;\$tot) >= \$licmin then \"pass\" else \"warn\" end),
+        detail:(if \$tot==0 then \"nothing to measure\"
+                else \"\(pct(\$lic_ok;\$tot))% (\(\$lic_ok)/\(\$tot))\" end), missing:[]},
        {id:\"hash\", label:\"Hash coverage (>= \(\$hashmin)%, recommended)\", required:false,
-        status:(if pct(\$hash_ok;\$tot) >= \$hashmin then \"pass\" else \"warn\" end),
-        detail:\"\(pct(\$hash_ok;\$tot))% (\(\$hash_ok)/\(\$tot))\", missing:[]},
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot>0 and pct(\$hash_ok;\$tot) >= \$hashmin then \"pass\" else \"warn\" end),
+        detail:(if \$tot==0 then \"nothing to measure\"
+                else \"\(pct(\$hash_ok;\$tot))% (\(\$hash_ok)/\(\$tot))\" end), missing:[]},
        {id:\"hash-algorithm\", label:\"SHA-512 checksum coverage (>= \(\$fieldmin)%, recommended)\", required:false,
-        status:(if \$tot==0 or pct(\$sha512_ok;\$tot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot==0 then \"warn\" elif pct(\$sha512_ok;\$tot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$tot==0 then \"nothing to measure\"
                 else \"\(pct(\$sha512_ok;\$tot))% (\(\$sha512_ok)/\(\$tot))\" end), missing:[]},
        {id:\"component-creator\", label:\"Component creator coverage (>= \(\$fieldmin)%, recommended)\", required:false,
-        status:(if \$ptot==0 or pct(\$creator_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$ptot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ptot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then \"warn\" elif pct(\$creator_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$ptot==0 then \"no packages to measure\"
                 else \"\(pct(\$creator_ok;\$ptot))% (\(\$creator_ok)/\(\$ptot))\" end), missing:[]},
        {id:\"component-filename\", label:\"Component filename coverage (>= \(\$fieldmin)%, recommended)\", required:false,
-        status:(if \$ptot==0 or pct(\$fname_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$ptot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ptot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then \"warn\" elif pct(\$fname_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$ptot==0 then \"no packages to measure\"
                 else \"\(pct(\$fname_ok;\$ptot))% (\(\$fname_ok)/\(\$ptot))\" end), missing:[]},
        {id:\"artifact-uri\", label:\"Source or distribution URI coverage (>= \(\$fieldmin)%, recommended)\", required:false,
-        status:(if \$ptot==0 or pct(\$uri_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$ptot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$ptot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then \"warn\" elif pct(\$uri_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$ptot==0 then \"no packages to measure\"
                 else \"\(pct(\$uri_ok;\$ptot))% (\(\$uri_ok)/\(\$ptot))\" end), missing:[]},
        {id:\"file-properties\", label:\"Delivered-file properties (executable/archive/structured)\", required:false,
-        source:(if \$ptot==0 or \$fprops_ok>0 then \"auto\" else \"na\" end),
-        status:(if \$ptot==0 or pct(\$fprops_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
+        source:(if \$ptot==0 then \"na\" elif \$fprops_ok>0 then \"auto\" else \"na\" end),
+        naKind:(if \$ptot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$ptot==0 then \"warn\" elif pct(\$fprops_ok;\$ptot) >= \$fieldmin then \"pass\" else \"warn\" end),
         detail:(if \$ptot==0 then \"no packages to measure\"
                 elif \$fprops_ok==0 then \"requires inspecting the delivered files (no automated source in this scan)\"
                 else \"\(pct(\$fprops_ok;\$ptot))% (\(\$fprops_ok)/\(\$ptot))\" end), missing:[]}
@@ -479,13 +504,20 @@ spdx_json_checks() {
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)\", required:true,
-        status:(if \$dep_edges>0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$dep_edges) edge(s)\", missing:[]},
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$dep_edges>0 then \"pass\" elif \$tot==0 then \"warn\" else \"fail\" end),
+        detail:(if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
+                else \"\(\$dep_edges) edge(s)\" end), missing:[]},
        {id:\"license\", label:\"License coverage (>= \(\$licmin)%, recommended)\", required:false,
-        status:(if pct(\$lic_ok;\$tot) >= \$licmin then \"pass\" else \"warn\" end),
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot>0 and pct(\$lic_ok;\$tot) >= \$licmin then \"pass\" else \"warn\" end),
         detail:\"\(pct(\$lic_ok;\$tot))% (\(\$lic_ok)/\(\$tot))\", missing:[]},
        {id:\"hash\", label:\"Hash coverage (>= \(\$hashmin)%, recommended)\", required:false,
-        status:(if pct(\$hash_ok;\$tot) >= \$hashmin then \"pass\" else \"warn\" end),
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot>0 and pct(\$hash_ok;\$tot) >= \$hashmin then \"pass\" else \"warn\" end),
         detail:\"\(pct(\$hash_ok;\$tot))% (\(\$hash_ok)/\(\$tot))\", missing:[]}
       ]" "$SBOM"
 }
@@ -521,7 +553,7 @@ spdx_tv_checks() {
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:"Traceable PURL (no pkg:generic, advisory)", required:false, status:(if $generic==0 then "pass" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/[namespace/]name)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
-      {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 then "pass" else "fail" end), detail:"\($deps) relationship(s)", missing:[]},
+      {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 or $names==0 then "pass" else "fail" end), detail:(if $deps==0 and $names==0 then "nothing to relate" else "\($deps) relationship(s)" end), missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
       {id:"hash", label:"Checksums present (recommended)", required:false, status:(if $hashes>0 then "pass" else "warn" end), detail:"\($hashes) checksum(s)", missing:[]}
     ]'
@@ -645,7 +677,16 @@ N_FAIL=$(echo "$CHECKS" | jq '[.[] | select(.required and .status=="fail")] | le
 # no-generic is advisory (untraceable-component visibility), counted on its own
 # line below rather than folded into the recommended-coverage warnings.
 N_WARN=$(echo "$CHECKS" | jq '[.[] | select(.status=="warn" and ((.source // "") != "na") and .id != "no-generic")] | length')
-N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na")] | length')
+# Two kinds of check carry no automated verdict, and they are not the same
+# statement. A review item has something to judge and no automated source for it;
+# a not-applicable item has nothing to judge at all, because what it measures is
+# absent from this document (no packages, no files, no parts to relate). Neither
+# counts as met, and neither counts against the document — but reporting them
+# together would call an unmeasurable field "needs review", and counting either
+# as a pass would put a document that declares less ahead of one that declares
+# more and is measured on it.
+N_REVIEW=$(echo "$CHECKS" | jq '[.[] | select((.source // "") == "na" and ((.naKind // "") != "not-applicable"))] | length')
+N_NA=$(echo "$CHECKS" | jq '[.[] | select((.naKind // "") == "not-applicable")] | length')
 # Untraceable components: count of pkg:generic / custom PURLs (from the no-generic
 # check's detail, "N untraceable"). Does NOT affect RESULT — surfaced so a pass
 # never hides components that can't be tracked for supply-chain / CVE matching.
@@ -851,7 +892,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_MD_TITLE=$(tfmt conformance.md_title "$PROJECT")
     C_MD_GEN=$(tfmt conformance.md_generated "$GEN_AT")
     C_MD_FMT=$(tfmt conformance.md_format "$FORMAT")
-    C_MD_RESULT=$(tfmt conformance.md_result "$RESULT_UP" "$N_FAIL" "$N_WARN" "$N_REVIEW")
+    C_MD_RESULT=$(tfmt conformance.md_result "$RESULT_UP" "$N_FAIL" "$N_WARN" "$N_REVIEW" "$N_NA")
     C_MD_UNTRACE=$(tfmt conformance.md_untraceable "$N_UNTRACEABLE")
     C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
     C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
@@ -878,11 +919,12 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
     C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
     C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
+    C_PILL_NA=$(kstr conformance.pill_na)
 else
     C_MD_TITLE="SBOM Conformance — ${PROJECT}"
     C_MD_GEN="- Generated: ${GEN_AT}"
     C_MD_FMT="- Format: ${FORMAT}"
-    C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW})"
+    C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW}, not applicable: ${N_NA})"
     C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
     C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
     C_TH_EVID="Evidence / how"; C_FIX_SUMMARY="How to fill this"; C_CHECK_SUMMARY="What to establish"
@@ -908,6 +950,7 @@ else
     C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
     C_PILL_RESULT="Result: ${RESULT_UP}"
     C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
+    C_PILL_NA="Not applicable:"
     C_PILL_UNTRACE="Untraceable (pkg:generic):"
 fi
 
@@ -932,7 +975,7 @@ fi
             # requirement instead of being reprinted as their own table.
             (((.regulations // []) | map((if $lang=="ko" then .short_ko else .short end) + " " + .ref)) as $refs
              | if ($refs|length) > 0 then " — " + ($refs|join(" · ")) else "" end) as $reftext |
-            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \((.label + $reftext) | gsub("[|\n]"; " ")) | "
+            "| \(if .status=="pass" then "✅" elif .status=="fail" then "❌" elif (.naKind // "")=="not-applicable" then "—" elif (.source // "")=="na" then "🔍" else "⚠️" end) | \((.label + $reftext) | gsub("[|\n]"; " ")) | "
             + (if $kind=="g7" then "" else "\(if .required then $yes else $no end) | " end)
             + "\(.detail | gsub("[|\n]"; " ")) | \(((.evidence // []) | join(", ")) | gsub("[|\n]"; " ")) |"'
     }
@@ -1078,6 +1121,7 @@ fi
  .s-fail{color:#dc2626;font-weight:700;}
  .s-warn{color:#ca8a04;font-weight:700;}
  .s-review{color:var(--review);font-weight:700;}
+ .s-na{color:var(--muted);font-weight:700;}
  td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
  th.num{text-align:right;}
  td.req{white-space:nowrap;}
@@ -1104,6 +1148,7 @@ fi
  <span class="pill pill-fail">${C_PILL_FAIL} <span class="count">${N_FAIL}</span></span>
  <span class="pill pill-warn">${C_PILL_WARN} <span class="count">${N_WARN}</span></span>
  <span class="pill">${C_PILL_REVIEW} <span class="count">${N_REVIEW}</span></span>
+$( [ "${N_NA:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_NA} <span class=\"count\">${N_NA}</span></span>" )
 $( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
 HTMLHEAD
@@ -1121,9 +1166,12 @@ HTMLHEAD
             --arg lang "$REPORT_LANG" '
             [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
             | to_entries[] | .key as $i | .value |
-            (if (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
+            (if (.naKind // "")=="not-applicable" then "s-na"
+             elif (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
             "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
-            "<td class=\"" + $cls + "\">" + (if (.source // "")=="na" then "REVIEW" else (.status|ascii_upcase) end|@html) + "</td>" +
+            "<td class=\"" + $cls + "\">" + (if (.naKind // "")=="not-applicable" then "N/A"
+                                              elif (.source // "")=="na" then "REVIEW"
+                                              else (.status|ascii_upcase) end|@html) + "</td>" +
             # The regulatory references ride under the requirement they belong to.
             # They used to be their own table further down, which reprinted every
             # mapped row verbatim; here they cost one line and stay next to the
@@ -1223,5 +1271,5 @@ HTMLHEAD
     echo "</body></html>"
 } > "$HTML"
 
-echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN, review=$N_REVIEW, untraceable=$N_UNTRACEABLE): $JSON, $MD, $HTML"
+echo "[validate] $FORMAT -> result=$RESULT (mandatory fails=$N_FAIL, warns=$N_WARN, review=$N_REVIEW, n/a=$N_NA, untraceable=$N_UNTRACEABLE): $JSON, $MD, $HTML"
 exit 0

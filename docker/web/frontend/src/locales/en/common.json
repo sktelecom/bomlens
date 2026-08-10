@@ -512,7 +512,8 @@
       "auto": "Auto",
       "inferred": "Inferred",
       "declared": "Declared",
-      "na": "Review needed"
+      "na": "Review needed",
+      "notApplicable": "Not applicable"
     },
     "help": {
       "g7-meta-author": {
@@ -815,7 +816,9 @@
     "verdictReview": "{{count}} need a person",
     "baseMandatory": "{{passed}}/{{total}} mandatory passed",
     "missingMore": "and {{count}} more",
-    "needsPerson": "What to establish:"
+    "needsPerson": "What to establish:",
+    "sNa": "N/A",
+    "notApplicable": "{{count}} not applicable"
   },
   "crosswalk": {
     "title": "Regulatory crosswalk",

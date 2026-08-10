@@ -81,8 +81,10 @@ export function sortByAttention(checks: ConformanceCheck[]): ConformanceCheck[] 
   return checks
     .map((c, i) => ({ c, i }))
     .sort((a, b) => {
-      const ra = a.c.source === "na" ? 2 : (STATUS_RANK[a.c.status] ?? 1);
-      const rb = b.c.source === "na" ? 2 : (STATUS_RANK[b.c.status] ?? 1);
+      const rank = (c: ConformanceCheck) =>
+        isNotApplicable(c) ? 3 : c.source === "na" ? 2 : (STATUS_RANK[c.status] ?? 1);
+      const ra = rank(a.c);
+      const rb = rank(b.c);
       return ra === rb ? a.i - b.i : ra - rb;
     })
     .map((x) => x.c);
@@ -145,6 +147,16 @@ export function groupG7ByCluster(g7: ConformanceCheck[]): G7Group[] {
   return groupByCluster(g7, G7_CLUSTER_ORDER);
 }
 
+/** A check the document gives nothing to judge: what it measures is absent here
+ *  (no packages, no files, no parts to relate). Distinct from a review item,
+ *  which has something to judge and no automated source for it. Neither counts as
+ *  met; neither belongs in a coverage denominator, because counting one as a pass
+ *  would rank a document that declares less above one that declares more and is
+ *  measured on it. */
+export function isNotApplicable(c: { naKind?: string }): boolean {
+  return c.naKind === "not-applicable";
+}
+
 export interface G7Tally {
   /** Checks whose element is present (status pass). */
   present: number;
@@ -154,7 +166,9 @@ export interface G7Tally {
   review: number;
   /** Total G7 checks (computed, never hardcoded). */
   total: number;
-  /** Checks with an automated source (total minus review) — the coverage base. */
+  /** Checks with nothing in this document to judge — outside the coverage base. */
+  notApplicable: number;
+  /** Checks with an automated source (total minus review and n/a) — the base. */
   autoTotal: number;
   /** Mandatory failures among G7 (G7 is advisory, so normally 0). */
   failed: number;
@@ -177,40 +191,55 @@ export interface VerdictTally {
   mandatoryPassed: number;
   advisoryGap: number;
   review: number;
+  notApplicable: number;
 }
 
 export function verdictTally(checks: ConformanceCheck[]): VerdictTally {
-  const mandatory = checks.filter((c) => c.required);
+  const mandatory = checks.filter((c) => c.required && !isNotApplicable(c));
   return {
     mandatoryFailed: mandatory.filter((c) => c.status === "fail").length,
     mandatoryTotal: mandatory.length,
     mandatoryPassed: mandatory.filter((c) => c.status === "pass").length,
     advisoryGap: checks.filter(
-      (c) => !c.required && c.status !== "pass" && c.source !== "na",
+      (c) =>
+        !c.required &&
+        c.status !== "pass" &&
+        c.source !== "na" &&
+        !isNotApplicable(c),
     ).length,
-    review: checks.filter((c) => c.source === "na").length,
+    review: checks.filter((c) => c.source === "na" && !isNotApplicable(c))
+      .length,
+    notApplicable: checks.filter(isNotApplicable).length,
   };
 }
 
 export function g7Tally(g7: ConformanceCheck[]): G7Tally {
-  const review = g7.filter((c) => c.source === "na").length;
+  const notApplicable = g7.filter(isNotApplicable).length;
+  const review = g7.filter(
+    (c) => c.source === "na" && !isNotApplicable(c),
+  ).length;
   return {
     present: g7.filter((c) => c.status === "pass").length,
-    advisory: g7.filter((c) => c.status === "warn" && c.source !== "na").length,
+    advisory: g7.filter(
+      (c) => c.status === "warn" && c.source !== "na" && !isNotApplicable(c),
+    ).length,
     review,
+    notApplicable,
     total: g7.length,
-    autoTotal: g7.length - review,
+    autoTotal: g7.length - review - notApplicable,
     failed: g7.filter((c) => c.status === "fail").length,
   };
 }
 
 /** Base-check tally for the format conformance panel. */
 export function baseTally(base: ConformanceCheck[]) {
+  const applicable = base.filter((c) => !isNotApplicable(c));
   return {
-    passed: base.filter((c) => c.status === "pass").length,
-    total: base.length,
-    failed: base.filter((c) => c.required && c.status === "fail").length,
-    warnings: base.filter((c) => c.status === "warn").length,
+    passed: applicable.filter((c) => c.status === "pass").length,
+    total: applicable.length,
+    failed: applicable.filter((c) => c.required && c.status === "fail").length,
+    warnings: applicable.filter((c) => c.status === "warn").length,
+    notApplicable: base.length - applicable.length,
   };
 }
 

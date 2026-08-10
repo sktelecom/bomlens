@@ -1283,6 +1283,45 @@ ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
 after=$(jq -S -c '.metadata.component | {type, name, "bom-ref": .["bom-ref"]}' "$WORK/already.json")
 case "$after" in *bert-base-uncased*) pass "a model already at the root stays the subject" ;; *) fail "root after enrichment='$after' (was $before)" ;; esac
 
+echo "== a document with nothing to relate does not fail the graph check =="
+# The dependency-graph check is mandatory, and rightly so for a package SBOM. An
+# AI SBOM whose subject is one model and whose card declares no datasets has no
+# parts to relate: components[] is empty, so an edge cannot exist. Failing it
+# there measures the absence of parts rather than the quality of the document —
+# and it used to pass only because the generator emitted a root edge keyed on an
+# id nothing defined. A model that does declare datasets still needs its edges.
+jq '{bomFormat, specVersion, version,
+     metadata: (.metadata + {component: (.components[0])}),
+     components: [],
+     dependencies: [{"ref": (.components[0]["bom-ref"]), "dependsOn": []}]}' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/solo_bom.json"
+bash "$LIB/validate-sbom.sh" "$WORK/solo_bom.json" "$WORK/solo" "solo" >/dev/null 2>&1
+sres=$(jq -r '.result' "$WORK/solo_conformance.json")
+strans=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)|\(.detail)"' "$WORK/solo_conformance.json")
+[ "$sres" = "pass" ] && pass "a subject with no parts does not fail conformance" || fail "result='$sres', expected pass"
+[ "$strans" = "warn|nothing to relate" ] && pass "the graph check warns with nothing to relate" || fail "transitive='$strans'"
+# Such a check is marked not-applicable: neither met nor a gap a reader can close,
+# and outside the coverage denominator. Crediting it as a pass would rank a
+# document that declares no parts above one that declares them and is measured.
+snak=$(jq -r '.checks[] | select(.id=="transitive") | .naKind // ""' "$WORK/solo_conformance.json")
+[ "$snak" = "not-applicable" ] && pass "an unmeasurable check is marked not-applicable" || fail "naKind='$snak'"
+slic=$(jq -r '.checks[] | select(.id=="license") | "\(.status)|\(.naKind // "")"' "$WORK/solo_conformance.json")
+shash=$(jq -r '.checks[] | select(.id=="hash") | "\(.status)|\(.naKind // "")"' "$WORK/solo_conformance.json")
+{ [ "$slic" = "warn|not-applicable" ] && [ "$shash" = "warn|not-applicable" ]; } && pass "coverage checks with an empty denominator are not-applicable" || fail "license='$slic' hash='$shash'"
+# A not-applicable check must not be reported as needing human review either: a
+# reviewer has nothing to look at.
+snar=$(jq -r '[.checks[] | select((.naKind // "")=="not-applicable")] | length' "$WORK/solo_conformance.json")
+[ "$snar" -ge 8 ] && pass "every empty-denominator check is marked ($snar of them)" || fail "not-applicable count=$snar, expected at least 8"
+grep -q "해당 없음" "$WORK/solo_conformance.md" 2>/dev/null && fail "the English report should not carry the Korean label" || pass "the English report keeps its own wording"
+# With parts present and no edges, the check must still fail.
+jq '{bomFormat, specVersion, version,
+     metadata: (.metadata + {component: (.components[0])}),
+     components: [{"type":"data","name":"org/ds","bom-ref":"dataset:org/ds"}],
+     dependencies: []}' "$FIX/aibom-owasp-1_7.json" > "$WORK/parts_bom.json"
+bash "$LIB/validate-sbom.sh" "$WORK/parts_bom.json" "$WORK/parts" "parts" >/dev/null 2>&1
+ptrans=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/parts_conformance.json")
+[ "$ptrans" = "fail" ] && pass "a document with parts and no edges still fails" || fail "transitive='$ptrans' with parts present, expected fail"
+
 echo "== a model named as the document's own component is treated as one =="
 # CycloneDX puts the subject of the document in metadata.component. The AIBOM
 # generator does not: it leaves the model in components[] and fills the root with

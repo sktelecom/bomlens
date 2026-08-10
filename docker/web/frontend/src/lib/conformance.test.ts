@@ -133,6 +133,7 @@ describe("g7Tally", () => {
       present: 6,
       advisory: 5,
       review: 4,
+      notApplicable: 0,
       total: 15,
       autoTotal: 11,
       failed: 0,
@@ -144,6 +145,7 @@ describe("g7Tally", () => {
       present: 0,
       advisory: 0,
       review: 0,
+      notApplicable: 0,
       total: 0,
       autoTotal: 0,
       failed: 0,
@@ -154,7 +156,7 @@ describe("g7Tally", () => {
 describe("baseTally", () => {
   it("counts passes, required failures and warnings", () => {
     const t = baseTally(splitChecks(CHECKS).base);
-    expect(t).toEqual({ passed: 1, total: 2, failed: 0, warnings: 1 });
+    expect(t).toEqual({ passed: 1, total: 2, failed: 0, warnings: 1, notApplicable: 0 });
   });
 });
 
@@ -227,7 +229,52 @@ describe("verdictTally", () => {
       mandatoryPassed: 1,
       advisoryGap: 1,
       review: 1,
+      notApplicable: 0,
     });
+  });
+
+  // A check the document gives nothing to judge leaves both sides of every
+  // fraction. Counting it as met would rank a document that declares fewer parts
+  // above one that declares them and is measured on them; counting it as a gap
+  // would show a field nobody can fill as work to do.
+  it("keeps a not-applicable check out of the numerator and the denominator", () => {
+    const v = verdictTally([
+      chk({ id: "tools", required: true, status: "pass" }),
+      chk({
+        id: "transitive",
+        required: true,
+        status: "warn",
+        source: "na",
+        naKind: "not-applicable",
+      }),
+      chk({ id: "license", status: "warn", source: "na", naKind: "not-applicable" }),
+      chk({ id: "cisa-b", status: "warn", source: "na" }),
+    ]);
+    expect(v).toEqual({
+      mandatoryFailed: 0,
+      mandatoryTotal: 1,
+      mandatoryPassed: 1,
+      advisoryGap: 0,
+      review: 1,
+      notApplicable: 2,
+    });
+  });
+
+  it("drops a not-applicable element from the advisory coverage base", () => {
+    const t = g7Tally([
+      chk({ id: "g7-model-name", status: "pass", cluster: "models" }),
+      chk({
+        id: "g7-ds-hash",
+        status: "warn",
+        source: "na",
+        naKind: "not-applicable",
+        cluster: "dp",
+      }),
+    ]);
+    expect(t.autoTotal).toBe(1);
+    expect(t.present).toBe(1);
+    expect(t.notApplicable).toBe(1);
+    expect(t.review).toBe(0);
   });
 });
 

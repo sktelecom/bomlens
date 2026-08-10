@@ -512,7 +512,8 @@
       "auto": "자동 확인",
       "inferred": "신호 추정",
       "declared": "선언 필요",
-      "na": "검토 필요"
+      "na": "검토 필요",
+      "notApplicable": "해당 없음"
     },
     "help": {
       "g7-meta-author": {
@@ -815,7 +816,9 @@
     "verdictReview": "사람이 확인할 항목 {{count}}건",
     "baseMandatory": "필수 {{passed}}/{{total}} 통과",
     "missingMore": "외 {{count}}개",
-    "needsPerson": "확인할 것:"
+    "needsPerson": "확인할 것:",
+    "sNa": "해당 없음",
+    "notApplicable": "해당 없음 {{count}}건"
   },
   "crosswalk": {
     "title": "규제 대응표",

@@ -1,7 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { CircleAlert, CircleCheck, CircleX } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleMinus, CircleX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
   dedupeMissing,
   groupByCluster,
   groupG7ByCluster,
+  isNotApplicable,
   isRegistryCheck,
   missingOverflow,
   profileCard,
@@ -32,10 +33,19 @@ const STATUS = {
   pass: { Icon: CircleCheck, color: "text-risk-low", key: "g7.sPass" },
   fail: { Icon: CircleX, color: "text-risk-critical", key: "g7.sFail" },
   warn: { Icon: CircleAlert, color: "text-risk-medium", key: "g7.sWarn" },
+  // Nothing in this document to judge. Muted on purpose: it is neither a gap the
+  // reader can close nor something met, so it must not read as either.
+  na: { Icon: CircleMinus, color: "text-muted-foreground", key: "g7.sNa" },
 } as const;
 
-function statusOf(s: ConformanceCheck["status"]) {
-  return STATUS[s] ?? STATUS.warn;
+function statusOf(check: ConformanceCheck) {
+  if (isNotApplicable(check)) return STATUS.na;
+  return statusOfValue(check.status);
+}
+
+/** For rows that carry a status without the rest of a check (crosswalk elements). */
+function statusOfValue(s: string) {
+  return STATUS[s as keyof typeof STATUS] ?? STATUS.warn;
 }
 
 /** AI compliance summary card — a compact one-glance rollup shown at the top of
@@ -162,7 +172,7 @@ function CrosswalkBlock({
                       <summary className="cursor-pointer text-foreground">{fw.title}</summary>
                       <ul className="mt-1 space-y-0.5">
                         {fw.elements.map((el, i) => {
-                          const { Icon, color } = statusOf(el.status);
+                          const { Icon, color } = statusOfValue(el.status);
                           return (
                             <li key={`${el.label}-${i}`} className="flex items-start gap-1.5 text-xs">
                               <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} aria-hidden />
@@ -198,10 +208,14 @@ function CrosswalkBlock({
 // Provenance badge: where a satisfied value comes from. Reuses existing badge
 // tones (no invented colours); the word carries the meaning, colour only backs
 // it. "na" (no automated source) takes the review-needed tone.
-function SourceBadge({ source }: { source?: string }) {
+function SourceBadge({ source, naKind }: { source?: string; naKind?: string }) {
   const { t } = useTranslation();
   if (!source) return null;
-  const label = t(`g7.source.${source}`, { defaultValue: "" });
+  const notApplicable = naKind === "not-applicable";
+  const label = notApplicable
+    ? t("g7.source.notApplicable", { defaultValue: "" })
+    : t(`g7.source.${source}`, { defaultValue: "" });
+  if (notApplicable && label) return <Badge variant="muted">{label}</Badge>;
   if (!label) return null;
   switch (source) {
     case "auto":
@@ -218,7 +232,7 @@ function SourceBadge({ source }: { source?: string }) {
 
 function CheckRow({ check }: { check: ConformanceCheck }) {
   const { t, i18n } = useTranslation();
-  const { Icon, color, key } = statusOf(check.status);
+  const { Icon, color, key } = statusOf(check);
   // A registry check carries a cluster, a data source, and — where the locale has
   // one — a plain-language "what this is" line and a "how to satisfy" hint. This
   // used to be gated on the id starting with "g7-", which meant the 2026 minimum
@@ -268,7 +282,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           {check.required ? (
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
-          {fromRegistry ? <SourceBadge source={check.source} /> : null}
+          {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} /> : null}
           {check.detail && !notMet ? (
             <span className="text-xs tabular-nums text-muted-foreground">{check.detail}</span>
           ) : null}
@@ -467,6 +481,11 @@ export function ConformancePanel({
                   · {t("g7.review", { count: cisaT.review })}
                 </span>
               )}
+              {cisaT.notApplicable > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  · {t("g7.notApplicable", { count: cisaT.notApplicable })}
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{t("cisa.allAdvisory")}</p>
             <div className="space-y-4">
@@ -505,6 +524,11 @@ export function ConformancePanel({
               {g7t.review > 0 && (
                 <span className="text-xs text-muted-foreground">
                   · {t("g7.review", { count: g7t.review })}
+                </span>
+              )}
+              {g7t.notApplicable > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  · {t("g7.notApplicable", { count: g7t.notApplicable })}
                 </span>
               )}
             </div>

@@ -50,17 +50,19 @@ fi
 G7=$(jq -c '
   [ .checks[]? | select(.id|startswith("g7-")) ] as $g
   | { total:   ($g|length),
-      auto:    ($g | map(select((.source//"")!="na")) | length),
+      auto:    ($g | map(select((.source//"")!="na" and ((.naKind//"")!="not-applicable"))) | length),
       present: ($g | map(select(.status=="pass")) | length),
-      gap:     ($g | map(select(.status=="warn" and ((.source//"")!="na"))) | length),
-      review:  ($g | map(select((.source//"")=="na")) | length),
+      gap:     ($g | map(select(.status=="warn" and ((.source//"")!="na") and ((.naKind//"")!="not-applicable"))) | length),
+      review:  ($g | map(select((.source//"")=="na" and ((.naKind//"")!="not-applicable"))) | length),
+      notApplicable: ($g | map(select((.naKind//"")=="not-applicable")) | length),
       clusters: ( $g | group_by(.cluster) | map({
                     cluster: (.[0].cluster // "other"),
                     total:   length,
                     present: (map(select(.status=="pass"))|length),
-                    gap:     (map(select(.status=="warn" and ((.source//"")!="na")))|length),
-                    review:  (map(select((.source//"")=="na"))|length) }) ),
-      reviewItems: ( $g | map(select((.source//"")=="na")) | map({id, label, cluster}) ),
+                    gap:     (map(select(.status=="warn" and ((.source//"")!="na") and ((.naKind//"")!="not-applicable")))|length),
+                    review:  (map(select((.source//"")=="na" and ((.naKind//"")!="not-applicable")))|length),
+                    notApplicable: (map(select((.naKind//"")=="not-applicable"))|length) }) ),
+      reviewItems: ( $g | map(select((.source//"")=="na" and ((.naKind//"")!="not-applicable"))) | map({id, label, cluster}) ),
       # Advisory elements that ARE automatable but absent — the closable set. The
       # conformance report carries the CycloneDX fragment for each; here we keep
       # the roll-up plus the reference link so the two artifacts do not duplicate.
