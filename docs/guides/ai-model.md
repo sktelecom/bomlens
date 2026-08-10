@@ -10,6 +10,8 @@ How to generate a CycloneDX ML-BOM (machine-learning bill of materials) for a Hu
 
 An AI model's "bill of materials" is its model card: identifier, architecture, task, license, supplier, datasets, and the integrity of its files. BomLens uses the [OWASP AIBOM Generator](https://github.com/GenAI-Security-Project/aibom-generator) to read a HuggingFace model card and build a **CycloneDX 1.7 ML-BOM** centered on the model and the datasets it references. It then adds a **G7 minimum-element conformance** check (advisory). Because a model has no package dependencies, there is no security (CVE) report.
 
+The model is the subject of the document: it sits in `metadata.component`, which is where CycloneDX names what an SBOM is about, and the datasets it references sit under `components[]` as its dependencies. A tool reading the ML-BOM should look for the model there rather than in the component list.
+
 A model card names its training datasets and stops there. BomLens looks each one up on HuggingFace and records what it finds — the declared license, the upstream datasets it derives from, and a content digest — as its own entry in the SBOM, linked to the model as a dependency. A dataset that cannot be read (withdrawn, renamed, or private to someone else) is kept in the SBOM as a name marked unreadable; no license is invented for it. This is also what decides the training-data disclosure axis: `open-data` needs at least one dataset that actually opened, and a card naming datasets nobody can retrieve reads `declared-unverified` instead.
 
 The full tool flow is in [Pipeline by input type](../concepts/pipeline-by-input.md#ai-model).
@@ -93,6 +95,8 @@ The same data is in the artifacts: the ML-BOM (`_bom.json`, CycloneDX 1.7) and t
 The G7 block leads with a headline such as "N / 41 present". The denominator counts only the checks that have an automated source — 41 of the 51 — so the number states what the tool could verify on its own. The 10 review-only elements appear next to it as a separate "need review" count, and any automated check that found nothing is counted as advisory.
 
 Each check has one of three statuses. Pass means the element is present in the ML-BOM. Warn means it is missing or could not be confirmed; the 10 review-only elements always show this status, labeled as requiring human review. Fail does not occur for G7 checks in practice: every G7 element is advisory, so a missing one never fails the SBOM as a whole. An overall fail verdict can only come from the base format checks — the required CycloneDX ones.
+
+Some rows read "not applicable" instead, with a count of their own in the summary. Those are checks the document gives nothing to judge: a coverage percentage over zero components, or dependency relationships in a document whose only subject is the model itself. They leave both sides of the fraction rather than counting as met, because crediting them would put a card that declares less above one that declares its datasets and is measured on them. They are not review items either — a reviewer has nothing to look at. A model card that names its training datasets therefore has more checks actually measured, and a smaller denominator is not a better result.
 
 A source badge on each row says where a satisfied value comes from:
 
