@@ -3139,6 +3139,12 @@ Redistributions of source code must retain the above copyright notice.
 Redistributions in binary form must reproduce the above copyright notice.
 Neither the name of the copyright holder may be used to endorse it.
 LICTXT
+    # click: installed as .egg-info, the older layout, which records no license
+    # file of its own — the declared name in PKG-INFO is all there is. Reading
+    # the site-packages directories by hand missed this entirely.
+    mkdir -p "$SP/click-8.1.7-py3.12.egg-info"
+    printf 'Metadata-Version: 2.1\nName: click\nVersion: 8.1.7\nLicense: BSD-3-Clause\n\nbody\n' \
+        > "$SP/click-8.1.7-py3.12.egg-info/PKG-INFO"
     # A component with no evidence at all keeps whatever cdxgen said.
     cat > "$WORK/pybom.json" <<'PYBOM'
 { "bomFormat": "CycloneDX", "specVersion": "1.6", "components": [
@@ -3150,6 +3156,8 @@ LICTXT
     "purl": "pkg:pypi/threadpoolctl@3.6.0", "licenses": [ { "license": { "name": "BSD License" } } ] },
   { "type": "library", "name": "python-dateutil", "version": "2.9.0.post0",
     "purl": "pkg:pypi/python-dateutil@2.9.0.post0", "licenses": [ { "license": { "name": "Dual License" } } ] },
+  { "type": "library", "name": "click", "version": "8.1.7",
+    "purl": "pkg:pypi/click@8.1.7", "licenses": [ { "license": { "id": "0BSD" } } ] },
   { "type": "library", "name": "mystery", "version": "1.0.0",
     "purl": "pkg:pypi/mystery@1.0.0", "licenses": [ { "license": { "id": "MIT" } } ] },
   { "type": "library", "name": "tslib", "version": "2.6.2",
@@ -3165,7 +3173,7 @@ PYBOM
     [ "$(lic joblib)" = "BSD-3-Clause" ] \
         && pass "joblib settled on BSD-3-Clause from its license text" \
         || fail "joblib license=$(lic joblib), expected BSD-3-Clause"
-    [ "$(src joblib)" = "dist-info license text" ] \
+    [ "$(src joblib)" = "installed license text" ] \
         && pass "the basis is recorded on the component" \
         || fail "joblib licenseSource=$(src joblib)"
     [ "$(lic pandas)" = "BSD-3-Clause" ] \
@@ -3174,6 +3182,9 @@ PYBOM
     [ "$(lic threadpoolctl)" = "BSD-3-Clause" ] \
         && pass "threadpoolctl settled on its PEP 639 expression" \
         || fail "threadpoolctl license=$(lic threadpoolctl), expected BSD-3-Clause"
+    [ "$(lic click)" = "BSD-3-Clause" ] \
+        && pass "click settled from PKG-INFO in an .egg-info install" \
+        || fail "click license=$(lic click), expected BSD-3-Clause"
     [ "$(lic python-dateutil)" = "Dual License" ] \
         && pass "a dual-licensed component is left for human review" \
         || fail "dateutil license=$(lic python-dateutil), expected the upstream value"

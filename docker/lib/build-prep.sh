@@ -624,7 +624,8 @@ if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v python3 >/dev/null 2>&1 \
     log "python: settling licenses on installed distribution metadata"
     _pylic="$(mktemp).py"
     cat > "$_pylic" <<'PY_LIC'
-import json, os, re, sys, sysconfig
+import json, os, re, sys
+from importlib.metadata import distributions
 
 bom_path = sys.argv[1]
 try:
@@ -691,27 +692,6 @@ def classify_name(declared):
     return None
 
 
-def site_dirs():
-    paths = []
-    try:
-        cfg = sysconfig.get_paths()
-        paths += [cfg.get("purelib"), cfg.get("platlib")]
-    except Exception:
-        pass
-    try:
-        import site
-        paths += list(site.getsitepackages())
-        paths.append(site.getusersitepackages())
-    except Exception:
-        pass
-    seen, out = set(), []
-    for p in paths:
-        if p and p not in seen and os.path.isdir(p):
-            seen.add(p)
-            out.append(p)
-    return out
-
-
 def read_text(path, limit=400000):
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
@@ -720,90 +700,87 @@ def read_text(path, limit=400000):
         return ""
 
 
-def evidence(dist_dir):
-    """Collect (name, version, expression, declared name, license files)."""
-    meta = os.path.join(dist_dir, "METADATA")
-    if not os.path.isfile(meta):
-        return None
-    name = version = expression = declared = None
-    declared_files = []
-    try:
-        with open(meta, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                if not line.strip():
-                    break                       # headers end at the blank line
-                if line[0] in " \t":
-                    continue                    # folded continuation of a header
-                m = re.match(r"([A-Za-z-]+):\s*(.*)", line)
-                if not m:
+def license_files(dist):
+    """Paths of the license files an installed distribution ships."""
+    files, seen = [], set()
+
+    def add(path):
+        path = str(path)
+        if path not in seen and os.path.isfile(path):
+            seen.add(path)
+            files.append(path)
+
+    is_license = lambda fn: re.match(r"(LICEN[CS]E|COPYING)", fn, re.I)
+    # The .dist-info / .egg-info directory itself, when the implementation
+    # exposes it: the license files sit next to the metadata, either directly or
+    # under licenses/ (PEP 639).
+    base = str(getattr(dist, "_path", "") or "")
+    if base and os.path.isdir(base):
+        for rel in (dist.metadata.get_all("License-File") or []):
+            for root in (os.path.join(base, "licenses"), base):
+                cand = os.path.join(root, rel)
+                if os.path.isfile(cand):
+                    add(cand)
+                    break
+        for root, _dirs, names in os.walk(base):
+            for fn in sorted(names):
+                if is_license(fn):
+                    add(os.path.join(root, fn))
+    # An egg-info distribution records no license file of its own, and a wheel
+    # whose metadata directory we could not locate still lists its files.
+    if not files:
+        for entry in (dist.files or []):
+            if is_license(os.path.basename(str(entry))):
+                try:
+                    add(dist.locate_file(entry))
+                except Exception:
                     continue
-                key, value = m.group(1).lower(), m.group(2).strip()
-                if key == "name" and not name:
-                    name = value
-                elif key == "version" and not version:
-                    version = value
-                elif key == "license-expression" and not expression:
-                    expression = value
-                elif key == "license" and not declared:
-                    declared = value
-                elif key == "license-file":
-                    declared_files.append(value)
+    return files
+
+
+def evidence(dist):
+    """Collect (version, expression, declared name, license files) for a dist."""
+    try:
+        meta = dist.metadata
+        # .get, not [...]: a missing header returns None today but is documented
+        # to start raising, and most distributions declare none of these.
+        name, version = meta.get("Name"), meta.get("Version")
     except Exception:
         return None
     if not name or not version:
         return None
-
-    files, seen = [], set()
-    for rel in declared_files:
-        for base in (os.path.join(dist_dir, "licenses"), dist_dir):
-            cand = os.path.join(base, rel)
-            if os.path.isfile(cand) and cand not in seen:
-                seen.add(cand)
-                files.append(cand)
-                break
-    for base in (os.path.join(dist_dir, "licenses"), dist_dir):
-        if not os.path.isdir(base):
-            continue
-        for root, _dirs, names in os.walk(base):
-            for fn in sorted(names):
-                if re.match(r"(LICEN[CS]E|COPYING)", fn, re.I):
-                    cand = os.path.join(root, fn)
-                    if cand not in seen:
-                        seen.add(cand)
-                        files.append(cand)
-    return {"name": name, "version": version, "expression": expression,
-            "declared": declared, "files": files}
+    return {"name": name, "version": version,
+            "expression": meta.get("License-Expression"),
+            "declared": meta.get("License"),
+            "files": license_files(dist)}
 
 
 def decide(ev):
     if ev["expression"]:
-        return ev["expression"], "dist-info license expression"
+        return ev["expression"], "installed license expression"
     ids = set()
     for path in ev["files"]:
         got = classify_text(read_text(path))
         if got:
             ids.add(got)
     if len(ids) == 1:
-        return ids.pop(), "dist-info license text"
+        return ids.pop(), "installed license text"
     if not ids and ev["declared"]:
         got = classify_name(ev["declared"])
         if got:
-            return got, "dist-info license name"
+            return got, "installed license name"
     return None, None
 
 
+# distributions() walks sys.path, so it finds what pip installed here and what
+# the image already had, in either metadata layout. Reading the site-packages
+# directories by hand missed both: a package the image ships can sit outside
+# them, and an older install records .egg-info rather than .dist-info.
 index = {}
-for site_dir in site_dirs():
-    try:
-        entries = sorted(os.listdir(site_dir))
-    except Exception:
-        continue
-    for entry in entries:
-        if not entry.endswith(".dist-info"):
-            continue
-        ev = evidence(os.path.join(site_dir, entry))
-        if ev:
-            index.setdefault((canon(ev["name"]), ev["version"]), ev)
+for dist in distributions():
+    ev = evidence(dist)
+    if ev:
+        index.setdefault((canon(ev["name"]), ev["version"]), ev)
 
 if not index:
     sys.exit(0)
@@ -834,7 +811,7 @@ for comp in components:
 if changed:
     with open(bom_path, "w", encoding="utf-8") as fh:
         json.dump(bom, fh, indent=2)
-    sys.stderr.write("[build-prep] python: settled %d component license(s) on dist-info evidence\n" % changed)
+    sys.stderr.write("[build-prep] python: settled %d component license(s) on installed evidence\n" % changed)
 PY_LIC
     python3 "$_pylic" "$OUT" || log "python: license evidence pass skipped (non-fatal)"
     rm -f "$_pylic"
