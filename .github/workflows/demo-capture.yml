@@ -1,0 +1,220 @@
+name: Demo capture
+
+# 읽기 전용 데모(/demo/)가 읽는 데이터를 다시 만든다.
+#
+# 데모는 두 조각으로 나뉘고 갱신 주기가 다르다. 화면은 문서 배포 때마다 소스에서
+# 다시 빌드되지만, 데이터는 캡처해서 커밋한 파일이라 저절로 따라오지 않는다.
+# 그래서 릴리스가 나가면 방문자는 새 화면 위에 옛 결과를 보게 된다.
+#
+# 다섯 건을 여기서 다시 스캔하고 캡처해 PR로 올린다. 손으로 돌리던 일을 옮겨온
+# 것이라 입력은 전부 이름 하나로 지정된다. 자바는 저장소 안의 예제, 컨테이너는
+# 이미지 태그, AI 모델은 HuggingFace 식별자, 공급사 SBOM은 저장소에 둔 입력
+# 파일, 펌웨어는 공개 URL이다. 사람이 판단할 지점은 PR 하나로 모인다.
+#
+# 캡처 스크립트는 대상 폴더를 통째로 다시 쓴다. 그래서 다섯 건을 한 번에 돌린다
+# — 일부만 돌리면 나머지가 데모에서 사라진다.
+#
+# 러너는 amd64라 펌웨어 이미지도 여기서는 그대로 돈다(Apple Silicon 장비에서
+# 돌지 않아 사람 손을 타던 이유가 여기서는 없다).
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "스캐너 이미지 태그 (예: 1.10.4)"
+        required: false
+        default: "latest"
+      firmware_url:
+        description: "펌웨어 이미지 URL (<url>.sha256 또는 같은 폴더의 sha256sums 필요)"
+        required: false
+        default: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-06-19/2026-06-18-raspios-trixie-arm64-lite.img.xz"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: demo-capture
+  cancel-in-progress: false
+
+env:
+  # 데모 목록에 보이는 이름과 버전. 폴더 이름(<project>_<version>)이 곧 run id라
+  # 데모 URL이 되므로, 바꾸면 기존 링크가 끊긴다.
+  FLASK_ID: FlaskDataService
+  FLASK_VER: "3.2.0"
+  SPRING_ID: SpringBootDemo
+  SPRING_VER: "1.0.0"
+  NGINX_ID: NginxRuntimeImage
+  NGINX_VER: "1.24-alpine"
+  MODEL_ID: BertBaseUncased
+  MODEL_VER: "1.0"
+  FW_ID: RaspberryPiOsLite
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # 스캐너는 요청한 태그로 고정한다. :latest 로 스캔하면 SBOM 의 도구 버전
+      # 필드에 `BomLens@latest` 가 박히는데, 그것은 돌아간 태그일 뿐 누구도 참조할
+      # 수 없는 값이라 적합성 화면에서 도구 식별 항목이 실패로 나온다.
+      - name: Pull the scanner images
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.image_tag }}"
+          docker pull "ghcr.io/sktelecom/sbom-scanner:${tag}"
+          docker pull "ghcr.io/sktelecom/bomlens-aibom:${tag}"     || docker pull ghcr.io/sktelecom/bomlens-aibom:latest
+          docker pull "ghcr.io/sktelecom/bomlens-firmware:${tag}"  || docker pull ghcr.io/sktelecom/bomlens-firmware:latest
+          {
+            echo "IMAGE=ghcr.io/sktelecom/sbom-scanner:${tag}"
+            docker image inspect "ghcr.io/sktelecom/bomlens-aibom:${tag}" >/dev/null 2>&1 \
+              && echo "SBOM_AIBOM_IMAGE=ghcr.io/sktelecom/bomlens-aibom:${tag}" \
+              || echo "SBOM_AIBOM_IMAGE=ghcr.io/sktelecom/bomlens-aibom:latest"
+            docker image inspect "ghcr.io/sktelecom/bomlens-firmware:${tag}" >/dev/null 2>&1 \
+              && echo "SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:${tag}" \
+              || echo "SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest"
+          } >> "$GITHUB_ENV"
+
+      # 1) 공급사가 제출한 SBOM 을 받아 검증·분석하는 경로. 입력은 저장소에 둔다
+      #    — 업로드 파일은 이름만으로는 재현되지 않는 유일한 입력이었다.
+      - name: Scan the supplier SBOM
+        run: |
+          set -euo pipefail
+          ./scripts/scan-sbom.sh \
+            --project "$FLASK_ID" --version "$FLASK_VER" \
+            --analyze docs/demo/inputs/flask-data-service.cdx.json \
+            --generate-only -o "$PWD/out"
+
+      # 2) 소스 스캔. 저장소 안의 예제를 그대로 쓴다.
+      - name: Scan the Java example from source
+        run: |
+          set -euo pipefail
+          cd examples/java-maven
+          "$GITHUB_WORKSPACE/scripts/scan-sbom.sh" \
+            --project "$SPRING_ID" --version "$SPRING_VER" \
+            --generate-only -o "$GITHUB_WORKSPACE/out"
+
+      # 3) 컨테이너 이미지.
+      - name: Scan the container image
+        run: |
+          set -euo pipefail
+          ./scripts/scan-sbom.sh \
+            --project "$NGINX_ID" --version "$NGINX_VER" \
+            --target "nginx:1.24-alpine" \
+            --generate-only -o "$PWD/out"
+
+      # 4) AI 모델. HuggingFace 에서 모델 카드를 읽으므로 네트워크가 필요하다.
+      - name: Scan the AI model
+        run: |
+          set -euo pipefail
+          ./scripts/scan-sbom.sh \
+            --project "$MODEL_ID" --version "$MODEL_VER" \
+            --model "google-bert/bert-base-uncased" \
+            --generate-only -o "$PWD/out"
+
+      # 5) 펌웨어. 외부에서 받은 바이너리는 공개된 체크섬과 대조한 뒤에만 푼다.
+      - name: Download the firmware, checksum-verified
+        run: |
+          set -euo pipefail
+          url="${{ inputs.firmware_url }}"
+          name="$(basename "$url")"
+          mkdir -p fw && cd fw
+          curl -fsSL -o "$name" "$url"
+          if curl -fsSL -o file.sha256 "${url}.sha256"; then
+            expected="$(awk '{print $1}' file.sha256 | head -1)"
+          else
+            curl -fsSL -o sha256sums "$(dirname "$url")/sha256sums"
+            expected="$(grep -F "$name" sha256sums | head -1 | awk '{print $1}')"
+          fi
+          [ -n "$expected" ] || { echo "::error::no checksum published for $name"; exit 1; }
+          echo "${expected}  ${name}" | sha256sum -c -
+          echo "FW_FILE=$name" >> "$GITHUB_ENV"
+          # 데모의 버전 표기는 이미지 날짜를 쓴다 (2026-06-18-raspios-... → 2026-06-18).
+          echo "FW_VER=$(echo "$name" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}' || echo unknown)" >> "$GITHUB_ENV"
+
+      - name: Scan the firmware
+        run: |
+          set -euo pipefail
+          ./scripts/scan-sbom.sh \
+            --project "$FW_ID" --version "$FW_VER" \
+            --target "fw/${FW_FILE}" \
+            --firmware --generate-only -o "$PWD/out"
+
+      # 캡처는 실제 server.py 를 띄워 그 응답을 저장한다. 데모가 읽는 모양이
+      # 서버의 모양과 어긋날 수 없도록, 손으로 쓰지 않고 서버에게 물어서 받는다.
+      - name: Capture the demo data
+        run: |
+          set -euo pipefail
+          test -d out || { echo "::error::no scan output to capture"; exit 1; }
+          echo "run folders:"; ls -1 out
+          ./scripts/capture-demo-data.sh "$PWD/out"
+
+      - name: Summarize what changed
+        run: |
+          set -euo pipefail
+          {
+            echo "### Demo capture"
+            echo "scanner: \`${IMAGE}\`"
+            echo ""
+            echo "| run | components | 0BSD |"
+            echo "|---|---|---|"
+            for bom in out/*/*_bom.json; do
+              [ -f "$bom" ] || continue
+              run="$(basename "$(dirname "$bom")")"
+              n="$(jq '[.components[]?]|length' "$bom")"
+              z="$(jq '[.components[]? | select((.licenses // [])[]?.license.id == "0BSD")] | length' "$bom")"
+              echo "| $run | $n | $z |"
+            done
+            echo ""
+            echo '```'
+            git -C . status --short docs/demo/data | head -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 산출물은 PR 로 올린다. 데이터가 곧 게시물이므로 사람이 한 번 보는 지점이
+      # 있어야 하고, PR 이 그 지점이다. 아티팩트도 함께 남겨 PR 생성이 막힌
+      # 환경에서도 손으로 받아 처리할 수 있게 한다.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-capture-data
+          path: docs/demo/data/
+          include-hidden-files: true
+          retention-days: 7
+
+      - name: Open a pull request with the recaptured data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/demo/data; then
+            echo "::notice::the capture matches what is committed; nothing to open"
+            exit 0
+          fi
+          branch="demo/recapture-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          cat > /tmp/demo-pr-body.md <<BODY
+          Captured by [demo-capture](${run_url}) against \`${IMAGE}\`.
+
+          All five published scans were re-run and recaptured together: the
+          capture script rewrites the whole folder, so a partial run would drop
+          the rest from the demo.
+
+          Check the run summary for the per-run component counts before merging.
+          BODY
+          sed -i 's/^          //' /tmp/demo-pr-body.md
+          git checkout -b "$branch"
+          git add docs/demo/data
+          printf 'chore(demo): recapture the demo data\n\nCaptured by the demo-capture workflow against %s.\n' "$IMAGE" > /tmp/demo-commit.txt
+          git commit -F /tmp/demo-commit.txt
+          git push origin "$branch"
+          gh pr create \
+            --title "chore(demo): recapture the demo data" \
+            --body-file /tmp/demo-pr-body.md \
+            --base main --head "$branch"
