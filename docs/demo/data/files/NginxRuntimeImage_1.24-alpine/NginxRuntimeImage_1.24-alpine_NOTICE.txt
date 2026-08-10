@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for NginxRuntimeImage
-Generated: 2026-08-09T02:21:47Z
+Generated: 2026-08-10T11:32:31Z
 Total components: 1393 · Distinct licenses: 30
 
 This product includes the following open source software.
@@ -308,13 +308,13 @@ Components (4):
       Source: http://xorg.freedesktop.org/
       Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
-License: custom:BELL
+License: custom:BELL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxpm@3.5.15-r0
       Source: http://xorg.freedesktop.org/
       Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
-License: custom:XFREE86
+License: custom:XFREE86  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libx11@1.8.7-r0
       Source: http://xorg.freedesktop.org/

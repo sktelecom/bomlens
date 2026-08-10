@@ -1,46 +1,19 @@
 Third-party Open Source Licenses for FlaskDataService
-Generated: 2026-08-09T02:22:06Z
-Total components: 39 · Distinct licenses: 10
+Generated: 2026-08-10T11:31:01Z
+Total components: 39 · Distinct licenses: 9
 
 This product includes the following open source software.
 Each component lists its source/download location and copyright/attribution.
 ================================================================================
-
-License: 0BSD
-Components (8):
-  - Flask@3.0.0
-      Source: https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl)
-  - Jinja2@3.1.6
-      Source: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl)
-  - Werkzeug@3.0.1
-      Source: https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl)
-  - click@8.1.7
-      Source: https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl)
-  - itsdangerous@2.2.0
-      Source: https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl)
-  - numpy@1.26.2
-      Source: https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl)
-  - pandas@2.1.4
-      Source: https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl)
-  - python-dotenv@1.0.0
-      Source: https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl)
 
 License: Apache-2.0
 Components (4):
   - coverage@7.15.2
       Source: https://files.pythonhosted.org/packages/10/03/060ce69008ac97bbc01b1411b3e55b61f6f015659400b46749b662107831/coverage-7.15.2-cp310-cp310-macosx_10_9_x86_64.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/10/03/060ce69008ac97bbc01b1411b3e55b61f6f015659400b46749b662107831/coverage-7.15.2-cp310-cp310-macosx_10_9_x86_64.whl)
-  - numpy@1.26.2
-      Source: https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl)
+  - python-dateutil@2.9.0.post0
+      Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
   - requests@2.31.0
       Source: https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl)
@@ -54,29 +27,53 @@ Components (1):
       Source: https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl)
 
+License: BSD License  [unverified name — not an SPDX identifier; confirm against the component's license file]
+Components (1):
+  - python-dateutil@2.9.0.post0
+      Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
+
 License: BSD-3-Clause
-Components (4):
+Components (10):
+  - Flask@3.0.0
+      Source: https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl)
+  - Jinja2@3.1.6
+      Source: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl)
   - MarkupSafe@3.0.3
       Source: https://files.pythonhosted.org/packages/e8/4b/3541d44f3937ba468b75da9eebcae497dcf67adb65caa16760b0a6807ebb/markupsafe-3.0.3-cp310-cp310-macosx_10_9_x86_64.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e8/4b/3541d44f3937ba468b75da9eebcae497dcf67adb65caa16760b0a6807ebb/markupsafe-3.0.3-cp310-cp310-macosx_10_9_x86_64.whl)
+  - Werkzeug@3.0.1
+      Source: https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl)
   - click@8.1.7
       Source: https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl)
   - idna@3.18
       Source: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl)
+  - itsdangerous@2.2.0
+      Source: https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl)
+  - numpy@1.26.2
+      Source: https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl)
+  - pandas@2.1.4
+      Source: https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl)
   - python-dotenv@1.0.0
       Source: https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl)
 
-License: Dual License
+License: Dual License  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python-dateutil@2.9.0.post0
       Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
 
 License: MIT
-Components (19):
+Components (20):
   - SQLAlchemy@2.0.23
       Source: https://files.pythonhosted.org/packages/53/ce/d7262dcc228f66c4d805c8975f71deca581e8a56b46612eb35708ec5cb51/SQLAlchemy-2.0.23-cp310-cp310-macosx_10_9_x86_64.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/53/ce/d7262dcc228f66c4d805c8975f71deca581e8a56b46612eb35708ec5cb51/SQLAlchemy-2.0.23-cp310-cp310-macosx_10_9_x86_64.whl)
@@ -101,6 +98,9 @@ Components (19):
   - mccabe@0.7.0
       Source: https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl)
+  - mypy-extensions@1.1.0
+      Source: https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl
+      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl)
   - platformdirs@4.11.0
       Source: https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl)
@@ -150,12 +150,6 @@ Components (2):
       Source: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
       Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl)
 
-License: NOASSERTION
-Components (1):
-  - mypy-extensions@1.1.0
-      Source: https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl)
-
 License: PSF-2.0
 Components (1):
   - typing-extensions@4.16.0
@@ -165,13 +159,6 @@ Components (1):
 ================================================================================
 License texts (SPDX standard)
 ================================================================================
-
------------------------------ 0BSD -----------------------------
-Copyright (C) YEAR by AUTHOR EMAIL
-
-Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ----------------------------- Apache-2.0 -----------------------------
 Apache License

@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-08-09T02:22:05Z",
+  "generatedAt": "2026-08-10T11:31:00Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -27,7 +27,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-07-28T04:14:38Z",
+      "detail": "2026-08-10T11:09:48Z",
       "missing": [],
       "regulations": [
         {
@@ -139,7 +139,7 @@
       "label": "Transitive dependencies (graph edges)",
       "required": true,
       "status": "pass",
-      "detail": "52 edge(s)",
+      "detail": "89 edge(s)",
       "missing": [],
       "regulations": [
         {
@@ -156,7 +156,7 @@
       "label": "License coverage (>= 80%, recommended)",
       "required": false,
       "status": "pass",
-      "detail": "97% (38/39)",
+      "detail": "100% (39/39)",
       "missing": [],
       "regulations": [
         {
@@ -373,8 +373,8 @@
       "label": "SBOM generation context",
       "label_ko": "SBOM 생성 시점",
       "required": false,
-      "status": "warn",
-      "detail": "not present in the SBOM",
+      "status": "pass",
+      "detail": "present",
       "missing": [],
       "evidence": [],
       "cluster": "cisa-metadata",
@@ -443,8 +443,8 @@
       "label": "SBOM tool version",
       "label_ko": "SBOM 생성 도구 버전",
       "required": false,
-      "status": "warn",
-      "detail": "not present in the SBOM",
+      "status": "pass",
+      "detail": "present",
       "missing": [],
       "evidence": [],
       "cluster": "cisa-metadata",
@@ -635,10 +635,9 @@
       "label_ko": "구성요소 라이선스",
       "required": false,
       "status": "warn",
-      "detail": "38/40 component(s)",
+      "detail": "39/40 component(s)",
       "missing": [
-        "FlaskDataService",
-        "mypy-extensions"
+        "FlaskDataService"
       ],
       "evidence": [],
       "cluster": "cisa-component",
@@ -911,7 +910,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-07-28T04:14:38Z",
+            "detail": "2026-08-10T11:09:48Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -961,7 +960,7 @@
             "label": "Transitive dependencies (graph edges)",
             "status": "pass",
             "source": null,
-            "detail": "52 edge(s)",
+            "detail": "89 edge(s)",
             "refs": [
               "Section 5.1; 5.2.2"
             ]
@@ -971,7 +970,7 @@
             "label": "License coverage (>= 80%, recommended)",
             "status": "pass",
             "source": null,
-            "detail": "97% (38/39)",
+            "detail": "100% (39/39)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1043,8 +1042,8 @@
         "title": "US SBOM minimum elements",
         "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
         "total": 23,
-        "present": 11,
-        "gap": 8,
+        "present": 13,
+        "gap": 6,
         "review": 4,
         "failed": 0,
         "elements": [
@@ -1091,9 +1090,9 @@
           {
             "id": "cisa-sbom-generation-context",
             "label": "SBOM generation context",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "not present in the SBOM",
+            "detail": "present",
             "refs": [
               "SBOM Generation Context"
             ]
@@ -1121,9 +1120,9 @@
           {
             "id": "cisa-sbom-tool-version",
             "label": "SBOM tool version",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "not present in the SBOM",
+            "detail": "present",
             "refs": [
               "SBOM Tool Version"
             ]
@@ -1183,7 +1182,7 @@
             "label": "Component license",
             "status": "warn",
             "source": "auto",
-            "detail": "38/40 component(s)",
+            "detail": "39/40 component(s)",
             "refs": [
               "Component License"
             ]

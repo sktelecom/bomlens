@@ -1,4 +1,30 @@
 {
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "type": "application",
+          "version": "12.8.3"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/app@latest"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, August 10, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'app'. This SBOM contains 39 dynamically instrumented library components discovered during process execution tracing. These libraries were loaded at runtime and mapped back to system packages.",
+      "timestamp": "2026-08-10T11:09:48Z"
+    }
+  ],
   "bomFormat": "CycloneDX",
   "components": [
     {
@@ -22,14 +48,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -57,8 +83,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -97,6 +122,10 @@
           "value": "1959042ee69ece0a558a30aa700cfc59, e82458911a4050ecf61f2a4c6015b7e9"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -127,7 +156,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -255,8 +284,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -295,6 +323,10 @@
           "value": "b3bfc89d72e88027fed8be5f315bfeee, 8fc708faae3b611900fce54d79895795, 6754c980710f92990b787c1808952068, eb3383dc76ae38ebf2c714648a75d0db, 054f0b19bb43e96f28d4a06c3ae809ae, 2f647f18253db525af253ca6366ecc0b, d60e2f683be4f8ad2c23f1db6c2c99ae, 0e654aa33c992ee40ca11c03ed1017b9, 773115b5f2f19ada3835d7cbd8e414b5, 49bdda49cc31b55cd43f8b902202de86, 6bbc9f0d871cb70d5738b8dd183e3bb9, b4863224e3eb88fe2e89588d2e484e4f, 3bcce753e246860d155029997388663d, 80daad0cd38afd067298966d4da17281, d4fee8725dccf7158a64876a5d2c661b, e7d1a8105add45e4f761ecb48a18f8a0, 281f372fac59042f76db012eb1afd039, 5a9ee70fa4a20f5e5e6e6e1057224086, 28c541e330fa79103cae502b125f0280, df10638f4d56d48289cc7a82e0ff528d, c612b7c1c6ec267519f2e8ff8d1e0aa4, 045b1165bce4833861f7d16324bfd869"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -318,14 +350,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -353,8 +385,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -393,6 +424,10 @@
           "value": "26605819b98a22f8bc46ee0eb2e0d4d2, 1ffce54aca3d568ab18ee921d479274f"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -416,14 +451,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -452,6 +487,28 @@
         {
           "license": {
             "id": "MPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/MPL-2.0"
           }
         }
@@ -491,6 +548,10 @@
           "value": "edeeb8218c0de1993d874d818064553c, 926857e560a3ae443ee35c2de270d75b"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
         }
@@ -517,14 +578,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -1007,8 +1068,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -1047,6 +1107,10 @@
           "value": "d506461f4ccaf30af8399dd153150b2c, c8df22f0b3748eb57db3e33c2981b589, 49bfe105d955955bd13e89af79f437ca, 44ef8bddf68f11cfe1562fc576e42307, b8051d92756bbba5714cca7c2c831c13, 3bf1354db1efcf56348eaad48fb5b626, 634dcd5e0db14736cab66f005c36551b, 073185fc2b3c9c1594b1f3e148941a50, e3a87c4f055027dab8a7e04fc816e5ea, b834d92c2a4ba665d30a3df03a128d7b, db51ff7e71869af404a03bc6f225384d, ed0642de16ddc4fb795b928fedc9f40c, efebd635017ea3dab333578092ef6ab5, bf2560a5275ffa6ec6cefb607a4bf7ad, 12c7c59e9ddd58c3017a10f506d427a1, 85245d121552c0fd305da9cac43c6180, 76e95aef65f2292e886a0a6eda13f801, e86570da0141252010446eded244892d, c25bd30fad9aa749c2619e0f4747d0f6, 96d4191107297b4c34c011413da944ba, 8ec30a467ecbbf7514bbd19ec337fde2, 77b1612666e299159367a2de8721af8a, 676f6982ca6d018910728ddae75a519a, 8f21b848204956027eb202b70bc8bcbd, 03819bd56ca01d71da0fab3f3f4be7f8, 67b72e44623522398bdf0183ee61ca7f, 919687c211c8736738a7fa4f59c780d4, 1e6c76b29ef5119dd54ef4632ae6f035, 070f09b4ae8ccf55b1a09f8432742d19, e8213b765494697ef0449b01564daa21, 481ab543527a6513ac688aeab6cccf39, ee6226288942c9f133e39a5634290532, cc9be3872f4e38fe38b4a3fa1126d33a, 73702bc38a09a5c97beca40e28ac8440, a79372ab0e0c8fb487b7ea3b30301853, af83c77313ac7c319111e5c31008bddf, 74bff3fd1210752b0edd5f5c5409dfea, cc092200161fe56157e121a5ad8ba8f3, 7ca9c7f685ce970c62c6a316b57dc64e, da2920d83cc645f9ac9b124748044a29, 1542f3cb5c4857906b1e33d476d7ae88, d7812d3cfac9c25eafbea61ede7ba53e, f4f7422516ea44deaeb35982728ca9f0, fffa7e6749823bd6bf7316594bd137bb, 8674e169f65493b721e59a11052d6157, 26d71a84ae9b5049a274b19255a5598e, 73f20f4de17e7886e1c753d5350ebd84, 3b47c8b1f4e0aea909c6393e6eb05019, 5629121b2445fbb2ca269cb7173f9334, 459fad2d4649a53f86c4eae7c28d7234, cf5e1a2082902f57d0d9b95d12063ff9, 243348c14d268fd99e901efb80bfdb96, ad9bf611bb77ea0388a06452175d8a13, 3292fea1c7263f24123f51f44654414d, 22c8b7c0c79ea4e707c3ef501946d6dd, ec138fd5a288112392ee9184f2fb6813, 7bfd5c9cc877f55d5faa4c22dcce6671, 465ee78f97c68687044458f8a3a3827c, 33f0c1492f3df6cedafce826b06de49b, fdecdf350830dbfe9821efacd550529b, b9d971696132cb3982d567fd7ddbef05, 930baf4cb6ad94106a655e61add467e4, 1537fd1e11f4f47b669657ac6e3f2d9b, 953afa6fd9b27dc13deb75a6f95f64cf, c0c1e71273ed4675931cc6dbeadac0cf, a2ecdd24c1a1f9ed665e24dd876db218, 28b6c488707455111c3e391ea501d812, 842c04684bb32e443be61840c080145d, c7c706332684f7771b0f7a18aaab7c2d, 950ffeb0a80dce578e7945a0e51e1f44, 3472f1a136b158e911b42576eaffd05a, 3547d34b13a678779d7cee600649aaf6, 5ca1e1861c475bfa58f75ebc0fca1260, 4a9cd2686e454705fd28236b02b88cf0, f87b5b65b46f6aab780175bcf345182f, 5e1f4b96ef942f94410dfec14032c50e, f891cc15d78aedc93e555c64d8b46442, d9930ece9f324e38ccdf67fe94edc14e, 11aeb96f04d36704cf014ef43041153e, 692dba3453ff25b6ad9fdfc75ab84bad, 5e04b40e1bd6390d5c80e8e1f64f270d, d1f71860683ddf0302f95f3202d8d475, 08f2baf930eb3f0197920a376b75b858, ecf80eefe00c4b16db1893c5361d05ed, 8c2608489ec38efedc2026470bdc110b, 45d4d2e1781ef9a7549f0bcbe6548c77, 15d751f787b29e2d98253b24722e6e9e, ec6e09c8bf9e7e158dc402a4cc9cf7e1, 43ac0451538574f4fbef7936b401c3cc, 25bdcfb09835e72617321232cb6b5483, 7c087006b2ce76cf262c388e93ff12ab, accd3b3d357cfec6c34c43d674303046, 6494b76e4b6a36161c9885080a13222e"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -1072,7 +1136,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -1100,14 +1164,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
-          }
-        },
-        {
-          "license": {
-            "id": "BSD-3-Clause",
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -1146,6 +1203,10 @@
           "value": "37a41134cc8a13400234746942d5d180, 7c3b52c56fd30699f453a7dc7b42cecb"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License, Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -1169,14 +1230,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -1649,8 +1710,7 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0",
-            "url": "https://opensource.org/licenses/Apache-2.0"
+            "id": "Apache-2.0"
           }
         }
       ],
@@ -1689,6 +1749,10 @@
           "value": "44af6d9ac409e12566279369066e41e5, 8bfac2040d6eda464e71a4820b726162, 68eb5bba3d443c4b14adc57112e68358, 99f358ac17f06f799350c4b78dabb381, 71725cf65e29b883fbbd4982d057f828, ffc11d9f1343193912bbfb0b6ac830b9, 2443f0251e7c429af759913672aaf301, ba5ca98928db909ebcd2e598bda569fd, 833a9bffc8e049bb60c793493b18d699, aac8971853af967062d080b7c5e5ffc7, 95f25ad51bbbcf994eec9e160c3cea09, bdea8168fb9a8f1f4d561b2490120599, 3def54786303fffc87d00f0ff262c601, 47269c817fe8ddf8088cb518d34020bf, 7fc8b9fad045cc8427f3ab4adc1242c0, ff31f82ef5282d1d53bcb3ed619c6cd6, 9ce1414dce09964ae961139fec513aa5, 19de539157aa4273f5dc9ce76e615f8d, f15eaddb653c847050e45871a683541b, 4bec4a966c2e3a7a89fa9d6a10905fee, 2a7a6880ddff958503d1fa7bbbc25fb5, 9eea6888678e5a12a0bba644d839b398, 5bc76a43713089b139221265aa41ae4f, bfdacd2fd04dd6f7be57a8dc9bfb7b8f, b9378010c8fbdd057a6eafdb00da3d5a, 239612f98a321b595b89e50944bee09e, 65e061098329d0df16ed3598ec54643c, 198dcbaf3a4f6842577ec5e3f2665380, ef12032419f641e702ec5d3a5fd1c8fb, df0b127675ed7ca80a025477e419ac87, d66f409e74967774160804b1b7546d3d, f7cde52d14277b69ffe47b5ac3369b79, 2598ed6b89b67ac2eb4ad8bede25528a, 9c7500fe7a8c0917a2bad45d7e6faf86, 2060b7da53682a68f91ea3bd6f1169ce, a605f47cfb1f43f78fd469b70301b009, 7d071b443cf6b700f876118e5c712264, 59cb1c2816d9a1373fedf863aab8de47, 2894391c3023e0080392166b045d1ea4, 4df7da2b1f316fbbece9803c10752f0a, f5178515c1ed66e426d21e7dcd8d6ab3, 8f5d00a9c81b680cad5ca0bb719ffcb3, eca6e935732271ca3ace225faeffde75, 4a83cfae7b5e8666cc3ebc96a22a5098, 7b119de4ce4f478f4970d00de09a733c, 6126df624fa4965005f7838676307118, e3be85cc070c79092804cbaea41130c4, 15f4ea5874ebe53c4de350f08f6eceab, 14ec6ba7ff8f367badde75b17c8ad3fb, 69f0f90a5e47181a94bb05e98eb27d4f, 430c2a2a83725722160b7cb14735237f, 5cbeef0e5b491bb7da1a814da94e4f8d, 0f8027344f433039d361563f42d39666, 1b5b7ea9c46c647617ced2ebab658620, 67d036ad273d4e857f0e4472e750bd86, 616863f05fb7a27c525e46e76a027bfc, 7797db5115953f376070da977ba6662a, 8ab6247a4757f2acfd1b2db3d41548b2, ff5f66f1bb2c26a5230f68300224c7f4, 5f6ff58a76f9c025363057ceab92628f, 3d2184af8dee46eb0e119951a82c018f, ada0d81abd7ce3b3418fb2d7847819f0, dd76149cf03777da165fcf47e1fc1120, 8c4c1877ea356773e44f9caffd7bf83f, 66aca3df4783eec9da04b47fe9ca3fd0, 9c240cee031c9dbb36f7e307a2ac7879, 30b05a39ee82650af5a942791d754a1c, a72c1762fd5e98cede48684512cdab0c, 174fecf99941c6d837f67d315b0ff464, 01bd5289b0d55fa6020fe0d1b64bd36d, b9c31f8e1d6cf4b6325d896b7398adc6, e54eae3469e5008e200583329f1d3a75, cce69d5ce69e94d8d2daafdff0a7a02e, 50a5069ef8a249c930bdd8a78b1c3b2d, 01c288b5f683a51eba6f3065c06cf490, 3cfec830baf1f8bbedc17f2bc8c6fceb, 80496b713a39d361f90d2bae992c6156, 31b7e4f44f57b70c6fb0b68217929622, e05e3b22c602c40fd3ba75cf47f48cae, b64039ee863e5c98ce1de3b633504467, 8b4a940b2f184ad606391b5fe95300b4, 027d2cafe11fb260b0fcee8f45d287a0, 4e39e3f00251282736d1378d95a39e40, 86a22ae42671c4de5e9d101091bab41b, 4d02d9221c1c5125d0ad1a8d836a2a4c, cd99164791b2e658549e68d546a8b0dd, 7636696a1d7a1aebb361b9a187ca43d1, 972eff46125cc40e6760d82c186e1e06, 07edffd4607a5509e53361349ecbe468, 0775369b314a1b81c799bd0342da5190, 740d30744f2141afb7bc0bbd56e576e1"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -1719,7 +1783,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -1747,8 +1811,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -1787,6 +1850,10 @@
           "value": "03f981c073a79099c08500f56aa0f992, 722df94bd0c8d720583a8a7a968ad170"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -1812,7 +1879,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -1840,8 +1907,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -1880,6 +1946,10 @@
           "value": "a89da9cc87440ebd82366d605eb866f2, 4848c9d5305197822b5b00c8e9a6d9aa"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -1907,14 +1977,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -2387,14 +2457,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -2422,8 +2492,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -2462,6 +2531,10 @@
           "value": "dbf22fd8e2a0cc51c209ff093585f573, 64359467ec86d86e398b1ae614e5718c"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -2488,14 +2561,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -2523,8 +2596,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -2563,6 +2635,10 @@
           "value": "d3e156a9abd59ac8b5eb0c2e8b1c5dad, 5c1d9c21275feb3da71400bf716edd72"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -2581,14 +2657,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -2616,8 +2692,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -2656,6 +2731,10 @@
           "value": "22e41bfb2008481e855f1693a9df4c54, a901babde35694c3577f7655010cd380"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -2674,14 +2753,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -2709,8 +2788,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -2749,6 +2827,10 @@
           "value": "845b37cea56edd0f4dbd949244e9d798, 66d4c25ff43d1deaf9637ccda523dec8"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -2770,14 +2852,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -3240,8 +3322,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3280,6 +3361,10 @@
           "value": "08f3e9158c7069aacb94c60746ad0cd0, 34e76ed392b542183edd5a6b23b8aa60, 309889a2e8c4bb45f1ef8bc66319b915, f0b62676dd5a7af5eeacdefb58a5784d, a8e172aa6d83495d270601ef5060f71d, 4062452b0a207c9b1ce0789ae2d0e3c3, 38771321fade055a5f76294a78944f4a, fa64516a9d05a06dd4eb24c307f621a0, c5adc353241627f2e26a55f780a021c0, cc9392951ba1859589bb6fcd5f9446da, c32c889fdd964df96252f59a4c434b9d, d0db4a2a5bab31e44b4d133b512cbd23, 5237d8b039e8b33fa685098327c9b81a, 294e7f97198c2d36497b6b7d1694fdc0, 767b1fa0e89c012ef36e0b9e05ab7d1d, 4493d5a45ad443dd34574f6bf43ca2b7, 023feb818f4d144595eec60738558485, db34a6eab86518ee6095c28dc66dd618, 5e7d03c2abc41cc9418c76b40299b387, 3b778d58a7f2f6bc6b73d9a6e6a47f76, 02e3d025fea204cbe5d5b6ccfb4ca902, aaf43408cd0d0fd6806dc70791ba2bf0, 5e6e0fa3bd5c2ed6dfb7aee4f017a457, 06843eff5ffe519f2ad13143a70a50f6, a7e82e2718ab572d1060b385103d4590, fcd28e22417988c5b5916dbff4f791a1, ea58cadd5b4bf5d9ca669dddac32fdb3, 383cddf2e8c8e0cc01d12d8d6078db04, 458322b1110e64d68d387e9d3a66786b, 2dbc367518f2e2f0d843aa9f532d631d, b50a1632de5d50b82c96072c69ed5fe6, 2a1376ead47461d91373005bf78fa316, 23ccba9662cf6a52c391bb67604b7c04, 0d7f15d256829d0d3f14aee8bbdff2f8, 8b3d9ec4ee1ae3d6f46f8efe9057d555, 3dba43257ba4d70ac12b2ac371d30632, c05c37ed90dd571df4f146632b52c884, 063639d2e8a3cda0f2bd91147bc7bcb4, c281e14077483234ed6857d9e542968a, c97b1d6bc3a55399dc0d72aa797137a8, de5ba9b4b5422e609751c129278a3c0c, 50be11c16c5c6303c62ffe48e37ee558, 0a830365d0864e91e4e144b21c5d1366, 480a95174d6a8837e488181975a0d7de, 0c8b61e407a7ce06245852877b4eee5f, bc811a17607dc8dbf6a4c5f53d37a7a4, 6b291b75ae3d8db5c81e4bd3df5b386b, 953bd9869070d958440a96a8447004bc, 07f8cf72b08dca99f9ef1c074c90ce58, 568420ce37d5a21d4ebe570ac67e4a58, d5c92d85c98157fc35e9bab285a26860, c92be29878a821015564fdd6e11ab313, 06d7dbbb3a8ab69f7f73405a271c4b7d, d8d34aa05e0c14e2ed46cc8c5ddd029b, 04ba29977bf1de22f74a39e72de367cb, 06528f1b515460dc49b8b829e408acff, 7c0e6182016e91e058bc2a231a732e61, 42808c3b9f1fc2fa4641bea6e4bcd426, 76ca02c288755ae6328a721353eaa27b, ba0ba1f41f6a39abbc2e21f681538ead, 45695a9ce6d6d3dbf208294640251198, 24771f808ed82b9ce5b5c593280a5919, db8099f16ecf225d7f0f549c5eb9a6ab, ddc8ae8e702a03b2e3d3bf000aa46253, 0008679f373d0016c37791ff89cd753e, 61a59296186e8a6418433b20ca601634, 0b1c3ff7a235bbf68466a5d1dea38bff, 259544f7198c6aa6d01ec0dbb9fb45ac, 6315df288c04b989d0d2c6a3057f5ced, 3e59f558528cd0bf7808aadbe40f3cd6, f70279ecb8f657703ba306dfab7772ed, 74b11ed65b0e7b57753b396db5ecc59d, 2323f8379a0d7c2e847cb901d07e2102, 4dd6b134f5ffd4ac161abc425cb60789, 4f12dcc2d1d1caa9c98a84199dd74f6a, f85cc52572f23beafb27d04c3baacc83, d8f5d585834925802aac80e51a710f5b, d22176ece70d568df8d0541a22cc4725, c1083afd278eaf9cf2cee21068ba5214, c3816875dba56fda42b3783e1159b9af, c68b42fe169380144314e48de3c6b4be, 9705d1384a40856b541aa5122805449a, 9c6fd59711e3d378d3f854ad74e952de, 3bc8869252d59ca1d2866a15297c049f, b0968a316b360cb0ebf0d927eaad3d1e, b6454d81bda225cf7c4751d3d457664c, 63d73f55afd0ca654801b4704bba2a68, 4063c9aa33dc0425b163eb572bada116, 13a73126d25afa72a1ff0daed072f5fe"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -3303,14 +3388,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -3377,6 +3462,10 @@
           "value": "9e5647aa3a016a0e27b50403efc5d8e7, 374ee2b9407546bb41d195e7436e5f62"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive, Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -3400,14 +3489,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -3432,7 +3521,13 @@
           "content": "1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505"
         }
       ],
-      "licenses": [],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
       "name": "mypy-extensions",
       "properties": [
         {
@@ -3469,7 +3564,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         }
       ],
       "purl": "pkg:pypi/mypy-extensions@1.1.0",
@@ -3498,7 +3593,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -3696,14 +3791,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
-          }
-        },
-        {
-          "license": {
-            "id": "Apache-2.0",
-            "url": "https://opensource.org/licenses/Apache-2.0"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3742,6 +3830,10 @@
           "value": "1a5dc6b5b3bf11ad40a59eedb3b69fa1, 4b741c6dfe4e6e22e34e9c5c788d4f04, 2953687fb26e1dd8a2d1bb7109551fcd, ea9127a3a03f27fd101c62425c661d8d, 7a6be7c6c1cc3e1ff73f64052fe30677, 4f45d3f69f54fd1638609fde34c33a5c, f22f5ea26c86eb126ff502fff75d6c21, 49871452488e1a55d15ab54c6f3e546e, 676740bf60fb1c8f5a6b31e00b9a4e9b, 7170545dcc2a38a1c2386a6081043b64, feae1190c73d811e2e7ebcad4baf6edf, 03131896abade61b77e0f6e53abb988a, f160632f128a3fd46787aa02d8731fbb, 014250db593d589b5533ef7127839c46, fb437346dac24d0cb23f5314db043c8b, 7359adc233874898ea768cd4aec28bb3, 207a678bea75227428e7fb84d4dc457a, 302ff6cc047a408cdf21981bd7b26056, 7526faaea58c76aed395c7128dd6e14d, 28d3b1943d3a8ad4bbb2ae9da0a77cb9, d91f5b2bb2c931e41ae7c80ec7509a31, b2504d4239419f012c08fa1eab12f940, 57944ba30adc07f33e83a9b45f5c625a, fe38cd95bbee405ce0cf51c8753a2676, 28e1bc3efaf89cf6f0a2b616c0e16401, 9932ccff54855f12ee24f60528279bf1, b52c1e987074dad100ad234122a397b9, 1d1bd7e0d2a89ce795a9566a38ed9bb5, 01d2abfe8e9b35415efb791ac6c5865e, 5a6d6ac287ebd93a221e59590329e202, 4e4e4d8cf661a8d2838ee700fabae87e, b8e52ecac110471502686abbdf774b78, aed2d2914be293f60fedda360b64abf8, 6bd88e0f33933445d0e18c1a850f60e0, 010aeb2a50af0af1f7ef56f76f8cf463, 8f6446a32e47953a03f8fe8533e21e98"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License, Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -3768,14 +3860,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -3870,7 +3962,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -4013,8 +4105,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -4053,6 +4144,10 @@
           "value": "52cd1b3d0543067b9eb833c8e447564d, 90f014deda4b6c0cee817c5b4c3abb63, dddde2f35e299ca0a985d21e937d82d9, 047f7e229d48b01fc4835253682902f4, 120e911ff81743fbfd9c67a0e6083688, 2fbe213f18511adabeb58efcfa90a3f2, 8403f4378c4f60784d16ca0b2a8f32dc, ba11872fd164f361b5fab7599a5203a7, 754311cc8d65cb234715b441c3254e66, ef8ca781a99f0191d4e2076a95e7c40a, a079206eb53cb806a191ea8deecf772b, 6f9f993db0744c40bf1fabc4e98d2c0f, fb778a3c045feb5044ced5fca4701c62, 75b158531729b449326dd99fc9047ff1, d0b51e0272c01f004b7d418e5847c8a4, b5ebeef9ece1c2dc85a4952407ac38aa, 12662636aa7c70c3b95f28d668e965f0, f0e63e42bc9404b384d5302f4fe674c5, e113285ca6642aeead9f0315cb073f8d, 61e4765b083574d71e2163090579af75, be9b5ead4d9fe38a2eb9be6c1884a554, 992b1cf0ab804b0b3a5414db48136cc1, b13ec04c7b80854d5817049706be02ab, c5c20cd46b8fc32a6c951738b98965e1, e4b598d1e0aac2a3407ed32added3f62"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License, Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -4079,14 +4174,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -4115,6 +4210,28 @@
         {
           "license": {
             "id": "MPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/MPL-2.0"
           }
         }
@@ -4154,6 +4271,10 @@
           "value": "124d4c96d90978265c9e7b4d8eefa288, c762d0a00d6cfc9de003e02d5072b26a"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
         }
@@ -4172,14 +4293,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -4207,8 +4328,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -4247,6 +4367,10 @@
           "value": "e4f3ba6e4144a87532bac41071d71c1d, 52e015b46ebb6c6e42aad5309f6f5e9f"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -4270,14 +4394,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 1,
-                "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
-              },
-              {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
+              },
+              {
+                "confidence": 1,
+                "technique": "instrumentation",
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -4305,8 +4429,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -4345,6 +4468,10 @@
           "value": "e107bd9fd0c26746617d74bac26fa0c5, 54391218af778acb006c2d915085d469"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -4368,14 +4495,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -4403,8 +4530,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -4443,6 +4569,10 @@
           "value": "d28d25e739d7dccd20965cfc19bc8d9b, c7ed096441b4b4961c0756d4000d1ee7"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -4465,14 +4595,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5015,8 +5145,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5053,6 +5182,10 @@
         {
           "name": "cdx:pypi:artifactDigestMd5",
           "value": "d8ba3106483856831df3cfd841397d45, 0fa99e9455739194a5e98cce151b4887, 9ccbc49e28d73734e9f93f0110b3c94d, c0e68e7aff3b4e555d45cd8a170a15c0, 59b217992c30b23f215885a3b1cc61f2, c08e7fe4f801548d07b8a976b8f5cd3f, f9efa1a47493ca91d3ff22dd67526af5, f23a5415163a1ff643a9ab3254ceaeca, 29cebe686c2a229be0c243944e086875, 04970a992c9f8c2f79583d09fbfe83c3, 025492e6752c5643d98cfdb0455763ec, 5e2f9b5e53b20624151b105c94561947, b6e41642014de4e425e3ed5e3c4fcfaf, 676a102aac3605b2a854639df96e55c2, cf381e1bff4eba0a0c39f44cecd64bd5, 3319198adb5ef7ef6f0717ce11bdf045, 269bfaa3c04edea1f33e894c88f7a1f4, e2ad8fbd9f0a392d7bd4258246387a54, 42441fc436256ccbd37611548538647a, 8abb66e4723b603aa0ff94748ab4e54c, 31d995fd449479f9dedb3bc90d9a7c1f, 2eab1d9c421c891ef8e7a9ef8b1f4b21, 2d062cd903916428a408532aedfe6464, 0a307f01c3f4c8ea66761c3b0a5e0544, 87e706c895c7dabd2d9c48f1e4e5a88a, f70972be60263ba2cd3cca62ec4b5479, 1560ebb27ac58b1378dcf7af5949540a, 08d6d94ace55d9cb6bf88954404648fb, 6dec1cd2473bcdb360a071036b2a03ce, afddd7562ad6bd447930b8e353d5153a, 004a143b05d242b4387139736d7bac9f, 71adf10d68794eb0f54edc808602be4b, 809e30f6abbe3cc7d163fcd42a976b0b, 9ca40a4f1e0161f4dee5f99b55958e62, 3538a9132532b5ecc7e52981f883005f, 98e5c2ec25bfd3d7418e143c0c386ce2, a9c4498a8e275afaf08b038185a71370, d19c70381c400ef7730d7045e5c12425, 2aab4b78dcb992f18b625448dc1e9202, 7c803ca5e8f91eb16199869d66a452dd, 9e7f2ede7a9490a072958d928eecf034, 4cb1eed47f702b0e64ea27240f36e54d, d3f8f67b0bc60498de5608815014b6f3, 4aaa33f0646886812e76a10d71295f41, 0306b0eca70ab17afc3099af25b774b7, 9798b572ababa3b6b22a30ab175b32af, eb1e8ad1b126bed129848e21d32ec7b5, 850997ebdf52ed9102e6ae2014c064bd, bfb629cb1f0eb3827090f61eff301297, 1203c274302f7dd1407a334434850c99, 38a0c548a73bd66416fa9367d53551e1, 1c5ad0e926917acb91d691801b931eea, e28c20a7f19cc575454ee5218c97aed7, 183976ff014c998f75dacede94f5eddc, 047608a2a8233bc67d970e40ff5049a7, e7caf92c13d0861ab4cd73e9620c1d74, 1a50cf7520f4db4aed98608bcd5002bc, 6a9e97153ef712b094bb9a7fff972727, 3eb4fd5f36ed1bc3d5f36e0de5ee17b2, 47d89263b286ea0b2248ccdd61456204, 60b56b193f4857e394a07e082a7368cc, f2f1b00c85ae8f641cc3071adddc1e36, ba16a64ab03b0c921fc63b9e581bba20, bbc0c5e558a2435c641d7d9b579cbb09, cedc3a7cf7f1c1d0d527f7c11ffe6137, 2c6618650522d3164ad155b2d222ab03, c292abf47f41c6f1ee2d7c6514bc2051, 45becefaa317534ec2631d91c1403c32, 5c61d9dc7b316606fa93178449515d3d, 737f81f440a66d326dfb8aa348960d63, f40355effcb86d1fbe06f6ec909cec3e, 86d460c1e1b9541c02274d64be9d5107, a2faf23d8039012bb3857ce767ed9f26, 932b83e1c16cf89ac5c14fb10eca0acd, 4093a33e653af6fdee5cc463e855c8b7, 9507775c54754415be56eddf42080af8, 70caf7848042276dbb68b4d4cdb8048e, 3cf2e13c04a0baafae7d26cf5314be74, 5c5a731f5c8b9b255b1c7884bdaa1e71, d2e5c5ef7fcf6e4fc8ca71e919ee6b78, e27fa11c644b49a9374db80475f7d7cc, 83301c6903d82eb4da88a0d54a97c573, 9bb19a3ad2111bd70732a5ea770dc40d, 7b67a263f8fbb9b56a3048d8474dd8df, 751a5df53fabd8b9cfd48a6ff4bd84f9, 79758ed764c30942bbe6d283fa1300c3, 308e93bcb967658ec0423bc193bd4c0d, a9f708dcdefb748020c17b629ae0864e, ff11bd0e63db5a10671dd88d79530057, 6d159fb177fc2abf272eccf8ff99f5a7, c908c54004172ab986ea46edd3165f8e, f448b11bb11820b8db21f1e41569ecfd, ec41d085881b1e81fb8151b83f3608c0, aa98d07a4db71395d9fcdfa8e2650827, 20530eb363575754f70746544327ace5, 54b4dcb835d3f5dfc609d753fea1621c, bc47e33cc6f35ceef759f85bae1b1d26, 8440ee62bc561ee457200350b3767cee, 143803deb49ac86b04500cb21fd19939, a133bcbf327851b616bac8c31828f7e5, b485d7be536f8cc3b831573666824f60, 3b0db6ba9ae7981699984d57112d6dcf, c9945b6236ba2a06ed72b98f477eb385, 9eed1648b206e08d82eca861513f6827, 1eb13c211147496c1c9484ff7f8ac438"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5112,7 +5245,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5140,8 +5273,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5180,6 +5312,10 @@
           "value": "42c59582eb3c9f2760c501be80fc6fe8, 348281a5a27eb5253c7a83927aae64e1"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5206,14 +5342,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5241,8 +5377,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5281,6 +5416,10 @@
           "value": "8fe9be379ddf5f077238690c049532a9, 8018ec247e041c4a835dfb638fcf11f9"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5311,7 +5450,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5339,8 +5478,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5377,6 +5515,10 @@
         {
           "name": "cdx:pypi:artifactDigestMd5",
           "value": "f3eb5a35c444e7d2c82efa80d089b1a5, 593d6458518d96ebc63ea69eaf17840f"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5424,7 +5566,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5452,8 +5594,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5492,6 +5633,10 @@
           "value": "de7ab8f50d3e458ce84c8338d45cac38, 9a13432f66fd105bdcbca3db867721bc"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5515,14 +5660,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5549,7 +5694,86 @@
       ],
       "licenses": [
         {
-          "expression": "Dual License"
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "name": "BSD License",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Unstated License"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ]
+          }
+        },
+        {
+          "license": {
+            "name": "Dual License",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Unstated License"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "false"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ]
+          }
         }
       ],
       "name": "python-dateutil",
@@ -5587,6 +5811,10 @@
           "value": "2178749b926fe0e2c25905cdfebe3361, 81cb6aad924ef40ebfd3d62eaebe47c6"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive, Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
         }
@@ -5617,7 +5845,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5645,14 +5873,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
-          }
-        },
-        {
-          "license": {
-            "id": "BSD-3-Clause",
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -5691,6 +5912,10 @@
           "value": "9868cc7c592b9b179b0ef0e9140a06f2, 47129adbbaf20422e8d19fe99d74be33"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License, Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5714,14 +5939,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5749,8 +5974,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5789,6 +6013,10 @@
           "value": "79586ee03c65c66c06d3c00e3b356218, 095e9edf5051aec8901beb072eb31a79"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5819,7 +6047,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5847,8 +6075,7 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0",
-            "url": "https://opensource.org/licenses/Apache-2.0"
+            "id": "Apache-2.0"
           }
         }
       ],
@@ -5887,6 +6114,10 @@
           "value": "0cb4b772a1a652cf3d170a6c42a69098, 941e175c276cd7d39d098092c56679a4"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -5910,14 +6141,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -5945,8 +6176,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -5985,6 +6215,10 @@
           "value": "090bac7d568f9c1f64b671de641ccdee, a0387fe15662c71057b4fb2b7aa9056a"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6015,7 +6249,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -6278,8 +6512,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -6318,6 +6551,10 @@
           "value": "12f47a35831cc9788067763dc3f6d15c, 831c6accbebb284acfff38e2a3899709, 630ae0d52b9e692ae502b9872732e0a3, e09162b2fb84e18e8184b1f51826c3c3, 4526cbb74b249a42677bf0200cdc72a1, 1f0a784ca334781e4a75c0679f436f79, e221fb5e159522b554492d51a70eb3c7, 50c2ddd797cc3009fb3512a1c126dd5d, a2f780c61f7ade4c0336b49a9fd6003a, 6a0517c53aa68fa5a9dc8d0d361f6964, 11de13383ff12fc1052ca8b629c0157f, 3875db93f05d6df733119bcdfc16a7dc, 6b8ae2fbd09143991e65e92b34790308, 664e3c23e4a73cc59492bb1c6fdc8aec, ba0228baf3395cc4f3d3ab8c945efdd0, 7e16bc68d37144b6fa53345b1ef28ee6, 5b6c44d9ba22e0d040a67c8c06788b13, b2d4ea0d72a67ef6737c5b7d26ad84e4, 726ef03d5784c00c51a695d5d5cc4ac9, b58a61cc29001ed0a71f5cc8fe22fc9c, b6f5f3607c7c0e5935744c0124d332c7, 9ca9c4c8c0f2ce0ad3d197addf0f2084, 124ba03cd6abc053b0d68a9bd130567d, eed838944874e22dd113d7f57b5e0d07, 1bf6691a158581ce6f26c2955540ac3b, d36b4fae3c8fb1873579e7dd01f7be5e, ae095dc93c39e55d2f59bcfa5274d9f5, 2b1d20c5a8b6038ac925618bcc8f3540, 0dd099c604780c9b12648af87fef8392, 2c8314be720bb350aa87e76e0db168c4, 7013bcda14d4242e99abd972e4fd0c8a, b0de4fce89ac6b8c3685a105c8e4efae, 3bf426595c4553da2fe69a7a50bde0c6, 416963485a02bc898f194111326a1d7b, 77ad41949a4a30f350f65fff3a46c262, dd42b16000f6cdd6eb911321fe642ade, d7dec44730212573795286665a3d210a, ef37a35e2aaeb8b37ff22171eacbf2cf, 62ede94f2f652ee368149eef5fadbb89, 05651b026c6bd424cabf6caccebbb28f, 57232a946e4f63eac2c8de97b8e0c7aa, 25a65c075e0eceae4b9afb3eb6b121f4, a3aa0ca5b70663878114998316a2da9a, b4938188612ec41258ff251629ec42f4, 49bc47fd524c30675c5f0a5da08a39f7, b74080439634fbbc9838776d85acd998, 51c2d71c386987e46c6c6da52a4207cd, 2431cc910cef342ad9bea3c3ce929bfb, 874f398183c2ebf54845d109e055a86f"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6353,14 +6590,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -6388,8 +6625,7 @@
       "licenses": [
         {
           "license": {
-            "id": "PSF-2.0",
-            "url": "https://opensource.org/licenses/PSF-2.0"
+            "id": "PSF-2.0"
           }
         }
       ],
@@ -6428,6 +6664,10 @@
           "value": "aaa249e7f620bbcecbcbf2b7b11fbd12, 7758284b826ec6ca6b722e7891bbd10d"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6454,14 +6694,14 @@
             "field": "purl",
             "methods": [
               {
-                "confidence": 0.8,
+                "confidence": 0.5,
                 "technique": "manifest-analysis",
                 "value": "requirements.txt"
               },
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -6489,8 +6729,7 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0",
-            "url": "https://opensource.org/licenses/Apache-2.0"
+            "id": "Apache-2.0"
           }
         }
       ],
@@ -6529,6 +6768,10 @@
           "value": "0514dbbecc44968238605e15d6b58939, d704e5e11179b2ba75ec706dcc77276e"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6559,7 +6802,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -6587,8 +6830,7 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+            "id": "MIT"
           }
         }
       ],
@@ -6627,6 +6869,10 @@
           "value": "56a1919e2243cc6af59b23c06eda3783, 7254f9fc014361500624dd396e759961"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6652,7 +6898,7 @@
               {
                 "confidence": 1,
                 "technique": "instrumentation",
-                "value": "cdxgen-venv-muRLWS"
+                "value": "cdxgen-venv-ePDMyS"
               }
             ]
           }
@@ -6680,8 +6926,7 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -6720,6 +6965,10 @@
           "value": "4b2073844741452e82be9934641eb47c, b8cb17df4a7d86b7c5cdffcd5657197a"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         }
@@ -6735,18 +6984,60 @@
   "dependencies": [
     {
       "dependsOn": [
+        "pkg:pypi/annotated-types@0.8.0",
+        "pkg:pypi/app@latest",
         "pkg:pypi/black@23.12.1",
+        "pkg:pypi/blinker@1.9.0",
+        "pkg:pypi/certifi@2026.7.22",
+        "pkg:pypi/charset-normalizer@3.4.9",
         "pkg:pypi/click@8.1.7",
+        "pkg:pypi/coverage@7.15.2",
         "pkg:pypi/flake8@6.1.0",
         "pkg:pypi/flask@3.0.0",
+        "pkg:pypi/greenlet@3.5.4",
+        "pkg:pypi/idna@3.18"
+      ],
+      "ref": "FlaskDataService@3.2.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:pypi/annotated-types@0.8.0",
+        "pkg:pypi/black@23.12.1",
+        "pkg:pypi/blinker@1.9.0",
+        "pkg:pypi/certifi@2026.7.22",
+        "pkg:pypi/charset-normalizer@3.4.9",
+        "pkg:pypi/click@8.1.7",
+        "pkg:pypi/coverage@7.15.2",
+        "pkg:pypi/flake8@6.1.0",
+        "pkg:pypi/flask@3.0.0",
+        "pkg:pypi/greenlet@3.5.4",
+        "pkg:pypi/idna@3.18",
+        "pkg:pypi/iniconfig@2.3.0",
+        "pkg:pypi/itsdangerous@2.2.0",
+        "pkg:pypi/jinja2@3.1.6",
+        "pkg:pypi/markupsafe@3.0.3",
+        "pkg:pypi/mccabe@0.7.0",
+        "pkg:pypi/mypy-extensions@1.1.0",
         "pkg:pypi/numpy@1.26.2",
+        "pkg:pypi/packaging@26.2",
         "pkg:pypi/pandas@2.1.4",
+        "pkg:pypi/pathspec@1.1.1",
+        "pkg:pypi/platformdirs@4.11.0",
+        "pkg:pypi/pluggy@1.6.0",
+        "pkg:pypi/pycodestyle@2.11.1",
+        "pkg:pypi/pydantic-core@2.14.5",
         "pkg:pypi/pydantic@2.5.2",
+        "pkg:pypi/pyflakes@3.1.0",
         "pkg:pypi/pytest-cov@4.1.0",
         "pkg:pypi/pytest@7.4.3",
+        "pkg:pypi/python-dateutil@2.9.0.post0",
         "pkg:pypi/python-dotenv@1.0.0",
+        "pkg:pypi/pytz@2026.3.post1",
         "pkg:pypi/requests@2.31.0",
+        "pkg:pypi/six@1.17.0",
         "pkg:pypi/sqlalchemy@2.0.23",
+        "pkg:pypi/typing-extensions@4.16.0",
+        "pkg:pypi/tzdata@2026.3",
         "pkg:pypi/urllib3@2.1.0",
         "pkg:pypi/werkzeug@3.0.1"
       ],
@@ -6968,23 +7259,48 @@
       }
     ],
     "component": {
-      "licenses": [],
+      "bom-ref": "FlaskDataService@3.2.0",
       "name": "FlaskDataService",
-      "purl": "",
       "type": "application",
       "version": "3.2.0"
     },
-    "timestamp": "2026-07-28T04:14:38Z",
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "pypi"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "requirements.txt"
+      }
+    ],
+    "timestamp": "2026-08-10T11:09:48Z",
     "tools": {
       "components": [
         {
-          "name": "cdxgen 12.7.0",
-          "type": "application"
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "type": "application",
+          "version": "12.8.3"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:a0305b45-b107-46ff-ad6d-8976fe91b0df",
+  "serialNumber": "urn:uuid:5f56d687-c6dc-45ac-b52b-bacab281c937",
+  "services": [],
   "specVersion": "1.6",
   "version": 1
 }

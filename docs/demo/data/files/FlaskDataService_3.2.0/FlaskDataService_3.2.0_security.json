@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.72.0"
   },
-  "ReportID": "019fe454-12aa-71d3-8ca3-2a7601715e9f",
-  "CreatedAt": "2026-08-09T02:22:22.89012168Z",
+  "ReportID": "019feb70-cc2b-7c8d-a99c-3278c011fb2c",
+  "CreatedAt": "2026-08-10T11:31:05.899824348Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -18,12 +18,12 @@
           "Name": "Flask",
           "Identifier": {
             "PURL": "pkg:pypi/flask@3.0.0",
-            "UID": "5aea5a733827f1e2",
+            "UID": "6888bbbafa8ebc5f",
             "BOMRef": "pkg:pypi/flask@3.0.0"
           },
           "Version": "3.0.0",
           "Licenses": [
-            "0BSD"
+            "BSD-3-Clause"
           ],
           "DependsOn": [
             "blinker@1.9.0",
@@ -39,12 +39,12 @@
           "Name": "Jinja2",
           "Identifier": {
             "PURL": "pkg:pypi/jinja2@3.1.6",
-            "UID": "deb25ff7fe0de34a",
+            "UID": "8e578e32f409618c",
             "BOMRef": "pkg:pypi/jinja2@3.1.6"
           },
           "Version": "3.1.6",
           "Licenses": [
-            "0BSD"
+            "BSD-3-Clause"
           ],
           "DependsOn": [
             "MarkupSafe@3.0.3"
@@ -88,12 +88,12 @@
           "Name": "Werkzeug",
           "Identifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "Version": "3.0.1",
           "Licenses": [
-            "0BSD"
+            "BSD-3-Clause"
           ],
           "DependsOn": [
             "MarkupSafe@3.0.3"
@@ -182,12 +182,11 @@
           "Name": "click",
           "Identifier": {
             "PURL": "pkg:pypi/click@8.1.7",
-            "UID": "dc2d5a9b88461eb5",
+            "UID": "fbde0dd0a4415d58",
             "BOMRef": "pkg:pypi/click@8.1.7"
           },
           "Version": "8.1.7",
           "Licenses": [
-            "0BSD",
             "BSD-3-Clause"
           ],
           "Digest": "sha256:ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28"
@@ -275,12 +274,12 @@
           "Name": "itsdangerous",
           "Identifier": {
             "PURL": "pkg:pypi/itsdangerous@2.2.0",
-            "UID": "91b89a56e8573f80",
+            "UID": "a95e3c3ae0a2b066",
             "BOMRef": "pkg:pypi/itsdangerous@2.2.0"
           },
           "Version": "2.2.0",
           "Licenses": [
-            "0BSD"
+            "BSD-3-Clause"
           ],
           "Digest": "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"
         },
@@ -303,10 +302,13 @@
           "Name": "mypy-extensions",
           "Identifier": {
             "PURL": "pkg:pypi/mypy-extensions@1.1.0",
-            "UID": "484648c9e27dce67",
+            "UID": "85fc275088558acf",
             "BOMRef": "pkg:pypi/mypy-extensions@1.1.0"
           },
           "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
           "Digest": "sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505"
         },
         {
@@ -314,13 +316,12 @@
           "Name": "numpy",
           "Identifier": {
             "PURL": "pkg:pypi/numpy@1.26.2",
-            "UID": "fedea355954eae95",
+            "UID": "d9c90f120ec3e14f",
             "BOMRef": "pkg:pypi/numpy@1.26.2"
           },
           "Version": "1.26.2",
           "Licenses": [
-            "0BSD",
-            "Apache-2.0"
+            "BSD-3-Clause"
           ],
           "Digest": "sha256:3703fc9258a4a122d17043e57b35e5ef1c5a5837c3db8be396c82e04c1cf9b0f"
         },
@@ -343,12 +344,12 @@
           "Name": "pandas",
           "Identifier": {
             "PURL": "pkg:pypi/pandas@2.1.4",
-            "UID": "4441bcd71992bd34",
+            "UID": "a52d3ad80fdd4281",
             "BOMRef": "pkg:pypi/pandas@2.1.4"
           },
           "Version": "2.1.4",
           "Licenses": [
-            "0BSD"
+            "BSD-3-Clause"
           ],
           "DependsOn": [
             "numpy@1.26.2",
@@ -508,11 +509,13 @@
           "Name": "python-dateutil",
           "Identifier": {
             "PURL": "pkg:pypi/python-dateutil@2.9.0.post0",
-            "UID": "901f20e86de8e175",
+            "UID": "177e46e79243b4ed",
             "BOMRef": "pkg:pypi/python-dateutil@2.9.0.post0"
           },
           "Version": "2.9.0.post0",
           "Licenses": [
+            "Apache-2.0",
+            "BSD License",
             "Dual License"
           ],
           "DependsOn": [
@@ -525,12 +528,11 @@
           "Name": "python-dotenv",
           "Identifier": {
             "PURL": "pkg:pypi/python-dotenv@1.0.0",
-            "UID": "bee6c108a6e4ef77",
+            "UID": "29137c8ad9695ba6",
             "BOMRef": "pkg:pypi/python-dotenv@1.0.0"
           },
           "Version": "1.0.0",
           "Licenses": [
-            "0BSD",
             "BSD-3-Clause"
           ],
           "Digest": "sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a"
@@ -636,7 +638,7 @@
           "PkgName": "Flask",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/flask@3.0.0",
-            "UID": "5aea5a733827f1e2",
+            "UID": "6888bbbafa8ebc5f",
             "BOMRef": "pkg:pypi/flask@3.0.0"
           },
           "InstalledVersion": "3.0.0",
@@ -699,7 +701,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -766,7 +768,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -828,7 +830,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -901,7 +903,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -961,7 +963,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -1015,7 +1017,7 @@
           "PkgName": "Werkzeug",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/werkzeug@3.0.1",
-            "UID": "f62cd3faa9c36b58",
+            "UID": "1ce851dd4ce32aa4",
             "BOMRef": "pkg:pypi/werkzeug@3.0.1"
           },
           "InstalledVersion": "3.0.1",
@@ -1183,7 +1185,7 @@
           "PkgName": "python-dotenv",
           "PkgIdentifier": {
             "PURL": "pkg:pypi/python-dotenv@1.0.0",
-            "UID": "bee6c108a6e4ef77",
+            "UID": "29137c8ad9695ba6",
             "BOMRef": "pkg:pypi/python-dotenv@1.0.0"
           },
           "InstalledVersion": "1.0.0",
@@ -1283,12 +1285,12 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2025:7049",
+            "https://access.redhat.com/errata/RHSA-2025:0012",
             "https://access.redhat.com/security/cve/CVE-2024-35195",
             "https://bugzilla.redhat.com/2282114",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2282114",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-35195",
-            "https://errata.almalinux.org/9/ALSA-2025-7049.html",
+            "https://errata.almalinux.org/8/ALSA-2025-0012.html",
             "https://errata.rockylinux.org/RLSA-2025:7049",
             "https://github.com/psf/requests",
             "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac",
@@ -1364,12 +1366,12 @@
             "http://www.openwall.com/lists/oss-security/2025/06/03/9",
             "http://www.openwall.com/lists/oss-security/2025/06/04/1",
             "http://www.openwall.com/lists/oss-security/2025/06/04/6",
-            "https://access.redhat.com/errata/RHSA-2025:12519",
+            "https://access.redhat.com/errata/RHSA-2025:14999",
             "https://access.redhat.com/security/cve/CVE-2024-47081",
             "https://bugzilla.redhat.com/2371272",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2371272",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-47081",
-            "https://errata.almalinux.org/9/ALSA-2025-12519.html",
+            "https://errata.almalinux.org/8/ALSA-2025-14999.html",
             "https://errata.rockylinux.org/RLSA-2025:12519",
             "https://github.com/psf/requests",
             "https://github.com/psf/requests/commit/96ba401c1296ab1dda74a2365ef36d88f7d144ef",
@@ -1507,7 +1509,7 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:1239",
+            "https://access.redhat.com/errata/RHSA-2026:1254",
             "https://access.redhat.com/security/cve/CVE-2025-66418",
             "https://bugzilla.redhat.com/2419455",
             "https://bugzilla.redhat.com/2419467",
@@ -1518,7 +1520,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/8/ALSA-2026-1254.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/24d7b67eac89f94e11003424bcf0d8f7b72222a8",
@@ -1592,7 +1594,7 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:1239",
+            "https://access.redhat.com/errata/RHSA-2026:1254",
             "https://access.redhat.com/security/cve/CVE-2025-66471",
             "https://bugzilla.redhat.com/2419455",
             "https://bugzilla.redhat.com/2419467",
@@ -1603,7 +1605,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/8/ALSA-2026-1254.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/c19571de34c47de3a766541b041637ba5f716ed7",
@@ -1803,7 +1805,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
-            "https://errata.almalinux.org/9/ALSA-2026-1239.html",
+            "https://errata.almalinux.org/8/ALSA-2026-1254.html",
             "https://errata.rockylinux.org/RLSA-2026:1087",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/8864ac407bba8607950025e0979c4c69bc7abc7b",
@@ -1851,7 +1853,7 @@
             "CWE-200"
           ],
           "VendorSeverity": {
-            "alma": 3,
+            "alma": 2,
             "amazon": 2,
             "azure": 3,
             "ghsa": 3,
@@ -1878,15 +1880,14 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2026:28159",
+            "https://access.redhat.com/errata/RHSA-2026:49927",
             "https://access.redhat.com/security/cve/CVE-2026-44431",
-            "https://bugzilla.redhat.com/2477154",
             "https://bugzilla.redhat.com/2477167",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2477154",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2477167",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44431",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44432",
-            "https://errata.almalinux.org/9/ALSA-2026-28159.html",
+            "https://errata.almalinux.org/8/ALSA-2026-49927.html",
             "https://errata.rockylinux.org/RLSA-2026:28158",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/security/advisories/GHSA-qccp-gfcp-xxvc",
@@ -1957,12 +1958,12 @@
             }
           },
           "References": [
-            "https://access.redhat.com/errata/RHSA-2024:9458",
+            "https://access.redhat.com/errata/RHSA-2024:8843",
             "https://access.redhat.com/security/cve/CVE-2024-37891",
             "https://bugzilla.redhat.com/2292788",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2292788",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-37891",
-            "https://errata.almalinux.org/9/ALSA-2024-9458.html",
+            "https://errata.almalinux.org/8/ALSA-2024-8843.html",
             "https://errata.rockylinux.org/RLSA-2024:9457",
             "https://github.com/urllib3/urllib3",
             "https://github.com/urllib3/urllib3/commit/40b6d1605814dd1db0a46e202d6e56f2e4c9a468",

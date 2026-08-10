@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for RaspberryPiOsLite
-Generated: 2026-08-09T01:03:47Z
+Generated: 2026-08-10T11:53:01Z
 Total components: 60126 · Distinct licenses: 395
 
 This product includes the following open source software.
@@ -879,7 +879,7 @@ Components (4):
       Source: pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5)
 
-License: BCM_LEGAL
+License: BCM_LEGAL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - bluez-firmware@1.2-13+rpt2
       Source: pkg:deb/debian/bluez-firmware@1.2-13%2Brpt2?arch=all&distro=debian-13.5
@@ -891,13 +891,13 @@ Components (1):
       Source: https://pypi.org/project/oauthlib/3.2.2/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/oauthlib/3.2.2/)
 
-License: BSD 3-Clause License or Apache License, Version 2.0
+License: BSD 3-Clause License or Apache License, Version 2.0  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - uritemplate@4.1.1
       Source: https://pypi.org/project/uritemplate/4.1.1/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/uritemplate/4.1.1/)
 
-License: BSD, Public Domain
+License: BSD, Public Domain  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - pycryptodomex@3.20.0
       Source: https://pypi.org/project/pycryptodomex/3.20.0/
@@ -2104,7 +2104,7 @@ Components (1):
       Source: pkg:deb/debian/libpng16-16t64@1.6.48-1%2Bdeb13u5?arch=arm64&distro=debian-13.5&upstream=libpng1.6
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libpng16-16t64@1.6.48-1%2Bdeb13u5?arch=arm64&distro=debian-13.5&upstream=libpng1.6)
 
-License: BSD-tcp_wrappers
+License: BSD-tcp_wrappers  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (4):
   - libpam-modules-bin@1.7.0-5
       Source: pkg:deb/debian/libpam-modules-bin@1.7.0-5?arch=arm64&distro=debian-13.5&upstream=pam
@@ -2581,23 +2581,23 @@ Components (4):
       Source: pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5)
 
-License: Dual BSD/GPL
+License: Dual BSD/GPL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (136):
   - Linux kernel modules (136), part of linux_kernel@6.18.34+rpt-rpi-2712
       Copyright: holders not captured in SBOM — see source
 
-License: Dual License
+License: Dual License  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python-dateutil@2.9.0
       Source: https://pypi.org/project/python-dateutil/2.9.0/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/python-dateutil/2.9.0/)
 
-License: Dual MIT/GPL
+License: Dual MIT/GPL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (3):
   - Linux kernel modules (3), part of linux_kernel@6.18.34+rpt-rpi-2712
       Copyright: holders not captured in SBOM — see source
 
-License: Dual-licensed under GPLv3 or Apache 2.0
+License: Dual-licensed under GPLv3 or Apache 2.0  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - cloud-init@25.2
       Source: https://pypi.org/project/cloud-init/25.2/
@@ -3029,13 +3029,13 @@ Components (7):
       Source: pkg:deb/debian/sed@4.9-2%2Bdeb13u1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/sed@4.9-2%2Bdeb13u1?arch=arm64&distro=debian-13.5)
 
-License: GNU GPL
+License: GNU GPL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python-apt@3.0.0
       Source: https://pypi.org/project/python-apt/3.0.0/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/python-apt/3.0.0/)
 
-License: GNU GPLv3+
+License: GNU GPLv3+  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - rfc3987@1.3.8
       Source: https://pypi.org/project/rfc3987/1.3.8/
@@ -3084,12 +3084,12 @@ Components (1460):
       Source: pkg:deb/debian/ncdu@1.22-1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/ncdu@1.22-1?arch=arm64&distro=debian-13.5)
 
-License: GPL and additional rights
+License: GPL and additional rights  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (5):
   - Linux kernel modules (5), part of linux_kernel@6.18.34+rpt-rpi-2712
       Copyright: holders not captured in SBOM — see source
 
-License: GPL v2
+License: GPL v2  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (312):
   - Linux kernel modules (312), part of linux_kernel@6.18.34+rpt-rpi-2712
       Copyright: holders not captured in SBOM — see source
@@ -8745,7 +8745,7 @@ Components (1):
       Source: pkg:deb/debian/libdb5.3t64@5.3.28%2Bdfsg2-9?arch=arm64&distro=debian-13.5&upstream=db5.3
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libdb5.3t64@5.3.28%2Bdfsg2-9?arch=arm64&distro=debian-13.5&upstream=db5.3)
 
-License: MIT/X
+License: MIT/X  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (3):
   - libluajit-5.1-2@2.1.0+openresty20250117-2
       Source: pkg:deb/debian/libluajit-5.1-2@2.1.0%2Bopenresty20250117-2?arch=arm64&distro=debian-13.5&upstream=luajit
@@ -8757,7 +8757,7 @@ Components (3):
       Source: pkg:deb/debian/luajit@2.1.0%2Bopenresty20250117-2?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/luajit@2.1.0%2Bopenresty20250117-2?arch=arm64&distro=debian-13.5)
 
-License: MIT/X11
+License: MIT/X11  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (5):
   - libncursesw6@6.5+20250216-2
       Source: pkg:deb/debian/libncursesw6@6.5%2B20250216-2?arch=arm64&distro=debian-13.5&upstream=ncurses
@@ -8775,7 +8775,7 @@ Components (5):
       Source: pkg:deb/debian/ncurses-term@6.5%2B20250216-2?arch=all&distro=debian-13.5&upstream=ncurses
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/ncurses-term@6.5%2B20250216-2?arch=all&distro=debian-13.5&upstream=ncurses)
 
-License: MPL 2.0
+License: MPL 2.0  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - fqdn@1.5.1
       Source: https://pypi.org/project/fqdn/1.5.1/
@@ -8874,7 +8874,7 @@ Components (2):
       Source: pkg:deb/debian/libglib2.0-data@2.84.4-3~deb13u3?arch=all&distro=debian-13.5&upstream=glib2.0
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libglib2.0-data@2.84.4-3~deb13u3?arch=all&distro=debian-13.5&upstream=glib2.0)
 
-License: Modified BSD License
+License: Modified BSD License  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - jsonpatch@1.32
       Source: https://pypi.org/project/jsonpatch/1.32/
@@ -9326,7 +9326,7 @@ Components (1):
       Source: pkg:deb/debian/python3-charset-normalizer@3.4.2-1?arch=arm64&distro=debian-13.5&upstream=python-charset-normalizer
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/python3-charset-normalizer@3.4.2-1?arch=arm64&distro=debian-13.5&upstream=python-charset-normalizer)
 
-License: Paul-Vixie's-license
+License: Paul-Vixie's-license  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - cron-daemon-common@3.0pl1-197
       Source: pkg:deb/debian/cron-daemon-common@3.0pl1-197?arch=all&distro=debian-13.5&upstream=cron
@@ -9380,7 +9380,7 @@ Components (4):
       Source: pkg:deb/debian/ssh@1%3A10.0p1-7%2Bdeb13u4?arch=all&distro=debian-13.5&upstream=openssh
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/ssh@1%3A10.0p1-7%2Bdeb13u4?arch=all&distro=debian-13.5&upstream=openssh)
 
-License: Proprietary_1
+License: Proprietary_1  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - raspi-firmware@1:1.20260521-3
       Source: pkg:deb/debian/raspi-firmware@1%3A1.20260521-3?arch=all&distro=debian-13.5
@@ -9440,7 +9440,7 @@ Components (4):
       Source: pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/perl@5.40.1-6?arch=arm64&distro=debian-13.5)
 
-License: REGCOMP,
+License: REGCOMP,  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (4):
   - libperl5.40@5.40.1-6
       Source: pkg:deb/debian/libperl5.40@5.40.1-6?arch=arm64&distro=debian-13.5&upstream=perl
@@ -11946,43 +11946,43 @@ Components (1):
       Source: pkg:deb/debian/libogg0@1.3.5-3%2Bb2?arch=arm64&distro=debian-13.5&upstream=libogg%401.3.5-3
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libogg0@1.3.5-3%2Bb2?arch=arm64&distro=debian-13.5&upstream=libogg%401.3.5-3)
 
-License: sha256:03733b4bcdbe83fc4a2d087d3eed34f70c4de08f833eb24a7075b76e80ee8c8d
+License: sha256:03733b4bcdbe83fc4a2d087d3eed34f70c4de08f833eb24a7075b76e80ee8c8d  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - zip@3.0-15
       Source: pkg:deb/debian/zip@3.0-15?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/zip@3.0-15?arch=arm64&distro=debian-13.5)
 
-License: sha256:118dd263a7b91c8f21c489f949bf13281dff9e766deea92b829dac4dce66601a
+License: sha256:118dd263a7b91c8f21c489f949bf13281dff9e766deea92b829dac4dce66601a  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxau6@1:1.0.11-1
       Source: pkg:deb/debian/libxau6@1%3A1.0.11-1?arch=arm64&distro=debian-13.5&upstream=libxau
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libxau6@1%3A1.0.11-1?arch=arm64&distro=debian-13.5&upstream=libxau)
 
-License: sha256:1433f148a620b82fd8a5103a9199b461a099e7eafa8fd890cd8b32f42a7a0cd8
+License: sha256:1433f148a620b82fd8a5103a9199b461a099e7eafa8fd890cd8b32f42a7a0cd8  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - exfatprogs@1.2.9-1+deb13u1
       Source: pkg:deb/debian/exfatprogs@1.2.9-1%2Bdeb13u1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/exfatprogs@1.2.9-1%2Bdeb13u1?arch=arm64&distro=debian-13.5)
 
-License: sha256:15a3a4d6627af76c0649067260debca0eb66248b96e5fda4f564aac38593e06f
+License: sha256:15a3a4d6627af76c0649067260debca0eb66248b96e5fda4f564aac38593e06f  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxmuu1@2:1.1.3-3+b4
       Source: pkg:deb/debian/libxmuu1@2%3A1.1.3-3%2Bb4?arch=arm64&distro=debian-13.5&upstream=libxmu%402%3A1.1.3-3
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libxmuu1@2%3A1.1.3-3%2Bb4?arch=arm64&distro=debian-13.5&upstream=libxmu%402%3A1.1.3-3)
 
-License: sha256:179c34f5e56cd0b6b73dd7970a97357ee784e2236e8293826656c7ebb3bface7
+License: sha256:179c34f5e56cd0b6b73dd7970a97357ee784e2236e8293826656c7ebb3bface7  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libnuma1@2.0.19-1
       Source: pkg:deb/debian/libnuma1@2.0.19-1?arch=arm64&distro=debian-13.5&upstream=numactl
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libnuma1@2.0.19-1?arch=arm64&distro=debian-13.5&upstream=numactl)
 
-License: sha256:1bcbb50f8603fe8b86d330bfa460b772ea04fbd3c70e4499f0768b5340b9fd6e
+License: sha256:1bcbb50f8603fe8b86d330bfa460b772ea04fbd3c70e4499f0768b5340b9fd6e  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxdmcp6@1:1.1.5-1
       Source: pkg:deb/debian/libxdmcp6@1%3A1.1.5-1?arch=arm64&distro=debian-13.5&upstream=libxdmcp
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libxdmcp6@1%3A1.1.5-1?arch=arm64&distro=debian-13.5&upstream=libxdmcp)
 
-License: sha256:20390f8a6f3b1e4d7cb45dd8652dabb259bbef688cbad839bcdb0b9ba7252f79
+License: sha256:20390f8a6f3b1e4d7cb45dd8652dabb259bbef688cbad839bcdb0b9ba7252f79  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (22):
   - cpp-14-aarch64-linux-gnu@14.2.0-19
       Source: pkg:deb/debian/cpp-14-aarch64-linux-gnu@14.2.0-19?arch=arm64&distro=debian-13.5&upstream=gcc-14
@@ -12051,7 +12051,7 @@ Components (22):
       Source: pkg:deb/debian/libubsan1@14.2.0-19?arch=arm64&distro=debian-13.5&upstream=gcc-14
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libubsan1@14.2.0-19?arch=arm64&distro=debian-13.5&upstream=gcc-14)
 
-License: sha256:20a9818b14f941467bcc0f459a1b1951e3bfecc1cc259e5004f8b9a80d7dc804
+License: sha256:20a9818b14f941467bcc0f459a1b1951e3bfecc1cc259e5004f8b9a80d7dc804  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (8):
   - binutils-aarch64-linux-gnu@2.44-3
       Source: pkg:deb/debian/binutils-aarch64-linux-gnu@2.44-3?arch=arm64&distro=debian-13.5&upstream=binutils
@@ -12078,61 +12078,61 @@ Components (8):
       Source: pkg:deb/debian/libsframe1@2.44-3?arch=arm64&distro=debian-13.5&upstream=binutils
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libsframe1@2.44-3?arch=arm64&distro=debian-13.5&upstream=binutils)
 
-License: sha256:289d796794edf8c547691e415ddd7ba3396e6e6d8de03397bd69ce9515914bf8
+License: sha256:289d796794edf8c547691e415ddd7ba3396e6e6d8de03397bd69ce9515914bf8  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - wget@1.25.0-2
       Source: pkg:deb/debian/wget@1.25.0-2?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/wget@1.25.0-2?arch=arm64&distro=debian-13.5)
 
-License: sha256:336d995e819d3a7a3fdbf3f5041c07094f75ee849acb3bb742b7503d45786329
+License: sha256:336d995e819d3a7a3fdbf3f5041c07094f75ee849acb3bb742b7503d45786329  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - busybox@1:1.37.0-6+b8
       Source: pkg:deb/debian/busybox@1%3A1.37.0-6%2Bb8?arch=arm64&distro=debian-13.5&upstream=busybox%401%3A1.37.0-6
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/busybox@1%3A1.37.0-6%2Bb8?arch=arm64&distro=debian-13.5&upstream=busybox%401%3A1.37.0-6)
 
-License: sha256:35f7f9792a4d64ef293878893d5cf07e09d2e5eb87fd17a4c0f47d66d4735c0c
+License: sha256:35f7f9792a4d64ef293878893d5cf07e09d2e5eb87fd17a4c0f47d66d4735c0c  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - xauth@1:1.1.2-1.1
       Source: pkg:deb/debian/xauth@1%3A1.1.2-1.1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/xauth@1%3A1.1.2-1.1?arch=arm64&distro=debian-13.5)
 
-License: sha256:3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf
+License: sha256:3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - typing-extensions@4.12.2
       Source: https://pypi.org/project/typing-extensions/4.12.2/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/typing-extensions/4.12.2/)
 
-License: sha256:4302abcc1ea1b6cbe8d19c79b892acf78878030220210707c19006828866207c
+License: sha256:4302abcc1ea1b6cbe8d19c79b892acf78878030220210707c19006828866207c  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - librtmp1@2.4+20151223.gitfa8646d.1-2+b5
       Source: pkg:deb/debian/librtmp1@2.4%2B20151223.gitfa8646d.1-2%2Bb5?arch=arm64&distro=debian-13.5&upstream=rtmpdump%402.4%2B20151223.gitfa8646d.1-2
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/librtmp1@2.4%2B20151223.gitfa8646d.1-2%2Bb5?arch=arm64&distro=debian-13.5&upstream=rtmpdump%402.4%2B20151223.gitfa8646d.1-2)
 
-License: sha256:45f2bd1337c3a154cc47b3e9dac295708f8eb8c919c8b821451a1214ad4e6ad1
+License: sha256:45f2bd1337c3a154cc47b3e9dac295708f8eb8c919c8b821451a1214ad4e6ad1  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python3-yaml@6.0.2-1+b2
       Source: pkg:deb/debian/python3-yaml@6.0.2-1%2Bb2?arch=arm64&distro=debian-13.5&upstream=pyyaml%406.0.2-1
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/python3-yaml@6.0.2-1%2Bb2?arch=arm64&distro=debian-13.5&upstream=pyyaml%406.0.2-1)
 
-License: sha256:4f7cb9db6bf6542f5417e3d674c780d3a5fd12291a54d63054fb576ee0cfae80
+License: sha256:4f7cb9db6bf6542f5417e3d674c780d3a5fd12291a54d63054fb576ee0cfae80  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxcb1@1.17.0-2+b1
       Source: pkg:deb/debian/libxcb1@1.17.0-2%2Bb1?arch=arm64&distro=debian-13.5&upstream=libxcb%401.17.0-2
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libxcb1@1.17.0-2%2Bb1?arch=arm64&distro=debian-13.5&upstream=libxcb%401.17.0-2)
 
-License: sha256:4feae258cab1ad4743fb569a77e0b2a5b7a0199520bdbc0a613916291b9aa8a8
+License: sha256:4feae258cab1ad4743fb569a77e0b2a5b7a0199520bdbc0a613916291b9aa8a8  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libgcrypt20@1.11.0-7+deb13u1
       Source: pkg:deb/debian/libgcrypt20@1.11.0-7%2Bdeb13u1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libgcrypt20@1.11.0-7%2Bdeb13u1?arch=arm64&distro=debian-13.5)
 
-License: sha256:5145b47d997486e5327091374e807046a32216168b6f2bbf6d1816f60927686c
+License: sha256:5145b47d997486e5327091374e807046a32216168b6f2bbf6d1816f60927686c  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - shared-mime-info@2.4-5+b2
       Source: pkg:deb/debian/shared-mime-info@2.4-5%2Bb2?arch=arm64&distro=debian-13.5&upstream=shared-mime-info%402.4-5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/shared-mime-info@2.4-5%2Bb2?arch=arm64&distro=debian-13.5&upstream=shared-mime-info%402.4-5)
 
-License: sha256:5a5e7ca0e9f3f9679977e3a3e9ede45ad92885a3297ea78e766979f9866c5a16
+License: sha256:5a5e7ca0e9f3f9679977e3a3e9ede45ad92885a3297ea78e766979f9866c5a16  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - libcrypt-dev@1:4.4.38-1
       Source: pkg:deb/debian/libcrypt-dev@1%3A4.4.38-1?arch=arm64&distro=debian-13.5&upstream=libxcrypt
@@ -12141,7 +12141,7 @@ Components (2):
       Source: pkg:deb/debian/libcrypt1@1%3A4.4.38-1?arch=arm64&distro=debian-13.5&upstream=libxcrypt
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libcrypt1@1%3A4.4.38-1?arch=arm64&distro=debian-13.5&upstream=libxcrypt)
 
-License: sha256:5b274dbb44b28a54b795b9471c07ab045054d6b8a86273cb9feb632b6fd2760d
+License: sha256:5b274dbb44b28a54b795b9471c07ab045054d6b8a86273cb9feb632b6fd2760d  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (4):
   - libpython3-stdlib@3.13.5-1
       Source: pkg:deb/debian/libpython3-stdlib@3.13.5-1?arch=arm64&distro=debian-13.5&upstream=python3-defaults
@@ -12156,31 +12156,31 @@ Components (4):
       Source: pkg:deb/debian/python3@3.13.5-1?arch=arm64&distro=debian-13.5&upstream=python3-defaults
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/python3@3.13.5-1?arch=arm64&distro=debian-13.5&upstream=python3-defaults)
 
-License: sha256:5f9f7b538d221104bdb561ae80fd794ec5f813eb8fd04650293bddcc0f856e7d
+License: sha256:5f9f7b538d221104bdb561ae80fd794ec5f813eb8fd04650293bddcc0f856e7d  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libtasn1-6@4.20.0-2
       Source: pkg:deb/debian/libtasn1-6@4.20.0-2?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libtasn1-6@4.20.0-2?arch=arm64&distro=debian-13.5)
 
-License: sha256:62f4bbaeb37f9e2c0795dd3ea7b1bfcf34fc9fef7a680bd863ee50fae0b4cf12
+License: sha256:62f4bbaeb37f9e2c0795dd3ea7b1bfcf34fc9fef7a680bd863ee50fae0b4cf12  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libksba8@1.6.7-2+b1
       Source: pkg:deb/debian/libksba8@1.6.7-2%2Bb1?arch=arm64&distro=debian-13.5&upstream=libksba%401.6.7-2
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libksba8@1.6.7-2%2Bb1?arch=arm64&distro=debian-13.5&upstream=libksba%401.6.7-2)
 
-License: sha256:648621d1a2180678818eb393565849bbc8b332cc521c21e009d948ea5541b3c3
+License: sha256:648621d1a2180678818eb393565849bbc8b332cc521c21e009d948ea5541b3c3  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - xkb-data@2.42-1
       Source: pkg:deb/debian/xkb-data@2.42-1?arch=all&distro=debian-13.5&upstream=xkeyboard-config
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/xkb-data@2.42-1?arch=all&distro=debian-13.5&upstream=xkeyboard-config)
 
-License: sha256:6491fe121e57c71bcbc7b7875c6225df12a797edfc199d361b9ef6d1a93ebfc2
+License: sha256:6491fe121e57c71bcbc7b7875c6225df12a797edfc199d361b9ef6d1a93ebfc2  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - ppp@2.5.2-1+1
       Source: pkg:deb/debian/ppp@2.5.2-1%2B1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/ppp@2.5.2-1%2B1?arch=arm64&distro=debian-13.5)
 
-License: sha256:66849d0ab7cbf0d770e40e00276ed8d264ed8974c0e064fb12814c0f80430c5d
+License: sha256:66849d0ab7cbf0d770e40e00276ed8d264ed8974c0e064fb12814c0f80430c5d  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (4):
   - avahi-daemon@0.8-16
       Source: pkg:deb/debian/avahi-daemon@0.8-16?arch=arm64&distro=debian-13.5&upstream=avahi
@@ -12195,25 +12195,25 @@ Components (4):
       Source: pkg:deb/debian/libavahi-core7@0.8-16?arch=arm64&distro=debian-13.5&upstream=avahi
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libavahi-core7@0.8-16?arch=arm64&distro=debian-13.5&upstream=avahi)
 
-License: sha256:6b0e609cf98f7abd39d3b81100fdb2bed24dcaee6656b500fcecb392db70dc60
+License: sha256:6b0e609cf98f7abd39d3b81100fdb2bed24dcaee6656b500fcecb392db70dc60  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libpcap0.8t64@1.10.5-2
       Source: pkg:deb/debian/libpcap0.8t64@1.10.5-2?arch=arm64&distro=debian-13.5&upstream=libpcap
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libpcap0.8t64@1.10.5-2?arch=arm64&distro=debian-13.5&upstream=libpcap)
 
-License: sha256:80763e4cca3963670637b98abff467ee09b83d1737d683ad5ccfb1e919bea94b
+License: sha256:80763e4cca3963670637b98abff467ee09b83d1737d683ad5ccfb1e919bea94b  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libmpc3@1.3.1-1+b3
       Source: pkg:deb/debian/libmpc3@1.3.1-1%2Bb3?arch=arm64&distro=debian-13.5&upstream=mpclib3%401.3.1-1
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libmpc3@1.3.1-1%2Bb3?arch=arm64&distro=debian-13.5&upstream=mpclib3%401.3.1-1)
 
-License: sha256:8e83684abbeb1642c708f095ed64db3c1da881fd4418e31c3f42098ed2047fd1
+License: sha256:8e83684abbeb1642c708f095ed64db3c1da881fd4418e31c3f42098ed2047fd1  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - groff-base@1.23.0-9
       Source: pkg:deb/debian/groff-base@1.23.0-9?arch=arm64&distro=debian-13.5&upstream=groff
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/groff-base@1.23.0-9?arch=arm64&distro=debian-13.5&upstream=groff)
 
-License: sha256:8f918c0bebd1454a084698a95c09d9a03cec8453dad1fc6eab9e6427da9d33a9
+License: sha256:8f918c0bebd1454a084698a95c09d9a03cec8453dad1fc6eab9e6427da9d33a9  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - debian-archive-keyring@2025.1
       Source: pkg:deb/debian/debian-archive-keyring@2025.1?arch=all&distro=debian-13.5
@@ -12222,13 +12222,13 @@ Components (2):
       Source: pkg:deb/debian/raspberrypi-archive-keyring@2025.1%2Brpt1?arch=all&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/raspberrypi-archive-keyring@2025.1%2Brpt1?arch=all&distro=debian-13.5)
 
-License: sha256:8fea73a6a82aa48f7b00aa9f88a6a36935528f60e2f79799e521754e1621bcf4
+License: sha256:8fea73a6a82aa48f7b00aa9f88a6a36935528f60e2f79799e521754e1621bcf4  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - xdg-user-dirs@0.18-2
       Source: pkg:deb/debian/xdg-user-dirs@0.18-2?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/xdg-user-dirs@0.18-2?arch=arm64&distro=debian-13.5)
 
-License: sha256:936728f4181718f42951b881c1e8f1386bf6b2723c4fbc533c374d6f42c71816
+License: sha256:936728f4181718f42951b881c1e8f1386bf6b2723c4fbc533c374d6f42c71816  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (4):
   - libgssapi-krb5-2@1.21.3-5+deb13u1
       Source: pkg:deb/debian/libgssapi-krb5-2@1.21.3-5%2Bdeb13u1?arch=arm64&distro=debian-13.5&upstream=krb5
@@ -12243,7 +12243,7 @@ Components (4):
       Source: pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=arm64&distro=debian-13.5&upstream=krb5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libkrb5support0@1.21.3-5%2Bdeb13u1?arch=arm64&distro=debian-13.5&upstream=krb5)
 
-License: sha256:9a3730df4bb18c8be5fdce05b9223f9b152b6bf40f7e45319529830ecd413eb2
+License: sha256:9a3730df4bb18c8be5fdce05b9223f9b152b6bf40f7e45319529830ecd413eb2  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (3):
   - libnl-3-200@3.7.0-2
       Source: pkg:deb/debian/libnl-3-200@3.7.0-2?arch=arm64&distro=debian-13.5&upstream=libnl3
@@ -12255,7 +12255,7 @@ Components (3):
       Source: pkg:deb/debian/libnl-route-3-200@3.7.0-2?arch=arm64&distro=debian-13.5&upstream=libnl3
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libnl-route-3-200@3.7.0-2?arch=arm64&distro=debian-13.5&upstream=libnl3)
 
-License: sha256:9aed29abee9d52d714b393c54a3394dba936694091a984b6d367fbb68cc5547c
+License: sha256:9aed29abee9d52d714b393c54a3394dba936694091a984b6d367fbb68cc5547c  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (3):
   - console-setup-linux@1.242~deb13u1
       Source: pkg:deb/debian/console-setup-linux@1.242~deb13u1?arch=all&distro=debian-13.5&upstream=console-setup
@@ -12267,19 +12267,19 @@ Components (3):
       Source: pkg:deb/debian/keyboard-configuration@1.242~deb13u1?arch=all&distro=debian-13.5&upstream=console-setup
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/keyboard-configuration@1.242~deb13u1?arch=all&distro=debian-13.5&upstream=console-setup)
 
-License: sha256:a07e99815cf1998f1dabbc21fe199460bfa09b85ead0d56b49a32cac3d1791b5
+License: sha256:a07e99815cf1998f1dabbc21fe199460bfa09b85ead0d56b49a32cac3d1791b5  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libgnutls30t64@3.8.9-3+deb13u4
       Source: pkg:deb/debian/libgnutls30t64@3.8.9-3%2Bdeb13u4?arch=arm64&distro=debian-13.5&upstream=gnutls28
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libgnutls30t64@3.8.9-3%2Bdeb13u4?arch=arm64&distro=debian-13.5&upstream=gnutls28)
 
-License: sha256:aacc60ee90cc889820675362044cce73adf6bd97ed39cf847bb902ccdf6a4b63
+License: sha256:aacc60ee90cc889820675362044cce73adf6bd97ed39cf847bb902ccdf6a4b63  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - unzip@6.0-29
       Source: pkg:deb/debian/unzip@6.0-29?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/unzip@6.0-29?arch=arm64&distro=debian-13.5)
 
-License: sha256:ac5dc105c35406f178ab0476347c18957e1300d7264ce4381e27aacd60e1cc24
+License: sha256:ac5dc105c35406f178ab0476347c18957e1300d7264ce4381e27aacd60e1cc24  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - libiw30t64@30~pre9-18+b1
       Source: pkg:deb/debian/libiw30t64@30~pre9-18%2Bb1?arch=arm64&distro=debian-13.5&upstream=wireless-tools%4030~pre9-18
@@ -12288,37 +12288,37 @@ Components (2):
       Source: pkg:deb/debian/wireless-tools@30~pre9-18%2Bb1?arch=arm64&distro=debian-13.5&upstream=wireless-tools%4030~pre9-18
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/wireless-tools@30~pre9-18%2Bb1?arch=arm64&distro=debian-13.5&upstream=wireless-tools%4030~pre9-18)
 
-License: sha256:bc57e445ca1d9fe082c8d54189dd411ff26caa8552c9c63d44ea06a982f32124
+License: sha256:bc57e445ca1d9fe082c8d54189dd411ff26caa8552c9c63d44ea06a982f32124  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxext6@2:1.3.4-1+b3
       Source: pkg:deb/debian/libxext6@2%3A1.3.4-1%2Bb3?arch=arm64&distro=debian-13.5&upstream=libxext%402%3A1.3.4-1
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libxext6@2%3A1.3.4-1%2Bb3?arch=arm64&distro=debian-13.5&upstream=libxext%402%3A1.3.4-1)
 
-License: sha256:bfc258d27d325eaba426c9a68bf4043a5aa1818f7e4aafee4ad65a2656eba6e0
+License: sha256:bfc258d27d325eaba426c9a68bf4043a5aa1818f7e4aafee4ad65a2656eba6e0  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - flashrom@1.4.0-3+rpt1
       Source: pkg:deb/debian/flashrom@1.4.0-3%2Brpt1?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/flashrom@1.4.0-3%2Brpt1?arch=arm64&distro=debian-13.5)
 
-License: sha256:c0855d496a9e7ac42a530e93fecb931c0c2e31193171b8d9388ff8f9808de2b7
+License: sha256:c0855d496a9e7ac42a530e93fecb931c0c2e31193171b8d9388ff8f9808de2b7  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libatasmart4@0.19-5+b2
       Source: pkg:deb/debian/libatasmart4@0.19-5%2Bb2?arch=arm64&distro=debian-13.5&upstream=libatasmart%400.19-5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libatasmart4@0.19-5%2Bb2?arch=arm64&distro=debian-13.5&upstream=libatasmart%400.19-5)
 
-License: sha256:c434a44e656a89e72b5cee13bba6719011e0899bfc626ab9c08205010ab2dbbe
+License: sha256:c434a44e656a89e72b5cee13bba6719011e0899bfc626ab9c08205010ab2dbbe  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libmpfr6@4.2.2-1
       Source: pkg:deb/debian/libmpfr6@4.2.2-1?arch=arm64&distro=debian-13.5&upstream=mpfr4
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libmpfr6@4.2.2-1?arch=arm64&distro=debian-13.5&upstream=mpfr4)
 
-License: sha256:cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48
+License: sha256:cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - packaging@24.2
       Source: https://pypi.org/project/packaging/24.2/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/packaging/24.2/)
 
-License: sha256:d0f580bd7629b15b6bb1b36468b51182545a8002612a030fca39fec2e3203707
+License: sha256:d0f580bd7629b15b6bb1b36468b51182545a8002612a030fca39fec2e3203707  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - klibc-utils@2.0.14-1
       Source: pkg:deb/debian/klibc-utils@2.0.14-1?arch=arm64&distro=debian-13.5&upstream=klibc
@@ -12327,7 +12327,7 @@ Components (2):
       Source: pkg:deb/debian/libklibc@2.0.14-1?arch=arm64&distro=debian-13.5&upstream=klibc
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libklibc@2.0.14-1?arch=arm64&distro=debian-13.5&upstream=klibc)
 
-License: sha256:f1cbf908e1daa8789b389fdcf17811ed36b675d736b39a103591399861350382
+License: sha256:f1cbf908e1daa8789b389fdcf17811ed36b675d736b39a103591399861350382  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (6):
   - libpython3.13-minimal@3.13.5-2+deb13u2
       Source: pkg:deb/debian/libpython3.13-minimal@3.13.5-2%2Bdeb13u2?arch=arm64&distro=debian-13.5&upstream=python3.13
@@ -12348,7 +12348,7 @@ Components (6):
       Source: pkg:deb/debian/python3.13@3.13.5-2%2Bdeb13u2?arch=arm64&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/python3.13@3.13.5-2%2Bdeb13u2?arch=arm64&distro=debian-13.5)
 
-License: sha256:f3be4874598a121349c16fdb3d000703d871807558f26ac876c83cb35f1bc804
+License: sha256:f3be4874598a121349c16fdb3d000703d871807558f26ac876c83cb35f1bc804  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (2):
   - fakeroot@1.37.1.1-1
       Source: pkg:deb/debian/fakeroot@1.37.1.1-1?arch=arm64&distro=debian-13.5
@@ -12357,13 +12357,13 @@ Components (2):
       Source: pkg:deb/debian/libfakeroot@1.37.1.1-1?arch=arm64&distro=debian-13.5&upstream=fakeroot
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libfakeroot@1.37.1.1-1?arch=arm64&distro=debian-13.5&upstream=fakeroot)
 
-License: sha256:f83511c0a26bca057b7381dadfaa94cc6c635d360add92fa7964455ebe6aad46
+License: sha256:f83511c0a26bca057b7381dadfaa94cc6c635d360add92fa7964455ebe6aad46  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - usb-modeswitch-data@20191128-7
       Source: pkg:deb/debian/usb-modeswitch-data@20191128-7?arch=all&distro=debian-13.5
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/usb-modeswitch-data@20191128-7?arch=all&distro=debian-13.5)
 
-License: sha256:f997ae27f25db0ddac1b8c852720175ca6ef6e624de11f02afd46cb3954d66aa
+License: sha256:f997ae27f25db0ddac1b8c852720175ca6ef6e624de11f02afd46cb3954d66aa  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libdaemon0@0.14-7.1+b3
       Source: pkg:deb/debian/libdaemon0@0.14-7.1%2Bb3?arch=arm64&distro=debian-13.5&upstream=libdaemon%400.14-7.1

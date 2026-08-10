@@ -25,10 +25,6 @@
       "type": "file"
     },
     {
-      "path": "README.md",
-      "type": "file"
-    },
-    {
       "path": "src/.gitkeep",
       "type": "file"
     },
@@ -41,6 +37,10 @@
       "type": "file"
     },
     {
+      "path": "src/main/java/com/.gitkeep",
+      "type": "file"
+    },
+    {
       "path": "src/main/java/com/example/Application.java",
       "type": "file"
     },
@@ -49,7 +49,7 @@
       "type": "file"
     },
     {
-      "path": "src/main/java/com/.gitkeep",
+      "path": "README.md",
       "type": "file"
     }
   ]

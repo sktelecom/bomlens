@@ -8,21 +8,21 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.7.0",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.7.0",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
           "type": "application",
-          "version": "12.7.0"
+          "version": "12.8.3"
         }
       },
       "bom-ref": "metadata-annotations",
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, August 9, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-08-09T02:21:08Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, August 10, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-08-10T11:32:15Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -57,12 +57,56 @@
         {
           "license": {
             "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/EPL-1.0"
           }
         },
         {
           "license": {
             "id": "LGPL-2.1-only",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/LGPL-2.1-only"
           }
         }
@@ -72,6 +116,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
         },
         {
           "name": "bomlens:licenseClass",
@@ -127,12 +175,56 @@
         {
           "license": {
             "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/EPL-1.0"
           }
         },
         {
           "license": {
             "id": "LGPL-2.1-only",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/LGPL-2.1-only"
           }
         }
@@ -142,6 +234,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
         },
         {
           "name": "bomlens:licenseClass",
@@ -197,6 +293,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -206,6 +324,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -261,6 +383,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -270,6 +414,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -324,6 +472,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -333,6 +503,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -387,6 +561,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
           }
         }
@@ -396,6 +592,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -450,6 +650,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
           }
         }
@@ -459,6 +681,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -513,6 +739,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
           }
         }
@@ -522,6 +770,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -576,6 +828,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -585,6 +859,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -640,12 +918,56 @@
         {
           "license": {
             "id": "MPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/MPL-2.0"
           }
         },
         {
           "license": {
             "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/EPL-1.0"
           }
         }
@@ -655,6 +977,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
         },
         {
           "name": "bomlens:licenseClass",
@@ -722,6 +1048,10 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         },
@@ -768,6 +1098,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -777,6 +1129,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -829,6 +1185,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -838,6 +1216,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -886,6 +1268,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -895,6 +1299,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -948,6 +1356,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://github.com/smallrye/jandex/blob/main/LICENSE.txt"
           }
         }
@@ -957,6 +1387,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1024,6 +1458,10 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         },
@@ -1075,16 +1513,7 @@
       "group": "jakarta.annotation",
       "licenses": [
         {
-          "license": {
-            "id": "EPL-2.0",
-            "url": "https://opensource.org/licenses/EPL-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "GPL-2.0-with-classpath-exception",
-            "url": "https://opensource.org/licenses/GPL-2.0-with-classpath-exception"
-          }
+          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
         }
       ],
       "name": "jakarta.annotation-api",
@@ -1099,11 +1528,11 @@
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "conditional"
+          "value": "unknown"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+          "value": "The dependency's license was not recognised."
         },
         {
           "name": "bomlens:cpeSource",
@@ -1147,6 +1576,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1156,6 +1607,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1209,7 +1664,37 @@
       "group": "jakarta.persistence",
       "licenses": [
         {
-          "expression": "Eclipse Public License v. 2.0 OR Eclipse Distribution License v. 1.0"
+          "license": {
+            "id": "EPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
         }
       ],
       "name": "jakarta.persistence-api",
@@ -1219,16 +1704,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited, Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "weak-copyleft"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The dependency's license was not recognised."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -1270,16 +1759,7 @@
       "group": "jakarta.transaction",
       "licenses": [
         {
-          "license": {
-            "id": "EPL-2.0",
-            "url": "https://opensource.org/licenses/EPL-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "GPL-2.0-with-classpath-exception",
-            "url": "https://opensource.org/licenses/GPL-2.0-with-classpath-exception"
-          }
+          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
         }
       ],
       "name": "jakarta.transaction-api",
@@ -1294,11 +1774,11 @@
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "conditional"
+          "value": "unknown"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+          "value": "The dependency's license was not recognised."
         },
         {
           "name": "bomlens:cpeSource",
@@ -1352,6 +1832,10 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         },
@@ -1401,6 +1885,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1410,6 +1916,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1464,6 +1974,28 @@
         {
           "license": {
             "id": "BSD-2-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/BSD-2-Clause"
           }
         }
@@ -1473,6 +2005,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1528,6 +2064,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1537,6 +2095,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1588,6 +2150,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1597,6 +2181,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1648,6 +2236,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1657,6 +2267,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1710,6 +2324,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1719,6 +2355,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1771,6 +2411,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1780,6 +2442,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1832,6 +2498,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -1841,6 +2529,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1899,6 +2591,28 @@
         {
           "license": {
             "id": "EPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/EPL-2.0"
           }
         }
@@ -1908,6 +2622,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1972,6 +2690,10 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         },
@@ -2034,6 +2756,10 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "permissive"
         },
@@ -2079,8 +2805,30 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -2089,6 +2837,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2136,8 +2888,30 @@
       "licenses": [
         {
           "license": {
-            "id": "0BSD",
-            "url": "https://opensource.org/licenses/0BSD"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -2146,6 +2920,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2335,7 +3113,30 @@
       "licenses": [
         {
           "license": {
-            "id": "Apache-2.0"
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -2344,6 +3145,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2457,6 +3262,28 @@
         {
           "license": {
             "id": "MIT",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/MIT"
           }
         }
@@ -2466,6 +3293,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2525,6 +3356,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -2534,6 +3387,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2569,7 +3426,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -2620,6 +3477,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -2629,6 +3508,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2664,7 +3547,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -2716,6 +3599,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -2725,6 +3630,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2760,7 +3669,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -2811,6 +3720,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -2820,6 +3751,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2855,7 +3790,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -2907,6 +3842,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -2916,6 +3873,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2951,7 +3912,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3002,6 +3963,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3011,6 +3994,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3046,7 +4033,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3098,6 +4085,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3107,6 +4116,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3142,7 +4155,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3194,6 +4207,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3203,6 +4238,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3238,7 +4277,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3291,6 +4330,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3300,6 +4361,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3335,7 +4400,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3387,6 +4452,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3396,6 +4483,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3431,7 +4522,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3482,6 +4573,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3491,6 +4604,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3549,6 +4666,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://github.com/spring-projects/spring-data-jpa/blob/main/LICENSE.txt"
           }
         }
@@ -3558,6 +4697,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3615,6 +4758,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3624,6 +4789,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3659,7 +4828,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3710,6 +4879,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3719,6 +4910,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3754,7 +4949,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3805,6 +5000,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3814,6 +5031,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3849,7 +5070,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3900,6 +5121,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -3909,6 +5152,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3944,7 +5191,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3995,6 +5242,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4004,6 +5273,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4039,7 +5312,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4090,6 +5363,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4099,6 +5394,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4134,7 +5433,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4185,6 +5484,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4194,6 +5515,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4229,7 +5554,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4281,6 +5606,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4290,6 +5637,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4325,7 +5676,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4376,6 +5727,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4385,6 +5758,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4420,7 +5797,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4471,6 +5848,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4480,6 +5879,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4515,7 +5918,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4566,6 +5969,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4575,6 +6000,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4610,7 +6039,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4661,6 +6090,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4670,6 +6121,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4705,7 +6160,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-08"
+          "value": "endoflife.date@2026-08-10"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4757,6 +6212,28 @@
         {
           "license": {
             "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
             "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
@@ -4766,6 +6243,10 @@
         {
           "name": "SrcFile",
           "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5180,7 +6661,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-08-09T02:21:08Z",
+    "timestamp": "2026-08-10T11:32:14Z",
     "tools": {
       "components": [
         {
@@ -5189,24 +6670,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.7.0",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.7.0",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
           "type": "application",
-          "version": "12.7.0"
+          "version": "12.8.3"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.10.3"
+          "version": "1.10.4"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:a914f060-420d-46e7-b4b2-4b0f62f4d2a3",
+  "serialNumber": "urn:uuid:864be6c8-212b-4162-9941-287747fd7ec0",
   "services": [],
   "specVersion": "1.6",
   "version": 1

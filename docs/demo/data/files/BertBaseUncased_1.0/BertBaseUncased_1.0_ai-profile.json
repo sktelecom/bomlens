@@ -1,6 +1,6 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-08-09T02:19:17Z",
+  "generatedAt": "2026-08-10T11:32:45Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
@@ -550,7 +550,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-08-09T02:19:06+00:00",
+            "detail": "2026-08-10T11:32:41+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -570,7 +570,7 @@
             "label": "Top-level component name+version",
             "status": "pass",
             "source": null,
-            "detail": "job-2026-08-09-02:19:06@1.0",
+            "detail": "job-2026-08-10-11:32:41@1.0",
             "refs": [
               "Section 5.1"
             ]
@@ -928,7 +928,7 @@
     "items": []
   },
   "riskAssessment": {
-    "usageContext": "product",
+    "usageContext": "",
     "disclaimer": "This assessment is guidance, not legal advice. It summarizes license terms and recorded signals; the final use decision needs human review.",
     "disclaimer_ko": "이 판정은 법적 자문이 아닌 안내입니다. 라이선스 조건과 수집된 신호를 요약한 것이며, 최종 사용 판단은 사람의 검토가 필요합니다.",
     "counts": {
@@ -951,9 +951,9 @@
         "keys": [
           "permissive"
         ],
-        "usageContext": "product",
+        "usageContext": "",
         "reasons": [
-          "license Apache-2.0: Permissive open-source license (ok for product use)",
+          "license Apache-2.0: Permissive open-source license (ok)",
           "file security: scan queued, pickle-format weights present (review)",
           "datasets: 2 referenced, worst review (bookcorpus)"
         ],

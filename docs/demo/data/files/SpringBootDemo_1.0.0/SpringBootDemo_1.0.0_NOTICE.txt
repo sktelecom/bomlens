@@ -1,19 +1,10 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-08-09T02:21:10Z
-Total components: 64 · Distinct licenses: 13
+Generated: 2026-08-10T11:32:16Z
+Total components: 64 · Distinct licenses: 11
 
 This product includes the following open source software.
 Each component lists its source/download location and copyright/attribution.
 ================================================================================
-
-License: 0BSD
-Components (2):
-  - jaxb-runtime@4.0.2
-      Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/)
-  - txw2@4.0.2
-      Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/)
 
 License: Apache-2.0
 Components (45):
@@ -160,7 +151,7 @@ Components (1):
       Copyright: holders not captured in SBOM — see source (https://github.com/antlr/antlr4/tree/master)
 
 License: BSD-3-Clause
-Components (5):
+Components (8):
   - angus-activation@2.0.0
       Source: https://github.com/eclipse-ee4j/angus-activation
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/angus-activation)
@@ -170,12 +161,21 @@ Components (5):
   - jakarta.activation-api@2.1.2
       Source: https://github.com/jakartaee/jaf-api
       Copyright: holders not captured in SBOM — see source (https://github.com/jakartaee/jaf-api)
+  - jakarta.persistence-api@3.1.0
+      Source: https://github.com/eclipse-ee4j/jpa-api.git
+      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jpa-api.git)
   - jakarta.xml.bind-api@4.0.1
       Source: https://github.com/eclipse-ee4j/jaxb-api.git
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jaxb-api.git)
   - jaxb-core@4.0.2
       Source: https://github.com/eclipse-ee4j/jaxb-ri.git
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jaxb-ri.git)
+  - jaxb-runtime@4.0.2
+      Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/
+      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/)
+  - txw2@4.0.2
+      Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/
+      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/)
 
 License: EPL-1.0
 Components (3):
@@ -190,24 +190,15 @@ Components (3):
       Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/logback)
 
 License: EPL-2.0
-Components (3):
+Components (2):
   - aspectjweaver@1.9.20.1
       Source: https://github.com/eclipse/org.aspectj
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse/org.aspectj)
-  - jakarta.annotation-api@2.1.1
-      Source: https://github.com/eclipse-ee4j/common-annotations-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/common-annotations-api)
-  - jakarta.transaction-api@2.0.1
-      Source: https://github.com/eclipse-ee4j/jta-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jta-api)
-
-License: Eclipse Public License v. 2.0 OR Eclipse Distribution License v. 1.0
-Components (1):
   - jakarta.persistence-api@3.1.0
       Source: https://github.com/eclipse-ee4j/jpa-api.git
       Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jpa-api.git)
 
-License: GPL-2.0-with-classpath-exception
+License: GPL-2.0-or-later OR Classpath-exception-2.0
 Components (2):
   - jakarta.annotation-api@2.1.1
       Source: https://github.com/eclipse-ee4j/common-annotations-api
@@ -255,13 +246,6 @@ Components (1):
 ================================================================================
 License texts (SPDX standard)
 ================================================================================
-
------------------------------ 0BSD -----------------------------
-Copyright (C) YEAR by AUTHOR EMAIL
-
-Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ----------------------------- Apache-2.0 -----------------------------
 Apache License

@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-08-09T02:19:16Z",
+  "generatedAt": "2026-08-10T11:32:44Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -27,7 +27,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-08-09T02:19:06+00:00",
+      "detail": "2026-08-10T11:32:41+00:00",
       "missing": [],
       "regulations": [
         {
@@ -61,7 +61,7 @@
       "label": "Top-level component name+version",
       "required": true,
       "status": "pass",
-      "detail": "job-2026-08-09-02:19:06@1.0",
+      "detail": "job-2026-08-10-11:32:41@1.0",
       "missing": [],
       "regulations": [
         {
@@ -1697,7 +1697,7 @@
         "bookcorpus"
       ],
       "evidence": [
-        "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-09-02:19:06@1.0",
+        "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-10-11:32:41@1.0",
         "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
       ],
       "cluster": "cisa-component",
@@ -1721,7 +1721,7 @@
       "status": "warn",
       "detail": "3/4 component(s)",
       "missing": [
-        "job-2026-08-09-02:19:06"
+        "job-2026-08-10-11:32:41"
       ],
       "evidence": [],
       "cluster": "cisa-component",
@@ -1745,7 +1745,7 @@
       "status": "warn",
       "detail": "2/4 component(s)",
       "missing": [
-        "job-2026-08-09-02:19:06",
+        "job-2026-08-10-11:32:41",
         "bookcorpus"
       ],
       "evidence": [],
@@ -2349,7 +2349,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-08-09T02:19:06+00:00",
+            "detail": "2026-08-10T11:32:41+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -2369,7 +2369,7 @@
             "label": "Top-level component name+version",
             "status": "pass",
             "source": null,
-            "detail": "job-2026-08-09-02:19:06@1.0",
+            "detail": "job-2026-08-10-11:32:41@1.0",
             "refs": [
               "Section 5.1"
             ]
