@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.10.5] - 2026-08-11
+
+### Changed
+
+Three changes alter what an AI-model scan writes, so a consumer of those artifacts sees different output than it did on v1.10.4. They are corrections rather than new behaviour, which is why this is a patch, but they are listed first because a tool reading the output has to know.
+
+- The model is the subject of the ML-BOM. It moves to `metadata.component`, where CycloneDX names what a document describes, and the datasets it references stay under `components[]`. The generator had put its own scan job (`job-<timestamp>`) at the subject and left the model in the component list, so the document stated that it described a generator run. A tool that looked for the model in `components[]` has to look at the subject instead.
+
+- The conformance report distinguishes a check with nothing to judge from one that is unmet. Such a check carries `naKind: "not-applicable"` in the JSON and leaves both sides of every coverage fraction, so the denominators move: an SBOM whose only subject is a model no longer collects format checks for having no packages to measure. Reports and the web UI label the state separately and count it on its own line.
+
+- A model card whose license is `other` now carries the license the card declares, as a license name with a link to the file, rather than an SPDX identifier.
+
+### Fixed
+
+- A dataset a model card declares carries the repository owner as its producer. The owner was recorded only inside `componentData.governance`, which the conformance checks do not read, so every dataset arrived without one. The effect ran backwards: a card that declared its training data added a component per dataset with no producer and scored lower on the 2026 minimum elements than a card that declared none.
+
+- The license of a model card tagged `other` is no longer guessed from the LICENSE text. With no identifier to copy, the generator matched its mapping table against the file body as a substring, and `mit` matches the `limited`, `submit` and `submitted` that ordinary license prose contains — an Apache-2.0-derived custom license was emitted as MIT, dropping the obligations the real terms carry. The discarded value is kept as a property so the correction is traceable.
+
+- Dataset names scraped out of a model card's prose no longer count as declared training data. The generator fills `modelCard.modelParameters.datasets` from the card text, so a sentence reading "pretrained on approximately 12.5 trillion tokens" left a dataset named `approximately`, and a footnote left `only`; neither is a repository. A name survives when the card frontmatter declares it or the datasets API resolves it, and what was dropped is recorded on the model.
+
+- An AI SBOM that follows the CycloneDX shape — a supplier submission, or a hand-written one, naming the model as the document's subject — is analyzed as an AI SBOM. Every model lookup expected the generator's layout, so such a document fell through all of them and was treated as ordinary software: no G7 minimum-element checks, no model risk assessment, no AI compliance profile.
+
+- A dependency-graph check no longer fails a document that has no parts to relate, and the stale dependency root the generator emitted — keyed on an identifier nothing in the document defines — is folded into the model's own entry. A document that does have parts and no edges still fails.
+
+- A Python component's license and version come from the installed distribution's own metadata, read through `importlib`, rather than from a filesystem guess at the `.dist-info` directory name.
+
 ## [v1.10.4] - 2026-08-10
 
 ### Fixed
@@ -602,7 +628,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.4...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.5...HEAD
+[v1.10.5]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.5
 [v1.10.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.4
 [v1.10.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.3
 [v1.10.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.2
