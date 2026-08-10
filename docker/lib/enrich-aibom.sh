@@ -343,6 +343,69 @@ def collect_datasets(api, declared):
         resolved += 1 if ok else 0
     return comps, refs, resolved
 
+
+def _card_dataset_name(entry):
+    """The dataset id an entry names, or "" when it names none.
+
+    An entry carrying a `ref` points at a component elsewhere in this document
+    and is left alone — resolving that reference is not this step's business.
+    """
+    if isinstance(entry, str):
+        return entry.strip()
+    if isinstance(entry, dict) and not entry.get("ref"):
+        name = entry.get("name") or (entry.get("componentData") or {}).get("name") or ""
+        return str(name).strip()
+    return ""
+
+
+def prune_prose_dataset_names(models, api, declared):
+    """Drop dataset names the generator lifted out of the card's prose.
+
+    The generator scrapes modelCard.modelParameters.datasets from the card text,
+    so "pretrained on approximately 12.5 trillion tokens" leaves a dataset named
+    "approximately" behind, and a table footnote "(*: public dataset only)"
+    leaves "only". The G7 dataset cluster counts any name it finds as a declared
+    dataset, so prose becomes a score for training data nobody disclosed.
+
+    A name survives when the card's own frontmatter declares it, or when the
+    datasets API can open it. One that is neither has nothing behind it. The
+    frontmatter is trusted without a lookup, so a declared dataset that is gated,
+    private or withdrawn is never removed for being unreadable.
+
+    Returns the list of dropped names. Without an API nothing is dropped: "cannot
+    be resolved right now" is not the same fact as "does not exist".
+    """
+    if api is None:
+        return []
+    frontmatter = declared if isinstance(declared, list) else ([declared] if declared else [])
+    known = {str(d).strip() for d in frontmatter if str(d or "").strip()}
+    dropped, checked = [], {}
+    for m in models:
+        params = (m.get("modelCard") or {}).get("modelParameters")
+        if not isinstance(params, dict) or not isinstance(params.get("datasets"), list):
+            continue
+        kept = []
+        for entry in params["datasets"]:
+            name = _card_dataset_name(entry)
+            if not name or name in known:
+                kept.append(entry)
+                continue
+            if name not in checked:
+                try:
+                    api.dataset_info(name)
+                    checked[name] = True
+                except Exception:
+                    checked[name] = False
+            if checked[name]:
+                kept.append(entry)
+            elif name not in dropped:
+                dropped.append(name)
+        if kept:
+            params["datasets"] = kept
+        else:
+            params.pop("datasets", None)
+    return dropped
+
 if hf_info is not None:
     siblings = getattr(hf_info, "siblings", None) or []
     # file name -> LFS SHA-256 (only LFS-tracked files expose a content hash)
@@ -373,6 +436,13 @@ if hf_info is not None:
     datasets = card_get(hf_info, "datasets")
     has_datasets = bool(datasets)
     dataset_comps, dataset_refs, resolved_datasets = collect_datasets(hf_api, datasets)
+    # Names the generator scraped out of the card's prose are removed here, before
+    # the openness axis and the conformance report read them as disclosed training
+    # data. The fact of the removal is stamped so the report can be traced back.
+    prose_dropped = prune_prose_dataset_names(models, hf_api, datasets)
+    if prose_dropped:
+        print(f"[enrich] datasets: dropped {len(prose_dropped)} card name(s) with no dataset "
+              f"behind them ({', '.join(prose_dropped[:5])}).", file=sys.stderr)
     # Training reproducibility is the weakest signal from metadata alone: treat a
     # declared base_model or an explicit training/library hint as "open training".
     library = card_get(hf_info, "library_name")
@@ -613,13 +683,17 @@ if hf_info is not None:
         props = [p for p in (m.get("properties") or [])
                  if not str(p.get("name", "")).startswith(
                      ("openness:", "bomlens:hf:scan:", "bomlens:weights:",
-                      "bomlens:license:", "bomlens:lineage:"))]
+                      "bomlens:license:", "bomlens:lineage:",
+                      "bomlens:card:datasetName"))]
         for name, value in openness.items():
             props.append({"name": name, "value": value})
         props.extend(scan_props)
         props.extend(weights_props)
         props.extend(lic_props)
         props.extend(lineage_props)
+        if prose_dropped:
+            props.append({"name": "bomlens:card:datasetNameDropped",
+                          "value": ", ".join(prose_dropped)[:300]})
         m["properties"] = props
     print(f"[enrich] HuggingFace: {len(weight_hashes)} weight hash(es), openness assessed "
           f"(weights={openness['openness:weights']}).", file=sys.stderr)

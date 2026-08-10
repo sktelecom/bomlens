@@ -410,6 +410,30 @@ edn2=$(jq '[.components[] | select(.type=="data")] | length' "$WORK/enrich-ds.js
 eddep2=$(jq '[.dependencies[] | select(.ref|startswith("pkg:huggingface")) | .dependsOn[]] | length' "$WORK/enrich-ds.json")
 { [ "$edn2" -eq 2 ] && [ "$eddep2" -eq 2 ]; } && pass "enriching twice is idempotent" || fail "after re-run: components=$edn2 edges=$eddep2, expected 2/2"
 
+echo "== card dataset names lifted from the prose are dropped =="
+# The generator scrapes modelCard.modelParameters.datasets out of the card text,
+# so "pretrained on approximately 12.5 trillion tokens" leaves a dataset named
+# "approximately" that the G7 dataset cluster then counts as declared training
+# data. A name survives only if the frontmatter declares it (org/gone-ds, which
+# the stub cannot open) or the API resolves it; a ref points elsewhere in the
+# document and is not this step's business.
+jq '(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets =
+      [{"name":"org/gone-ds"},{"name":"approximately"},{"name":"only"},{"ref":"dataset:keep-me"}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/prose-ds.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/prose-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
+pkept=$(jq -r '[(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets[]? | (.name // .ref)] | join(",")' "$WORK/prose-ds.json")
+[ "$pkept" = "org/gone-ds,dataset:keep-me" ] && pass "prose names go, the declared name and the ref stay" || fail "card datasets='$pkept', expected org/gone-ds,dataset:keep-me"
+pdrop=$(jq -r '[.components[]|select(.type=="machine-learning-model")|.properties[]?|select(.name=="bomlens:card:datasetNameDropped")|.value] | first // ""' "$WORK/prose-ds.json")
+[ "$pdrop" = "approximately, only" ] && pass "the dropped names stay recorded on the model" || fail "datasetNameDropped='$pdrop'"
+# The score the oversight produced must be gone too.
+bash "$LIB/validate-sbom.sh" "$WORK/prose-ds.json" "$WORK/conf-prose" "prose-ds" >/dev/null 2>&1
+pds=$(jq -r '.checks[] | select(.id=="g7-ds-name") | "\(.status)|\(.evidence|join(","))"' "$WORK/conf-prose_conformance.json")
+case "$pds" in
+    *approximately*) fail "g7-ds-name still credits a prose name: '$pds'" ;;
+    *) pass "no prose name reaches the dataset-name evidence" ;;
+esac
+
 echo "== a card that names only unreachable datasets is not called open data =="
 cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
 class _S:
