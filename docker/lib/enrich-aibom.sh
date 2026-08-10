@@ -189,6 +189,14 @@ def build_dataset_component(api, ds_id):
     """
     url = "https://huggingface.co/datasets/" + ds_id
     props = [{"name": DATASET_MARK, "value": "huggingface"}]
+    # The repository owner is this dataset's producer and the id already carries
+    # it, so it is recorded before the API call: a dataset that cannot be opened
+    # still says who published it. It goes on the component itself and not only
+    # in componentData.governance below, because that is where the G7 dataset
+    # cluster and the 2026 minimum elements look for a producer — a model that
+    # declares its training data was otherwise scored down for the datasets it
+    # added, each one counting as a component with no producer.
+    owner = ds_id.split("/")[0] if "/" in ds_id else None
     comp = {
         "type": "data",
         "bom-ref": dataset_ref(ds_id),
@@ -198,9 +206,14 @@ def build_dataset_component(api, ds_id):
         ],
         "properties": props,
     }
+    if owner:
+        comp["authors"] = [{"name": owner}]
+        comp["supplier"] = {"name": owner, "url": ["https://huggingface.co/" + owner]}
     # componentData (spec: component.data[]) is where CycloneDX describes what a
     # data component actually holds.
     cdata = {"type": "dataset", "name": ds_id, "contents": {"url": url}}
+    if owner:
+        cdata["governance"] = {"owners": [{"organization": {"name": owner}}]}
 
     if api is None:
         props.append({"name": "bomlens:dataset:unresolved", "value": "huggingface-unavailable"})
@@ -291,9 +304,15 @@ def build_dataset_component(api, ds_id):
     for src in (card_get(info, "source_datasets") or []):
         props.append({"name": "bomlens:dataset:sourceDataset", "value": str(src)[:200]})
 
-    owner = ds_id.split("/")[0] if "/" in ds_id else None
-    if owner:
-        cdata["governance"] = {"owners": [{"organization": {"name": owner}}]}
+    # A bare id ("squad") carries no owner, but the API names one; taking it here
+    # is the only way such a dataset gets a producer at all.
+    if not owner:
+        api_owner = getattr(info, "author", None)
+        if api_owner:
+            comp["authors"] = [{"name": str(api_owner)}]
+            comp["supplier"] = {"name": str(api_owner),
+                                "url": ["https://huggingface.co/" + str(api_owner)]}
+            cdata["governance"] = {"owners": [{"organization": {"name": str(api_owner)}}]}
 
     if getattr(info, "private", False):
         props.append({"name": "bomlens:dataset:visibility", "value": "private"})

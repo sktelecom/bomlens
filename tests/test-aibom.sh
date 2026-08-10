@@ -396,6 +396,13 @@ edhash=$(jq '[.components[] | select(.name=="org/open-ds") | .hashes[]?] | lengt
 [ "$edhash" -eq 1 ] && pass "LFS content digests reach the dataset component" || fail "dataset hashes=$edhash, expected 1"
 edopen=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-ds.json")
 [ "$edopen" = "open-data" ] && pass "one resolvable dataset makes the training-data axis open-data" || fail "openness:training-data='$edopen'"
+# The repository owner has to reach the component-level producer fields, for the
+# unreachable dataset too: that is what the G7 dataset cluster and the 2026
+# minimum elements read, and a model that declared its training data was scored
+# down for every dataset it added while a model that declared none was not.
+edsup=$(jq -r '[.components[] | select(.type=="data") | .supplier.name] | unique | join(",")' "$WORK/enrich-ds.json")
+edauth=$(jq -r '[.components[] | select(.type=="data") | .authors[]?.name] | unique | join(",")' "$WORK/enrich-ds.json")
+{ [ "$edsup" = "org" ] && [ "$edauth" = "org" ]; } && pass "every dataset component names its repository owner as producer" || fail "dataset supplier='$edsup' authors='$edauth', expected org/org"
 # Re-running must not append a second copy of anything.
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/enrich-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
