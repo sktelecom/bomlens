@@ -345,6 +345,112 @@ if find . -name Podfile -type f 2>/dev/null | grep -q .; then
 fi
 set -- "$@" "$SRC"
 
+# --- correct the BSD license-name aliases cdxgen resolves against ---
+# cdxgen turns a license NAME into an SPDX id through two data files, and both
+# hand the generic BSD names to 0BSD: data/lic-mapping.json lists "BSD",
+# "BSD License", "BSD-like", "new BSD" and "new BSD License" under its 0BSD
+# entry, and data/license-aliases.json repeats them as normalised lookup keys
+# ("bsd", "bsdlicense", "bsdlike", "newbsd", "bsdpublicdomain"). PyPI files every
+# BSD variant under the single classifier "License :: OSI Approved :: BSD
+# License" and Maven poms carry names like "New BSD License", so BSD-3-Clause
+# components came out as 0BSD — a license with no conditions at all, standing in
+# for one that requires the copyright notice and the license text to be shipped.
+# A notice built from that is missing an obligation the component carries.
+#
+# Both files are read from disk when cdxgen runs, so correcting them first covers
+# every ecosystem that resolves a license by name. It is also the only place the
+# correction can be made: once the SBOM is written the name is gone and only the
+# id 0BSD remains, which post-processing cannot tell apart from a component that
+# really is 0BSD (tslib, liblzma). That is why normalize-sbom.sh still leaves a
+# valid upstream id alone.
+#
+# "new BSD" moves to BSD-3-Clause, which is what the name means, in the exact
+# spelling each file matches on. "BSD", "BSD License" and "BSD-like" are dropped
+# without a new home: the clause count cannot be known from those strings, and
+# asserting one is the mistake being corrected here. An unmatched name passes
+# through as free text, so it reaches the SBOM as a license name rather than as a
+# wrong id, and generate-notice.sh marks it as unverified.
+#
+# Best-effort and idempotent: a missing, read-only or already-corrected file is a
+# no-op, so this keeps working once the upstream data ships the same fix.
+fix_lic_mapping() {
+    command -v node >/dev/null 2>&1 || return 0
+    _lic_dir=""
+    for _c in /opt/cdxgen/data /opt/bin/data \
+              /usr/local/lib/node_modules/@cyclonedx/cdxgen/data; do
+        [ -f "$_c/lic-mapping.json" ] && { _lic_dir="$_c"; break; }
+    done
+    if [ -z "$_lic_dir" ]; then
+        _f=$(find /opt /usr/local/lib -maxdepth 8 -name lic-mapping.json -type f 2>/dev/null | head -1)
+        [ -n "$_f" ] && _lic_dir=$(dirname "$_f")
+    fi
+    if [ -z "$_lic_dir" ]; then
+        log "lic-mapping: not found in image; BSD names left as shipped"
+        return 0
+    fi
+    # The images ship these read-only (444); we run as root, so take write
+    # permission explicitly rather than relying on root overriding the mode.
+    chmod u+w "$_lic_dir/lic-mapping.json" "$_lic_dir/license-aliases.json" 2>/dev/null
+    _fix="$(mktemp).js"
+    cat > "$_fix" <<'FIX_LIC_JS'
+const fs = require("fs");
+const dir = process.argv[2];
+const dropped = [];
+
+const read = f => {
+  try { return JSON.parse(fs.readFileSync(dir + "/" + f, "utf8")); } catch (e) { return null; }
+};
+const write = (f, data) => fs.writeFileSync(dir + "/" + f, JSON.stringify(data, null, 2));
+const isNewBsd = s => /^new[^a-z0-9]*bsd([^a-z0-9]*license)?$/i.test(s);
+
+// lic-mapping.json: [{ exp: "0BSD", names: [...] }, ...]
+const map = read("lic-mapping.json");
+if (Array.isArray(map)) {
+  const entry = exp => map.find(e => e && e.exp === exp && Array.isArray(e.names));
+  const zero = entry("0BSD");
+  const three = entry("BSD-3-Clause");
+  if (zero) {
+    const isZeroClause = n => /zero[\s-]*clause/i.test(n) || /^0BSD$/i.test(n);
+    const gone = zero.names.filter(n => !isZeroClause(n));
+    if (gone.length) {
+      zero.names = zero.names.filter(isZeroClause);
+      // cdxgen matches these names case-sensitively, so keep the exact spelling.
+      if (three) {
+        for (const n of gone) {
+          if (isNewBsd(n) && !three.names.includes(n)) three.names.push(n);
+        }
+      }
+      write("lic-mapping.json", map);
+      dropped.push(...gone);
+    }
+  }
+}
+
+// license-aliases.json: { "<normalised name>": "<SPDX id>" }. Keys are lowercase
+// and stripped of punctuation, so "BSD License" is looked up as "bsdlicense".
+const aliases = read("license-aliases.json");
+if (aliases && typeof aliases === "object" && !Array.isArray(aliases)) {
+  const isZeroClause = k => /zeroclause/.test(k) || k === "0bsd" || k === "bsdzero";
+  let touched = false;
+  for (const [key, value] of Object.entries(aliases)) {
+    if (value !== "0BSD" || isZeroClause(key)) continue;
+    if (isNewBsd(key)) aliases[key] = "BSD-3-Clause";
+    else delete aliases[key];
+    dropped.push(key);
+    touched = true;
+  }
+  if (touched) write("license-aliases.json", aliases);
+}
+
+if (!dropped.length) process.exit(0);            // already corrected upstream
+process.stderr.write("[build-prep] lic-mapping: 0BSD no longer claims " +
+  [...new Set(dropped)].map(d => JSON.stringify(d)).join(", ") + "\n");
+FIX_LIC_JS
+    node "$_fix" "$_lic_dir" || log "lic-mapping: correction skipped (non-fatal)"
+    rm -f "$_fix"
+}
+fix_lic_mapping
+
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
 if command -v cdxgen >/dev/null 2>&1; then
     log "cdxgen (PATH)"
@@ -491,6 +597,247 @@ process.stderr.write('[build-prep] maven: kept ' + bom.components.length + ' of 
 MFILTER_JS
     node "$_mflt" "$OUT" || log "maven: filter skipped (non-fatal)"
     rm -f "$_mflt"
+fi
+
+# Python license evidence: settle each PyPI component's license on what the
+# installed distribution actually ships, rather than on the summary PyPI serves.
+#
+# cdxgen reads three PyPI fields — the trove classifier, `license` and
+# `license_expression` — and keeps whatever each one maps to. The classifier is
+# a family, not a license ("License :: OSI Approved :: BSD License" covers the
+# 2-, 3- and 4-clause variants alike), and `license` increasingly holds the whole
+# license text, which cdxgen scans for the first name it recognises: numpy and
+# pandas came out Apache-2.0 that way, off a bundled-dependency notice inside a
+# BSD-3-Clause file.
+#
+# The wheel carries better evidence, and pip has already unpacked it here: the
+# dist-info directory holds the PEP 639 expression when the project declares one,
+# the license files themselves, and a `License:` field that is a name rather than
+# a text. We read those in that order and only overwrite a component's license
+# when the evidence settles on exactly one answer — a file whose text matches
+# several templates (a dual license, or a license file with bundled notices
+# appended) leaves the component alone for a human to read, and so does a
+# declared name too vague to place, like a bare "BSD". Whatever we do set is
+# stamped with bomlens:licenseSource so the basis is visible in the SBOM.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v python3 >/dev/null 2>&1 \
+   && grep -q '"pkg:pypi/' "$OUT" 2>/dev/null; then
+    log "python: settling licenses on installed distribution metadata"
+    _pylic="$(mktemp).py"
+    cat > "$_pylic" <<'PY_LIC'
+import json, os, re, sys, sysconfig
+
+bom_path = sys.argv[1]
+try:
+    with open(bom_path, encoding="utf-8") as fh:
+        bom = json.load(fh)
+except Exception:
+    sys.exit(0)
+components = bom.get("components")
+if not isinstance(components, list):
+    sys.exit(0)
+
+
+def canon(name):
+    """PEP 503 normalisation, so Pillow/pillow and foo_bar/foo-bar match."""
+    return re.sub(r"[-_.]+", "-", (name or "").strip()).lower()
+
+
+def classify_text(text):
+    """Identify a license by its distinctive clause wording.
+
+    Mirrors identify_license_text in docker/lib/spdx-normalize.jq: matched on
+    clause phrases, never on the copyright header, and deliberately silent when
+    a text matches more than one template.
+    """
+    x = re.sub(r"\s+", " ", text).lower()
+    hits = []
+    if "permission is hereby granted, free of charge" in x and "without restriction" in x:
+        hits.append("MIT")
+    if "permission to use, copy, modify, and/or distribute this software for any purpose" in x:
+        hits.append("ISC")
+    if "apache license" in x and "version 2.0" in x:
+        hits.append("Apache-2.0")
+    if ("redistributions of source code must retain" in x
+            and "redistributions in binary form must reproduce" in x
+            and "advertising materials" not in x):
+        hits.append("BSD-3-Clause" if "neither the name" in x else "BSD-2-Clause")
+    return hits[0] if len(hits) == 1 else None
+
+
+def classify_name(declared):
+    """Map a short declared license NAME to an SPDX id.
+
+    A subset of normalize() in spdx-normalize.jq, holding to the same rule: a
+    name that does not say which variant it is ("BSD", "BSD License") maps to
+    nothing, because guessing the clause count is the error this whole pass
+    exists to undo. Compound expressions and any GPL family name are left to the
+    upstream value and to human review.
+    """
+    n = re.sub(r"[ ,._/-]+", " ", (declared or "").strip().lower()).strip()
+    if not n or len(n) > 100:
+        return None
+    if " or " in n or " and " in n or "general public" in n:
+        return None
+    if re.search(r"apache.*2", n):
+        return "Apache-2.0"
+    if n == "mit" or "mit license" in n or "expat" in n:
+        return "MIT"
+    if re.search(r"bsd.*3|new bsd|revised bsd|modified bsd", n):
+        return "BSD-3-Clause"
+    if re.search(r"bsd.*2|simplified bsd|freebsd", n):
+        return "BSD-2-Clause"
+    if n in ("isc", "isc license"):
+        return "ISC"
+    return None
+
+
+def site_dirs():
+    paths = []
+    try:
+        cfg = sysconfig.get_paths()
+        paths += [cfg.get("purelib"), cfg.get("platlib")]
+    except Exception:
+        pass
+    try:
+        import site
+        paths += list(site.getsitepackages())
+        paths.append(site.getusersitepackages())
+    except Exception:
+        pass
+    seen, out = set(), []
+    for p in paths:
+        if p and p not in seen and os.path.isdir(p):
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def read_text(path, limit=400000):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read(limit)
+    except Exception:
+        return ""
+
+
+def evidence(dist_dir):
+    """Collect (name, version, expression, declared name, license files)."""
+    meta = os.path.join(dist_dir, "METADATA")
+    if not os.path.isfile(meta):
+        return None
+    name = version = expression = declared = None
+    declared_files = []
+    try:
+        with open(meta, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if not line.strip():
+                    break                       # headers end at the blank line
+                if line[0] in " \t":
+                    continue                    # folded continuation of a header
+                m = re.match(r"([A-Za-z-]+):\s*(.*)", line)
+                if not m:
+                    continue
+                key, value = m.group(1).lower(), m.group(2).strip()
+                if key == "name" and not name:
+                    name = value
+                elif key == "version" and not version:
+                    version = value
+                elif key == "license-expression" and not expression:
+                    expression = value
+                elif key == "license" and not declared:
+                    declared = value
+                elif key == "license-file":
+                    declared_files.append(value)
+    except Exception:
+        return None
+    if not name or not version:
+        return None
+
+    files, seen = [], set()
+    for rel in declared_files:
+        for base in (os.path.join(dist_dir, "licenses"), dist_dir):
+            cand = os.path.join(base, rel)
+            if os.path.isfile(cand) and cand not in seen:
+                seen.add(cand)
+                files.append(cand)
+                break
+    for base in (os.path.join(dist_dir, "licenses"), dist_dir):
+        if not os.path.isdir(base):
+            continue
+        for root, _dirs, names in os.walk(base):
+            for fn in sorted(names):
+                if re.match(r"(LICEN[CS]E|COPYING)", fn, re.I):
+                    cand = os.path.join(root, fn)
+                    if cand not in seen:
+                        seen.add(cand)
+                        files.append(cand)
+    return {"name": name, "version": version, "expression": expression,
+            "declared": declared, "files": files}
+
+
+def decide(ev):
+    if ev["expression"]:
+        return ev["expression"], "dist-info license expression"
+    ids = set()
+    for path in ev["files"]:
+        got = classify_text(read_text(path))
+        if got:
+            ids.add(got)
+    if len(ids) == 1:
+        return ids.pop(), "dist-info license text"
+    if not ids and ev["declared"]:
+        got = classify_name(ev["declared"])
+        if got:
+            return got, "dist-info license name"
+    return None, None
+
+
+index = {}
+for site_dir in site_dirs():
+    try:
+        entries = sorted(os.listdir(site_dir))
+    except Exception:
+        continue
+    for entry in entries:
+        if not entry.endswith(".dist-info"):
+            continue
+        ev = evidence(os.path.join(site_dir, entry))
+        if ev:
+            index.setdefault((canon(ev["name"]), ev["version"]), ev)
+
+if not index:
+    sys.exit(0)
+
+changed = 0
+for comp in components:
+    if not str(comp.get("purl") or "").startswith("pkg:pypi/"):
+        continue
+    ev = index.get((canon(comp.get("name")), comp.get("version")))
+    if not ev:
+        continue
+    settled, basis = decide(ev)
+    if not settled:
+        continue
+    if re.search(r"\s(OR|AND|WITH)\s", settled):
+        entry = {"expression": settled}
+    else:
+        entry = {"license": {"id": settled}}
+    if comp.get("licenses") == [entry]:
+        continue                                # already exactly this
+    comp["licenses"] = [entry]
+    props = [p for p in comp.get("properties") or []
+             if p.get("name") != "bomlens:licenseSource"]
+    props.append({"name": "bomlens:licenseSource", "value": basis})
+    comp["properties"] = props
+    changed += 1
+
+if changed:
+    with open(bom_path, "w", encoding="utf-8") as fh:
+        json.dump(bom, fh, indent=2)
+    sys.stderr.write("[build-prep] python: settled %d component license(s) on dist-info evidence\n" % changed)
+PY_LIC
+    python3 "$_pylic" "$OUT" || log "python: license evidence pass skipped (non-fatal)"
+    rm -f "$_pylic"
 fi
 
 # Put the scanned tree back before the ownership fix below, so anything we

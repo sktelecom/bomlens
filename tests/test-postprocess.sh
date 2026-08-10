@@ -3022,6 +3022,206 @@ BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
     && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
     || fail "the opt-out did not keep the resolved tree"
 
+echo "== lic-mapping: 0BSD stops claiming the generic BSD names =="
+# build-prep.sh corrects cdxgen's two license-name tables before cdxgen runs,
+# because "BSD License" (the only BSD classifier PyPI has) resolved to 0BSD — a
+# license with no conditions in place of one that requires attribution. The
+# correction is a heredoc inside build-prep.sh; extract and run it against a
+# copy of the shipped tables so the test exercises the same code the scan does.
+if command -v node >/dev/null 2>&1; then
+    LICDIR="$WORK/licdata"
+    mkdir -p "$LICDIR"
+    cp "$FIX/cdxgen-lic-mapping.json" "$LICDIR/lic-mapping.json"
+    cp "$FIX/cdxgen-license-aliases.json" "$LICDIR/license-aliases.json"
+    sed -n "/cat > \"\$_fix\" <<'FIX_LIC_JS'/,/^FIX_LIC_JS\$/p" "$LIB/build-prep.sh" \
+        | sed '1d;$d' > "$WORK/fix-lic.js"
+    [ -s "$WORK/fix-lic.js" ] \
+        && pass "correction script extracted from build-prep.sh" \
+        || fail "could not extract the lic-mapping correction from build-prep.sh"
+    node "$WORK/fix-lic.js" "$LICDIR" 2>"$WORK/fix-lic.err"
+    grep -q "0BSD no longer claims" "$WORK/fix-lic.err" \
+        && pass "correction reports what 0BSD gave up" \
+        || fail "correction produced no report" "$(cat "$WORK/fix-lic.err")"
+
+    zero_names=$(jq -c '.[] | select(.exp=="0BSD") | .names' "$LICDIR/lic-mapping.json")
+    [ "$zero_names" = '["Zero-Clause BSD"]' ] \
+        && pass "0BSD keeps only the zero-clause name" \
+        || fail "0BSD names=$zero_names"
+    jq -e '.[] | select(.exp=="BSD-3-Clause") | .names | index("new BSD")' "$LICDIR/lic-mapping.json" >/dev/null \
+        && pass "\"new BSD\" moved to BSD-3-Clause in its exact casing" \
+        || fail "\"new BSD\" was dropped instead of moved to BSD-3-Clause"
+    # The alias table keys are normalised (lowercase, punctuation stripped).
+    for k in bsd bsdlicense bsdlike bsdpublicdomain; do
+        jq -e --arg k "$k" 'has($k)' "$LICDIR/license-aliases.json" >/dev/null \
+            && fail "alias \"$k\" still resolves to 0BSD" \
+            || pass "alias \"$k\" no longer resolves to 0BSD"
+    done
+    newbsd=$(jq -r '.newbsd // "ABSENT"' "$LICDIR/license-aliases.json")
+    [ "$newbsd" = "BSD-3-Clause" ] && pass "alias \"newbsd\" now resolves to BSD-3-Clause" \
+        || fail "alias newbsd=$newbsd, expected BSD-3-Clause"
+    # A component that really is 0BSD must still resolve, and the unrelated
+    # families must be untouched.
+    for pair in '0bsd 0BSD' 'zeroclausebsd 0BSD' 'bsd3clause BSD-3-Clause' 'bsd2clause BSD-2-Clause' 'mitlicense MIT'; do
+        k=${pair%% *}; want=${pair##* }
+        got=$(jq -r --arg k "$k" '.[$k] // "ABSENT"' "$LICDIR/license-aliases.json")
+        [ "$got" = "$want" ] && pass "alias \"$k\" still resolves to $want" \
+            || fail "alias $k=$got, expected $want"
+    done
+
+    # Idempotent: a second run has nothing to report and changes nothing.
+    cp "$LICDIR/lic-mapping.json" "$WORK/lm-before.json"
+    cp "$LICDIR/license-aliases.json" "$WORK/la-before.json"
+    node "$WORK/fix-lic.js" "$LICDIR" 2>"$WORK/fix-lic2.err"
+    [ ! -s "$WORK/fix-lic2.err" ] \
+        && pass "second run reports nothing (already corrected)" \
+        || fail "second run was not a no-op" "$(cat "$WORK/fix-lic2.err")"
+    diff -q "$WORK/lm-before.json" "$LICDIR/lic-mapping.json" >/dev/null \
+        && diff -q "$WORK/la-before.json" "$LICDIR/license-aliases.json" >/dev/null \
+        && pass "second run leaves both tables byte-identical" \
+        || fail "second run rewrote the tables"
+else
+    echo "  SKIP: node not available"
+fi
+
+echo "== python: license settled on installed dist-info evidence =="
+# cdxgen reads PyPI's summary fields, where the classifier is a family rather
+# than a license and `license` may hold the whole license text (which it then
+# scans for the first name it recognises — how numpy became Apache-2.0). The
+# installed wheel carries better evidence, so build-prep.sh re-reads it. Build a
+# venv with hand-written dist-info dirs so sysconfig points the script at them.
+if command -v python3 >/dev/null 2>&1 && python3 -m venv --without-pip "$WORK/venv" >/dev/null 2>&1; then
+    SP=$(echo "$WORK"/venv/lib/python*/site-packages)
+    mkdir -p "$SP"
+    sed -n "/cat > \"\$_pylic\" <<'PY_LIC'/,/^PY_LIC\$/p" "$LIB/build-prep.sh" \
+        | sed '1d;$d' > "$WORK/settle.py"
+    [ -s "$WORK/settle.py" ] \
+        && pass "evidence script extracted from build-prep.sh" \
+        || fail "could not extract the python license pass from build-prep.sh"
+
+    # joblib: license file text says BSD-3-Clause; PyPI only ever said "BSD".
+    mkdir -p "$SP/joblib-1.2.0.dist-info"
+    printf 'Metadata-Version: 2.1\nName: joblib\nVersion: 1.2.0\nLicense: BSD\n\nbody\n' \
+        > "$SP/joblib-1.2.0.dist-info/METADATA"
+    cat > "$SP/joblib-1.2.0.dist-info/LICENSE.txt" <<'LICTXT'
+Copyright (c) 2008-2021, The joblib developers.
+Redistributions of source code must retain the above copyright notice.
+Redistributions in binary form must reproduce the above copyright notice.
+Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software.
+LICTXT
+    # pandas: license file carries bundled notices too, so the text is
+    # ambiguous; the short declared name settles it.
+    mkdir -p "$SP/pandas-2.3.3.dist-info"
+    printf 'Metadata-Version: 2.1\nName: pandas\nVersion: 2.3.3\nLicense: BSD 3-Clause License\n\nbody\n' \
+        > "$SP/pandas-2.3.3.dist-info/METADATA"
+    cat > "$SP/pandas-2.3.3.dist-info/LICENSE" <<'LICTXT'
+Redistributions of source code must retain the above copyright notice.
+Redistributions in binary form must reproduce the above copyright notice.
+Neither the name of the copyright holder may be used to endorse it.
+---- bundled ----
+Apache License Version 2.0, January 2004
+---- bundled ----
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software, to deal in the Software without restriction.
+LICTXT
+    # threadpoolctl: PEP 639 expression wins outright.
+    mkdir -p "$SP/threadpoolctl-3.6.0.dist-info/licenses"
+    printf 'Metadata-Version: 2.4\nName: threadpoolctl\nVersion: 3.6.0\nLicense-Expression: BSD-3-Clause\n\nbody\n' \
+        > "$SP/threadpoolctl-3.6.0.dist-info/METADATA"
+    # python-dateutil: genuinely dual-licensed. Ambiguous text, and a declared
+    # name that says nothing — this one must be left for a human.
+    mkdir -p "$SP/python_dateutil-2.9.0.post0.dist-info"
+    printf 'Metadata-Version: 2.1\nName: python-dateutil\nVersion: 2.9.0.post0\nLicense: Dual License\n\nbody\n' \
+        > "$SP/python_dateutil-2.9.0.post0.dist-info/METADATA"
+    cat > "$SP/python_dateutil-2.9.0.post0.dist-info/LICENSE" <<'LICTXT'
+Apache License Version 2.0, January 2004
+Redistributions of source code must retain the above copyright notice.
+Redistributions in binary form must reproduce the above copyright notice.
+Neither the name of the copyright holder may be used to endorse it.
+LICTXT
+    # A component with no evidence at all keeps whatever cdxgen said.
+    cat > "$WORK/pybom.json" <<'PYBOM'
+{ "bomFormat": "CycloneDX", "specVersion": "1.6", "components": [
+  { "type": "library", "name": "joblib", "version": "1.2.0",
+    "purl": "pkg:pypi/joblib@1.2.0", "licenses": [ { "license": { "id": "0BSD" } } ] },
+  { "type": "library", "name": "pandas", "version": "2.3.3",
+    "purl": "pkg:pypi/pandas@2.3.3", "licenses": [ { "license": { "id": "Apache-2.0" } } ] },
+  { "type": "library", "name": "threadpoolctl", "version": "3.6.0",
+    "purl": "pkg:pypi/threadpoolctl@3.6.0", "licenses": [ { "license": { "name": "BSD License" } } ] },
+  { "type": "library", "name": "python-dateutil", "version": "2.9.0.post0",
+    "purl": "pkg:pypi/python-dateutil@2.9.0.post0", "licenses": [ { "license": { "name": "Dual License" } } ] },
+  { "type": "library", "name": "mystery", "version": "1.0.0",
+    "purl": "pkg:pypi/mystery@1.0.0", "licenses": [ { "license": { "id": "MIT" } } ] },
+  { "type": "library", "name": "tslib", "version": "2.6.2",
+    "purl": "pkg:npm/tslib@2.6.2", "licenses": [ { "license": { "id": "0BSD" } } ] }
+] }
+PYBOM
+    "$WORK/venv/bin/python3" "$WORK/settle.py" "$WORK/pybom.json" 2>"$WORK/settle.err"
+    lic() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+        | (.licenses[0].license.id // .licenses[0].license.name // .licenses[0].expression // "ABSENT")' "$WORK/pybom.json"; }
+    src() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+        | ((.properties // []) | map(select(.name=="bomlens:licenseSource")) | .[0].value // "ABSENT")' "$WORK/pybom.json"; }
+
+    [ "$(lic joblib)" = "BSD-3-Clause" ] \
+        && pass "joblib settled on BSD-3-Clause from its license text" \
+        || fail "joblib license=$(lic joblib), expected BSD-3-Clause"
+    [ "$(src joblib)" = "dist-info license text" ] \
+        && pass "the basis is recorded on the component" \
+        || fail "joblib licenseSource=$(src joblib)"
+    [ "$(lic pandas)" = "BSD-3-Clause" ] \
+        && pass "pandas settled on the declared name when the text is ambiguous" \
+        || fail "pandas license=$(lic pandas), expected BSD-3-Clause"
+    [ "$(lic threadpoolctl)" = "BSD-3-Clause" ] \
+        && pass "threadpoolctl settled on its PEP 639 expression" \
+        || fail "threadpoolctl license=$(lic threadpoolctl), expected BSD-3-Clause"
+    [ "$(lic python-dateutil)" = "Dual License" ] \
+        && pass "a dual-licensed component is left for human review" \
+        || fail "dateutil license=$(lic python-dateutil), expected the upstream value"
+    [ "$(lic mystery)" = "MIT" ] \
+        && pass "a component with no installed evidence is untouched" \
+        || fail "mystery license=$(lic mystery)"
+    [ "$(lic tslib)" = "0BSD" ] \
+        && pass "a genuine 0BSD component outside PyPI is untouched" \
+        || fail "tslib license=$(lic tslib), expected 0BSD"
+else
+    echo "  SKIP: python3 venv not available"
+fi
+
+echo "== NOTICE: a license name that is not an SPDX id is marked unverified =="
+cat > "$WORK/unverified.json" <<'UNVBOM'
+{ "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": { "component": { "type": "application", "name": "UnverifiedProj", "version": "1.0.0" } },
+  "components": [
+  { "type": "library", "name": "joblib", "version": "1.2.0", "purl": "pkg:pypi/joblib@1.2.0",
+    "licenses": [ { "license": { "name": "BSD License" } } ] },
+  { "type": "library", "name": "python-dateutil", "version": "2.9.0", "purl": "pkg:pypi/python-dateutil@2.9.0",
+    "licenses": [ { "license": { "name": "Dual License" } } ] },
+  { "type": "library", "name": "six", "version": "1.17.0", "purl": "pkg:pypi/six@1.17.0",
+    "licenses": [ { "license": { "id": "MIT" } } ] },
+  { "type": "library", "name": "packaging", "version": "24.0", "purl": "pkg:pypi/packaging@24.0",
+    "licenses": [ { "expression": "Apache-2.0 OR BSD-2-Clause" } ] }
+] }
+UNVBOM
+bash "$LIB/generate-notice.sh" "$WORK/unverified.json" "$WORK/unv" "UnverifiedProj" >/dev/null 2>&1
+UNV_TXT="$WORK/unv_NOTICE.txt"
+[ -f "$UNV_TXT" ] || UNV_TXT=$(ls "$WORK"/unv*NOTICE*.txt 2>/dev/null | head -1)
+if [ -n "$UNV_TXT" ] && [ -f "$UNV_TXT" ]; then
+    grep -q "^License: BSD License.*unverified name" "$UNV_TXT" \
+        && pass "\"BSD License\" is marked unverified" \
+        || fail "BSD License group carries no unverified note" "$(grep '^License:' "$UNV_TXT")"
+    grep -q "^License: Dual License.*unverified name" "$UNV_TXT" \
+        && pass "\"Dual License\" is marked unverified" \
+        || fail "Dual License group carries no unverified note"
+    grep -q "^License: MIT$" "$UNV_TXT" \
+        && pass "a real SPDX id is left unannotated" \
+        || fail "MIT group was annotated" "$(grep '^License: MIT' "$UNV_TXT")"
+    grep -q "^License: Apache-2.0 OR BSD-2-Clause$" "$UNV_TXT" \
+        && pass "an SPDX expression is left unannotated" \
+        || fail "compound expression was annotated" "$(grep '^License: Apache' "$UNV_TXT")"
+else
+    fail "generate-notice.sh produced no NOTICE for the unverified-name fixture"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

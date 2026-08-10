@@ -208,6 +208,27 @@ TOTAL_COMP=$(jq '[.components[]?] | length' "$SBOM")
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Some upstream metadata names a license without saying which one it is: PyPI's
+# trove classifier "BSD License" covers the 2-, 3- and 4-clause variants, and
+# python-dateutil declares the bare string "Dual License". Those arrive here as
+# the license name, because neither the scanner nor cdxgen will guess a clause
+# count, and a name is not an obligation a reader can act on. Rather than drop or
+# rewrite them, say so where the group is printed, so the reader knows this one
+# entry still needs the component's own license file to settle.
+#
+# The test is structural: an SPDX id carries no spaces, and an SPDX expression is
+# ids joined by OR / AND / WITH. Anything else is prose. NOASSERTION is excluded
+# — it already says, in its own vocabulary, that nothing was declared.
+SPDX_SHAPE_DEF='
+def is_spdx_shaped($s):
+  ($s == "NOASSERTION")
+  or ($s | test("^[A-Za-z0-9.+()-]+$"))
+  or ($s | test("^\\(?[A-Za-z0-9.+-]+\\)?( (OR|AND|WITH) \\(?[A-Za-z0-9.+-]+\\)?)+$"));
+def unverified_note($s):
+  if is_spdx_shaped($s) then ""
+  else "  [unverified name — not an SPDX identifier; confirm against the component'"'"'s license file]" end;
+'
+
 # Licenses needing human review (AI behavioral-use / non-commercial). Empty for a
 # normal software scan; populated when a model/dataset carries e.g. a Llama/RAIL
 # or CC-BY-NC license. The tool surfaces the class; a human judges applicability.
@@ -238,8 +259,8 @@ done)
     # license -> components, each with source location and copyright/attribution.
     # Attribution falls back to an honest "not captured" line (never blank) so the
     # notice always names the holder source even when component.copyright is empty.
-    echo "$LICENSE_MAP" | jq -r '.[] |
-        "\nLicense: \(.license)\nComponents (\(.count // (.components | length))):",
+    echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'.[] |
+        "\nLicense: \(.license)\(unverified_note(.license))\nComponents (\(.count // (.components | length))):",
         (.components[] |
             "  - \(.comp)",
             (if .src then "      Source: \(.src)" else empty end),
@@ -332,6 +353,7 @@ done)
  .src a{color:var(--brand);text-decoration:none;word-break:break-all;}
  .attr{display:block;color:var(--muted);font-size:.78rem;margin-top:.1rem;}
  .attr.none{font-style:italic;opacity:.75;}
+ .lic .unverified{color:var(--brand-2);font-size:.78rem;margin:.1rem 0 0;}
  .texts{margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.25rem;}
  .texts pre{background:var(--th-bg);border:1px solid var(--border);
   border-radius:var(--radius);padding:1rem;overflow:auto;font-size:.76rem;
@@ -360,7 +382,7 @@ HTMLHEAD
     # jq @html escapes license names, component identifiers, source URLs and
     # copyright. An http(s) source is rendered as a link; a raw purl as plain text.
     # Attribution always renders: component.copyright, or an honest "not captured".
-    echo "$LICENSE_MAP" | jq -r '
+    echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'
         def srchtml($s):
           if $s == null then ""
           elif ($s | test("^https?://"))
@@ -372,6 +394,8 @@ HTMLHEAD
           else "<span class=\"attr none\">Copyright: holders not captured in SBOM — see source</span>" end;
         .[] |
         "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
+        (if is_spdx_shaped(.license) then ""
+         else "<p class=\"unverified\">unverified name — not an SPDX identifier; confirm against the component'"'"'s license file</p>" end) +
         "<p class=\"count\">" + ((.count // (.components | length)) | tostring) + " component(s)</p><ul>" +
         (.components | map("<li>" + (.comp | @html)
             + srchtml(.src)

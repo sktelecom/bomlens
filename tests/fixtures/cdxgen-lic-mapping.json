@@ -1,0 +1,85 @@
+[
+  {
+    "exp": "Apache-2.0",
+    "names": [
+      "Apache2",
+      "Apache 2",
+      "Apache 2.0",
+      "Apache Version 2.0",
+      "Apache 2.0 License",
+      "Apache Software License, Version 2.0",
+      "The Apache Software License, Version 2.0",
+      "Apache License v2.0",
+      "Apache License (v2.0)",
+      "Apache License 2.0",
+      "Apache License Version 2.0",
+      "Apache License, Version 2.0",
+      "Apache Public License 2.0",
+      "Apache Software License - Version 2.0",
+      "The Apache License, Version 2.0",
+      "Apache Software License",
+      "Apache2.0",
+      "apache-2-0",
+      "APL2",
+      "the Apache License, ASL Version 2.0",
+      "Apache Publich License 2.0",
+      "https://opensource.org/licenses/Apache2.0",
+      "https://opensource.org/license/apache-2-0",
+      "http://www.apache.org/licenses/LICENSE-2.0.html"
+    ]
+  },
+  {
+    "exp": "0BSD",
+    "names": [
+      "Zero-Clause BSD",
+      "BSD",
+      "BSD License",
+      "BSD-like",
+      "new BSD License",
+      "new BSD",
+      "BSD, Public Domain"
+    ]
+  },
+  {
+    "exp": "BSD-2-Clause",
+    "names": [
+      "BSD 2 Clause",
+      "BSD 2-Clause",
+      "BSD-2-Clause",
+      "BSD 2-Clause License",
+      "The BSD 2-Clause License",
+      "The 2-Clause BSD License",
+      "The BSD License"
+    ]
+  },
+  {
+    "exp": "BSD-3-Clause",
+    "names": [
+      "BSD 3 Clause",
+      "BSD 3-Clause",
+      "BSD-3-Clause",
+      "BSD 3-clause",
+      "BSD 3-Clause License",
+      "The BSD 3-Clause License",
+      "BSD 3-Clause \"New\" or \"Revised\" License (BSD-3-Clause)",
+      "Eclipse Distribution License (New BSD License)",
+      "New BSD License",
+      "Modified BSD License",
+      "Revised BSD",
+      "Revised BSD License",
+      "The New BSD License",
+      "BSD (3-clause)",
+      "3-Clause BSD License"
+    ]
+  },
+  {
+    "exp": "MIT",
+    "names": [
+      "MIT License",
+      "The MIT License",
+      "MIT license",
+      "The MIT License (MIT)",
+      "Apache-2.0 OR MIT"
+    ]
+  }
+]
