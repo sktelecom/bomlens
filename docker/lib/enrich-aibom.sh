@@ -505,6 +505,9 @@ if hf_info is not None:
     # only raise concerns, so the property says "no-known-restriction" and the
     # verdict stays review either way.
     lic_props = []
+    # What the card declares, for the licence-correction step in the model loop
+    # below: None means the card named a licence and the component can keep it.
+    declared_license = None
     model_license = card_get(hf_info, "license")
     if isinstance(model_license, list):
         model_license = model_license[0] if model_license else None
@@ -515,6 +518,16 @@ if hf_info is not None:
         lic_name = card_get(hf_info, "license_name")
         if lic_name:
             lic_props.append({"name": "bomlens:license:customName", "value": str(lic_name)[:120]})
+        # The card is the declaration and it says the terms are not one of the
+        # known ids, so that is what the component has to carry. Recorded as a
+        # name, never guessed into an id — the same rule the dataset step follows.
+        declared_license = {"name": str(lic_name)[:120] if lic_name else "other"}
+        lic_link = card_get(hf_info, "license_link")
+        if lic_link:
+            lic_link = str(lic_link)
+            if not lic_link.lower().startswith("http"):
+                lic_link = f"https://huggingface.co/{model_id}/blob/main/{lic_link.lstrip('/')}"
+            declared_license["url"] = lic_link[:500]
         text = ""
         if lic_file:
             try:
@@ -598,6 +611,25 @@ if hf_info is not None:
                                       "value": f"{conflict[0]} ({conflict[1]})"})
             print(f"[enrich] lineage: {len(chain)} ancestor(s), "
                   f"conflict={'yes' if conflict else 'no'}.", file=sys.stderr)
+
+    # A card that says "other" leaves the generator with no id to copy, so it
+    # guesses one from the LICENSE text by substring — "limited" or "submit" in an
+    # Apache-derived custom licence is enough to make it read as MIT, and the SBOM
+    # then names terms the model was never released under. The declaration wins;
+    # the guess is kept as a property so the correction is traceable rather than
+    # silent. Runs before the property assembly below so the note lands with it.
+    if declared_license is not None:
+        guessed = []
+        for m in models:
+            guessed += [str((e.get("license") or {}).get("id"))
+                        for e in (m.get("licenses") or [])
+                        if isinstance(e, dict) and (e.get("license") or {}).get("id")]
+            m["licenses"] = [{"license": dict(declared_license)}]
+        if guessed:
+            lic_props.append({"name": "bomlens:license:replacedGuess",
+                              "value": ", ".join(sorted(set(guessed)))[:120]})
+            print("[enrich] licence: the card declares 'other'; replaced the generated id "
+                  f"({', '.join(sorted(set(guessed)))}) with the declared terms.", file=sys.stderr)
 
     for m in models:
         if weight_hashes:

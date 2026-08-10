@@ -667,7 +667,8 @@ class _Info:
 MODEL = _Info(
     siblings=[_S("model.safetensors", "a" * 64), _S("LICENSE")],
     gated=False, private=False, tags=[],
-    card_data={"license": "other", "license_name": "acme-community"},
+    card_data={"license": "other", "license_name": "acme-community",
+               "license_link": "LICENSE"},
 )
 
 
@@ -698,6 +699,14 @@ cprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-m
 cq=$(cprop bomlens:license:customScan:quote)
 case "$cq" in *"research purposes only"*) pass "the verdict quotes the wording it is based on" ;; *) fail "quote='$cq'" ;; esac
 [ "$(cprop bomlens:license:customName)" = "acme-community" ] && pass "the declared license_name is recorded" || fail "customName='$(cprop bomlens:license:customName)'"
+# The generator has no id to copy for a card that says "other", so it guesses one
+# from the LICENSE text by substring: the fixture arrives carrying Apache-2.0.
+# What the SBOM presents as the licence has to be the declaration, not the guess.
+clic() { jq -r --arg k "$1" '[.components[] | select(.type=="machine-learning-model") | .licenses[]?.license[$k]] | first // ""' "$WORK/cus.json"; }
+[ "$(clic name)" = "acme-community" ] && pass "the declared terms replace the generated license id" || fail "license name='$(clic name)', expected acme-community"
+[ -z "$(clic id)" ] && pass "no guessed SPDX id survives on a custom-license model" || fail "license id='$(clic id)', expected none"
+[ "$(clic url)" = "https://huggingface.co/acme/custom-model/blob/main/LICENSE" ] && pass "license_link is resolved to the repository file" || fail "license url='$(clic url)'"
+[ "$(cprop bomlens:license:replacedGuess)" = "Apache-2.0" ] && pass "the replaced guess stays recorded as a property" || fail "replacedGuess='$(cprop bomlens:license:replacedGuess)'"
 bash "$LIB/assess-ai-risk.sh" "$WORK/cus.json" >/dev/null 2>&1
 [ "$(cprop bomlens:assessment:license)" = "caution" ] && pass "the license axis picks up the custom-scan caution" || fail "license axis='$(cprop bomlens:assessment:license)'"
 # A text with no matched pattern must still read review, never clean.
