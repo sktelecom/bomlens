@@ -31,7 +31,7 @@ echo "== fixture is a CycloneDX 1.7 AI SBOM with a model card =="
 cp "$FIX/aibom-owasp-1_7.json" "$WORK/a.json"
 spec=$(jq -r '.specVersion' "$WORK/a.json")
 [ "$spec" = "1.7" ] && pass "fixture specVersion is 1.7" || fail "fixture specVersion='$spec', expected 1.7"
-if jq -e '[.components[] | select(.type=="machine-learning-model" and has("modelCard"))] | length >= 1' "$WORK/a.json" >/dev/null 2>&1; then
+if jq -e '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model" and has("modelCard"))] | length >= 1' "$WORK/a.json" >/dev/null 2>&1; then
     pass "fixture has a machine-learning-model component with a modelCard"
 else
     fail "fixture lacks a model component with a modelCard"
@@ -41,12 +41,12 @@ echo "== normalize-sbom.sh preserves the 1.7 specVersion and the modelCard =="
 bash "$LIB/normalize-sbom.sh" "$WORK/a.json" >/dev/null 2>&1
 spec=$(jq -r '.specVersion' "$WORK/a.json")
 [ "$spec" = "1.7" ] && pass "specVersion stays 1.7 after normalize (not clobbered to 1.6)" || fail "specVersion='$spec' after normalize, expected 1.7"
-if jq -e '[.components[] | select(.type=="machine-learning-model" and has("modelCard"))] | length >= 1' "$WORK/a.json" >/dev/null 2>&1; then
+if jq -e '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model" and has("modelCard"))] | length >= 1' "$WORK/a.json" >/dev/null 2>&1; then
     pass "modelCard survives normalize"
 else
     fail "modelCard lost during normalize"
 fi
-mlid=$(jq -r '.components[] | select(.type=="machine-learning-model") | .licenses[0].license.id // .licenses[0].license.name // "ABSENT"' "$WORK/a.json")
+mlid=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .licenses[0].license.id // .licenses[0].license.name // "ABSENT"' "$WORK/a.json")
 [ "$mlid" = "Apache-2.0" ] && pass "model license stays Apache-2.0" || fail "model license='$mlid', expected Apache-2.0"
 
 echo "== scan-aibom.sh keeps the generator's 1.7 variant =="
@@ -329,14 +329,14 @@ tl=$(jq -r '[.checks[] | select(.id=="g7-meta-tool-name" or .id=="g7-meta-tool-v
 [ "$tl" = "pass" ] && pass "legacy tools array satisfies tool name/version" || fail "tool checks on legacy array = '$tl', expected pass"
 
 echo "== prose openness declarations still count (supplier SBOM without openness:* props) =="
-jq '(.components[]|select(.type=="machine-learning-model")).description = "Open-weight model trained on open data." | del(.components[].properties)' \
+jq '(.components[] | select(.type=="machine-learning-model")).description = "Open-weight model trained on open data." | del(.components[].properties)' \
     "$FIX/aibom-owasp-1_7.json" > "$WORK/prose.json"
 bash "$LIB/validate-sbom.sh" "$WORK/prose.json" "$WORK/conf6" "prose" >/dev/null 2>&1
 po=$(jq -r '.checks[] | select(.id=="g7-model-openness") | .status' "$WORK/conf6_conformance.json")
 [ "$po" = "pass" ] && pass "prose openness declaration passes (no property convention required)" || fail "g7-model-openness on prose = '$po', expected pass"
 
 echo "== ref-only dataset references count as dataset names =="
-jq '(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets = [{"ref":"dataset-a"},{"ref":"dataset-b"}]' \
+jq '(.components[] | select(.type=="machine-learning-model")).modelCard.modelParameters.datasets = [{"ref":"dataset-a"},{"ref":"dataset-b"}]' \
     "$FIX/aibom-owasp-1_7.json" > "$WORK/refds.json"
 bash "$LIB/validate-sbom.sh" "$WORK/refds.json" "$WORK/conf7" "refds" >/dev/null 2>&1
 ds=$(jq -r '.checks[] | select(.id=="g7-ds-name") | "\(.status)|\(.evidence|join(","))"' "$WORK/conf7_conformance.json")
@@ -394,7 +394,7 @@ edlic=$(jq -r '[.components[] | select(.name=="org/open-ds") | .licenses[]?.lice
 [ "$edlic" = "cc-by-sa-4.0" ] && pass "the resolved dataset carries its declared license" || fail "resolved dataset license='$edlic'"
 edhash=$(jq '[.components[] | select(.name=="org/open-ds") | .hashes[]?] | length' "$WORK/enrich-ds.json")
 [ "$edhash" -eq 1 ] && pass "LFS content digests reach the dataset component" || fail "dataset hashes=$edhash, expected 1"
-edopen=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-ds.json")
+edopen=$(jq -r '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-ds.json")
 [ "$edopen" = "open-data" ] && pass "one resolvable dataset makes the training-data axis open-data" || fail "openness:training-data='$edopen'"
 # The repository owner has to reach the component-level producer fields, for the
 # unreachable dataset too: that is what the G7 dataset cluster and the 2026
@@ -417,14 +417,14 @@ echo "== card dataset names lifted from the prose are dropped =="
 # data. A name survives only if the frontmatter declares it (org/gone-ds, which
 # the stub cannot open) or the API resolves it; a ref points elsewhere in the
 # document and is not this step's business.
-jq '(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets =
+jq '(.components[] | select(.type=="machine-learning-model")).modelCard.modelParameters.datasets =
       [{"name":"org/gone-ds"},{"name":"approximately"},{"name":"only"},{"ref":"dataset:keep-me"}]' \
     "$FIX/aibom-owasp-1_7.json" > "$WORK/prose-ds.json"
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/prose-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
-pkept=$(jq -r '[(.components[]|select(.type=="machine-learning-model")).modelCard.modelParameters.datasets[]? | (.name // .ref)] | join(",")' "$WORK/prose-ds.json")
+pkept=$(jq -r '[(([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model")).modelCard.modelParameters.datasets[]? | (.name // .ref)] | join(",")' "$WORK/prose-ds.json")
 [ "$pkept" = "org/gone-ds,dataset:keep-me" ] && pass "prose names go, the declared name and the ref stay" || fail "card datasets='$pkept', expected org/gone-ds,dataset:keep-me"
-pdrop=$(jq -r '[.components[]|select(.type=="machine-learning-model")|.properties[]?|select(.name=="bomlens:card:datasetNameDropped")|.value] | first // ""' "$WORK/prose-ds.json")
+pdrop=$(jq -r '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model")|.properties[]?|select(.name=="bomlens:card:datasetNameDropped")|.value] | first // ""' "$WORK/prose-ds.json")
 [ "$pdrop" = "approximately, only" ] && pass "the dropped names stay recorded on the model" || fail "datasetNameDropped='$pdrop'"
 # The score the oversight produced must be gone too.
 bash "$LIB/validate-sbom.sh" "$WORK/prose-ds.json" "$WORK/conf-prose" "prose-ds" >/dev/null 2>&1
@@ -463,7 +463,7 @@ STUB
 cp "$FIX/aibom-owasp-1_7.json" "$WORK/enrich-gone.json"
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/enrich-gone.json" google-bert/bert-base-uncased >/dev/null 2>&1
-goneval=$(jq -r '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-gone.json")
+goneval=$(jq -r '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="openness:training-data") | .value] | first' "$WORK/enrich-gone.json")
 [ "$goneval" = "declared-unverified" ] && pass "named-but-unreachable datasets read as declared-unverified" || fail "openness:training-data='$goneval', expected declared-unverified"
 
 echo "== enrich-aibom.sh records HuggingFace file-security scan results =="
@@ -537,7 +537,7 @@ run_scan() {  # $1 scenario -> writes $WORK/scan.json
     HF_SCAN_SCENARIO="$1" HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
         bash "$LIB/enrich-aibom.sh" "$WORK/scan.json" google-bert/bert-base-uncased >/dev/null 2>&1
 }
-mprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/scan.json"; }
+mprop() { jq -r --arg n "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/scan.json"; }
 : > "$WORK/tree-calls.txt"
 run_scan safe
 [ "$(mprop bomlens:hf:scan:status)" = "safe" ] && pass "all-safe scan reads safe" || fail "scan status='$(mprop bomlens:hf:scan:status)', expected safe"
@@ -562,7 +562,7 @@ bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
 # Idempotency: enriching twice leaves one property set.
 HF_SCAN_SCENARIO=safe HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/scan.json" google-bert/bert-base-uncased >/dev/null 2>&1
-scnt=$(jq '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:hf:scan:status")] | length' "$WORK/scan.json")
+scnt=$(jq '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name=="bomlens:hf:scan:status")] | length' "$WORK/scan.json")
 [ "$scnt" = "1" ] && pass "re-enriching keeps one scan status (idempotent)" || fail "scan status properties=$scnt, expected 1"
 # Gate: ENRICH_HF_SECURITY=false must not call the tree API nor stamp a status.
 : > "$WORK/tree-calls.txt"
@@ -627,9 +627,9 @@ piiv=$(jq -r '.components[] | select(.name=="org/pii-ds") | .properties[] | sele
 [ "$piiv" = "caution" ] && pass "the pii signal assesses the dataset caution" || fail "pii dataset signals axis='$piiv', expected caution"
 gatv=$(jq -r '.components[] | select(.name=="org/gated-ds") | .properties[] | select(.name=="bomlens:assessment:signals") | .value' "$WORK/sig.json")
 [ "$gatv" = "review" ] && pass "a gated dataset assesses review (access-restricted)" || fail "gated dataset signals axis='$gatv', expected review"
-mdax=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:datasets") | .value' "$WORK/sig.json")
+mdax=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:datasets") | .value' "$WORK/sig.json")
 [ "$mdax" = "caution" ] && pass "the model datasets axis takes the worst dataset verdict" || fail "model datasets axis='$mdax', expected caution"
-mre=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/sig.json")
+mre=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/sig.json")
 case "$mre" in *"org/pii-ds"*) pass "the offending dataset is named in the model reasons" ;; *) fail "model reasons='$mre'" ;; esac
 
 echo "== the datasets axis is scoped per model via dependencies[], not global =="
@@ -717,7 +717,7 @@ cp "$FIX/aibom-owasp-1_7.json" "$WORK/cus.json"
 HF_LICENSE_TEXT="This model is provided for research purposes only. You may not use it for any commercial deployment." \
     ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/cus.json" acme/custom-model >/dev/null 2>&1
-cprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/cus.json"; }
+cprop() { jq -r --arg n "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/cus.json"; }
 [ "$(cprop bomlens:license:customScan)" = "matched" ] && pass "restrictive wording in the LICENSE file is detected" || fail "customScan='$(cprop bomlens:license:customScan)'"
 [ "$(cprop bomlens:license:customScan:verdict)" = "caution" ] && pass "a clear prohibition maps to caution" || fail "customScan verdict='$(cprop bomlens:license:customScan:verdict)'"
 cq=$(cprop bomlens:license:customScan:quote)
@@ -726,7 +726,7 @@ case "$cq" in *"research purposes only"*) pass "the verdict quotes the wording i
 # The generator has no id to copy for a card that says "other", so it guesses one
 # from the LICENSE text by substring: the fixture arrives carrying Apache-2.0.
 # What the SBOM presents as the licence has to be the declaration, not the guess.
-clic() { jq -r --arg k "$1" '[.components[] | select(.type=="machine-learning-model") | .licenses[]?.license[$k]] | first // ""' "$WORK/cus.json"; }
+clic() { jq -r --arg k "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .licenses[]?.license[$k]] | first // ""' "$WORK/cus.json"; }
 [ "$(clic name)" = "acme-community" ] && pass "the declared terms replace the generated license id" || fail "license name='$(clic name)', expected acme-community"
 [ -z "$(clic id)" ] && pass "no guessed SPDX id survives on a custom-license model" || fail "license id='$(clic id)', expected none"
 [ "$(clic url)" = "https://huggingface.co/acme/custom-model/blob/main/LICENSE" ] && pass "license_link is resolved to the repository file" || fail "license url='$(clic url)'"
@@ -778,7 +778,7 @@ STUB
 cp "$FIX/aibom-owasp-1_7.json" "$WORK/lin.json"
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/lin.json" acme/llama-finetune >/dev/null 2>&1
-lprop() { jq -r --arg n "$1" '[.components[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/lin.json"; }
+lprop() { jq -r --arg n "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/lin.json"; }
 [ "$(lprop bomlens:lineage:chain)" = "org/base-llama:llama3" ] && pass "the base-model chain is recorded" || fail "chain='$(lprop bomlens:lineage:chain)'"
 [ "$(lprop bomlens:lineage:conflict)" = "true" ] && pass "an undeclared inheritable ancestor license is flagged" || fail "conflict='$(lprop bomlens:lineage:conflict)'"
 bash "$LIB/assess-ai-risk.sh" "$WORK/lin.json" >/dev/null 2>&1
@@ -865,7 +865,7 @@ mspec=$(jq -r '.specVersion' "$WORK/merged.json")
 # ephemeral job id (the OWASP root is named "job-<timestamp>").
 mroot=$(jq -r '"\(.metadata.component.name)@\(.metadata.component.version)"' "$WORK/merged.json")
 [ "$mroot" = "combo@1.0" ] && pass "preserved root renamed to the caller's project/version" || fail "merged root='$mroot', expected combo@1.0"
-mcard=$(jq '[.components[] | select(.type=="machine-learning-model" and (.modelCard!=null))] | length' "$WORK/merged.json")
+mcard=$(jq '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model" and (.modelCard!=null))] | length' "$WORK/merged.json")
 [ "$mcard" -ge 1 ] && pass "model component + modelCard survive the merge" || fail "modelCard lost in merge"
 mflask=$(jq '[.components[] | select(.name=="flask")] | length' "$WORK/merged.json")
 [ "$mflask" -ge 1 ] && pass "application software component merged in (infrastructure layer)" || fail "flask not merged"
@@ -1101,7 +1101,7 @@ for spec in "Apache-2.0:ok" "llama3.1:conditional" "CC-BY-NC-4.0:caution" "Custo
     jq --arg l "$lic" '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":$l}}]' \
         "$FIX/aibom-owasp-1_7.json" > "$WORK/as.json"
     bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
-    got=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/as.json")
+    got=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/as.json")
     [ "$got" = "$want" ] && pass "license $lic assessed $want" || fail "license $lic assessed '$got', expected $want"
 done
 # Worst-of: a known blocker (caution) outranks an unknown license (review).
@@ -1113,7 +1113,7 @@ worst=$(jq -r '.components[] | select(.type=="machine-learning-model") | .proper
 # No declared license is review — with the reason saying so.
 jq '(.components[] | select(.type=="machine-learning-model")) |= del(.licenses)' "$FIX/aibom-owasp-1_7.json" > "$WORK/as.json"
 bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
-noli=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as.json")
+noli=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as.json")
 case "$noli" in *"no license declared"*) pass "a model without a license falls to review with the reason recorded" ;; *) fail "no-license reason='$noli'" ;; esac
 # Dataset (data) components are assessed too; an unresolved dataset without a
 # license reads review, never a guessed verdict.
@@ -1125,7 +1125,7 @@ unv=$(jq -r '.components[] | select(.type=="data") | select((.properties // []) 
 [ "$unv" = "review" ] && pass "an unresolved dataset assesses review" || fail "unresolved dataset verdict='$unv', expected review"
 # Idempotent: a second run leaves exactly one property set.
 bash "$LIB/assess-ai-risk.sh" "$WORK/asds.json" >/dev/null 2>&1
-ncnt=$(jq '[.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall")] | length' "$WORK/asds.json")
+ncnt=$(jq '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall")] | length' "$WORK/asds.json")
 [ "$ncnt" = "1" ] && pass "assessing twice is idempotent" || fail "after re-run: $ncnt overall properties, expected 1"
 # A plain SBOM is untouched (self-gate), so ANALYZE of a non-AI SBOM is a no-op.
 printf '{"bomFormat":"CycloneDX","components":[{"type":"library","name":"x","licenses":[{"license":{"id":"MIT"}}]}]}' > "$WORK/asplain.json"
@@ -1171,16 +1171,16 @@ mkusage() {  # $1 license, $2 ctx -> verdict on stdout
     jq --arg l "$1" '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":$l}}]' \
         "$FIX/aibom-owasp-1_7.json" > "$WORK/uc.json"
     AI_USAGE_CONTEXT="$2" bash "$LIB/assess-ai-risk.sh" "$WORK/uc.json" >/dev/null 2>&1
-    jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/uc.json"
+    jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:overall") | .value' "$WORK/uc.json"
 }
 [ "$(mkusage CC-BY-NC-4.0 internal)" = "conditional" ] && pass "CC-BY-NC for internal use reads conditional" || fail "CC-BY-NC internal verdict wrong"
 [ "$(mkusage CC-BY-NC-4.0 product)" = "caution" ] && pass "CC-BY-NC for product use reads caution" || fail "CC-BY-NC product verdict wrong"
 [ "$(mkusage cc-by-4.0 internal)" = "ok" ] && pass "an attribution-only license with no internal conditions reads ok" || fail "CC-BY internal verdict wrong"
-uctx=$(jq -r '.components[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
+uctx=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
 [ "$uctx" = "internal" ] && pass "the scenario is stamped as usageContext" || fail "usageContext='$uctx'"
 [ "$(mkusage CC-BY-NC-4.0 '')" = "caution" ] && pass "no scenario judges the full terms" || fail "unset scenario verdict wrong"
 [ "$(mkusage CC-BY-NC-4.0 partytime)" = "caution" ] && pass "an unknown scenario is dropped, not guessed at" || fail "unknown scenario verdict wrong"
-uctx2=$(jq -r '.components[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
+uctx2=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | [.properties[] | select(.name=="bomlens:assessment:usageContext") | .value] | first // "unset"' "$WORK/uc.json")
 [ "$uctx2" = "unset" ] && pass "an unknown scenario stamps no usageContext" || fail "usageContext='$uctx2' after unknown scenario"
 
 echo "== the profile states the scenario and lists only its binding conditions =="
@@ -1250,6 +1250,38 @@ if grep -q "License review needed" "$WORK/norm_NOTICE.txt" 2>/dev/null; then
 else
     pass "no review section for a normal software scan"
 fi
+
+echo "== enrichment makes the model the document's subject =="
+# The generator writes its own scan job into metadata.component and leaves the
+# model under components[], so the document claims to describe a generator run.
+# Enrichment promotes the model and drops the job; the generator itself stays
+# named in metadata.tools, and the dependency root — which the generator keys on
+# an id it never defines — folds into the model's own entry.
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/promote.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/promote.json" google-bert/bert-base-uncased >/dev/null 2>&1
+proot=$(jq -r '.metadata.component | "\(.type)|\(.name)"' "$WORK/promote.json")
+[ "$proot" = "machine-learning-model|bert-base-uncased" ] && pass "the model is the document's component" || fail "metadata.component='$proot'"
+pjob=$(jq -r '[.. | objects | select(.name? // "" | startswith("job-")) | .name] | length' "$WORK/promote.json")
+[ "$pjob" -eq 0 ] && pass "the generator's scan job is gone from the document" || fail "job components left=$pjob"
+ptool=$(jq -r '[.metadata.tools.components[]?.name] | join(",")' "$WORK/promote.json")
+case "$ptool" in *owasp-aibom-generator*) pass "the generator stays named in metadata.tools" ;; *) fail "tools='$ptool'" ;; esac
+pmodelref=$(jq -r '.metadata.component."bom-ref"' "$WORK/promote.json")
+pdeps=$(jq -r --arg r "$pmodelref" '[.dependencies[]? | select(.ref==$r)] | length' "$WORK/promote.json")
+[ "$pdeps" -eq 1 ] && pass "the subject has its own dependency entry" || fail "dependency entries for the subject=$pdeps, expected 1"
+# Every ref must resolve to something the document defines; a dangling ref reads
+# as a component the consumer failed to find.
+pbad=$(jq -r '([.metadata.component."bom-ref"] + [.components[]?."bom-ref"] | map(select(. != null))) as $defined
+  | [ .dependencies[]? | (.ref, (.dependsOn[]? )) ] | map(select(($defined | index(.)) == null)) | length' "$WORK/promote.json")
+[ "$pbad" -eq 0 ] && pass "no dependency reference dangles after promotion" || fail "dangling refs=$pbad"
+# A model already at the root is left alone.
+jq '{bomFormat, specVersion, version, metadata: (.metadata + {component: (.components[0])}), components: [], dependencies: []}' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/already.json"
+before=$(jq -S -c '.metadata.component' "$WORK/already.json")
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/already.json" google-bert/bert-base-uncased >/dev/null 2>&1
+after=$(jq -S -c '.metadata.component | {type, name, "bom-ref": .["bom-ref"]}' "$WORK/already.json")
+case "$after" in *bert-base-uncased*) pass "a model already at the root stays the subject" ;; *) fail "root after enrichment='$after' (was $before)" ;; esac
 
 echo "== a model named as the document's own component is treated as one =="
 # CycloneDX puts the subject of the document in metadata.component. The AIBOM

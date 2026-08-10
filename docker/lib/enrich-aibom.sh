@@ -832,6 +832,90 @@ elif cdxgen_bin:
 else:
     print("[enrich] cdxgen harvest disabled or not present; skipping pedigree/metrics.", file=sys.stderr)
 
+# ---- The document's subject is the model ------------------------------------
+# CycloneDX names what an SBOM is about in metadata.component. The generator puts
+# its own scan job there (job-<timestamp>, supplied by "OWASP AIBOM Generator")
+# and leaves the model under components[], which makes the document say it
+# describes a generator run that happens to contain a model. Everything that reads
+# an SBOM as "one subject plus its parts" then reads it wrong: the 2026 minimum
+# elements score the job as a component with no licence and no hash, the
+# dependency root points at an id nothing in the document defines, and the web UI
+# had to special-case the job name out of its scan list.
+#
+# So the model is promoted to the subject and the job is dropped. Nothing is lost:
+# the generator is already named in metadata.tools, and the job id was a
+# timestamp. Only a generator-shaped document is rewritten — a model already at
+# the root is left exactly as it is.
+def _defined_refs():
+    """Every bom-ref the document defines, root included."""
+    refs = set()
+    root = (sbom.get("metadata") or {}).get("component")
+    for c in ([root] if isinstance(root, dict) else []) + [
+            c for c in (sbom.get("components") or []) if isinstance(c, dict)]:
+        if c.get("bom-ref"):
+            refs.add(c["bom-ref"])
+    return refs
+
+
+def promote_model_to_root():
+    meta = sbom.setdefault("metadata", {})
+    if not isinstance(meta, dict):
+        return None
+    root = meta.get("component")
+    if isinstance(root, dict) and root.get("type") == "machine-learning-model":
+        return None
+    body = sbom.get("components")
+    if not isinstance(body, list):
+        return None
+    model = next((c for c in body
+                  if isinstance(c, dict) and c.get("type") == "machine-learning-model"), None)
+    if model is None:
+        return None
+    old_ref = root.get("bom-ref") if isinstance(root, dict) else None
+    model_ref = model.get("bom-ref")
+    body.remove(model)
+    meta["component"] = model
+    # Dependency edges: the generator writes a root edge under an id it never
+    # defines as a component, whose only dependsOn is the model. Fold that edge
+    # into the model's own, then drop every reference to the ids that are gone —
+    # a dangling ref is worse than a missing edge, because a consumer reads it as
+    # a component it failed to find.
+    deps = sbom.get("dependencies")
+    if isinstance(deps, list) and model_ref:
+        stale = {r for r in (old_ref, model.get("purl")) if r and r != model_ref}
+        # An edge keyed on a stale id contributes its dependsOn to the model.
+        adopted, kept = [], []
+        for d in deps:
+            if not isinstance(d, dict):
+                continue
+            ref = d.get("ref")
+            if ref in stale or (ref is not None and ref not in _defined_refs() and ref != model_ref):
+                adopted += [x for x in (d.get("dependsOn") or []) if x != model_ref]
+                continue
+            kept.append(d)
+        # The subject always gets its own entry, even with nothing to depend on: a
+        # document that lists no relationships at all is a different (and worse)
+        # statement than one that says the subject depends on nothing recorded.
+        model_edge = next((d for d in kept if d.get("ref") == model_ref), None)
+        if model_edge is None:
+            model_edge = {"ref": model_ref, "dependsOn": []}
+            kept.append(model_edge)
+        if adopted:
+            model_edge["dependsOn"] = list(dict.fromkeys(
+                (model_edge.get("dependsOn") or []) + adopted))
+        defined = _defined_refs()
+        for d in kept:
+            if isinstance(d.get("dependsOn"), list):
+                d["dependsOn"] = [x for x in d["dependsOn"] if x in defined]
+        sbom["dependencies"] = kept
+    return model.get("name")
+
+
+promoted = promote_model_to_root()
+if promoted:
+    print(f"[enrich] subject: {promoted} is now the document's component "
+          "(the generator's scan job is not what this SBOM describes).", file=sys.stderr)
+
 with open(sbom_path, "w") as f:
     json.dump(sbom, f, indent=2)
 print("[enrich] enrichment complete.", file=sys.stderr)
