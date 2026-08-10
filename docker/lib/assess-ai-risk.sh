@@ -44,7 +44,8 @@ fi
 
 # Self-gate: only an SBOM that carries a model component gets assessed, so
 # ANALYZE over a plain dependency SBOM is a clean no-op.
-if ! jq -e '[.components[]? | select(.type=="machine-learning-model")] | length > 0' "$SBOM" >/dev/null 2>&1; then
+if ! jq -e '([.metadata.component // empty] + [.components[]?])
+            | map(select(.type=="machine-learning-model")) | length > 0' "$SBOM" >/dev/null 2>&1; then
     echo "[assess] no machine-learning-model component; skipping."
     exit 0
 fi
@@ -203,7 +204,12 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
                               end)) ] }
         end;
 
-  (.components) |= (if type == "array" then map(
+  # One definition, applied wherever the model actually sits: the AIBOM generator
+  # writes its scan job into metadata.component and leaves the model in
+  # components[], while a spec-shaped AI SBOM (hand-written, or from a supplier)
+  # puts the model in metadata.component. The verdict must not depend on which
+  # tool wrote the document.
+  def assess_component:
       if .type == "machine-learning-model" then
         (.properties // []) as $p0
         | (assess_license) as $a0
@@ -251,13 +257,17 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
             { name: "bomlens:assessment:reasons",
               value: (($d.a.reasons + (if $d.s != null then $d.s.reasons else [] end))[0:8] | join("; ")) }
           ])
-      else . end
-  ) else . end)
+      else . end;
+
+  (.components) |= (if type == "array" then map(assess_component) else . end)
+  | (if ((.metadata? // {}) | type) == "object" and ((.metadata.component? // null) | type) == "object"
+     then .metadata.component |= assess_component else . end)
 ' "$SBOM" > "$TMP"
 mv "$TMP" "$SBOM"
 
 COUNTS=$(jq -r '
-  [ .components[]? | select(.type=="machine-learning-model" or .type=="data")
+  [ ([.metadata.component // empty] + [.components[]?])[]
+    | select(.type=="machine-learning-model" or .type=="data")
     | ((.properties // [])[] | select(.name=="bomlens:assessment:overall") | .value) ]
   | group_by(.) | map("\(.[0])=\(length)") | join(" ")' "$SBOM")
 echo "[assess] stamped bomlens:assessment:* (${COUNTS:-none})"

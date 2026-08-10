@@ -122,7 +122,8 @@ fi
 # because it holds even if the generator's wording changes upstream. Either way
 # an unusable ML-BOM must never be trusted as a real supply-chain artifact —
 # offline use is not supported (docs/guides/ai-model.md).
-ml_with_card=$(jq '[.components[]? | select(.type=="machine-learning-model" and ((.modelCard? // {}) | length) > 0)] | length' "$OUTPUT" 2>/dev/null || echo 0)
+ml_with_card=$(jq '([.metadata.component // empty] + [.components[]?])
+    | map(select(.type=="machine-learning-model" and ((.modelCard? // {}) | length) > 0)) | length' "$OUTPUT" 2>/dev/null || echo 0)
 if [ "${ml_with_card:-0}" -lt 1 ]; then
     echo "[aibom] ERROR: the generated ML-BOM carries no model card for $MODEL_ID." >&2
     echo "[aibom]   The card could not be collected. AIBOM needs HuggingFace network access." >&2

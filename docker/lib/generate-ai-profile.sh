@@ -106,7 +106,7 @@ ASSESS='{"disclaimer":"","disclaimer_ko":"","counts":{"ok":0,"conditional":0,"ca
 if [ -f "$BOM" ] && [ -f "$KBJ" ]; then
     ASSESS=$(jq -c --slurpfile kb "$KBJ" '
       ($kb[0]) as $K
-      | [ .components[]?
+      | [ ([.metadata.component // empty] + [.components[]?])[]
           | select(.type == "machine-learning-model")
           | (.properties // []) as $p
           | ($p | map(select(.name == "bomlens:assessment:overall")) | (.[0].value // null)) as $ov

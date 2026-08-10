@@ -981,6 +981,16 @@ def sbom_summary(run_id):
     except (OSError, json.JSONDecodeError):
         return None
     comps = _as_list(data.get("components"))
+    # A spec-shaped AI SBOM names the model as the document's own component
+    # (metadata.component) and lists only its datasets under components[]. Such a
+    # model would otherwise be missing from every model-driven view — the Models
+    # section, the risk-verdict tile, the AI-scan detection — because all of them
+    # read this list. Only a machine-learning-model root is folded in: for every
+    # other scan the root is the scanned project itself, which is not one of its
+    # own components and must stay out of the count.
+    _root = _as_dict(_as_dict(data.get("metadata")).get("component"))
+    if _root.get("type") == "machine-learning-model":
+        comps = [_root] + comps
     risk_by_purl, risk_by_nv = _component_risk_index(run_id)
     scope_by_ref, has_deps = _scope_index(data)
     rows = []

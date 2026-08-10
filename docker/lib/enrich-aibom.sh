@@ -121,7 +121,24 @@ with open(sbom_path) as f:
     sbom = json.load(f)
 
 comps = sbom.get("components") or []
-models = [c for c in comps if isinstance(c, dict) and c.get("type") == "machine-learning-model"]
+
+
+def model_components(doc):
+    """Every machine-learning-model in the document, wherever it sits.
+
+    The AIBOM generator leaves the model in components[] and fills
+    metadata.component with its own scan job; a spec-shaped AI SBOM names the
+    model as the document's component. Enrichment has to reach it either way.
+    """
+    found = []
+    root = ((doc.get("metadata") or {}) if isinstance(doc.get("metadata"), dict) else {}).get("component")
+    for c in ([root] if isinstance(root, dict) else []) + [c for c in (doc.get("components") or [])]:
+        if isinstance(c, dict) and c.get("type") == "machine-learning-model":
+            found.append(c)
+    return found
+
+
+models = model_components(sbom)
 if not models:
     print("[enrich] no machine-learning-model component; nothing to enrich.", file=sys.stderr)
     sys.exit(0)
@@ -786,8 +803,7 @@ if cdxgen_bin and hf_info is not None:
             )
             with open(out) as f:
                 cg = json.load(f)
-        cg_models = [c for c in (cg.get("components") or [])
-                     if isinstance(c, dict) and c.get("type") == "machine-learning-model"]
+        cg_models = model_components(cg)
         cg_model = cg_models[0] if cg_models else None
         if cg_model:
             for m in models:

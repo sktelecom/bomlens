@@ -332,7 +332,7 @@ registry_checks() {
     fi
     local prog
     prog=$(jq -r '
-        ((.subject // "[.components[]? | select(.type==\"machine-learning-model\")]")) as $subject
+        ((.subject // "([.metadata.component // empty] + [.components[]?]) | map(select(.type==\"machine-learning-model\"))")) as $subject
         | ((.subjectLabel // "model component")) as $slabel
         | ((.emptySubjectDetail // "no machine-learning-model components")) as $sempty
         | "(" + $subject + ") as $subjects | ["
@@ -536,8 +536,12 @@ case "$FORMAT" in
         # the widened spec-version range (the AIBOM toolchain emits 1.7) and
         # the G7 minimum-element checks — works for both a generated AIBOM and
         # a supplier-submitted AI SBOM under ANALYZE.
+        # The model can sit in either place: the AIBOM generator leaves it in
+        # components[] and fills metadata.component with its scan job, while a
+        # spec-shaped AI SBOM names the model as the document's own component.
         IS_AI=false
-        if jq -e '[.components[]? | select(.type=="machine-learning-model")] | length > 0' "$SBOM" >/dev/null 2>&1; then
+        if jq -e '([.metadata.component // empty] + [.components[]?])
+                  | map(select(.type=="machine-learning-model")) | length > 0' "$SBOM" >/dev/null 2>&1; then
             IS_AI=true
         fi
         # Whether a registry applies to THIS SBOM is the registry's own statement
@@ -757,7 +761,8 @@ RESULT_UP=$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')
 PROJECT_ESC=$(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
 # Header link: an AI SBOM carries the model's own page as an external reference, so
 # the project name can point at it. A plain dependency SBOM has none — stays text.
-MODEL_URL=$(jq -r '[.components[]? | select(.type=="machine-learning-model")
+MODEL_URL=$(jq -r '[([.metadata.component // empty] + [.components[]?])[]
+    | select(.type=="machine-learning-model")
     | .externalReferences[]? | select(.type=="website") | .url
     | select(type=="string" and startswith("https://"))] | .[0] // empty' "$SBOM" 2>/dev/null || true)
 PROJECT_HTML="$PROJECT_ESC"

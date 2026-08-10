@@ -171,7 +171,8 @@ fi
 # software SBOM, in which case the section is skipped entirely.
 AS_MODELS=0; AS_OK=0; AS_COND=0; AS_CAU=0; AS_REV=0
 if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
-    AS_COUNTS=$(jq -c '[ .components[]? | select(.type=="machine-learning-model")
+    AS_COUNTS=$(jq -c '[ ([.metadata.component // empty] + [.components[]?])[]
+        | select(.type=="machine-learning-model")
         | ((.properties // [])[] | select(.name=="bomlens:assessment:overall") | .value) ]
         | { n: length, ok: (map(select(.=="ok"))|length), c: (map(select(.=="conditional"))|length),
             w: (map(select(.=="caution"))|length), r: (map(select(.=="review"))|length) }' "$BOM" 2>/dev/null || echo '{"n":0}')

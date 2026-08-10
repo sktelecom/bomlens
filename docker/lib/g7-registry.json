@@ -1,6 +1,6 @@
 {
-  "appliesWhen": "[.components[]? | select(.type==\"machine-learning-model\")] | length > 0",
-  "subject": "[.components[]? | select(.type==\"machine-learning-model\")]",
+  "appliesWhen": "([.metadata.component // empty] + [.components[]?]) | map(select(.type==\"machine-learning-model\")) | length > 0",
+  "subject": "([.metadata.component // empty] + [.components[]?]) | map(select(.type==\"machine-learning-model\"))",
   "subjectLabel": "model component",
   "emptySubjectDetail": "no machine-learning-model components",
   "spec": "G7 Software Bill of Materials for AI — Minimum Elements (BSI/ACN et al., 2026-05)",

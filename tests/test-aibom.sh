@@ -1251,6 +1251,32 @@ else
     pass "no review section for a normal software scan"
 fi
 
+echo "== a model named as the document's own component is treated as one =="
+# CycloneDX puts the subject of the document in metadata.component. The AIBOM
+# generator does not: it leaves the model in components[] and fills the root with
+# its scan job. A supplier SBOM that follows the spec used to fall through every
+# model lookup, so it got no G7 checks, no risk assessment and no AI profile at
+# all. The same fixture, with the model moved to the root, must read the same.
+jq '{bomFormat, specVersion, version,
+     metadata: (.metadata + {component: (.components[0])}),
+     components: []}' "$FIX/aibom-owasp-1_7.json" > "$WORK/rootmodel_bom.json"
+bash "$LIB/validate-sbom.sh" "$WORK/rootmodel_bom.json" "$WORK/rootmodel" "rootmodel" >/dev/null 2>&1
+rg7=$(jq '[.checks[] | select(.id|startswith("g7-"))] | length' "$WORK/rootmodel_conformance.json")
+[ "$rg7" -eq 51 ] && pass "the G7 elements are measured against a root model component" || fail "G7 checks=$rg7, expected 51"
+rname=$(jq -r '[.checks[] | select(.id=="g7-model-name") | .status] | first // ""' "$WORK/rootmodel_conformance.json")
+[ "$rname" = "pass" ] && pass "the root model satisfies the model-name element" || fail "g7-model-name='$rname', expected pass"
+bash "$LIB/assess-ai-risk.sh" "$WORK/rootmodel_bom.json" >/dev/null 2>&1
+rov=$(jq -r '[.metadata.component.properties[]? | select(.name=="bomlens:assessment:overall") | .value] | first // ""' "$WORK/rootmodel_bom.json")
+[ -n "$rov" ] && pass "the root model carries an assessment verdict ($rov)" || fail "no bomlens:assessment:overall on the root model"
+bash "$LIB/generate-ai-profile.sh" "$WORK/rootmodel" "rootmodel" >/dev/null 2>&1
+rprof=$(jq -r '.riskAssessment.models | length' "$WORK/rootmodel_ai-profile.json" 2>/dev/null || echo 0)
+[ "$rprof" -eq 1 ] && pass "the AI profile lists the root model" || fail "profile models=$rprof, expected 1"
+# The AIBOM generator's own shape must keep working unchanged: same fixture, model
+# in components[], scan job at the root.
+bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/genshape" "genshape" >/dev/null 2>&1
+gg7=$(jq '[.checks[] | select(.id|startswith("g7-"))] | length' "$WORK/genshape_conformance.json")
+[ "$gg7" -eq 51 ] && pass "the generator's own shape still gets the G7 elements" || fail "G7 checks=$gg7 on the generator shape, expected 51"
+
 echo "== G7 registry: Korean labels/cluster names cover every element/cluster =="
 # Drift guard mirroring the crosswalk one: the ko reports look up label_ko by id
 # and name_ko by cluster id, so a new element/cluster without a Korean string
