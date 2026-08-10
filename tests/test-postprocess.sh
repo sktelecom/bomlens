@@ -1899,23 +1899,30 @@ co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conforma
     && pass "the file-only case is named in the detail" || fail "file-only detail: '$co_detail'"
 # The failure above is narrow on purpose: it fires when the denominator emptied
 # because file components stopped being counted, and nowhere else. An SBOM with no
-# components at all, or one whose components are all data, keeps the behaviour an
-# earlier fix established — the two checks agree and neither complains, because a
-# dataset has no purl and no package version to begin with and an SBOM listing only
-# datasets is legitimate to submit. Widening the failure to every empty denominator
-# would report those as uncovered, which is the same false alarm in a new place.
+# components at all, or one whose components are all data, must still not read as
+# uncovered — a dataset has no purl and no package version to begin with, and an
+# SBOM listing only datasets is legitimate to submit. It is not reported as met
+# either: crediting an empty denominator would rank such a document above one that
+# lists packages and is measured on them. Both checks come back not-applicable,
+# which leaves the coverage fractions and never moves the result.
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
-ce=$(jq -r '"\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/ce_conformance.json")
-[ "$ce" = "pass/pass" ] \
-    && pass "an SBOM with no components at all is not reported as uncovered" \
-    || fail "empty SBOM: name-version/purl = $ce, expected pass/pass"
+ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/\(.checks[]|select(.id=="purl")|.naKind // "-")"' "$WORK/ce_conformance.json")
+[ "$ce" = "pass/not-applicable/not-applicable" ] \
+    && pass "an SBOM with no components at all is neither uncovered nor credited" \
+    || fail "empty SBOM: result/name-version/purl = $ce, expected pass/not-applicable/not-applicable"
+ce_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/ce_conformance.json")
+[ "$ce_detail" = "no packages to measure" ] \
+    && pass "the empty-denominator case says why it cannot be measured" || fail "empty detail: '$ce_detail'"
 jq '.components = [.components[] | select(.type=="data")]' "$FIX/aibom-datasets-1_7.json" > "$WORK/conf-dataonly.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-dataonly.json" "$WORK/cd" "supplier" >/dev/null 2>&1
-cd_st=$(jq -r '"\(.checks[]|select(.id=="name-version")|.status)/\(.checks[]|select(.id=="purl")|.status)"' "$WORK/cd_conformance.json")
-[ "$cd_st" = "pass/pass" ] \
-    && pass "an SBOM of datasets only is not reported as uncovered" \
-    || fail "data-only SBOM: name-version/purl = $cd_st, expected pass/pass"
+# Only the two coverage checks are read here: dropping the model from an AI SBOM
+# also drops the 1.7 spec version out of its allowed range, which fails the
+# document for a reason that has nothing to do with the empty denominator.
+cd_st=$(jq -r '"\(.checks[]|select(.id=="name-version")|.naKind // "-")/\(.checks[]|select(.id=="purl")|.naKind // "-")"' "$WORK/cd_conformance.json")
+[ "$cd_st" = "not-applicable/not-applicable" ] \
+    && pass "an SBOM of datasets only is neither uncovered nor credited" \
+    || fail "data-only SBOM: name-version/purl = $cd_st, expected not-applicable/not-applicable"
 
 echo "== range-dedup: pypi manifest range lower bound is dropped when the installed sibling exists =="
 # Regression for the SCA-benchmark py-range report: cdxgen (after build-prep's
