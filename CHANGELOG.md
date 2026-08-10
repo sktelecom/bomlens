@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.10.4] - 2026-08-10
+
+### Fixed
+
+- A BSD-3-Clause component is no longer reported as 0BSD. The two license-name tables the SBOM generator resolves against both mapped the generic BSD names — "BSD", "BSD License", "new BSD" — onto 0BSD, a license that carries no conditions at all, so components that require the copyright notice and license text to be shipped came out requiring nothing, and the notice generated from them left that attribution out. PyPI files every BSD variant under the single classifier "BSD License", which put most Python projects in reach of this; Maven poms naming "New BSD License" put Java ones there too. The tables are corrected before generation runs, which is the only point where the original name still exists — once the SBOM is written, a mislabelled component is indistinguishable from one that really is 0BSD. "new BSD" now resolves to BSD-3-Clause. "BSD" and "BSD License" resolve to nothing: the clause count cannot be known from those strings, so they reach the SBOM as a license name for a person to settle rather than as a wrong identifier.
+
+- A Python component's license is settled on the installed distribution's own metadata — its PEP 639 license expression, the license text it ships, then its declared license name, in that order — rather than on the summary PyPI serves. That summary's license field increasingly holds the entire license text, which the generator scanned for the first license name it recognised: numpy and pandas were reported as Apache-2.0, off a bundled-dependency notice inside a BSD-3-Clause file. Evidence that settles on more than one answer, as a genuinely dual-licensed component does, keeps the upstream value for a person to read. Where a license was settled this way, the component records what settled it.
+
+- The notice marks a license group whose name is not an SPDX identifier — "BSD License", "Dual License" — as unverified, instead of printing prose where a license belongs.
+
 ## [v1.10.3] - 2026-08-08
 
 ### Added
@@ -592,7 +602,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.2...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.10.4...HEAD
+[v1.10.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.4
+[v1.10.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.3
 [v1.10.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.2
 [v1.10.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.1
 [v1.10.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.10.0
