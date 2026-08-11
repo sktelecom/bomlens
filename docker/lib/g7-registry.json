@@ -472,7 +472,7 @@
           "label_ko": "운영 성능 지표(KPI)",
           "role": "model-producer",
           "source": "inferred",
-          "cdxPath": "[ .components[]? | select(.type==\"machine-learning-model\") | select(((.modelCard.quantitativeAnalysis.performanceMetrics // .modelCard.modelParameters.performanceMetrics // null) != null)) ] | length > 0"
+          "cdxPath": "(([.metadata.component // empty] + [.components[]?]) | map(select(.type==\"machine-learning-model\") | select(((.modelCard.quantitativeAnalysis.performanceMetrics // .modelCard.modelParameters.performanceMetrics // null) != null)))) | length > 0"
         }
       ]
     }

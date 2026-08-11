@@ -1322,6 +1322,19 @@ bash "$LIB/validate-sbom.sh" "$WORK/parts_bom.json" "$WORK/parts" "parts" >/dev/
 ptrans=$(jq -r '.checks[] | select(.id=="transitive") | .status' "$WORK/parts_conformance.json")
 [ "$ptrans" = "fail" ] && pass "a document with parts and no edges still fails" || fail "transitive='$ptrans' with parts present, expected fail"
 
+echo "== performance metrics on a root model satisfy the KPI element =="
+# The registry subject reaches both places, but this one element spelled out its
+# own path over components[] — so once the model became the document's subject,
+# a card with an evaluation table could never satisfy it.
+jq '.metadata.component = (.components[0]
+      | .modelCard.quantitativeAnalysis.performanceMetrics = [{"type":"accuracy","value":"97.1"}])
+    | .components = []
+    | .dependencies = [{"ref": .metadata.component["bom-ref"], "dependsOn": []}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/kpi_bom.json"
+bash "$LIB/validate-sbom.sh" "$WORK/kpi_bom.json" "$WORK/kpi" "kpi" >/dev/null 2>&1
+kst=$(jq -r '.checks[] | select(.id=="g7-kpi-operational") | .status' "$WORK/kpi_conformance.json")
+[ "$kst" = "pass" ] && pass "operational KPIs are read from the document subject" || fail "g7-kpi-operational='$kst', expected pass"
+
 echo "== a model named as the document's own component is treated as one =="
 # CycloneDX puts the subject of the document in metadata.component. The AIBOM
 # generator does not: it leaves the model in components[] and fills the root with
