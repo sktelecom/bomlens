@@ -29,9 +29,9 @@ on:
         required: false
         default: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-06-19/2026-06-18-raspios-trixie-arm64-lite.img.xz"
 
+# 기본은 읽기 전용. 캡처 결과를 브랜치로 밀고 PR을 여는 잡만 스스로 쓰기로 올린다.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: demo-capture
@@ -54,6 +54,9 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
