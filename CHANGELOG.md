@@ -7,15 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- An SPDX document with no packages reports its name+version and PURL coverage as not-applicable, the way a CycloneDX document with no components already did. Both checks had stayed "met" on an empty denominator, so a document that named nothing counted toward coverage on one format but not the other.
-
-### Changed
-
-- Updated cdxgen to 12.8.3, which carries the BSD license-name correction shipped in v1.10.5 in its own data: `0BSD` now covers only "Zero-Clause BSD", and "new BSD" resolves to `BSD-3-Clause`. BomLens still corrects the tables before a scan, because the sibling images pinned to an earlier cdxgen release ship the old ones. Running the correction against the 12.8.3 tables leaves both files byte-identical.
-
-## [v1.10.5] - 2026-08-11
+## [v1.10.5] - 2026-08-12
 
 ### Changed
 
@@ -26,6 +18,8 @@ Three changes alter what an AI-model scan writes, so a consumer of those artifac
 - The conformance report distinguishes a check with nothing to judge from one that is unmet. Such a check carries `naKind: "not-applicable"` in the JSON and leaves both sides of every coverage fraction, so the denominators move: an SBOM whose only subject is a model no longer collects format checks for having no packages to measure. Reports and the web UI label the state separately and count it on its own line.
 
 - A model card whose license is `other` now carries the license the card declares, as a license name with a link to the file, rather than an SPDX identifier.
+
+- Updated cdxgen to 12.8.3, which carries the BSD license-name correction from v1.10.4 in its own data: `0BSD` now covers only "Zero-Clause BSD", and "new BSD" resolves to `BSD-3-Clause`. BomLens still corrects the tables before a scan, because the sibling images pinned to an earlier cdxgen release ship the old ones. Running the correction against the 12.8.3 tables leaves both files byte-identical.
 
 ### Fixed
 
@@ -38,6 +32,10 @@ Three changes alter what an AI-model scan writes, so a consumer of those artifac
 - An AI SBOM that follows the CycloneDX shape — a supplier submission, or a hand-written one, naming the model as the document's subject — is analyzed as an AI SBOM. Every model lookup expected the generator's layout, so such a document fell through all of them and was treated as ordinary software: no G7 minimum-element checks, no model risk assessment, no AI compliance profile.
 
 - A dependency-graph check no longer fails a document that has no parts to relate, and the stale dependency root the generator emitted — keyed on an identifier nothing in the document defines — is folded into the model's own entry. A document that does have parts and no edges still fails.
+
+- An SPDX document with no packages reports its name+version and PURL coverage as not-applicable, the way a CycloneDX document with no components does. Both checks had stayed "met" on an empty denominator, so a document that named nothing counted toward coverage on one format but not the other.
+
+- A model card that publishes an evaluation table can satisfy the operational-KPI element. The check read its own path over `components[]`, which is the one place the model no longer sits now that it is the subject of its own ML-BOM, so no card could meet it.
 
 - A Python component's license and version come from the installed distribution's own metadata, read through `importlib`, rather than from a filesystem guess at the `.dist-info` directory name.
 
