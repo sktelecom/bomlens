@@ -2,6 +2,11 @@
   "bomFormat": "CycloneDX",
   "components": [
     {
+      "authors": [
+        {
+          "name": "bookcorpus"
+        }
+      ],
       "bom-ref": "dataset:huggingface/bookcorpus",
       "data": [
         {
@@ -35,6 +40,15 @@
             "url": "https://huggingface.co/datasets/bookcorpus"
           },
           "description": "Books are a rich source of both fine-grained information, how a character, an object or a scene looks like, as well as high-level semantics, what someone is thinking, feeling and how these states evolve through a story.This work aims to align books to their movie releases in order to providerich descriptive explanations for visual content that go semantically farbeyond the captions available in current datasets. \\",
+          "governance": {
+            "owners": [
+              {
+                "organization": {
+                  "name": "bookcorpus"
+                }
+              }
+            ]
+          },
           "name": "bookcorpus",
           "type": "dataset"
         }
@@ -77,6 +91,14 @@
           "value": "uncategorized"
         },
         {
+          "name": "bomlens:licenseConflict",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "The dependency's license was not recognised."
+        },
+        {
           "name": "bomlens:assessment:axes",
           "value": "license"
         },
@@ -97,285 +119,21 @@
           "value": "license unknown: License declared unknown (review)"
         }
       ],
+      "supplier": {
+        "name": "bookcorpus",
+        "url": [
+          "https://huggingface.co/bookcorpus"
+        ]
+      },
       "type": "data",
       "version": "d917559b"
     },
     {
       "authors": [
         {
-          "name": "google-bert"
+          "name": "legacy-datasets"
         }
       ],
-      "bom-ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
-      "description": "No description available",
-      "externalReferences": [
-        {
-          "comment": "Model repository",
-          "type": "website",
-          "url": "https://huggingface.co/google-bert/bert-base-uncased"
-        },
-        {
-          "comment": "Model files",
-          "type": "distribution",
-          "url": "https://huggingface.co/google-bert/bert-base-uncased/tree/main"
-        },
-        {
-          "comment": "Specific commit",
-          "type": "vcs",
-          "url": "https://huggingface.co/google-bert/bert-base-uncased/commit/86b5e0934494bd15c9632b12f734a8a67f723594"
-        },
-        {
-          "comment": "Training dataset: bookcorpus",
-          "type": "distribution",
-          "url": "https://huggingface.co/datasets/bookcorpus"
-        },
-        {
-          "comment": "Training dataset: wikipedia",
-          "type": "distribution",
-          "url": "https://huggingface.co/datasets/wikipedia"
-        },
-        {
-          "comment": "ArXiv Paper",
-          "type": "documentation",
-          "url": "https://arxiv.org/abs/1810.04805"
-        }
-      ],
-      "group": "google-bert",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "c0c9f4914b4f0053785e96b8583cd59cda63c2f1b6e95a03970d772bf097e289"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "ea201fabe466ef7182f1f687fb5be4b62a73d3a78883f11264ff7f682cdb54bf"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "44d7a2896d341c51fb1eba89aea3a590e6af0ce33e25481136f7eeecb62e5f7f"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "68d45e234eb4a928074dfd868cead0219ab85354cc53d20e772753c6bb9169d3"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "097417381d6c7230bd9e3557456d726de6e83245ec8b24f529f60198a67b203a"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "a7a17d6d844b5de815ccab5f42cad6d24496db3850a2a43d8258221018ce87d2"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "manufacturer": {
-        "name": "google-bert",
-        "url": [
-          "https://huggingface.co/google-bert"
-        ]
-      },
-      "modelCard": {
-        "considerations": {
-          "technicalLimitations": [
-            "You can use the raw model for either masked language modeling or next sentence prediction, but it's mostly intended to be fine-tuned on a downstream task"
-          ]
-        },
-        "modelParameters": {
-          "datasets": [
-            {
-              "contents": {
-                "url": "https://huggingface.co/datasets/bookcorpus"
-              },
-              "name": "bookcorpus",
-              "type": "dataset"
-            },
-            {
-              "contents": {
-                "url": "https://huggingface.co/datasets/wikipedia"
-              },
-              "name": "wikipedia",
-              "type": "dataset"
-            }
-          ],
-          "modelArchitecture": "bert",
-          "task": "fill-mask"
-        },
-        "properties": [
-          {
-            "name": "genai:aibom:modelcard:vocabSize",
-            "value": "30522"
-          },
-          {
-            "name": "serialNumber",
-            "value": "urn:uuid:google-bert-bert-base-uncased"
-          },
-          {
-            "name": "safetyRiskAssessment",
-            "value": "Even if the training data used for this model could be characterized as fairly neutral, this model can have biased predictions: ```python >>> from transformers import pipeline >>> unmasker = pipeline('fill-mask', model='bert-base-uncased') >>> unmasker(\"The man worked as a [MASK]"
-          }
-        ]
-      },
-      "name": "bert-base-uncased",
-      "properties": [
-        {
-          "name": "openness:weights",
-          "value": "open-weight"
-        },
-        {
-          "name": "openness:architecture",
-          "value": "open-architecture"
-        },
-        {
-          "name": "openness:training-data",
-          "value": "open-data"
-        },
-        {
-          "name": "openness:training",
-          "value": "undisclosed"
-        },
-        {
-          "name": "bomlens:hf:scan:repoStatus",
-          "value": "{\"filesWithIssues\":[],\"scansDone\":true}"
-        },
-        {
-          "name": "bomlens:hf:scan:status",
-          "value": "queued"
-        },
-        {
-          "name": "bomlens:hf:scan:files",
-          "value": "14"
-        },
-        {
-          "name": "bomlens:hf:scan:filesFlagged",
-          "value": "0"
-        },
-        {
-          "name": "bomlens:hf:scan:source",
-          "value": "huggingface-api"
-        },
-        {
-          "name": "bomlens:weights:formats",
-          "value": "bin,h5,msgpack,onnx,safetensors"
-        },
-        {
-          "name": "bomlens:weights:pickleFiles",
-          "value": "2"
-        },
-        {
-          "name": "cdx:ai:provider",
-          "value": "huggingface"
-        },
-        {
-          "name": "cdx:ai:source",
-          "value": "huggingface-api"
-        },
-        {
-          "name": "cdx:ai:kind",
-          "value": "model"
-        },
-        {
-          "name": "cdx:ai:modality",
-          "value": "fill-mask"
-        },
-        {
-          "name": "cdx:huggingface:downloads",
-          "value": "116379836"
-        },
-        {
-          "name": "cdx:huggingface:downloadsAllTime",
-          "value": "3160334713"
-        },
-        {
-          "name": "cdx:huggingface:likes",
-          "value": "2731"
-        },
-        {
-          "name": "cdx:huggingface:gated",
-          "value": "false"
-        },
-        {
-          "name": "cdx:huggingface:private",
-          "value": "false"
-        },
-        {
-          "name": "cdx:huggingface:disabled",
-          "value": "false"
-        },
-        {
-          "name": "cdx:huggingface:createdAt",
-          "value": "2022-03-02T23:29:04.000Z"
-        },
-        {
-          "name": "cdx:huggingface:lastModified",
-          "value": "2024-02-19T11:06:12.000Z"
-        },
-        {
-          "name": "cdx:huggingface:fileCount",
-          "value": "16"
-        },
-        {
-          "name": "cdx:huggingface:libraryName",
-          "value": "transformers"
-        },
-        {
-          "name": "cdx:huggingface:spaceCount",
-          "value": "100"
-        },
-        {
-          "name": "cdx:huggingface:inferenceProviderCount",
-          "value": "1"
-        },
-        {
-          "name": "cdx:ai:parameterCount",
-          "value": "110106428"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "permissive"
-        },
-        {
-          "name": "bomlens:assessment:axes",
-          "value": "license,security,datasets"
-        },
-        {
-          "name": "bomlens:assessment:license",
-          "value": "ok"
-        },
-        {
-          "name": "bomlens:assessment:license:keys",
-          "value": "permissive"
-        },
-        {
-          "name": "bomlens:assessment:security",
-          "value": "review"
-        },
-        {
-          "name": "bomlens:assessment:datasets",
-          "value": "review"
-        },
-        {
-          "name": "bomlens:assessment:overall",
-          "value": "review"
-        },
-        {
-          "name": "bomlens:assessment:reasons",
-          "value": "license Apache-2.0: Permissive open-source license (ok); file security: scan queued, pickle-format weights present (review); datasets: 2 referenced, worst review (bookcorpus)"
-        }
-      ],
-      "purl": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
-      "supplier": {
-        "name": "google-bert"
-      },
-      "type": "machine-learning-model",
-      "version": "86b5e093"
-    },
-    {
       "bom-ref": "dataset:huggingface/wikipedia",
       "data": [
         {
@@ -409,6 +167,15 @@
             "url": "https://huggingface.co/datasets/wikipedia"
           },
           "description": "Wikipedia dataset containing cleaned articles of all languages.\nThe datasets are built from the Wikipedia dump\n(https://dumps.wikimedia.org/) with one split per language. Each example\ncontains the content of one full Wikipedia article with cleaning to strip\nmarkdown and unwanted sections (references, etc.).",
+          "governance": {
+            "owners": [
+              {
+                "organization": {
+                  "name": "legacy-datasets"
+                }
+              }
+            ]
+          },
           "name": "wikipedia",
           "type": "dataset"
         }
@@ -713,6 +480,14 @@
           "value": "uncategorized"
         },
         {
+          "name": "bomlens:licenseConflict",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "The dependency's license was not recognised."
+        },
+        {
           "name": "bomlens:assessment:axes",
           "value": "license"
         },
@@ -733,17 +508,17 @@
           "value": "license CC-BY-SA-3.0: Share-alike data/content license (conditional)"
         }
       ],
+      "supplier": {
+        "name": "legacy-datasets",
+        "url": [
+          "https://huggingface.co/legacy-datasets"
+        ]
+      },
       "type": "data",
       "version": "97a0b052"
     }
   ],
   "dependencies": [
-    {
-      "dependsOn": [
-        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
-      ],
-      "ref": "pkg:generic/google-bert/bert-base-uncased@86b5e093"
-    },
     {
       "dependsOn": [
         "dataset:huggingface/bookcorpus",
@@ -762,18 +537,275 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-10-11:32:41@1.0",
-      "description": "Generating SBOM for google-bert/bert-base-uncased",
+      "authors": [
+        {
+          "name": "google-bert"
+        }
+      ],
+      "bom-ref": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+      "description": "No description available",
+      "externalReferences": [
+        {
+          "comment": "Model repository",
+          "type": "website",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased"
+        },
+        {
+          "comment": "Model files",
+          "type": "distribution",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/tree/main"
+        },
+        {
+          "comment": "Specific commit",
+          "type": "vcs",
+          "url": "https://huggingface.co/google-bert/bert-base-uncased/commit/86b5e0934494bd15c9632b12f734a8a67f723594"
+        },
+        {
+          "comment": "Training dataset: bookcorpus",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/bookcorpus"
+        },
+        {
+          "comment": "Training dataset: wikipedia",
+          "type": "distribution",
+          "url": "https://huggingface.co/datasets/wikipedia"
+        },
+        {
+          "comment": "ArXiv Paper",
+          "type": "documentation",
+          "url": "https://arxiv.org/abs/1810.04805"
+        }
+      ],
+      "group": "google-bert",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "c0c9f4914b4f0053785e96b8583cd59cda63c2f1b6e95a03970d772bf097e289"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ea201fabe466ef7182f1f687fb5be4b62a73d3a78883f11264ff7f682cdb54bf"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "44d7a2896d341c51fb1eba89aea3a590e6af0ce33e25481136f7eeecb62e5f7f"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "68d45e234eb4a928074dfd868cead0219ab85354cc53d20e772753c6bb9169d3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "097417381d6c7230bd9e3557456d726de6e83245ec8b24f529f60198a67b203a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a7a17d6d844b5de815ccab5f42cad6d24496db3850a2a43d8258221018ce87d2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
       "manufacturer": {
-        "name": "OWASP AIBOM Generator"
+        "name": "google-bert",
+        "url": [
+          "https://huggingface.co/google-bert"
+        ]
       },
-      "name": "job-2026-08-10-11:32:41",
-      "purl": "pkg:generic/OWASP-AIBOM-Generator/job-2026-08-10-11:32:41@1.0",
+      "modelCard": {
+        "considerations": {
+          "technicalLimitations": [
+            "You can use the raw model for either masked language modeling or next sentence prediction, but it's mostly intended to be fine-tuned on a downstream task"
+          ]
+        },
+        "modelParameters": {
+          "datasets": [
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/bookcorpus"
+              },
+              "name": "bookcorpus",
+              "type": "dataset"
+            },
+            {
+              "contents": {
+                "url": "https://huggingface.co/datasets/wikipedia"
+              },
+              "name": "wikipedia",
+              "type": "dataset"
+            }
+          ],
+          "modelArchitecture": "bert",
+          "task": "fill-mask"
+        },
+        "properties": [
+          {
+            "name": "genai:aibom:modelcard:vocabSize",
+            "value": "30522"
+          },
+          {
+            "name": "serialNumber",
+            "value": "urn:uuid:google-bert-bert-base-uncased"
+          },
+          {
+            "name": "safetyRiskAssessment",
+            "value": "Even if the training data used for this model could be characterized as fairly neutral, this model can have biased predictions: ```python >>> from transformers import pipeline >>> unmasker = pipeline('fill-mask', model='bert-base-uncased') >>> unmasker(\"The man worked as a [MASK]"
+          }
+        ]
+      },
+      "name": "bert-base-uncased",
+      "properties": [
+        {
+          "name": "openness:weights",
+          "value": "open-weight"
+        },
+        {
+          "name": "openness:architecture",
+          "value": "open-architecture"
+        },
+        {
+          "name": "openness:training-data",
+          "value": "open-data"
+        },
+        {
+          "name": "openness:training",
+          "value": "undisclosed"
+        },
+        {
+          "name": "bomlens:hf:scan:repoStatus",
+          "value": "{\"filesWithIssues\":[],\"scansDone\":true}"
+        },
+        {
+          "name": "bomlens:hf:scan:status",
+          "value": "queued"
+        },
+        {
+          "name": "bomlens:hf:scan:files",
+          "value": "14"
+        },
+        {
+          "name": "bomlens:hf:scan:filesFlagged",
+          "value": "0"
+        },
+        {
+          "name": "bomlens:hf:scan:source",
+          "value": "huggingface-api"
+        },
+        {
+          "name": "bomlens:weights:formats",
+          "value": "bin,h5,msgpack,onnx,safetensors"
+        },
+        {
+          "name": "bomlens:weights:pickleFiles",
+          "value": "2"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "huggingface"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "huggingface-api"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modality",
+          "value": "fill-mask"
+        },
+        {
+          "name": "cdx:huggingface:downloads",
+          "value": "111558274"
+        },
+        {
+          "name": "cdx:huggingface:downloadsAllTime",
+          "value": "3165428746"
+        },
+        {
+          "name": "cdx:huggingface:likes",
+          "value": "2732"
+        },
+        {
+          "name": "cdx:huggingface:gated",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:private",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:disabled",
+          "value": "false"
+        },
+        {
+          "name": "cdx:huggingface:createdAt",
+          "value": "2022-03-02T23:29:04.000Z"
+        },
+        {
+          "name": "cdx:huggingface:lastModified",
+          "value": "2024-02-19T11:06:12.000Z"
+        },
+        {
+          "name": "cdx:huggingface:fileCount",
+          "value": "16"
+        },
+        {
+          "name": "cdx:huggingface:libraryName",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:huggingface:spaceCount",
+          "value": "100"
+        },
+        {
+          "name": "cdx:huggingface:inferenceProviderCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:ai:parameterCount",
+          "value": "110106428"
+        },
+        {
+          "name": "bomlens:assessment:axes",
+          "value": "license,security,datasets"
+        },
+        {
+          "name": "bomlens:assessment:license",
+          "value": "ok"
+        },
+        {
+          "name": "bomlens:assessment:license:keys",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:assessment:security",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:datasets",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:overall",
+          "value": "review"
+        },
+        {
+          "name": "bomlens:assessment:reasons",
+          "value": "license Apache-2.0: Permissive open-source license (ok); file security: scan queued, pickle-format weights present (review); datasets: 2 referenced, worst review (bookcorpus)"
+        }
+      ],
+      "purl": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
       "supplier": {
-        "name": "OWASP AIBOM Generator"
+        "name": "google-bert"
       },
-      "type": "application",
-      "version": "1.0"
+      "type": "machine-learning-model",
+      "version": "86b5e093"
     },
     "lifecycles": [
       {
@@ -786,7 +818,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-08-10T11:32:41+00:00",
+    "timestamp": "2026-08-12T11:12:56+00:00",
     "tools": {
       "components": [
         {
@@ -802,12 +834,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.10.4"
+          "version": "1.10.5"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:1391dce2-d99e-4c95-ac50-ad98ccdeb4e5",
+  "serialNumber": "urn:uuid:f2660d7c-d7f0-43dd-a46a-13ddbf91a7f7",
   "specVersion": "1.7",
   "version": 1
 }

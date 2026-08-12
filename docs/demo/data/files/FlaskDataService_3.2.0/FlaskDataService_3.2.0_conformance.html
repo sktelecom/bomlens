@@ -56,6 +56,7 @@
  .s-fail{color:#dc2626;font-weight:700;}
  .s-warn{color:#ca8a04;font-weight:700;}
  .s-review{color:var(--review);font-weight:700;}
+ .s-na{color:var(--muted);font-weight:700;}
  td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
  th.num{text-align:right;}
  td.req{white-space:nowrap;}
@@ -76,12 +77,13 @@
  <div class="report-kind">Conformance</div>
 </header>
 <h1>SBOM Conformance Report</h1>
-<p class="meta">Project: FlaskDataService &middot; Generated: 2026-08-10T11:31:00Z &middot; Format: CycloneDX</p>
+<p class="meta">Project: FlaskDataService &middot; Generated: 2026-08-12T11:11:03Z &middot; Format: CycloneDX</p>
 <div class="cards">
  <span class="pill pill-pass">Result: PASS</span>
  <span class="pill pill-fail">Mandatory failures: <span class="count">0</span></span>
  <span class="pill pill-warn">Warnings: <span class="count">8</span></span>
  <span class="pill">Needs review: <span class="count">5</span></span>
+ <span class="pill">Not applicable: <span class="count">1</span></span>
 
 </div>
 <h2>Regulatory crosswalk</h2>
@@ -99,7 +101,7 @@
 <tr><td class="num">4</td><td class="s-pass">PASS</td><td>Top-level component name+version<br><span class="meta">BSI TR-03183-2 Section 5.1</span></td><td class="req">yes</td><td>FlaskDataService@3.2.0</td><td></td></tr>
 <tr><td class="num">5</td><td class="s-pass">PASS</td><td>Component name+version coverage (100%)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">yes</td><td>39/39</td><td></td></tr>
 <tr><td class="num">6</td><td class="s-pass">PASS</td><td>PURL coverage (&gt;= 90%)<br><span class="meta">BSI TR-03183-2 Section 5.2.4</span></td><td class="req">yes</td><td>100% (39/39)</td><td></td></tr>
-<tr><td class="num">7</td><td class="s-pass">PASS</td><td>File component identifier coverage (hash, &gt;= 80%, recommended)</td><td class="req">no</td><td>no file components</td><td></td></tr>
+<tr><td class="num">7</td><td class="s-na">N/A</td><td>File component identifier coverage (hash, &gt;= 80%, recommended)</td><td class="req">no</td><td>no file components</td><td></td></tr>
 <tr><td class="num">8</td><td class="s-pass">PASS</td><td>Traceable PURL (no pkg:generic, advisory)</td><td class="req">no</td><td>0 untraceable</td><td></td></tr>
 <tr><td class="num">9</td><td class="s-pass">PASS</td><td>PURL syntax (pkg:type/[namespace/]name)</td><td class="req">yes</td><td>0 malformed</td><td></td></tr>
 <tr><td class="num">10</td><td class="s-pass">PASS</td><td>Transitive dependencies (graph edges)<br><span class="meta">BSI TR-03183-2 Section 5.1; 5.2.2</span></td><td class="req">yes</td><td>89 edge(s)</td><td></td></tr>

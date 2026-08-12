@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-08-10T11:31:00Z",
+  "generatedAt": "2026-08-12T11:11:03Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -77,6 +77,8 @@
       "id": "name-version",
       "label": "Component name+version coverage (100%)",
       "required": true,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "39/39",
       "missing": [],
@@ -94,6 +96,8 @@
       "id": "purl",
       "label": "PURL coverage (>= 90%)",
       "required": true,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "100% (39/39)",
       "missing": [],
@@ -111,7 +115,9 @@
       "id": "file-identifier",
       "label": "File component identifier coverage (hash, >= 80%, recommended)",
       "required": false,
-      "status": "pass",
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
       "detail": "no file components",
       "missing": [],
       "regulations": []
@@ -138,6 +144,8 @@
       "id": "transitive",
       "label": "Transitive dependencies (graph edges)",
       "required": true,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "89 edge(s)",
       "missing": [],
@@ -155,6 +163,8 @@
       "id": "license",
       "label": "License coverage (>= 80%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "100% (39/39)",
       "missing": [],
@@ -172,6 +182,8 @@
       "id": "hash",
       "label": "Hash coverage (>= 50%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "100% (39/39)",
       "missing": [],
@@ -189,6 +201,8 @@
       "id": "hash-algorithm",
       "label": "SHA-512 checksum coverage (>= 80%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "warn",
       "detail": "0% (0/39)",
       "missing": [],
@@ -206,6 +220,8 @@
       "id": "component-creator",
       "label": "Component creator coverage (>= 80%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "82% (32/39)",
       "missing": [],
@@ -223,6 +239,8 @@
       "id": "component-filename",
       "label": "Component filename coverage (>= 80%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "warn",
       "detail": "0% (0/39)",
       "missing": [],
@@ -240,6 +258,8 @@
       "id": "artifact-uri",
       "label": "Source or distribution URI coverage (>= 80%, recommended)",
       "required": false,
+      "source": "auto",
+      "naKind": "",
       "status": "pass",
       "detail": "100% (39/39)",
       "missing": [],
@@ -258,6 +278,7 @@
       "label": "Delivered-file properties (executable/archive/structured)",
       "required": false,
       "source": "na",
+      "naKind": "",
       "status": "warn",
       "detail": "requires inspecting the delivered files (no automated source in this scan)",
       "missing": [],
@@ -939,7 +960,7 @@
             "id": "name-version",
             "label": "Component name+version coverage (100%)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "39/39",
             "refs": [
               "Section 5.2.2"
@@ -949,7 +970,7 @@
             "id": "purl",
             "label": "PURL coverage (>= 90%)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "100% (39/39)",
             "refs": [
               "Section 5.2.4"
@@ -959,7 +980,7 @@
             "id": "transitive",
             "label": "Transitive dependencies (graph edges)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "89 edge(s)",
             "refs": [
               "Section 5.1; 5.2.2"
@@ -969,7 +990,7 @@
             "id": "license",
             "label": "License coverage (>= 80%, recommended)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "100% (39/39)",
             "refs": [
               "Section 5.2.2"
@@ -979,7 +1000,7 @@
             "id": "hash",
             "label": "Hash coverage (>= 50%, recommended)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "100% (39/39)",
             "refs": [
               "Section 5.2.2"
@@ -989,7 +1010,7 @@
             "id": "hash-algorithm",
             "label": "SHA-512 checksum coverage (>= 80%, recommended)",
             "status": "warn",
-            "source": null,
+            "source": "auto",
             "detail": "0% (0/39)",
             "refs": [
               "Section 5.2.2"
@@ -999,7 +1020,7 @@
             "id": "component-creator",
             "label": "Component creator coverage (>= 80%, recommended)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "82% (32/39)",
             "refs": [
               "Section 5.2.2"
@@ -1009,7 +1030,7 @@
             "id": "component-filename",
             "label": "Component filename coverage (>= 80%, recommended)",
             "status": "warn",
-            "source": null,
+            "source": "auto",
             "detail": "0% (0/39)",
             "refs": [
               "Section 5.2.2"
@@ -1019,7 +1040,7 @@
             "id": "artifact-uri",
             "label": "Source or distribution URI coverage (>= 80%, recommended)",
             "status": "pass",
-            "source": null,
+            "source": "auto",
             "detail": "100% (39/39)",
             "refs": [
               "Section 5.2.4"

@@ -1,6 +1,6 @@
 Third-party Open Source Licenses for RaspberryPiOsLite
-Generated: 2026-08-10T11:53:01Z
-Total components: 60126 · Distinct licenses: 395
+Generated: 2026-08-12T11:24:43Z
+Total components: 60125 · Distinct licenses: 395
 
 This product includes the following open source software.
 Each component lists its source/download location and copyright/attribution.
@@ -8899,7 +8899,7 @@ Components (4):
       Copyright: holders not captured in SBOM — see source (pkg:deb/debian/libboost-thread1.83.0@1.83.0-4.2?arch=arm64&distro=debian-13.5&upstream=boost1.83)
 
 License: NOASSERTION
-Components (57354):
+Components (57353):
   - Catalogued files (57270) — paths recorded by the scan, listed in the SBOM, not components
       Copyright: holders not captured in SBOM — see source
   - arrow@1.3.0
@@ -9114,8 +9114,6 @@ Components (57354):
       Source: https://pypi.org/project/mdurl/0.1.2/
       Copyright: holders not captured in SBOM — see source (https://pypi.org/project/mdurl/0.1.2/)
   - ncurses
-      Copyright: holders not captured in SBOM — see source
-  - net-tools@2.10
       Copyright: holders not captured in SBOM — see source
   - raspberrypi-net-mods@1.4.4
       Source: pkg:deb/debian/raspberrypi-net-mods@1.4.4?arch=all&distro=debian-13.5

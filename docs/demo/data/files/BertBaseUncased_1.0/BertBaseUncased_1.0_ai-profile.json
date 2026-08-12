@@ -1,62 +1,70 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-08-10T11:32:45Z",
+  "generatedAt": "2026-08-12T11:12:59Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
     "auto": 41,
-    "present": 32,
-    "gap": 9,
+    "present": 31,
+    "gap": 10,
     "review": 10,
+    "notApplicable": 0,
     "clusters": [
       {
         "cluster": "dp",
         "total": 10,
         "present": 8,
         "gap": 0,
-        "review": 2
+        "review": 2,
+        "notApplicable": 0
       },
       {
         "cluster": "infrastructure",
         "total": 2,
         "present": 0,
         "gap": 2,
-        "review": 0
+        "review": 0,
+        "notApplicable": 0
       },
       {
         "cluster": "kpi",
         "total": 2,
         "present": 0,
         "gap": 1,
-        "review": 1
+        "review": 1,
+        "notApplicable": 0
       },
       {
         "cluster": "metadata",
         "total": 10,
         "present": 7,
         "gap": 3,
-        "review": 0
+        "review": 0,
+        "notApplicable": 0
       },
       {
         "cluster": "models",
         "total": 14,
         "present": 13,
         "gap": 1,
-        "review": 0
+        "review": 0,
+        "notApplicable": 0
       },
       {
         "cluster": "slp",
         "total": 9,
-        "present": 4,
-        "gap": 1,
-        "review": 4
+        "present": 3,
+        "gap": 2,
+        "review": 4,
+        "notApplicable": 0
       },
       {
         "cluster": "sp",
         "total": 4,
         "present": 0,
         "gap": 1,
-        "review": 3
+        "review": 3,
+        "notApplicable": 0
       }
     ],
     "reviewItems": [
@@ -131,6 +139,12 @@
         "docUrl": ""
       },
       {
+        "id": "g7-slp-name",
+        "label": "System name",
+        "cluster": "slp",
+        "docUrl": ""
+      },
+      {
         "id": "g7-slp-producer",
         "label": "System producer",
         "cluster": "slp",
@@ -176,17 +190,17 @@
         "title": "EU AI Act — Annex IV technical documentation",
         "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
         "total": 23,
-        "present": 9,
-        "gap": 5,
+        "present": 8,
+        "gap": 6,
         "review": 9,
         "failed": 0,
         "elements": [
           {
             "id": "g7-slp-name",
             "label": "System name",
-            "status": "pass",
+            "status": "warn",
             "source": "declared",
-            "detail": "present",
+            "detail": "not present in the SBOM",
             "refs": [
               "Annex IV(1)"
             ]
@@ -418,17 +432,17 @@
         "title": "AI Framework Act (Korea)",
         "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
         "total": 10,
-        "present": 2,
-        "gap": 1,
+        "present": 1,
+        "gap": 2,
         "review": 7,
         "failed": 0,
         "elements": [
           {
             "id": "g7-slp-name",
             "label": "System name",
-            "status": "pass",
+            "status": "warn",
             "source": "declared",
-            "detail": "present",
+            "detail": "not present in the SBOM",
             "refs": [
               "제31조"
             ]
@@ -530,9 +544,9 @@
         "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
         "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
         "total": 14,
-        "present": 11,
-        "gap": 2,
-        "review": 1,
+        "present": 7,
+        "gap": 1,
+        "review": 6,
         "failed": 0,
         "elements": [
           {
@@ -550,7 +564,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-08-10T11:32:41+00:00",
+            "detail": "2026-08-12T11:12:56+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -570,7 +584,7 @@
             "label": "Top-level component name+version",
             "status": "pass",
             "source": null,
-            "detail": "job-2026-08-10-11:32:41@1.0",
+            "detail": "bert-base-uncased@86b5e093",
             "refs": [
               "Section 5.1"
             ]
@@ -578,9 +592,9 @@
           {
             "id": "name-version",
             "label": "Component name+version coverage (100%)",
-            "status": "pass",
-            "source": null,
-            "detail": "1/1",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.2"
             ]
@@ -588,9 +602,9 @@
           {
             "id": "purl",
             "label": "PURL coverage (>= 90%)",
-            "status": "pass",
-            "source": null,
-            "detail": "100% (1/1)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.4"
             ]
@@ -599,8 +613,8 @@
             "id": "transitive",
             "label": "Transitive dependencies (graph edges)",
             "status": "pass",
-            "source": null,
-            "detail": "3 edge(s)",
+            "source": "auto",
+            "detail": "2 edge(s)",
             "refs": [
               "Section 5.1; 5.2.2"
             ]
@@ -609,8 +623,8 @@
             "id": "license",
             "label": "License coverage (>= 80%, recommended)",
             "status": "pass",
-            "source": null,
-            "detail": "100% (3/3)",
+            "source": "auto",
+            "detail": "100% (2/2)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -619,8 +633,8 @@
             "id": "hash",
             "label": "Hash coverage (>= 50%, recommended)",
             "status": "pass",
-            "source": null,
-            "detail": "66% (2/3)",
+            "source": "auto",
+            "detail": "50% (1/2)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -629,8 +643,8 @@
             "id": "hash-algorithm",
             "label": "SHA-512 checksum coverage (>= 80%, recommended)",
             "status": "warn",
-            "source": null,
-            "detail": "0% (0/3)",
+            "source": "auto",
+            "detail": "0% (0/2)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -638,9 +652,9 @@
           {
             "id": "component-creator",
             "label": "Component creator coverage (>= 80%, recommended)",
-            "status": "pass",
-            "source": null,
-            "detail": "100% (1/1)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.2"
             ]
@@ -649,8 +663,8 @@
             "id": "component-filename",
             "label": "Component filename coverage (>= 80%, recommended)",
             "status": "warn",
-            "source": null,
-            "detail": "0% (0/1)",
+            "source": "na",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.2"
             ]
@@ -658,9 +672,9 @@
           {
             "id": "artifact-uri",
             "label": "Source or distribution URI coverage (>= 80%, recommended)",
-            "status": "pass",
-            "source": null,
-            "detail": "100% (1/1)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.4"
             ]
@@ -670,7 +684,7 @@
             "label": "Delivered-file properties (executable/archive/structured)",
             "status": "warn",
             "source": "na",
-            "detail": "requires inspecting the delivered files (no automated source in this scan)",
+            "detail": "no packages to measure",
             "refs": [
               "Section 5.2.2"
             ]
@@ -682,8 +696,8 @@
         "title": "US SBOM minimum elements",
         "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
         "total": 23,
-        "present": 13,
-        "gap": 6,
+        "present": 15,
+        "gap": 4,
         "review": 4,
         "failed": 0,
         "elements": [
@@ -782,7 +796,7 @@
             "label": "Component name",
             "status": "pass",
             "source": "auto",
-            "detail": "4/4 component(s)",
+            "detail": "3/3 component(s)",
             "refs": [
               "Component Name"
             ]
@@ -792,7 +806,7 @@
             "label": "Component version",
             "status": "pass",
             "source": "auto",
-            "detail": "4/4 component(s)",
+            "detail": "3/3 component(s)",
             "refs": [
               "Component Version"
             ]
@@ -800,9 +814,9 @@
           {
             "id": "cisa-component-producer",
             "label": "Component producer",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "2/4 component(s)",
+            "detail": "3/3 component(s)",
             "refs": [
               "Component Producer"
             ]
@@ -812,7 +826,7 @@
             "label": "Component identifiers",
             "status": "warn",
             "source": "auto",
-            "detail": "3/4 component(s)",
+            "detail": "2/3 component(s)",
             "refs": [
               "Component Identifiers"
             ]
@@ -820,9 +834,9 @@
           {
             "id": "cisa-component-license",
             "label": "Component license",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "3/4 component(s)",
+            "detail": "3/3 component(s)",
             "refs": [
               "Component License"
             ]
@@ -832,7 +846,7 @@
             "label": "Component hash value",
             "status": "warn",
             "source": "auto",
-            "detail": "2/4 component(s)",
+            "detail": "2/3 component(s)",
             "refs": [
               "Component Hash Value"
             ]
@@ -842,7 +856,7 @@
             "label": "Component hash algorithm",
             "status": "pass",
             "source": "auto",
-            "detail": "4/4 component(s)",
+            "detail": "3/3 component(s)",
             "refs": [
               "Component Hash Algorithm"
             ]
