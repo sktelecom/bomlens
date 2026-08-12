@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An SPDX document with no packages reports its name+version and PURL coverage as not-applicable, the way a CycloneDX document with no components already did. Both checks had stayed "met" on an empty denominator, so a document that named nothing counted toward coverage on one format but not the other.
+
 ### Changed
 
 - Updated cdxgen to 12.8.3, which carries the BSD license-name correction shipped in v1.10.5 in its own data: `0BSD` now covers only "Zero-Clause BSD", and "new BSD" resolves to `BSD-3-Clause`. BomLens still corrects the tables before a scan, because the sibling images pinned to an earlier cdxgen release ship the old ones. Running the correction against the 12.8.3 tables leaves both files byte-identical.

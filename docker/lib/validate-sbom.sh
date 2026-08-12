@@ -488,11 +488,21 @@ spdx_json_checks() {
        {id:\"top-component\", label:\"Document name + described root\", required:true,
         status:(if (\$docname|length)>0 and (\$describes>0 or \$tot>0) then \"pass\" else \"fail\" end),
         detail:\$docname, missing:[]},
+       # A document with no packages has nothing to measure here, the same state
+       # the CycloneDX branch above reports as not-applicable. Reporting it as
+       # \"0/0, met\" would count an empty denominator toward coverage and let a
+       # document that named nothing clear the bar.
        {id:\"name-version\", label:\"Package name+version coverage (100%)\", required:true,
-        status:(if (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
-        detail:\"\(\$tot - (\$miss_nv|length))/\(\$tot)\", missing:(\$miss_nv[0:\$cap])},
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot==0 then \"warn\" elif (\$miss_nv|length)==0 then \"pass\" else \"fail\" end),
+        detail:(if \$tot==0 then \"no packages to measure\"
+                else \"\(\$tot - (\$miss_nv|length))/\(\$tot)\" end),
+        missing:(\$miss_nv[0:\$cap])},
        {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
-        status:(if \$tot==0 or pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
+        source:(if \$tot==0 then \"na\" else \"auto\" end),
+        naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
+        status:(if \$tot==0 then \"warn\" elif pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
         detail:(if \$tot==0 then \"no packages to measure\"
                 else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\"
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),

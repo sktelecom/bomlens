@@ -737,23 +737,28 @@ check_bad bad-nodeps-cyclonedx.json  transitive  "no dependencies"
 
 # Nothing to measure is not a coverage failure. pct() returns 0 on an empty
 # denominator to avoid dividing by zero, and comparing that placeholder against
-# the minimum used to fail the purl check for a field that had no subject —
+# the minimum used to fail the purl check for a field that had no subject,
 # while its sibling name-version passed the same input, because it asks whether
 # the missing list is empty rather than whether a percentage clears a bar. The
-# two must agree. Covered for both JSON formats and for a BOM whose only
-# components are data (a training dataset carries no purl: purl defines no type
-# for one).
+# two must agree. Both now report the state as not-applicable rather than as met,
+# so an empty denominator no longer counts toward coverage. Covered for both JSON
+# formats and for a BOM whose only components are data (a training dataset
+# carries no purl: purl defines no type for one).
 empty_denominator() {
     local label="$1" src="$2" filter="$3"
     jq "$filter" "$src" > "$atmp/empty-src.json"
     bash "$LIB/validate-sbom.sh" "$atmp/empty-src.json" "$atmp/ed" "demo" >/dev/null 2>&1
-    local nv purl
+    local nv purl nv_na purl_na
     nv=$(jq -r '.checks[]|select(.id=="name-version")|.status' "$atmp/ed_conformance.json" 2>/dev/null)
     purl=$(jq -r '.checks[]|select(.id=="purl")|.status' "$atmp/ed_conformance.json" 2>/dev/null)
-    if [ "$nv" = "pass" ] && [ "$purl" = "pass" ]; then
-        pass "validate: $label -> coverage checks agree (both pass)"
+    nv_na=$(jq -r '.checks[]|select(.id=="name-version")|.naKind // ""' "$atmp/ed_conformance.json" 2>/dev/null)
+    purl_na=$(jq -r '.checks[]|select(.id=="purl")|.naKind // ""' "$atmp/ed_conformance.json" 2>/dev/null)
+    if [ "$nv" = "$purl" ] && [ "$nv" != "fail" ] && \
+       [ "$nv_na" = "not-applicable" ] && [ "$purl_na" = "not-applicable" ]; then
+        pass "validate: $label -> coverage checks agree (both not-applicable)"
     else
-        fail "validate: $label -> coverage checks agree" "name-version=$nv purl=$purl"
+        fail "validate: $label -> coverage checks agree" \
+             "name-version=$nv/$nv_na purl=$purl/$purl_na"
     fi
 }
 empty_denominator "CycloneDX with no components" "$FIX/good-cyclonedx.json" '.components = []'
