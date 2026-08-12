@@ -1,8 +1,11 @@
 name: Docs site
 
-# docs/ 정본 마크다운을 MkDocs Material로 빌드해 GitHub Pages(gh-pages 브랜치)에 배포한다.
+# docs/ 정본 마크다운을 MkDocs Material로 빌드해 GitHub Pages에 배포한다.
 # 사이트 소스는 docs/이며, internal/과 contributing/는 mkdocs.yml의 exclude_docs로 제외된다.
-# 최초 1회 저장소 Settings > Pages에서 소스를 "gh-pages 브랜치"로 지정해야 한다.
+# 최초 1회 저장소 Settings > Pages에서 소스를 "GitHub Actions"로 지정해야 한다.
+#
+# 빌드 결과는 아티팩트로 올리고 Pages가 그것을 받아 배포한다. 저장소 브랜치에
+# 쓰지 않으므로 워크플로 토큰에 contents 쓰기가 필요하지 않다.
 #
 # 사이트에는 읽기 전용 데모(/demo/)도 함께 실린다. 데이터(docs/demo/data/)는
 # scripts/capture-demo-data.sh가 만들어 저장소에 커밋된 것이고, 화면을 그리는
@@ -63,12 +66,11 @@ jobs:
           pip install -r docs/requirements.txt
           mkdocs build --strict
 
-  deploy:
+  # main에서는 빌드 결과를 Pages 아티팩트로 올리기만 한다. 저장소에 쓰지 않으므로
+  # 읽기 권한이면 충분하다.
+  build-site:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # gh-deploy가 gh-pages 브랜치로 푸시하므로 쓰기 권한이 필요하다.
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -79,11 +81,29 @@ jobs:
       - name: Build the demo bundle
         run: bash scripts/build-demo-bundle.sh
       # 시스템 파이썬은 externally-managed라 venv로 격리해 의존성을 설치한다.
-      - name: Build and deploy
+      - name: Build
         run: |
           python3 -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
           pip install -r docs/requirements.txt
           mkdocs build --strict
-          mkdocs gh-deploy --force --no-history
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  # 배포만 하는 잡. pages 쓰기는 사이트 배포에만 쓰이고, id-token 쓰기는 그 배포를
+  # 인증하는 OIDC 토큰을 받기 위한 것이라 저장소 내용에는 닿지 않는다.
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build-site
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
