@@ -346,10 +346,10 @@ fi
 set -- "$@" "$SRC"
 
 # --- correct the BSD license-name aliases cdxgen resolves against ---
-# cdxgen turns a license NAME into an SPDX id through two data files, and both
-# hand the generic BSD names to 0BSD: data/lic-mapping.json lists "BSD",
-# "BSD License", "BSD-like", "new BSD" and "new BSD License" under its 0BSD
-# entry, and data/license-aliases.json repeats them as normalised lookup keys
+# cdxgen turns a license NAME into an SPDX id through two data files, and up to
+# cdxgen 12.8.2 both handed the generic BSD names to 0BSD: data/lic-mapping.json
+# listed "BSD", "BSD License", "BSD-like", "new BSD" and "new BSD License" under
+# its 0BSD entry, and data/license-aliases.json repeated them as lookup keys
 # ("bsd", "bsdlicense", "bsdlike", "newbsd", "bsdpublicdomain"). PyPI files every
 # BSD variant under the single classifier "License :: OSI Approved :: BSD
 # License" and Maven poms carry names like "New BSD License", so BSD-3-Clause
@@ -372,7 +372,10 @@ set -- "$@" "$SRC"
 # wrong id, and generate-notice.sh marks it as unverified.
 #
 # Best-effort and idempotent: a missing, read-only or already-corrected file is a
-# no-op, so this keeps working once the upstream data ships the same fix.
+# no-op. cdxgen 12.8.3 ships the same correction, and running this against those
+# tables leaves both files byte-identical, so it stays in place for the images
+# that are still pinned to an earlier release (CDXGEN_ALLINONE in
+# source-detect.sh) and for a caller that points CDXGEN_TAG at one.
 fix_lic_mapping() {
     command -v node >/dev/null 2>&1 || return 0
     _lic_dir=""
