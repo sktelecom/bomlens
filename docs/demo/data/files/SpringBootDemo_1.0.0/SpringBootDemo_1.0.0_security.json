@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.73.0"
   },
-  "ReportID": "019ff5ac-87f5-7c30-a19a-1b41bcb847ec",
-  "CreatedAt": "2026-08-12T11:12:32.757800145Z",
+  "ReportID": "01a00516-ee04-7e07-b092-842e6a2ae5ac",
+  "CreatedAt": "2026-08-15T11:03:03.940921171Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1535,6 +1535,7 @@
             "https://bugzilla.redhat.com/2492015",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492010",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492015",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
             "https://errata.almalinux.org/9/ALSA-2026-40895.html",
@@ -1617,11 +1618,14 @@
             "https://access.redhat.com/errata/RHSA-2026:50847",
             "https://access.redhat.com/errata/RHSA-2026:50848",
             "https://access.redhat.com/errata/RHSA-2026:50849",
+            "https://access.redhat.com/errata/RHSA-2026:54435",
+            "https://access.redhat.com/errata/RHSA-2026:54622",
             "https://access.redhat.com/security/cve/CVE-2026-54513",
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492010",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2492015",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
             "https://errata.almalinux.org/9/ALSA-2026-40895.html",
@@ -1640,7 +1644,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-08-06T13:18:20.053Z"
+          "LastModifiedDate": "2026-08-14T13:19:03.37Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -1877,6 +1881,71 @@
           "LastModifiedDate": "2026-06-17T09:30:29.473Z"
         },
         {
+          "VulnerabilityID": "CVE-2026-49844",
+          "VendorIDs": [
+            "GHSA-qv9r-c865-cp47"
+          ],
+          "PkgID": "org.apache.logging.log4j:log4j-api:2.21.1",
+          "PkgName": "org.apache.logging.log4j:log4j-api",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar",
+            "UID": "588e027f4c97d525",
+            "BOMRef": "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar"
+          },
+          "InstalledVersion": "2.21.1",
+          "FixedVersion": "2.25.5, 2.26.1",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-49844",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:6f29db376059b5862462abd6e23619fe3d8adea7530c93b9f2b43e8a0cdbcb62",
+          "Title": "org.apache.logging.log4j/log4j-api: Apache Log4j API: Malformed JSON output due to improper encoding of floating-point values",
+          "Description": "Improper encoding of non-finite floating-point values during MapMessage JSON serialization in Apache Log4j API produces output that is not valid JSON. This issue affects Apache Log4j API versions 2.13.1 through 2.25.4 and version 2.26.0.\n\nThe fix for CVE-2026-34481 did not cover all code paths: when a MapMessage contains a non-finite IEEE 754 value (NaN, Infinity, or -Infinity), MapMessage.asJson() emits the corresponding bare token. RFC 8259 does not permit these tokens, so a conformant parser rejects the resulting document.\n\nThe defect is reachable only when both of the following conditions hold:\n\n  *  The application uses the  message resolver https://logging.apache.org/log4j/2.x/manual/json-template-layout.html#event-template-resolver-message  of JsonTemplateLayout or any other layout that relies on MapMessage.asJson() or MapMessage.getFormattedMessage(new String[]{\"JSON\"}).\n  *  The application logs a MapMessage that contains an attacker-controlled floating-point value.\n\n\nAn attacker who can supply a non-finite value can cause the affected layout to emit malformed JSON, which may corrupt the enclosing log record or disrupt downstream log ingestion and parsing.\n\nUsers are advised to upgrade to Apache Log4j API 2.25.5 or 2.26.1, both of which emit RFC 8259-compliant JSON for non-finite values.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-116"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "nvd": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V40Vector": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:L/SA:N",
+              "V40Score": 6.3
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+              "V3Score": 5.9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-49844",
+            "https://github.com/apache/logging-log4j2",
+            "https://github.com/apache/logging-log4j2/commit/19edb23e162d6c728a8c2221a240037d389ed300",
+            "https://github.com/apache/logging-log4j2/commit/feadf8eb0b4acb6ddfa4c0ab2bbc6d88b8e12d82",
+            "https://github.com/apache/logging-log4j2/pull/4163",
+            "https://github.com/apache/logging-log4j2/releases/tag/rel/2.25.5",
+            "https://github.com/apache/logging-log4j2/releases/tag/rel/2.26.1",
+            "https://logging.apache.org/cyclonedx/vdr.xml",
+            "https://logging.apache.org/log4j/2.x/manual/json-template-layout.html#event-template-resolver-message",
+            "https://logging.apache.org/security.html#CVE-2026-49844",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-49844",
+            "https://www.cve.org/CVERecord?id=CVE-2026-49844"
+          ],
+          "PublishedDate": "2026-07-10T22:16:42.54Z",
+          "LastModifiedDate": "2026-07-14T20:03:09.91Z"
+        },
+        {
           "VulnerabilityID": "CVE-2025-24813",
           "VendorIDs": [
             "GHSA-83qj-6fr2-vhqg"
@@ -1947,6 +2016,7 @@
             "https://bugzilla.redhat.com/2351129",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332817",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2351129",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50379",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-24813",
             "https://errata.almalinux.org/9/ALSA-2025-3645.html",
@@ -2252,6 +2322,7 @@
             "https://access.redhat.com/security/cve/CVE-2024-34750",
             "https://bugzilla.redhat.com/2295651",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2295651",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-34750",
             "https://errata.almalinux.org/9/ALSA-2024-5693.html",
             "https://errata.rockylinux.org/RLSA-2024:5693",
@@ -2416,6 +2487,7 @@
             "https://bugzilla.redhat.com/2351129",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2332817",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2351129",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50379",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-24813",
             "https://errata.almalinux.org/9/ALSA-2025-3645.html",
@@ -2508,6 +2580,7 @@
             "https://bugzilla.redhat.com/2362783",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2333521",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2362783",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
             "https://errata.almalinux.org/9/ALSA-2025-11335.html",
@@ -2560,7 +2633,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -2603,6 +2676,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379374",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379382",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379386",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48976",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48988",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48989",
@@ -2704,6 +2778,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379382",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379386",
             "https://cert-portal.siemens.com/productcert/html/ssa-032379.html",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48976",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48988",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48989",
@@ -2807,6 +2882,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379374",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379382",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379386",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48976",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48988",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48989",
@@ -2905,6 +2981,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379374",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379382",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379386",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48976",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48988",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48989",
@@ -2995,6 +3072,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2362782",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406591",
             "https://cert-portal.siemens.com/productcert/html/ssa-032379.html",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
             "https://errata.almalinux.org/9/ALSA-2025-23049.html",
@@ -3091,6 +3169,7 @@
             "https://access.redhat.com/security/cve/CVE-2026-24734",
             "https://bugzilla.redhat.com/2440426",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2440426",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
             "https://errata.almalinux.org/9/ALSA-2026-26323.html",
             "https://errata.rockylinux.org/RLSA-2026:26323",
@@ -3176,6 +3255,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
@@ -3280,6 +3360,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
@@ -3302,6 +3383,107 @@
           ],
           "PublishedDate": "2026-04-09T20:16:24.937Z",
           "LastModifiedDate": "2026-06-17T10:39:07.367Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-34487",
+          "VendorIDs": [
+            "GHSA-x4m4-345f-5h5g"
+          ],
+          "PkgID": "org.apache.tomcat.embed:tomcat-embed-core:10.1.16",
+          "PkgName": "org.apache.tomcat.embed:tomcat-embed-core",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar",
+            "UID": "a2ae8a336f9a6e9c",
+            "BOMRef": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar"
+          },
+          "InstalledVersion": "10.1.16",
+          "FixedVersion": "9.0.117, 10.1.54, 11.0.21",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-34487",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:8b285ac166ffcf7f57e54712e86ee847b55b172f254ea62c4b174f6b9c3d3f99",
+          "Title": "Apache Tomcat: Apache Tomcat: Information disclosure via sensitive data in log files",
+          "Description": "Insertion of Sensitive Information into Log File vulnerability in the cloud membership for clustering component of Apache Tomcat exposed the Kubernetes bearer token.\n\nThis issue affects Apache Tomcat: from 11.0.0-M1 through 11.0.20, from 10.1.0-M1 through 10.1.53, from 9.0.13 through 9.0.116.\n\nUsers are recommended to upgrade to version 11.0.21, 10.1.54 or 9.0.117, which fix the issue.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-532"
+          ],
+          "VendorSeverity": {
+            "alma": 3,
+            "amazon": 2,
+            "bitnami": 3,
+            "ghsa": 3,
+            "redhat": 1,
+            "rocky": 3,
+            "ubuntu": 2
+          },
+          "CVSS": {
+            "bitnami": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 7.5
+            },
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N",
+              "V3Score": 6.5
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2026/04/09/28",
+            "https://access.redhat.com/errata/RHSA-2026:36790",
+            "https://access.redhat.com/security/cve/CVE-2026-34487",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2440426",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2440430",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2440437",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457020",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457025",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457027",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457031",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457037",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457038",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457039",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
+            "https://creativecommons.org/licenses/by/4.0/",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24880",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-25854",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29129",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29145",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-29146",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-32990",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34483",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34486",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34487",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-34500",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
+            "https://errata.rockylinux.org/RLSA-2026:36790",
+            "https://github.com/apache/tomcat",
+            "https://github.com/apache/tomcat/commit/301bc6efbf72feb14dacfdfa3f50372182736150",
+            "https://github.com/apache/tomcat/commit/5eff2a773b8b728083e5195b3183df1b9e12a03d",
+            "https://github.com/apache/tomcat/commit/f593292a082e5ef9336a8db2b4b522f7f3e36976",
+            "https://lists.apache.org/thread/4xpkwolpkrj8v5xzp5nyovtlqp3y850h",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-34487",
+            "https://tomcat.apache.org/security-10.html",
+            "https://tomcat.apache.org/security-11.html",
+            "https://tomcat.apache.org/security-9.html",
+            "https://www.cve.org/CVERecord?id=CVE-2026-34487"
+          ],
+          "PublishedDate": "2026-04-09T20:16:25.203Z",
+          "LastModifiedDate": "2026-06-17T10:39:07.65Z"
         },
         {
           "VulnerabilityID": "CVE-2026-41284",
@@ -3573,6 +3755,7 @@
             "https://bugzilla.redhat.com/2269608",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2269607",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2269608",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-23672",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24549",
             "https://errata.almalinux.org/9/ALSA-2024-3307.html",
@@ -3668,6 +3851,7 @@
             "https://bugzilla.redhat.com/2362783",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2333521",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2362783",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
             "https://errata.almalinux.org/9/ALSA-2025-11335.html",
@@ -3827,6 +4011,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379374",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379382",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2379386",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48976",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48988",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-48989",
@@ -3910,10 +4095,12 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/08/13/3",
+            "https://access.redhat.com/errata/RHSA-2026:18537",
             "https://access.redhat.com/security/cve/CVE-2025-55668",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2388226",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406590",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-46701",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55668",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55754",
@@ -4015,6 +4202,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
@@ -4120,6 +4308,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457040",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457043",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2457044",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66614",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24733",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
@@ -4210,6 +4399,7 @@
             "https://bugzilla.redhat.com/2406591",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2362782",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406591",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
             "https://errata.almalinux.org/9/ALSA-2025-23049.html",
@@ -4288,10 +4478,12 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/05/29/4",
+            "https://access.redhat.com/errata/RHSA-2026:18537",
             "https://access.redhat.com/security/cve/CVE-2025-46701",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2388226",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406590",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-46701",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55668",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55754",
@@ -4378,11 +4570,13 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/10/27/5",
+            "https://access.redhat.com/errata/RHSA-2026:18537",
             "https://access.redhat.com/security/cve/CVE-2025-55754",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2369253",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2388226",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406590",
             "https://cert-portal.siemens.com/productcert/html/ssa-032379.html",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-46701",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55668",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55754",
@@ -4437,7 +4631,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,
@@ -4472,6 +4666,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406588",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2406591",
             "https://cert-portal.siemens.com/productcert/html/ssa-032379.html",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-61795",
@@ -4625,6 +4820,7 @@
             "https://bugzilla.redhat.com/2269608",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2269607",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2269608",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-23672",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24549",
             "https://errata.almalinux.org/9/ALSA-2024-3307.html",
@@ -4709,6 +4905,115 @@
           ],
           "PublishedDate": "2025-04-28T08:15:15.273Z",
           "LastModifiedDate": "2026-06-17T08:45:48.46Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41711",
+          "VendorIDs": [
+            "GHSA-5vpf-xvv7-c8vh"
+          ],
+          "PkgID": "org.springframework.data:spring-data-commons:3.2.0",
+          "PkgName": "org.springframework.data:spring-data-commons",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
+            "UID": "6af97c25e05e5af3",
+            "BOMRef": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar"
+          },
+          "InstalledVersion": "3.2.0",
+          "FixedVersion": "4.0.6, 3.5.12",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41711",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:90e02c644895a56bff444793142915f0a06b34bbd1f5a5ba07beca0b3cfe1142",
+          "Title": "Spring Data Commons: Spring Data Commons: Denial of Service via parsing Sort parameters",
+          "Description": "Applications using Spring Data Commons may be vulnerable to a Denial of Service (DoS) attack leading to a StackOverflowException when parsing Sort parameters.\n\nAffected versions:\nSpring Data Commons 4.0.0 through 4.0.5; 3.5.0 through 3.5.11; 3.4.0 through 3.4.14; 3.3.0 through 3.3.16; 3.2.0 through 3.2.15; 3.1.0 through 3.1.14; 3.0.0 through 3.0.15; 2.7.0 through 2.7.19.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-400"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41711",
+            "https://github.com/spring-projects/spring-data-commons",
+            "https://github.com/spring-projects/spring-data-commons/releases/tag/3.5.12",
+            "https://github.com/spring-projects/spring-data-commons/releases/tag/4.0.6",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41711",
+            "https://spring.io/security/cve-2026-41711",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41711"
+          ],
+          "PublishedDate": "2026-06-10T00:16:51.337Z",
+          "LastModifiedDate": "2026-07-23T09:10:00.113Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-41721",
+          "VendorIDs": [
+            "GHSA-5m4m-73w9-8433"
+          ],
+          "PkgID": "org.springframework.data:spring-data-commons:3.2.0",
+          "PkgName": "org.springframework.data:spring-data-commons",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
+            "UID": "6af97c25e05e5af3",
+            "BOMRef": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar"
+          },
+          "InstalledVersion": "3.2.0",
+          "FixedVersion": "4.0.6, 3.5.12",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-41721",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:4d17977f71584be69ba62985cce64aee8f0850f9b8420be8a23b3bcaf120b2a9",
+          "Title": "Spring Data Commons: Spring Data Commons: Denial of Service via specially crafted HTTP request with @ProjectedPayload",
+          "Description": "Spring Data Commons contains a vulnerability that can lead to a Denial of Service (DoS) condition if Spring Data Web Support is enabled in conjunction with a Controller method using @ProjectedPayload, when an attacker sends a specially crafted HTTP request that causes the application to allocate lots of memory.\n\nAffected versions:\nSpring Data Commons 4.0.0 through 4.0.5; 3.5.0 through 3.5.11; 3.4.0 through 3.4.14; 3.3.0 through 3.3.16; 3.2.0 through 3.2.15; 3.1.0 through 3.1.14; 3.0.0 through 3.0.15; 2.7.0 through 2.7.19.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-400"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2026-41721",
+            "https://github.com/spring-projects/spring-data-commons/releases/tag/3.5.12",
+            "https://github.com/spring-projects/spring-data-commons/releases/tag/4.0.6",
+            "https://nvd.nist.gov/vuln/detail/CVE-2026-41721",
+            "https://spring.io/security/cve-2026-41721",
+            "https://www.cve.org/CVERecord?id=CVE-2026-41721"
+          ],
+          "PublishedDate": "2026-06-10T00:16:51.917Z",
+          "LastModifiedDate": "2026-07-23T09:10:00.113Z"
         },
         {
           "VulnerabilityID": "CVE-2024-38820",

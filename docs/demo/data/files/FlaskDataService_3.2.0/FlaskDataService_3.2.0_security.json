@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.73.0"
   },
-  "ReportID": "019ff5ab-41f7-7b6b-b56b-7f67c5c9596d",
-  "CreatedAt": "2026-08-12T11:11:09.303749917Z",
+  "ReportID": "01a00516-0324-73be-ab42-c937fbdde6c2",
+  "CreatedAt": "2026-08-15T11:02:03.812246636Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1289,6 +1289,7 @@
             "https://access.redhat.com/security/cve/CVE-2024-35195",
             "https://bugzilla.redhat.com/2282114",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2282114",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-35195",
             "https://errata.almalinux.org/9/ALSA-2025-7049.html",
             "https://errata.rockylinux.org/RLSA-2025:7049",
@@ -1370,6 +1371,7 @@
             "https://access.redhat.com/security/cve/CVE-2024-47081",
             "https://bugzilla.redhat.com/2371272",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2371272",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-47081",
             "https://errata.almalinux.org/9/ALSA-2025-12519.html",
             "https://errata.rockylinux.org/RLSA-2025:12519",
@@ -1483,7 +1485,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,
@@ -1509,6 +1511,7 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:1087",
             "https://access.redhat.com/errata/RHSA-2026:1239",
             "https://access.redhat.com/security/cve/CVE-2025-66418",
             "https://bugzilla.redhat.com/2419455",
@@ -1517,6 +1520,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419455",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419467",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2427726",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
@@ -1568,7 +1572,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,
@@ -1594,6 +1598,7 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:1087",
             "https://access.redhat.com/errata/RHSA-2026:1239",
             "https://access.redhat.com/security/cve/CVE-2025-66471",
             "https://bugzilla.redhat.com/2419455",
@@ -1602,6 +1607,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419455",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419467",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2427726",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
@@ -1802,6 +1808,7 @@
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419455",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2419467",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2427726",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66418",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-66471",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-21441",
@@ -1821,7 +1828,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-21441"
           ],
           "PublishedDate": "2026-01-07T22:15:44.04Z",
-          "LastModifiedDate": "2026-08-10T13:17:59.61Z"
+          "LastModifiedDate": "2026-08-14T13:17:38.737Z"
         },
         {
           "VulnerabilityID": "CVE-2026-44431",
@@ -1880,12 +1887,14 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2026:28158",
             "https://access.redhat.com/errata/RHSA-2026:28159",
             "https://access.redhat.com/security/cve/CVE-2026-44431",
             "https://bugzilla.redhat.com/2477154",
             "https://bugzilla.redhat.com/2477167",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2477154",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2477167",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44431",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-44432",
             "https://errata.almalinux.org/9/ALSA-2026-28159.html",
@@ -1959,10 +1968,12 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2024:9457",
             "https://access.redhat.com/errata/RHSA-2024:9458",
             "https://access.redhat.com/security/cve/CVE-2024-37891",
             "https://bugzilla.redhat.com/2292788",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2292788",
+            "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-37891",
             "https://errata.almalinux.org/9/ALSA-2024-9458.html",
             "https://errata.rockylinux.org/RLSA-2024:9457",
