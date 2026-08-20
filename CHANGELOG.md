@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.3] - 2026-08-20
+
+### Fixed
+
+- A Python component whose installed license file bundles a primary license followed by third-party notices in the same file (numpy, pandas, and similarly-packaged distributions) could resolve to a bundled license instead of its own. The scanner now reads only the leading license block and cross-checks it against the PyPI license classifier before accepting it. A batched `pip install -r` failure on one pinned dependency no longer drops installed-license evidence for every other dependency in the same file; each line is retried individually and pip's own error reaches the scan log.
+
 ## [v1.11.2] - 2026-08-17
 
 The local web UI now answers only on the machine that started it.
@@ -739,7 +745,8 @@ Three changes alter what an AI-model scan writes, so a consumer of those artifac
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.2...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.3...HEAD
+[v1.11.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.3
 [v1.11.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.2
 [v1.11.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.1
 [v1.11.0]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.0
