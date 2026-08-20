@@ -10,10 +10,10 @@
  "spdxExport": false,
  "spdxSibling": false,
  "hfAuth": false,
- "firmwareImage": "ghcr.io/sktelecom/bomlens-firmware:1.11.2",
- "aibomImage": "ghcr.io/sktelecom/bomlens-aibom:1.11.2",
+ "firmwareImage": "ghcr.io/sktelecom/bomlens-firmware:1.11.3",
+ "aibomImage": "ghcr.io/sktelecom/bomlens-aibom:1.11.3",
  "deepCveImage": "ghcr.io/sktelecom/bomlens-deep-cve:latest",
- "version": "1.11.2",
+ "version": "1.11.3",
  "hostDir": "",
  "scanRoots": []
 }

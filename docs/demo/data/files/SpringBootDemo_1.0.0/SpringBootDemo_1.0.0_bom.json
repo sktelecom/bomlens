@@ -8,21 +8,21 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.4",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.4",
           "type": "application",
-          "version": "12.8.3"
+          "version": "12.8.4"
         }
       },
       "bom-ref": "metadata-annotations",
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, August 17, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-08-17T07:08:00Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Thursday, August 20, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-08-20T12:23:50Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -557,6 +557,36 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-datatype-jdk8",
       "properties": [
         {
@@ -564,16 +594,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -612,6 +646,36 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-datatype-jsr310",
       "properties": [
         {
@@ -619,16 +683,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -667,6 +735,36 @@
         }
       ],
       "group": "com.fasterxml.jackson.module",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
       "name": "jackson-module-parameter-names",
       "properties": [
         {
@@ -674,16 +772,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -1250,6 +1352,36 @@
         }
       ],
       "group": "io.smallrye",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/smallrye/jandex/blob/main/LICENSE.txt"
+          }
+        }
+      ],
       "name": "jandex",
       "properties": [
         {
@@ -1257,16 +1389,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -3290,7 +3426,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3411,7 +3547,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3533,7 +3669,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3654,7 +3790,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3776,7 +3912,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3897,7 +4033,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4019,7 +4155,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4141,7 +4277,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4264,7 +4400,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4386,7 +4522,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4526,6 +4662,36 @@
         }
       ],
       "group": "org.springframework.data",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/spring-projects/spring-data-jpa/blob/main/LICENSE.txt"
+          }
+        }
+      ],
       "name": "spring-data-jpa",
       "properties": [
         {
@@ -4533,16 +4699,20 @@
           "value": "pom.xml"
         },
         {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:licenseConflict",
-          "value": "unknown"
+          "value": "compatible"
         },
         {
           "name": "bomlens:licenseConflict:why",
-          "value": "The component declares no license."
+          "value": "Both are permissive; keep the notices."
         },
         {
           "name": "bomlens:cpeSource",
@@ -4658,7 +4828,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4779,7 +4949,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4900,7 +5070,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5021,7 +5191,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5142,7 +5312,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5263,7 +5433,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5384,7 +5554,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5506,7 +5676,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5627,7 +5797,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5748,7 +5918,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5869,7 +6039,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5990,7 +6160,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-17"
+          "value": "endoflife.date@2026-08-20"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6491,7 +6661,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-08-17T07:08:00Z",
+    "timestamp": "2026-08-20T12:23:49Z",
     "tools": {
       "components": [
         {
@@ -6500,24 +6670,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.4",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.4",
           "type": "application",
-          "version": "12.8.3"
+          "version": "12.8.4"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.2"
+          "version": "1.11.3"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:8ac10ee9-e380-49e2-97da-4278c899b2ab",
+  "serialNumber": "urn:uuid:520e9eeb-f816-42a2-bb88-cd1568173e08",
   "services": [],
   "specVersion": "1.6",
   "version": 1

@@ -1,10 +1,10 @@
 {
   "SchemaVersion": 2,
   "Trivy": {
-    "Version": "0.73.0"
+    "Version": "0.74.0"
   },
-  "ReportID": "01a00e8c-df21-7c27-b130-dfc358144469",
-  "CreatedAt": "2026-08-17T07:08:28.321797622Z",
+  "ReportID": "01a01f20-fc51-7c58-b16a-6c59c51d63da",
+  "CreatedAt": "2026-08-20T12:24:10.57781046Z",
   "ArtifactName": "NginxRuntimeImage_1.24-alpine_bom.json",
   "ArtifactType": "cyclonedx",
   "Metadata": {

@@ -45510,7 +45510,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-08-17T07:08:19Z",
+    "timestamp": "2026-08-20T12:24:03Z",
     "tools": {
       "components": [
         {
@@ -45523,12 +45523,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.2"
+          "version": "1.11.3"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:68ba93a4-a0b8-443d-8782-3b2beb651f29",
+  "serialNumber": "urn:uuid:5970ed3d-3997-414f-a506-5187a9ceafd1",
   "specVersion": "1.6",
   "version": 1
 }

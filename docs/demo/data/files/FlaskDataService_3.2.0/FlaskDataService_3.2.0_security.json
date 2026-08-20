@@ -1,10 +1,10 @@
 {
   "SchemaVersion": 2,
   "Trivy": {
-    "Version": "0.73.0"
+    "Version": "0.74.0"
   },
-  "ReportID": "01a00e8b-06d9-76e5-85bd-8043122ded62",
-  "CreatedAt": "2026-08-17T07:06:27.417452799Z",
+  "ReportID": "01a01f1f-c1d9-718a-9232-43ad08319f5b",
+  "CreatedAt": "2026-08-20T12:22:50.073102337Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1828,7 +1828,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-21441"
           ],
           "PublishedDate": "2026-01-07T22:15:44.04Z",
-          "LastModifiedDate": "2026-08-14T13:17:38.737Z"
+          "LastModifiedDate": "2026-08-19T12:17:18.37Z"
         },
         {
           "VulnerabilityID": "CVE-2026-44431",

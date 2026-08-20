@@ -1,10 +1,10 @@
 {
   "SchemaVersion": 2,
   "Trivy": {
-    "Version": "0.73.0"
+    "Version": "0.74.0"
   },
-  "ReportID": "01a00e8c-9049-7cdf-9e91-9b62b6806c13",
-  "CreatedAt": "2026-08-17T07:08:08.137844766Z",
+  "ReportID": "01a01f20-c458-77f3-9798-2cfcf5c312b4",
+  "CreatedAt": "2026-08-20T12:23:56.248523419Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -92,30 +92,39 @@
           "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar",
-            "UID": "e9f255e0c3a3dfcb",
+            "UID": "8d11f3411ff118cf",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.3",
           "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
-            "UID": "aa3d6e5892f8fbc6",
+            "UID": "56ee3951200fea9b",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml.jackson.module:jackson-module-parameter-names:2.15.3",
           "Name": "com.fasterxml.jackson.module:jackson-module-parameter-names",
           "Identifier": {
             "PURL": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar",
-            "UID": "811e07f8efec8bd3",
+            "UID": "a1083beb8e2e3c66",
             "BOMRef": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar"
           },
-          "Version": "2.15.3"
+          "Version": "2.15.3",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "com.fasterxml:classmate:1.5.1",
@@ -204,10 +213,13 @@
           "Name": "io.smallrye:jandex",
           "Identifier": {
             "PURL": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
-            "UID": "114157861659ce6f",
+            "UID": "2b8c7099e46adaa1",
             "BOMRef": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar"
           },
-          "Version": "3.1.2"
+          "Version": "3.1.2",
+          "Licenses": [
+            "Apache-2.0"
+          ]
         },
         {
           "ID": "jakarta.activation:jakarta.activation-api:2.1.2",
@@ -736,10 +748,13 @@
           "Name": "org.springframework.data:spring-data-jpa",
           "Identifier": {
             "PURL": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
-            "UID": "86a046b043dac9d6",
+            "UID": "99dff5e8c5b0b3a3",
             "BOMRef": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar"
           },
           "Version": "3.2.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
           "DependsOn": [
             "org.slf4j:slf4j-api:2.0.2",
             "org.springframework.data:spring-data-commons:3.2.0",
