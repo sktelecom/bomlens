@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: bl-fixture-preamble
+Version: 1.0.0
+Summary: Aggregate notice file whose first license text starts far past the head
+Classifier: License :: OSI Approved :: BSD License
+License: BSD
+License-File: LICENSE
+
+A fixture, not a package. The classifier would confirm a BSD reading, so only
+the head-of-file guard can keep this one from being settled.

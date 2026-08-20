@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: bl-fixture-dualtext
+Version: 1.0.0
+Summary: Genuinely dual licensed, both texts in one license file
+Classifier: License :: OSI Approved :: MIT License
+Classifier: License :: OSI Approved :: Apache Software License
+License: MIT OR Apache-2.0
+License-File: LICENSE
+
+A fixture, not a package.

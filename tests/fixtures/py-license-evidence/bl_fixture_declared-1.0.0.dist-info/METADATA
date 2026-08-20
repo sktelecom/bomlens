@@ -1,0 +1,22 @@
+Metadata-Version: 2.1
+Name: bl-fixture-declared
+Version: 1.0.0
+Summary: No license file at all; the License field holds the whole license text
+Classifier: License :: OSI Approved :: BSD License
+License: Copyright (c) 2026, BomLens fixture authors.
+        All rights reserved.
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions are met:
+        * Redistributions of source code must retain the above copyright notice, this
+        list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright notice,
+        this list of conditions and the following disclaimer in the documentation
+        and/or other materials provided with the distribution.
+        * Neither the name of the copyright holder nor the names of its contributors
+        may be used to endorse or promote products derived from this software
+        without specific prior written permission.
+        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+        AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
+
+A fixture, not a package. Header folding keeps the whole text in the field, the
+way setuptools writes it for a project that pastes its license in there.

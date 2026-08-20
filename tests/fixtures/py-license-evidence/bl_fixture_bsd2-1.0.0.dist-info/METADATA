@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: bl-fixture-bsd2
+Version: 1.0.0
+Summary: BSD-2-Clause project whose license file also carries a bundled BSD-3 text
+Classifier: License :: OSI Approved :: BSD License
+License: BSD
+License-File: LICENSE
+
+A fixture, not a package. The classifier says only "BSD", so the clause count
+has to come from the project's own text and from nothing else.

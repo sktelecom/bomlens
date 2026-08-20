@@ -257,12 +257,77 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     fi
 fi
 
-# Python — install into a venv so transitive deps are visible (requirements.txt
-# without a lockfile)
+# Python — install the requirements so transitive deps are visible
+# (requirements.txt without a lockfile) and so the license-evidence pass near the
+# end of this script has real dist-info metadata to read.
+#
+# `pip install -r` is all or nothing: a single pin that cannot be resolved or
+# built aborts the run and installs NOTHING. With pip's stderr discarded that
+# failure was also silent, and the damage reached well past the missing package:
+# every other requirement's dist-info was absent too, so the license pass found
+# no evidence for anything and cdxgen's PyPI-summary licenses stood unchallenged
+# (numpy and pandas then carry the wrong license on a tree that scans fine
+# without the bad pin). So: keep the bulk install as the fast path, surface pip's
+# own error when it fails, then retry requirement by requirement so one
+# unbuildable pin costs only its own evidence.
 if [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
     log "pip install requirements"
-    pip3 install -q -r requirements.txt 2>/dev/null \
-      || pip3 install -q --break-system-packages -r requirements.txt 2>/dev/null
+    PIP_BSP=""                       # PEP 668 needs --break-system-packages here
+    _piperr=$(mktemp 2>/dev/null) || _piperr="${TMPDIR:-/tmp}/bomlens-pip.err"
+
+    # One best-effort install attempt. A PEP 668 "externally managed" image
+    # refuses the plain call and needs --break-system-packages; that is the only
+    # failure worth retrying, and once seen it is remembered, so a requirement
+    # that simply cannot be built is attempted once rather than twice.
+    pip_try() {
+        if [ -n "$PIP_BSP" ]; then
+            pip3 install -q --break-system-packages "$@" 2>>"$_piperr"
+            return $?
+        fi
+        _ptry=$(mktemp 2>/dev/null) || _ptry="${TMPDIR:-/tmp}/bomlens-pip-try.err"
+        pip3 install -q "$@" 2>"$_ptry"
+        _prc=$?
+        if [ "$_prc" -ne 0 ] && grep -q "externally-managed-environment" "$_ptry" 2>/dev/null; then
+            rm -f "$_ptry"
+            pip3 install -q --break-system-packages "$@" 2>>"$_piperr" || return 1
+            PIP_BSP=1
+            return 0
+        fi
+        cat "$_ptry" >> "$_piperr" 2>/dev/null
+        rm -f "$_ptry"
+        return "$_prc"
+    }
+
+    if ! pip_try -r requirements.txt; then
+        log "pip: bulk install failed; retrying one requirement at a time"
+        _reqs=$(mktemp 2>/dev/null) || _reqs="${TMPDIR:-/tmp}/bomlens-reqs.txt"
+        # Strip comments the way pip does: a whole-line '#', or a '#' that
+        # follows whitespace. A bare '#' inside a token is left alone so a VCS
+        # URL fragment (git+https://...#egg=name) survives.
+        sed -e 's/^[[:space:]]*#.*$//' -e 's/[[:space:]][[:space:]]*#.*$//' \
+            -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' requirements.txt > "$_reqs"
+        _pn=0; _pf=0
+        while IFS= read -r _req; do
+            [ -n "$_req" ] || continue
+            # Option lines (-r/-c/-e/--index-url/--hash/...) are not requirement
+            # specifiers; installing them one by one is meaningless.
+            case "$_req" in -*) continue ;; esac
+            _pn=$((_pn + 1))
+            pip_try "$_req" \
+                || { _pf=$((_pf + 1)); echo "[build-prep] pip: could not install '$_req'" >&2; }
+        done < "$_reqs"
+        rm -f "$_reqs"
+        # This report goes to stderr, next to pip's own output, so the two stay
+        # together in a combined log. What pip said is the point: the cause of a
+        # partial install belongs in the scan log, not in /dev/null. Tail only,
+        # because a resolver failure can print hundreds of candidate lines.
+        [ "$_pf" -gt 0 ] && echo "[build-prep] pip: $_pf of $_pn requirement(s) failed to install" >&2
+        if [ -s "$_piperr" ]; then
+            echo "[build-prep] pip: last lines of pip output:" >&2
+            tail -20 "$_piperr" >&2
+        fi
+    fi
+    rm -f "$_piperr"
 fi
 
 # Swift / SPM — cdxgen reads Package.resolved for the resolved graph, and parses it
@@ -615,13 +680,20 @@ fi
 #
 # The wheel carries better evidence, and pip has already unpacked it here: the
 # dist-info directory holds the PEP 639 expression when the project declares one,
-# the license files themselves, and a `License:` field that is a name rather than
-# a text. We read those in that order and only overwrite a component's license
-# when the evidence settles on exactly one answer — a file whose text matches
-# several templates (a dual license, or a license file with bundled notices
-# appended) leaves the component alone for a human to read, and so does a
-# declared name too vague to place, like a bare "BSD". Whatever we do set is
-# stamped with bomlens:licenseSource so the basis is visible in the SBOM.
+# the license files themselves, the trove classifiers, and a `License:` field. We
+# read those in that order and only overwrite a component's license when the
+# evidence settles on exactly one answer.
+#
+# A license file that carries the notices of bundled dependencies matches several
+# templates at once. Rather than give up on all of them, we read the license the
+# file OPENS with (the project's own) and confirm it against the distribution's
+# trove classifiers: pandas' file is BSD-3-Clause followed by Bottleneck's,
+# dateutil's and an MIT notice, and its one classifier says BSD. A file whose
+# leading license the classifiers do not back, a genuinely dual-licensed
+# distribution (two families claimed, or two license files that disagree), and a
+# declared name too vague to place, like a bare "BSD", all still leave the
+# component alone for a human to read. Whatever we do set is stamped with
+# bomlens:licenseSource so the basis is visible in the SBOM.
 if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v python3 >/dev/null 2>&1 \
    && grep -q '"pkg:pypi/' "$OUT" 2>/dev/null; then
     log "python: settling licenses on installed distribution metadata"
@@ -649,9 +721,15 @@ def canon(name):
 def classify_text(text):
     """Identify a license by its distinctive clause wording.
 
-    Mirrors identify_license_text in docker/lib/spdx-normalize.jq: matched on
-    clause phrases, never on the copyright header, and deliberately silent when
-    a text matches more than one template.
+    Same matching as identify_license_text in docker/lib/spdx-normalize.jq:
+    clause phrases, never the copyright header, and deliberately silent when a
+    text matches more than one template.
+
+    The two are INTENTIONALLY no longer symmetric beyond this function. Here we
+    can go further (classify_leading below reads which license a multi-license
+    file LEADS with) because an installed distribution also carries trove
+    classifiers to confirm the reading against. A raw SBOM has no such second
+    source, so spdx-normalize.jq stops at the ambiguity.
     """
     x = re.sub(r"\s+", " ", text).lower()
     hits = []
@@ -668,6 +746,98 @@ def classify_text(text):
     return hits[0] if len(hits) == 1 else None
 
 
+# The opening clause of each license template, used to find where a license
+# STARTS rather than merely whether it appears. Ordered as (family, anchor);
+# the clause count of a BSD text is settled later, from that text alone.
+ANCHORS = (
+    ("mit", "permission is hereby granted, free of charge"),
+    ("isc", "permission to use, copy, modify, and/or distribute this software for any purpose"),
+    ("apache", "apache license"),
+    ("bsd", "redistributions of source code must retain"),
+)
+# How far into a license file the primary license may start (normalised
+# characters). A license file opens with at most a title and a copyright line
+# before the terms: numpy's begins ~120 characters in, pandas' ~350. Appended
+# third-party notices are by definition further down than this.
+LEAD_LIMIT = 600
+# Longest stretch treated as belonging to one license, when no other license
+# starts sooner. The longest of these templates (Apache-2.0) is well under it.
+SECTION_LIMIT = 3000
+
+
+def settle_clauses(family, window):
+    """Turn a matched family into an SPDX id, using one license's text only."""
+    if family == "mit":
+        return "MIT" if "without restriction" in window else None
+    if family == "isc":
+        return "ISC"
+    if family == "apache":
+        return "Apache-2.0" if "version 2.0" in window else None
+    if family == "bsd":
+        if ("redistributions in binary form must reproduce" not in window
+                or "advertising materials" in window):
+            return None
+        return "BSD-3-Clause" if "neither the name" in window else "BSD-2-Clause"
+    return None
+
+
+def family_of(spdx_id):
+    """The license family an SPDX id belongs to, for classifier confirmation."""
+    if spdx_id.startswith("BSD-"):
+        return "bsd"
+    return {"MIT": "mit", "Apache-2.0": "apache", "ISC": "isc"}.get(spdx_id)
+
+
+def classify_leading(text):
+    """Identify the license a multi-license text LEADS with.
+
+    A license file that also carries the notices of bundled dependencies matches
+    several templates at once, and classify_text goes silent on it, which is
+    why pandas kept the Apache-2.0 that cdxgen read off python-dateutil's notice
+    inside pandas' own BSD-3-Clause file.
+
+    The primary license is the one the file opens with, so we take the earliest
+    template opening and require it to sit in the head of the file (LEAD_LIMIT).
+    Everything after it is another project's notice, and every further check runs
+    inside that first license's own window, up to wherever the next license
+    starts. Reading the clause count outside the window is how a bundled BSD-3
+    would turn a BSD-2 text into BSD-3-Clause.
+
+    Returns None for a single-license text (classify_text's job) and for
+    anything that does not settle. The caller must still confirm the answer
+    against the distribution's trove classifiers.
+    """
+    x = re.sub(r"\s+", " ", text).lower()
+    starts = []
+    for family, anchor in ANCHORS:
+        pos = x.find(anchor)
+        if pos >= 0:
+            starts.append((pos, family, anchor))
+    if not starts:
+        return None
+    # A single template that appears once is an ordinary license file, and
+    # classify_text already reads it. A template that appears twice is not: the
+    # second copy is a bundled notice, and its clauses must be kept out.
+    if len(starts) < 2 and x.find(starts[0][2], starts[0][0] + 1) < 0:
+        return None
+    starts.sort()
+    pos, family, _anchor = starts[0]
+    if pos > LEAD_LIMIT:
+        # The file opens with something else (a preamble listing bundled
+        # components, an aggregate notice); we cannot say what governs it.
+        return None
+    # The window ends where the next license begins, including a second
+    # occurrence of the same template, which is how a bundled BSD notice after a
+    # BSD license is kept out of the clause count.
+    ends = []
+    for _family, anchor in ANCHORS:
+        nxt = x.find(anchor, pos + 1)
+        if nxt > pos:
+            ends.append(nxt)
+    end = min(ends) if ends else len(x)
+    return settle_clauses(family, x[pos:min(end, pos + SECTION_LIMIT)])
+
+
 def classify_name(declared):
     """Map a short declared license NAME to an SPDX id.
 
@@ -679,6 +849,9 @@ def classify_name(declared):
     """
     n = re.sub(r"[ ,._/-]+", " ", (declared or "").strip().lower()).strip()
     if not n or len(n) > 100:
+        # Longer than any license NAME: this is a license text in the field
+        # (setuptools has long allowed it, and pandas ships 63 KB there).
+        # classify_declared_text reads those.
         return None
     if " or " in n or " and " in n or "general public" in n:
         return None
@@ -693,6 +866,22 @@ def classify_name(declared):
     if n in ("isc", "isc license"):
         return "ISC"
     return None
+
+
+def classify_declared_text(ev):
+    """Read an over-long `License:` field as license TEXT rather than a name.
+
+    Core metadata puts a NAME in this field, but setuptools never enforced it
+    and projects paste the whole license in (pandas' is 63 KB, bundled notices
+    and all). classify_name rightly refuses to treat that as a name; here we
+    classify it the same way a license file is classified, under the same
+    confirmation rule. Reached only when no license file settled the question.
+    """
+    text = ev["declared"] or ""
+    if len(text) <= 100:
+        return None
+    got = classify_leading(text) or classify_text(text)
+    return got if got and confirms(ev, got) else None
 
 
 def read_text(path, limit=400000):
@@ -741,8 +930,43 @@ def license_files(dist):
     return files
 
 
+def classifier_families(meta):
+    """License families named by a distribution's trove classifiers.
+
+    PyPI files every variant of a family under one classifier ("License :: OSI
+    Approved :: BSD License" covers the 2-, 3- and 4-clause texts alike), so this
+    can never pick a license on its own: reading a clause count out of it is the
+    very mistake this pass exists to undo. It is used only to confirm what a
+    license text already said, and a distribution that names two families
+    confirms nothing.
+    """
+    fams = set()
+    try:
+        classifiers = meta.get_all("Classifier") or []
+    except Exception:
+        return fams
+    for entry in classifiers:
+        c = str(entry).lower()
+        if not c.startswith("license ::"):
+            continue
+        if c.endswith(":: bsd license"):
+            fams.add("bsd")
+        elif c.endswith(":: mit license"):
+            fams.add("mit")
+        elif c.endswith(":: apache software license"):
+            fams.add("apache")
+        elif c.endswith(":: isc license (iscl)"):
+            fams.add("isc")
+        elif c not in ("license :: osi approved", "license :: other/proprietary license"):
+            # Some other named license (GPL, MPL, a project-specific one): not a
+            # family we match, but it still means the distribution claims more
+            # than one thing if a matched family is also present.
+            fams.add(c)
+    return fams
+
+
 def evidence(dist):
-    """Collect (version, expression, declared name, license files) for a dist."""
+    """Collect (version, expression, declared name, files, families) for a dist."""
     try:
         meta = dist.metadata
         # .get, not [...]: a missing header returns None today but is documented
@@ -755,23 +979,42 @@ def evidence(dist):
     return {"name": name, "version": version,
             "expression": meta.get("License-Expression"),
             "declared": meta.get("License"),
+            "families": classifier_families(meta),
             "files": license_files(dist)}
+
+
+def confirms(ev, spdx_id):
+    """True when the distribution's classifiers name that family and no other."""
+    fam = family_of(spdx_id)
+    return bool(fam) and ev["families"] == {fam}
 
 
 def decide(ev):
     if ev["expression"]:
         return ev["expression"], "installed license expression"
-    ids = set()
+    ids, from_lead = set(), False
     for path in ev["files"]:
-        got = classify_text(read_text(path))
-        if got:
-            ids.add(got)
+        text = read_text(path)
+        plain = classify_text(text)
+        lead = classify_leading(text)
+        # The leading license only overrides the whole-text reading when the two
+        # disagree AND the classifiers back it. Otherwise the file is read exactly
+        # as before, so an unconfirmed guess never makes things worse.
+        if lead and lead != plain and confirms(ev, lead):
+            ids.add(lead)
+            from_lead = True
+        elif plain:
+            ids.add(plain)
     if len(ids) == 1:
-        return ids.pop(), "installed license text"
+        return ids.pop(), "installed license text (leading)" if from_lead \
+            else "installed license text"
     if not ids and ev["declared"]:
         got = classify_name(ev["declared"])
         if got:
             return got, "installed license name"
+        got = classify_declared_text(ev)
+        if got:
+            return got, "declared license text"
     return None, None
 
 
@@ -786,14 +1029,20 @@ for dist in distributions():
         index.setdefault((canon(ev["name"]), ev["version"]), ev)
 
 if not index:
+    # Nothing is installed here, so nothing can be checked. Say so: this is what
+    # a failed `pip install` looks like from the SBOM's side, and in silence it
+    # is indistinguishable from a run where every license was already right.
+    sys.stderr.write("[build-prep] python: no installed distribution metadata found; "
+                     "licenses left as the generator resolved them\n")
     sys.exit(0)
 
-changed = 0
+changed = missing = 0
 for comp in components:
     if not str(comp.get("purl") or "").startswith("pkg:pypi/"):
         continue
     ev = index.get((canon(comp.get("name")), comp.get("version")))
     if not ev:
+        missing += 1
         continue
     settled, basis = decide(ev)
     if not settled:
@@ -815,6 +1064,11 @@ if changed:
     with open(bom_path, "w", encoding="utf-8") as fh:
         json.dump(bom, fh, indent=2)
     sys.stderr.write("[build-prep] python: settled %d component license(s) on installed evidence\n" % changed)
+if missing:
+    # Usually a package the install could not reach (a failed pin, a private
+    # index) or a version cdxgen resolved differently from the one installed.
+    # Those components keep the generator's license, unchecked.
+    sys.stderr.write("[build-prep] python: %d pypi component(s) had no installed evidence\n" % missing)
 PY_LIC
     python3 "$_pylic" "$OUT" || log "python: license evidence pass skipped (non-fatal)"
     rm -f "$_pylic"

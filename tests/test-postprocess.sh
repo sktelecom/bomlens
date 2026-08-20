@@ -3205,6 +3205,100 @@ else
     echo "  SKIP: python3 venv not available"
 fi
 
+echo "== python: a license file with bundled notices settles on the license it leads with =="
+# The reported defect: a project's own license file, with the notices of the
+# libraries it bundles appended, matches several templates at once, so the whole
+# pass went silent and the generator's wrong license stood (pandas came out
+# Apache-2.0 off python-dateutil's notice inside pandas' BSD-3-Clause file).
+# build-prep.sh now reads the license the file OPENS with and confirms it against
+# the distribution's trove classifiers. These fixtures cover both what that must
+# fix and what it must still refuse to touch.
+if command -v python3 >/dev/null 2>&1 && python3 -m venv --without-pip "$WORK/leadvenv" >/dev/null 2>&1; then
+    LSP=$(echo "$WORK"/leadvenv/lib/python*/site-packages)
+    mkdir -p "$LSP"
+    cp -R "$ROOT_DIR/tests/fixtures/py-license-evidence/." "$LSP/"
+    sed -n "/cat > \"\$_pylic\" <<'PY_LIC'/,/^PY_LIC\$/p" "$LIB/build-prep.sh" \
+        | sed '1d;$d' > "$WORK/settle-lead.py"
+    cat > "$WORK/leadbom.json" <<'LEADBOM'
+{ "bomFormat": "CycloneDX", "specVersion": "1.6", "components": [
+  { "type": "library", "name": "bl-fixture-pandas", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-pandas@1.0.0",
+    "licenses": [ { "license": { "id": "0BSD" } }, { "license": { "id": "Apache-2.0" } } ] },
+  { "type": "library", "name": "bl-fixture-numpy", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-numpy@1.0.0", "licenses": [ { "license": { "id": "0BSD" } } ] },
+  { "type": "library", "name": "bl-fixture-bsd2", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-bsd2@1.0.0", "licenses": [ { "license": { "id": "0BSD" } } ] },
+  { "type": "library", "name": "bl-fixture-bundlefirst", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-bundlefirst@1.0.0", "licenses": [ { "license": { "name": "BSD License" } } ] },
+  { "type": "library", "name": "bl-fixture-dualfiles", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-dualfiles@1.0.0", "licenses": [ { "license": { "name": "MIT OR Apache-2.0" } } ] },
+  { "type": "library", "name": "bl-fixture-dualtext", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-dualtext@1.0.0", "licenses": [ { "license": { "name": "MIT OR Apache-2.0" } } ] },
+  { "type": "library", "name": "bl-fixture-preamble", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-preamble@1.0.0", "licenses": [ { "license": { "name": "BSD License" } } ] },
+  { "type": "library", "name": "bl-fixture-declared", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-declared@1.0.0", "licenses": [ { "license": { "id": "0BSD" } } ] },
+  { "type": "library", "name": "bl-fixture-absent", "version": "1.0.0",
+    "purl": "pkg:pypi/bl-fixture-absent@1.0.0", "licenses": [ { "license": { "id": "MIT" } } ] }
+] }
+LEADBOM
+    "$WORK/leadvenv/bin/python3" "$WORK/settle-lead.py" "$WORK/leadbom.json" 2>"$WORK/settle-lead.err"
+    llic() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+        | (.licenses[0].license.id // .licenses[0].license.name // .licenses[0].expression // "ABSENT")' "$WORK/leadbom.json"; }
+    lsrc() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+        | ((.properties // []) | map(select(.name=="bomlens:licenseSource")) | .[0].value // "ABSENT")' "$WORK/leadbom.json"; }
+    lcount() { jq -r --arg n "$1" '.components[] | select(.name==$n) | (.licenses | length)' "$WORK/leadbom.json"; }
+
+    # 1. The reported case: BSD-3-Clause text, then bundled BSD-2 / Apache-2.0 /
+    #    MIT notices, no separator, and a License field holding the whole text.
+    [ "$(llic bl-fixture-pandas)" = "BSD-3-Clause" ] && [ "$(lcount bl-fixture-pandas)" = "1" ] \
+        && pass "a bundled-notice file settles on its leading BSD-3-Clause (was 0BSD + Apache-2.0)" \
+        || fail "pandas-shaped fixture license=$(llic bl-fixture-pandas) (entries: $(lcount bl-fixture-pandas))"
+    [ "$(lsrc bl-fixture-pandas)" = "installed license text (leading)" ] \
+        && pass "the leading-license basis is recorded on the component" \
+        || fail "pandas-shaped fixture licenseSource=$(lsrc bl-fixture-pandas)"
+    # 2. A file whose bundle list carries names only still takes the plain path.
+    [ "$(llic bl-fixture-numpy)" = "BSD-3-Clause" ] && [ "$(lsrc bl-fixture-numpy)" = "installed license text" ] \
+        && pass "a single-license file is still read whole, basis unchanged" \
+        || fail "numpy-shaped fixture=$(llic bl-fixture-numpy) via $(lsrc bl-fixture-numpy)"
+    # 7. The clause count comes from the leading text's own window: a bundled
+    #    BSD-3 notice must not turn a BSD-2 project into BSD-3-Clause.
+    [ "$(llic bl-fixture-bsd2)" = "BSD-2-Clause" ] \
+        && pass "a bundled BSD-3 notice does not raise a BSD-2 project's clause count" \
+        || fail "bsd2 fixture license=$(llic bl-fixture-bsd2), expected BSD-2-Clause"
+    # 3. The failure this whole pass exists to prevent: reading a bundled license
+    #    as the project's own. The classifiers disagree, so nothing is settled.
+    [ "$(llic bl-fixture-bundlefirst)" = "BSD License" ] \
+        && pass "a leading license the classifiers contradict is left alone" \
+        || fail "bundlefirst fixture license=$(llic bl-fixture-bundlefirst), expected the upstream value"
+    # 4. Dual licensing, in both shapes it is published in.
+    [ "$(llic bl-fixture-dualfiles)" = "MIT OR Apache-2.0" ] \
+        && pass "two license files that disagree leave the component for review" \
+        || fail "dualfiles fixture license=$(llic bl-fixture-dualfiles)"
+    [ "$(llic bl-fixture-dualtext)" = "MIT OR Apache-2.0" ] \
+        && pass "two license texts in one file, two classifiers: left for review" \
+        || fail "dualtext fixture license=$(llic bl-fixture-dualtext)"
+    # 5. An aggregate notice file does not open with the license that governs it.
+    [ "$(llic bl-fixture-preamble)" = "BSD License" ] \
+        && pass "a license text starting past the head of the file is not taken as leading" \
+        || fail "preamble fixture license=$(llic bl-fixture-preamble), expected the upstream value"
+    # 6. A License field too long to be a name is read as the text it is.
+    [ "$(llic bl-fixture-declared)" = "BSD-3-Clause" ] && [ "$(lsrc bl-fixture-declared)" = "declared license text" ] \
+        && pass "an over-long declared license is classified as text, not abandoned" \
+        || fail "declared fixture=$(llic bl-fixture-declared) via $(lsrc bl-fixture-declared)"
+    # Observability: a component with no installed distribution is now counted,
+    # so a silent pip failure is visible in the scan log instead of looking like
+    # a run where every license was already right.
+    [ "$(llic bl-fixture-absent)" = "MIT" ] \
+        && pass "a component with no installed evidence is untouched" \
+        || fail "absent fixture license=$(llic bl-fixture-absent)"
+    grep -q "1 pypi component(s) had no installed evidence" "$WORK/settle-lead.err" \
+        && pass "components without installed evidence are reported" \
+        || fail "no missing-evidence count logged" "$(cat "$WORK/settle-lead.err")"
+else
+    echo "  SKIP: python3 venv not available"
+fi
+
 echo "== NOTICE: a license name that is not an SPDX id is marked unverified =="
 cat > "$WORK/unverified.json" <<'UNVBOM'
 { "bomFormat": "CycloneDX", "specVersion": "1.6",

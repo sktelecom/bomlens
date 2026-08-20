@@ -54,6 +54,14 @@ def normalize($s):
 # has an unmistakable phrase are listed, the BSD tests reject 4-clause texts
 # (advertising clause), and a text matching several templates (e.g. a
 # concatenated multi-license file) returns "" rather than a guess.
+#
+# build-prep.sh carries the same tests plus a step this one deliberately lacks:
+# there, a multi-license file is read for the license it LEADS with, because an
+# installed distribution also ships trove classifiers to confirm that reading
+# against. Here the input is a finished SBOM, where the only other license
+# statement is the one already suspected of being wrong, so there is nothing to
+# confirm against and the ambiguity stands. The asymmetry is intended; do not
+# port the leading-license step into this filter without a second source.
 def identify_license_text($t):
   (($t // "") | ascii_downcase | gsub("\\s+"; " ")) as $x |
   [ (if ($x | test("permission is hereby granted, free of charge"))

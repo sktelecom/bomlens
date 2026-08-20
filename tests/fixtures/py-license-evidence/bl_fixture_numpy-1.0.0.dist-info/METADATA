@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: bl-fixture-numpy
+Version: 1.0.0
+Summary: BSD-3-Clause license file followed by a bundled-component name list
+Classifier: License :: OSI Approved :: BSD License
+License: BSD-3-Clause
+License-File: LICENSE.txt
+
+A fixture, not a package.

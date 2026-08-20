@@ -377,10 +377,14 @@ print_test "Test 2/15: Python project (pip)"
 mkdir -p python-project
 cd python-project || true
 
+# Every pin here must have a wheel for the cdxgen python image's interpreter
+# (3.12). pandas 2.1.0 has none, so pip fell back to building it from source and
+# failed. The scan still listed the component (cdxgen reads requirements.txt),
+# but no dist-info was installed, so nothing downstream could check its license.
 cat > requirements.txt <<'EOF'
 flask==3.0.0
 requests==2.31.0
-pandas==2.1.0
+pandas==2.3.3
 EOF
 
 if run_scan_with_logs "test-python" "TestPythonApp" "1.0.0"; then
@@ -389,6 +393,24 @@ if run_scan_with_logs "test-python" "TestPythonApp" "1.0.0"; then
         if [ "$COMP_COUNT" -gt 0 ]; then
             print_success "Python project ($COMP_COUNT components)"
             ((PASSED++))
+            # pandas ships its own BSD-3-Clause text with the notices of the
+            # libraries it bundles appended, so reading that file whole matches
+            # several licenses at once, which is how the wrong one used to end
+            # up on the component. Asserted here rather than in a unit test
+            # because only a real install produces the dist-info the license is
+            # settled from, and only this path exercises the pip step that has
+            # to succeed for that evidence to exist at all.
+            PANDAS_LIC=$(jq -r 'first(.components[] | select(.name=="pandas")
+                | .licenses[0] | .license.id // .license.name // .expression) // "ABSENT"' \
+                "$FOUND" 2>/dev/null || echo "ABSENT")
+            if [ "$PANDAS_LIC" = "BSD-3-Clause" ]; then
+                print_success "Python project (pandas license settled on BSD-3-Clause)"
+                ((PASSED++))
+            else
+                print_error "Python project (pandas license is '$PANDAS_LIC', expected BSD-3-Clause)"
+                show_failure_log "test-python"
+                ((FAILED++))
+            fi
         else
             print_error "Python project (SBOM is empty)"
             show_failure_log "test-python"
