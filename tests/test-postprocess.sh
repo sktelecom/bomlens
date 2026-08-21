@@ -1231,6 +1231,35 @@ diff -q "$WORK/mvn-mech.json" "$WORK/mvn-mech2.json" >/dev/null 2>&1 && pass "me
 changed=$(diff <(jq -S '.components' "$WORK/mvn-mech-orig.json") <(jq -S '.components' "$WORK/mvn-mech.json") | grep -c '"cpe"' || true)
 [ "$changed" -gt 0 ] && pass "mechanical-copy fixture changed cpe field(s) ($changed diff line(s))" || fail "expected cpe changes, saw none"
 
+echo "== F-1c3: maven CPE enrichment — per-submodule mechanical copy is replaced =="
+# Multi-module projects (netty, istack, jna) name each submodule artifact
+# "<last groupId segment>-<submodule>" (io.netty / netty-buffer). Some
+# generators mirror that into vendor="<groupId>.<submodule>" (io.netty.buffer)
+# per submodule -- still a coordinate copy, just reassembled differently than
+# F-1c2's whole-group-or-artifact shapes. Left alone it blocks derive_cpe()'s
+# umbrella cpe (netty:netty) on every submodule, so NVD's per-project (not
+# per-submodule) Netty CVEs never match.
+cat > "$WORK/mvn-submod.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"netty-buffer","version":"4.1.130.Final","purl":"pkg:maven/io.netty/netty-buffer@4.1.130.Final","cpe":"cpe:2.3:a:io.netty.buffer:netty-buffer:4.1.130.Final:*:*:*:*:*:*:*"},
+ {"type":"library","name":"netty-codec-dns","version":"4.1.131.Final","purl":"pkg:maven/io.netty/netty-codec-dns@4.1.131.Final","cpe":"cpe:2.3:a:io.netty.codec-dns:netty-codec-dns:4.1.131.Final:*:*:*:*:*:*:*"},
+ {"type":"library","name":"netty-transport-native-epoll","version":"4.1.131.Final","purl":"pkg:maven/io.netty/netty-transport-native-epoll@4.1.131.Final","cpe":"cpe:2.3:a:io.netty.transport-native-epoll.linux-x86_64:netty-transport-native-epoll:4.1.131.Final:*:*:*:*:*:*:*"}]}
+JSON
+cp "$WORK/mvn-submod.json" "$WORK/mvn-submod-orig.json"
+python3 "$MVNCPE" "$WORK/mvn-submod.json" >/dev/null 2>&1
+submod_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-submod.json"; }
+# (a) vendor="<group>.<submodule>" reconstructs exactly from artifact -> replaced
+# with the umbrella cpe (netty:netty), the same one a from-scratch derive gives.
+[ "$(submod_cpe_of netty-buffer)" = "cpe:2.3:a:netty:netty:4.1.130.Final:*:*:*:*:*:*:*" ] && pass "per-submodule mechanical cpe replaced (netty-buffer -> netty:netty)" || fail "netty-buffer cpe='$(submod_cpe_of netty-buffer)'"
+[ "$(submod_cpe_of netty-codec-dns)" = "cpe:2.3:a:netty:netty:4.1.131.Final:*:*:*:*:*:*:*" ] && pass "per-submodule mechanical cpe replaced (netty-codec-dns -> netty:netty)" || fail "netty-codec-dns cpe='$(submod_cpe_of netty-codec-dns)'"
+# (b) boundary: an extra classifier segment on the vendor (".linux-x86_64") means
+# submodule != vendor tail, so the exact-reconstruction check fails and the
+# pre-existing cpe is left untouched rather than guessed at.
+[ "$(submod_cpe_of netty-transport-native-epoll)" = "cpe:2.3:a:io.netty.transport-native-epoll.linux-x86_64:netty-transport-native-epoll:4.1.131.Final:*:*:*:*:*:*:*" ] && pass "classifier-suffixed vendor left untouched (netty-transport-native-epoll)" || fail "netty-transport-native-epoll cpe changed to '$(submod_cpe_of netty-transport-native-epoll)'"
+# (c) idempotent.
+cp "$WORK/mvn-submod.json" "$WORK/mvn-submod2.json"; python3 "$MVNCPE" "$WORK/mvn-submod2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-submod.json" "$WORK/mvn-submod2.json" >/dev/null 2>&1 && pass "per-submodule mechanical-overwrite pass is idempotent" || fail "second run changed the SBOM further"
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
