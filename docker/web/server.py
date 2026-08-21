@@ -830,6 +830,11 @@ def _epss_kev_map(run_id):
 # advisory feed. Kept in step with the same list in docker/lib/scan-security.sh.
 _KERNEL_PKG_NAMES = ("linux_kernel", "linux-kernel", "kernel", "linux")
 
+# NVD's 1..4 severity rating (VendorSeverity.nvd in Trivy's report), converted
+# to the same CRITICAL/HIGH/MEDIUM/LOW vocabulary as the adopted `severity`
+# field so the UI doesn't need a second scale.
+_NVD_SEVERITY_NAMES = {1: "LOW", 2: "MEDIUM", 3: "HIGH", 4: "CRITICAL"}
+
 
 def security_summary(run_id):
     p = run_file(run_id, "_security.json")
@@ -885,6 +890,22 @@ def security_summary(run_id):
                     row["epss"] = epss
                 if pr.get("kev"):
                     row["kev"] = True
+                # Status (fix availability per the advisory, e.g. "fixed" /
+                # "affected" / "will_not_fix"), NVD's own severity rating (a
+                # second axis from the adopted `severity` above), and the
+                # advisory's publish date. Trivy/grype don't fill these for
+                # every finding, so each key is added only when present.
+                status = v.get("Status")
+                if isinstance(status, str) and status:
+                    row["status"] = status
+                vendor_sev = v.get("VendorSeverity")
+                if isinstance(vendor_sev, dict):
+                    nvd_rating = vendor_sev.get("nvd")
+                    if isinstance(nvd_rating, int) and nvd_rating in _NVD_SEVERITY_NAMES:
+                        row["nvdSeverity"] = _NVD_SEVERITY_NAMES[nvd_rating]
+                published = v.get("PublishedDate")
+                if isinstance(published, str) and published:
+                    row["publishedDate"] = published
                 vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns

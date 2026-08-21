@@ -1125,6 +1125,35 @@ else
 fi
 rm -f "$OUT"/sec_1.0_*
 
+echo "== Status / NVD severity / publish date (security_summary) =="
+# Status (fix availability), VendorSeverity.nvd (a second rating axis) and
+# PublishedDate are only sometimes present on a finding; each must be joined
+# onto the row when present and omitted entirely when not.
+cat > "$OUT/sev_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-1","Severity":"CRITICAL","PkgName":"openssl","InstalledVersion":"3.0",
+   "Status":"affected","VendorSeverity":{"nvd":3},"PublishedDate":"2024-01-02T00:00:00Z"},
+  {"VulnerabilityID":"CVE-2","Severity":"LOW","PkgName":"zlib","InstalledVersion":"1.2"}
+]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+vulns = {x["id"]: x for x in server.security_summary("sev_1.0")["vulnerabilities"]}
+assert vulns["CVE-1"]["status"] == "affected", vulns["CVE-1"]
+assert vulns["CVE-1"]["nvdSeverity"] == "HIGH", vulns["CVE-1"]
+assert vulns["CVE-1"]["publishedDate"] == "2024-01-02T00:00:00Z", vulns["CVE-1"]
+for k in ("status", "nvdSeverity", "publishedDate"):
+    assert k not in vulns["CVE-2"], (k, vulns["CVE-2"])
+PY
+then
+    pass "status/nvdSeverity/publishedDate joined when present, omitted when not"
+else
+    fail "status/nvdSeverity/publishedDate handling is wrong"
+fi
+rm -f "$OUT"/sev_1.0_*
+
 echo "== scanError exposure (security_summary) =="
 # scan-security.sh stamps ScanError when the engine run fails; the summary must
 # surface it so the UI can tell "scan failed" from a clean 0-findings result,
