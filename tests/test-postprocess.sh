@@ -1186,6 +1186,51 @@ mvn_src=$(jq -r '[.components[]|select(.name=="pdfbox-app")]|.[0]|[(.properties/
 cp "$WORK/mvn.json" "$WORK/mvn2.json"; python3 "$MVNCPE" "$WORK/mvn2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn.json" "$WORK/mvn2.json" >/dev/null 2>&1 && pass "enrich-maven-cpe is idempotent" || fail "second run changed the SBOM"
 
+echo "== F-1c2: maven CPE enrichment — mechanical groupId/artifactId copy is replaced =="
+# Some generators, lacking a real CPE dictionary match, fall back to gluing the
+# maven coordinate itself into vendor:product (group verbatim, artifact verbatim,
+# or group+artifact concatenated -- always paired with product=artifact). That
+# shape carries no more information than no cpe at all, so it is eligible for
+# replacement by derive_cpe(). A cpe with any other vendor is left untouched,
+# including one already set to a MAVEN_CPE_MAP vendor.
+cat > "$WORK/mvn-mech.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"pdfbox-app","version":"1.8.7","purl":"pkg:maven/org.apache.pdfbox/pdfbox-app@1.8.7","cpe":"cpe:2.3:a:org.apache.pdfbox:pdfbox-app:1.8.7:*:*:*:*:*:*:*"},
+ {"type":"library","name":"jakarta.annotation-api","version":"2.1.1","purl":"pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1","cpe":"cpe:2.3:a:jakarta.annotation-api:jakarta.annotation-api:2.1.1:*:*:*:*:*:*:*"},
+ {"type":"library","name":"HikariCP","version":"4.0.3","purl":"pkg:maven/com.zaxxer/HikariCP@4.0.3","cpe":"cpe:2.3:a:com.zaxxer.HikariCP:HikariCP:4.0.3:*:*:*:*:*:*:*"},
+ {"type":"library","name":"catalina-ant","version":"11.0.22","purl":"pkg:maven/catalina-ant/catalina-ant@11.0.22","cpe":"cpe:2.3:a:apache-software-foundation:catalina-ant:11.0.22:*:*:*:*:*:*:*"},
+ {"type":"library","name":"spring-web","version":"5.0.0","purl":"pkg:maven/org.springframework/spring-web@5.0.0","cpe":"cpe:2.3:a:vmware:spring_framework:5.0.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"json-java","version":"20231013","purl":"pkg:maven/org.json/json-java@20231013","cpe":"cpe:2.3:a:stleary:json-java:20231013:*:*:*:*:*:*:*"}]}
+JSON
+cp "$WORK/mvn-mech.json" "$WORK/mvn-mech-orig.json"
+python3 "$MVNCPE" "$WORK/mvn-mech.json" >/dev/null 2>&1
+mech_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-mech.json"; }
+# (a) vendor=<group> (dotted, verbatim), product=<artifact> -> replaced (same
+# result as deriving from no cpe at all: org.apache.pdfbox -> apache:pdfbox).
+[ "$(mech_cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "mechanical group-copy cpe replaced (apache:pdfbox)" || fail "pdfbox-app cpe='$(mech_cpe_of pdfbox-app)'"
+# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced (2-segment
+# group, parts[1]==parts[-1] shape: jakarta.annotation -> annotation:annotation).
+[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:annotation)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
+# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced.
+[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:zaxxer:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:zaxxer)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
+# (d) boundary: single-segment groupId equal to the artifactId, but the
+# pre-existing vendor ("apache-software-foundation") is not the group or
+# artifact string in any form -- it looks like a real (if possibly wrong)
+# lookup, not a coordinate copy, and a single-segment group cannot be
+# re-derived anyway (derive_cpe has no domain to split). Left untouched.
+[ "$(mech_cpe_of catalina-ant)" = "cpe:2.3:a:apache-software-foundation:catalina-ant:11.0.22:*:*:*:*:*:*:*" ] && pass "non-coordinate vendor on a single-segment group left untouched (catalina-ant)" || fail "catalina-ant cpe changed to '$(mech_cpe_of catalina-ant)'"
+# (e) most important invariant: a cpe already set to a MAVEN_CPE_MAP vendor is
+# never touched, precisely because that vendor never matches the mechanical
+# group/artifact-copy shape.
+[ "$(mech_cpe_of spring-web)" = "cpe:2.3:a:vmware:spring_framework:5.0.0:*:*:*:*:*:*:*" ] && pass "curated MAVEN_CPE_MAP cpe (spring) never overwritten" || fail "spring-web cpe changed to '$(mech_cpe_of spring-web)'"
+[ "$(mech_cpe_of json-java)" = "cpe:2.3:a:stleary:json-java:20231013:*:*:*:*:*:*:*" ] && pass "curated MAVEN_CPE_MAP cpe (org.json) never overwritten, even though product==artifact" || fail "json-java cpe changed to '$(mech_cpe_of json-java)'"
+# (f) idempotent on the mechanical-overwrite path too.
+cp "$WORK/mvn-mech.json" "$WORK/mvn-mech2.json"; python3 "$MVNCPE" "$WORK/mvn-mech2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-mech.json" "$WORK/mvn-mech2.json" >/dev/null 2>&1 && pass "mechanical-overwrite pass is idempotent" || fail "second run changed the SBOM further"
+# (g) exactly 3 components changed from the original (pdfbox-app, jakarta.annotation-api, HikariCP).
+changed=$(diff <(jq -S '.components' "$WORK/mvn-mech-orig.json") <(jq -S '.components' "$WORK/mvn-mech.json") | grep -c '"cpe"' || true)
+[ "$changed" -gt 0 ] && pass "mechanical-copy fixture changed cpe field(s) ($changed diff line(s))" || fail "expected cpe changes, saw none"
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower

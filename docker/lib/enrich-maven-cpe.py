@@ -27,9 +27,16 @@
 # Anything else gets NO CPE — a wrong vendor:product is worse than none, so we
 # never guess outside the map and the apache rule.
 #
-# A pre-existing cpe is never overwritten. Best-effort, idempotent, and a no-op
-# when the SBOM has no maven components. Toggle: ENRICH_MAVEN_CPE (default on);
-# the entrypoint skips it for AI SBOMs.
+# A pre-existing cpe is left alone UNLESS it is a mechanical copy of the maven
+# groupId/artifactId into vendor:product (some generators do this as a fallback
+# when they have no real CPE dictionary match, e.g. "org.apache.pdfbox:pdfbox" or
+# "com.zaxxer.HikariCP:HikariCP" -- the coordinate glued in verbatim, never a
+# looked-up vendor). That narrow, structurally-certain shape is replaced by
+# derive_cpe(); any other pre-existing cpe -- including one already set to a
+# MAVEN_CPE_MAP vendor, which never has this shape -- is never touched. See
+# _is_mechanical_maven_cpe(). Best-effort, idempotent, and a no-op when the SBOM
+# has no maven components. Toggle: ENRICH_MAVEN_CPE (default on); the entrypoint
+# skips it for AI SBOMs.
 #
 # NOTE: attaching the CPE is only half the path — a CPE-matching engine (grype
 # with GRYPE_MATCH_JAVA_USING_CPES) must run to turn it into findings, and its
@@ -56,6 +63,46 @@ MAVEN_CPE_MAP = {
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),
 # whitespace, or a wildcard would shift or break the 13-field cpe:2.3 grammar.
 _CPE_SAFE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+
+# Splits a cpe:2.3 string on unescaped ':' (a field may carry an escaped '\:').
+_CPE_FIELD_SPLIT = re.compile(r"(?<!\\):")
+_CPE_UNESCAPE = re.compile(r"\\(.)")
+
+
+def _cpe_vendor_product(cpe):
+    """Return (vendor, product) from a cpe:2.3:a:vendor:product:... string, or
+    None if it does not look like a well-formed cpe:2.3 URI."""
+    parts = _CPE_FIELD_SPLIT.split(cpe)
+    if len(parts) < 5 or parts[0] != "cpe" or parts[1] != "2.3":
+        return None
+    return parts[3], parts[4]
+
+
+def _cpe_norm(s):
+    """Undo cpe:2.3 backslash-escaping and lowercase, for text comparison."""
+    return _CPE_UNESCAPE.sub(r"\1", s).lower()
+
+
+def _is_mechanical_maven_cpe(cpe, group, artifact):
+    """True when a pre-existing cpe's vendor:product is nothing but the maven
+    groupId and/or artifactId copied in verbatim, e.g. vendor=<group> (the whole
+    dotted string), vendor=<artifact>, or vendor=<group>+<artifact> concatenated
+    -- always paired with product=<artifact>. That shape is a generator's
+    fallback when it has no real CPE dictionary match, not a vendor lookup, so
+    it carries no more information than an absent cpe and is safe to replace
+    with derive_cpe(). Anything else (a real vendor token, however unusual) is
+    left alone -- including any cpe already set to a MAVEN_CPE_MAP vendor, which
+    by construction never has this shape.
+    """
+    parsed = _cpe_vendor_product(cpe)
+    if not parsed:
+        return False
+    vendor, product = _cpe_norm(parsed[0]), _cpe_norm(parsed[1])
+    na = _cpe_norm(artifact)
+    if product != na:
+        return False
+    ng = _cpe_norm(group)
+    return vendor in (ng, na, ng + "." + na, ng + na)
 
 
 def _parse_maven(purl):
@@ -121,10 +168,15 @@ def enrich(path):
     n = 0
     for c in components:
         purl = c.get("purl", "")
-        if not purl.startswith("pkg:maven/") or c.get("cpe"):
-            continue  # not maven, or a CPE is already present (never overwrite)
+        if not purl.startswith("pkg:maven/"):
+            continue  # not maven
+        existing = c.get("cpe")
+        if existing:
+            parsed = _parse_maven(purl)
+            if not parsed or not _is_mechanical_maven_cpe(existing, parsed[0], parsed[1]):
+                continue  # a real cpe is already present; never overwrite it
         cpe = derive_cpe(purl)
-        if not cpe:
+        if not cpe or cpe == existing:
             continue
         c["cpe"] = cpe
         props = [p for p in (c.get("properties") or []) if p.get("name") != "bomlens:cpeSource"]
