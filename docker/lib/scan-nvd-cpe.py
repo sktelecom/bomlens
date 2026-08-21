@@ -32,9 +32,11 @@
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 
 try:
     import urllib.request
@@ -46,6 +48,13 @@ except Exception:  # pragma: no cover
 
 GRYPE = os.environ.get("GRYPE_BIN", "grype")
 NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+
+# grype's vulnerability.fix.state -> Trivy's Status string. "unknown" and a
+# missing fix object both map to "leave the key out" (see build_sidecar).
+GRYPE_FIX_STATE_TO_STATUS = {"fixed": "fixed", "not-fixed": "affected", "wont-fix": "will_not_fix"}
+
+# grype's nvd:cpe severity string -> Trivy's VendorSeverity integer scale.
+GRYPE_SEVERITY_TO_VENDOR = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 
 # ---- version comparison (maven/NVD, best-effort numeric) -------------------
@@ -127,6 +136,67 @@ def _cpe_product(cpe):
     return parts[4] if len(parts) > 4 else ""
 
 
+def _nvd_cpe_vendor_severity(m, vuln, is_nvd):
+    """Trivy-shaped VendorSeverity (e.g. {"nvd": 3}) from grype's nvd:cpe rating.
+
+    When the primary match namespace already is nvd:cpe, use its severity
+    directly. Otherwise look for the nvd:cpe entry among relatedVulnerabilities
+    (the common case: grype's primary match comes from a different namespace).
+    """
+    if is_nvd:
+        sev = vuln.get("severity")
+    else:
+        sev = next((r.get("severity") for r in (m.get("relatedVulnerabilities") or [])
+                    if r.get("namespace") == "nvd:cpe"), None)
+    n = GRYPE_SEVERITY_TO_VENDOR.get((sev or "").lower())
+    return {"nvd": n} if n is not None else None
+
+
+def _grype_db_path():
+    """Path to grype's local sqlite vulnerability DB, or None if unavailable."""
+    try:
+        p = subprocess.run([GRYPE, "db", "status", "-o", "json"],
+                            capture_output=True, text=True, timeout=30)
+        if p.returncode != 0:
+            return None
+        data = json.loads(p.stdout)
+        path = data.get("path")
+        if path and os.path.exists(path):
+            return path
+    except Exception:
+        pass
+    return None
+
+
+def _to_iso8601(raw):
+    """Best-effort conversion of a sqlite date string to Trivy-shaped ISO 8601."""
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).strip())
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _published_date(conn, cve):
+    """CVE published date from grype's local DB (nvd provider), Trivy-shaped."""
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT published_date FROM vulnerability_handles "
+            "WHERE provider_id = 'nvd' AND name = ? LIMIT 1",
+            (cve,)).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    return _to_iso8601(row[0])
+
+
 # ---- main -------------------------------------------------------------------
 def run_grype(sbom):
     env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
@@ -160,6 +230,17 @@ def build_sidecar(sbom_path, out_prefix):
     verify = os.environ.get("SECURITY_NVD_VERIFY", "false") == "true"
     nvd_key = os.environ.get("NVD_API_KEY", "")
     cache = {}
+
+    # Best-effort: grype's local vulnerability DB carries published dates that
+    # grype's own JSON output doesn't. Missing/unreadable DB (air-gapped image
+    # without a bundled DB) just means PublishedDate is omitted below.
+    db_conn = None
+    try:
+        db_path = _grype_db_path()
+        if db_path:
+            db_conn = sqlite3.connect(db_path)
+    except Exception:
+        db_conn = None
 
     kept, dropped, unverified = [], 0, 0
     for m in g.get("matches", []):
@@ -203,10 +284,25 @@ def build_sidecar(sbom_path, out_prefix):
             if vuln.get("cvss") else {},
             "source": "grype-nvd-cpe",
         }
+        status = GRYPE_FIX_STATE_TO_STATUS.get((vuln.get("fix") or {}).get("state"))
+        if status is not None:
+            rec["Status"] = status
+        vendor_severity = _nvd_cpe_vendor_severity(m, vuln, is_nvd)
+        if vendor_severity is not None:
+            rec["VendorSeverity"] = vendor_severity
+        published = _published_date(db_conn, cve)
+        if published is not None:
+            rec["PublishedDate"] = published
         if flag_unverified:
             rec["bomlens:cpeVersionUnverified"] = True
             unverified += 1
         kept.append(rec)
+
+    if db_conn is not None:
+        try:
+            db_conn.close()
+        except Exception:
+            pass
 
     sidecar = {"Results": [{
         "Target": "maven (grype nvd:cpe)",
