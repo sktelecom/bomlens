@@ -80,6 +80,47 @@ if jq -e '[.components[]? | select(.type=="file" and .purl=="pkg:generic/config@
 else
     fail "a purl-carrying file component was wrongly dropped"
 fi
+
+# Regression: some supplier SPDX input bakes a redundant " : <version>" suffix into
+# PackageName itself (e.g. "uuid : 3.4.0" alongside PackageVersionInfo "3.4.0"), which
+# syft/jq carry straight through to the CycloneDX .name. Trivy's SBOM scanner keys its
+# npm/pypi/go vulnerability matchers off .name, not just purl, so a name of
+# "uuid : 3.4.0" makes every CVE for that package invisible to `trivy sbom` even
+# though .purl and .version are both correct. normalize-sbom.sh must strip the
+# suffix ONLY when it exactly equals .version (so a real name that happens to
+# contain " : " but not the version string is left alone).
+cp "$FIX/name-version-suffix-components.json" "$WORK/nvs.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/nvs.json" >/dev/null 2>&1
+if jq -e '[.components[]? | select(.purl=="pkg:npm/uuid@3.4.0" and .name=="uuid")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "redundant name : version suffix stripped (npm uuid)"
+else
+    fail "npm uuid's name : version suffix was not stripped"
+fi
+if jq -e '[.components[]? | select(.purl|test("google/uuid")) | select(.name=="google/uuid")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "redundant name : version suffix stripped (golang google/uuid)"
+else
+    fail "golang google/uuid's name : version suffix was not stripped"
+fi
+if jq -e '[.components[]? | select(.purl=="pkg:npm/postcss@8.5.4" and .name=="postcss")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "a component whose name never had the suffix is untouched"
+else
+    fail "a clean component name was wrongly rewritten"
+fi
+if jq -e '[.components[]? | select(.purl=="pkg:generic/weird@thing" and .name=="weird : name")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "only the trailing version-matching segment is stripped, not earlier colons"
+else
+    fail "a multi-colon name was stripped incorrectly"
+fi
+if jq -e '[.components[]? | select(.purl=="pkg:generic/colon@1.0" and .name=="colon:nospace")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "a colon with no surrounding spaces is left alone"
+else
+    fail "a name with an unrelated colon was wrongly touched"
+fi
+if jq -e '[.components[]? | select(.purl=="pkg:generic/noversion" and .name=="no-version-field")] | length == 1' "$WORK/nvs.json" >/dev/null 2>&1; then
+    pass "a component with no version field is left alone"
+else
+    fail "a component with no version field was wrongly touched"
+fi
 # normalize-sbom.sh surfaces the delivered filename as bsi:component:filename from
 # syft's location path, but ONLY when that path is a real artifact (known artifact
 # extension), so a manifest-declared component is never labelled with the manifest

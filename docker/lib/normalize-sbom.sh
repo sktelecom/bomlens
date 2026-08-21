@@ -44,6 +44,27 @@ NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
 # always have a name or purl) and named file components are untouched.
 DROP_EMPTY_FILES='(.components) |= (if type=="array" then map(select((.type != "file") or ((.name // "") != "") or ((.purl // "") != ""))) else . end)'
 
+# Always: strip a redundant " : <version>" suffix a supplier SBOM sometimes bakes
+# into the component name itself (observed in supplier-provided SPDX input,
+# e.g. PackageName "uuid : 3.4.0" with PackageVersionInfo "3.4.0" — the same
+# value twice, once as the real .version field and once appended to .name).
+# Trivy's SBOM scanner keys its npm/pypi/go vulnerability matchers off the
+# component name, not just purl; a name of "uuid : 3.4.0" instead of "uuid"
+# makes every CVE for that package invisible to `trivy sbom` even though the
+# purl and version are both correct. Only strip when the trailing segment
+# after " : " is an EXACT match for .version — a coincidental colon in a real
+# name (e.g. "Bouncy Castle: C# API") won't match unless it happens to equal
+# the version string too, so this can't misfire on legitimate names.
+NAME_VERSION_DEDUP='(.components) |= (if type=="array" then map(
+    (.name // "") as $n | (.version // "") as $v
+    | if ($n != "" and $v != "" and ($n | test(" : "))) then
+        ($n | split(" : ")) as $parts
+        | if ($parts[-1:] | first) == $v and ($parts | length) > 1 then
+            .name = ($parts[0:-1] | join(" : "))
+          else . end
+      else . end
+  ) else . end)'
+
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
@@ -346,6 +367,7 @@ if [ "$MODE" = "--stable" ]; then
         ${NORMALIZE_DEF}
         ${NULL_FIX}
         | ${DROP_EMPTY_FILES}
+        | ${NAME_VERSION_DEDUP}
         | ${PYRANGE_DEDUP}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
@@ -366,7 +388,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${DROP_EMPTY_FILES} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
