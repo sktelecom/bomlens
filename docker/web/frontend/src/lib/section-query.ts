@@ -31,7 +31,7 @@ export type VulnSort = { key: VulnSortKey; dir: SortDir };
 export const DEFAULT_VULN_SORT: VulnSort = { key: "severity", dir: "desc" };
 
 const COMPONENT_SORT_KEYS: ComponentSortKey[] = ["name", "version", "type", "scope", "risk"];
-const VULN_SORT_KEYS: VulnSortKey[] = ["severity", "cvss", "epss"];
+const VULN_SORT_KEYS: VulnSortKey[] = ["severity", "cvss", "epss", "nvdSeverity"];
 
 /** Boolean filters travel as `1`; absent means off. */
 const COMPONENT_FLAGS = {

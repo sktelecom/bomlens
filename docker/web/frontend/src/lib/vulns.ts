@@ -8,7 +8,7 @@
  */
 import { SEVERITY_ORDER, type VulnItem } from "./api";
 
-export type VulnSortKey = "severity" | "cvss" | "epss";
+export type VulnSortKey = "severity" | "cvss" | "epss" | "nvdSeverity";
 export type SortDir = "asc" | "desc";
 
 /** Higher = more severe (CRITICAL highest). Unknown/absent severities sort last. */
@@ -27,8 +27,18 @@ function epssValue(v: VulnItem): number {
   return typeof v.epss === "number" ? v.epss : -1;
 }
 
+/** Same scale as severityValue, but on NVD's own rating; absent sorts last. */
+function nvdSeverityValue(v: VulnItem): number {
+  if (!v.nvdSeverity) return -1;
+  const i = SEVERITY_ORDER.indexOf(v.nvdSeverity);
+  return i === -1 ? -1 : SEVERITY_ORDER.length - i;
+}
+
 function primaryValue(v: VulnItem, key: VulnSortKey): number {
-  return key === "cvss" ? cvssValue(v) : key === "epss" ? epssValue(v) : severityValue(v);
+  if (key === "cvss") return cvssValue(v);
+  if (key === "epss") return epssValue(v);
+  if (key === "nvdSeverity") return nvdSeverityValue(v);
+  return severityValue(v);
 }
 
 /**

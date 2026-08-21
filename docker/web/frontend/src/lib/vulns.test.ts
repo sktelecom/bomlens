@@ -50,6 +50,34 @@ describe("compareVulns — EPSS key", () => {
   });
 });
 
+describe("compareVulns — nvdSeverity key", () => {
+  function withNvd(
+    id: string,
+    severity: Severity,
+    nvdSeverity?: Severity,
+  ): VulnItem {
+    return {
+      id,
+      severity,
+      cvss: null,
+      pkg: "p",
+      installed: "1",
+      fixed: "",
+      title: "",
+      nvdSeverity,
+    };
+  }
+  const items = [
+    withNvd("CVE-a", "MEDIUM", "LOW"),
+    withNvd("CVE-b", "MEDIUM", "CRITICAL"),
+    withNvd("CVE-c", "MEDIUM", undefined), // no NVD rating sorts last (desc)
+  ];
+  it("sorts by NVD severity descending, missing ratings last", () => {
+    const ids = [...items].sort((a, b) => compareVulns(a, b, "nvdSeverity", "desc")).map((x) => x.id);
+    expect(ids).toEqual(["CVE-b", "CVE-a", "CVE-c"]);
+  });
+});
+
 describe("tiebreak", () => {
   it("breaks equal severity by CVSS desc then id", () => {
     const a = v("CVE-2", "CRITICAL", 9.0);

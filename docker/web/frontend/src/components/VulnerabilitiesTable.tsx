@@ -33,6 +33,38 @@ const TONE: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
   UNKNOWN: "info",
 };
 
+// Vendor/advisory disposition badge, shown beside the severity badge. `fixed`
+// reads as resolved (success); the still-open dispositions read as a caution
+// (medium); dispositions that are informational rather than actionable stay
+// neutral (info) — same three-tier logic as the severity/EOL/outdated badges
+// elsewhere in this table.
+const STATUS_TONE: Record<string, "success" | "medium" | "info"> = {
+  fixed: "success",
+  affected: "medium",
+  will_not_fix: "medium",
+  end_of_life: "medium",
+  fix_deferred: "info",
+  under_investigation: "info",
+};
+
+const STATUS_LABEL_KEY: Record<string, string> = {
+  fixed: "result.statusFixed",
+  affected: "result.statusAffected",
+  will_not_fix: "result.statusWillNotFix",
+  end_of_life: "result.statusEndOfLife",
+  fix_deferred: "result.statusFixDeferred",
+  under_investigation: "result.statusUnderInvestigation",
+};
+
+const STATUS_HINT_KEY: Record<string, string> = {
+  fixed: "result.statusFixedHint",
+  affected: "result.statusAffectedHint",
+  will_not_fix: "result.statusWillNotFixHint",
+  end_of_life: "result.statusEndOfLifeHint",
+  fix_deferred: "result.statusFixDeferredHint",
+  under_investigation: "result.statusUnderInvestigationHint",
+};
+
 interface Props {
   security: SecuritySummary;
   /** The scan's id, so an export says which scan it came from. */
@@ -100,6 +132,13 @@ function vulnLinks(v: VulnItem): string[] {
   return out;
 }
 
+/** Human-readable publish date; falls back to the raw string if it doesn't parse. */
+function formatPublishedDate(iso: string, locale: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale, { dateStyle: "medium" });
+}
+
 /** Expanded detail for one CVE — CVSS, description and reference links. */
 function VulnDetail({
   vuln,
@@ -110,8 +149,13 @@ function VulnDetail({
   links: string[];
   onPickComponent?: (name: string) => void;
 }) {
-  const { t } = useTranslation();
-  if (vuln.cvss == null && !vuln.description && links.length === 0) {
+  const { t, i18n } = useTranslation();
+  if (
+    vuln.cvss == null &&
+    !vuln.description &&
+    links.length === 0 &&
+    !vuln.publishedDate
+  ) {
     return <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>;
   }
   return (
@@ -125,6 +169,14 @@ function VulnDetail({
               {vuln.cvssVector}
             </span>
           ) : null}
+        </div>
+      )}
+      {vuln.publishedDate && (
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="font-medium">{t("result.vulnPublished")}</span>
+          <span className="tabular-nums text-muted-foreground">
+            {formatPublishedDate(vuln.publishedDate, i18n.language)}
+          </span>
         </div>
       )}
       {vuln.description ? (
@@ -236,6 +288,10 @@ export function VulnerabilitiesTable({
   };
 
   const anyEpss = useMemo(() => items.some((v) => typeof v.epss === "number"), [items]);
+  // NVD's own severity rating is a distinct axis from the adopted `severity`
+  // above and only shows up when the report carries it — same opt-in pattern
+  // as the EPSS column.
+  const anyNvdSeverity = useMemo(() => items.some((v) => !!v.nvdSeverity), [items]);
 
   const sorted = useMemo(
     () => [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir)),
@@ -342,6 +398,14 @@ export function VulnerabilitiesTable({
             {anyEpss && (
               <SortableTh label={t("result.colEpss")} sortKey="epss" sort={sort} onSort={onSort} />
             )}
+            {anyNvdSeverity && (
+              <SortableTh
+                label={t("result.colNvdSeverity")}
+                sortKey="nvdSeverity"
+                sort={sort}
+                onSort={onSort}
+              />
+            )}
             <th className="whitespace-nowrap px-3 py-2 font-medium">{t("result.colCve")}</th>
             <th className="whitespace-nowrap px-3 py-2 font-medium">{t("result.colPackage")}</th>
             <th className="whitespace-nowrap px-3 py-2 font-medium">{t("result.colInstalled")}</th>
@@ -354,7 +418,10 @@ export function VulnerabilitiesTable({
             const isOpen = openKey === key;
             const links = vulnLinks(v);
             const hasDetail =
-              v.cvss != null || !!v.description || links.length > 0;
+              v.cvss != null ||
+              !!v.description ||
+              links.length > 0 ||
+              !!v.publishedDate;
             const toggle = () => setOpenKey(isOpen ? null : key);
             return (
               <Fragment key={key}>
@@ -395,6 +462,18 @@ export function VulnerabilitiesTable({
                       <Badge tone={TONE[v.severity] ?? "info"}>
                         {t(`severity.${v.severity}`)}
                       </Badge>
+                      {v.status && (
+                        <Badge
+                          tone={STATUS_TONE[v.status] ?? "info"}
+                          title={
+                            STATUS_HINT_KEY[v.status]
+                              ? t(STATUS_HINT_KEY[v.status])
+                              : undefined
+                          }
+                        >
+                          {STATUS_LABEL_KEY[v.status] ? t(STATUS_LABEL_KEY[v.status]) : v.status}
+                        </Badge>
+                      )}
                       {v.kev && (
                         <Badge tone="critical" title={t("result.kevHint")}>
                           {t("result.kevBadge")}
@@ -412,6 +491,17 @@ export function VulnerabilitiesTable({
                   {anyEpss && (
                     <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
                       {typeof v.epss === "number" ? `${(v.epss * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  )}
+                  {anyNvdSeverity && (
+                    <td className="px-3 py-2">
+                      {v.nvdSeverity ? (
+                        <Badge tone={TONE[v.nvdSeverity] ?? "info"}>
+                          {t(`severity.${v.nvdSeverity}`)}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                   )}
                   <td className="px-3 py-2">
@@ -441,7 +531,10 @@ export function VulnerabilitiesTable({
                 </tr>
                 {isOpen && (
                   <tr className="border-b last:border-0">
-                    <td colSpan={anyEpss ? 7 : 6} className="bg-muted/30 px-3 py-3">
+                    <td
+                      colSpan={6 + (anyEpss ? 1 : 0) + (anyNvdSeverity ? 1 : 0)}
+                      className="bg-muted/30 px-3 py-3"
+                    >
                       <VulnDetail
                         vuln={v}
                         links={links}

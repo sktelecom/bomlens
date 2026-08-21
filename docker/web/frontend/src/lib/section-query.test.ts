@@ -78,6 +78,12 @@ describe("vulnerabilities query", () => {
     expect(vulnsFromQuery(undefined).sort).toEqual(DEFAULT_VULN_SORT);
     expect(vulnsFromQuery({ sort: "vibes" }).sort).toEqual(DEFAULT_VULN_SORT);
   });
+
+  it("round-trips the NVD severity sort key", () => {
+    const query = vulnsToQuery("", "", { key: "nvdSeverity", dir: "desc" });
+    expect(query).toEqual({ sort: "nvdSeverity", dir: "desc" });
+    expect(vulnsFromQuery(query).sort).toEqual({ key: "nvdSeverity", dir: "desc" });
+  });
 });
 
 describe("through the hash", () => {

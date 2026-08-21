@@ -1513,6 +1513,63 @@ test("Vulnerabilities table shows CVSS, sorts, and expands a row", async ({ page
   await expect(page.getByText("CVSS:3.1/AV:N/AC:L")).toBeVisible();
 });
 
+// Status, NVD severity and publish date are all optional per-CVE fields the
+// security report may or may not carry. Kept in its own fixture (not the
+// shared DONE above) so the visual baseline stays unaffected by this data.
+const VEX_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "vex_1.0",
+  results: [{ name: "vex_1.0_bom.json", size: 100 }],
+  security: {
+    CRITICAL: 1, HIGH: 1, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 2,
+    vulnerabilities: [
+      { id: "CVE-2024-1111", severity: "CRITICAL", pkg: "openssl", installed: "3.0.0", fixed: "3.0.1", title: "buffer overflow", status: "fixed", nvdSeverity: "HIGH", publishedDate: "2024-01-15T00:00:00Z" },
+      { id: "CVE-2024-2222", severity: "HIGH", pkg: "zlib", installed: "1.2.0", fixed: "", title: "oob read", status: "will_not_fix", nvdSeverity: "MEDIUM" },
+    ],
+  },
+  conformance: null,
+  sbom: { components: 2, componentList: [] },
+};
+
+async function stubVexAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(VEX_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "vex");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("Vulnerabilities table shows the disposition status and NVD severity, when the report carries them", async ({ page }) => {
+  await stubVexAndRun(page);
+  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+
+  // Status badges, scoped to their own row — "Fixed" also names the Fixed
+  // column header, so an unscoped lookup would be ambiguous.
+  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
+  const row2 = page.locator("tr", { has: page.getByText("CVE-2024-2222") });
+  await expect(row1.getByText("Fixed", { exact: true })).toBeVisible();
+  await expect(row2.getByText("Will not fix", { exact: true })).toBeVisible();
+
+  // NVD severity is its own sortable column, separate from the adopted severity.
+  await expect(page.getByRole("button", { name: "NVD severity", exact: true })).toBeVisible();
+  await expect(row1.getByText("High", { exact: true })).toBeVisible();
+
+  // Expanding the row with a publish date shows it in the detail area.
+  await page.getByText("CVE-2024-1111").click();
+  await expect(page.getByText("Published", { exact: true })).toBeVisible();
+  await expect(page.getByText("Jan 15, 2024")).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).include("main").analyze();
+  expect(results.violations).toEqual([]);
+});
+
 for (const { theme, lang } of COMBOS) {
   test(`vulnerabilities section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);

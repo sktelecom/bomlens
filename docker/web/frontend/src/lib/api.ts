@@ -191,6 +191,14 @@ export interface VulnItem {
   epss?: number;
   /** On CISA's Known Exploited Vulnerabilities list (actively exploited). */
   kev?: boolean;
+  /** Vendor/advisory disposition for this CVE against the installed version
+   *  (e.g. VEX-style triage), when the report carries one. */
+  status?: string;
+  /** NVD's own severity rating — a different axis from `severity` above
+   *  (which is the scanner's adopted grade and can diverge from NVD's). */
+  nvdSeverity?: Severity;
+  /** When the advisory was first published (ISO 8601), when known. */
+  publishedDate?: string;
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */
