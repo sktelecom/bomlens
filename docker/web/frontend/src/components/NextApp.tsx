@@ -446,6 +446,7 @@ export function NextApp() {
             }
             errorMessage={scanError}
             newScanHref={newHash()}
+            deepCveEnabled={retryParams?.deepCve}
             onRetry={
               canRetry && retryParams ? () => run(retryParams) : undefined
             }

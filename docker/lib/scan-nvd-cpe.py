@@ -199,6 +199,7 @@ def _published_date(conn, cve):
 
 # ---- main -------------------------------------------------------------------
 def run_grype(sbom):
+    print("[nvd-cpe] grype CPE matching started")
     env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
     try:
         p = subprocess.run(
@@ -242,8 +243,21 @@ def build_sidecar(sbom_path, out_prefix):
     except Exception:
         db_conn = None
 
+    grype_matches = g.get("matches", [])
+    # The verify loop is the only part of this script with a known total, so it
+    # is also the only part that reports [deep-cve-progress]. Count up front how
+    # many findings will actually hit the NVD lookup (nvd:cpe CVE matches) so the
+    # percentage reflects that work, not the full grype match list.
+    to_verify = sum(
+        1 for m in grype_matches
+        if m.get("vulnerability", {}).get("id", "").startswith("CVE-")
+        and m.get("vulnerability", {}).get("namespace") == "nvd:cpe"
+    ) if verify else 0
+    verified_so_far = 0
+    last_percent = None
+
     kept, dropped, unverified = [], 0, 0
-    for m in g.get("matches", []):
+    for m in grype_matches:
         vuln = m.get("vulnerability", {})
         cve = vuln.get("id", "")
         if not cve.startswith("CVE-"):
@@ -262,11 +276,16 @@ def build_sidecar(sbom_path, out_prefix):
         flag_unverified = False
         if is_nvd:
             if verify:
-                matches = _nvd_matches(cve, nvd_key, cache)
-                if matches is None:
+                nvd_ms = _nvd_matches(cve, nvd_key, cache)
+                verified_so_far += 1
+                percent = min(100, (verified_so_far * 100) // to_verify) if to_verify else 100
+                if percent != last_percent:
+                    print(f"[deep-cve-progress] {percent}%")
+                    last_percent = percent
+                if nvd_ms is None:
                     flag_unverified = True  # network down: keep but flag
                 else:
-                    prod_m = [x for x in matches if f":{product}:" in x["criteria"].lower()]
+                    prod_m = [x for x in nvd_ms if f":{product}:" in x["criteria"].lower()]
                     if prod_m and not any(_in_range(ver, x) for x in prod_m):
                         dropped += 1
                         continue  # version outside every NVD range -> false positive

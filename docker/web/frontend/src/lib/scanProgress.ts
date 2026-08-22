@@ -19,6 +19,7 @@ export const SCAN_STAGES: ScanStage[] = [
   { id: "normalize", labelKey: "run.stageNormalize", match: /\[normalize\]/i },
   { id: "notice", labelKey: "run.stageNotice", match: /\[notice\]/i },
   { id: "security", labelKey: "run.stageSecurity", match: /\[security\]/i },
+  { id: "deepCve", labelKey: "run.stageDeepCve", match: /\[nvd-cpe\]/i },
   { id: "report", labelKey: "run.stageReport", match: /\[risk\]/i },
 ];
 

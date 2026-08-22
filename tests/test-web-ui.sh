@@ -130,7 +130,8 @@ server._self_container_id = lambda: "selfcid000000"
 # A hostile project name reaches docker run only as a sanitized -e value, and
 # an out-of-allowlist mode is refused outright (returns -1 without launching).
 captured = {}
-def fake_stream(args, on_log, on_progress=None, cancel=None, container=None, env=None):
+def fake_stream(args, on_log, on_progress=None, cancel=None, container=None, env=None,
+                on_deepcve_progress=None):
     captured["args"] = args
     captured["container"] = container
     captured["env"] = env
@@ -549,6 +550,19 @@ server._emit_or_log("regular build line", logs.append, progs.append)
 server._emit_or_log("[firmware-cvedb-progress] 10%", logs.append, None)
 assert progs == [42, 100], progs
 assert logs == ["regular build line", "[firmware-cvedb-progress] 10%"], logs
+
+# Deep-cve NVD-verification progress markers get their own channel
+# (on_deepcve_progress), separate from the firmware CVE-DB one above — a
+# missing on_deepcve_progress falls back to log the same way.
+logs = []; progs = []; deep_progs = []
+server._emit_or_log("[deep-cve-progress] 7%", logs.append, progs.append, deep_progs.append)
+server._emit_or_log("[deep-cve-progress] 150%", logs.append, progs.append, deep_progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 5%", logs.append, progs.append, deep_progs.append)
+server._emit_or_log("regular build line", logs.append, progs.append, deep_progs.append)
+server._emit_or_log("[deep-cve-progress] 20%", logs.append, progs.append, None)
+assert deep_progs == [7, 100], deep_progs
+assert progs == [5], progs
+assert logs == ["regular build line", "[deep-cve-progress] 20%"], logs
 PY
 then
     pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"
@@ -2252,6 +2266,7 @@ write_bom() {
 case "$mode" in
     ok) write_bom; echo "[stub] done" ;;
     progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
+    deepcve-progress) echo "[deep-cve-progress] 55%"; write_bom ;;
     fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
     hang)
         i=0
@@ -2366,6 +2381,22 @@ assert not any('firmware-cvedb-progress' in str(e['data']) for e in evs if e['ev
     pass "cvedb progress marker becomes a progress event (not duplicated as log)"
 else
     fail "progress event contract violated" "$events"
+fi
+
+echo deepcve-progress > "$STUB_MODE_FILE"
+events=$(sse_events "project=deepprog&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+progs = [e for e in evs if e['event'] == 'progress']
+assert len(progs) == 1, 'expected one progress event, got %d' % len(progs)
+assert progs[0]['data'] == {'phase': 'deepcve', 'percent': 55}, progs[0]['data']
+assert not any('deep-cve-progress' in str(e['data']) for e in evs if e['event'] == 'log'), \
+    'progress marker leaked into log events'
+"; then
+    pass "deep-cve progress marker becomes a progress event on its own phase (not duplicated as log)"
+else
+    fail "deep-cve progress event contract violated" "$events"
 fi
 
 echo fail > "$STUB_MODE_FILE"

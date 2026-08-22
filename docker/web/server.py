@@ -2054,19 +2054,32 @@ _CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")  # docker --name
 # marker into an SSE `progress` event instead of a plain log line.
 _CVEDB_PROGRESS_RE = re.compile(r"^\[firmware-cvedb-progress\]\s+(\d+)%\s*$")
 
+# scan-nvd-cpe.py (the deep-cve image's grype CPE-matching sidecar) emits
+# `[deep-cve-progress] NN%` on stdout while it verifies grype's CPE matches
+# against NVD (NVD_VERIFY=true only). Same treatment as the firmware CVE-DB
+# marker above: turned into an SSE `progress` event instead of a plain log line.
+_DEEPCVE_PROGRESS_RE = re.compile(r"^\[deep-cve-progress\]\s+(\d+)%\s*$")
 
-def _emit_or_log(line, on_log, on_progress=None):
+
+def _emit_or_log(line, on_log, on_progress=None, on_deepcve_progress=None):
     """Route a captured child-process line to the right SSE channel.
 
     If the line is a firmware CVE-DB progress marker and a progress handler is
-    given, emit the clamped (0..100) percent via on_progress; otherwise pass the
-    line through to on_log unchanged (preserving the existing log behaviour)."""
+    given, emit the clamped (0..100) percent via on_progress. If it is a
+    deep-cve progress marker and on_deepcve_progress is given, emit it there
+    instead — a separate channel, since the two markers mean different things
+    and the caller needs to label each with its own SSE `phase`. Any other line
+    passes through to on_log unchanged (preserving the existing log
+    behaviour)."""
     m = _CVEDB_PROGRESS_RE.match(line) if on_progress is not None else None
     if m is not None:
-        percent = max(0, min(100, int(m.group(1))))
-        on_progress(percent)
-    else:
-        on_log(line)
+        on_progress(max(0, min(100, int(m.group(1)))))
+        return
+    m = _DEEPCVE_PROGRESS_RE.match(line) if on_deepcve_progress is not None else None
+    if m is not None:
+        on_deepcve_progress(max(0, min(100, int(m.group(1)))))
+        return
+    on_log(line)
 
 
 # Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
@@ -2142,7 +2155,8 @@ def _path_under(path, base):
 
 def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id=None,
                      source_root=None, target_image=None, target_dir=None,
-                     extra_env=None, on_progress=None, cancel=None, container_name=None):
+                     extra_env=None, on_progress=None, on_deepcve_progress=None,
+                     cancel=None, container_name=None):
     """Run a firmware/aibom SBOM scan in a SIBLING container.
 
     The desktop app's base UI image is permissive-only (no GPL firmware tools,
@@ -2402,7 +2416,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # a NAME-ONLY `-e API_KEY` / `-e HF_TOKEN` resolves the value from here instead
     # of the argv — keeping the upload token and HF token out of `ps`.
     return _stream_cmd(args, on_log, on_progress=on_progress, cancel=cancel,
-                       container=safe_name, env=env)
+                       container=safe_name, env=env,
+                       on_deepcve_progress=on_deepcve_progress)
 
 
 def convert_bom_to_spdx(bom_path, spdx_path, stable, on_log):
@@ -2647,7 +2662,8 @@ def _sibling_image_present(image):
         return False
 
 
-def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env=None):
+def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env=None,
+                on_deepcve_progress=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
     Returns the exit code, or -1 if the binary could not be launched.
 
@@ -2669,7 +2685,7 @@ def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env
     for raw in proc.stdout:
         for piece in raw.rstrip("\n").split("\r"):
             if piece:
-                _emit_or_log(piece, on_log, on_progress)
+                _emit_or_log(piece, on_log, on_progress, on_deepcve_progress)
         if cancel and cancel():
             if container:
                 try:
@@ -3730,6 +3746,13 @@ class Handler(BaseHTTPRequestHandler):
 
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
+            # Two distinct progress markers may appear in the child's output (see
+            # _emit_or_log): scan-firmware.sh's CVE-DB download and scan-nvd-cpe.py's
+            # deep-cve NVD verification. Each gets its own SSE `phase` regardless of
+            # which mode is running (a stub/alternate scanner may emit either marker
+            # from any mode), so both callbacks are always wired, not chosen by mode.
+            on_cvedb_progress = lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p}))
+            on_deepcve_progress = lambda p: sse("progress", json.dumps({"phase": "deepcve", "percent": p}))
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
@@ -3745,7 +3768,8 @@ class Handler(BaseHTTPRequestHandler):
                     target_image=sibling.get("target_image"),
                     target_dir=sibling.get("target_dir"),
                     extra_env=env,
-                    on_progress=lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
+                    on_progress=on_cvedb_progress,
+                    on_deepcve_progress=on_deepcve_progress,
                     # Cancel: if the client closes the stream, stop this sibling.
                     cancel=lambda: disconnected[0],
                     container_name="bomlens-sib-%s" % run_id,
@@ -3766,7 +3790,8 @@ class Handler(BaseHTTPRequestHandler):
                                 _emit_or_log(
                                     piece,
                                     lambda ln: sse("log", json.dumps(ln)),
-                                    lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
+                                    on_cvedb_progress,
+                                    on_deepcve_progress,
                                 )
                         # Client cancelled (the SSE write broke): stop the scan
                         # instead of running it to completion on a dead stream.
