@@ -1512,6 +1512,79 @@ else
     fail "coverage still counts the placeholder as a version" "detail: $got"
 fi
 
+echo "== an OS package's epoch:version-release is not carried as a language-ecosystem version =="
+
+# A directory-based catalog pass can misattribute the OWNING rpm package's
+# epoch:version-release (EVR) string to a component it identified one directory
+# below by its own package.json/purl (observed with a Node.js RPM that also owns
+# the npm CLI it ships). A colon-prefixed epoch is exclusively an rpm/dpkg
+# convention — no language ecosystem's own manifest (semver, PEP 440, RubyGems...)
+# ever produces one — so a `pkg:npm/...` (or any non-OS-package purl) with a
+# version starting `<digits>:` is unambiguously contaminated.
+cat > "$WORK/evr-ver.cdx.json" <<'EVREOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"container","name":"img","version":"1"}},
+ "components":[
+  {"type":"library","name":"npm","version":"1:10.8.2-1.20.20.2.1.module+el9.7.0+24193+41b7b572","purl":"pkg:npm/npm@10.8.2"},
+  {"type":"library","name":"tar","version":"1:20.19.5-1.module+el9.7.0+24193+41b7b572","purl":"pkg:npm/tar@6.2.1"},
+  {"type":"library","name":"real","version":"1.2.3","purl":"pkg:npm/real@1.2.3"},
+  {"type":"library","name":"nodejs","version":"1:20.20.2-1.module+el9.7.0+24193+41b7b572",
+   "purl":"pkg:rpm/redhat/nodejs@20.20.2-1.module%2Bel9.7.0%2B24193%2B41b7b572?epoch=1"},
+  {"type":"library","name":"deb-epoch","version":"2:1.2.3-4","purl":"pkg:deb/debian/foo@1.2.3-4?epoch=2"},
+  {"type":"library","name":"no-purl-no-colon-check","version":"1:9.9.9-1.el9"}]}
+EVREOF
+bash "$LIB/normalize-sbom.sh" "$WORK/evr-ver.cdx.json" >/dev/null 2>&1
+
+# The two npm components carrying the owning RPM's EVR lose the fabricated
+# version and are marked present-only, with the raw value kept as evidence.
+got=$(jq -r '[.components[] | select(.name=="npm" or .name=="tar") | .version] | join(",")' "$WORK/evr-ver.cdx.json")
+if [ "$got" = "," ]; then
+    pass "an RPM EVR string on a non-OS-package purl is dropped, not carried as the version"
+else
+    fail "the contaminated version was not removed" "got: $got"
+fi
+got=$(jq -r '[.components[] | select(.name=="npm") | .properties[]
+    | select(.name=="bomlens:versionContaminated") | .value] | join(",")' "$WORK/evr-ver.cdx.json")
+if [ "$got" = "1:10.8.2-1.20.20.2.1.module+el9.7.0+24193+41b7b572" ]; then
+    pass "the raw contaminated value is kept as evidence, not silently discarded"
+else
+    fail "the contaminated raw value was not recorded" "got: ${got:-none}"
+fi
+got=$(jq -r '[.components[] | select(.name=="tar") | .properties[]
+    | select(.name=="bomlens:evidenceGrade") | .value] | join(",")' "$WORK/evr-ver.cdx.json")
+if [ "$got" = "presence-only" ]; then
+    pass "a contaminated component is graded present-only, same as an UNKNOWN version"
+else
+    fail "a contaminated component was not graded presence-only" "grade: ${got:-none}"
+fi
+
+# A real npm version is never touched.
+if jq -e '[.components[] | select(.name=="real") | .version] == ["1.2.3"]' \
+   "$WORK/evr-ver.cdx.json" >/dev/null; then
+    pass "a real semver version is untouched"
+else
+    fail "a real semver version was altered"
+fi
+
+# An OS package's own epoch (rpm or deb) is legitimate and must be left alone.
+got=$(jq -r '[.components[] | select(.name=="nodejs" or .name=="deb-epoch") | .version] | sort | join(",")' \
+    "$WORK/evr-ver.cdx.json")
+if [ "$got" = "1:20.20.2-1.module+el9.7.0+24193+41b7b572,2:1.2.3-4" ]; then
+    pass "an OS package's own legitimate epoch:version-release is left alone"
+else
+    fail "an OS package's legitimate epoch was altered" "got: $got"
+fi
+
+# With no purl there is nothing to confirm the component is NOT an OS package by,
+# so the value is left alone rather than guessed at.
+got=$(jq -r '[.components[] | select(.name=="no-purl-no-colon-check") | .version] | join(",")' \
+    "$WORK/evr-ver.cdx.json")
+if [ "$got" = "1:9.9.9-1.el9" ]; then
+    pass "a colon-prefixed version with no purl to check is left alone (nothing to confirm it is contaminated)"
+else
+    fail "a version was altered without a purl to justify it" "got: $got"
+fi
+
 echo "== SPDX export: the containers a firmware holds reach the SPDX file too =="
 
 # syft's converter writes a package for what it counts as software and drops the

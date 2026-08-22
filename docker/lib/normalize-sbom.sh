@@ -140,6 +140,38 @@ UNKNOWN_VERSION_FIX='
   else . end)
 else . end)'
 
+# An OS package's epoch:version-release EVR string is not a version any language
+# ecosystem's own manifest ever produces (semver, PEP 440, RubyGems, etc. have no
+# digit-colon epoch prefix — a colon there is exclusively an rpm/dpkg convention).
+# Seen in the wild on a package manager bundled inside a distro's runtime package
+# (e.g. a Node.js RPM that also owns the npm CLI it ships): a directory-based
+# catalog pass can misattribute the OWNING RPM's EVR to a component it identified
+# by ITS OWN package.json/purl one directory below, so a component with a clean
+# `pkg:npm/...` purl carries the runtime RPM's `1:20.19.5-1.module+el9...` as its
+# .version instead of its own. Feeding that string to a vulnerability matcher is
+# worse than feeding it nothing — it compares a real package against a version it
+# never shipped, which can miss a genuine match or fabricate one. Scoped tightly:
+# only a purl outside the OS package families (rpm/deb/apk/alpm, which legitimately
+# use an epoch) with a version starting `<digits>:` triggers this — a real
+# ecosystem version never takes that shape, so this cannot misfire on one. As with
+# UNKNOWN above, the fabricated value is dropped rather than guessed at, and the
+# raw string is kept in a property so the misattribution is auditable, not silent.
+VERSION_EVR_CONTAMINATION_FIX='
+(.components) |= (if type=="array" then map(
+  (.version // "") as $v
+  | (.purl // "") as $p
+  | if ($v != "" and ($v | test("^[0-9]+:"))
+        and $p != "" and ($p | test("^pkg:(rpm|deb|apk|alpm)/") | not))
+    then
+      del(.version)
+      | .properties = (((.properties // []) | map(select(.name != "bomlens:versionContaminated")))
+          + [{name: "bomlens:versionContaminated", value: $v}])
+      | (if any(.properties[]?; .name == "bomlens:evidenceGrade")
+         then . else .properties = ((.properties // [])
+           + [{name: "bomlens:evidenceGrade", value: "presence-only"}]) end)
+    else . end
+) else . end)'
+
 PYRANGE_DEDUP='
   ( [ .components[]?
       | select(((.purl // "") | startswith("pkg:pypi/"))
@@ -366,6 +398,7 @@ if [ "$MODE" = "--stable" ]; then
         ${LICENSE_FLAGS_DEF}
         ${NORMALIZE_DEF}
         ${NULL_FIX}
+        | ${VERSION_EVR_CONTAMINATION_FIX}
         | ${DROP_EMPTY_FILES}
         | ${NAME_VERSION_DEDUP}
         | ${PYRANGE_DEDUP}
@@ -388,7 +421,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
