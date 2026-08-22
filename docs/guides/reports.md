@@ -118,14 +118,15 @@ For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation,
 
 ## Deep CVE matching (`--deep-cve`)
 
-Trivy matches vulnerabilities by package identity (PURL), which covers the ecosystem advisory databases well. Some CVEs in older Java libraries, however, are recorded only in the NVD against a CPE identifier, so a PURL-based scan never reaches them. `--deep-cve` adds a second pass for Maven components: BomLens derives an NVD-matchable CPE for each component from its groupId, and grype matches those CPEs against a bundled NVD database.
+Trivy matches vulnerabilities by package identity (PURL), which covers the ecosystem advisory databases well. Some CVEs in older Java libraries, however, are recorded only in the NVD against a CPE identifier, so a PURL-based scan never reaches them. `--deep-cve` adds a second pass: BomLens derives an NVD-matchable CPE for each Maven component from its groupId (that enrichment step targets Maven), then grype matches every component's CPE, whatever ecosystem it came from, against a bundled NVD database. In practice most of the extra findings are still Maven, since that is where the enrichment adds a CPE the SBOM did not already carry.
 
 ```bash
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --deep-cve --generate-only
 ```
 
 - `--deep-cve` implies `--security`. The extra findings merge into the same security report (`_security.json/.md/.html`), tagged with their `nvd:cpe` source.
-- The scan runs on the opt-in `ghcr.io/sktelecom/bomlens-deep-cve:latest` image, which bundles grype and its database; it is pulled automatically when the flag is set (override with `SBOM_DEEP_CVE_IMAGE`). The flag applies to the base-image modes (source, image, binary, rootfs, SBOM analysis); a firmware or AI-model scan prints a warning and runs without grype.
+- The scan runs on the opt-in `ghcr.io/sktelecom/bomlens-deep-cve:latest` image, which bundles grype and its database; it is pulled automatically when the flag is set (override with `SBOM_DEEP_CVE_IMAGE`). It applies to the base-image modes (source, image, binary, rootfs, SBOM analysis); a firmware or AI-model scan prints a warning and runs without grype, since neither produces package purls for it to match.
+- In the web UI (and the desktop app), the same option is the **Deep CVE matching (NVD CPE)** toggle in the scan options. It is offered on every scan mode that uses the base image — source, Docker image, rootfs, package upload, and SBOM upload — and hidden only for firmware and AI-model scans, matching the CLI. Turning it on switches the security report on too, and the deep-cve image downloads once on first use, either as a sibling container or in-process if the UI itself was launched from that image.
 - CPE matching is looser than PURL matching, because NVD version ranges can be recorded coarsely. By default the scan stays offline: such findings are kept and marked **version-unverified** in the report (a dagger with a footnote), so a reader knows which rows may be loose-version false positives. To tighten them, set `SECURITY_NVD_VERIFY=true` with an `NVD_API_KEY`: each finding is then checked against the live NVD version range and out-of-range false positives are dropped. The verification needs network access and adds minutes.
 
 ```bash

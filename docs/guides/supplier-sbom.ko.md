@@ -29,7 +29,7 @@ description: 외부에서 받은 SBOM(CycloneDX/SPDX)이 요구사항을 충족�
 
 웹 UI를 열고 **SBOM 업로드**를 골라 받은 파일을 올린 뒤, 프로젝트 이름과 버전을 입력하고 스캔을 실행합니다. Yocto SPDX 2.2 빌드는 문서가 아니라 `<image>.spdx.tar.zst`를 건네는데, 그 빌드가 만드는 유일한 SBOM이므로 이 아카이브도 그대로 올릴 수 있습니다.
 
-Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 (maven, NVD)**을 켜세요. 오래된 Maven 라이브러리를 NVD 전용 취약점까지 대조해 다른 출처가 놓치는 항목을 찾아내며, 대신 스캔이 더 오래 걸립니다. 이 옵션은 SBOM 업로드에서만 나타나고, 처음 실행할 때 deep-cve 이미지를 한 번 내려받습니다. CLI의 `--deep-cve`와 같은 매칭입니다.
+Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 (NVD CPE)**을 켜세요. 오래된 Maven 라이브러리를 NVD 전용 취약점까지 대조해 다른 출처가 놓치는 항목을 찾아내며, 대신 스캔이 더 오래 걸립니다. 이 옵션은 SBOM 업로드뿐 아니라 기본 이미지를 쓰는 모든 스캔 모드에서 나타나고, 패키지 SBOM이 없는 펌웨어와 AI 모델 스캔에서만 숨겨집니다. 처음 실행할 때 deep-cve 이미지를 한 번 내려받습니다. CLI의 `--deep-cve`와 같은 매칭입니다.
 
 ```bash
 ./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열립니다

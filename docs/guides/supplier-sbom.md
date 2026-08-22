@@ -29,7 +29,7 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 
 Open the web UI, choose **SBOM upload**, and upload the file you received; enter a project name and version, then run. A Yocto SPDX 2.2 build hands over an `<image>.spdx.tar.zst` rather than a document — that archive uploads here too, since it is the only SBOM such a build produces.
 
-For a Java (Maven) heavy SBOM, turn on **Deep CVE matching (maven, NVD)** in the scan options. It also checks older Maven libraries against NVD-only vulnerabilities that other advisory sources miss, at the cost of a longer scan. The option appears only for SBOM upload, and the first run downloads the deep-cve image once. It is the same matching as the CLI's `--deep-cve`.
+If the SBOM leans Java (Maven), turn on **Deep CVE matching (NVD CPE)** in the scan options. It checks older Maven libraries against NVD-only vulnerabilities that other advisory sources miss, at the cost of a longer scan. The option is offered on every base-image scan mode, not just SBOM upload — it is hidden only for firmware and AI-model scans, which have no package SBOM to extend. The first run downloads the deep-cve image once. It is the same matching as the CLI's `--deep-cve`.
 
 ```bash
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080
