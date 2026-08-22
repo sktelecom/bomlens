@@ -21,18 +21,28 @@ describe("scanStageIndex", () => {
     expect(scanStageIndex(["[1/2] syft", "[normalize] normalized"])).toBe(1);
     expect(scanStageIndex(["[normalize] x", "[notice] generated"])).toBe(2);
     expect(scanStageIndex(["[security] running Trivy SBOM scan..."])).toBe(3);
-    expect(scanStageIndex(["[risk] generated"])).toBe(4);
+    expect(scanStageIndex(["[nvd-cpe] grype CPE matching started"])).toBe(4);
+    expect(scanStageIndex(["[risk] generated"])).toBe(5);
   });
 
   it("uses the furthest marker regardless of log order", () => {
-    expect(scanStageIndex(["[risk] generated", "[1/2] cdxgen"])).toBe(4);
+    expect(scanStageIndex(["[risk] generated", "[1/2] cdxgen"])).toBe(5);
+  });
+
+  it("recognizes the deep-CVE matching marker even when the option is skipped", () => {
+    // A run without deep CVE never emits [nvd-cpe]; a later marker (e.g. [risk])
+    // still counts the skipped stage as passed, matching the "honest and
+    // monotonic" contract documented at the top of this module.
+    expect(
+      scanStageIndex(["[security] running Trivy SBOM scan...", "[risk] generated"]),
+    ).toBe(5);
   });
 });
 
 describe("stageStatuses", () => {
   it("marks reached stages done, the current active, the rest pending", () => {
     const s = stageStatuses(["[1/2] syft", "[notice] generated"], false);
-    expect(s).toEqual(["done", "done", "active", "pending", "pending"]);
+    expect(s).toEqual(["done", "done", "active", "pending", "pending", "pending"]);
   });
 
   it("marks every stage done once finished", () => {

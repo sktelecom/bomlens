@@ -1334,6 +1334,51 @@ sys.exit(1 if fails else 0)
 PY
 if [ $? -eq 0 ]; then pass "NVD version-filter predicate: all range cases correct"; else fail "NVD version-filter predicate has a wrong case"; fi
 
+echo "== F-1e: scan-nvd-cpe.py reports a start marker and deep-cve progress =="
+# The grype CPE matcher runs for minutes with no output; a start marker lets a
+# caller show the stage is running, and a progress marker (only when the NVD
+# version-verify loop is on, since only that loop knows its total up front)
+# lets the caller show a percentage. server.py's [firmware-cvedb-progress]
+# consumer uses the identical `^\[<marker>\]\s+(\d+)%\s*$` shape.
+cat > "$WORK/grype-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"CVE-2020-0001","namespace":"nvd:cpe","severity":"high"},"artifact":{"name":"foo","version":"1.0","purl":"pkg:maven/foo/foo@1.0","cpes":["cpe:2.3:a:foo:foo:1.0:*:*:*:*:*:*:*"]}},
+ {"vulnerability":{"id":"CVE-2020-0002","namespace":"nvd:cpe","severity":"medium"},"artifact":{"name":"bar","version":"2.0","purl":"pkg:maven/bar/bar@2.0","cpes":["cpe:2.3:a:bar:bar:2.0:*:*:*:*:*:*:*"]}}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-stub"
+echo '{}' > "$WORK/nvdcpe-sbom.json"
+out_verify=$(GRYPE_BIN="$WORK/grype-stub" SECURITY_NVD_VERIFY=true python3 - "$LIB/scan-nvd-cpe.py" "$WORK/nvdcpe-sbom.json" "$WORK/nvdcpe-verify" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snc", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+m._nvd_matches = lambda cve, key, cache: []  # skip the real NVD network call
+m.build_sidecar(sys.argv[2], sys.argv[3])
+PY
+)
+echo "$out_verify" | grep -qx '\[nvd-cpe\] grype CPE matching started' \
+    && pass "scan-nvd-cpe.py prints the start marker before grype runs" \
+    || fail "start marker missing" "$out_verify"
+echo "$out_verify" | grep -Eq '^\[deep-cve-progress\]\s+(\d+)%\s*$' \
+    && pass "scan-nvd-cpe.py prints deep-cve-progress lines when SECURITY_NVD_VERIFY=true" \
+    || fail "deep-cve-progress marker missing with SECURITY_NVD_VERIFY=true" "$out_verify"
+echo "$out_verify" | grep -qx '\[deep-cve-progress\] 100%' \
+    && pass "deep-cve-progress reaches 100% at the end of the verify loop" \
+    || fail "deep-cve-progress never reached 100%" "$out_verify"
+out_noverify=$(GRYPE_BIN="$WORK/grype-stub" python3 "$LIB/scan-nvd-cpe.py" "$WORK/nvdcpe-sbom.json" "$WORK/nvdcpe-noverify")
+echo "$out_noverify" | grep -qx '\[nvd-cpe\] grype CPE matching started' \
+    && pass "start marker prints even with SECURITY_NVD_VERIFY unset (default off)" \
+    || fail "start marker missing without SECURITY_NVD_VERIFY" "$out_noverify"
+if echo "$out_noverify" | grep -q '\[deep-cve-progress\]'; then
+    fail "deep-cve-progress printed with SECURITY_NVD_VERIFY unset (should be silent)" "$out_noverify"
+else
+    pass "no deep-cve-progress line when SECURITY_NVD_VERIFY is off (the default)"
+fi
+
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
 # file without breaking the contract server.py security_summary reads.

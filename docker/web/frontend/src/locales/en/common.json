@@ -463,6 +463,7 @@
     "stageNormalize": "Normalize",
     "stageNotice": "Notices",
     "stageSecurity": "Security",
+    "stageDeepCve": "Deep CVE matching",
     "stageReport": "Report",
     "failedTitle": "The scan didn't finish",
     "failedBody": "Something went wrong before the scan could complete. Check the run log below for details, then try again.",

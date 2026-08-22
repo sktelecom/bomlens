@@ -41,6 +41,7 @@ export function ScanRunning({
   newScanHref,
   onRetry,
   onCancel,
+  deepCveEnabled,
 }: {
   logs: string[];
   status: Status;
@@ -54,10 +55,17 @@ export function ScanRunning({
   onRetry?: () => void;
   /** Stop a running scan (closes the stream; the backend ends the process). */
   onCancel?: () => void;
+  /** Whether this run requested deep CVE matching. When false, its stage marker
+   *  never appears in the log, so the step is dropped from the list rather than
+   *  left showing pending forever. */
+  deepCveEnabled?: boolean;
 }) {
   const { t } = useTranslation();
   const failed = status === "error";
   const statuses = stageStatuses(logs, status !== "running");
+  const visible = SCAN_STAGES.map((stage, i) => ({ stage, status: statuses[i] })).filter(
+    ({ stage }) => stage.id !== "deepCve" || deepCveEnabled,
+  );
 
   return (
     <div className="space-y-5">
@@ -115,8 +123,7 @@ export function ScanRunning({
         <Card>
           <CardContent className="p-4">
             <ol className="flex flex-col gap-2">
-              {SCAN_STAGES.map((stage, i) => {
-                const st = statuses[i];
+              {visible.map(({ stage, status: st }) => {
                 const Icon =
                   st === "done" ? CircleCheck : st === "active" ? Loader2 : CircleDashed;
                 return (
