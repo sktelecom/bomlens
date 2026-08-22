@@ -236,6 +236,185 @@ server.run_sibling_scan(
 assert not any(x == "DEEP_CVE=true" for x in captured["args"]), captured["args"]
 assert not any("/input/" in a for a in captured["args"]), captured["args"]
 
+# Deep CVE matching also runs as a sibling on the base-image scan modes (SOURCE,
+# IMAGE, ROOTFS, BINARY) — not just an uploaded SBOM. Each carries exactly the
+# one env var that mode needs (mirroring the ANALYZE/upload_file case above),
+# plus DEEP_CVE=true, and nothing from another mode's input shape.
+for m in ("SOURCE", "IMAGE", "ROOTFS", "BINARY"):
+    assert m in server._SIBLING_MODES, server._SIBLING_MODES
+
+src_root = server.SRC_DIR + "/myproject"
+target_dir = server.SRC_DIR + "/rootfs"
+target_image = "ghcr.io/library/nginx:1.25"
+
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODE=SOURCE" in _a, _a
+assert ("SOURCE_ROOT=%s" % src_root) in _a, _a
+assert "DEEP_CVE=true" in _a, _a
+assert "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0" in _a, _a
+assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
+assert not any(x.startswith("TARGET_DIR=") for x in _a), _a
+assert not any(x.startswith("TARGET_IMAGE=") for x in _a), _a
+assert not any(x.startswith("ANALYZE_SBOM=") for x in _a), _a
+
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "IMAGE", run_out,
+    lambda ln: None, target_image=target_image,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODE=IMAGE" in _a, _a
+assert ("TARGET_IMAGE=%s" % target_image) in _a, _a
+assert "DEEP_CVE=true" in _a, _a
+assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
+assert not any(x.startswith("SOURCE_ROOT=") for x in _a), _a
+assert not any(x.startswith("TARGET_DIR=") for x in _a), _a
+
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ROOTFS", run_out,
+    lambda ln: None, target_dir=target_dir,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODE=ROOTFS" in _a, _a
+assert ("TARGET_DIR=%s" % target_dir) in _a, _a
+assert "DEEP_CVE=true" in _a, _a
+assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
+assert not any(x.startswith("SOURCE_ROOT=") for x in _a), _a
+assert not any(x.startswith("TARGET_IMAGE=") for x in _a), _a
+
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "BINARY", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODE=BINARY" in _a, _a
+assert ("TARGET_FILE=%s" % up_file) in _a, _a
+assert "DEEP_CVE=true" in _a, _a
+assert not any(x.startswith("ANALYZE_SBOM=") for x in _a), _a
+
+# DEEP_CVE off -> stays out of the argv on every one of these modes too (not
+# just ANALYZE).
+for m, kw in (("SOURCE", {"source_root": src_root}),
+              ("IMAGE", {"target_image": target_image}),
+              ("ROOTFS", {"target_dir": target_dir}),
+              ("BINARY", {"upload_file": up_file})):
+    captured.clear()
+    rc = server.run_sibling_scan(
+        "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", m, run_out,
+        lambda ln: None, extra_env={"GENERATE_SECURITY": "true"}, **kw,
+    )
+    assert rc == 0, (m, rc)
+    assert not any(x == "DEEP_CVE=true" for x in captured["args"]), (m, captured["args"])
+
+# FIRMWARE/AIBOM never carry DEEP_CVE even if a caller sets it — those two use
+# their own tools and never swap to the deep-cve image.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
+    lambda ln: None, upload_file=up_file, extra_env={"DEEP_CVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x == "DEEP_CVE=true" for x in captured["args"]), captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip", extra_env={"DEEP_CVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x == "DEEP_CVE=true" for x in captured["args"]), captured["args"]
+
+# A SOURCE scan also forwards SOURCE_ROOT_HOST unchanged when present, so the
+# deep-cve sibling's own entrypoint sees the same "this tree is under a mount
+# we own" signal an in-process SOURCE scan gets (its VALUE is unused there —
+# see server.py — only non-emptiness matters); absent, nothing is forwarded.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "SOURCE_ROOT_HOST": "/Users/x/project"},
+)
+assert rc == 0, rc
+assert "SOURCE_ROOT_HOST=/Users/x/project" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root, extra_env={"DEEP_CVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x.startswith("SOURCE_ROOT_HOST=") for x in captured["args"]), captured["args"]
+
+# Vendored-OSS identification (SCANOSS) can ride the same SOURCE sibling: the
+# flag is forwarded verbatim, and a credential goes by NAME ONLY, never as its
+# value, mirroring API_KEY/HF_TOKEN.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "IDENTIFY_VENDORED": "true",
+               "SCANOSS_API_KEY": "scanoss-secret-should-not-appear"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "IDENTIFY_VENDORED=true" in _a, _a
+assert "SCANOSS_API_KEY" in _a and not any(x.startswith("SCANOSS_API_KEY=") for x in _a), _a
+assert "scanoss-secret-should-not-appear" not in " ".join(_a), "SCANOSS key leaked onto the argv"
+assert (captured["env"] or {}).get("SCANOSS_API_KEY") == "scanoss-secret-should-not-appear"
+# IMAGE never carries the vendored-OSS flags (source-only).
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "IMAGE", run_out,
+    lambda ln: None, target_image=target_image,
+    extra_env={"DEEP_CVE": "true", "IDENTIFY_VENDORED": "true",
+               "SCANOSS_API_KEY": "scanoss-secret-should-not-appear"},
+)
+assert rc == 0, rc
+assert not any(x.startswith("IDENTIFY_VENDORED") for x in captured["args"]), captured["args"]
+assert not any(x.startswith("SCANOSS_API_KEY") for x in captured["args"]), captured["args"]
+
+# Path-safety regression: SOURCE_ROOT / TARGET_DIR outside every allowed scan
+# root (SRC_DIR, UPLOAD_DIR, ALLOWED_SCAN_ROOTS) is refused before any docker
+# run is attempted, exactly like the existing upload_file / out_dir guards.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root="/etc",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root="/etc/../etc/passwd",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ROOTFS", run_out,
+    lambda ln: None, target_dir="/etc",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+# An invalid image reference (leading '-', flag smuggling) is refused too.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "IMAGE", run_out,
+    lambda ln: None, target_image="-v/etc:/etc",
+)
+assert rc == -1 and "args" not in captured, (rc, captured)
+
 # Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
 # they are forwarded to the sibling as exactly two fixed -e literals. AIBOM and
 # the default (off) firmware path must NOT carry them.

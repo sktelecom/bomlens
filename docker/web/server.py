@@ -2071,8 +2071,10 @@ def _emit_or_log(line, on_log, on_progress=None):
 
 # Modes this dispatcher may launch as a sibling. A fixed allowlist (not the raw
 # caller string) is interpolated into the docker-run command line, so the MODE
-# argument can only ever be one of these literals.
-_SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE")
+# argument can only ever be one of these literals. SOURCE/IMAGE/ROOTFS/BINARY are
+# the deep-CVE-only sibling path (this image lacks grype but the deep-cve image
+# has it); FIRMWARE/AIBOM/ANALYZE are the pre-existing tool-isolation siblings.
+_SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE", "SOURCE", "IMAGE", "ROOTFS", "BINARY")
 
 # AI usage scenarios (the CLI's --usage) the model risk assessment may be scoped
 # to; forwarded to assess-ai-risk.sh as AI_USAGE_CONTEXT. A closed allowlist:
@@ -2139,6 +2141,7 @@ def _path_under(path, base):
 
 
 def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id=None,
+                     source_root=None, target_image=None, target_dir=None,
                      extra_env=None, on_progress=None, cancel=None, container_name=None):
     """Run a firmware/aibom SBOM scan in a SIBLING container.
 
@@ -2159,9 +2162,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     resolved OUTPUT_DIR mount, so both `out_dir` and `upload_file` (both container
     paths under OUTPUT_DIR) are visible at the same paths on every host OS.
       out_dir      the run's output dir (HOST_OUTPUT_DIR / -w; == run_out)
-      upload_file  the firmware upload, read in place as TARGET_FILE  [firmware only]
+      upload_file  the firmware/binary upload or an uploaded/found SBOM, read in
+                   place as TARGET_FILE / ANALYZE_SBOM
+      source_root  a source tree to scan, read in place as SOURCE_ROOT  [SOURCE, deep-cve only]
+      target_dir   a directory to scan, read in place as TARGET_DIR    [ROOTFS, deep-cve only]
+      target_image a container image reference, forwarded as TARGET_IMAGE (not a
+                   path — validated against _REF_RE, not containment)  [IMAGE, deep-cve only]
     The host socket is mounted so the firmware image can, in turn, do its own
-    work; AIBOM needs only outbound network (HuggingFace).
+    work; AIBOM needs only outbound network (HuggingFace); the deep-cve modes
+    (SOURCE/IMAGE/ROOTFS/BINARY) need it too, since a SOURCE scan launches its
+    own cdxgen-language sibling in turn.
 
     Returns the sibling's exit code, or -1 if docker could not be invoked.
     Streams every line (docker pull progress + scan log) through on_log so the
@@ -2209,6 +2219,33 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         on_log("[ui] refusing to launch sibling: input is outside the uploads dir "
                "and every scan root")
         return -1
+    # source_root/target_dir are the deep-cve sibling's SOURCE/ROOTFS equivalents
+    # of upload_file: container paths under a mount --volumes-from already shares,
+    # never a fresh -v spec. Same containment guard (SRC_DIR, UPLOAD_DIR — a
+    # cloned/extracted/copied tree lives there — or any registered scan root).
+    if source_root is not None and not (
+            _path_under(source_root, SRC_DIR)
+            or _path_under(source_root, UPLOAD_DIR)
+            or any(_path_under(source_root, r) for r in ALLOWED_SCAN_ROOTS)):
+        on_log("[ui] refusing to launch sibling: source root is outside every "
+               "allowed scan root")
+        return -1
+    if target_dir is not None and not (
+            _path_under(target_dir, SRC_DIR)
+            or _path_under(target_dir, UPLOAD_DIR)
+            or any(_path_under(target_dir, r) for r in ALLOWED_SCAN_ROOTS)):
+        on_log("[ui] refusing to launch sibling: target directory is outside "
+               "every allowed scan root")
+        return -1
+    # target_image is a reference, not a path — it never touches a filesystem
+    # containment check, only the same charset barrier as the sibling image
+    # itself (rebind to the match, never the caller's string).
+    if target_image is not None:
+        _m = _REF_RE.fullmatch(target_image)
+        if _m is None:
+            on_log("[ui] refusing to launch sibling: invalid target image reference")
+            return -1
+        target_image = _m.group(0)
     if model_id is not None:
         _m = _MODEL_RE.fullmatch(model_id)
         if _m is None:
@@ -2283,11 +2320,38 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
             args += ["-e", "ANALYZE_SBOM=%s" % upload_file]
         else:
             args += ["-e", "TARGET_FILE=%s" % upload_file]
-    # Deep CVE matching: forward the opt-in flag on the ANALYZE path only, from a
-    # fixed literal (never the env string), so the deep-cve image's scan-security.sh
-    # runs the grype maven NVD-CPE sidecar. The image swap itself is the caller's.
-    if mode == "ANALYZE" and env.get("DEEP_CVE") == "true":
+    if source_root is not None:
+        # Read in place via --volumes-from (validated above); mirrors upload_file.
+        args += ["-e", "SOURCE_ROOT=%s" % source_root]
+        # entrypoint.sh's SOURCE case only launches the cdxgen sibling when
+        # SOURCE_ROOT_HOST is non-empty — its VALUE is unused there (mounts ride
+        # --volumes-from, not a host path), it is purely the "this tree is under
+        # a mount we own" signal. Forward the same value this container computed
+        # (already in env via extra_env) so the deep-cve sibling exercises the
+        # same cdxgen path an in-process SOURCE scan does, instead of silently
+        # falling back to syft (see host_path_of()).
+        if env.get("SOURCE_ROOT_HOST"):
+            args += ["-e", "SOURCE_ROOT_HOST=%s" % env["SOURCE_ROOT_HOST"]]
+    if target_dir is not None:
+        args += ["-e", "TARGET_DIR=%s" % target_dir]
+    if target_image is not None:
+        # target_image passed _REF_RE above.
+        args += ["-e", "TARGET_IMAGE=%s" % target_image]
+    # Deep CVE matching: forward the opt-in flag from a fixed literal (never the
+    # env string), so the deep-cve image's scan-security.sh runs the grype
+    # NVD-CPE sidecar. Every sibling mode except FIRMWARE/AIBOM may carry it —
+    # those two use their own tools and never swap to the deep-cve image. The
+    # image swap itself is the caller's (sibling["image"] == DEEP_CVE_IMAGE).
+    if env.get("DEEP_CVE") == "true" and mode not in ("FIRMWARE", "AIBOM"):
         args += ["-e", "DEEP_CVE=true"]
+    # Vendored-OSS identification (SCANOSS) can be enabled alongside deep-cve on
+    # a source scan; forward the flag and, when set, the credential by NAME ONLY
+    # (mirrors API_KEY/HF_TOKEN below — the value stays out of the argv/`ps`).
+    if mode == "SOURCE":
+        if env.get("IDENTIFY_VENDORED") == "true":
+            args += ["-e", "IDENTIFY_VENDORED=true"]
+        if env.get("SCANOSS_API_KEY"):
+            args += ["-e", "SCANOSS_API_KEY"]
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
@@ -3152,6 +3216,28 @@ class Handler(BaseHTTPRequestHandler):
             sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
                                     "sbom": None, "security": None, "conformance": None}))
 
+        def _deep_cve_route(mode, sibling_extra):
+            """Decide how MODE should carry the opt-in deep_cve request, once the
+            mode's own dispatch has finished (env["DEEP_CVE"] is already set from
+            the request, see below).
+
+            Mirrors the sbom-upload branch's own inline version of this choice:
+            in-process when this image already has grype, a sibling on the
+            deep-cve image when Docker is reachable, or a reported failure
+            otherwise. Returns the `sibling` dict to use (possibly unchanged /
+            None), or None to signal that fail() was already called and the
+            caller should return immediately.
+            """
+            if env.get("DEEP_CVE") != "true":
+                return None
+            if deep_cve_capable():
+                return None  # in-process; DEEP_CVE rides the in-process env as-is
+            if docker_cli_present() and docker_capable():
+                return {"image": DEEP_CVE_IMAGE, **sibling_extra}
+            fail("Deep CVE matching requires Docker (to run the deep-cve image) "
+                 "or relaunching the UI from the deep-cve image.")
+            return "stop"
+
         # Build the run-scan environment + working dir for the chosen source.
         env = os.environ.copy()
         env.update({
@@ -3611,6 +3697,37 @@ class Handler(BaseHTTPRequestHandler):
                 if host_root:
                     env["SOURCE_ROOT_HOST"] = host_root
 
+            # Opt-in deep CVE matching on the base-image scan modes (SOURCE, IMAGE,
+            # ROOTFS, BINARY). FIRMWARE and AIBOM already routed (or refused) their
+            # own DEEP_CVE request above, in their own branch, alongside their own
+            # tool-isolation sibling decision — they never reach here still unset.
+            # ANALYZE (sbom-upload / a Yocto manifest) makes the same choice inline
+            # in its own branch, before `sibling` may already carry that image.
+            if sibling is None and mode == "SOURCE":
+                route = _deep_cve_route("SOURCE", {"source_root": env.get("SOURCE_ROOT")})
+                if route == "stop":
+                    return
+                if route:
+                    sibling = route
+            elif sibling is None and mode == "IMAGE":
+                route = _deep_cve_route("IMAGE", {"target_image": env.get("TARGET_IMAGE")})
+                if route == "stop":
+                    return
+                if route:
+                    sibling = route
+            elif sibling is None and mode == "ROOTFS":
+                route = _deep_cve_route("ROOTFS", {"target_dir": env.get("TARGET_DIR")})
+                if route == "stop":
+                    return
+                if route:
+                    sibling = route
+            elif sibling is None and mode == "BINARY":
+                route = _deep_cve_route("BINARY", {"upload_file": env.get("TARGET_FILE")})
+                if route == "stop":
+                    return
+                if route:
+                    sibling = route
+
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
             if sibling is not None:
@@ -3624,6 +3741,9 @@ class Handler(BaseHTTPRequestHandler):
                     lambda ln: sse("log", json.dumps(ln)),
                     upload_file=sibling.get("upload_file"),
                     model_id=sibling.get("model_id"),
+                    source_root=sibling.get("source_root"),
+                    target_image=sibling.get("target_image"),
+                    target_dir=sibling.get("target_dir"),
                     extra_env=env,
                     on_progress=lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p})),
                     # Cancel: if the client closes the stream, stop this sibling.
