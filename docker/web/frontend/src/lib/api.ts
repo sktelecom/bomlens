@@ -441,8 +441,10 @@ export interface ScanConfig {
   /** The outbound license declared for this scan (SPDX id), which switches the
    *  license-conflict check on. Empty or absent means it stayed off. */
   license?: string;
-  /** SBOM-upload only: match components against NVD-only (CPE) advisories too —
-   *  catches vulnerabilities in older Java (Maven) libraries other sources miss. */
+  /** Match components against NVD-only (CPE) advisories too, catching
+   *  vulnerabilities other matching paths miss. Offered for any scan that
+   *  produces or reads a package SBOM (not firmware or an AI model — see
+   *  showDeepCve). Forces security on when set. */
   deepCve: boolean;
 }
 
@@ -568,9 +570,10 @@ export interface ScanParams {
    *  against. Read server-side as the exact `usage` query parameter; omitted
    *  (sent empty) when unspecified or for any other source. */
   usage?: UsageContext;
-  /** SBOM-upload only: also match against NVD-only (CPE) advisories, catching
-   *  vulnerabilities in older Java (Maven) libraries other sources miss. Read
-   *  server-side as the exact `deep_cve` flag. Ignored for every other source. */
+  /** Also match against NVD-only (CPE) advisories, catching vulnerabilities
+   *  other matching paths miss. Offered for any scan with a package SBOM
+   *  (not firmware or an AI model). Read server-side as the exact `deep_cve`
+   *  flag; ignored (sent false) where the toggle is hidden. */
   deepCve: boolean;
   /** Optional upload of the generated SBOM. "" leaves the scan generate-only. */
   uploadTarget?: "" | "dependency-track" | "trusca";
@@ -683,9 +686,10 @@ export interface Capabilities {
   firmwareSibling?: boolean;
   /** AI-model is satisfied by a sibling container (first run pulls the aibom image). */
   aibomSibling?: boolean;
-  /** Deep CVE matching (NVD-only advisories for uploaded SBOMs) offerable here —
-   *  grype built into this image OR reachable by running the deep-cve image as a
-   *  sibling container. False hides the toggle. */
+  /** Deep CVE matching (NVD-only advisories, on top of any package SBOM)
+   *  offerable in this environment — grype built into this image OR reachable
+   *  by running the deep-cve image as a sibling container. False hides the
+   *  toggle for every source. */
   deepCve?: boolean;
   /** Deep CVE is satisfied by a sibling container, so the first run pulls the
    *  (large) deep-cve image — show the one-time notice. */

@@ -231,9 +231,17 @@ export function useScanForm({
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
   const showOutboundLicense = !isAnalyze && !isAiModel;
-  // Deep CVE matching only applies to an uploaded SBOM we analyze, and only when
-  // this environment can run it (grype in-image or the deep-cve sibling).
-  const showDeepCve = isAnalyze && Boolean(capabilities.deepCve);
+  // Deep CVE matching (grype's NVD-CPE matcher) applies to any scan that
+  // produces or reads a package SBOM — firmware and AI models have neither
+  // package purls nor a security report to extend, so it's hidden there. Also
+  // gated on this environment being able to run it (grype in-image or the
+  // deep-cve sibling).
+  const showDeepCve = !isFirmware && !isAiModel && Boolean(capabilities.deepCve);
+  // Deep CVE's extra matching pass is only useful alongside the security
+  // report it extends, and the server's --deep-cve flag itself implies
+  // GENERATE_SECURITY=true — so turning deep CVE on forces security on too.
+  const deepCveOn = showDeepCve && deepCve;
+  const securityForced = isAnalyze || deepCveOn;
   const showScanOptions =
     showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
     showOutboundLicense || showDeepCve;
@@ -429,10 +437,11 @@ export function useScanForm({
       token,
       cred,
       scanossCred,
-      // ANALYZE forces notice+security on (needed for the risk report). AI-model
-      // scans have no package CVEs, so security is off there.
+      // ANALYZE forces notice+security on (needed for the risk report), and so
+      // does turning deep CVE on (see securityForced above). AI-model scans
+      // have no package CVEs, so security is off there regardless.
       notice: isAnalyze ? true : notice,
-      security: isAiModel ? false : isAnalyze ? true : security,
+      security: isAiModel ? false : securityForced ? true : security,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
@@ -442,7 +451,8 @@ export function useScanForm({
       license: showOutboundLicense ? outboundLicense.trim() : "",
       // AI-model only: grade the assessment against the chosen usage.
       usage: isAiModel && usage ? usage : undefined,
-      // Deep CVE matching: SBOM-upload-only opt-in; ignored for any other source.
+      // Deep CVE matching: opt-in wherever offered (see showDeepCve); ignored
+      // (sent false) when hidden.
       deepCve: showDeepCve ? deepCve : false,
       uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
       uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
@@ -460,10 +470,11 @@ export function useScanForm({
   // screen exports it on demand instead of making the user decide up front.
   const options: OptionToggle[] = [
     { key: "notice", value: isAnalyze ? true : notice, set: setNotice, forced: isAnalyze },
-    // AI-model scans skip the (empty) security report.
+    // AI-model scans skip the (empty) security report. Forced on for ANALYZE
+    // and whenever deep CVE matching is on (see securityForced above).
     ...(isAiModel
       ? []
-      : [{ key: "security", value: isAnalyze ? true : security, set: setSecurity, forced: isAnalyze }]),
+      : [{ key: "security", value: securityForced ? true : security, set: setSecurity, forced: securityForced }]),
   ];
 
   return {
