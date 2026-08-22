@@ -2494,7 +2494,10 @@ echo "== sec-multi-os: mixed OS package families are split, scanned, and merged,
 # including every non-OS purl type — with "multiple types of OS packages in SBOM
 # are not supported". This stub trivy mimics that: it rejects a mix of rpm+deb and
 # succeeds only when given a single-family input, returning a family-specific
-# finding so the test can confirm both families' results survive the merge.
+# os-pkgs finding plus a non-OS (maven) finding so the test can confirm both
+# families' results survive the merge AND that the non-OS finding — present in
+# every split's input, since each split keeps the full non-OS component set —
+# is not counted once per split.
 cat > "$FAKEBIN/trivy" <<'SH'
 #!/bin/sh
 out=""; sbom=""
@@ -2512,11 +2515,11 @@ if [ "${families:-0}" -gt 1 ]; then
     exit 1
 fi
 fam=$(jq -r '[.components[]?.purl // "" | select(test("^pkg:(rpm|deb)/")) | capture("^pkg:(?<t>rpm|deb)/").t] | unique | .[0] // "none"' "$sbom" 2>/dev/null)
-echo "{\"SchemaVersion\":2,\"Results\":[{\"Target\":\"$fam\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9000\",\"PkgName\":\"pkg-$fam\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]}]}" > "$out"
+echo "{\"SchemaVersion\":2,\"Results\":[{\"Target\":\"$fam\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9000\",\"PkgName\":\"pkg-$fam\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]},{\"Target\":\"Java\",\"Class\":\"lang-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9001\",\"PkgName\":\"mavenpkg\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]}]}" > "$out"
 exit 0
 SH
 chmod +x "$FAKEBIN/trivy"
-printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"mixed","version":"1.0"}},"components":[{"type":"library","name":"rpmpkg","version":"1.0","purl":"pkg:rpm/rpmpkg@1.0"},{"type":"library","name":"debpkg","version":"1.0","purl":"pkg:deb/debpkg@1.0"}]}' > "$WORK/mixedos-bom.json"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"mixed","version":"1.0"}},"components":[{"type":"library","name":"rpmpkg","version":"1.0","purl":"pkg:rpm/rpmpkg@1.0"},{"type":"library","name":"debpkg","version":"1.0","purl":"pkg:deb/debpkg@1.0"},{"type":"library","name":"mavenpkg","version":"1.0","purl":"pkg:maven/g/mavenpkg@1.0"}]}' > "$WORK/mixedos-bom.json"
 PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
     bash "$LIB/scan-security.sh" "$WORK/mixedos-bom.json" "$WORK/mixedos" proj >/dev/null 2>&1 \
     || fail "scan-security.sh exited non-zero on the mixed-OS split path"
@@ -2524,11 +2527,11 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
     && pass "mixed OS families split and retried -> no ScanError" \
     || fail "mixed OS families still produced a ScanError"
 mixed_ids=$(jq -r '[.Results[]?.Vulnerabilities[]?.PkgName] | sort | join(",")' "$WORK/mixedos_security.json")
-[ "$mixed_ids" = "pkg-deb,pkg-rpm" ] \
+[ "$mixed_ids" = "mavenpkg,pkg-deb,pkg-rpm" ] \
     && pass "both OS families' findings survive the split-and-merge (got: $mixed_ids)" \
     || fail "expected findings from both families, got: $mixed_ids"
-[ "$(jq '.components | length' "$WORK/mixedos-bom.json")" = "2" ] \
-    && pass "delivered SBOM still has both OS packages (only Trivy's input copies were split)" \
+[ "$(jq '.components | length' "$WORK/mixedos-bom.json")" = "3" ] \
+    && pass "delivered SBOM still has all 3 components (only Trivy's input copies were split)" \
     || fail "delivered SBOM was mutated"
 
 echo "== B-obs: best-effort steps log + mark failures instead of swallowing them =="

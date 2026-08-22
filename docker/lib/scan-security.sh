@@ -106,7 +106,22 @@ if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" /tmp/trivy.err
             rm -f "$split_in"
         done
         if [ "${#split_outs[@]}" -gt 0 ]; then
-            jq -s '{Results: [ .[].Results[]? ]}' "${split_outs[@]}" > "$JSON" 2>/dev/null \
+            # Every split keeps the full non-OS component set, so a non-OS finding
+            # (e.g. a maven CVE) is independently redetected in each split and would
+            # appear once per OS family without this — dedup by (Target,
+            # purl-or-pkg, CVE) while keeping each Target's findings grouped.
+            jq -s '
+                [ .[].Results[]? ]
+                | group_by(.Target)
+                | map({
+                    Target: .[0].Target,
+                    Class: .[0].Class,
+                    Vulnerabilities: ([ .[].Vulnerabilities[]? ]
+                        | group_by(((.PkgIdentifier // {}).PURL // .PkgName // "") + "|" + (.VulnerabilityID // ""))
+                        | map(.[0]))
+                  })
+                | { Results: . }
+            ' "${split_outs[@]}" > "$JSON" 2>/dev/null \
                 && trivy_ok=1
             echo "[security] Trivy rejected the SBOM's mixed OS package families ($(echo "$os_types" | tr '\n' ' ')); re-ran once per family and merged the results (delivered SBOM unchanged)."
         fi
