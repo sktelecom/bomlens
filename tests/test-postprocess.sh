@@ -2415,7 +2415,8 @@ out=""; sbom=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --output) out="$2"; shift ;;
-        *.json)   sbom="$1" ;;
+        -*) ;;
+        *) sbom="$1" ;;
     esac
     shift
 done
@@ -2442,6 +2443,93 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq -r '.metadata.component.type' "$WORK/fwtype-bom.json")" = "firmware" ] \
     && pass "delivered SBOM still declares type=firmware (only Trivy's input was remapped)" \
     || fail "delivered SBOM root type was mutated"
+
+echo "== sec-specversion: a malformed specVersion is normalized and retried, not failed =="
+# Regression for the supplier-SBOM gap review: a supplier-submitted SBOM built by
+# syft2 1.46.0 carried specVersion "1.70" (a spurious trailing zero on "1.7"),
+# which the bundled Trivy rejects outright with "invalid specification version",
+# emptying the whole security report for every purl type in that project, not
+# just the malformed field. This stub trivy mimics that: it rejects "1.70" and
+# succeeds once specVersion is normalized to "1.7" — exactly the retry
+# scan-security.sh now performs.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; sbom=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) out="$2"; shift ;;
+        -*) ;;
+        *) sbom="$1" ;;
+    esac
+    shift
+done
+sv=$(jq -r '.specVersion // ""' "$sbom" 2>/dev/null)
+if [ "$sv" = "1.70" ]; then
+    echo "2026-08-22T00:00:00Z	FATAL	Fatal error	run error: sbom scan error: SBOM decode error: CycloneDX decode error: invalid specification version" >&2
+    exit 1
+fi
+echo '{"SchemaVersion":2,"Results":[{"Target":"Java","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-42577","PkgName":"io.netty:netty-transport-classes-epoll","InstalledVersion":"4.2.10.Final","Severity":"HIGH"}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.70","metadata":{"component":{"type":"application","name":"aem","version":"260701"}},"components":[{"type":"library","name":"netty-transport-classes-epoll","version":"4.2.10.Final","purl":"pkg:maven/io.netty/netty-transport-classes-epoll@4.2.10.Final"}]}' > "$WORK/specver-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/specver-bom.json" "$WORK/specver" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on the specVersion retry path"
+[ "$(jq -r '.ScanError.Message // "none"' "$WORK/specver_security.json")" = "none" ] \
+    && pass "malformed specVersion retried normalized -> no ScanError" \
+    || fail "malformed specVersion still produced a ScanError"
+[ "$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$WORK/specver_security.json")" -ge 1 ] \
+    && pass "Trivy vulnerabilities present after the specVersion retry" \
+    || fail "no vulnerabilities after the specVersion retry"
+[ "$(jq -r '.specVersion' "$WORK/specver-bom.json")" = "1.70" ] \
+    && pass "delivered SBOM still declares specVersion=1.70 (only Trivy's input was normalized)" \
+    || fail "delivered SBOM specVersion was mutated"
+
+echo "== sec-multi-os: mixed OS package families are split, scanned, and merged, not failed =="
+# Regression for the supplier-SBOM gap review: merge-sbom.sh can combine layers
+# from different OS bases (e.g. an rpm subsystem merged with a deb or apk one)
+# into a single SBOM. Trivy's SBOM decoder refuses to scan a document whose OS
+# packages span more than one package-manager family, failing the WHOLE scan —
+# including every non-OS purl type — with "multiple types of OS packages in SBOM
+# are not supported". This stub trivy mimics that: it rejects a mix of rpm+deb and
+# succeeds only when given a single-family input, returning a family-specific
+# finding so the test can confirm both families' results survive the merge.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; sbom=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) out="$2"; shift ;;
+        -*) ;;
+        *) sbom="$1" ;;
+    esac
+    shift
+done
+families=$(jq -r '[.components[]?.purl // "" | select(test("^pkg:(rpm|deb)/")) | capture("^pkg:(?<t>rpm|deb)/").t] | unique | length' "$sbom" 2>/dev/null)
+if [ "${families:-0}" -gt 1 ]; then
+    echo "2026-08-22T00:00:00Z	FATAL	Fatal error	run error: sbom scan error: failed analysis: SBOM decode error: failed to decode: failed to aggregate packages: multiple types of OS packages in SBOM are not supported ([\"rpm\" \"deb\"])" >&2
+    exit 1
+fi
+fam=$(jq -r '[.components[]?.purl // "" | select(test("^pkg:(rpm|deb)/")) | capture("^pkg:(?<t>rpm|deb)/").t] | unique | .[0] // "none"' "$sbom" 2>/dev/null)
+echo "{\"SchemaVersion\":2,\"Results\":[{\"Target\":\"$fam\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9000\",\"PkgName\":\"pkg-$fam\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]}]}" > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"mixed","version":"1.0"}},"components":[{"type":"library","name":"rpmpkg","version":"1.0","purl":"pkg:rpm/rpmpkg@1.0"},{"type":"library","name":"debpkg","version":"1.0","purl":"pkg:deb/debpkg@1.0"}]}' > "$WORK/mixedos-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/mixedos-bom.json" "$WORK/mixedos" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on the mixed-OS split path"
+[ "$(jq -r '.ScanError.Message // "none"' "$WORK/mixedos_security.json")" = "none" ] \
+    && pass "mixed OS families split and retried -> no ScanError" \
+    || fail "mixed OS families still produced a ScanError"
+mixed_ids=$(jq -r '[.Results[]?.Vulnerabilities[]?.PkgName] | sort | join(",")' "$WORK/mixedos_security.json")
+[ "$mixed_ids" = "pkg-deb,pkg-rpm" ] \
+    && pass "both OS families' findings survive the split-and-merge (got: $mixed_ids)" \
+    || fail "expected findings from both families, got: $mixed_ids"
+[ "$(jq '.components | length' "$WORK/mixedos-bom.json")" = "2" ] \
+    && pass "delivered SBOM still has both OS packages (only Trivy's input copies were split)" \
+    || fail "delivered SBOM was mutated"
 
 echo "== B-obs: best-effort steps log + mark failures instead of swallowing them =="
 # run_optional_step keeps the "never abort a scan" guarantee of the old
