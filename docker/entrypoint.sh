@@ -695,6 +695,21 @@ if [ "${ENRICH_MAVEN_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ];
     run_optional_step enrich-maven-cpe python3 "$LIBDIR/enrich-maven-cpe.py" "$OUTPUT_FILE"
 fi
 
+# GitHub-coordinate CPE enrichment: a component identified only by its source
+# repository (pkg:github/<owner>/<repo>@<version> — large C/C++ projects with no
+# package-manager ecosystem, e.g. a browser engine or a header-only library) has
+# no purl an ecosystem vulnerability source can match, and Trivy does not
+# recognize pkg:github/ at all, so these silently score zero findings.
+# enrich-github-cpe.py attaches an NVD-matchable cpe:2.3 for a short, hand-
+# verified owner/repo -> vendor:product map only (e.g. chromium/chromium ->
+# google:chrome); anything not in the map gets no CPE, since a repo's own name
+# rarely matches NVD's vendor:product and guessing would inject wrong CVEs.
+# Skipped for AI SBOMs and with ENRICH_GITHUB_CPE=false; a no-op when the SBOM
+# has no pkg:github/ component in the map.
+if [ "${ENRICH_GITHUB_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
+    run_optional_step enrich-github-cpe python3 "$LIBDIR/enrich-github-cpe.py" "$OUTPUT_FILE"
+fi
+
 # EOL enrichment: flag components whose release cycle is past its published
 # end-of-life, fully OFFLINE from a bundled endoflife.date snapshot (no network,
 # works air-gapped). Answers "is this still maintained?" — a supply-chain risk

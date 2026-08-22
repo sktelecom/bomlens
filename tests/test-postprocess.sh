@@ -1301,6 +1301,68 @@ submod_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe
 cp "$WORK/mvn-submod.json" "$WORK/mvn-submod2.json"; python3 "$MVNCPE" "$WORK/mvn-submod2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn-submod.json" "$WORK/mvn-submod2.json" >/dev/null 2>&1 && pass "per-submodule mechanical-overwrite pass is idempotent" || fail "second run changed the SBOM further"
 
+echo "== F-1c4: github-coordinate CPE enrichment — curated owner/repo map only =="
+# A component identified only by pkg:github/<owner>/<repo>@<version> (typical for
+# large C/C++ projects with no package-manager ecosystem) has no purl an ecosystem
+# vulnerability source can match, and Trivy does not recognize pkg:github/ at all.
+# enrich-github-cpe.py attaches a cpe:2.3 ONLY for owner/repo pairs in its curated
+# map (never derived from the repo name); everything else is left without a cpe.
+GHCPE="$LIB/enrich-github-cpe.py"
+cat > "$WORK/gh.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"chromium","version":"133.0.6937.1","purl":"pkg:github/chromium/chromium@133.0.6937.1"},
+ {"type":"library","name":"boost","version":"v1.69.0-p0","purl":"pkg:github/hunter-packages/boost@v1.69.0-p0"},
+ {"type":"library","name":"open5gs","version":"2.6.5","purl":"pkg:github/open5gs/open5gs@2.6.5"},
+ {"type":"library","name":"random-tool","version":"1.0.0","purl":"pkg:github/some-org/random-tool@1.0.0"},
+ {"type":"library","name":"has-cpe","version":"1.0","purl":"pkg:github/chromium/chromium@1.0","cpe":"cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}]}
+JSON
+python3 "$GHCPE" "$WORK/gh.json" >/dev/null 2>&1
+gh_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/gh.json"; }
+# (a) curated map: chromium/chromium -> google:chrome (NVD's vendor:product, not
+# the repo's own org/name).
+[ "$(gh_cpe_of chromium)" = "cpe:2.3:a:google:chrome:133.0.6937.1:*:*:*:*:*:*:*" ] && pass "chromium/chromium -> google:chrome (curated)" || fail "chromium cpe='$(gh_cpe_of chromium)'"
+# (b) curated map: a vendored mirror (hunter-packages/boost) maps to the real
+# upstream vendor:product (boost:boost), not the mirror's own org name.
+[ "$(gh_cpe_of boost)" = "cpe:2.3:a:boost:boost:v1.69.0-p0:*:*:*:*:*:*:*" ] && pass "hunter-packages/boost -> boost:boost (curated)" || fail "boost cpe='$(gh_cpe_of boost)'"
+# (c) curated map: open5gs/open5gs -> open5gs:open5gs.
+[ "$(gh_cpe_of open5gs)" = "cpe:2.3:a:open5gs:open5gs:2.6.5:*:*:*:*:*:*:*" ] && pass "open5gs/open5gs -> open5gs:open5gs (curated)" || fail "open5gs cpe='$(gh_cpe_of open5gs)'"
+# (d) NOT in the curated map: no cpe is guessed from the owner/repo name.
+[ "$(gh_cpe_of random-tool)" = "NONE" ] && pass "owner/repo not in the curated map gets no cpe (no guessing)" || fail "random-tool wrongly got cpe='$(gh_cpe_of random-tool)'"
+# (e) a pre-existing cpe is never overwritten, even for a mapped owner/repo.
+[ "$(gh_cpe_of has-cpe)" = "cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*" ] && pass "pre-existing cpe preserved (no overwrite)" || fail "has-cpe cpe changed to '$(gh_cpe_of has-cpe)'"
+# (f) a non-github purl is untouched.
+[ "$(gh_cpe_of lodash)" = "NONE" ] && pass "non-github (npm) component left without a cpe" || fail "lodash wrongly got a cpe"
+# (g) provenance marker on a derived cpe.
+gh_src=$(jq -r '[.components[]|select(.name=="chromium")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/gh.json")
+[ "$gh_src" = "github-curated" ] && pass "derived cpe carries bomlens:cpeSource=github-curated" || fail "chromium cpeSource='$gh_src'"
+# (h) idempotent.
+cp "$WORK/gh.json" "$WORK/gh2.json"; python3 "$GHCPE" "$WORK/gh2.json" >/dev/null 2>&1
+diff -q "$WORK/gh.json" "$WORK/gh2.json" >/dev/null 2>&1 && pass "enrich-github-cpe is idempotent" || fail "second run changed the SBOM"
+# (i) regression: feeding the curated-CPE SBOM through grype's CPE matcher (the
+# scan-nvd-cpe.py path) actually recovers the real-world CVEs that motivated this
+# map (Chromium CVE-2025-0995, boost's bundled-zlib CVE-2016-9840). Requires a
+# local grype binary; skipped (not failed) when unavailable, matching the rest of
+# this suite's deep-cve tests.
+if command -v grype >/dev/null 2>&1; then
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/gh.json" "$WORK/gh-out" >/dev/null 2>&1
+    if [ -f "$WORK/gh-out_security_grype.json" ]; then
+        gh_cves=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID] | unique | join(",")' "$WORK/gh-out_security_grype.json")
+        case ",$gh_cves," in
+            *,CVE-2025-0995,*) pass "grype CPE matcher recovers CVE-2025-0995 for chromium (github-curated cpe)" ;;
+            *) fail "CVE-2025-0995 not found in grype nvd:cpe results for chromium" ;;
+        esac
+        case ",$gh_cves," in
+            *,CVE-2016-9840,*) pass "grype CPE matcher recovers CVE-2016-9840 for boost (github-curated cpe)" ;;
+            *) fail "CVE-2016-9840 not found in grype nvd:cpe results for boost" ;;
+        esac
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping CVE-recovery assertions"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c4i)"
+fi
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
