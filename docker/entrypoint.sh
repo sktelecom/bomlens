@@ -710,6 +710,19 @@ if [ "${ENRICH_GITHUB_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]
     run_optional_step enrich-github-cpe python3 "$LIBDIR/enrich-github-cpe.py" "$OUTPUT_FILE"
 fi
 
+# Interpreter CPE enrichment: a language interpreter distributed AS a package
+# under conda or NuGet (e.g. a conda environment pinning `python`, or a NuGet
+# package bundling CPython) carries a pkg:conda/ or pkg:nuget/ purl that Trivy
+# parses fine, but neither ecosystem's advisory feed carries CVEs for a package
+# named "python" -- CPython's CVEs live in NVD, keyed by cpe:2.3:a:python:python.
+# enrich-interpreter-cpe.py attaches that CPE for a short, hand-verified
+# (purl type, name) -> vendor:product map only; anything not in the map gets no
+# CPE (no guessing from the purl name). Skipped for AI SBOMs and with
+# ENRICH_INTERPRETER_CPE=false; a no-op when the SBOM has no matching component.
+if [ "${ENRICH_INTERPRETER_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
+    run_optional_step enrich-interpreter-cpe python3 "$LIBDIR/enrich-interpreter-cpe.py" "$OUTPUT_FILE"
+fi
+
 # EOL enrichment: flag components whose release cycle is past its published
 # end-of-life, fully OFFLINE from a bundled endoflife.date snapshot (no network,
 # works air-gapped). Answers "is this still maintained?" — a supply-chain risk

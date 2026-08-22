@@ -1363,6 +1363,74 @@ else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c4i)"
 fi
 
+echo "== F-1c5: interpreter CPE enrichment — curated (purl type, name) map only =="
+# A conda/nuget component named "python" (the CPython interpreter distributed as
+# a package under an ecosystem whose advisory feed does not cover it) has no cpe,
+# so a CPE-aware scanner cannot reach its NVD-only CVEs. enrich-interpreter-cpe.py
+# attaches a cpe:2.3 ONLY for a (purl type, name) pair in its curated map (never
+# derived from the purl name); everything else is left without a cpe.
+INTCPE="$LIB/enrich-interpreter-cpe.py"
+cat > "$WORK/interp.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"python","version":"3.8.2","purl":"pkg:conda/python@3.8.2"},
+ {"type":"library","name":"python","version":"3.13.13","purl":"pkg:nuget/python@3.13.13"},
+ {"type":"library","name":"python","version":"1.0.0","purl":"pkg:npm/python@1.0.0"},
+ {"type":"library","name":"numpy","version":"1.26.0","purl":"pkg:conda/numpy@1.26.0"},
+ {"type":"library","name":"has-cpe","version":"3.9.0","purl":"pkg:conda/python@3.9.0","cpe":"cpe:2.3:a:preset:preset:3.9.0:*:*:*:*:*:*:*"}]}
+JSON
+python3 "$INTCPE" "$WORK/interp.json" >/dev/null 2>&1
+interp_cpe_of() { jq -r --arg p "$1" '[.components[]|select(.purl==$p)]|.[0].cpe // "NONE"' "$WORK/interp.json"; }
+# (a) curated map: pkg:conda/python -> cpe:2.3:a:python:python.
+[ "$(interp_cpe_of pkg:conda/python@3.8.2)" = "cpe:2.3:a:python:python:3.8.2:*:*:*:*:*:*:*" ] && pass "pkg:conda/python -> python:python (curated)" || fail "conda python cpe='$(interp_cpe_of pkg:conda/python@3.8.2)'"
+# (b) curated map: pkg:nuget/python -> cpe:2.3:a:python:python.
+[ "$(interp_cpe_of pkg:nuget/python@3.13.13)" = "cpe:2.3:a:python:python:3.13.13:*:*:*:*:*:*:*" ] && pass "pkg:nuget/python -> python:python (curated)" || fail "nuget python cpe='$(interp_cpe_of pkg:nuget/python@3.13.13)'"
+# (c) a "python" name in an ecosystem NOT in the curated purl-type set (npm) gets
+# no cpe: the map is keyed on (purl type, name), not on name alone.
+[ "$(interp_cpe_of pkg:npm/python@1.0.0)" = "NONE" ] && pass "pkg:npm/python (uncurated ecosystem) gets no cpe" || fail "npm python wrongly got cpe='$(interp_cpe_of pkg:npm/python@1.0.0)'"
+# (d) a conda/nuget name NOT in the curated map gets no cpe (no guessing from name).
+[ "$(interp_cpe_of pkg:conda/numpy@1.26.0)" = "NONE" ] && pass "pkg:conda/numpy (not in the curated map) gets no cpe" || fail "conda numpy wrongly got cpe='$(interp_cpe_of pkg:conda/numpy@1.26.0)'"
+# (e) a pre-existing cpe is never overwritten, even for a mapped (type, name).
+[ "$(interp_cpe_of pkg:conda/python@3.9.0)" = "cpe:2.3:a:preset:preset:3.9.0:*:*:*:*:*:*:*" ] && pass "pre-existing cpe preserved (no overwrite)" || fail "has-cpe cpe changed to '$(interp_cpe_of pkg:conda/python@3.9.0)'"
+# (f) provenance marker on a derived cpe.
+interp_src=$(jq -r '[.components[]|select(.purl=="pkg:conda/python@3.8.2")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/interp.json")
+[ "$interp_src" = "interpreter-curated" ] && pass "derived cpe carries bomlens:cpeSource=interpreter-curated" || fail "conda python cpeSource='$interp_src'"
+# (g) idempotent.
+cp "$WORK/interp.json" "$WORK/interp2.json"; python3 "$INTCPE" "$WORK/interp2.json" >/dev/null 2>&1
+diff -q "$WORK/interp.json" "$WORK/interp2.json" >/dev/null 2>&1 && pass "enrich-interpreter-cpe is idempotent" || fail "second run changed the SBOM"
+# (h) regression: feeding the curated-CPE SBOM through grype's CPE matcher (the
+# scan-nvd-cpe.py path) actually recovers real CVEs for the affected conda/nuget
+# CPython versions. Requires a local grype binary; skipped (not failed) when
+# unavailable, matching the rest of this suite's deep-cve tests.
+if command -v grype >/dev/null 2>&1; then
+    cat > "$WORK/interp-conda.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"python","version":"3.8.2","purl":"pkg:conda/python@3.8.2"}]}
+JSON
+    python3 "$INTCPE" "$WORK/interp-conda.json" >/dev/null 2>&1
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/interp-conda.json" "$WORK/interp-conda-out" >/dev/null 2>&1
+    if [ -f "$WORK/interp-conda-out_security_grype.json" ]; then
+        interp_conda_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/interp-conda-out_security_grype.json")
+        [ "${interp_conda_n:-0}" -gt 0 ] && pass "grype CPE matcher recovers CVEs for conda python@3.8.2 (interpreter-curated cpe)" || fail "no CVEs recovered for conda python@3.8.2"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping conda CVE-recovery assertion"
+    fi
+
+    cat > "$WORK/interp-nuget.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"python","version":"3.13.13","purl":"pkg:nuget/python@3.13.13"}]}
+JSON
+    python3 "$INTCPE" "$WORK/interp-nuget.json" >/dev/null 2>&1
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/interp-nuget.json" "$WORK/interp-nuget-out" >/dev/null 2>&1
+    if [ -f "$WORK/interp-nuget-out_security_grype.json" ]; then
+        interp_nuget_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/interp-nuget-out_security_grype.json")
+        [ "${interp_nuget_n:-0}" -gt 0 ] && pass "grype CPE matcher recovers CVEs for nuget python@3.13.13 (interpreter-curated cpe)" || fail "no CVEs recovered for nuget python@3.13.13"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping nuget CVE-recovery assertion"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c5)"
+fi
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
