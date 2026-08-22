@@ -44,7 +44,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
 | `--deep-license` | false | scancode 정밀 라이선스 탐지 (opt-in 이미지) |
-| `--deep-cve` | false | grype로 Maven 컴포넌트를 CPE 기준으로 NVD와 추가 대조한다 (opt-in `bomlens-deep-cve` 이미지, 자동으로 내려받음). 오래된 Java 라이브러리에서 Trivy가 놓치는 NVD 전용 CVE를 찾아내며, `--security`를 자동으로 켠다. NVD 실시간 버전 범위로 확인하지 못한 결과는 보고서에 버전 미검증으로 표시된다 — [정밀 CVE 대조 가이드](../guides/reports.ko.md) 참고 |
+| `--deep-cve` | false | grype의 NVD CPE 매칭으로 두 번째 대조를 더한다 (opt-in `bomlens-deep-cve` 이미지, 자동으로 내려받음). BomLens는 Maven 컴포넌트에만 NVD 대조가 가능한 CPE를 붙여 주므로, Trivy가 놓치는 NVD 전용 CVE는 대부분 오래된 Maven 라이브러리에서 나온다. `--security`를 자동으로 켠다. NVD 실시간 버전 범위로 확인하지 못한 결과는 보고서에 버전 미검증으로 표시된다 — [정밀 CVE 대조 가이드](../guides/reports.ko.md) 참고 |
 | `--identify-vendored` | false | 패키지 매니저가 없는 C/C++ 소스에 복사돼 들어간(vendored) 오픈소스를 식별. 파일 지문을 OSSKB 서비스와 대조 (발행 이미지에 포함; 소스가 아니라 해시 전송). [내장 오픈소스 식별 가이드](../guides/identify-vendored.md) 참고 |
 | `--byte-stable` | false | 결정론적(재현 가능) SBOM 출력 |
 | `--sign` | false | cosign 서명 (`COSIGN_KEY` 필요) |
@@ -61,7 +61,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의 |
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
 | `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
-| `SBOM_DEEP_CVE_IMAGE` | `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype maven CPE 매칭)용 이미지 지정 |
+| `SBOM_DEEP_CVE_IMAGE` | `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
 | `SBOM_OUTPUT_FLAT` | — | `1`로 두면 실행별 하위 폴더 없이 산출물을 베이스에 평면으로 저장(격리 이전 배치, 옛 경로를 기대하는 CI용) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | 데스크톱 앱과 웹 UI의 산출물 베이스(CLI는 대신 `--output-dir` 사용). 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장 |
 | `SBOM_UI_MOUNT_DIR` | — | CLI 인자를 받지 않는 Windows 실행 파일 `sbom-ui.bat`용: 웹 UI의 디렉터리 경로 입력에 읽기 전용 대상으로 추가할 폴더 하나(`--ui --mount`의 더블클릭 대응). `& ^ | < >` 가 없는 경로를 쓸 것 — 런처는 이런 문자가 있으면 잘못된 마운트를 Docker에 넘기는 대신 거부한다 |

@@ -13,6 +13,7 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 | `ghcr.io/sktelecom/bomlens` | Scanning and post-processing (canonical name) |
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | Aliases of the same image (former names, same digest) |
 | `ghcr.io/sktelecom/bomlens-firmware` | Firmware analysis (includes GPL tools, opt-in) (legacy alias: sbom-scanner-firmware) |
+| `ghcr.io/sktelecom/bomlens-deep-cve` | Bundles grype for deep CVE matching (opt-in). Used by the CLI's `--deep-cve` and by the web UI's Deep CVE matching toggle, both of which pull it automatically as a sibling container when it is not already the running image |
 
 `latest` and version tags are available, and both `linux/amd64` and `linux/arm64` are supported. Images are signed with cosign before publishing.
 

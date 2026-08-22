@@ -13,6 +13,7 @@ description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호�
 | `ghcr.io/sktelecom/bomlens` | 스캔과 후처리 (대표 이름) |
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | 같은 이미지의 별칭 (이전 이름, 같은 다이제스트) |
 | `ghcr.io/sktelecom/bomlens-firmware` | 펌웨어 분석용 (GPL 도구 포함, opt-in) (legacy alias: sbom-scanner-firmware) |
+| `ghcr.io/sktelecom/bomlens-deep-cve` | 심층 CVE 매칭용 grype 포함 (opt-in). CLI의 `--deep-cve`와 웹 UI의 심층 CVE 매칭 토글이 쓰며, 둘 다 지금 실행 중인 이미지가 이 이미지가 아니면 곁들임 컨테이너로 자동으로 내려받습니다 |
 
 `latest`와 버전 태그를 제공하며, `linux/amd64`와 `linux/arm64`를 지원합니다. 이미지는 cosign으로 서명되어 발행됩니다.
 
