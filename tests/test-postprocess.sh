@@ -1363,7 +1363,7 @@ PY
 echo "$out_verify" | grep -qx '\[nvd-cpe\] grype CPE matching started' \
     && pass "scan-nvd-cpe.py prints the start marker before grype runs" \
     || fail "start marker missing" "$out_verify"
-echo "$out_verify" | grep -Eq '^\[deep-cve-progress\]\s+(\d+)%\s*$' \
+echo "$out_verify" | grep -Eq '^\[deep-cve-progress\][[:space:]]+[0-9]+%[[:space:]]*$' \
     && pass "scan-nvd-cpe.py prints deep-cve-progress lines when SECURITY_NVD_VERIFY=true" \
     || fail "deep-cve-progress marker missing with SECURITY_NVD_VERIFY=true" "$out_verify"
 echo "$out_verify" | grep -qx '\[deep-cve-progress\] 100%' \
