@@ -62,10 +62,32 @@ MAVEN_CPE_MAP = {
     "com.fasterxml.jackson.dataformat": ("fasterxml", "@artifact"),
     "org.springframework": ("vmware", "spring_framework"),
     "org.springframework.security": ("vmware", "spring_security"),
+    "org.springframework.boot": ("vmware", "spring_boot"),
     "commons-beanutils": ("apache", "commons_beanutils"),
     "commons-fileupload": ("apache", "commons_fileupload"),
     "commons-collections": ("apache", "commons_collections"),
     "org.json": ("stleary", "json-java"),
+    # The generic org.apache.* rule (vendor=2nd segment, product=last segment)
+    # only holds when NVD's own CPE reuses the groupId's tail. These groups
+    # need an explicit override because NVD's product (or vendor) differs from
+    # what the rule would derive — each verified against NVD's own cpeMatch
+    # data, not guessed.
+    "log4j": ("apache", "log4j"),  # single-segment group: the generic rule needs 2+ segments, so this old-style Log4j 1.x groupId gets no CPE without an override
+    "org.apache.sshd": ("apache", "mina_sshd"),  # rule would derive apache:sshd; NVD files it under mina_sshd
+    "org.apache.xmlgraphics": ("apache", "batik"),  # rule would derive apache:xmlgraphics; this groupId is Batik's, and NVD's product is batik
+    "com.h2database": ("h2database", "h2"),  # rule would derive h2database:h2database; NVD's product is h2 (the artifactId, not the groupId tail)
+    "rhino": ("mozilla", "rhino"),  # single-segment group, map-only like log4j above
+    "net.sourceforge.nekohtml": ("cyberneko_html_project", "cyberneko_html"),  # rule would derive sourceforge:nekohtml
+    "org.owasp.antisamy": ("antisamy_project", "antisamy"),  # rule would derive owasp:antisamy
+    "org.postgresql": ("postgresql", "postgresql_jdbc_driver"),  # rule would derive postgresql:postgresql
+    "org.quartz-scheduler": ("softwareag", "quartz"),  # rule would derive quartz-scheduler:quartz-scheduler
+    "org.codehaus.woodstox": ("fasterxml", "woodstox"),  # the pre-rename groupId; NVD files Woodstox CVEs under the current fasterxml vendor regardless of which groupId a given release used
+    "com.mchange": ("mchange", "c3p0"),  # rule would derive mchange:mchange; NVD's product is the artifactId c3p0
+    "io.opentelemetry.instrumentation": ("linuxfoundation", "opentelemetry_instrumentation_for_java"),  # rule would derive opentelemetry:instrumentation
+    "io.undertow": ("redhat", "undertow"),  # rule would derive undertow:undertow; NVD files it under redhat
+    "org.eclipse.angus": ("eclipse", "angus_mail"),  # rule would derive eclipse:angus (missing the _mail suffix NVD's product carries)
+    "org.bouncycastle": ("bouncycastle", "bc-java"),  # the modern (post-rename) Bouncy Castle groupId; rule would derive bouncycastle:bouncycastle
+    "bouncycastle": ("bouncycastle", "bouncy-castle-crypto-package"),  # the legacy (pre-rename) groupId, single-segment so map-only; covers releases up to 1.35, distinct from bc-java above
 }
 
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),

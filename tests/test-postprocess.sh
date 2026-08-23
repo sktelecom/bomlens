@@ -1431,6 +1431,74 @@ else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c5)"
 fi
 
+echo "== F-1c6: maven CPE enrichment — expanded curated map (groups where the generic rule derives the wrong product) =="
+# These groupIds all pass the generic org.apache.* (or 2-segment) rule and get
+# SOME cpe, but the wrong one -- NVD's actual product differs from what the
+# rule would derive (e.g. org.apache.sshd -> apache:sshd, but NVD's product is
+# mina_sshd). Each entry below is verified against NVD's own cpeMatch data
+# (docker/lib/enrich-maven-cpe.py's MAVEN_CPE_MAP comment has the per-entry
+# rationale), not guessed.
+cat > "$WORK/mvn-expanded.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"log4j","version":"1.2.17","purl":"pkg:maven/log4j/log4j@1.2.17"},
+ {"type":"library","name":"sshd-core","version":"2.12.1","purl":"pkg:maven/org.apache.sshd/sshd-core@2.12.1"},
+ {"type":"library","name":"batik-css","version":"1.7","purl":"pkg:maven/org.apache.xmlgraphics/batik-css@1.7"},
+ {"type":"library","name":"h2","version":"1.3.157","purl":"pkg:maven/com.h2database/h2@1.3.157"},
+ {"type":"library","name":"js","version":"1.7R2","purl":"pkg:maven/rhino/js@1.7R2"},
+ {"type":"library","name":"nekohtml","version":"1.9.12","purl":"pkg:maven/net.sourceforge.nekohtml/nekohtml@1.9.12"},
+ {"type":"library","name":"antisamy","version":"1.4.3","purl":"pkg:maven/org.owasp.antisamy/antisamy@1.4.3"},
+ {"type":"library","name":"postgresql","version":"42.1.4","purl":"pkg:maven/org.postgresql/postgresql@42.1.4"},
+ {"type":"library","name":"quartz","version":"1.5.2","purl":"pkg:maven/org.quartz-scheduler/quartz@1.5.2"},
+ {"type":"library","name":"spring-boot","version":"1.5.6.RELEASE","purl":"pkg:maven/org.springframework.boot/spring-boot@1.5.6.RELEASE"},
+ {"type":"library","name":"woodstox-core-asl","version":"4.1.2","purl":"pkg:maven/org.codehaus.woodstox/woodstox-core-asl@4.1.2"},
+ {"type":"library","name":"c3p0","version":"0.9.1.1","purl":"pkg:maven/com.mchange/c3p0@0.9.1.1"},
+ {"type":"library","name":"opentelemetry-instrumentation-api","version":"2.10.0","purl":"pkg:maven/io.opentelemetry.instrumentation/opentelemetry-instrumentation-api@2.10.0"},
+ {"type":"library","name":"undertow-core","version":"2.3.17.Final","purl":"pkg:maven/io.undertow/undertow-core@2.3.17.Final"},
+ {"type":"library","name":"angus-mail","version":"2.0.3","purl":"pkg:maven/org.eclipse.angus/angus-mail@2.0.3"},
+ {"type":"library","name":"bcprov-jdk15on","version":"1.36","purl":"pkg:maven/org.bouncycastle/bcprov-jdk15on@1.36"},
+ {"type":"library","name":"bcmail-jdk14","version":"1.35","purl":"pkg:maven/bouncycastle/bcmail-jdk14@1.35"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-expanded.json" >/dev/null 2>&1
+exp_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-expanded.json"; }
+[ "$(exp_cpe_of log4j)" = "cpe:2.3:a:apache:log4j:1.2.17:*:*:*:*:*:*:*" ] && pass "single-segment log4j groupId curated (apache:log4j)" || fail "log4j cpe='$(exp_cpe_of log4j)'"
+[ "$(exp_cpe_of sshd-core)" = "cpe:2.3:a:apache:mina_sshd:2.12.1:*:*:*:*:*:*:*" ] && pass "org.apache.sshd curated (apache:mina_sshd, not apache:sshd)" || fail "sshd-core cpe='$(exp_cpe_of sshd-core)'"
+[ "$(exp_cpe_of batik-css)" = "cpe:2.3:a:apache:batik:1.7:*:*:*:*:*:*:*" ] && pass "org.apache.xmlgraphics curated (apache:batik, not apache:xmlgraphics)" || fail "batik-css cpe='$(exp_cpe_of batik-css)'"
+[ "$(exp_cpe_of h2)" = "cpe:2.3:a:h2database:h2:1.3.157:*:*:*:*:*:*:*" ] && pass "com.h2database curated (h2database:h2, not h2database:h2database)" || fail "h2 cpe='$(exp_cpe_of h2)'"
+[ "$(exp_cpe_of js)" = "cpe:2.3:a:mozilla:rhino:1.7R2:*:*:*:*:*:*:*" ] && pass "single-segment rhino groupId curated (mozilla:rhino)" || fail "js cpe='$(exp_cpe_of js)'"
+[ "$(exp_cpe_of nekohtml)" = "cpe:2.3:a:cyberneko_html_project:cyberneko_html:1.9.12:*:*:*:*:*:*:*" ] && pass "net.sourceforge.nekohtml curated (not sourceforge:nekohtml)" || fail "nekohtml cpe='$(exp_cpe_of nekohtml)'"
+[ "$(exp_cpe_of antisamy)" = "cpe:2.3:a:antisamy_project:antisamy:1.4.3:*:*:*:*:*:*:*" ] && pass "org.owasp.antisamy curated (not owasp:antisamy)" || fail "antisamy cpe='$(exp_cpe_of antisamy)'"
+[ "$(exp_cpe_of postgresql)" = "cpe:2.3:a:postgresql:postgresql_jdbc_driver:42.1.4:*:*:*:*:*:*:*" ] && pass "org.postgresql curated (postgresql_jdbc_driver, not postgresql)" || fail "postgresql cpe='$(exp_cpe_of postgresql)'"
+[ "$(exp_cpe_of quartz)" = "cpe:2.3:a:softwareag:quartz:1.5.2:*:*:*:*:*:*:*" ] && pass "org.quartz-scheduler curated (softwareag:quartz)" || fail "quartz cpe='$(exp_cpe_of quartz)'"
+[ "$(exp_cpe_of spring-boot)" = "cpe:2.3:a:vmware:spring_boot:1.5.6.RELEASE:*:*:*:*:*:*:*" ] && pass "org.springframework.boot curated (vmware:spring_boot)" || fail "spring-boot cpe='$(exp_cpe_of spring-boot)'"
+[ "$(exp_cpe_of woodstox-core-asl)" = "cpe:2.3:a:fasterxml:woodstox:4.1.2:*:*:*:*:*:*:*" ] && pass "org.codehaus.woodstox curated to the post-rename vendor (fasterxml:woodstox)" || fail "woodstox-core-asl cpe='$(exp_cpe_of woodstox-core-asl)'"
+[ "$(exp_cpe_of c3p0)" = "cpe:2.3:a:mchange:c3p0:0.9.1.1:*:*:*:*:*:*:*" ] && pass "com.mchange curated (mchange:c3p0, not mchange:mchange)" || fail "c3p0 cpe='$(exp_cpe_of c3p0)'"
+[ "$(exp_cpe_of opentelemetry-instrumentation-api)" = "cpe:2.3:a:linuxfoundation:opentelemetry_instrumentation_for_java:2.10.0:*:*:*:*:*:*:*" ] && pass "io.opentelemetry.instrumentation curated" || fail "opentelemetry-instrumentation-api cpe='$(exp_cpe_of opentelemetry-instrumentation-api)'"
+[ "$(exp_cpe_of undertow-core)" = "cpe:2.3:a:redhat:undertow:2.3.17.Final:*:*:*:*:*:*:*" ] && pass "io.undertow curated (redhat:undertow, not undertow:undertow)" || fail "undertow-core cpe='$(exp_cpe_of undertow-core)'"
+[ "$(exp_cpe_of angus-mail)" = "cpe:2.3:a:eclipse:angus_mail:2.0.3:*:*:*:*:*:*:*" ] && pass "org.eclipse.angus curated (angus_mail, not angus)" || fail "angus-mail cpe='$(exp_cpe_of angus-mail)'"
+[ "$(exp_cpe_of bcprov-jdk15on)" = "cpe:2.3:a:bouncycastle:bc-java:1.36:*:*:*:*:*:*:*" ] && pass "org.bouncycastle curated (bc-java, not bouncycastle:bouncycastle)" || fail "bcprov-jdk15on cpe='$(exp_cpe_of bcprov-jdk15on)'"
+[ "$(exp_cpe_of bcmail-jdk14)" = "cpe:2.3:a:bouncycastle:bouncy-castle-crypto-package:1.35:*:*:*:*:*:*:*" ] && pass "legacy bouncycastle groupId curated (bouncy-castle-crypto-package)" || fail "bcmail-jdk14 cpe='$(exp_cpe_of bcmail-jdk14)'"
+# idempotent.
+cp "$WORK/mvn-expanded.json" "$WORK/mvn-expanded2.json"; python3 "$MVNCPE" "$WORK/mvn-expanded2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-expanded.json" "$WORK/mvn-expanded2.json" >/dev/null 2>&1 && pass "F-1c6 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: feeding a couple of these through grype's CPE matcher actually
+# recovers the real CVE, not just a syntactically-correct cpe string.
+if command -v grype >/dev/null 2>&1; then
+    cat > "$WORK/exp-log4j.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"log4j","version":"1.2.17","purl":"pkg:maven/log4j/log4j@1.2.17"}]}
+JSON
+    python3 "$MVNCPE" "$WORK/exp-log4j.json" >/dev/null 2>&1
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/exp-log4j.json" "$WORK/exp-log4j-out" >/dev/null 2>&1
+    if [ -f "$WORK/exp-log4j-out_security_grype.json" ]; then
+        exp_log4j_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/exp-log4j-out_security_grype.json")
+        [ "${exp_log4j_n:-0}" -gt 0 ] && pass "grype CPE matcher recovers CVEs for log4j@1.2.17 (curated cpe)" || fail "no CVEs recovered for log4j@1.2.17"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping log4j CVE-recovery assertion"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c6)"
+fi
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
