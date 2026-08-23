@@ -120,6 +120,18 @@ MAVEN_CPE_MAP = {
     "org.mortbay.jetty": ("mortbay", "jetty", (
         ("eclipse", "jetty"),
     )),
+    # org.apache.activemq is shared by two different NVD products: Artemis
+    # (artifactIds prefixed "artemis-") and Classic ActiveMQ (everything
+    # else -- activemq-client, activemq-broker, the legacy activeio-core,
+    # etc.). The generic rule already derives apache:activemq correctly for
+    # the Classic side; this entry exists only to route the artemis-*
+    # artifacts to apache:artemis instead. See the artifact_prefix branch in
+    # derive_cpe() -- "" is the fallback for every artifactId that matches no
+    # more specific prefix.
+    "org.apache.activemq": {
+        "artemis-": ("apache", "artemis"),
+        "": ("apache", "activemq"),
+    },
 }
 
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),
@@ -229,6 +241,17 @@ def derive_cpe(purl):
     for prefix in sorted(MAVEN_CPE_MAP, key=len, reverse=True):
         if group == prefix or group.startswith(prefix + "."):
             entry = MAVEN_CPE_MAP[prefix]
+            if isinstance(entry, dict):
+                # A groupId shared by more than one NVD product, split by
+                # artifactId prefix (e.g. org.apache.activemq's artemis-*
+                # artifacts vs everything else). Longest prefix wins; ""
+                # is the catch-all for whatever matches no specific prefix.
+                for art_prefix in sorted(entry, key=len, reverse=True):
+                    if artifact.startswith(art_prefix):
+                        entry = entry[art_prefix]
+                        break
+                else:
+                    break  # no prefix matched (should not happen with a "" catch-all)
             vendor, src = entry[0], entry[1]
             product = artifact if src == "@artifact" else src
             alt_specs = entry[2] if len(entry) > 2 else ()

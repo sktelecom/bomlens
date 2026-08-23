@@ -1548,6 +1548,39 @@ else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c7)"
 fi
 
+echo "== F-1c8: maven CPE enrichment — artifactId-prefix branching for a shared groupId =="
+# org.apache.activemq is shared by two different NVD products: Artemis
+# (artifactIds prefixed "artemis-") and Classic ActiveMQ (everything else).
+# A MAVEN_CPE_MAP entry can be a dict keyed by artifactId prefix (longest
+# wins, "" is the catch-all) instead of a flat (vendor, product) tuple.
+cat > "$WORK/mvn-split.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"artemis-commons","version":"2.44.0","purl":"pkg:maven/org.apache.activemq/artemis-commons@2.44.0"},
+ {"type":"library","name":"activemq-client","version":"5.5.1","purl":"pkg:maven/org.apache.activemq/activemq-client@5.5.1"},
+ {"type":"library","name":"activeio-core","version":"3.1.4","purl":"pkg:maven/org.apache.activemq/activeio-core@3.1.4"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-split.json" >/dev/null 2>&1
+split_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-split.json"; }
+[ "$(split_cpe_of artemis-commons)" = "cpe:2.3:a:apache:artemis:2.44.0:*:*:*:*:*:*:*" ] \
+    && pass "artemis-* artifactId under org.apache.activemq routes to apache:artemis" \
+    || fail "artemis-commons cpe='$(split_cpe_of artemis-commons)'"
+[ "$(split_cpe_of activemq-client)" = "cpe:2.3:a:apache:activemq:5.5.1:*:*:*:*:*:*:*" ] \
+    && pass "non-artemis artifactId under org.apache.activemq falls back to apache:activemq" \
+    || fail "activemq-client cpe='$(split_cpe_of activemq-client)'"
+[ "$(split_cpe_of activeio-core)" = "cpe:2.3:a:apache:activemq:3.1.4:*:*:*:*:*:*:*" ] \
+    && pass "an unrelated-looking artifactId under the same groupId also falls back to the \"\" default" \
+    || fail "activeio-core cpe='$(split_cpe_of activeio-core)'"
+cp "$WORK/mvn-split.json" "$WORK/mvn-split2.json"; python3 "$MVNCPE" "$WORK/mvn-split2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-split.json" "$WORK/mvn-split2.json" >/dev/null 2>&1 && pass "F-1c8 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: grype's local DB confirms apache:artemis is a real, distinct NVD
+# product from apache:activemq (a CVE only one of the two carries).
+if command -v grype >/dev/null 2>&1; then
+    artemis_only_n=$(grype "cpe:2.3:a:apache:artemis:2.11.0:*:*:*:*:*:*:*" -o json 2>/dev/null | jq '[.matches[]] | length')
+    [ "${artemis_only_n:-0}" -gt 0 ] && pass "apache:artemis is a real, distinct NVD product (grype DB carries its own CVEs)" || echo "  SKIP: could not confirm apache:artemis has its own CVEs on this grype DB build"
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c8)"
+fi
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower
