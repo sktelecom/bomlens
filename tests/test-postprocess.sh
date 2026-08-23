@@ -1499,6 +1499,55 @@ else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c6)"
 fi
 
+echo "== F-1c7: maven CPE enrichment — alternate CPEs for NVD vendor-split projects =="
+# Some projects (a rename or corporate acquisition) have NVD-filed CVEs under
+# more than one CPE vendor across their history, e.g. Spring Framework's
+# SpringSource -> Pivotal -> VMware lineage or Jetty's pre-Eclipse Mortbay
+# groupId. A CycloneDX component's cpe field can only hold one vendor, so
+# MAVEN_CPE_MAP's alternates attach the rest as bomlens:cpeAlternates for
+# scan-nvd-cpe.py to look up separately.
+cat > "$WORK/mvn-alt.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"spring-context","version":"2.5.6","purl":"pkg:maven/org.springframework/spring-context@2.5.6"},
+ {"type":"library","name":"spring-security-core","version":"3.0.0","purl":"pkg:maven/org.springframework.security/spring-security-core@3.0.0"},
+ {"type":"library","name":"jetty","version":"6.1.21","purl":"pkg:maven/org.mortbay.jetty/jetty@6.1.21"},
+ {"type":"library","name":"spring-boot","version":"1.5.6.RELEASE","purl":"pkg:maven/org.springframework.boot/spring-boot@1.5.6.RELEASE"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-alt.json" >/dev/null 2>&1
+alt_props_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-alt.json"; }
+[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*"]' ] \
+    && pass "org.springframework carries both pivotal_software and springsource alternates" \
+    || fail "spring-context alternates='$(alt_props_of spring-context)'"
+[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*"]' ] \
+    && pass "org.springframework.security carries the pivotal_software alternate" \
+    || fail "spring-security-core alternates='$(alt_props_of spring-security-core)'"
+[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*"]' ] \
+    && pass "org.mortbay.jetty carries the eclipse:jetty alternate" \
+    || fail "jetty alternates='$(alt_props_of jetty)'"
+[ "$(alt_props_of spring-boot)" = "NONE" ] \
+    && pass "org.springframework.boot (single vendor, verified no split) gets no alternates property" \
+    || fail "spring-boot wrongly got alternates='$(alt_props_of spring-boot)'"
+cp "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json"; python3 "$MVNCPE" "$WORK/mvn-alt2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json" >/dev/null 2>&1 && pass "F-1c7 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: scan-nvd-cpe.py actually looks the alternates up and recovers
+# CVEs the primary cpe alone would miss, with no duplicate (purl, cve) rows.
+if command -v grype >/dev/null 2>&1; then
+    cp "$WORK/mvn-alt.json" "$WORK/mvn-alt-scan.json"
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/mvn-alt-scan.json" "$WORK/mvn-alt-out" >/dev/null 2>&1
+    if [ -f "$WORK/mvn-alt-out_security_grype.json" ]; then
+        alt_spring_cve=$(jq '[.Results[0].Vulnerabilities[] | select(.PkgName=="spring-context" and .VulnerabilityID=="CVE-2016-9878")] | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "${alt_spring_cve:-0}" -gt 0 ] && pass "alternate pivotal_software:spring_framework recovers CVE-2016-9878 (vmware alone misses it)" || fail "CVE-2016-9878 not recovered via alternate"
+        alt_jetty_cve=$(jq '[.Results[0].Vulnerabilities[] | select(.PkgName=="jetty" and .VulnerabilityID=="CVE-2009-5045")] | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "${alt_jetty_cve:-0}" -gt 0 ] && pass "alternate eclipse:jetty recovers CVE-2009-5045 (mortbay alone misses it)" || fail "CVE-2009-5045 not recovered via alternate"
+        alt_dupes=$(jq '[.Results[0].Vulnerabilities[] | ((.PkgIdentifier.PURL // .PkgName) + "|" + .VulnerabilityID)] | group_by(.) | map(select(length>1)) | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "$alt_dupes" = "0" ] && pass "no duplicate (purl, cve) rows between primary and alternate matches" || fail "$alt_dupes duplicate (purl, cve) row(s) found"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping alternate-CVE-recovery assertions"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c7)"
+fi
+
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
 # Tomcat CVE that grype's DB matches to 7.0.50 because it dropped the >= 9.0.0 lower

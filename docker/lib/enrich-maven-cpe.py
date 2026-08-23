@@ -54,14 +54,38 @@ import json
 import re
 import sys
 
-# Curated groupId -> (vendor, product_source). Verified against NVD.
-# product_source: a literal string, or the sentinel "@artifact" meaning "use the
-# component's artifactId as the product" (Jackson: fasterxml:jackson-databind).
+# Curated groupId -> (vendor, product_source) or (vendor, product_source,
+# alternates). Verified against NVD. product_source: a literal string, or the
+# sentinel "@artifact" meaning "use the component's artifactId as the product"
+# (Jackson: fasterxml:jackson-databind).
+#
+# alternates, when present, is a tuple of extra (vendor, product_source) pairs
+# for a project NVD has filed under more than one CPE vendor over its history
+# -- a rename or corporate acquisition, where NVD keeps assigning the vendor
+# current at each CVE's disclosure date rather than backfilling old ones to
+# the new name. A CycloneDX component carries exactly one cpe field, so the
+# primary entry above still drives that field; the alternates are attached
+# separately (bomlens:cpeAlternates) and looked up as their own grype CPE
+# queries by scan-nvd-cpe.py, since a single cpe:2.3 string cannot express
+# more than one vendor:product.
 MAVEN_CPE_MAP = {
     "com.fasterxml.jackson.core": ("fasterxml", "@artifact"),
     "com.fasterxml.jackson.dataformat": ("fasterxml", "@artifact"),
-    "org.springframework": ("vmware", "spring_framework"),
-    "org.springframework.security": ("vmware", "spring_security"),
+    # Spring Framework spans three NVD CPE vendors across its corporate history
+    # (SpringSource -> acquired by VMware in 2009 -> spun off as Pivotal in
+    # 2013 -> reabsorbed into VMware in 2019); NVD assigns whichever vendor was
+    # current at each CVE's disclosure date, never backfilling. Confirmed via
+    # direct grype CPE lookups: springsource:spring_framework and
+    # pivotal_software:spring_framework each carry CVEs vmware:spring_framework
+    # alone does not.
+    "org.springframework": ("vmware", "spring_framework", (
+        ("pivotal_software", "spring_framework"),
+        ("springsource", "spring_framework"),
+    )),
+    # Same split, minus the SpringSource-era name (verified absent).
+    "org.springframework.security": ("vmware", "spring_security", (
+        ("pivotal_software", "spring_security"),
+    )),
     "org.springframework.boot": ("vmware", "spring_boot"),
     "commons-beanutils": ("apache", "commons_beanutils"),
     "commons-fileupload": ("apache", "commons_fileupload"),
@@ -88,6 +112,14 @@ MAVEN_CPE_MAP = {
     "org.eclipse.angus": ("eclipse", "angus_mail"),  # rule would derive eclipse:angus (missing the _mail suffix NVD's product carries)
     "org.bouncycastle": ("bouncycastle", "bc-java"),  # the modern (post-rename) Bouncy Castle groupId; rule would derive bouncycastle:bouncycastle
     "bouncycastle": ("bouncycastle", "bouncy-castle-crypto-package"),  # the legacy (pre-rename) groupId, single-segment so map-only; covers releases up to 1.35, distinct from bc-java above
+    # org.mortbay.jetty is Jetty's pre-Eclipse-Foundation groupId (6.x era).
+    # The generic rule already derives mortbay:jetty correctly for it -- this
+    # entry exists only to attach the eclipse:jetty alternate, since NVD filed
+    # at least one Jetty 6.x CVE (CVE-2009-5045) under the current Eclipse
+    # vendor even though the release predates the foundation's involvement.
+    "org.mortbay.jetty": ("mortbay", "jetty", (
+        ("eclipse", "jetty"),
+    )),
 }
 
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),
@@ -173,23 +205,33 @@ def _parse_maven(purl):
     return group, artifact, version
 
 
+def _cpe_string(vendor, product, version):
+    return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
+
+
 def derive_cpe(purl):
-    """Return an NVD-matchable cpe:2.3 string, or None if we cannot map it safely."""
+    """Return (cpe, alt_cpes): an NVD-matchable cpe:2.3 string (or None if we
+    cannot map it safely) and a list of additional cpe:2.3 strings for a
+    project NVD splits across more than one CPE vendor (see MAVEN_CPE_MAP's
+    alternates). alt_cpes is always [] when derive_cpe returns None."""
     parsed = _parse_maven(purl)
     if not parsed:
-        return None
+        return None, []
     group, artifact, version = parsed
     if not _CPE_SAFE_VERSION.match(version):
-        return None
+        return None, []
 
     vendor = product = None
+    alt_specs = ()
     # 1. Curated map (longest groupId prefix wins, so *.security beats *). These
     # override the generic rule where it is known wrong (spring -> vmware, Jackson
     # product = artifact, org.json -> stleary:json-java).
     for prefix in sorted(MAVEN_CPE_MAP, key=len, reverse=True):
         if group == prefix or group.startswith(prefix + "."):
-            vendor, src = MAVEN_CPE_MAP[prefix]
+            entry = MAVEN_CPE_MAP[prefix]
+            vendor, src = entry[0], entry[1]
             product = artifact if src == "@artifact" else src
+            alt_specs = entry[2] if len(entry) > 2 else ()
             break
     else:
         # 2. Generic reverse-domain rule for 2+ segment groups (parts[1]:parts[-1]):
@@ -207,8 +249,12 @@ def derive_cpe(purl):
             vendor, product = parts[1], parts[-1]
 
     if not vendor or not product:
-        return None
-    return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
+        return None, []
+    alt_cpes = [
+        _cpe_string(alt_vendor, artifact if alt_src == "@artifact" else alt_src, version)
+        for alt_vendor, alt_src in alt_specs
+    ]
+    return _cpe_string(vendor, product, version), alt_cpes
 
 
 def enrich(path):
@@ -237,12 +283,18 @@ def enrich(path):
                 or _is_submodule_mechanical_cpe(existing, parsed[0], parsed[1])
             ):
                 continue  # a real cpe is already present; never overwrite it
-        cpe = derive_cpe(purl)
+        cpe, alt_cpes = derive_cpe(purl)
         if not cpe or cpe == existing:
             continue
         c["cpe"] = cpe
-        props = [p for p in (c.get("properties") or []) if p.get("name") != "bomlens:cpeSource"]
+        props = [p for p in (c.get("properties") or [])
+                 if p.get("name") not in ("bomlens:cpeSource", "bomlens:cpeAlternates")]
         props.append({"name": "bomlens:cpeSource", "value": "maven-groupid"})
+        if alt_cpes:
+            # A second cpe:2.3 the component itself cannot carry (CycloneDX
+            # allows exactly one), read back by scan-nvd-cpe.py as extra
+            # individual grype CPE lookups. See MAVEN_CPE_MAP's alternates.
+            props.append({"name": "bomlens:cpeAlternates", "value": json.dumps(alt_cpes)})
         c["properties"] = props
         n += 1
 
