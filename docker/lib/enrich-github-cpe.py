@@ -33,15 +33,27 @@ import json
 import re
 import sys
 
-# Curated (owner/repo) -> (vendor, product). Verified against NVD; each entry's
-# CPE was confirmed to carry real, version-ranged NVD vulnerabilities. Keep this
-# list short and hand-checked — do not add an entry by pattern-matching a repo
-# name against its apparent vendor.
+# Curated (owner/repo) -> (vendor, product) or (vendor, product, strip_prefix).
+# Verified against NVD; each entry's CPE was confirmed to carry real,
+# version-ranged NVD vulnerabilities. Keep this list short and hand-checked —
+# do not add an entry by pattern-matching a repo name against its apparent
+# vendor.
+#
+# strip_prefix, when present, is a literal prefix removed from the purl
+# version before it goes into the cpe (e.g. golang/go tags its releases
+# "go1.24.2", but NVD's version field is "1.24.2"). Confirmed with a direct
+# grype CPE lookup: feeding the raw "go1.24.2" string in, grype's version
+# comparator fails to parse it and treats the component as vulnerable to
+# essentially every Go CVE ever filed regardless of version -- a false-positive
+# flood, not a missing-match problem, so this is a correctness requirement,
+# not cosmetic.
 GITHUB_CPE_MAP = {
     ("chromium", "chromium"): ("google", "chrome"),
     ("boostorg", "boost"): ("boost", "boost"),
     ("hunter-packages", "boost"): ("boost", "boost"),
     ("open5gs", "open5gs"): ("open5gs", "open5gs"),
+    ("golang", "go"): ("golang", "go", "go"),
+    ("davegamble", "cjson"): ("davegamble", "cjson"),
 }
 
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),
@@ -70,7 +82,11 @@ def derive_cpe(purl):
     entry = GITHUB_CPE_MAP.get((owner.lower(), repo.lower()))
     if not entry:
         return None
-    vendor, product = entry
+    vendor, product = entry[0], entry[1]
+    if len(entry) > 2 and version.startswith(entry[2]):
+        version = version[len(entry[2]):]
+        if not version or not _CPE_SAFE_VERSION.match(version):
+            return None
     return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
 
 
