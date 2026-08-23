@@ -261,7 +261,19 @@ def build_sidecar(sbom_path, out_prefix):
         vuln = m.get("vulnerability", {})
         cve = vuln.get("id", "")
         if not cve.startswith("CVE-"):
-            continue
+            # grype's primary vulnerability id is sometimes a non-CVE alias
+            # from a non-NVD advisory source (e.g. "BIT-kafka-2024-27309",
+            # built from an Apache mailing-list thread) with the actual CVE
+            # listed only in relatedVulnerabilities. Fall back to the first
+            # CVE-prefixed alias there rather than silently dropping a real
+            # match.
+            cve = next(
+                (r.get("id", "") for r in (m.get("relatedVulnerabilities") or [])
+                 if r.get("id", "").startswith("CVE-")),
+                "",
+            )
+            if not cve:
+                continue
         is_nvd = vuln.get("namespace") == "nvd:cpe"
         art = m.get("artifact", {})
         ver = art.get("version", "")

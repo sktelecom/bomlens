@@ -1509,6 +1509,39 @@ else
     pass "no deep-cve-progress line when SECURITY_NVD_VERIFY is off (the default)"
 fi
 
+echo "== F-1f: scan-nvd-cpe.py falls back to a CVE alias in relatedVulnerabilities =="
+# grype's primary vulnerability id is sometimes a non-CVE alias from a
+# non-NVD advisory source (e.g. "BIT-kafka-2024-27309", built from an Apache
+# mailing-list thread), with the actual CVE listed only under
+# relatedVulnerabilities. Confirmed against a real corpus finding (Apache
+# Kafka CVE-2024-27309): grype's primary match previously got silently
+# dropped because .id didn't start with "CVE-".
+cat > "$WORK/grype-alias-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"BIT-kafka-2024-27309","namespace":"github:language:java","severity":"high"},
+  "artifact":{"name":"kafka-clients","version":"3.6.1","purl":"pkg:maven/org.apache.kafka/kafka-clients@3.6.1"},
+  "relatedVulnerabilities":[{"id":"CVE-2024-27309","namespace":"nvd:cpe"}]},
+ {"vulnerability":{"id":"BIT-no-cve-alias","namespace":"github:language:java","severity":"low"},
+  "artifact":{"name":"baz","version":"1.0","purl":"pkg:maven/baz/baz@1.0"},
+  "relatedVulnerabilities":[{"id":"GHSA-xxxx-yyyy-zzzz","namespace":"github:language:java"}]}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-alias-stub"
+echo '{}' > "$WORK/nvdcpe-alias-sbom.json"
+GRYPE_BIN="$WORK/grype-alias-stub" python3 "$LIB/scan-nvd-cpe.py" "$WORK/nvdcpe-alias-sbom.json" "$WORK/nvdcpe-alias" >/dev/null 2>&1
+alias_cves=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID] | join(",")' "$WORK/nvdcpe-alias_security_grype.json")
+[ "$alias_cves" = "CVE-2024-27309" ] \
+    && pass "non-CVE primary id resolves via a CVE alias in relatedVulnerabilities" \
+    || fail "alias resolution failed, got VulnerabilityIDs='$alias_cves'"
+alias_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/nvdcpe-alias_security_grype.json")
+[ "$alias_n" = "1" ] \
+    && pass "a match with no CVE alias anywhere is still dropped (no guessing)" \
+    || fail "expected exactly 1 kept finding, got $alias_n"
+
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
 # file without breaking the contract server.py security_summary reads.
