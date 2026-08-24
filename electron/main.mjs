@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  BACKGROUND_REFRESH_STALL_MS,
   cleanupOrphans,
   DEFAULT_IMAGE,
   dockerStatus,
@@ -210,6 +211,52 @@ async function createWindow() {
   });
 }
 
+// 이미지가 이미 로컬에 있을 때 registry의 최신 버전을 조용히 받는다. `:latest`를 한 번
+// pull하면 그 뒤로는 imagePresent만 보고 기동하므로, 새 릴리스가 나와도 사용자가 이미지를
+// 손으로 지우기 전에는 영영 갱신되지 않는 문제를 메운다. 실패(오프라인, 느린 registry 등)는
+// 조용히 무시하고 로컬 이미지로 기동을 이어간다 — 이 확인은 부가 기능이지 필수 경로가 아니다.
+async function refreshImageInBackground() {
+  const progress = createPullProgress();
+  const startedAt = Date.now();
+  let tally = { total: 0, complete: 0 };
+  let downloading = false;
+  const heartbeat = setInterval(() => {
+    if (downloading) {
+      statusProgress(
+        t.pullProgress(tally.complete, tally.total, Math.round((Date.now() - startedAt) / 1000)),
+      );
+    }
+  }, 1000);
+
+  let pull;
+  try {
+    pull = await pullImage(
+      DEFAULT_IMAGE,
+      (line) => {
+        const next = progress.feed(line);
+        if (next) {
+          tally = next;
+          if (!downloading) {
+            // 레이어 진행 줄이 처음 왔다는 것은 로컬 이미지가 낡아 실제로 새로 받고
+            // 있다는 뜻이다 — 그때만 진행 화면으로 전환한다(최신이면 이 콜백이 아예
+            // 안 온다).
+            downloading = true;
+            setBootState(BOOT.PULLING);
+            status(t.updateFound);
+          }
+        }
+      },
+      { stallMs: BACKGROUND_REFRESH_STALL_MS },
+    );
+  } finally {
+    clearInterval(heartbeat);
+  }
+  if (!pull.ok) {
+    // 갱신 확인 실패는 치명적이지 않다: 로컬 이미지로 계속 부팅한다. 사유는 진단용으로만 남긴다.
+    console.error("[bomlens] background image refresh skipped:", pull.reason);
+  }
+}
+
 async function startup() {
   // 중복 진입 가드: 이미 부팅이 진행 중이면 아무것도 하지 않는다(재시도 경합 대비).
   if (isBusy(bootState)) return;
@@ -270,6 +317,9 @@ async function startup() {
       setBootState(BOOT.FAILED_PULL, classifyPullFailure(pull.log, pull.reason));
       return;
     }
+  } else {
+    // 첫 pull이 아니어도 registry에 새 버전이 있으면 조용히 받는다(실패해도 기동을 막지 않음).
+    await refreshImageInBackground();
   }
 
   setBootState(BOOT.STARTING);

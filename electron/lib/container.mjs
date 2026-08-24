@@ -235,6 +235,15 @@ export async function imagePresent(image = DEFAULT_IMAGE) {
 // 실패 원인 분류를 위해 보관하는 출력 꼬리 길이. 전체 pull 로그는 수 MB가 될 수 있다.
 const PULL_LOG_TAIL = 4096;
 
+// 이미지가 이미 로컬에 있을 때 백그라운드로 최신 여부를 확인하는 stall 타임아웃.
+// `:latest` 태그는 한 번 pull하면 로컬 이미지 존재만으로 기동을 계속하는 경로를 타므로,
+// 그 뒤로 registry가 새 버전을 내놓아도 이 앱은 그 사실을 영영 모른다(다음 pull이
+// 트리거될 일이 없다). 이 값으로 짧게 pullImage를 다시 호출해 그걸 메운다: 이미 최신이면
+// "Status: Image is up to date"만 찍히고 몇 초 안에 끝나고, 오프라인이면 첫 응답도 못
+// 받아 이 시간 안에 조용히 포기한다. 실제로 새 레이어가 오기 시작하면 pullImage의 stall
+// 타이머가 매 출력 줄마다 갱신되므로, 이 짧은 값이 진행 중인 다운로드를 끊지는 않는다.
+export const BACKGROUND_REFRESH_STALL_MS = 12_000;
+
 // 첫 실행이면 이미지를 받는다. 진행 줄을 onProgress로 흘려보내 창에 표시할 수 있게 한다.
 //
 // 타임아웃은 절대시간이 아니라 "정체(stall)" 기준이다 — 행사장 Wi-Fi에서는 큰 pull이
