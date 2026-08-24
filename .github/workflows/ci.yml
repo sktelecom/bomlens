@@ -614,6 +614,7 @@ jobs:
         with:
           name: visual-baselines
           path: docker/web/frontend/tests/ui/**/*-snapshots/**
+          retention-days: 7
 
   # Guide screenshots (docs/images/web-ui-*.png) are captured by npm run capture:ui
   # in the same pinned container so they render like the visual baselines. They are
@@ -641,6 +642,7 @@ jobs:
         with:
           name: guide-screenshots
           path: docs/images/**
+          retention-days: 7
 
   doc-coverage:
     name: Doc Coverage
