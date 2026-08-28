@@ -180,7 +180,7 @@ jobs:
 
   desktop-linux:
     name: Desktop boot tests (linux)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     defaults:
       run:
         working-directory: electron
@@ -364,7 +364,7 @@ jobs:
 
   validate-docs:
     name: Validate Documentation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     steps:
       - name: Checkout repository
