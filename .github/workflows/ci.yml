@@ -34,7 +34,7 @@ permissions:
 jobs:
   test:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     steps:
       - name: Checkout repository
@@ -73,7 +73,7 @@ jobs:
   
   lint:
     name: Lint Scripts
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     steps:
       - name: Checkout repository
@@ -106,7 +106,7 @@ jobs:
 
   secrets:
     name: Secret Scan
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
 
     steps:
       - name: Checkout repository
@@ -155,7 +155,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'windows-latest' && fromJSON('["self-hosted","windows","bomlens-win"]') || fromJSON('["self-hosted","linux","bomlens-wsl"]') }}
 
     steps:
       - name: Checkout repository
@@ -180,7 +180,7 @@ jobs:
 
   desktop-linux:
     name: Desktop boot tests (linux)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     defaults:
       run:
         working-directory: electron
@@ -208,7 +208,7 @@ jobs:
 
   postprocess:
     name: Post-process Unit and Sync Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
 
     steps:
       - name: Checkout repository
@@ -290,7 +290,7 @@ jobs:
   # `git diff base HEAD` is exactly the PR's change set.
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     if: github.event_name == 'pull_request'
     outputs:
       web: ${{ steps.filter.outputs.web }}
@@ -364,7 +364,7 @@ jobs:
 
   validate-docs:
     name: Validate Documentation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     steps:
       - name: Checkout repository
@@ -420,7 +420,7 @@ jobs:
   
   validate-examples:
     name: Validate Examples
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     strategy:
       matrix:
@@ -537,7 +537,7 @@ jobs:
   
   ui:
     name: UI Tests (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     defaults:
       run:
         working-directory: docker/web/frontend
@@ -582,7 +582,7 @@ jobs:
   # upload them, then commit the ones that actually changed.
   visual:
     name: UI Visual Regression
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-jammy
     defaults:
@@ -644,7 +644,7 @@ jobs:
 
   doc-coverage:
     name: Doc Coverage
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     # Reads the scan-mode list from docker/entrypoint.sh and checks every
     # user-facing input form is documented across by-input, ui, cli, architecture,
     # pipeline-by-input and README. A new mode missing from a page fails here.
@@ -687,7 +687,7 @@ jobs:
 
   summary:
     name: CI Summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     needs: [test, secrets, contract, postprocess, web-e2e, full-e2e, docs-walkthrough, lint, validate-docs, validate-examples, ui, visual, doc-coverage]
     if: always()
 
