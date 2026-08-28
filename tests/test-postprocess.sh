@@ -1313,6 +1313,10 @@ cat > "$WORK/gh.json" <<'JSON'
  {"type":"library","name":"chromium","version":"133.0.6937.1","purl":"pkg:github/chromium/chromium@133.0.6937.1"},
  {"type":"library","name":"boost","version":"v1.69.0-p0","purl":"pkg:github/hunter-packages/boost@v1.69.0-p0"},
  {"type":"library","name":"open5gs","version":"2.6.5","purl":"pkg:github/open5gs/open5gs@2.6.5"},
+ {"type":"library","name":"go","version":"go1.24.2","purl":"pkg:github/golang/go@go1.24.2"},
+ {"type":"library","name":"go-bare-version","version":"1.24.2","purl":"pkg:github/golang/go@1.24.2"},
+ {"type":"library","name":"cjson","version":"v1.7.16","purl":"pkg:github/davegamble/cjson@v1.7.16"},
+ {"type":"library","name":"tor","version":"tor-0.2.4.8-alpha","purl":"pkg:github/torproject/tor@tor-0.2.4.8-alpha"},
  {"type":"library","name":"random-tool","version":"1.0.0","purl":"pkg:github/some-org/random-tool@1.0.0"},
  {"type":"library","name":"has-cpe","version":"1.0","purl":"pkg:github/chromium/chromium@1.0","cpe":"cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*"},
  {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}]}
@@ -1327,6 +1331,20 @@ gh_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // 
 [ "$(gh_cpe_of boost)" = "cpe:2.3:a:boost:boost:v1.69.0-p0:*:*:*:*:*:*:*" ] && pass "hunter-packages/boost -> boost:boost (curated)" || fail "boost cpe='$(gh_cpe_of boost)'"
 # (c) curated map: open5gs/open5gs -> open5gs:open5gs.
 [ "$(gh_cpe_of open5gs)" = "cpe:2.3:a:open5gs:open5gs:2.6.5:*:*:*:*:*:*:*" ] && pass "open5gs/open5gs -> open5gs:open5gs (curated)" || fail "open5gs cpe='$(gh_cpe_of open5gs)'"
+# (c2) curated map with a strip_prefix: golang/go tags releases "go1.24.2";
+# NVD's version field has no "go" prefix, so it must be stripped before the cpe
+# is built (feeding the raw tag in floods every Go CVE ever, see F-1c4i below).
+[ "$(gh_cpe_of go)" = "cpe:2.3:a:golang:go:1.24.2:*:*:*:*:*:*:*" ] && pass "golang/go strips its \"go\" version-tag prefix before the cpe" || fail "go cpe='$(gh_cpe_of go)'"
+# (c3) the strip is conditional -- a version that never had the prefix is left as-is.
+[ "$(gh_cpe_of go-bare-version)" = "cpe:2.3:a:golang:go:1.24.2:*:*:*:*:*:*:*" ] && pass "golang/go with an already-bare version is untouched by the strip" || fail "go-bare-version cpe='$(gh_cpe_of go-bare-version)'"
+# (c4) curated map, no strip_prefix needed: davegamble/cjson keeps its "v" tag
+# prefix as-is (grype's comparator handles it fine, confirmed in F-1c4i).
+[ "$(gh_cpe_of cjson)" = "cpe:2.3:a:davegamble:cjson:v1.7.16:*:*:*:*:*:*:*" ] && pass "davegamble/cjson -> davegamble:cjson (curated, no strip needed)" || fail "cjson cpe='$(gh_cpe_of cjson)'"
+# (c5) curated map: torproject/tor -> torproject:tor, AND the release-tag prefix
+# ('tor-0.2.4.8-alpha') is stripped from the embedded version. Left in, that
+# prefix defeats grype's version-range comparison against NVD (verified: it
+# drops CVE recovery for this component from 30 to 2 — see enrich-github-cpe.py).
+[ "$(gh_cpe_of tor)" = "cpe:2.3:a:torproject:tor:0.2.4.8-alpha:*:*:*:*:*:*:*" ] && pass "torproject/tor -> torproject:tor, repo-prefix stripped from version (curated)" || fail "tor cpe='$(gh_cpe_of tor)'"
 # (d) NOT in the curated map: no cpe is guessed from the owner/repo name.
 [ "$(gh_cpe_of random-tool)" = "NONE" ] && pass "owner/repo not in the curated map gets no cpe (no guessing)" || fail "random-tool wrongly got cpe='$(gh_cpe_of random-tool)'"
 # (e) a pre-existing cpe is never overwritten, even for a mapped owner/repo.
@@ -1355,6 +1373,26 @@ if command -v grype >/dev/null 2>&1; then
         case ",$gh_cves," in
             *,CVE-2016-9840,*) pass "grype CPE matcher recovers CVE-2016-9840 for boost (github-curated cpe)" ;;
             *) fail "CVE-2016-9840 not found in grype nvd:cpe results for boost" ;;
+        esac
+        case ",$gh_cves," in
+            *,CVE-2025-4674,*) pass "grype CPE matcher recovers CVE-2025-4674 for golang/go (\"go\" prefix stripped)" ;;
+            *) fail "CVE-2025-4674 not found in grype nvd:cpe results for go" ;;
+        esac
+        # the false-positive-flood this strip prevents: every Go CVE ever, because
+        # grype's comparator can't parse "go1.24.2" as a version at all.
+        go_raw_n=$(GRYPE_BIN=grype python3 -c "
+import subprocess, json
+p = subprocess.run(['grype', 'cpe:2.3:a:golang:go:go1.24.2:*:*:*:*:*:*:*', '-o', 'json'], capture_output=True, text=True, timeout=60)
+print(len(json.loads(p.stdout).get('matches', [])))
+" 2>/dev/null)
+        [ "${go_raw_n:-0}" -gt 50 ] && pass "unstripped \"go1.24.2\" confirmed to flood matches (${go_raw_n}), motivating the strip_prefix fix" || echo "  SKIP: could not reproduce the unstripped-version flood (got ${go_raw_n:-0} matches); not a failure, just unconfirmed on this grype DB build"
+        case ",$gh_cves," in
+            *,CVE-2023-50471,*) pass "grype CPE matcher recovers CVE-2023-50471 for davegamble/cjson" ;;
+            *) fail "CVE-2023-50471 not found in grype nvd:cpe results for cjson" ;;
+        esac
+        case ",$gh_cves," in
+            *,CVE-2013-7295,*) pass "grype CPE matcher recovers CVE-2013-7295 for tor (github-curated cpe, prefix stripped)" ;;
+            *) fail "CVE-2013-7295 not found in grype nvd:cpe results for tor" ;;
         esac
     else
         echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping CVE-recovery assertions"
@@ -1429,6 +1467,156 @@ JSON
     fi
 else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c5)"
+fi
+
+echo "== F-1c6: maven CPE enrichment — expanded curated map (groups where the generic rule derives the wrong product) =="
+# These groupIds all pass the generic org.apache.* (or 2-segment) rule and get
+# SOME cpe, but the wrong one -- NVD's actual product differs from what the
+# rule would derive (e.g. org.apache.sshd -> apache:sshd, but NVD's product is
+# mina_sshd). Each entry below is verified against NVD's own cpeMatch data
+# (docker/lib/enrich-maven-cpe.py's MAVEN_CPE_MAP comment has the per-entry
+# rationale), not guessed.
+cat > "$WORK/mvn-expanded.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"log4j","version":"1.2.17","purl":"pkg:maven/log4j/log4j@1.2.17"},
+ {"type":"library","name":"sshd-core","version":"2.12.1","purl":"pkg:maven/org.apache.sshd/sshd-core@2.12.1"},
+ {"type":"library","name":"batik-css","version":"1.7","purl":"pkg:maven/org.apache.xmlgraphics/batik-css@1.7"},
+ {"type":"library","name":"h2","version":"1.3.157","purl":"pkg:maven/com.h2database/h2@1.3.157"},
+ {"type":"library","name":"js","version":"1.7R2","purl":"pkg:maven/rhino/js@1.7R2"},
+ {"type":"library","name":"nekohtml","version":"1.9.12","purl":"pkg:maven/net.sourceforge.nekohtml/nekohtml@1.9.12"},
+ {"type":"library","name":"antisamy","version":"1.4.3","purl":"pkg:maven/org.owasp.antisamy/antisamy@1.4.3"},
+ {"type":"library","name":"postgresql","version":"42.1.4","purl":"pkg:maven/org.postgresql/postgresql@42.1.4"},
+ {"type":"library","name":"quartz","version":"1.5.2","purl":"pkg:maven/org.quartz-scheduler/quartz@1.5.2"},
+ {"type":"library","name":"spring-boot","version":"1.5.6.RELEASE","purl":"pkg:maven/org.springframework.boot/spring-boot@1.5.6.RELEASE"},
+ {"type":"library","name":"woodstox-core-asl","version":"4.1.2","purl":"pkg:maven/org.codehaus.woodstox/woodstox-core-asl@4.1.2"},
+ {"type":"library","name":"c3p0","version":"0.9.1.1","purl":"pkg:maven/com.mchange/c3p0@0.9.1.1"},
+ {"type":"library","name":"opentelemetry-instrumentation-api","version":"2.10.0","purl":"pkg:maven/io.opentelemetry.instrumentation/opentelemetry-instrumentation-api@2.10.0"},
+ {"type":"library","name":"undertow-core","version":"2.3.17.Final","purl":"pkg:maven/io.undertow/undertow-core@2.3.17.Final"},
+ {"type":"library","name":"angus-mail","version":"2.0.3","purl":"pkg:maven/org.eclipse.angus/angus-mail@2.0.3"},
+ {"type":"library","name":"bcprov-jdk15on","version":"1.36","purl":"pkg:maven/org.bouncycastle/bcprov-jdk15on@1.36"},
+ {"type":"library","name":"bcmail-jdk14","version":"1.35","purl":"pkg:maven/bouncycastle/bcmail-jdk14@1.35"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-expanded.json" >/dev/null 2>&1
+exp_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-expanded.json"; }
+[ "$(exp_cpe_of log4j)" = "cpe:2.3:a:apache:log4j:1.2.17:*:*:*:*:*:*:*" ] && pass "single-segment log4j groupId curated (apache:log4j)" || fail "log4j cpe='$(exp_cpe_of log4j)'"
+[ "$(exp_cpe_of sshd-core)" = "cpe:2.3:a:apache:mina_sshd:2.12.1:*:*:*:*:*:*:*" ] && pass "org.apache.sshd curated (apache:mina_sshd, not apache:sshd)" || fail "sshd-core cpe='$(exp_cpe_of sshd-core)'"
+[ "$(exp_cpe_of batik-css)" = "cpe:2.3:a:apache:batik:1.7:*:*:*:*:*:*:*" ] && pass "org.apache.xmlgraphics curated (apache:batik, not apache:xmlgraphics)" || fail "batik-css cpe='$(exp_cpe_of batik-css)'"
+[ "$(exp_cpe_of h2)" = "cpe:2.3:a:h2database:h2:1.3.157:*:*:*:*:*:*:*" ] && pass "com.h2database curated (h2database:h2, not h2database:h2database)" || fail "h2 cpe='$(exp_cpe_of h2)'"
+[ "$(exp_cpe_of js)" = "cpe:2.3:a:mozilla:rhino:1.7R2:*:*:*:*:*:*:*" ] && pass "single-segment rhino groupId curated (mozilla:rhino)" || fail "js cpe='$(exp_cpe_of js)'"
+[ "$(exp_cpe_of nekohtml)" = "cpe:2.3:a:cyberneko_html_project:cyberneko_html:1.9.12:*:*:*:*:*:*:*" ] && pass "net.sourceforge.nekohtml curated (not sourceforge:nekohtml)" || fail "nekohtml cpe='$(exp_cpe_of nekohtml)'"
+[ "$(exp_cpe_of antisamy)" = "cpe:2.3:a:antisamy_project:antisamy:1.4.3:*:*:*:*:*:*:*" ] && pass "org.owasp.antisamy curated (not owasp:antisamy)" || fail "antisamy cpe='$(exp_cpe_of antisamy)'"
+[ "$(exp_cpe_of postgresql)" = "cpe:2.3:a:postgresql:postgresql_jdbc_driver:42.1.4:*:*:*:*:*:*:*" ] && pass "org.postgresql curated (postgresql_jdbc_driver, not postgresql)" || fail "postgresql cpe='$(exp_cpe_of postgresql)'"
+[ "$(exp_cpe_of quartz)" = "cpe:2.3:a:softwareag:quartz:1.5.2:*:*:*:*:*:*:*" ] && pass "org.quartz-scheduler curated (softwareag:quartz)" || fail "quartz cpe='$(exp_cpe_of quartz)'"
+[ "$(exp_cpe_of spring-boot)" = "cpe:2.3:a:vmware:spring_boot:1.5.6.RELEASE:*:*:*:*:*:*:*" ] && pass "org.springframework.boot curated (vmware:spring_boot)" || fail "spring-boot cpe='$(exp_cpe_of spring-boot)'"
+[ "$(exp_cpe_of woodstox-core-asl)" = "cpe:2.3:a:fasterxml:woodstox:4.1.2:*:*:*:*:*:*:*" ] && pass "org.codehaus.woodstox curated to the post-rename vendor (fasterxml:woodstox)" || fail "woodstox-core-asl cpe='$(exp_cpe_of woodstox-core-asl)'"
+[ "$(exp_cpe_of c3p0)" = "cpe:2.3:a:mchange:c3p0:0.9.1.1:*:*:*:*:*:*:*" ] && pass "com.mchange curated (mchange:c3p0, not mchange:mchange)" || fail "c3p0 cpe='$(exp_cpe_of c3p0)'"
+[ "$(exp_cpe_of opentelemetry-instrumentation-api)" = "cpe:2.3:a:linuxfoundation:opentelemetry_instrumentation_for_java:2.10.0:*:*:*:*:*:*:*" ] && pass "io.opentelemetry.instrumentation curated" || fail "opentelemetry-instrumentation-api cpe='$(exp_cpe_of opentelemetry-instrumentation-api)'"
+[ "$(exp_cpe_of undertow-core)" = "cpe:2.3:a:redhat:undertow:2.3.17.Final:*:*:*:*:*:*:*" ] && pass "io.undertow curated (redhat:undertow, not undertow:undertow)" || fail "undertow-core cpe='$(exp_cpe_of undertow-core)'"
+[ "$(exp_cpe_of angus-mail)" = "cpe:2.3:a:eclipse:angus_mail:2.0.3:*:*:*:*:*:*:*" ] && pass "org.eclipse.angus curated (angus_mail, not angus)" || fail "angus-mail cpe='$(exp_cpe_of angus-mail)'"
+[ "$(exp_cpe_of bcprov-jdk15on)" = "cpe:2.3:a:bouncycastle:bc-java:1.36:*:*:*:*:*:*:*" ] && pass "org.bouncycastle curated (bc-java, not bouncycastle:bouncycastle)" || fail "bcprov-jdk15on cpe='$(exp_cpe_of bcprov-jdk15on)'"
+[ "$(exp_cpe_of bcmail-jdk14)" = "cpe:2.3:a:bouncycastle:bouncy-castle-crypto-package:1.35:*:*:*:*:*:*:*" ] && pass "legacy bouncycastle groupId curated (bouncy-castle-crypto-package)" || fail "bcmail-jdk14 cpe='$(exp_cpe_of bcmail-jdk14)'"
+# idempotent.
+cp "$WORK/mvn-expanded.json" "$WORK/mvn-expanded2.json"; python3 "$MVNCPE" "$WORK/mvn-expanded2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-expanded.json" "$WORK/mvn-expanded2.json" >/dev/null 2>&1 && pass "F-1c6 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: feeding a couple of these through grype's CPE matcher actually
+# recovers the real CVE, not just a syntactically-correct cpe string.
+if command -v grype >/dev/null 2>&1; then
+    cat > "$WORK/exp-log4j.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"log4j","version":"1.2.17","purl":"pkg:maven/log4j/log4j@1.2.17"}]}
+JSON
+    python3 "$MVNCPE" "$WORK/exp-log4j.json" >/dev/null 2>&1
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/exp-log4j.json" "$WORK/exp-log4j-out" >/dev/null 2>&1
+    if [ -f "$WORK/exp-log4j-out_security_grype.json" ]; then
+        exp_log4j_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/exp-log4j-out_security_grype.json")
+        [ "${exp_log4j_n:-0}" -gt 0 ] && pass "grype CPE matcher recovers CVEs for log4j@1.2.17 (curated cpe)" || fail "no CVEs recovered for log4j@1.2.17"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping log4j CVE-recovery assertion"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c6)"
+fi
+
+echo "== F-1c7: maven CPE enrichment — alternate CPEs for NVD vendor-split projects =="
+# Some projects (a rename or corporate acquisition) have NVD-filed CVEs under
+# more than one CPE vendor across their history, e.g. Spring Framework's
+# SpringSource -> Pivotal -> VMware lineage or Jetty's pre-Eclipse Mortbay
+# groupId. A CycloneDX component's cpe field can only hold one vendor, so
+# MAVEN_CPE_MAP's alternates attach the rest as bomlens:cpeAlternates for
+# scan-nvd-cpe.py to look up separately.
+cat > "$WORK/mvn-alt.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"spring-context","version":"2.5.6","purl":"pkg:maven/org.springframework/spring-context@2.5.6"},
+ {"type":"library","name":"spring-security-core","version":"3.0.0","purl":"pkg:maven/org.springframework.security/spring-security-core@3.0.0"},
+ {"type":"library","name":"jetty","version":"6.1.21","purl":"pkg:maven/org.mortbay.jetty/jetty@6.1.21"},
+ {"type":"library","name":"spring-boot","version":"1.5.6.RELEASE","purl":"pkg:maven/org.springframework.boot/spring-boot@1.5.6.RELEASE"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-alt.json" >/dev/null 2>&1
+alt_props_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-alt.json"; }
+[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*"]' ] \
+    && pass "org.springframework carries both pivotal_software and springsource alternates" \
+    || fail "spring-context alternates='$(alt_props_of spring-context)'"
+[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*"]' ] \
+    && pass "org.springframework.security carries the pivotal_software alternate" \
+    || fail "spring-security-core alternates='$(alt_props_of spring-security-core)'"
+[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*"]' ] \
+    && pass "org.mortbay.jetty carries the eclipse:jetty alternate" \
+    || fail "jetty alternates='$(alt_props_of jetty)'"
+[ "$(alt_props_of spring-boot)" = "NONE" ] \
+    && pass "org.springframework.boot (single vendor, verified no split) gets no alternates property" \
+    || fail "spring-boot wrongly got alternates='$(alt_props_of spring-boot)'"
+cp "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json"; python3 "$MVNCPE" "$WORK/mvn-alt2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json" >/dev/null 2>&1 && pass "F-1c7 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: scan-nvd-cpe.py actually looks the alternates up and recovers
+# CVEs the primary cpe alone would miss, with no duplicate (purl, cve) rows.
+if command -v grype >/dev/null 2>&1; then
+    cp "$WORK/mvn-alt.json" "$WORK/mvn-alt-scan.json"
+    python3 "$LIB/scan-nvd-cpe.py" "$WORK/mvn-alt-scan.json" "$WORK/mvn-alt-out" >/dev/null 2>&1
+    if [ -f "$WORK/mvn-alt-out_security_grype.json" ]; then
+        alt_spring_cve=$(jq '[.Results[0].Vulnerabilities[] | select(.PkgName=="spring-context" and .VulnerabilityID=="CVE-2016-9878")] | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "${alt_spring_cve:-0}" -gt 0 ] && pass "alternate pivotal_software:spring_framework recovers CVE-2016-9878 (vmware alone misses it)" || fail "CVE-2016-9878 not recovered via alternate"
+        alt_jetty_cve=$(jq '[.Results[0].Vulnerabilities[] | select(.PkgName=="jetty" and .VulnerabilityID=="CVE-2009-5045")] | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "${alt_jetty_cve:-0}" -gt 0 ] && pass "alternate eclipse:jetty recovers CVE-2009-5045 (mortbay alone misses it)" || fail "CVE-2009-5045 not recovered via alternate"
+        alt_dupes=$(jq '[.Results[0].Vulnerabilities[] | ((.PkgIdentifier.PURL // .PkgName) + "|" + .VulnerabilityID)] | group_by(.) | map(select(length>1)) | length' "$WORK/mvn-alt-out_security_grype.json")
+        [ "$alt_dupes" = "0" ] && pass "no duplicate (purl, cve) rows between primary and alternate matches" || fail "$alt_dupes duplicate (purl, cve) row(s) found"
+    else
+        echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping alternate-CVE-recovery assertions"
+    fi
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c7)"
+fi
+
+echo "== F-1c8: maven CPE enrichment — artifactId-prefix branching for a shared groupId =="
+# org.apache.activemq is shared by two different NVD products: Artemis
+# (artifactIds prefixed "artemis-") and Classic ActiveMQ (everything else).
+# A MAVEN_CPE_MAP entry can be a dict keyed by artifactId prefix (longest
+# wins, "" is the catch-all) instead of a flat (vendor, product) tuple.
+cat > "$WORK/mvn-split.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"artemis-commons","version":"2.44.0","purl":"pkg:maven/org.apache.activemq/artemis-commons@2.44.0"},
+ {"type":"library","name":"activemq-client","version":"5.5.1","purl":"pkg:maven/org.apache.activemq/activemq-client@5.5.1"},
+ {"type":"library","name":"activeio-core","version":"3.1.4","purl":"pkg:maven/org.apache.activemq/activeio-core@3.1.4"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-split.json" >/dev/null 2>&1
+split_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-split.json"; }
+[ "$(split_cpe_of artemis-commons)" = "cpe:2.3:a:apache:artemis:2.44.0:*:*:*:*:*:*:*" ] \
+    && pass "artemis-* artifactId under org.apache.activemq routes to apache:artemis" \
+    || fail "artemis-commons cpe='$(split_cpe_of artemis-commons)'"
+[ "$(split_cpe_of activemq-client)" = "cpe:2.3:a:apache:activemq:5.5.1:*:*:*:*:*:*:*" ] \
+    && pass "non-artemis artifactId under org.apache.activemq falls back to apache:activemq" \
+    || fail "activemq-client cpe='$(split_cpe_of activemq-client)'"
+[ "$(split_cpe_of activeio-core)" = "cpe:2.3:a:apache:activemq:3.1.4:*:*:*:*:*:*:*" ] \
+    && pass "an unrelated-looking artifactId under the same groupId also falls back to the \"\" default" \
+    || fail "activeio-core cpe='$(split_cpe_of activeio-core)'"
+cp "$WORK/mvn-split.json" "$WORK/mvn-split2.json"; python3 "$MVNCPE" "$WORK/mvn-split2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-split.json" "$WORK/mvn-split2.json" >/dev/null 2>&1 && pass "F-1c8 enrichment is idempotent" || fail "second run changed the SBOM"
+# regression: grype's local DB confirms apache:artemis is a real, distinct NVD
+# product from apache:activemq (a CVE only one of the two carries).
+if command -v grype >/dev/null 2>&1; then
+    artemis_only_n=$(grype "cpe:2.3:a:apache:artemis:2.11.0:*:*:*:*:*:*:*" -o json 2>/dev/null | jq '[.matches[]] | length')
+    [ "${artemis_only_n:-0}" -gt 0 ] && pass "apache:artemis is a real, distinct NVD product (grype DB carries its own CVEs)" || echo "  SKIP: could not confirm apache:artemis has its own CVEs on this grype DB build"
+else
+    echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c8)"
 fi
 
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
@@ -1508,6 +1696,39 @@ if echo "$out_noverify" | grep -q '\[deep-cve-progress\]'; then
 else
     pass "no deep-cve-progress line when SECURITY_NVD_VERIFY is off (the default)"
 fi
+
+echo "== F-1f: scan-nvd-cpe.py falls back to a CVE alias in relatedVulnerabilities =="
+# grype's primary vulnerability id is sometimes a non-CVE alias from a
+# non-NVD advisory source (e.g. "BIT-kafka-2024-27309", built from an Apache
+# mailing-list thread), with the actual CVE listed only under
+# relatedVulnerabilities. Confirmed against a real corpus finding (Apache
+# Kafka CVE-2024-27309): grype's primary match previously got silently
+# dropped because .id didn't start with "CVE-".
+cat > "$WORK/grype-alias-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"BIT-kafka-2024-27309","namespace":"github:language:java","severity":"high"},
+  "artifact":{"name":"kafka-clients","version":"3.6.1","purl":"pkg:maven/org.apache.kafka/kafka-clients@3.6.1"},
+  "relatedVulnerabilities":[{"id":"CVE-2024-27309","namespace":"nvd:cpe"}]},
+ {"vulnerability":{"id":"BIT-no-cve-alias","namespace":"github:language:java","severity":"low"},
+  "artifact":{"name":"baz","version":"1.0","purl":"pkg:maven/baz/baz@1.0"},
+  "relatedVulnerabilities":[{"id":"GHSA-xxxx-yyyy-zzzz","namespace":"github:language:java"}]}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-alias-stub"
+echo '{}' > "$WORK/nvdcpe-alias-sbom.json"
+GRYPE_BIN="$WORK/grype-alias-stub" python3 "$LIB/scan-nvd-cpe.py" "$WORK/nvdcpe-alias-sbom.json" "$WORK/nvdcpe-alias" >/dev/null 2>&1
+alias_cves=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID] | join(",")' "$WORK/nvdcpe-alias_security_grype.json")
+[ "$alias_cves" = "CVE-2024-27309" ] \
+    && pass "non-CVE primary id resolves via a CVE alias in relatedVulnerabilities" \
+    || fail "alias resolution failed, got VulnerabilityIDs='$alias_cves'"
+alias_n=$(jq '[.Results[0].Vulnerabilities[]] | length' "$WORK/nvdcpe-alias_security_grype.json")
+[ "$alias_n" = "1" ] \
+    && pass "a match with no CVE alias anywhere is still dropped (no guessing)" \
+    || fail "expected exactly 1 kept finding, got $alias_n"
 
 echo "== F-2: firmware cve-bin-tool CVEs merge into the Trivy security contract (Plan 2) =="
 # Sidecar (Trivy-shaped) + a Trivy report must merge into one .Results[].Vulnerabilities[]
@@ -2415,7 +2636,8 @@ out=""; sbom=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --output) out="$2"; shift ;;
-        *.json)   sbom="$1" ;;
+        -*) ;;
+        *) sbom="$1" ;;
     esac
     shift
 done
@@ -2442,6 +2664,96 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq -r '.metadata.component.type' "$WORK/fwtype-bom.json")" = "firmware" ] \
     && pass "delivered SBOM still declares type=firmware (only Trivy's input was remapped)" \
     || fail "delivered SBOM root type was mutated"
+
+echo "== sec-specversion: a malformed specVersion is normalized and retried, not failed =="
+# Regression for the supplier-SBOM gap review: a supplier-submitted SBOM built by
+# syft2 1.46.0 carried specVersion "1.70" (a spurious trailing zero on "1.7"),
+# which the bundled Trivy rejects outright with "invalid specification version",
+# emptying the whole security report for every purl type in that project, not
+# just the malformed field. This stub trivy mimics that: it rejects "1.70" and
+# succeeds once specVersion is normalized to "1.7" — exactly the retry
+# scan-security.sh now performs.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; sbom=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) out="$2"; shift ;;
+        -*) ;;
+        *) sbom="$1" ;;
+    esac
+    shift
+done
+sv=$(jq -r '.specVersion // ""' "$sbom" 2>/dev/null)
+if [ "$sv" = "1.70" ]; then
+    echo "2026-08-22T00:00:00Z	FATAL	Fatal error	run error: sbom scan error: SBOM decode error: CycloneDX decode error: invalid specification version" >&2
+    exit 1
+fi
+echo '{"SchemaVersion":2,"Results":[{"Target":"Java","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2026-42577","PkgName":"io.netty:netty-transport-classes-epoll","InstalledVersion":"4.2.10.Final","Severity":"HIGH"}]}]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.70","metadata":{"component":{"type":"application","name":"aem","version":"260701"}},"components":[{"type":"library","name":"netty-transport-classes-epoll","version":"4.2.10.Final","purl":"pkg:maven/io.netty/netty-transport-classes-epoll@4.2.10.Final"}]}' > "$WORK/specver-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/specver-bom.json" "$WORK/specver" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on the specVersion retry path"
+[ "$(jq -r '.ScanError.Message // "none"' "$WORK/specver_security.json")" = "none" ] \
+    && pass "malformed specVersion retried normalized -> no ScanError" \
+    || fail "malformed specVersion still produced a ScanError"
+[ "$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$WORK/specver_security.json")" -ge 1 ] \
+    && pass "Trivy vulnerabilities present after the specVersion retry" \
+    || fail "no vulnerabilities after the specVersion retry"
+[ "$(jq -r '.specVersion' "$WORK/specver-bom.json")" = "1.70" ] \
+    && pass "delivered SBOM still declares specVersion=1.70 (only Trivy's input was normalized)" \
+    || fail "delivered SBOM specVersion was mutated"
+
+echo "== sec-multi-os: mixed OS package families are split, scanned, and merged, not failed =="
+# Regression for the supplier-SBOM gap review: merge-sbom.sh can combine layers
+# from different OS bases (e.g. an rpm subsystem merged with a deb or apk one)
+# into a single SBOM. Trivy's SBOM decoder refuses to scan a document whose OS
+# packages span more than one package-manager family, failing the WHOLE scan —
+# including every non-OS purl type — with "multiple types of OS packages in SBOM
+# are not supported". This stub trivy mimics that: it rejects a mix of rpm+deb and
+# succeeds only when given a single-family input, returning a family-specific
+# os-pkgs finding plus a non-OS (maven) finding so the test can confirm both
+# families' results survive the merge AND that the non-OS finding — present in
+# every split's input, since each split keeps the full non-OS component set —
+# is not counted once per split.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""; sbom=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --output) out="$2"; shift ;;
+        -*) ;;
+        *) sbom="$1" ;;
+    esac
+    shift
+done
+families=$(jq -r '[.components[]?.purl // "" | select(test("^pkg:(rpm|deb)/")) | capture("^pkg:(?<t>rpm|deb)/").t] | unique | length' "$sbom" 2>/dev/null)
+if [ "${families:-0}" -gt 1 ]; then
+    echo "2026-08-22T00:00:00Z	FATAL	Fatal error	run error: sbom scan error: failed analysis: SBOM decode error: failed to decode: failed to aggregate packages: multiple types of OS packages in SBOM are not supported ([\"rpm\" \"deb\"])" >&2
+    exit 1
+fi
+fam=$(jq -r '[.components[]?.purl // "" | select(test("^pkg:(rpm|deb)/")) | capture("^pkg:(?<t>rpm|deb)/").t] | unique | .[0] // "none"' "$sbom" 2>/dev/null)
+echo "{\"SchemaVersion\":2,\"Results\":[{\"Target\":\"$fam\",\"Class\":\"os-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9000\",\"PkgName\":\"pkg-$fam\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]},{\"Target\":\"Java\",\"Class\":\"lang-pkgs\",\"Vulnerabilities\":[{\"VulnerabilityID\":\"CVE-2026-9001\",\"PkgName\":\"mavenpkg\",\"InstalledVersion\":\"1.0\",\"Severity\":\"HIGH\"}]}]}" > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"mixed","version":"1.0"}},"components":[{"type":"library","name":"rpmpkg","version":"1.0","purl":"pkg:rpm/rpmpkg@1.0"},{"type":"library","name":"debpkg","version":"1.0","purl":"pkg:deb/debpkg@1.0"},{"type":"library","name":"mavenpkg","version":"1.0","purl":"pkg:maven/g/mavenpkg@1.0"}]}' > "$WORK/mixedos-bom.json"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/mixedos-bom.json" "$WORK/mixedos" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh exited non-zero on the mixed-OS split path"
+[ "$(jq -r '.ScanError.Message // "none"' "$WORK/mixedos_security.json")" = "none" ] \
+    && pass "mixed OS families split and retried -> no ScanError" \
+    || fail "mixed OS families still produced a ScanError"
+mixed_ids=$(jq -r '[.Results[]?.Vulnerabilities[]?.PkgName] | sort | join(",")' "$WORK/mixedos_security.json")
+[ "$mixed_ids" = "mavenpkg,pkg-deb,pkg-rpm" ] \
+    && pass "both OS families' findings survive the split-and-merge (got: $mixed_ids)" \
+    || fail "expected findings from both families, got: $mixed_ids"
+[ "$(jq '.components | length' "$WORK/mixedos-bom.json")" = "3" ] \
+    && pass "delivered SBOM still has all 3 components (only Trivy's input copies were split)" \
+    || fail "delivered SBOM was mutated"
 
 echo "== B-obs: best-effort steps log + mark failures instead of swallowing them =="
 # run_optional_step keeps the "never abort a scan" guarantee of the old

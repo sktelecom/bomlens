@@ -36,21 +36,97 @@ GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "[security] running Trivy SBOM scan..."
 # --exit-code 0: report-only (never fail the scan pipeline on findings).
 trivy_ok=""
-if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$SBOM" 2>/tmp/trivy.err; then
-    trivy_ok=1
-elif grep -qi "unmarshal component type\|unsupported type" /tmp/trivy.err && command -v jq >/dev/null 2>&1; then
-    # Trivy 0.70's CycloneDX decoder rejects some valid-but-newer ROOT component types
-    # ("firmware" from a firmware scan is CycloneDX 1.4+), failing the whole decode with
-    # "unsupported type". Retry with the root coerced to a type Trivy accepts; the
-    # delivered SBOM keeps its accurate type — only Trivy's input copy is remapped, and
-    # component types are left untouched, so vulnerability matching is unaffected.
-    trivy_in="$(mktemp)"
-    if jq '.metadata.component.type = "application"' "$SBOM" > "$trivy_in" 2>/dev/null \
-       && trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>/tmp/trivy.err; then
-        echo "[security] Trivy could not decode the SBOM's root component type; re-ran with it coerced to 'application' for Trivy input (delivered SBOM unchanged)."
+trivy_in="$SBOM"
+trivy_in_tmp=""
+for _attempt in 1 2; do
+    if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>/tmp/trivy.err; then
         trivy_ok=1
+        break
     fi
-    rm -f "$trivy_in"
+    command -v jq >/dev/null 2>&1 || break
+    next="$(mktemp)"
+    if grep -qi "invalid specification version" /tmp/trivy.err \
+       && jq '
+           (.specVersion // "") as $s
+           # A supplier-submitted SBOM can carry a malformed specVersion (observed:
+           # syft2 1.46.0 writing "1.70" instead of "1.7") that Trivy refuses outright.
+           # Strip a spurious trailing zero when the shape matches; otherwise fall back
+           # to the newest version Trivy is known to accept.
+           | .specVersion = (if ($s | test("^[0-9]+\\.[0-9]0$")) then ($s | sub("0$"; ""))
+                              else "1.6" end)
+         ' "$trivy_in" > "$next" 2>/dev/null; then
+        echo "[security] Trivy rejected the SBOM's specVersion (\"$(jq -r '.specVersion' "$trivy_in")\"); re-ran with it normalized for Trivy input (delivered SBOM unchanged)."
+    elif grep -qi "unmarshal component type\|unsupported type" /tmp/trivy.err \
+       && jq '.metadata.component.type = "application"' "$trivy_in" > "$next" 2>/dev/null; then
+        # Trivy 0.70's CycloneDX decoder rejects some valid-but-newer ROOT component
+        # types ("firmware" from a firmware scan is CycloneDX 1.4+), failing the whole
+        # decode with "unsupported type". Retry with the root coerced to a type Trivy
+        # accepts; the delivered SBOM keeps its accurate type — only Trivy's input copy
+        # is remapped, and component types are left untouched, so vulnerability
+        # matching is unaffected.
+        echo "[security] Trivy could not decode the SBOM's root component type; re-ran with it coerced to 'application' for Trivy input (delivered SBOM unchanged)."
+    else
+        rm -f "$next"
+        break
+    fi
+    [ -n "$trivy_in_tmp" ] && rm -f "$trivy_in_tmp"
+    trivy_in="$next"
+    trivy_in_tmp="$next"
+done
+[ -n "$trivy_in_tmp" ] && rm -f "$trivy_in_tmp"
+
+if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" /tmp/trivy.err && command -v jq >/dev/null 2>&1; then
+    # Trivy's SBOM decoder refuses a CycloneDX document whose OS packages span more
+    # than one package-manager family (e.g. an rpm base merged with a deb or apk
+    # layer) — it can't tell which single OS the packages belong to. merge-sbom.sh
+    # produces exactly this shape for layered images that mix bases, so the whole
+    # scan (every purl type, not just the OS packages) would otherwise fail. Work
+    # around it by scanning once per OS family present — each pass keeps every
+    # non-OS-package component plus only that family's OS packages — and unioning
+    # the results; the delivered SBOM is untouched, only Trivy's input copies split.
+    os_types=$(jq -r '
+        [ .components[]? | (.purl // "")
+          | select(test("^pkg:(rpm|deb|apk)/"))
+          | capture("^pkg:(?<t>rpm|deb|apk)/").t ]
+        | unique | .[]' "$SBOM" 2>/dev/null)
+    if [ -n "$os_types" ]; then
+        split_outs=()
+        for t in $os_types; do
+            split_in="$(mktemp)"; split_out="$(mktemp)"
+            jq --arg t "$t" '
+                .components = [ .components[]
+                    | select((((.purl // "") | test("^pkg:(rpm|deb|apk)/")) | not)
+                              or ((.purl // "") | test("^pkg:" + $t + "/"))) ]
+            ' "$SBOM" > "$split_in" 2>/dev/null
+            if trivy sbom --quiet --format json --output "$split_out" --exit-code 0 "$split_in" 2>>/tmp/trivy.err; then
+                split_outs+=("$split_out")
+            else
+                rm -f "$split_out"
+            fi
+            rm -f "$split_in"
+        done
+        if [ "${#split_outs[@]}" -gt 0 ]; then
+            # Every split keeps the full non-OS component set, so a non-OS finding
+            # (e.g. a maven CVE) is independently redetected in each split and would
+            # appear once per OS family without this — dedup by (Target,
+            # purl-or-pkg, CVE) while keeping each Target's findings grouped.
+            jq -s '
+                [ .[].Results[]? ]
+                | group_by(.Target)
+                | map({
+                    Target: .[0].Target,
+                    Class: .[0].Class,
+                    Vulnerabilities: ([ .[].Vulnerabilities[]? ]
+                        | group_by(((.PkgIdentifier // {}).PURL // .PkgName // "") + "|" + (.VulnerabilityID // ""))
+                        | map(.[0]))
+                  })
+                | { Results: . }
+            ' "${split_outs[@]}" > "$JSON" 2>/dev/null \
+                && trivy_ok=1
+            echo "[security] Trivy rejected the SBOM's mixed OS package families ($(echo "$os_types" | tr '\n' ' ')); re-ran once per family and merged the results (delivered SBOM unchanged)."
+        fi
+        rm -f "${split_outs[@]}"
+    fi
 fi
 if [ -z "$trivy_ok" ]; then
     echo "[security] WARN: Trivy scan failed:" >&2

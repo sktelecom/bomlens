@@ -221,10 +221,61 @@ def run_grype(sbom):
         return None
 
 
+def _run_grype_cpe(cpe):
+    """A single bare-CPE grype lookup (cheap: grype's local DB query, not a
+    second full-SBOM scan). Returns grype's raw matches list, or [] on any
+    failure -- an alternate CPE that can't be queried is silently skipped,
+    matching this script's existing "no path -> no finding" posture."""
+    try:
+        p = subprocess.run([GRYPE, cpe, "-o", "json"],
+                            capture_output=True, text=True, timeout=60)
+        if p.returncode != 0:
+            return []
+        return json.loads(p.stdout).get("matches", [])
+    except Exception:
+        return []
+
+
+def _sbom_cpe_alternates(sbom_path):
+    """Yield (name, version, purl, [alt_cpe, ...]) for every maven component
+    enrich-maven-cpe.py tagged with bomlens:cpeAlternates -- a project NVD
+    splits across more than one CPE vendor (see MAVEN_CPE_MAP's alternates),
+    which a component's single cpe field cannot express on its own."""
+    try:
+        with open(sbom_path) as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        return
+    for c in doc.get("components") or []:
+        props = c.get("properties") or []
+        raw = next((p.get("value") for p in props if p.get("name") == "bomlens:cpeAlternates"), None)
+        if not raw:
+            continue
+        try:
+            alt_cpes = json.loads(raw)
+        except ValueError:
+            continue
+        if alt_cpes:
+            yield c.get("name", ""), c.get("version", ""), c.get("purl", ""), alt_cpes
+
+
 def build_sidecar(sbom_path, out_prefix):
     g = run_grype(sbom_path)
     if g is None:
         return
+    grype_matches = g.get("matches", [])
+    # Alternate-CPE matches: fold each curated alternate's own bare-CPE lookup
+    # into the same match list (with the real component's name/version/purl
+    # substituted for grype's bare-CPE artifact, which carries no purl) so
+    # they get exactly the same NVD-verify/severity/record-building treatment
+    # as the primary SBOM scan's matches below -- no separate code path to
+    # keep in sync.
+    for name, version, purl, alt_cpes in _sbom_cpe_alternates(sbom_path):
+        for alt_cpe in alt_cpes:
+            for m in _run_grype_cpe(alt_cpe):
+                art = m.setdefault("artifact", {})
+                art["name"], art["version"], art["purl"] = name, version, purl
+                grype_matches.append(m)
     # Default off: the base behavior stays offline (air-gap safe). When on it needs
     # network + NVD_API_KEY and adds minutes per scan, so it is opt-in; without it
     # nvd:cpe findings are kept and flagged bomlens:cpeVersionUnverified.
@@ -243,7 +294,6 @@ def build_sidecar(sbom_path, out_prefix):
     except Exception:
         db_conn = None
 
-    grype_matches = g.get("matches", [])
     # The verify loop is the only part of this script with a known total, so it
     # is also the only part that reports [deep-cve-progress]. Count up front how
     # many findings will actually hit the NVD lookup (nvd:cpe CVE matches) so the
@@ -257,17 +307,35 @@ def build_sidecar(sbom_path, out_prefix):
     last_percent = None
 
     kept, dropped, unverified = [], 0, 0
+    seen = set()  # (purl-or-name, cve): an alternate CPE lookup can rediscover
+    # a CVE the primary SBOM scan already found (their version ranges overlap),
+    # or two alternates can overlap each other -- keep the first hit only.
     for m in grype_matches:
         vuln = m.get("vulnerability", {})
         cve = vuln.get("id", "")
         if not cve.startswith("CVE-"):
-            continue
+            # grype's primary vulnerability id is sometimes a non-CVE alias
+            # from a non-NVD advisory source (e.g. "BIT-kafka-2024-27309",
+            # built from an Apache mailing-list thread) with the actual CVE
+            # listed only in relatedVulnerabilities. Fall back to the first
+            # CVE-prefixed alias there rather than silently dropping a real
+            # match.
+            cve = next(
+                (r.get("id", "") for r in (m.get("relatedVulnerabilities") or [])
+                 if r.get("id", "").startswith("CVE-")),
+                "",
+            )
+            if not cve:
+                continue
         is_nvd = vuln.get("namespace") == "nvd:cpe"
         art = m.get("artifact", {})
         ver = art.get("version", "")
         purl = art.get("purl", "")
         cpes = art.get("cpes") or []
         product = _cpe_product(cpes[0]) if cpes else ""
+        dedup_key = (purl or art.get("name", ""), cve)
+        if dedup_key in seen:
+            continue
 
         # Take grype's GHSA matches too (its Java matcher catches maven CVEs Trivy
         # misses); the sidecar merge dedups against Trivy's findings by (purl, cve).
@@ -316,6 +384,7 @@ def build_sidecar(sbom_path, out_prefix):
             rec["bomlens:cpeVersionUnverified"] = True
             unverified += 1
         kept.append(rec)
+        seen.add(dedup_key)
 
     if db_conn is not None:
         try:
