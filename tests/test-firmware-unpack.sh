@@ -563,6 +563,7 @@ echo "== a cap the warning tells you to raise can actually be raised =="
 # stopped in the same place as before. Measured on a switch OS image of some
 # 38,000 files, where the version-string pass covered barely half of them.
 for v in FW_VERSTR_MAX_FILES FW_VERSTR_MAX_BYTES FW_ELF_MAX_FILES \
+         FW_KERNEL_MAX_FILES FW_KERNEL_MAX_BYTES FW_KERNEL_MAX_VERSIONS \
          FW_EXTRA_ROOTS FW_MAX_EXTRA_ROOTS; do
     if grep -q -- "-e $v=" "$ROOT_DIR/scripts/scan-sbom.sh"; then
         pass "$v reaches the container"
@@ -575,7 +576,7 @@ done
 # Those variables are forwarded as `-e NAME=` whether or not anyone set one, so an
 # unset cap arrives as an empty string. A bare int("") raises, which would abort
 # the pass on every scan rather than fall back to the default.
-for f in identify-version-strings identify-elf-presence; do
+for f in identify-version-strings identify-elf-presence identify-kernel-version; do
     if grep -q 'def cap(name, default)' "$ROOT_DIR/docker/lib/$f.py"; then
         pass "$f falls back when a cap arrives empty or malformed"
     else
@@ -591,6 +592,11 @@ if [ -f "$cap_probe" ] && command -v python3 >/dev/null 2>&1; then
         pass "an empty or zero cap falls back, a real one is honoured"
     else
         fail "the cap helper does not behave as documented"
+    fi
+    if python3 "$cap_probe" "$ROOT_DIR/docker/lib/identify-kernel-version.py" >/dev/null 2>&1; then
+        pass "identify-kernel-version's cap helper behaves the same way"
+    else
+        fail "identify-kernel-version's cap helper does not behave as documented"
     fi
 fi
 
@@ -775,6 +781,182 @@ if printf '%s' "$with_verstr" | jq -e '
     pass "the surviving uclibc is the versioned one"
 else
     fail "the versionless uclibc won over the versioned one"
+fi
+
+echo "== the kernel is read from wherever in the image it sits =="
+
+# Every pass above reads only inside the rootfs. Two firmware images measured
+# this session both boot a kernel that sits outside it: an install ISO whose
+# boot catalog and install payload are sibling top-level trees, and an image
+# where the kernel is an intermediate decompression stage unblob unpacks
+# *through* on the way down to the rootfs rather than a file inside it. In
+# both a rootfs-scoped search never reads the file naming the kernel version.
+if command -v python3 >/dev/null 2>&1; then
+    KTREE="$(mktemp -d)"
+
+    mkdir -p "$KTREE/boot_extract/mod_extract" \
+             "$KTREE/a_extract" "$KTREE/b_extract" \
+             "$KTREE/lookalike" "$KTREE/rootfs/lib/modules/5.10.177"
+
+    python3 - "$KTREE" <<'PY'
+import sys
+root = sys.argv[1]
+# The kernel image's own boot banner. The byte before "Linux version" is a NUL
+# here, as it is in a real gzip-uncompressed vmlinux -- never a newline, which
+# is what cve-bin-tool's own pattern (built for pre-extracted strings, not raw
+# bytes) anchors on instead.
+open(f"{root}/boot_extract/vmlinux.uncompressed", "wb").write(
+    b"\x00\x00garbage\x00Linux version 5.10.177 (b@h) (gcc 8.4) "
+    b"#1 SMP Tue Apr 4 01:02:03 UTC 2023\x00more")
+# A loadable module's vermagic -- the strongest signature, and it should win
+# over the banner above even though both are present in this tree.
+open(f"{root}/boot_extract/mod_extract/drv.ko", "wb").write(
+    b"ELF\x00...\x00vermagic=5.10.177 SMP mod_unload \x00...")
+# Two files that collide under identify-version-strings.py's marker-stripping
+# dedupe (both reduce to "lzma.uncompressed") but sit under different
+# branches. Only one carries a kernel string; both must still be read.
+open(f"{root}/a_extract/lzma.uncompressed", "wb").write(
+    b"junk\x00Linux version 4.4.153 (foo) (gcc 7) #1 Mon Jan 1 00:00:00 UTC 2024\x00pad")
+open(f"{root}/b_extract/lzma.uncompressed", "wb").write(
+    b"completely unrelated content, no kernel here at all")
+# Text that resembles both patterns but must not match: a missing "vermagic="
+# prefix, a missing "Linux version " prefix, and prose mentioning a version
+# without the trailing "#<n> <weekday>" the real banner always carries.
+open(f"{root}/lookalike/notes.txt", "wb").write(
+    b"Requires Linux version 2.6 or later.\n2.6.32 #1 SMP\nvermagic\nHTTP/1.1 200 OK\n")
+PY
+
+    kernel_out="$(python3 "$ROOT_DIR/docker/lib/identify-kernel-version.py" \
+                  "$KTREE" "$KTREE/rootfs" 2>/dev/null)"
+
+    if printf '%s' "$kernel_out" | jq -e \
+        'any(.[]; .name == "linux_kernel" and .version == "5.10.177")' >/dev/null 2>&1; then
+        pass "the kernel is identified from a file outside the rootfs entirely"
+    else
+        fail "the kernel signature outside the rootfs was not read" "$kernel_out"
+    fi
+
+    if printf '%s' "$kernel_out" | jq -e \
+        'any(.[]; .name == "linux_kernel" and .version == "5.10.177")
+         and (any(.[]; .properties[]? | .name == "bomlens:identifiedBy" and .value == "kernel-signature"))' \
+        >/dev/null 2>&1; then
+        pass "a vermagic hit outranks a banner hit for the same tree"
+    else
+        fail "the wrong evidence grade won" "$kernel_out"
+    fi
+
+    if printf '%s' "$kernel_out" | jq -e \
+        '[.[] | select(.name == "linux_kernel")] | length == 1' >/dev/null 2>&1; then
+        pass "only the strongest-grade version is reported when a stronger one exists"
+    else
+        fail "more than one kernel version was reported" "$kernel_out"
+    fi
+
+    # cpe:/a:, not cpe:/o: -- firmware-cpe-match.py's parser only reads part
+    # `a` out of either CPE form, and this is the form cve-bin-tool's own
+    # scan output and the Dockerfile's kernel smoke test both use.
+    if printf '%s' "$kernel_out" | jq -e \
+        'any(.[]; .cpe == "cpe:/a:linux:linux_kernel:5.10.177")' >/dev/null 2>&1; then
+        pass "the kernel's cpe uses part a, matching what firmware-cpe-match.py parses"
+    else
+        fail "the kernel's cpe is not cpe:/a:linux:linux_kernel:<version>" "$kernel_out"
+    fi
+
+    # Drop the vermagic file and confirm the banner-only fallback still works,
+    # picks the version with an actual file behind it (not the empty b_extract
+    # file), and reads no evidence from the lookalikes.
+    rm -rf "$KTREE/boot_extract"
+    fallback_out="$(python3 "$ROOT_DIR/docker/lib/identify-kernel-version.py" \
+                     "$KTREE" "$KTREE/rootfs" 2>/dev/null)"
+    if printf '%s' "$fallback_out" | jq -e \
+        'any(.[]; .name == "linux_kernel" and .version == "4.4.153")' >/dev/null 2>&1; then
+        pass "falls back to the banner signature when no vermagic is present"
+    else
+        fail "the banner-only fallback did not read the kernel version" "$fallback_out"
+    fi
+    if printf '%s' "$fallback_out" | jq -e \
+        'all(.[]; .evidence.occurrences[0].location | test("lzma.uncompressed|drv.ko|vmlinux.uncompressed"))
+         and (all(.[]; .evidence.occurrences[0].location | test("notes.txt") | not))' \
+        >/dev/null 2>&1; then
+        pass "nothing is read out of the version-shaped lookalike text"
+    else
+        fail "a pattern matched text that only resembles a kernel signature" "$fallback_out"
+    fi
+
+    # The two identically-named files after marker-stripping (a_extract and
+    # b_extract's "lzma.uncompressed") are the exact collision
+    # identify-version-strings.py's dedupe would hit -- this pass must not
+    # reuse that dedupe, or reading either file becomes a coin flip on walk
+    # order. Confirmed above (4.4.153 was read from a_extract); this checks
+    # the evidence points at the right one, not b_extract's unrelated content.
+    if printf '%s' "$fallback_out" | jq -e \
+        '[.[] | select(.name == "linux_kernel")][0].evidence.occurrences[0].location
+         == "lzma.uncompressed"' >/dev/null 2>&1; then
+        pass "a marker-stripped name collision does not hide the kernel-bearing file"
+    else
+        fail "the path-collision regression guard failed" "$fallback_out"
+    fi
+
+    # choose() is importable and its answer must not depend on the order
+    # candidates arrive in -- the same property pick_shallowest's own test
+    # checks for rootfs selection, for the same MikroTik-shaped reason.
+    order_out="$(python3 - "$ROOT_DIR/docker/lib/identify-kernel-version.py" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ikv", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+
+forward = [
+    ("banner", "4.4.153", "a", "Linux version 4.4.153 ..."),
+    ("banner", "4.4.153", "b", "Linux version 4.4.153 ..."),
+    ("banner", "3.10.20", "c", "Linux version 3.10.20 ..."),
+]
+reversed_ = list(reversed(forward))
+r1 = m.choose(forward)
+r2 = m.choose(reversed_)
+print("OK" if r1 == r2 and r1[0][0] == "4.4.153" else f"MISMATCH {r1} {r2}")
+PY
+)"
+    if [ "$order_out" = "OK" ]; then
+        pass "choose() picks the same answer regardless of candidate order"
+    else
+        fail "choose() is order-dependent" "$order_out"
+    fi
+
+    # The hard-won part: identification alone is not the fix, matching
+    # against the index is. A synthetic index with one linux_kernel row
+    # proves the component this pass emits actually reaches a CVE through
+    # firmware-cpe-match.py unmodified -- this is the check that would have
+    # caught shipping cpe:/o: instead of cpe:/a:.
+    if command -v sqlite3 >/dev/null 2>&1; then
+        KIDX="$(mktemp -u).sqlite"
+        sqlite3 "$KIDX" "CREATE TABLE cpe_match (vendor TEXT NOT NULL, product TEXT NOT NULL,
+            exact_version TEXT, version_start TEXT, vs_incl INTEGER, version_end TEXT,
+            ve_incl INTEGER, cve_id TEXT NOT NULL, severity TEXT, cvss_version TEXT, cvss_score REAL);
+            INSERT INTO cpe_match VALUES ('linux','linux_kernel',NULL,'4.4.0',1,'4.4.180',0,
+            'CVE-TEST-KERNEL','HIGH','3',7.5);"
+        ksbom="$(mktemp -u).json"
+        jq -n --argjson comps "$fallback_out" '{components: $comps}' > "$ksbom"
+        match_out="$(python3 "$ROOT_DIR/docker/lib/firmware-cpe-match.py" "$ksbom" "$KIDX" 2>/dev/null)"
+        rm -f "$KIDX" "$ksbom"
+        if printf '%s' "$match_out" | jq -e \
+            'any(.[]; .cve_number == "CVE-TEST-KERNEL")' >/dev/null 2>&1; then
+            pass "the emitted component reaches a CVE through the real matcher unmodified"
+        else
+            fail "the kernel component did not reach a CVE through firmware-cpe-match.py" "$match_out"
+        fi
+    fi
+
+    rm -rf "$KTREE"
+fi
+
+# Wiring guard: the whole point is reading $EXTRACT, not $ROOTFS. If this pass
+# is ever called with the rootfs like every other identification step, this
+# fix silently stops doing anything on exactly the images that motivated it.
+if grep -q 'identify-kernel-version.py" "\$EXTRACT" "\$ROOTFS"' "$ROOT_DIR/docker/lib/scan-firmware.sh"; then
+    pass "the kernel pass is wired to the whole extraction, not the rootfs"
+else
+    fail "identify-kernel-version.py is not called with \$EXTRACT" \
+         "the fix only works if this pass sees outside the rootfs"
 fi
 
 echo "== a program is also evidence of the component that ships it =="

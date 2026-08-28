@@ -39,6 +39,8 @@ const MAIN = {
       total === 0
         ? `레지스트리에 접속하는 중... (${secs}초 경과)`
         : `이미지 레이어 내려받는 중: ${total}개 중 ${complete}개 완료 (${secs}초 경과)`,
+    // 이미지가 이미 있어도 조용히 최신 여부를 확인하다가 실제로 새 버전을 받기 시작했을 때만 뜬다.
+    updateFound: "새 버전의 스캐너 이미지를 내려받는 중입니다...",
     cleanedOrphans: (n) => `이전 실행에서 남은 컨테이너 ${n}개를 정리했습니다.`,
     startingUi: "UI 컨테이너를 시작하는 중...",
     ready: "준비 완료. UI를 엽니다.",
@@ -71,6 +73,7 @@ const MAIN = {
       total === 0
         ? `Contacting the registry... (${secs}s elapsed)`
         : `Downloading image layers: ${complete}/${total} done (${secs}s elapsed)`,
+    updateFound: "Downloading a newer scanner image...",
     cleanedOrphans: (n) =>
       n === 1
         ? "Cleaned up 1 leftover container from a previous run."

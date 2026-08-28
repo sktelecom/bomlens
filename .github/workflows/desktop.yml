@@ -173,6 +173,11 @@ jobs:
             electron/dist-electron/*.exe
             electron/dist-electron/*.dmg
           if-no-files-found: warn
+          # This is boot-smoke-test evidence for the daily nightly run, not the
+          # user-facing installer (that's attached to the release separately,
+          # below) — the 90-day default retention let a year of daily
+          # macOS+Windows builds pile up into real Actions storage billing.
+          retention-days: 7
       # 태그 릴리스에는 같은 릴리스에 인스톨러를 덧붙여 일반 사용자가 바로 받게 한다.
       # PR과 수동 실행에서는 이 단계를 건너뛰고 위 아티팩트만 남긴다.
       - name: Attach installer to the release
