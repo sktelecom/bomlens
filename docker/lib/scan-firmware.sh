@@ -645,6 +645,39 @@ if [ "${FW_VERSION_STRINGS:-true}" != "false" ] && command -v python3 >/dev/null
 fi
 
 # --------------------------------------------------------
+# ③.75 The kernel is read from wherever in the image it sits, not from $ROOTFS.
+# --------------------------------------------------------
+# Every pass above — cve-bin-tool's own checkers, identify-elf-presence.py,
+# identify-version-strings.py — reads only inside $ROOTFS (the parent of the
+# shallowest `etc`), and that is the right choice for the filesystem the device
+# boots into. The kernel is not part of that filesystem, though: an install
+# ISO keeps its boot catalog and its install payload as siblings, not parent
+# and child, and some images carry the kernel as an intermediate decompression
+# stage on the way down to the rootfs rather than inside it. Either shape
+# leaves a rootfs-scoped search unable to read the one file every image ships
+# exactly once.
+#
+# identify-kernel-version.py reads the whole extraction for this reason, but
+# only for the kernel's own two signatures (a loadable module's vermagic, the
+# kernel's own boot banner) — widening a search's directory scope is safe
+# here in a way it would not be for identify-version-strings.py's open table:
+# there is one kernel question to ask, not an open set of product names.
+KERNEL_COMPS="$WORK/kernel-out.json"
+echo '[]' > "$KERNEL_COMPS"
+if [ "${FW_KERNEL_VERSION:-true}" != "false" ] && command -v python3 >/dev/null 2>&1; then
+    echo "[firmware] reading the kernel version signature across the whole extraction..."
+    python3 "$(dirname "$0")/identify-kernel-version.py" "$EXTRACT" "$ROOTFS" > "$WORK/kernel-raw.json" \
+        || echo '[]' > "$WORK/kernel-raw.json"
+    if [ -s "$WORK/kernel-raw.json" ] && jq -e 'type == "array"' "$WORK/kernel-raw.json" >/dev/null 2>&1; then
+        cp "$WORK/kernel-raw.json" "$KERNEL_COMPS"
+    fi
+    if [ "$(jq 'length' "$KERNEL_COMPS" 2>/dev/null || echo 0)" != "0" ]; then
+        jq -s 'add // []' "$VERSTR_COMPS" "$KERNEL_COMPS" > "$WORK/verstr-merged.json" \
+            && mv "$WORK/verstr-merged.json" "$VERSTR_COMPS"
+    fi
+fi
+
+# --------------------------------------------------------
 # ④ Merge package + binary components, dedupe by name@version.
 # --------------------------------------------------------
 # Keep only components with a real name (drops syft's empty "os:unknown" noise).

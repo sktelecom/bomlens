@@ -202,7 +202,7 @@ jobs:
             "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest"
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: "trivy-${{ matrix.image }}.sarif"
           category: "nightly-image-${{ matrix.image }}"
@@ -237,7 +237,7 @@ jobs:
             --skip-dirs examples --skip-dirs tests/test-workspace .
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: trivy-deps.sarif
           category: nightly-deps

@@ -74,9 +74,11 @@ case "${1:-}" in
         rm -f "$piddir/server.pid"
         ;;
     pull)
-        # Should never be reached (image inspect says present); fail loudly.
-        echo "fake-docker: unexpected pull" >&2
-        exit 1
+        # refreshImageInBackground: the app checks for a newer image even though
+        # imagePresent said one is already there. Answer "already up to date" so
+        # the background check finishes instantly and boot proceeds unchanged.
+        echo "Status: Image is up to date for ${2:-image}"
+        exit 0
         ;;
     *)
         echo "fake-docker: unhandled subcommand: ${1:-}" >&2
