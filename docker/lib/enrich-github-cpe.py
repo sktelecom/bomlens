@@ -54,6 +54,7 @@ GITHUB_CPE_MAP = {
     ("open5gs", "open5gs"): ("open5gs", "open5gs"),
     ("golang", "go"): ("golang", "go", "go"),
     ("davegamble", "cjson"): ("davegamble", "cjson"),
+    ("torproject", "tor"): ("torproject", "tor"),
 }
 
 # Versions with a CPE-unsafe shape are left alone: a ':' (cpe field separator),
@@ -70,6 +71,20 @@ def _parse_github(purl):
     return owner, repo, version
 
 
+def _strip_repo_prefix(version, repo):
+    """Some projects tag releases as '<repo>-<version>' (torproject/tor uses
+    'tor-0.2.4.8-alpha', boostorg/boost uses 'boost-1.69.0-beta1'). Left in
+    place, that literal prefix sits inside the CPE version field and defeats
+    grype's own version-range comparison against NVD (verified: for Tor,
+    embedding the raw 'tor-0.2.4.8-alpha' string recovered only 2 of the 30
+    CVEs a plain '0.2.4.8-alpha' recovers). Strip it so the comparator sees the
+    same version scheme NVD's ranges are expressed in."""
+    prefix = repo.lower() + "-"
+    if version.lower().startswith(prefix):
+        return version[len(prefix):]
+    return version
+
+
 def derive_cpe(purl):
     """Return an NVD-matchable cpe:2.3 string, or None if this owner/repo is not
     in the curated map or the version is not safe to embed in a cpe:2.3 URI."""
@@ -83,10 +98,15 @@ def derive_cpe(purl):
     if not entry:
         return None
     vendor, product = entry[0], entry[1]
-    if len(entry) > 2 and version.startswith(entry[2]):
-        version = version[len(entry[2]):]
-        if not version or not _CPE_SAFE_VERSION.match(version):
-            return None
+    if len(entry) > 2:
+        # Explicit strip_prefix (e.g. golang/go's "go" tag prefix, which has no
+        # separator _strip_repo_prefix could key off).
+        if version.startswith(entry[2]):
+            version = version[len(entry[2]):]
+            if not version or not _CPE_SAFE_VERSION.match(version):
+                return None
+    else:
+        version = _strip_repo_prefix(version, repo)
     return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
 
 

@@ -1316,6 +1316,7 @@ cat > "$WORK/gh.json" <<'JSON'
  {"type":"library","name":"go","version":"go1.24.2","purl":"pkg:github/golang/go@go1.24.2"},
  {"type":"library","name":"go-bare-version","version":"1.24.2","purl":"pkg:github/golang/go@1.24.2"},
  {"type":"library","name":"cjson","version":"v1.7.16","purl":"pkg:github/davegamble/cjson@v1.7.16"},
+ {"type":"library","name":"tor","version":"tor-0.2.4.8-alpha","purl":"pkg:github/torproject/tor@tor-0.2.4.8-alpha"},
  {"type":"library","name":"random-tool","version":"1.0.0","purl":"pkg:github/some-org/random-tool@1.0.0"},
  {"type":"library","name":"has-cpe","version":"1.0","purl":"pkg:github/chromium/chromium@1.0","cpe":"cpe:2.3:a:preset:preset:1.0:*:*:*:*:*:*:*"},
  {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}]}
@@ -1339,6 +1340,11 @@ gh_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // 
 # (c4) curated map, no strip_prefix needed: davegamble/cjson keeps its "v" tag
 # prefix as-is (grype's comparator handles it fine, confirmed in F-1c4i).
 [ "$(gh_cpe_of cjson)" = "cpe:2.3:a:davegamble:cjson:v1.7.16:*:*:*:*:*:*:*" ] && pass "davegamble/cjson -> davegamble:cjson (curated, no strip needed)" || fail "cjson cpe='$(gh_cpe_of cjson)'"
+# (c5) curated map: torproject/tor -> torproject:tor, AND the release-tag prefix
+# ('tor-0.2.4.8-alpha') is stripped from the embedded version. Left in, that
+# prefix defeats grype's version-range comparison against NVD (verified: it
+# drops CVE recovery for this component from 30 to 2 — see enrich-github-cpe.py).
+[ "$(gh_cpe_of tor)" = "cpe:2.3:a:torproject:tor:0.2.4.8-alpha:*:*:*:*:*:*:*" ] && pass "torproject/tor -> torproject:tor, repo-prefix stripped from version (curated)" || fail "tor cpe='$(gh_cpe_of tor)'"
 # (d) NOT in the curated map: no cpe is guessed from the owner/repo name.
 [ "$(gh_cpe_of random-tool)" = "NONE" ] && pass "owner/repo not in the curated map gets no cpe (no guessing)" || fail "random-tool wrongly got cpe='$(gh_cpe_of random-tool)'"
 # (e) a pre-existing cpe is never overwritten, even for a mapped owner/repo.
@@ -1383,6 +1389,10 @@ print(len(json.loads(p.stdout).get('matches', [])))
         case ",$gh_cves," in
             *,CVE-2023-50471,*) pass "grype CPE matcher recovers CVE-2023-50471 for davegamble/cjson" ;;
             *) fail "CVE-2023-50471 not found in grype nvd:cpe results for cjson" ;;
+        esac
+        case ",$gh_cves," in
+            *,CVE-2013-7295,*) pass "grype CPE matcher recovers CVE-2013-7295 for tor (github-curated cpe, prefix stripped)" ;;
+            *) fail "CVE-2013-7295 not found in grype nvd:cpe results for tor" ;;
         esac
     else
         echo "  SKIP: grype produced no sidecar (offline DB unavailable?); skipping CVE-recovery assertions"
