@@ -52,7 +52,7 @@ env:
 
 jobs:
   capture:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     timeout-minutes: 180
     permissions:
       contents: write
