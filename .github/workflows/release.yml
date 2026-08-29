@@ -19,7 +19,7 @@ permissions:
 jobs:
   create-release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       contents: write
 
@@ -107,7 +107,7 @@ jobs:
   upload-assets:
     name: Upload Release Assets
     needs: create-release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       contents: write
 
@@ -271,7 +271,7 @@ jobs:
   release-gate:
     name: Release Gate (verify entry points, then publish)
     needs: [create-release, upload-assets, docs-walkthrough]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       contents: write
       packages: read
@@ -350,7 +350,7 @@ jobs:
   summary:
     name: Release Summary
     needs: [create-release, upload-assets, docs-walkthrough, release-gate]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     
     steps:
       - name: Generate summary
