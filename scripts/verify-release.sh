@@ -43,6 +43,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fail=0
 
+# Resolve gh once, up front, rather than relying on it staying on PATH for the
+# whole script. Observed on v1.11.4 (self-hosted runner): `gh` resolved fine
+# at the start of this script but had silently dropped off PATH by the time
+# step 4 ran, ~6 minutes and a `bash tests/test-docs-walkthrough.sh` later --
+# the exact mechanism wasn't pinned down. A fixed path sidesteps whatever is
+# mutating PATH mid-script instead of chasing it further.
+GH_BIN="$(command -v gh || true)"
+if [ -z "$GH_BIN" ]; then
+    echo "❌ gh CLI not found on PATH; cannot verify the release" >&2
+    exit 1
+fi
+
 echo "Verifying release $TAG (image $IMAGE)"
 
 # ---------------------------------------------------------------------------
@@ -53,7 +65,7 @@ echo "1) Desktop installers attached to release $TAG"
 deadline=$(( $(date +%s) + TIMEOUT ))
 exe_size=""; dmg_size=""
 while :; do
-    assets="$(gh release view "$TAG" --repo "$REPO" --json assets \
+    assets="$("$GH_BIN" release view "$TAG" --repo "$REPO" --json assets \
         -q '.assets[] | .name + ":" + (.size|tostring)' 2>/dev/null || true)"
     exe_size="$(printf '%s\n' "$assets" | sed -n 's/^BomLens-Setup\.exe://p' | head -1)"
     dmg_size="$(printf '%s\n' "$assets" | sed -n 's/^BomLens-Setup\.dmg://p' | head -1)"
@@ -125,7 +137,7 @@ echo "4) SBOM assets attached to release $TAG"
 # minute walkthrough had already passed. Retry a few times before giving up.
 sbom_size=""
 for _ in 1 2 3 4 5; do
-    sbom_assets="$(gh release view "$TAG" --repo "$REPO" --json assets \
+    sbom_assets="$("$GH_BIN" release view "$TAG" --repo "$REPO" --json assets \
         -q '.assets[] | .name + ":" + (.size|tostring)' 2>&1)"
     sbom_size="$(printf '%s\n' "$sbom_assets" | sed -n "s/^bomlens-source-${TAG}\.cdx\.json://p" | head -1)"
     if [ -n "$sbom_size" ] && [ "$sbom_size" -ge 100 ] 2>/dev/null; then
