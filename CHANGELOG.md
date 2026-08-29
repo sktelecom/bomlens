@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.4] - 2026-08-29
+
+### Fixed
+
+- The desktop app now refreshes its bundled scanner image when a newer one is published to the registry, instead of staying pinned to whatever was pulled once.
+
+- A malformed or unusual SBOM (a mistyped CycloneDX `specVersion`, or one mixing multiple OS package types) no longer causes the security scan to silently return zero findings; the scan retries after normalizing or splitting the input.
+
+- A CVE without grype's primary identifier is now recovered through its aliases instead of being dropped.
+
+- The curated CPE maps used to attach NVD-only CVEs to GitHub- and Maven-coordinate components were expanded and corrected: Tor's release-tag prefix is stripped before matching, Go's "go1.x" tag no longer floods every Go CVE into scan results, several mismapped Maven groupIds now resolve to their real NVD vendor, and projects NVD has split across more than one CPE vendor over their history (Spring Framework, Spring Security, Jetty) now carry every relevant vendor's CVEs. Apache ActiveMQ's Artemis and Classic lines, which share a Maven groupId but are different NVD products, are now told apart by artifact name.
+
+### Added
+
+- Firmware scans now read the kernel version from outside the root filesystem when the kernel image lives there, so kernel CVE identification no longer silently comes up empty for those images.
+
 ## [v1.11.3] - 2026-08-20
 
 ### Fixed
