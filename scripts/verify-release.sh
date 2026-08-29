@@ -118,9 +118,22 @@ fi
 #    quietly lost them would still install and scan, so nothing else notices.
 # ---------------------------------------------------------------------------
 echo "4) SBOM assets attached to release $TAG"
-sbom_assets="$(gh release view "$TAG" --repo "$REPO" --json assets \
-    -q '.assets[] | .name + ":" + (.size|tostring)' 2>/dev/null || true)"
-sbom_size="$(printf '%s\n' "$sbom_assets" | sed -n "s/^bomlens-source-${TAG}\.cdx\.json://p" | head -1)"
+# A single one-shot `gh release view` here (unlike step 1's polling loop) had
+# no resilience against a transient read failure -- observed on v1.11.4: the
+# call silently came back empty (stderr swallowed by 2>/dev/null) even though
+# the asset was already confirmed present, failing the gate after the ~40-
+# minute walkthrough had already passed. Retry a few times before giving up.
+sbom_size=""
+for _ in 1 2 3 4 5; do
+    sbom_assets="$(gh release view "$TAG" --repo "$REPO" --json assets \
+        -q '.assets[] | .name + ":" + (.size|tostring)' 2>&1)"
+    sbom_size="$(printf '%s\n' "$sbom_assets" | sed -n "s/^bomlens-source-${TAG}\.cdx\.json://p" | head -1)"
+    if [ -n "$sbom_size" ] && [ "$sbom_size" -ge 100 ] 2>/dev/null; then
+        break
+    fi
+    echo "  (retrying SBOM asset lookup: $sbom_assets)"
+    sleep 5
+done
 if [ -n "$sbom_size" ] && [ "$sbom_size" -ge 100 ] 2>/dev/null; then
     echo "  ✓ bomlens-source-${TAG}.cdx.json attached (${sbom_size} bytes)"
 else
