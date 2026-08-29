@@ -44,7 +44,7 @@ jobs:
   # ---------------------------------------------------------------
   build-postprocess:
     name: Build post-process image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       contents: write   # attach the image SBOM to the release
       id-token: write   # keyless cosign signing (Sigstore OIDC)
@@ -254,12 +254,13 @@ jobs:
   # ---------------------------------------------------------------
   build-firmware:
     name: Build firmware image
-    # ubuntu-latest (amd64): the firmware CVE data now comes from a plain git clone
-    # of the NVD data feeds plus a local distill (docker/build-cpe-index.py), with
-    # no NVD api2 rate limit and no API key, so this builds on GitHub cloud runners.
-    # (It previously needed a self-hosted runner because NVD throttled the api2
-    # fetch into multi-hour stalls from cloud IPs.)
-    runs-on: ubuntu-latest
+    # The firmware CVE data comes from a plain git clone of the NVD data feeds
+    # plus a local distill (docker/build-cpe-index.py), with no NVD api2 rate
+    # limit and no API key, so this doesn't need a cloud IP. (It previously
+    # needed a self-hosted runner because NVD throttled the api2 fetch into
+    # multi-hour stalls from cloud IPs — that constraint no longer applies,
+    # so being back on self-hosted here is incidental, not required.)
+    runs-on: [self-hosted, linux, bomlens-wsl]
     # The NVD-feed clone + distill is the long pole (~a few minutes).
     timeout-minutes: 45
     permissions:
@@ -328,7 +329,7 @@ jobs:
   # ---------------------------------------------------------------
   build-aibom:
     name: Build AIBOM image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       contents: read
       packages: write
@@ -395,7 +396,7 @@ jobs:
   #     lean; the DB is ~1.8 GB.
   build-deep-cve:
     name: Build deep-cve image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     # `grype db update` downloads a ~1.8 GB DB at build time; give it headroom.
     timeout-minutes: 45
     permissions:
@@ -458,7 +459,7 @@ jobs:
 
   summary:
     name: Build summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     needs: [ build-postprocess, build-firmware, build-aibom, build-deep-cve ]
     # always(): the opt-in images are skipped on plain main pushes — still summarize.
     if: ${{ always() && github.event_name != 'pull_request' && needs.build-postprocess.result == 'success' }}

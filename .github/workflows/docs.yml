@@ -47,7 +47,7 @@ jobs:
   # main 병합 전에 드러난다.
   build:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -70,7 +70,7 @@ jobs:
   # 읽기 권한이면 충분하다.
   build-site:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -97,7 +97,7 @@ jobs:
   deploy:
     if: github.event_name != 'pull_request'
     needs: build-site
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bomlens-wsl]
     permissions:
       pages: write
       id-token: write
