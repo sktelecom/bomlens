@@ -2,10 +2,15 @@ name: Docs site
 
 # docs/ 정본 마크다운을 MkDocs Material로 빌드해 GitHub Pages에 배포한다.
 # 사이트 소스는 docs/이며, internal/과 contributing/는 mkdocs.yml의 exclude_docs로 제외된다.
-# 최초 1회 저장소 Settings > Pages에서 소스를 "GitHub Actions"로 지정해야 한다.
+# 저장소 Settings > Pages의 소스는 "브랜치"(gh-pages, 루트)로 지정돼 있어야 한다.
 #
-# 빌드 결과는 아티팩트로 올리고 Pages가 그것을 받아 배포한다. 저장소 브랜치에
-# 쓰지 않으므로 워크플로 토큰에 contents 쓰기가 필요하지 않다.
+# 빌드 결과를 gh-pages 브랜치에 직접 push한다(고아 커밋으로 매번 히스토리를
+# 새로 씀 — 브랜치는 빌드 산출물일 뿐이라 이력이 쌓일 이유가 없다). Actions
+# 아티팩트는 거치지 않는다: upload-pages-artifact/deploy-pages 조합이 계속
+# 실패해서, 그 저장소를 아예 안 쓰는 브랜치 push로 바꿨다. 나중에 그 조합이
+# 다시 안정적으로 동작하면 Settings > Pages를 "GitHub Actions" 소스로 돌리고
+# 이 워크플로도 아티팩트 방식으로 되돌리는 걸 고려할 것 — 지금 이 방식으로도
+# 계속 문제없이 돌아간다면 굳이 되돌릴 필요는 없다.
 #
 # 사이트에는 읽기 전용 데모(/demo/)도 함께 실린다. 데이터(docs/demo/data/)는
 # scripts/capture-demo-data.sh가 만들어 저장소에 커밋된 것이고, 화면을 그리는
@@ -35,6 +40,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: docs-site-deploy
+  cancel-in-progress: false
 
 env:
   # 사이트가 하위 경로(/bomlens/)에 서비스되므로 번들의 자산 경로와 데이터 경로
@@ -66,11 +75,13 @@ jobs:
           pip install -r docs/requirements.txt
           mkdocs build --strict
 
-  # main에서는 빌드 결과를 Pages 아티팩트로 올리기만 한다. 저장소에 쓰지 않으므로
-  # 읽기 권한이면 충분하다.
+  # main에서는 빌드 결과를 gh-pages 브랜치에 직접 push해 배포한다. 브랜치 쓰기가
+  # 필요하므로 이 잡만 contents: write로 권한을 올린다.
   build-site:
     if: github.event_name != 'pull_request'
     runs-on: [self-hosted, linux, bomlens-wsl]
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -88,22 +99,20 @@ jobs:
           pip install --upgrade pip
           pip install -r docs/requirements.txt
           mkdocs build --strict
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: site
 
-  # 배포만 하는 잡. pages 쓰기는 사이트 배포에만 쓰이고, id-token 쓰기는 그 배포를
-  # 인증하는 OIDC 토큰을 받기 위한 것이라 저장소 내용에는 닿지 않는다.
-  deploy:
-    if: github.event_name != 'pull_request'
-    needs: build-site
-    runs-on: [self-hosted, linux, bomlens-wsl]
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      # site/를 고아 커밋 하나로 gh-pages에 강제 push한다. 이 브랜치는 빌드
+      # 산출물일 뿐이라 이력을 쌓을 이유가 없고, 매번 새로 써서 브랜치가
+      # 무한정 커지는 것도 막는다.
+      - name: Publish to gh-pages
+        run: |
+          set -euo pipefail
+          cd site
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          touch .nojekyll
+          git add -A
+          git commit -q -m "docs: publish ${GITHUB_SHA}"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
