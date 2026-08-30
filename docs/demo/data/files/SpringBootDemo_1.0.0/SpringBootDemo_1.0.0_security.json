@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a01f20-c458-77f3-9798-2cfcf5c312b4",
-  "CreatedAt": "2026-08-20T12:23:56.248523419Z",
+  "ReportID": "01a050ab-da5e-7240-b1ec-93affe86ea52",
+  "CreatedAt": "2026-08-30T03:17:14.974152166Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1644,7 +1644,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-08-14T13:19:03.37Z"
+          "LastModifiedDate": "2026-08-26T13:19:15.917Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -2633,7 +2633,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -4631,7 +4631,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,

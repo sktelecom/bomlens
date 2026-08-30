@@ -8,21 +8,21 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.4",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.4",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
           "type": "application",
-          "version": "12.8.4"
+          "version": "12.8.3"
         }
       },
       "bom-ref": "metadata-annotations",
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Thursday, August 20, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-08-20T12:23:50Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, August 30, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-08-30T03:16:59Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -1006,7 +1006,7 @@
       ],
       "type": "library",
       "version": "2.2.224",
-      "cpe": "cpe:2.3:a:h2database:h2database:2.2.224:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:h2database:h2:2.2.224:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
@@ -2714,7 +2714,7 @@
       "scope": "required",
       "type": "library",
       "version": "2.0.0",
-      "cpe": "cpe:2.3:a:eclipse:angus:2.0.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:eclipse:angus_mail:2.0.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar",
@@ -3426,7 +3426,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3445,7 +3445,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar",
@@ -3547,7 +3547,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3567,7 +3567,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
@@ -3669,7 +3669,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3688,7 +3688,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar",
@@ -3790,7 +3790,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3810,7 +3810,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar",
@@ -3912,7 +3912,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3931,7 +3931,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar",
@@ -4033,7 +4033,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4053,7 +4053,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar",
@@ -4155,7 +4155,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4175,7 +4175,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
@@ -4277,7 +4277,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4298,7 +4298,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
@@ -4400,7 +4400,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4420,7 +4420,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar",
@@ -4522,7 +4522,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4541,7 +4541,7 @@
       ],
       "type": "framework",
       "version": "3.2.0",
-      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
@@ -4624,6 +4624,10 @@
         {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:3.2.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:3.2.0:*:*:*:*:*:*:*\"]"
         }
       ],
       "publisher": "Pivotal Software, Inc.",
@@ -4717,6 +4721,10 @@
         {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:3.2.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:3.2.0:*:*:*:*:*:*:*\"]"
         }
       ],
       "purl": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
@@ -4811,6 +4819,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -4828,7 +4840,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4932,6 +4944,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -4949,7 +4965,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5053,6 +5069,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5070,7 +5090,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5174,6 +5194,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5191,7 +5215,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5295,6 +5319,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5312,7 +5340,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5416,6 +5444,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5433,7 +5465,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5537,6 +5569,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5554,7 +5590,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5659,6 +5695,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5676,7 +5716,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5780,6 +5820,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.0:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5797,7 +5841,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5901,6 +5945,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.0:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -5918,7 +5966,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6022,6 +6070,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -6039,7 +6091,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6143,6 +6195,10 @@
           "value": "maven-groupid"
         },
         {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
           "name": "bomlens:eol",
           "value": "true"
         },
@@ -6160,7 +6216,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-08-20"
+          "value": "endoflife.date@2026-08-28"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6661,7 +6717,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-08-20T12:23:49Z",
+    "timestamp": "2026-08-30T03:16:59Z",
     "tools": {
       "components": [
         {
@@ -6670,24 +6726,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.4",
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
           "group": "@cyclonedx",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.4",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
           "type": "application",
-          "version": "12.8.4"
+          "version": "12.8.3"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.3"
+          "version": "unknown"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:520e9eeb-f816-42a2-bb88-cd1568173e08",
+  "serialNumber": "urn:uuid:0ddf6af5-f46e-4f29-b339-84b3d0e05bc2",
   "services": [],
   "specVersion": "1.6",
   "version": 1

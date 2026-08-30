@@ -21,11 +21,23 @@
       "type": "directory"
     },
     {
-      "path": "src/.gitkeep",
+      "path": "README.md",
+      "type": "file"
+    },
+    {
+      "path": "pom.xml",
+      "type": "file"
+    },
+    {
+      "path": "src/main/.gitkeep",
       "type": "file"
     },
     {
       "path": "src/main/java/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/.gitkeep",
       "type": "file"
     },
     {
@@ -37,19 +49,7 @@
       "type": "file"
     },
     {
-      "path": "src/main/java/com/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "type": "file"
-    },
-    {
-      "path": "pom.xml",
+      "path": "src/.gitkeep",
       "type": "file"
     }
   ]

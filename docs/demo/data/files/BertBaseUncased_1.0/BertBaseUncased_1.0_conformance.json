@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-08-20T12:24:21Z",
+  "generatedAt": "2026-08-30T03:18:11Z",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -27,7 +27,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-08-20T12:24:16+00:00",
+      "detail": "2026-08-30T03:18:04+00:00",
       "missing": [],
       "regulations": [
         {
@@ -2363,7 +2363,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-08-20T12:24:16+00:00",
+            "detail": "2026-08-30T03:18:04+00:00",
             "refs": [
               "Section 5.2.1"
             ]
