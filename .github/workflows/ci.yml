@@ -96,6 +96,14 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
           echo "✅ Shellcheck passed (warning severity and above)"
       
+      # This runner is long-lived (not a fresh VM per job), so a `docker login
+      # ghcr.io` from an earlier job on the box can leave a repo-scoped
+      # credential cached that then gets tried against unrelated public ghcr.io
+      # images and rejected ("denied: denied") instead of falling back to an
+      # anonymous pull. Clear it before pulling hadolint's public image below.
+      - name: Log out of ghcr.io
+        run: docker logout ghcr.io || true
+
       # Blocking at error level (warnings stay advisory); the Dockerfile passes
       # this threshold today, so a new error-level finding should fail the build.
       - name: Lint Dockerfile
