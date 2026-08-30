@@ -17,7 +17,10 @@ import {
   CONTAINER_ERR,
   currentDockerBin,
   defaultOutputDir,
+  detectWsl2Docker,
+  dockerStatus,
   findFreePort,
+  resetDockerBin,
   resolveDockerBin,
   scanMountArgs,
 } from "../lib/container.mjs";
@@ -226,4 +229,81 @@ test("sibling image refs default to the firmware/aibom images", () => {
   if (!process.env.SBOM_AIBOM_IMAGE) {
     assert.equal(AIBOM_IMAGE, "ghcr.io/sktelecom/bomlens-aibom:latest");
   }
+});
+
+// dockerStatus의 -1(spawn 실패, 진짜 못 찾음) vs 그 밖의 0이 아닌 코드(바이너리는 찾아서
+// 실행했지만 엔진에 못 붙음) 분류. 실제 회귀: Rancher/Docker Desktop이 설치는 됐지만 꺼져
+// 있으면 Windows에서 이게 타임아웃이 아니라 code 1로 빠르게 끝나는데, 예전 코드는 이걸
+// "미설치"로 오분류해 이미 설치한 걸 또 설치하라고 안내했다.
+test("dockerStatus reports installed+not running when a found binary can't reach the engine", async () => {
+  resetDockerBin();
+  const runImpl = async () => ({ code: 1, out: "", err: "cannot connect to the docker daemon" });
+  const status = await dockerStatus({ runImpl });
+  assert.deepEqual(status, { installed: true, running: false });
+});
+
+test("dockerStatus retries known install paths on any non-zero, non-timeout code", async () => {
+  resetDockerBin();
+  const calls = [];
+  const runImpl = async (cmd) => {
+    calls.push(cmd);
+    // 첫 시도("docker")는 PATH에 없어 ENOENT, 재탐색으로 찾은 경로는 실행은 되지만
+    // 엔진에 못 붙어 code 1.
+    return cmd === "docker" ? { code: -1, out: "", err: "" } : { code: 1, out: "", err: "" };
+  };
+  const resolveDockerBinImpl = () => "C:\\Program Files\\Rancher Desktop\\...\\docker.exe";
+  const status = await dockerStatus({ runImpl, resolveDockerBinImpl });
+  assert.deepEqual(status, { installed: true, running: false });
+  assert.deepEqual(calls, ["docker", "C:\\Program Files\\Rancher Desktop\\...\\docker.exe"]);
+});
+
+test("dockerStatus reports not-installed only when spawn fails even after the retry", async () => {
+  resetDockerBin();
+  const runImpl = async () => ({ code: -1, out: "", err: "" });
+  const detectWsl2DockerImpl = async () => false;
+  const status = await dockerStatus({
+    runImpl,
+    resolveDockerBinImpl: () => null,
+    detectWsl2DockerImpl,
+  });
+  assert.deepEqual(status, { installed: false, running: false, wsl2Only: false });
+});
+
+test("dockerStatus flags wsl2Only when WSL2 has a working Docker engine but native lookup failed", async () => {
+  resetDockerBin();
+  const runImpl = async () => ({ code: -1, out: "", err: "" });
+  const detectWsl2DockerImpl = async () => true;
+  const status = await dockerStatus({
+    runImpl,
+    resolveDockerBinImpl: () => null,
+    detectWsl2DockerImpl,
+  });
+  assert.deepEqual(status, { installed: false, running: false, wsl2Only: true });
+});
+
+test("dockerStatus still treats a stalled engine as installed+not running (timeout path unchanged)", async () => {
+  resetDockerBin();
+  const runImpl = async () => ({ code: -2, out: "", err: "", timedOut: true });
+  const status = await dockerStatus({ runImpl });
+  assert.deepEqual(status, { installed: true, running: false });
+});
+
+test("detectWsl2Docker is false on non-Windows without spawning anything", async () => {
+  const runImpl = async () => {
+    throw new Error("should not be called on non-win32");
+  };
+  assert.equal(await detectWsl2Docker({ runImpl, platform: "darwin" }), false);
+});
+
+test("detectWsl2Docker reflects whether `wsl.exe -- docker info` succeeds", async () => {
+  const calls = [];
+  const ok = async (cmd, args) => {
+    calls.push([cmd, ...args]);
+    return { code: 0, out: "", err: "" };
+  };
+  assert.equal(await detectWsl2Docker({ runImpl: ok, platform: "win32" }), true);
+  assert.deepEqual(calls, [["wsl.exe", "--", "docker", "info"]]);
+
+  const fail = async () => ({ code: 1, out: "", err: "" });
+  assert.equal(await detectWsl2Docker({ runImpl: fail, platform: "win32" }), false);
 });

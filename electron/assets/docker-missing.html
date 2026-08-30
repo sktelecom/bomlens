@@ -190,11 +190,15 @@
         ko: {
           title: "Docker가 필요합니다",
           titleNotRunning: "Docker 엔진을 켜 주세요",
+          titleWsl2Only: "이 앱은 WSL2의 Docker를 못 씁니다",
           leadNotRunning:
             "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. Rancher Desktop 또는 Docker Desktop을 켜고 아이콘이 안정될 때까지 기다린 뒤 이 앱을 다시 실행하세요.",
           leadNotRunningLinux:
             "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. sudo systemctl start docker로 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
           leadNotInstalled: "Docker가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다.",
+          leadWsl2Only:
+            "WSL2 안에 Docker가 떠 있는 게 확인됐지만, 이 데스크톱 앱은 WSL2 쪽 Docker에 연결하는 방법을 아직 지원하지 않습니다. 대신 WSL2 터미널 안에서 CLI로 실행하세요.",
+          wsl2Cli: "wsl 실행 후, 저장소 폴더에서:",
           intro: {
             win32: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Windows에서 쓸 수 있는 무료 옵션:",
             darwin: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. macOS에서 쓸 수 있는 옵션:",
@@ -208,11 +212,15 @@
         en: {
           title: "Docker is required",
           titleNotRunning: "Please start the Docker engine",
+          titleWsl2Only: "This app can't use Docker inside WSL2",
           leadNotRunning:
             "Docker is installed but the engine isn't running. Start Rancher Desktop or Docker Desktop, wait until the icon settles, then relaunch this app.",
           leadNotRunningLinux:
             "Docker is installed but the engine isn't running. Start it with sudo systemctl start docker, then relaunch this app.",
           leadNotInstalled: "Docker isn't installed or can't be found on your PATH.",
+          leadWsl2Only:
+            "Docker is running inside WSL2, but this desktop app doesn't yet know how to reach it. Run BomLens from the CLI inside WSL2 instead.",
+          wsl2Cli: "Open wsl, then from the repository folder:",
           intro: {
             win32: "BomLens runs the scanner as a Docker container. Free options on Windows:",
             darwin: "BomLens runs the scanner as a Docker container. Options on macOS:",
@@ -239,7 +247,10 @@
           {
             url: "https://docs.docker.com/engine/install/",
             name: "WSL2 + docker-ce",
-            desc: { ko: "완전 무료", en: "completely free" },
+            desc: {
+              ko: "완전 무료 — CLI 전용, 이 데스크톱 앱에서는 안 됨",
+              en: "completely free — CLI only, does not work with this desktop app",
+            },
           },
           {
             url: "https://www.docker.com/products/docker-desktop/",
@@ -296,32 +307,48 @@
       const s = STR[lang];
 
       document.getElementById("title").textContent =
-        reason === "not-running" ? s.titleNotRunning : s.title;
+        reason === "not-running" ? s.titleNotRunning : reason === "wsl2-only" ? s.titleWsl2Only : s.title;
       document.getElementById("lead").textContent =
         reason === "not-running"
           ? platform === "linux"
             ? s.leadNotRunningLinux
             : s.leadNotRunning
-          : s.leadNotInstalled;
-      document.getElementById("intro").textContent = s.intro[platform];
-      document.getElementById("hint").textContent = s.hint;
+          : reason === "wsl2-only"
+            ? s.leadWsl2Only
+            : s.leadNotInstalled;
 
-      // 옵션 목록 렌더: 링크가 있으면 <a>, 명령어면 <code>, 설명은 " — "로 잇는다.
-      const list = document.getElementById("options");
-      for (const opt of OPTIONS[platform]) {
+      // wsl2-only: 설치 옵션 목록(이 앱에는 안 맞는 항목들 포함)을 보여주는 대신 CLI 명령
+      // 한 줄만 안내한다 — 이 경우엔 "무엇을 설치할지"가 아니라 "어떻게 실행할지"가 문제다.
+      if (reason === "wsl2-only") {
+        document.getElementById("intro").textContent = s.wsl2Cli;
+        const list = document.getElementById("options");
         const li = document.createElement("li");
-        let label;
-        if (opt.url) {
-          label = document.createElement("a");
-          label.href = opt.url;
-          label.textContent = opt.name;
-        } else {
-          label = document.createElement(opt.code ? "code" : "span");
-          label.textContent = opt.name;
-        }
-        li.appendChild(label);
-        li.appendChild(document.createTextNode(` — ${opt.desc[lang]}`));
+        const code = document.createElement("code");
+        code.textContent = "./scripts/scan-sbom.sh --ui";
+        li.appendChild(code);
         list.appendChild(li);
+        document.getElementById("hint").textContent = "";
+      } else {
+        document.getElementById("intro").textContent = s.intro[platform];
+        document.getElementById("hint").textContent = s.hint;
+
+        // 옵션 목록 렌더: 링크가 있으면 <a>, 명령어면 <code>, 설명은 " — "로 잇는다.
+        const list = document.getElementById("options");
+        for (const opt of OPTIONS[platform]) {
+          const li = document.createElement("li");
+          let label;
+          if (opt.url) {
+            label = document.createElement("a");
+            label.href = opt.url;
+            label.textContent = opt.name;
+          } else {
+            label = document.createElement(opt.code ? "code" : "span");
+            label.textContent = opt.name;
+          }
+          li.appendChild(label);
+          li.appendChild(document.createTextNode(` — ${opt.desc[lang]}`));
+          list.appendChild(li);
+        }
       }
 
       // "다시 확인": main이 Docker를 재점검한다. 성공하면 main이 상태 화면으로 전환하고,
@@ -342,6 +369,14 @@
             ? await window.sbomDesktop.retryStartup()
             : { ok: false };
         if (!result || !result.ok) {
+          // 사유가 바뀌었으면(예: 재확인 사이에 WSL2 Docker가 새로 감지됨) 토스트 대신
+          // 화면 전체를 새 사유로 다시 연다 — 안내 문구·옵션 목록이 사유에 따라 다르다.
+          if (result && result.reason && result.reason !== reason) {
+            const next = new URLSearchParams(location.search);
+            next.set("reason", result.reason);
+            location.replace(`${location.pathname}?${next}`);
+            return;
+          }
           checkAgain.disabled = false;
           feedback.textContent = s.stillMissing;
           feedback.style.visibility = "visible";

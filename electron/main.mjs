@@ -265,7 +265,9 @@ async function startup() {
   const docker = await dockerStatus();
   if (!docker.installed || !docker.running) {
     appOrigin = "file://";
-    const reason = !docker.installed ? "not-installed" : "not-running";
+    // wsl2Only: 네이티브로는 못 찾았지만 WSL2 안에는 Docker가 있다 — "설치하세요"가 아니라
+    // "이 앱은 그 조합을 못 씁니다"를 안내해야 한다(docker-missing.html의 별도 분기).
+    const reason = !docker.installed ? (docker.wsl2Only ? "wsl2-only" : "not-installed") : "not-running";
     setBootState(BOOT.FAILED_DOCKER, reason);
     // platform은 OS별 설치 안내(옵션 목록) 분기용. 렌더러는 process에 접근할 수 없다.
     await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
@@ -445,7 +447,8 @@ function registerApp() {
       resetDockerBin();
       const docker = await dockerStatus();
       if (!docker.installed || !docker.running) {
-        return { ok: false, reason: !docker.installed ? "not-installed" : "not-running" };
+        const reason = !docker.installed ? (docker.wsl2Only ? "wsl2-only" : "not-installed") : "not-running";
+        return { ok: false, reason };
       }
       // Docker가 살아났다: 상태 화면으로 돌아가 부팅을 재개한다(응답은 즉시 반환).
       await mainWindow.loadFile(path.join(here, "assets", "status.html"), {

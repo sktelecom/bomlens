@@ -147,9 +147,11 @@ Docker Desktop이 가장 간단하지만 일정 규모 이상의 조직에서는
 
 | 옵션 | 특징 |
 |------|------|
-| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투에 docker-ce를 설치하고 그 안에서 `scan-sbom.sh`를 실행. `.bat`와 Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 |
+| **WSL2 + docker-ce** (권장, 완전 무료) | WSL2 우분투에 docker-ce를 설치하고 그 안에서 `scan-sbom.sh`를 실행. `.bat`와 Windows 명명 파이프가 필요 없고 경로 변환 문제도 없음 — **CLI 전용, 위 1번(설치 파일 `.exe`) 흐름과는 안 맞음** |
 | **Rancher Desktop** (무료, GUI) | Docker Desktop 대체 GUI, `docker` CLI 제공. `.bat`와 데스크톱 앱 흐름에 그대로 사용 |
 | Docker Desktop | 가장 간편하지만 조직 사용 시 유료 라이선스 확인 필요 |
+
+위에서 [명령어 없이 시작하기](#명령어-없이-시작하기-권장)(설치 파일 `.exe`)로 시작했다면 WSL2 + docker-ce가 아니라 Rancher Desktop이나 Docker Desktop을 설치하세요. 데스크톱 앱은 아직 WSL2 안의 Docker에 연결하는 방법을 모릅니다 — WSL2 쪽에 설치해도 앱은 계속 "Docker가 설치되어 있지 않습니다"라고 안내합니다.
 
 WSL2 + docker-ce 설치 요약(관리자 PowerShell):
 

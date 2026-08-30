@@ -145,9 +145,11 @@ Docker Desktop is simplest, but it needs a paid license above a certain organiza
 
 | Option | Notes |
 |--------|-------|
-| **WSL2 + docker-ce** (free) | Install docker-ce inside WSL2 Ubuntu and run `scan-sbom.sh` there. No `.bat`, no Windows named pipe, no path-conversion issues. |
+| **WSL2 + docker-ce** (free) | Install docker-ce inside WSL2 Ubuntu and run `scan-sbom.sh` there. No `.bat`, no Windows named pipe, no path-conversion issues. **CLI only — does not work with the `.exe` installer flow above.** |
 | **Rancher Desktop** (free, GUI) | A drop-in GUI replacement for Docker Desktop with a `docker` CLI. Works with the `.bat` double-click and desktop-app flows. |
 | Docker Desktop | Easiest, but check licensing for organizational use. |
+
+If you started with [the installer](#start-without-the-command-line-recommended) (the `.exe`), install Rancher Desktop or Docker Desktop instead of WSL2 + docker-ce — the desktop app doesn't yet know how to reach Docker running inside WSL2, so it will keep reporting "Docker isn't installed" even after you set that up.
 
 WSL2 + docker-ce, the short version (admin PowerShell):
 
