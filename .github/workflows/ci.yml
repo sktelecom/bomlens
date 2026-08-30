@@ -96,21 +96,26 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
           echo "✅ Shellcheck passed (warning severity and above)"
       
-      # This runner is long-lived (not a fresh VM per job), so a `docker login
-      # ghcr.io` from an earlier job on the box can leave a repo-scoped
-      # credential cached that then gets tried against unrelated public ghcr.io
-      # images and rejected ("denied: denied") instead of falling back to an
-      # anonymous pull. Clear it before pulling hadolint's public image below.
-      - name: Log out of ghcr.io
-        run: docker logout ghcr.io || true
+      # Pinned release binary rather than the action: the action builds and
+      # runs a Docker image from ghcr.io/hadolint/hadolint, which started
+      # failing anonymous pulls with "denied: denied" on this runner (a
+      # `docker logout ghcr.io` before it didn't help, ruling out a stale
+      # cached credential from an earlier job on this long-lived runner as the
+      # cause). A plain binary from github.com sidesteps the registry pull
+      # entirely, matching the install shape gitleaks already uses below.
+      - name: Install hadolint
+        env:
+          # renovate: datasource=github-releases depName=hadolint/hadolint
+          HADOLINT_VERSION: v2.15.0
+        run: |
+          curl -sSfL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o /tmp/hadolint
+          sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
+          hadolint --version
 
       # Blocking at error level (warnings stay advisory); the Dockerfile passes
       # this threshold today, so a new error-level finding should fail the build.
       - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@2a66e89f53d0771bb131a7fa31f3136336094aa6 # v3.4.0
-        with:
-          dockerfile: docker/Dockerfile
-          failure-threshold: error
+        run: hadolint --failure-threshold error docker/Dockerfile
 
   secrets:
     name: Secret Scan
