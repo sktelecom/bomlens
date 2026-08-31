@@ -127,13 +127,13 @@ SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.8.0" \
 
 스캔이 끝났는데 산출물 파일이 PC에 보이지 않으면, 실행 폴더가 Docker 파일 공유에 포함된 경로인지 확인하세요. 홈 디렉터리(`C:\Users\...`) 아래는 Rancher Desktop과 Docker Desktop 모두 기본 공유되므로 안전합니다. 공유되지 않은 위치에서 실행하면 컨테이너가 결과를 호스트에 쓰지 못합니다.
 
-### Docker 권한 오류
+### Docker 권한 오류 (Linux/WSL2)
 
 ```
 Got permission denied while trying to connect to the Docker daemon
 ```
 
-현재 사용자를 `docker` 그룹에 추가합니다.
+Rancher Desktop이나 Docker Desktop을 쓰는 Windows/macOS에는 해당하지 않습니다. 현재 사용자를 `docker` 그룹에 추가합니다.
 
 ```bash
 sudo usermod -aG docker $USER
@@ -146,11 +146,13 @@ newgrp docker
 no space left on device
 ```
 
-Docker 캐시를 정리합니다.
+Docker 캐시를 정리합니다. 터미널이 있다면:
 
 ```bash
 docker system prune -f
 ```
+
+Rancher Desktop이나 Docker Desktop을 쓴다면 앱의 설정(Preferences) 화면에서도 같은 정리를 할 수 있습니다.
 
 ### 그 밖의 문제
 

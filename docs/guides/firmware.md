@@ -47,11 +47,17 @@ Firmware analysis needs the firmware image (above), whether you use the web UI o
 
 ### From the web UI
 
-The web UI offers the firmware upload tile whenever the firmware image is reachable, then runs the firmware analysis in that image. Launch the UI and upload the file:
+Launch the web UI as usual — you do not need to point it at this image yourself. As long as the Docker engine is running, the base UI image launches this firmware image as a sibling container over the Docker socket, and the firmware upload tile appears automatically.
 
 ```bash
-SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
-#   Windows: set SBOM_FIRMWARE_IMAGE before double-clicking sbom-ui.bat
+./scripts/scan-sbom.sh --ui
+#   Windows: just double-click sbom-ui.bat
+```
+
+Set `SBOM_FIRMWARE_IMAGE` only if you want a different tag or an internal mirror registry. It takes effect only as a real environment variable — the settings file `bomlens.settings.txt` that a double-clicked `.bat` reads does not support this key.
+
+```bash
+SBOM_FIRMWARE_IMAGE=<your-mirror>:<tag> ./scripts/scan-sbom.sh --ui
 ```
 
 Enter a project name and version, choose the firmware upload tile, upload the file, and run. While the CVE database downloads on a first online run, the UI shows a download progress bar.

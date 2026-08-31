@@ -12,6 +12,9 @@ SaaS 없이 로컬에서 단일 프로젝트의 [SBOM](concepts/what-is-sbom.ko.
 [데모 둘러보기](https://sktelecom.github.io/bomlens/demo/){ .md-button }
 [Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
 
+[![최신 릴리스](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
+Windows 설치 파일은 Docker 엔진이 미리 켜져 있어야 동작합니다. 아래 [비개발자 빠른 시작](start/no-cli.ko.md)을 참고하세요.
+
 설치하기 전에 결과가 어떤 모습인지 보고 싶다면 [데모](https://sktelecom.github.io/bomlens/demo/)를 둘러보세요. 입력 종류별로 완료된 스캔을 하나씩 담은 실제 웹 UI입니다. 소스로 스캔한 Spring Boot 프로젝트, 컨테이너 이미지, 언패킹한 기기 펌웨어 이미지, CycloneDX ML-BOM으로 만든 AI 모델, 그리고 형식 요건을 검사한 공급사 SBOM입니다. 설치할 것이 없고 아무것도 업로드되지 않습니다. 평범한 로컬 실행으로 나온 결과를 그대로 담아 둔 화면입니다.
 
 CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.

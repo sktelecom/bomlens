@@ -124,8 +124,8 @@ AI G7 최소 요소 검사는 위의 **SBOM 적합성** 섹션 안에 나타납�
 
 ## 참고
 
-> 펌웨어 업로드 타일은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다.
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui`
+> 펌웨어 업로드 타일은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 동작 방식과 이미지 태그를
+> 바꾸는 방법은 [펌웨어 분석 가이드](../guides/firmware.ko.md)를 참고하세요.
 >
 > **참고:** UI의 소스 스캔(현재 폴더 / ZIP / GitHub)은 컨테이너 안에서 syft로 디렉터리를 분석합니다. 락 파일(`package-lock.json`, `go.sum` 등)이나 설치된 의존성이 있어야 구성요소가 잡힙니다. 매니페스트만 있고 더 깊은 해석이 필요하면 CLI 소스 모드(cdxgen)를 사용하세요.
 

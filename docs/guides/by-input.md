@@ -210,12 +210,17 @@ Pick a scan target at the top of the UI and provide the matching input.
 | Scan target | Input |
 |-------------|-------|
 | Current folder | scans the source in the folder where the UI was launched |
+| Directory path | a subfolder under the launch folder (e.g. an OS rootfs), a folder mounted with `--ui --mount <dir>`, or a folder picked with the desktop app's "Add folder" button |
 | GitHub URL | enter the URL |
 | ZIP upload | upload a `.zip`/tar file |
+| Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` |
 | SBOM upload | upload an existing SBOM (JSON), ANALYZE mode |
-| Firmware upload | upload a `.bin`, etc. (run the UI from the firmware image) |
+| Firmware upload | upload a `.bin`, etc. — the tile appears automatically whenever Docker is running |
 | Docker image | enter the image name |
-| AI model | enter a HuggingFace model id (run the UI from the aibom image) |
+| AI model | enter a HuggingFace model id — the tile appears automatically whenever Docker is running |
+| Model file | upload a `.gguf`, `.safetensors`, `.pt`, etc. (up to 8 GB) |
+
+This table lists what the input scenarios in this guide cover; the full set (10 targets) is in the [web UI reference](../reference/ui.md#new-scan).
 
 For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced scan options** section offers toggles that change how the source is analyzed rather than which files are produced:
 
@@ -226,12 +231,12 @@ Both are slow and off by default, so enable them only when needed. ScanCode is a
 
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report (plus the conformance report when relevant). The conformance result (pass/fail) is shown as a card at the top.
 
-> The firmware upload tab is only enabled when the UI runs from an image that includes the firmware tools:
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest $SBOM --ui`
+> The firmware upload tab appears automatically whenever the Docker engine is running. See the
+> [firmware guide](firmware.md) for how it works and how to point it at a different image tag.
 
 ## Troubleshooting / limits
 
-- **GitHub URL**: private repos need `GIT_TOKEN`. Disallowed URL forms (shell metacharacters, `..`, spaces) are rejected for security.
+- **GitHub URL**: for a private repo, the CLI authenticates with the `GIT_TOKEN` environment variable; the web UI has its own token field below the URL input instead (the two are separate paths). Disallowed URL forms (shell metacharacters, `..`, spaces) are rejected for security.
 - **ZIP/tar**: archives containing a path escape (zip-slip) are rejected. If Git Bash on Windows has no `unzip`, `tar` is used.
 - **C/C++**: pure source without a package manager produces a sparse SBOM (see [Scenario 3](#scenario-3--local-cc-source-directory)).
 - **Firmware**: statically linked libraries and vendor-modified squashfs have limited detection (see the [firmware analysis guide](../guides/firmware.md), Limits).

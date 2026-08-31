@@ -39,7 +39,7 @@ git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 
 ![결과 화면 — 종류별 결과물 카드와 전체 ZIP 다운로드](../images/app-results.png)
 
-> 펌웨어 업로드 타일은 펌웨어 도구가 포함된 이미지에서 UI를 실행할 때만 활성화됩니다: `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui`
+> 펌웨어 업로드 타일은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 자세한 동작은 [펌웨어 분석 가이드](../guides/firmware.ko.md)를 참고하세요.
 
 UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../reference/ui.ko.md)를 참고하세요.
 

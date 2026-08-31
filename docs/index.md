@@ -12,6 +12,9 @@ A local-first SBOM generator and open-source risk assessor for a single project 
 [Try the demo](https://sktelecom.github.io/bomlens/demo/){ .md-button }
 [Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
 
+[![Latest release](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
+The Windows installer needs a Docker engine already running; see the [no-CLI quick start](start/no-cli.md) below.
+
 Want to see what a result looks like before installing anything? The [live demo](https://sktelecom.github.io/bomlens/demo/) is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
 
 Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md).

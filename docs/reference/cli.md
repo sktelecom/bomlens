@@ -128,13 +128,13 @@ SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.8.0" \
 
 If the scan finishes but no output files show up, check that the folder you ran from is inside a Docker file-sharing path. Anything under your home directory (`C:\Users\...`) is shared by default in both Rancher Desktop and Docker Desktop. From an unshared location the container cannot write results to the host.
 
-### Docker permission error
+### Docker permission error (Linux/WSL2)
 
 ```
 Got permission denied while trying to connect to the Docker daemon
 ```
 
-Add your user to the `docker` group.
+Does not apply on Windows/macOS with Rancher Desktop or Docker Desktop. Add your user to the `docker` group.
 
 ```bash
 sudo usermod -aG docker $USER
@@ -147,11 +147,13 @@ newgrp docker
 no space left on device
 ```
 
-Prune the Docker cache.
+Prune the Docker cache. From a terminal:
 
 ```bash
 docker system prune -f
 ```
+
+With Rancher Desktop or Docker Desktop, the same cleanup is also available from the app's own Preferences screen.
 
 ### Anything else
 

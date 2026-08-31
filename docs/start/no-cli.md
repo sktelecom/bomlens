@@ -47,7 +47,7 @@ flowchart TD
 
 1. **Install a Docker engine**. Download the Windows installer from [rancherdesktop.io](https://rancherdesktop.io/), install it, and run it. If it asks whether to use Kubernetes during install, you can turn it off. When the taskbar icon settles (usually 1–2 minutes), it is ready.
 2. **Get and run the app**. Click [Download BomLens for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) and double-click the file. It is unsigned for now, so if Windows shows a "Windows protected your PC" warning, click "More info" and choose "Run anyway". The app opens with no console window.
-3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait.
+3. **First-run image download**. The scanner image is pulled just once. The app shows progress as below, so leave the window open and wait. On later launches, the app pulls a newer image automatically when one has been published, so there is nothing to redownload or reinstall by hand.
 
 ![Click "More info" on the SmartScreen warning and proceed with "Run anyway"](../images/smartscreen.png)
 
@@ -64,7 +64,7 @@ Now go to [Scan and get the notice](#scan-and-get-the-notice) below.
 If you prefer a script over the desktop app, this path works too.
 
 1. **Install a Docker engine**. Same as step 1 of Path A.
-2. **Download the tool**. On the GitHub repository page, click the green Code button, choose Download ZIP, and unzip it. You should see a `scripts` folder inside the unzipped folder.
+2. **Download the tool**. On the [latest release page](https://github.com/sktelecom/bomlens/releases/latest), download `bomlens-cli-windows.zip` from the assets and unzip it. You should see a `scripts` folder inside the unzipped folder. (The green Code button on the repository page also gives you a ZIP, but that one is an unreleased snapshot of the current source, not a tagged release.)
 3. **Run the web UI**. Double-click `sbom-ui.bat` in the `scripts` folder. At first a black window shows "downloading the scanner image (about 250 MB)", and once done a browser opens `http://localhost:8080`. Each scan's results are saved to a `{Project}_{Version}\` subfolder under `C:\Users\<your-name>\sbom-output`.
 
 To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in your Windows display language.

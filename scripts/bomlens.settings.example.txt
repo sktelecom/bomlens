@@ -29,6 +29,14 @@
 # Use a path without & ^ | < > characters.
 #SBOM_OUTPUT_DIR=C:\Users\me\sbom-output
 
+# --- Network interface / 네트워크 인터페이스 --------------------------------
+# Default 127.0.0.1: only this machine can reach the UI. Set 0.0.0.0 to reach
+# it from another machine, and put something that authenticates in front of it
+# first — the UI itself has no login.
+# 기본값 127.0.0.1: 이 기기에서만 접속됩니다. 다른 기기에서 써야 하면 0.0.0.0으로 바꾸고,
+# UI 자체에는 로그인이 없으므로 앞단에 인증을 거치는 장치를 먼저 두세요.
+#UI_BIND_ADDRESS=127.0.0.1
+
 # --- Extra scan folder / 추가 스캔 대상 폴더 --------------------------------
 # Mounted read-only and offered in the web UI as a scan target
 # (e.g. an extracted Linux rootfs).

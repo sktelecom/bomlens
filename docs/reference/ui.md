@@ -126,8 +126,8 @@ The home screen — opened from the rail's Scan management link, the logo, or th
 
 ## Notes
 
-> The firmware upload tile is enabled only when the UI runs from an image that includes the firmware tools:
-> `SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui`
+> The firmware upload tile appears automatically whenever the Docker engine is running. See the
+> [firmware guide](../guides/firmware.md) for how it works and how to point it at a different image tag.
 >
 > **Note:** the UI's source scan (current folder / ZIP / GitHub) analyzes the directory with syft inside the container. Components are captured only when there is a lock file (`package-lock.json`, `go.sum`, and so on) or installed dependencies. If you only have a manifest and need deeper resolution, use the CLI source mode (cdxgen).
 

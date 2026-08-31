@@ -40,6 +40,8 @@ Installation is in [Getting started](../start/first-scan.md).
 
 ### From the CLI
 
+Prefer no command line? See the [no-CLI quick start](../start/no-cli.md) first. What follows is the CLI path.
+
 Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), then pass the SBOM file to `--analyze`:
 
 ```bash

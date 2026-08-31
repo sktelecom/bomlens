@@ -33,11 +33,21 @@ docker pull ghcr.io/sktelecom/bomlens-firmware:latest
 
 ### 웹 UI에서
 
-펌웨어 이미지에 닿을 수 있으면 웹 UI가 펌웨어 업로드 타일을 보여주고, 그 이미지에서 펌웨어 분석을 실행합니다. UI를 띄우고 파일을 올립니다.
+웹 UI를 평소처럼 띄우면 됩니다. 이 이미지를 따로 지정할 필요는 없습니다. Docker 엔진이 켜져
+있으면 기본 UI 이미지가 Docker 소켓을 통해 위 펌웨어 이미지를 곁들임 컨테이너로 직접 띄우므로,
+펌웨어 업로드 타일이 자동으로 나타납니다.
 
 ```bash
-SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:latest ./scripts/scan-sbom.sh --ui
-#   Windows: sbom-ui.bat 더블클릭 전에 SBOM_FIRMWARE_IMAGE를 지정
+./scripts/scan-sbom.sh --ui
+#   Windows: sbom-ui.bat을 그대로 더블클릭
+```
+
+다른 태그나 사내 미러 레지스트리를 쓰고 싶을 때만 `SBOM_FIRMWARE_IMAGE`로 지정하세요. 실제
+환경변수를 설정했을 때만 적용되며, `.bat` 더블클릭이 읽는 설정 파일(`bomlens.settings.txt`)에는
+이 항목이 없습니다.
+
+```bash
+SBOM_FIRMWARE_IMAGE=<사내 미러>:<태그> ./scripts/scan-sbom.sh --ui
 ```
 
 프로젝트 이름과 버전을 입력하고, 펌웨어 업로드 타일을 골라 파일을 올린 뒤 스캔을 실행합니다. 온라인 첫 실행에서 CVE 데이터베이스를 받는 동안에는 UI에 다운로드 진행률 바가 표시됩니다.

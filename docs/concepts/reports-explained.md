@@ -23,7 +23,7 @@ Severity alone makes it hard to decide what to fix first. To help with that, the
 - **EPSS** — the probability of real-world exploitation within the next 30 days (0–1). Queried from FIRST.org; a higher score means a greater chance of being used in an attack.
 - **CISA KEV** — whether it is on the "known exploited vulnerabilities" list maintained by the US CISA. If it is, the HTML report marks it with a ⚠️ badge.
 
-The table puts KEV-listed items at the top, then sorts by severity, and finally by EPSS descending. Working top-down naturally addresses the highest-risk items first.
+The table puts KEV-listed items at the top, then sorts by severity, and finally by EPSS descending. Working top-down naturally addresses the highest-risk items first. This is specific to the static report file; the [web UI's vulnerabilities table](../reference/ui.md#result-sections) opens sorted by severity then CVSS instead, and lets you re-sort by any column, including EPSS.
 
 EPSS and KEV require external API lookups. On an air-gapped network, set `SECURITY_ENRICH=false` to omit the two columns and still generate the rest of the report.
 

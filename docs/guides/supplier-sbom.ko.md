@@ -40,6 +40,8 @@ Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 
 
 ### CLI에서
 
+명령줄 없이 하고 싶다면 [비개발자 빠른 시작](../start/no-cli.ko.md)을 먼저 보세요. 아래는 CLI 기준입니다.
+
 스캐너 이미지를 한 번 받아 두고(`docker pull ghcr.io/sktelecom/bomlens:latest`), 받은 SBOM 파일을 `--analyze`에 넘깁니다.
 
 ```bash
