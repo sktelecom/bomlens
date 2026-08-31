@@ -102,6 +102,15 @@ export function TopBar({
       ) : (
         logo
       )}
+      {version && (
+        <span
+          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sm:inline-block"
+          title={t("nav.helpVersion", { version })}
+          data-testid="app-version-badge"
+        >
+          {version}
+        </span>
+      )}
       {project && (
         <>
           <span className="h-5 w-px shrink-0 bg-border" aria-hidden />

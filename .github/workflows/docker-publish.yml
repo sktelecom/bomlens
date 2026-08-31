@@ -82,6 +82,18 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
 
+      # metadata-action's `version` output is the literal string "latest" for a
+      # main-branch build, which tells a reader nothing about which commit is
+      # actually running. Swap in the short SHA for that one case so
+      # BOMLENS_VERSION (surfaced by /capabilities and the image's OCI label)
+      # always names a real commit; a tagged release keeps its clean semver.
+      - name: Resolve BOMLENS_VERSION
+        id: version
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+
       # --- Publish gate ---------------------------------------------------
       # The registry copy is the one users pull, so the scan has to happen while
       # the image is still local. buildx pushes multi-arch straight from the
@@ -106,7 +118,7 @@ jobs:
           push: false
           build-args: |
             SBOM_SCANOSS=true
-            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
           tags: bomlens:publish-gate
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -150,9 +162,13 @@ jobs:
           # the flag). The Dockerfile default stays false for lean local builds.
           build-args: |
             SBOM_SCANOSS=true
-            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          # Override metadata-action's own image.version annotation (which
+          # would otherwise say "latest") with the same resolved identifier.
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -292,6 +308,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
+      - name: Resolve BOMLENS_VERSION
+        id: version
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
       # Firmware tools (unblob/cve-bin-tool/ubi_reader) target amd64; build amd64 only.
       - name: Build and push
         id: build
@@ -302,9 +324,11 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_FIRMWARE=true
-            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=firmware
           cache-to: type=gha,mode=max,scope=firmware
       - name: Install cosign
@@ -359,6 +383,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
+      - name: Resolve BOMLENS_VERSION
+        id: version
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
       # The AIBOM Generator is Python; build multi-arch like the base image. If an
       # arm64 build ever fails on a native dep, drop this to `linux/amd64`.
       - name: Build and push
@@ -370,9 +400,11 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_AIBOM=true
-            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=aibom
           cache-to: type=gha,mode=max,scope=aibom
       - name: Install cosign
@@ -427,6 +459,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
+      - name: Resolve BOMLENS_VERSION
+        id: version
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
       # grype targets amd64; build amd64 only (the DB download dominates anyway).
       - name: Build and push
         id: build
@@ -437,9 +475,11 @@ jobs:
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_DEEP_CVE=true
-            BOMLENS_VERSION=${{ steps.meta.outputs.version }}
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=deep-cve
           cache-to: type=gha,mode=max,scope=deep-cve
       - name: Install cosign
