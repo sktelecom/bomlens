@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.5] - 2026-08-31
+
+### Added
+
+- The web UI and desktop app now show the running BomLens version as an always-visible badge, not only inside the help menu. A build from `latest` stamps the real commit id instead of the literal string "latest", and the same value is mirrored into the image's OCI version label.
+- The Windows settings file (`bomlens.settings.txt`) now accepts `UI_BIND_ADDRESS`, matching what the launcher scripts already read.
+
 ## [v1.11.4] - 2026-08-29
 
 ### Fixed
@@ -761,7 +768,9 @@ Three changes alter what an AI-model scan writes, so a consumer of those artifac
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.3...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.5...HEAD
+[v1.11.5]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.5
+[v1.11.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.4
 [v1.11.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.3
 [v1.11.2]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.2
 [v1.11.1]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.1
