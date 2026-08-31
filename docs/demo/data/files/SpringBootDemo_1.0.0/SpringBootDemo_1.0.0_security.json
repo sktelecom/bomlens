@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a050ab-da5e-7240-b1ec-93affe86ea52",
-  "CreatedAt": "2026-08-30T03:17:14.974152166Z",
+  "ReportID": "01a05a11-af63-702a-8b7b-780c58071a40",
+  "CreatedAt": "2026-08-31T23:05:03.587015901Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -2633,7 +2633,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -4631,7 +4631,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,
