@@ -62,7 +62,9 @@ export function SiblingImagePanel({ imageKey }: { imageKey: PullImageKey }) {
         setPulling(false);
         setStop(null);
         if (d.ok) {
-          setStatus((prev) => ({ image: prev?.image ?? "", present: true }));
+          // Re-fetch rather than assume present: true tells us the freshly
+          // pulled layer's own version too.
+          void fetchImageStatus(imageKey).then(setStatus);
         } else {
           setFailure(d.reason ?? "unknown");
         }
@@ -77,6 +79,15 @@ export function SiblingImagePanel({ imageKey }: { imageKey: PullImageKey }) {
       <div className="flex items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
         <Check className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />
         <span>{t("image.ready")}</span>
+        {status.version && (
+          <span
+            className="font-mono text-[10px] text-muted-foreground/80"
+            title={t("nav.helpVersion", { version: status.version })}
+            data-testid="sibling-image-version"
+          >
+            {status.version}
+          </span>
+        )}
       </div>
     );
   }

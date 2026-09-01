@@ -2662,6 +2662,29 @@ def _sibling_image_present(image):
         return False
 
 
+# Reads the version baked into a LOCALLY PRESENT sibling image, the same way
+# this container reports its own via BOMLENS_VERSION. A reporter can update the
+# app and still run a scan against a sibling image `docker pull` never
+# refreshed (a stale `:latest` layer cached from before a fix) — the app's own
+# version then looks current while the image that actually ran the scan is
+# not. Call only after _sibling_image_present(image) is true; there is nothing
+# to inspect otherwise.
+def _sibling_image_version(image):
+    try:
+        r = subprocess.run(
+            ["docker", "image", "inspect", "--format", "{{json .Config.Env}}", image],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=10,
+        )
+        if r.returncode != 0:
+            return ""
+        for entry in json.loads(r.stdout.decode("utf-8", "replace")) or []:
+            if entry.startswith("BOMLENS_VERSION="):
+                return entry.split("=", 1)[1]
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
 def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env=None,
                 on_deepcve_progress=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
@@ -3051,9 +3074,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         image = images[key]
         out = {"image": image, "present": _sibling_image_present(image)}
-        size = _image_download_bytes(image) if not out["present"] else None
-        if size:
-            out["downloadBytes"] = size
+        if out["present"]:
+            version = _sibling_image_version(image)
+            if version:
+                out["version"] = version
+        else:
+            size = _image_download_bytes(image)
+            if size:
+                out["downloadBytes"] = size
         self._send(200, json.dumps(out))
 
     def _pull_stream(self, qs):

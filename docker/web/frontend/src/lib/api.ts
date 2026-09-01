@@ -610,6 +610,10 @@ export interface ImageStatus {
   image: string;
   present: boolean;
   downloadBytes?: number;
+  /** BOMLENS_VERSION baked into the image actually present on this machine.
+   *  Absent until a `docker pull` refreshes a stale cached layer, so this can
+   *  read older than the app's own version. */
+  version?: string;
 }
 
 export type PullImageKey = "firmware" | "aibom" | "deep-cve";
