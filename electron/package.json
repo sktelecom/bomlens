@@ -1,6 +1,6 @@
 {
   "name": "sbom-generator-desktop",
-  "version": "1.11.5",
+  "version": "1.11.6",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.6] - 2026-09-01
+
+### Added
+
+- `GET /image-status` now reports the version baked into a firmware/AI-model/deep-CVE sibling image that is already on disk, read via `docker image inspect`. The scan form's "ready" indicator shows it, so a stale cached sibling image (one a `docker pull` never refreshed) is visible even when the app's own version is current.
+
 ## [v1.11.5] - 2026-08-31
 
 ### Added
@@ -768,7 +774,8 @@ Three changes alter what an AI-model scan writes, so a consumer of those artifac
 
 - No publicly known vulnerabilities have been reported or fixed in this project to date.
 
-[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.5...HEAD
+[Unreleased]: https://github.com/sktelecom/bomlens/compare/v1.11.6...HEAD
+[v1.11.6]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.6
 [v1.11.5]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.5
 [v1.11.4]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.4
 [v1.11.3]: https://github.com/sktelecom/bomlens/releases/tag/v1.11.3
