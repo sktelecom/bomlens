@@ -310,6 +310,35 @@ got="$(detect_lang "$LANGDIR/proj")"
 [ "$got" = "mixed" ] && pass "setup.py beside another language reads as mixed" \
     || fail "a mixed tree detects as '$got'"
 
+echo "== --model routes a Figshare item to the dataset path =="
+# One option takes both AI inputs a person is handed a link to, so the reference
+# itself decides which path runs. The server applies the same rule on the string
+# it receives, which is what keeps the CLI and the UI from disagreeing about
+# what a given input means.
+route_rule=$(awk '/^    case "\$MODEL" in$/,/^    esac$/' "$SCRIPT")
+if printf '%s' "$route_rule" | grep -q '\*figshare\*) MODE="DATASET"'; then
+    pass "a reference carrying figshare selects DATASET"
+else
+    fail "the model reference is not routed by its content" "rule: ${route_rule:-not found}"
+fi
+if printf '%s' "$route_rule" | grep -q '\*)          MODE="AIBOM"'; then
+    pass "every other reference stays on the model path"
+else
+    fail "the default model route changed"
+fi
+if grep -q 'DATASET) VOL=.*ENVV="-e DATASET_REF' "$SCRIPT"; then
+    pass "the dataset path passes the reference and needs no opt-in image"
+else
+    fail "DATASET does not hand the reference to the container"
+fi
+# The server has to read the same string the same way, or a reference that works
+# in the CLI would be refused in the browser.
+if grep -q '"figshare" in target.lower()' "$ROOT_DIR/docker/web/server.py"; then
+    pass "the web server applies the same rule to the same field"
+else
+    fail "the server does not route a Figshare reference"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

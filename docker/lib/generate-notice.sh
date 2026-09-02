@@ -157,7 +157,16 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
            // "unknown version" )
     else null end;
   def is_file($c): ($c.type // "") == "file";
-  [ .components[]?
+  # A dataset scan describes one published item and has no components[]: the
+  # item sits in the document root. Its terms are exactly what a notice exists
+  # to carry (CC-BY asks for attribution like any other licence), so the root is
+  # folded in when the collectors marked it as one they fetched. Every other
+  # root is the scanned project itself and stays out.
+  def collected_root:
+    [ .metadata.component // empty ]
+    | map(select((.type // "") == "data"
+                 and ((.properties // []) | any(.name == "bomlens:dataset:collectedBy"))));
+  [ collected_root[], .components[]?
     | . as $c
     | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)
                + (if ($c.type // "") == "data" then " [dataset]" else "" end)),
@@ -204,7 +213,10 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
   | sort_by(.license)
 ' "$SBOM")
 
-TOTAL_COMP=$(jq '[.components[]?] | length' "$SBOM")
+TOTAL_COMP=$(jq '[ ([.metadata.component // empty]
+                   | map(select((.type // "") == "data"
+                                and ((.properties // []) | any(.name == "bomlens:dataset:collectedBy")))))[],
+                   .components[]? ] | length' "$SBOM")
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 

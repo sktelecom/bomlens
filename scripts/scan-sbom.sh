@@ -195,9 +195,16 @@ Options:
                          archive being extracted and scanned as source.
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
-  --model <owner/name>   Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a
-                         HuggingFace model via the OWASP AIBOM Generator (opt-in
-                         image; fetches model-card metadata over the network).
+  --model <ref>          Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a
+                         HuggingFace model given as owner/name, via the OWASP
+                         AIBOM Generator (opt-in image; fetches model-card
+                         metadata over the network).
+                         A Figshare item is taken here too — its page URL, its
+                         DOI, or the item number — and is described as a dataset
+                         from the public item endpoint: no account, no opt-in
+                         image. An institutional DOI that does not carry
+                         "figshare" cannot be told apart from any other DOI, so
+                         give the item URL for those.
                          Mutually exclusive with --target/--analyze/--git/--merge.
   --model-file <path>    Read one AI model FILE (GGUF, safetensors, PyTorch,
                          pickle, npz, npy, ONNX) and describe it from its own
@@ -985,13 +992,27 @@ elif [ -n "$MODEL" ]; then
     [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --model is mutually exclusive with --analyze."; exit 1; }
     [ -z "$GIT_URL" ]     || { echo "[ERROR] --model is mutually exclusive with --git."; exit 1; }
     [ "$FORCE_FIRMWARE" != "true" ] || { echo "[ERROR] --model cannot be combined with --firmware."; exit 1; }
-    MODE="AIBOM"
+    # Research data is published where the paper put it, which for a great deal
+    # of science is Figshare rather than a model hub. Both are "the thing I was
+    # handed a link to", so one option takes both and the reference decides which
+    # path runs. An institutional DOI carrying no "figshare" (10.25916/sut.…)
+    # cannot be told apart from any other DOI: give the item url for those.
+    case "$MODEL" in
+        *figshare*) MODE="DATASET" ;;
+        *)          MODE="AIBOM" ;;
+    esac
     case "${USAGE_CONTEXT:-}" in
         ""|internal|product|redistribute|outputs-only) : ;;
         *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
     esac
     # Default the project name to the model's last segment (owner/name -> name).
-    [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${MODEL##*/}"
+    # A Figshare reference has no such name, so the item number stands in until
+    # the fetch replaces the root component with the item's real title.
+    if [ "$MODE" = "DATASET" ]; then
+        [ -n "$PROJECT_NAME" ] || PROJECT_NAME="figshare-$(printf '%s' "$MODEL" | tr -cd '0-9' | tail -c 12)"
+    else
+        [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${MODEL##*/}"
+    fi
 elif [ -n "$MODEL_FILE" ]; then
     # AI model SBOM read from the file itself. Base image, no network: the whole
     # step is one stdlib Python script inside the container.
@@ -1150,8 +1171,8 @@ elif [ "$FORCE_FIRMWARE" = "true" ]; then
     echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
 fi
 
-if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ]; then
-    echo "[ERROR] --usage applies to AI model scans only (use it with --model or --model-file)."; exit 1
+if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ]; then
+    echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
@@ -1173,9 +1194,9 @@ fi
 # every mode; the risk report still renders from the notice, as it does in the
 # UI. Announce the skip only when the user actually asked (--security / --all),
 # so an ordinary --model run stays quiet instead of explaining a default.
-if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ]; } && [ "$GENERATE_SECURITY" = "true" ]; then
+if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]; } && [ "$GENERATE_SECURITY" = "true" ]; then
     [ "$SECURITY_REQUESTED" = "true" ] && \
-        echo "[INFO] Skipping the security report: an AI model has no package dependencies to scan."
+        echo "[INFO] Skipping the security report: this input has no package dependencies to scan."
     GENERATE_SECURITY="false"
 fi
 
@@ -1354,6 +1375,9 @@ else
                 # own environment instead. AIBOM only — no other mode needs it.
                 [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN"
                 RUN_IMAGE="$AIBOM_IMAGE" ;;
+        # Base image: reading a Figshare item is one stdlib Python script and one
+        # public API call, so this needs neither the generator image nor an account.
+        DATASET) VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e DATASET_REF=\"$MODEL\"" ;;
         ANALYZE)
             if [ -z "$ANALYZE_SBOM" ]; then
                 # A Yocto build directory with no SPDX document: the build tree is
@@ -1458,7 +1482,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
     # It used to be announced for ANALYZE only, so an AI-model scan produced the
     # G7 report and never mentioned it.
-    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ]; then
+    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
             || note_missing "conformance report"
     fi

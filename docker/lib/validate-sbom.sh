@@ -581,9 +581,18 @@ case "$FORMAT" in
         # The model can sit in either place: the AIBOM generator leaves it in
         # components[] and fills metadata.component with its scan job, while a
         # spec-shaped AI SBOM names the model as the document's own component.
+        # A dataset scan carries no model at all — the item IS the document — and
+        # is emitted at 1.7 for the same reason: `data` components and their
+        # governance are what the AI clusters are written against. It qualifies on
+        # the marker the dataset collectors stamp, so an ordinary SBOM that happens
+        # to carry a `data` component is not swept in.
         IS_AI=false
         if jq -e '([.metadata.component // empty] + [.components[]?])
-                  | map(select(.type=="machine-learning-model")) | length > 0' "$SBOM" >/dev/null 2>&1; then
+                  | map(select(.type == "machine-learning-model"
+                               or (.type == "data"
+                                   and ((.properties // [])
+                                        | any(.name == "bomlens:dataset:collectedBy")))))
+                  | length > 0' "$SBOM" >/dev/null 2>&1; then
             IS_AI=true
         fi
         # Whether a registry applies to THIS SBOM is the registry's own statement

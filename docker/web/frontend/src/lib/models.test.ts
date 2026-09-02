@@ -235,6 +235,54 @@ describe("parseModelCards", () => {
     expect(m.assessment?.overall).toBe("review");
   });
 
+  // A dataset scan describes one published item: the dataset IS the document,
+  // components[] is empty, and there is no model anywhere. Reading components[]
+  // alone left this view with nothing to show on exactly the scan it exists for.
+  const FIGSHARE_BOM = {
+    specVersion: "1.7",
+    metadata: {
+      component: {
+        type: "data",
+        "bom-ref": "dataset:figshare/33412285",
+        name: "SS-Cu-Ti multi-material structures study dataset",
+        version: "v1",
+        licenses: [{ license: { id: "CC-BY-4.0" } }],
+        hashes: [{ alg: "MD5", content: "7b8123ec815a365c6f4d2cd8e8796583" }],
+        externalReferences: [
+          { type: "distribution", url: "https://figshare.com/articles/dataset/x/33412285" },
+        ],
+        properties: [
+          { name: "bomlens:dataset:collectedBy", value: "figshare" },
+          { name: "bomlens:dataset:doi", value: "10.25916/sut.33412285.v1" },
+          { name: "bomlens:assessment:overall", value: "ok" },
+        ],
+      },
+    },
+    components: [],
+  };
+
+  it("reads a dataset that is the document root", () => {
+    const { models, datasets } = parseModelCards(FIGSHARE_BOM);
+    expect(models).toHaveLength(0);
+    expect(datasets).toHaveLength(1);
+    const d = datasets[0];
+    expect(d.name).toContain("SS-Cu-Ti");
+    expect(d.licenses).toEqual(["CC-BY-4.0"]);
+    expect(d.hasIntegrity).toBe(true);
+    expect(d.collectedBy).toBe("figshare");
+    expect(d.url).toContain("figshare.com");
+    expect(d.assessment).toBe("ok");
+  });
+
+  it("leaves a non-dataset root out of the dataset list", () => {
+    const appRoot = {
+      specVersion: "1.6",
+      metadata: { component: { type: "application", name: "web-api", version: "2.0" } },
+      components: [{ type: "library", name: "flask", version: "2.0" }],
+    };
+    expect(parseModelCards(appRoot).datasets).toHaveLength(0);
+  });
+
   it("leaves the assessment absent when the pipeline stamped none", () => {
     const m = parseModelCards(ML_BOM).models[0];
     expect(m.assessment).toBeUndefined();

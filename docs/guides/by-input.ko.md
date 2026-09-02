@@ -51,6 +51,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
 | AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 | AI 모델 파일(GGUF, safetensors 등) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
+| 공개 데이터셋(Figshare) | DATASET | `$SBOM --model <항목 주소> --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 
 > 모든 명령에 `--project <이름> --version <버전>`이 필요합니다(아래 예시 참고).
 >
@@ -175,6 +176,25 @@ $SBOM --project bert-base --version 1.0.0 \
 - 모델 카드, 데이터셋, G7 세부는 [AI 모델 가이드](ai-model.ko.md)를 참고하세요.
 
 **산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, G7 적합성
+
+### 모델이 아니라 공개된 데이터셋이라면
+
+연구 데이터는 논문이 올려 둔 곳에 있고, 여러 분야에서 그곳은 모델 허브가 아니라 Figshare 같은 저장소입니다. `--model`에 해당 항목을 그대로 넣습니다.
+
+```bash
+$SBOM --project cell-imaging-data --version 1.0.0 \
+  --model "https://figshare.com/articles/dataset/Title/33412285" \
+  --usage product --generate-only
+```
+
+- 페이지 주소, DOI, 항목 번호 모두 됩니다. 최신 버전이 아니라 특정 버전을 읽으려면 버전이 표시된 주소나 DOI를 주면 됩니다(`.../33412285/2`, `10.6084/m9.figshare.33413521.v1`).
+- 계정도 별도 이미지도 필요 없습니다. 공개 항목 조회는 인증 없이 응답하고, 변환은 기본 이미지에 들어 있습니다.
+- 항목은 CycloneDX `data` 컴포넌트가 되며 라이선스, DOI, 저자, 파일별 MD5 값을 담습니다. 표준 식별자로 옮길 수 있는 라이선스(Creative Commons 계열, MIT, Apache 2.0, GPL 계열, CC0)는 SPDX 식별자로 기록하고, 그 밖의 것은 추측하지 않고 표기 그대로 남깁니다.
+- `--usage`는 모델과 마찬가지로 적용됩니다. 비상업 조건은 내부 연구용일 때와 외부에 제공할 때 의미가 다릅니다.
+- 이름에 "figshare"가 없는 기관 DOI(`10.25916/sut.33412285.v1`)는 다른 DOI와 구분할 수 없으므로 항목 주소를 주십시오.
+- 비공개, 엠바고, 철회된 항목은 계정 없이 읽을 수 없으며, 라이선스가 없는 데이터셋으로 기록하지 않고 오류로 알립니다.
+
+산출물: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, 적합성 검사
 
 ### 모델 id가 아니라 모델 파일을 받았다면
 

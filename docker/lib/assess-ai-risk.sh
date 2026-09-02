@@ -42,11 +42,18 @@ if [ ! -f "$KB" ]; then
     exit 0
 fi
 
-# Self-gate: only an SBOM that carries a model component gets assessed, so
-# ANALYZE over a plain dependency SBOM is a clean no-op.
+# Self-gate: only an SBOM that carries a model or a collected dataset gets
+# assessed, so ANALYZE over a plain dependency SBOM is a clean no-op. A dataset
+# qualifies on the marker the collectors stamp, not on its type alone: `data` is
+# a general CycloneDX type, and judging one this pipeline never fetched would be
+# a verdict on a component nobody here resolved.
 if ! jq -e '([.metadata.component // empty] + [.components[]?])
-            | map(select(.type=="machine-learning-model")) | length > 0' "$SBOM" >/dev/null 2>&1; then
-    echo "[assess] no machine-learning-model component; skipping."
+            | map(select(.type == "machine-learning-model"
+                         or (.type == "data"
+                             and ((.properties // [])
+                                  | any(.name == "bomlens:dataset:collectedBy")))))
+            | length > 0' "$SBOM" >/dev/null 2>&1; then
+    echo "[assess] no AI model or collected dataset component; skipping."
     exit 0
 fi
 

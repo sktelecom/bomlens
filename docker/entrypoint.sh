@@ -191,13 +191,14 @@ mark_sbom_degraded() {
 # shellcheck source=docker/lib/pipeline-step.sh
 . "$LIBDIR/pipeline-step.sh"
 
-# Modes whose SBOM describes an AI model rather than a software project: the
-# model-card path (AIBOM, from a HuggingFace id) and the model-file path
-# (MODELFILE, from the file itself). They share the AI post-processing — risk
-# assessment, G7 conformance, the AI profile — and skip the package-oriented
-# enrichments, which have no purl, no CPE and no release cycle to match on.
+# Modes whose SBOM describes an AI asset rather than a software project: the
+# model-card path (AIBOM, from a HuggingFace id), the model-file path
+# (MODELFILE, from the file itself) and the dataset path (DATASET, from a
+# published research item). They share the AI post-processing — risk assessment,
+# G7 conformance, the AI profile — and skip the package-oriented enrichments,
+# which have no purl, no CPE and no release cycle to match on.
 case "$SCAN_MODE" in
-    AIBOM|MODELFILE) AI_MODEL_SCAN=true ;;
+    AIBOM|MODELFILE|DATASET) AI_MODEL_SCAN=true ;;
     *) AI_MODEL_SCAN=false ;;
 esac
 
@@ -352,6 +353,17 @@ EOF
         run_optional_step enrich-aibom bash "$LIBDIR/enrich-aibom.sh" "$OUTPUT_FILE" "$MODEL_ID"
         ;;
 
+    DATASET)
+        # A published research dataset, from a Figshare item reference. The fields
+        # an SBOM wants are fields there rather than prose in a model card, and the
+        # public item endpoint needs no account, so this is one stdlib script in the
+        # base image: no generator, no opt-in image, and it works for whoever can
+        # reach the API. It writes its own metadata.component, like AIBOM.
+        if [ -z "$DATASET_REF" ]; then echo "[ERROR] DATASET_REF required for DATASET mode."; exit 1; fi
+        echo "[1/2] figshare: describe $DATASET_REF"
+        python3 "$LIBDIR/scan-figshare.py" "$DATASET_REF" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        ;;
+
     MODELFILE)
         # AI model SBOM built from a model FILE rather than a HuggingFace id: the
         # file's own header is the only source. No network, no generator image —
@@ -483,7 +495,7 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/ANALYZE/MERGE/POSTPROCESS/UI)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/ANALYZE/MERGE/POSTPROCESS/UI)"
         exit 1
         ;;
 esac
@@ -646,7 +658,7 @@ case "$SCAN_MODE" in
     BINARY|FIRMWARE|MODELFILE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$TARGET_FILE"
         ;;
-    SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|MERGE)
+    SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
         ;;
 esac

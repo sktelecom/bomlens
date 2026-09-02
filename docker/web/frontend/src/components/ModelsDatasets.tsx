@@ -84,7 +84,7 @@ export function ModelsDatasets({
       </ErrorState>
     );
   }
-  if (data.models.length === 0) {
+  if (data.models.length === 0 && data.datasets.length === 0) {
     return (
       <EmptyState icon={Boxes} hint={t("models.emptyHint")}>
         {t("models.empty")}
@@ -139,6 +139,11 @@ export function ModelsDatasets({
                       <span className="font-mono">{d.name}</span>
                       {d.version && (
                         <span className="text-muted-foreground">@{d.version}</span>
+                      )}
+                      {d.collectedBy && (
+                        <Badge variant="outline" className="ml-1.5 align-middle">
+                          {d.collectedBy}
+                        </Badge>
                       )}
                       {d.url && (
                         <a

@@ -3711,24 +3711,40 @@ class Handler(BaseHTTPRequestHandler):
                 env["TARGET_FILE"] = up
 
             elif source == "ai-model":
-                # Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a HuggingFace
-                # model via the OWASP AIBOM Generator (opt-in bomlens-aibom image).
+                # One field takes both AI inputs a person is handed a link to: a
+                # HuggingFace model id, or a published research dataset on
+                # Figshare. Which path runs is decided by the reference, the same
+                # rule scan-sbom.sh applies, so the CLI and the UI never disagree
+                # about what a given string means.
                 if not target:
-                    fail("HuggingFace model id required (owner/name)"); return
-                # owner/name (optional owner), HuggingFace charset only; no traversal.
-                if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$", target):
-                    fail("Unsupported model id (expected owner/name)"); return
-                mode = "AIBOM"
-                env["MODE"] = "AIBOM"
-                env["MODEL_ID"] = target
-                if aibom_capable():
-                    pass  # in-process (UI launched from the aibom image)
-                elif docker_cli_present() and docker_capable():
-                    # Heavy aibom image runs as a sibling; needs only outbound net.
-                    sibling = {"image": AIBOM_IMAGE, "model_id": target}
+                    fail("HuggingFace model id (owner/name) or Figshare item required"); return
+                if "figshare" in target.lower():
+                    # A Figshare item is read by one stdlib script in THIS image
+                    # against a public endpoint, so unlike the model path it needs
+                    # neither Docker nor the generator image. The charset is wider
+                    # than a model id (it is a URL or a DOI) and still bounded: no
+                    # whitespace, no shell bytes, no leading dash.
+                    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._:/~-]{0,300}$", target):
+                        fail("Unsupported Figshare reference (give the item URL, its DOI, "
+                             "or the item number)"); return
+                    mode = "DATASET"
+                    env["MODE"] = "DATASET"
+                    env["DATASET_REF"] = target
                 else:
-                    fail("AI-model SBOM generation requires Docker (to run the AIBOM image) "
-                         "or relaunching the UI from the AIBOM image."); return
+                    # owner/name (optional owner), HuggingFace charset only; no traversal.
+                    if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$", target):
+                        fail("Unsupported model id (expected owner/name)"); return
+                    mode = "AIBOM"
+                    env["MODE"] = "AIBOM"
+                    env["MODEL_ID"] = target
+                    if aibom_capable():
+                        pass  # in-process (UI launched from the aibom image)
+                    elif docker_cli_present() and docker_capable():
+                        # Heavy aibom image runs as a sibling; needs only outbound net.
+                        sibling = {"image": AIBOM_IMAGE, "model_id": target}
+                    else:
+                        fail("AI-model SBOM generation requires Docker (to run the AIBOM image) "
+                             "or relaunching the UI from the AIBOM image."); return
 
             else:
                 fail("unknown input type: %s" % source); return

@@ -51,6 +51,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | Firmware `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | same |
 | AI model (HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 | AI model file (GGUF, safetensors, …) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
+| Published dataset (Figshare) | DATASET | `$SBOM --model <item URL> --generate-only` | notice, ML-BOM (1.7), risk report (no security) |
 
 > Every command also needs `--project <name> --version <version>` (see examples below).
 >
@@ -175,6 +176,25 @@ $SBOM --project bert-base --version 1.0.0 \
 - For the model card, datasets, and G7 details, see the [AI model guide](ai-model.md).
 
 **Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, G7 conformance
+
+### When it is a published dataset, not a model
+
+Research data is published where the paper put it, which for a great deal of science is a repository like Figshare rather than a model hub. Hand `--model` the item instead:
+
+```bash
+$SBOM --project cell-imaging-data --version 1.0.0 \
+  --model "https://figshare.com/articles/dataset/Title/33412285" \
+  --usage product --generate-only
+```
+
+- The page URL, the DOI, or the item number all work. To read a specific version rather than the latest, give the URL or DOI that names it (`.../33412285/2`, `10.6084/m9.figshare.33413521.v1`).
+- No account and no opt-in image: the public item endpoint answers without authentication and the mapping ships in the base image.
+- The item becomes a CycloneDX `data` component carrying its licence, its DOI, its authors, and an MD5 digest per file. A licence the item states as one we can place (the Creative Commons deeds, MIT, Apache 2.0, the GPLs, CC0) becomes an SPDX id; anything else is kept verbatim rather than guessed at.
+- `--usage` applies here as it does to a model: a non-commercial deed reads differently for internal research than for something you ship.
+- An institutional DOI that does not carry "figshare" (`10.25916/sut.33412285.v1`) cannot be told apart from any other DOI, so give the item URL for those.
+- A private, embargoed or withdrawn item cannot be read without an account, and is reported as an error rather than described as a dataset with no licence.
+
+**Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, conformance check
 
 ### When you have the model file, not the model id
 

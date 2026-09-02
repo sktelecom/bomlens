@@ -276,7 +276,7 @@ guard "--merge needs >=2 files"         "needs at least 2" --project p --version
 guard "--merge-root without --merge"    "only applies with --merge" --project p --version 1 --merge-root x.json
 guard "--merge-root not in --merge list" "must be one of the --merge input files" \
   --project p --version 1 --merge a.json b.json --merge-root c.json
-guard "--usage without --model/--model-file" "AI model scans only" --project p --version 1 --target x --usage internal
+guard "--usage without --model/--model-file" "AI model and dataset scans only" --project p --version 1 --target x --usage internal
 
 # --------------------------------------------------------
 section "Archive ingestion (auto-extract → source scan)"

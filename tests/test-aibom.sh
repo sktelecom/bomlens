@@ -1463,6 +1463,107 @@ else
     fail "ko profile produced no output"
 fi
 
+echo "== figshare: a published dataset item becomes a data component =="
+# Research data lives where the paper put it, which for a lot of science is a
+# repository like Figshare rather than a model hub. The mapping is a
+# transcription of fields the item already carries, so these cases exercise it
+# without the network: the reference forms a person would paste, and the shape
+# the item turns into.
+FS_PY="$LIB/scan-figshare.py"
+fs_call() {
+    python3 - "$FS_PY" "$@" <<'PYEOF'
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("fs", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+op = sys.argv[2]
+if op == "ref":
+    try:
+        item, version = mod.parse_reference(sys.argv[3])
+        print(f"{item}:{version or '-'}")
+    except mod.FigshareError:
+        print("error")
+elif op == "component":
+    item = json.load(open(sys.argv[3]))
+    print(json.dumps(mod.component(item, "test"), ensure_ascii=False))
+PYEOF
+}
+
+for pair in \
+    "33412285|33412285:-" \
+    "https://figshare.com/articles/dataset/Title/33412285|33412285:-" \
+    "https://figshare.com/articles/dataset/Title/33412285/2|33412285:2" \
+    "10.6084/m9.figshare.33413521.v1|33413521:1" \
+    "https://api.figshare.com/v2/articles/33412285|33412285:-" \
+    "not-a-reference|error"; do
+    ref="${pair%%|*}"; want="${pair##*|}"
+    got="$(fs_call ref "$ref")"
+    if [ "$got" = "$want" ]; then
+        pass "reference '$ref' reads as $want"
+    else
+        fail "reference '$ref' read as '$got', expected '$want'"
+    fi
+done
+
+# The item as the public endpoint returns it, trimmed to the fields that map.
+cat > "$WORK/fs-item.json" <<'ITEMEOF'
+{"id": 33412285, "title": "SS-Cu-Ti study dataset", "version": 1,
+ "doi": "10.25916/sut.33412285.v1", "defined_type_name": "dataset",
+ "figshare_url": "https://figshare.com/articles/dataset/x/33412285",
+ "license": {"value": 1, "name": "CC BY 4.0", "url": "https://creativecommons.org/licenses/by/4.0/"},
+ "authors": [{"full_name": "Jiawei Wang"}],
+ "files": [{"name": "a.png", "computed_md5": "7b8123ec815a365c6f4d2cd8e8796583"},
+           {"name": "b.csv", "computed_md5": "aa8123ec815a365c6f4d2cd8e8796584"}]}
+ITEMEOF
+fs_call component "$WORK/fs-item.json" > "$WORK/fs-comp.json"
+
+if jq -e '.type == "data" and .name == "SS-Cu-Ti study dataset" and .version == "v1"' \
+   "$WORK/fs-comp.json" >/dev/null; then
+    pass "the item becomes a data component with its title and version"
+else
+    fail "component shape wrong: $(jq -c '{type,name,version}' "$WORK/fs-comp.json")"
+fi
+
+# A CC deed is placed from its url, which is what says whether the data can be
+# used commercially at all.
+got=$(jq -r '.licenses[0].license.id // ""' "$WORK/fs-comp.json")
+[ "$got" = "CC-BY-4.0" ] && pass "the licence is placed as an SPDX id" \
+    || fail "licence read as '$got', expected CC-BY-4.0"
+
+got=$(jq -r '[.hashes[] | select(.alg == "MD5")] | length' "$WORK/fs-comp.json")
+[ "$got" = "2" ] && pass "per-file digests are carried as MD5 hashes" \
+    || fail "hashes=$got, expected 2"
+
+if jq -e '[.properties[] | select(.name == "bomlens:dataset:collectedBy") | .value] == ["figshare"]
+      and ([.properties[] | select(.name == "bomlens:dataset:doi") | .value] | length == 1)' \
+   "$WORK/fs-comp.json" >/dev/null; then
+    pass "the repository and the DOI are recorded"
+else
+    fail "collectedBy/doi missing: $(jq -c '[.properties[].name]' "$WORK/fs-comp.json")"
+fi
+
+# An institutional instance can offer a licence we cannot place. Guessing an
+# SPDX id there would turn "we do not know" into a claim about what is allowed.
+jq '.license = {"value": 99, "name": "Institutional terms", "url": "https://example.edu/terms"}' \
+   "$WORK/fs-item.json" > "$WORK/fs-item2.json"
+fs_call component "$WORK/fs-item2.json" > "$WORK/fs-comp2.json"
+if jq -e '.licenses[0].license.name == "Institutional terms"
+      and (.licenses[0].license.id // null) == null' "$WORK/fs-comp2.json" >/dev/null; then
+    pass "an unplaceable licence is kept verbatim, not guessed at"
+else
+    fail "unplaceable licence: $(jq -c '.licenses' "$WORK/fs-comp2.json")"
+fi
+
+# The pipeline judges a dataset it collected; the marker is what says it did.
+cp "$WORK/fs-comp.json" "$WORK/fs-bom-comp.json"
+jq -n --slurpfile c "$WORK/fs-comp.json" \
+   '{bomFormat: "CycloneDX", specVersion: "1.7", version: 1,
+     metadata: {component: $c[0]}, components: []}' > "$WORK/fs-bom.json"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/fs-bom.json" >/dev/null 2>&1
+got=$(jq -r '[.metadata.component.properties[] | select(.name == "bomlens:assessment:overall") | .value] | first // ""' "$WORK/fs-bom.json")
+[ -n "$got" ] && pass "a collected dataset is assessed (overall=$got)" \
+    || fail "the dataset was not assessed"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

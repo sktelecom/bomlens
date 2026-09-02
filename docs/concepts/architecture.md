@@ -203,6 +203,7 @@ flowchart TD
 | `IMAGE` | `--target <image name>` | syft | docker.sock mount |
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **Opt-in image** `bomlens-aibom`. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check |
 | `MODELFILE` | `--model-file <path>` | `identify-model-file.py` (stdlib) | Base image, offline. CycloneDX 1.7 ML-BOM read from a model file's own header (GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX); adds the same G7 check |
+| `DATASET` | `--model <Figshare item>` | `scan-figshare.py` (stdlib) | Base image. A published research dataset read from the public Figshare item endpoint (no account): licence, DOI, authors and a per-file MD5 digest become a CycloneDX 1.7 `data` component |
 | `UI` | `--ui` | — | Browser UI; runs every scan target type through the form or file upload |
 
 ---
@@ -223,6 +224,7 @@ How CLI flags translate into environment variables and which steps they enable (
 | `--firmware` | `MODE=FIRMWARE` (firmware image) | Unpack, then syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom image) | Generate an ML-BOM from a HuggingFace model, plus a G7 check |
 | `--model-file <path>` | `MODE=MODELFILE` | Read one model file's header into an ML-BOM, offline, plus a G7 check |
+| `--model <Figshare item>` | `MODE=DATASET` | Describe a published dataset from its Figshare item, no account needed |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
 | `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (also the UI's Reproducible output toggle) |
 | `--sign` | `SIGN_SBOM=true` (plus `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ signing |
