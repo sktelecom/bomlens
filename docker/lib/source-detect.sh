@@ -48,7 +48,12 @@ detect_lang() {
     # Separate single-pattern globs: `ls a.gradle *.gradle.kts` exits non-zero when
     # one variant is absent, which would mis-skip gradle-only / kts-only projects.
     { [ -f "$d/pom.xml" ] || ls "$d"/*.gradle >/dev/null 2>&1 || ls "$d"/*.gradle.kts >/dev/null 2>&1; } && langs="$langs java"
-    { [ -f "$d/requirements.txt" ] || [ -f "$d/pyproject.toml" ]; } && langs="$langs python"
+    # setup.py/setup.cfg predate pyproject.toml and are still what a lot of
+    # scientific Python ships: leaving them out made such a project detect as
+    # "unknown", which sent it to the all-in-one image AND told the user no
+    # manifest was found while the scan went on to resolve its dependencies.
+    { [ -f "$d/requirements.txt" ] || [ -f "$d/pyproject.toml" ] \
+      || [ -f "$d/setup.py" ] || [ -f "$d/setup.cfg" ] || [ -f "$d/Pipfile" ]; } && langs="$langs python"
     [ -f "$d/package.json" ] && langs="$langs node"
     [ -f "$d/composer.json" ] && langs="$langs php"
     { ls "$d"/*.csproj >/dev/null 2>&1 || ls "$d"/*.sln >/dev/null 2>&1; } && langs="$langs dotnet"
