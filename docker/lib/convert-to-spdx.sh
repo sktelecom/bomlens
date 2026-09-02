@@ -61,10 +61,21 @@ if [ -n "$DOC_NAME" ]; then
     fi
 fi
 
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Runs before the containers step, which attaches what it adds to whatever the
+# document describes: naming that root first means the images hang off the real
+# component rather than off syft's blank wrapper.
+SPDX_DOC_ROOT="$LIB_DIR/spdx-document-root.py"
+if [ -f "$SPDX_DOC_ROOT" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$SPDX_DOC_ROOT" "$INPUT" "$OUTPUT" \
+        || echo "[spdx] WARN: the document root was left unnamed." >&2
+fi
+
 # Best-effort, and after the rename so the document is otherwise final: the SPDX
 # file is an additional artifact and the scan has already produced everything else
 # by now, so a failure here costs the memberships rather than the run.
-SPDX_CONTAINERS="$(cd "$(dirname "$0")" && pwd)/spdx-containers.py"
+SPDX_CONTAINERS="$LIB_DIR/spdx-containers.py"
 if [ -f "$SPDX_CONTAINERS" ] && command -v python3 >/dev/null 2>&1; then
     python3 "$SPDX_CONTAINERS" "$INPUT" "$OUTPUT" \
         || echo "[spdx] WARN: containers were not carried into the SPDX file." >&2

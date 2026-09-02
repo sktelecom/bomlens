@@ -2105,6 +2105,107 @@ else
     fail "the SPDX file was rewritten for a scan that has no containers"
 fi
 
+echo "== spdx: the document says which component it describes =="
+# syft converts every input the way it converts an image: the document DESCRIBES
+# one root package that CONTAINS the rest. A CycloneDX file has no such wrapper,
+# so the converter invented a blank one — no name, no version — and the export of
+# a scan that passed its own conformance check failed when read back, on the
+# field coverage every SBOM regulation asks for.
+cat > "$WORK/docroot-in.cdx.json" <<'CDXEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"application","name":"app","version":"1.0",
+                          "bom-ref":"pkg:pypi/app@1.0"}},
+ "components":[{"type":"library","name":"dep","version":"2.0","purl":"pkg:pypi/dep@2.0"}]}
+CDXEOF
+# The converter's output: the blank wrapper holding everything, with the root
+# component sitting among the dependencies as an ordinary package.
+cat > "$WORK/docroot.spdx.json" <<'SPDXEOF'
+{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"app-1.0",
+ "creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: syft"]},
+ "packages":[
+  {"SPDXID":"SPDXRef-DocumentRoot-Unknown-","name":"","filesAnalyzed":false},
+  {"SPDXID":"SPDXRef-Package-app","name":"app","versionInfo":"1.0",
+   "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                    "referenceLocator":"pkg:pypi/app@1.0"}]},
+  {"SPDXID":"SPDXRef-Package-dep","name":"dep","versionInfo":"2.0"}],
+ "relationships":[
+  {"spdxElementId":"SPDXRef-DOCUMENT","relatedSpdxElement":"SPDXRef-DocumentRoot-Unknown-",
+   "relationshipType":"DESCRIBES"},
+  {"spdxElementId":"SPDXRef-DocumentRoot-Unknown-","relatedSpdxElement":"SPDXRef-Package-app",
+   "relationshipType":"CONTAINS"},
+  {"spdxElementId":"SPDXRef-DocumentRoot-Unknown-","relatedSpdxElement":"SPDXRef-Package-dep",
+   "relationshipType":"CONTAINS"},
+  {"spdxElementId":"SPDXRef-Package-dep","relatedSpdxElement":"SPDXRef-Package-app",
+   "relationshipType":"DEPENDENCY_OF"}]}
+SPDXEOF
+python3 "$LIB/spdx-document-root.py" "$WORK/docroot-in.cdx.json" "$WORK/docroot.spdx.json" 2>/dev/null
+
+if jq -e '[.packages[] | select((.name // "") == "")] | length == 0' \
+   "$WORK/docroot.spdx.json" >/dev/null; then
+    pass "no package is left without a name"
+else
+    fail "the blank wrapper survived the conversion"
+fi
+
+got=$(jq -r '.relationships[] | select(.relationshipType == "DESCRIBES") | .relatedSpdxElement' \
+      "$WORK/docroot.spdx.json")
+if [ "$got" = "SPDXRef-Package-app" ]; then
+    pass "the document describes the component the BOM stamps as its root"
+else
+    fail "the document describes the wrong package" "got: ${got:-nothing}"
+fi
+
+# The memberships move with the DESCRIBES, minus the one that would now say the
+# root contains itself.
+got=$(jq -r '[.relationships[] | select(.relationshipType == "CONTAINS")
+      | "\(.spdxElementId)->\(.relatedSpdxElement)"] | sort | join(",")' "$WORK/docroot.spdx.json")
+if [ "$got" = "SPDXRef-Package-app->SPDXRef-Package-dep" ]; then
+    pass "what the wrapper held now hangs off the real root"
+else
+    fail "the memberships did not move to the real root" "got: ${got:-nothing}"
+fi
+
+if jq -e '[.relationships[] | select(.spdxElementId == .relatedSpdxElement)] | length == 0' \
+   "$WORK/docroot.spdx.json" >/dev/null; then
+    pass "no package is said to contain itself"
+else
+    fail "the root was related to itself"
+fi
+
+# A converter may drop a root it does not count as software. Then the wrapper is
+# the only thing holding the memberships, so it is filled in rather than removed.
+cat > "$WORK/docroot-nb.spdx.json" <<'SPDXEOF'
+{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"app-1.0",
+ "creationInfo":{"created":"1970-01-01T00:00:00Z","creators":["Tool: syft"]},
+ "packages":[
+  {"SPDXID":"SPDXRef-DocumentRoot-Unknown-","name":"","filesAnalyzed":false},
+  {"SPDXID":"SPDXRef-Package-dep","name":"dep","versionInfo":"2.0"}],
+ "relationships":[
+  {"spdxElementId":"SPDXRef-DOCUMENT","relatedSpdxElement":"SPDXRef-DocumentRoot-Unknown-",
+   "relationshipType":"DESCRIBES"},
+  {"spdxElementId":"SPDXRef-DocumentRoot-Unknown-","relatedSpdxElement":"SPDXRef-Package-dep",
+   "relationshipType":"CONTAINS"}]}
+SPDXEOF
+python3 "$LIB/spdx-document-root.py" "$WORK/docroot-in.cdx.json" "$WORK/docroot-nb.spdx.json" 2>/dev/null
+if jq -e '([.packages[] | select(.SPDXID == "SPDXRef-DocumentRoot-Unknown-"
+      and .name == "app" and .versionInfo == "1.0")] | length == 1)
+      and ([.relationships[] | select(.relationshipType == "CONTAINS")] | length == 1)' \
+   "$WORK/docroot-nb.spdx.json" >/dev/null; then
+    pass "a root the converter dropped is filled in on the wrapper it left"
+else
+    fail "the wrapper was neither replaced nor filled in"
+fi
+
+# A document whose root already has a name is not this bug, and is left alone.
+cp "$FIX/good-spdx.json" "$WORK/docroot-ok.spdx.json"
+before="$(jq -S . "$WORK/docroot-ok.spdx.json")"
+python3 "$LIB/spdx-document-root.py" "$WORK/docroot-in.cdx.json" "$WORK/docroot-ok.spdx.json" 2>/dev/null
+if [ "$before" = "$(jq -S . "$WORK/docroot-ok.spdx.json")" ]; then
+    pass "an already-named document root is left untouched"
+else
+    fail "a document that did not have this problem was rewritten"
+fi
+
 echo "== conformance: a PURL failure says when the components carry a CPE instead =="
 # The submission criteria require a PURL, so this stays a mandatory failure. What
 # it must not do is read as "unidentified components" when the components are
