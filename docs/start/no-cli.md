@@ -73,11 +73,13 @@ To check that everything is ready, double-click `scripts\check-setup.bat` in the
 
 ![The BomLens web UI](../images/web-ui.png)
 
-## If macOS says the app is damaged
+## If the app won't open on macOS
 
-On macOS you may see a warning that "BomLens" is damaged and can't be opened, offering only "Move to Trash". The app is not actually damaged. The current macOS build is not yet signed and notarized with an Apple Developer ID, so macOS quarantines the downloaded app and Gatekeeper blocks it. It is the same kind of block as the SmartScreen warning on Windows.
+The current macOS build is not yet signed and notarized with an Apple Developer ID, so macOS quarantines the downloaded app. It is the same kind of block as the SmartScreen warning on Windows.
 
-This message behaves differently from the ordinary "unidentified developer" warning. On recent macOS, right-clicking the app and choosing Open, or the "Open anyway" button in System Settings, usually does not clear it. The reliable way is to remove the quarantine attribute from a terminal.
+What you see depends on your macOS version. You may get a warning that "BomLens" is damaged and can't be opened, offering only "Move to Trash" — the app is not actually damaged. Or the app may simply open, in which case macOS is running it from a temporary read-only copy rather than from where you installed it (App Translocation). It runs, but not from the location you chose, and nothing guarantees the same state the next time you open it.
+
+The fix is the same either way. Right-clicking the app and choosing Open, or the "Open anyway" button in System Settings, usually does not clear it on recent macOS. The reliable way is to remove the quarantine attribute from a terminal.
 
 1. Open the `.dmg` and drag `BomLens.app` into your Applications folder.
 2. Open Terminal and run the command below, then open BomLens from Applications as usual.
@@ -134,6 +136,29 @@ SBOM_IMAGE_TAR=D:\bomlens-image.tar
 ```
 
 The file is commented in both English and Korean. A real environment variable, if you set one, still wins over the file.
+
+## Removing it
+
+Deleting the app leaves the scanner images and the settings behind. The images can exceed 10 GB, so clear these too if you want it gone completely.
+
+Desktop app (macOS):
+
+```bash
+rm -rf /Applications/BomLens.app
+rm -rf ~/Library/Application\ Support/sbom-generator-desktop
+rm -f ~/Library/Preferences/com.sktelecom.sbom-generator.plist
+```
+
+On Windows, uninstall the desktop app from Settings; the settings folder left behind is `%APPDATA%\sbom-generator-desktop`.
+
+The scanner images are the same on every operating system. Remove only the ones you actually pulled.
+
+```bash
+docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
+           ghcr.io/sktelecom/bomlens-firmware ghcr.io/sktelecom/bomlens-deep-cve
+```
+
+Your scan results live in the `sbom-output` folder under your home directory. Leave it alone if you want to keep the reports.
 
 For more detail and command-line usage, see [Getting started](../start/first-scan.md) and the [Notice and security guide](../guides/reports.md).
 

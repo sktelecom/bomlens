@@ -93,16 +93,20 @@ Docker 설치와 실행, 스캐너 이미지, 포트 상태를 Windows 표시 �
 
 ![BomLens 웹 UI](../images/web-ui.png)
 
-## macOS에서 '손상됨' 경고가 날 때
+## macOS에서 앱이 열리지 않을 때
 
-macOS에서 "'BomLens'은(는) 손상되었기 때문에 열 수 없습니다"라는 경고가 뜨고 "휴지통으로 이동"만
-보일 수 있습니다. 앱이 실제로 손상된 것은 아닙니다. 현재 macOS 빌드가 아직 Apple Developer ID로
-코드 서명·공증(notarization)되지 않아, macOS가 내려받은 앱을 격리(quarantine)하고 Gatekeeper가
-막는 것입니다. Windows의 SmartScreen 경고와 같은 성격의 차단입니다.
+현재 macOS 빌드는 아직 Apple Developer ID로 코드 서명·공증(notarization)되지 않았습니다. 그래서
+macOS가 내려받은 앱을 격리(quarantine)합니다. Windows의 SmartScreen 경고와 같은 성격입니다.
 
-이 메시지는 흔한 "확인되지 않은 개발자" 경고와 다르게 동작합니다. 최근 macOS에서는 앱을 우클릭해
-열기를 고르거나 시스템 설정의 "확인 없이 열기" 버튼을 눌러도 잘 풀리지 않습니다. 믿을 수 있는
-방법은 터미널에서 격리 속성을 지우는 것입니다.
+macOS 버전에 따라 겪는 모습이 다릅니다. "'BomLens'은(는) 손상되었기 때문에 열 수 없습니다"라는
+경고가 뜨고 "휴지통으로 이동"만 보일 수 있습니다. 앱이 실제로 손상된 것은 아닙니다. 반대로 앱이
+그냥 열리기도 하는데, 이때는 macOS가 앱을 원래 자리가 아닌 임시 읽기 전용 폴더에 복사해
+실행합니다(App Translocation). 열리기는 하지만 설치한 위치에서 도는 것이 아니라, 다음에 열 때
+같은 상태가 유지된다는 보장이 없습니다.
+
+어느 쪽이든 조치는 같습니다. 앱을 우클릭해 열기를 고르거나 시스템 설정의 "확인 없이 열기" 버튼을
+누르는 방법은 최근 macOS에서 잘 통하지 않습니다. 믿을 수 있는 방법은 터미널에서 격리 속성을
+지우는 것입니다.
 
 1. `.dmg`를 열어 `BomLens.app`을 응용 프로그램(Applications) 폴더로 끌어다 놓습니다.
 2. 터미널을 열어 아래 명령을 실행한 뒤, 평소처럼 응용 프로그램에서 BomLens를 엽니다.
@@ -178,6 +182,30 @@ SBOM_IMAGE_TAR=D:\bomlens-image.tar
 ```
 
 파일에는 한국어와 영어 설명이 함께 들어 있습니다. 실제 환경변수를 설정해 두었다면 그쪽이 우선합니다.
+
+## 지울 때
+
+앱만 지워도 스캐너 이미지와 설정은 남습니다. 이미지가 10GB를 넘을 수 있어 디스크를 꽤 차지하므로,
+완전히 지우려면 아래를 함께 정리하세요.
+
+데스크톱 앱(macOS):
+
+```bash
+rm -rf /Applications/BomLens.app
+rm -rf ~/Library/Application\ Support/sbom-generator-desktop
+rm -f ~/Library/Preferences/com.sktelecom.sbom-generator.plist
+```
+
+Windows에서는 설정에서 앱 제거로 지우고, 남은 설정 폴더는 `%APPDATA%\sbom-generator-desktop`입니다.
+
+스캐너 이미지는 어느 운영체제든 같습니다. 받아 둔 것만 골라 지우면 됩니다.
+
+```bash
+docker rmi ghcr.io/sktelecom/bomlens ghcr.io/sktelecom/bomlens-aibom \
+           ghcr.io/sktelecom/bomlens-firmware ghcr.io/sktelecom/bomlens-deep-cve
+```
+
+스캔 결과는 홈 디렉터리 아래 `sbom-output` 폴더에 있습니다. 보고서를 보관할 생각이면 지우지 마세요.
 
 더 자세한 설명과 CLI 사용법은 [시작하기](../start/first-scan.ko.md)와
 [고지문·보안 보고서 가이드](../guides/reports.ko.md) 문서를 참고하세요.
