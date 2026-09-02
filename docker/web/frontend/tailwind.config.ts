@@ -56,6 +56,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--brand))",
           foreground: "hsl(var(--brand-foreground))",
           accent: "hsl(var(--brand-accent))",
+          strong: "hsl(var(--brand-strong))",
         },
         // Sidebar surface — the left rail reads as its own plane.
         sidebar: {

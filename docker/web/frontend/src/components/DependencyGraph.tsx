@@ -48,8 +48,16 @@ function themeColors() {
     const channels = css.getPropertyValue(name).trim().replace(/\s+/g, ", ");
     return `hsl(${channels})`;
   };
-  // Risk tokens are stored as hex, so read them raw (Cytoscape accepts hex).
-  const raw = (name: string) => css.getPropertyValue(name).trim();
+  // Risk tokens are NOT hex: they store RGB channels space-separated
+  // ("234 88 12"), because the Tailwind utilities compose them as
+  // `rgb(var(--risk-high) / <alpha-value>)`. Handing the bare channels to
+  // Cytoscape left it unable to parse a colour, so every severity ring fell back
+  // to black — invisible against the dark canvas, and out of step with the
+  // legend, which renders the same severities through the utility classes.
+  const rgb = (name: string) => {
+    const channels = css.getPropertyValue(name).trim().replace(/\s+/g, ", ");
+    return `rgb(${channels})`;
+  };
   return {
     node: hsl("--muted-foreground"),
     text: hsl("--foreground"),
@@ -59,11 +67,11 @@ function themeColors() {
     // Direct-dependency accent — SK red brand token (legend mark).
     direct: hsl("--brand"),
     risk: {
-      CRITICAL: raw("--risk-critical"),
-      HIGH: raw("--risk-high"),
-      MEDIUM: raw("--risk-medium"),
-      LOW: raw("--risk-low"),
-      UNKNOWN: raw("--risk-info"),
+      CRITICAL: rgb("--risk-critical"),
+      HIGH: rgb("--risk-high"),
+      MEDIUM: rgb("--risk-medium"),
+      LOW: rgb("--risk-low"),
+      UNKNOWN: rgb("--risk-info"),
     } as Record<Severity, string>,
   };
 }

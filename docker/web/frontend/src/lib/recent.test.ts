@@ -64,6 +64,15 @@ describe("scanType / presentTypes", () => {
     ).toBe("ai");
   });
 
+  it("calls a scanned folder a folder, not a generic SBOM", () => {
+    // A rootfs scan roots at `file`, which fell through to the default and put
+    // the scan in the list as "SBOM" — out of every other filter. The saved
+    // input says exactly what it was.
+    expect(scanType(scan({ inputSource: "rootfs-dir", componentType: "file" }))).toBe("rootfs");
+    // Scans made before the input sidecar existed have only the root type.
+    expect(scanType(scan({ componentType: "file" }))).toBe("rootfs");
+  });
+
   it("calls a submitted SBOM an SBOM, not the source its root claims to be", () => {
     // A supplier's document declares "application" at its root, exactly like a
     // source scan — reading the component type alone labelled it Source.

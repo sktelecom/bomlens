@@ -371,7 +371,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         {scanType(s) === "ai" ? (
-                          <Badge className="border-transparent bg-brand/10 text-brand">
+                          <Badge className="border-transparent bg-brand/10 text-brand-strong">
                             {t(scanTypeLabelKey(s))}
                           </Badge>
                         ) : (

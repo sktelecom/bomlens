@@ -55,6 +55,15 @@
      * existing UI keeps working while the new shell adopts the brand accent. */
     --brand: 349 100% 46%; /* SK Red #EA002C */
     --brand-foreground: 0 0% 100%;
+    /* Brand red as TEXT on the page surface. Separate from --brand because
+     * that one is also a solid fill (the New scan pill) whose white label
+     * needs it dark — so it cannot be lightened for dark mode, and a badge
+     * using it directly fell to 3.74:1 there, under the 4.5:1 AA floor.
+     * Chosen against the surface these actually sit on: a bg-brand/10 tint
+     * over the CARD, not over the page. Measured on the live UI, the badge
+     * composites to rgb(253, 229.5, 233.8) in light and rgb(47.8, 24.3,
+     * 30.4) in dark, where the old value scored 3.87 and 3.57. */
+    --brand-strong: 349 100% 38%;
     --brand-accent: 24 90% 55%; /* SK Orange #F47725 */
 
     /* Sidebar surface — a hair off the canvas so the rail reads as its own
@@ -155,6 +164,8 @@
      * WCAG AA (4.5:1); a lighter red here drops the pill to ~3.8:1. */
     --brand: 349 100% 46%;
     --brand-foreground: 0 0% 100%;
+    /* Lightened so brand-coloured text clears AA against the dark surface. */
+    --brand-strong: 349 100% 68%;
     --brand-accent: 24 90% 60%;
 
     --sidebar: 240 5% 9%; /* one step above --background (6%) */

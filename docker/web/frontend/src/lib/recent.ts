@@ -81,6 +81,11 @@ export function scanType(scan: RecentScan): ScanType {
   // Every other input either matches its component type or has none to conflict
   // with, so they stay on the SBOM's own declaration.
   if (scan.inputSource === "sbom-upload") return "sbom";
+  // A scanned folder is the other case the root type gets wrong: a rootfs scan
+  // roots at `file` (or at nothing), which fell through to the generic SBOM
+  // label even though the saved input says exactly what was pointed at — so a
+  // folder scan sat in the list as "SBOM" and dropped out of every other filter.
+  if (scan.inputSource === "rootfs-dir") return "rootfs";
   switch (scan.componentType) {
     // A model can also be the SBOM's own root component rather than an entry in
     // components[], which is what `isAiScan` reads. Both spellings are the same
@@ -97,6 +102,10 @@ export function scanType(scan: RecentScan): ScanType {
     case "library":
     case "framework":
       return "source";
+    // Scans made before the input sidecar existed have only this to go on, and
+    // `file` is what a rootfs scan declares.
+    case "file":
+      return "rootfs";
     default:
       return "sbom";
   }
