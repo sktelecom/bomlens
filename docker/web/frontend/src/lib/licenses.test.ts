@@ -95,6 +95,18 @@ describe("licenseRiskTier", () => {
     expect(licenseRiskTier("Apache-2.0")).toBe("permissive");
   });
 
+  it("does not label a GPL with an exception clause as strong copyleft", () => {
+    // The clause exists to permit linking the bare license forbids (jakarta/javax
+    // APIs and OpenJDK ship this way), so strong-copyleft would warn about an
+    // obligation the component does not impose.
+    expect(licenseRiskTier("GPL-2.0-with-classpath-exception")).toBe("weak-copyleft");
+    expect(licenseRiskTier("GPL-2.0-only WITH Classpath-exception-2.0")).toBe("weak-copyleft");
+    // Anchored on GPL: the word WITH alone must not pull a license into copyleft.
+    expect(licenseRiskTier("Bespoke-1.0 WITH Vendor-exception")).toBe("uncategorized");
+    // And a GPL without any exception is unchanged.
+    expect(licenseRiskTier("GPL-2.0-only")).toBe("strong-copyleft");
+  });
+
   it("never assumes an unrecognised license is permissive", () => {
     // The core safety property: unknown is uncategorized, not safe.
     expect(licenseRiskTier("Foo-1.0")).toBe("uncategorized");

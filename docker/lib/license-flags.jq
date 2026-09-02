@@ -44,7 +44,13 @@ def license_flag($s):
 def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11"];
 
 # Classify ONE license id/name/expression. Order matters: AGPL and LGPL are
-# matched before the bare GPL test so they don't fall to strong-copyleft.
+# matched before the bare GPL test so they don't fall to strong-copyleft, and a
+# GPL carrying an exception clause is matched before it too. That clause exists
+# precisely to permit linking the bare license would forbid (the classpath
+# exception on jakarta/javax APIs and OpenJDK is the common one), so labelling it
+# strong-copyleft warns about an obligation the component does not impose. The
+# GPL prefix keeps the test narrow: "Apache-2.0 WITH LLVM-exception" is permissive
+# and must not be pulled up into copyleft by the word WITH alone.
 def license_class($s):
   (($s // "") | sub("^\\s+"; "") | sub("\\s+$"; "")) as $id
   | if $id == "" then "uncategorized"
@@ -52,6 +58,7 @@ def license_class($s):
     elif ($id | test("\\bAGPL"; "i")) then "network-copyleft"
     elif ($id | test("\\bLGPL"; "i")) then "weak-copyleft"
     elif ($id | test("\\b(MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL|Sleepycat)\\b"; "i")) then "weak-copyleft"
+    elif ($id | test("\\bGPL.*(\\bWITH\\b|-with-.*-exception)"; "i")) then "weak-copyleft"
     elif ($id | test("\\bGPL"; "i")) then "strong-copyleft"
     else "uncategorized" end;
 

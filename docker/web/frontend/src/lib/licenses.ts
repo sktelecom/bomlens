@@ -116,6 +116,12 @@ export function licenseRiskTier(license: string): LicenseRiskTier {
   if (/\bLGPL/i.test(id)) return "weak-copyleft";
   if (/\b(MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL|Sleepycat)\b/i.test(id))
     return "weak-copyleft";
+  // A GPL carrying an exception clause, before the bare GPL test. The clause exists
+  // precisely to permit linking the bare license would forbid (the classpath exception
+  // on jakarta/javax APIs and OpenJDK is the common one), so strong-copyleft would warn
+  // about an obligation the component does not impose. The GPL prefix keeps it narrow:
+  // "Apache-2.0 WITH LLVM-exception" must not be pulled into copyleft by WITH alone.
+  if (/\bGPL.*(\bWITH\b|-with-.*-exception)/i.test(id)) return "weak-copyleft";
   if (/\bGPL/i.test(id)) return "strong-copyleft";
   return "uncategorized";
 }

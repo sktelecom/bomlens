@@ -551,6 +551,27 @@ lclass() { jq -r --arg n "$1" '.components[] | select(.name==$n)
 [ "$(lclass bare-lib)" = "uncategorized" ] && pass "no license info -> uncategorized" || fail "bare-lib class='$(lclass bare-lib)', expected uncategorized"
 [ "$(lclass dual-lib)" = "strong-copyleft" ] && pass "dual license (GPL-2.0-only OR MIT) -> strongest wins" || fail "dual-lib class='$(lclass dual-lib)', expected strong-copyleft"
 [ "$(lclass mixed-lib)" = "uncategorized" ] && pass "MIT + unknown -> uncategorized (unknown outranks confirmed-permissive)" || fail "mixed-lib class='$(lclass mixed-lib)', expected uncategorized"
+# An exception clause exists to permit linking the bare license forbids, so a GPL
+# carrying one must not be labelled with the obligation it lifts. jakarta/javax APIs
+# and OpenJDK ship this way, so mislabelling it is a common false alarm. Its own
+# fixture, so the counts the risk-report assertions below read stay put.
+cat > "$WORK/lcx.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"cpe-lib","version":"1.0","licenses":[{"license":{"id":"GPL-2.0-with-classpath-exception"}}]},
+ {"type":"library","name":"cpe-with-lib","version":"1.0","licenses":[{"license":{"id":"GPL-2.0-only WITH Classpath-exception-2.0"}}]},
+ {"type":"library","name":"bare-gpl-lib","version":"1.0","licenses":[{"license":{"id":"GPL-3.0-only"}}]},
+ {"type":"library","name":"with-noise-lib","version":"1.0","licenses":[{"license":{"name":"Bespoke-1.0 WITH Vendor-exception"}}]}
+]}
+JSON
+bash "$LIB/normalize-sbom.sh" "$WORK/lcx.json" >/dev/null 2>&1
+lclassx() { jq -r --arg n "$1" '.components[] | select(.name==$n)
+    | [(.properties // [])[] | select(.name=="bomlens:licenseClass") | .value] | first // "ABSENT"' "$WORK/lcx.json"; }
+[ "$(lclassx cpe-lib)" = "weak-copyleft" ] && pass "GPL with a classpath exception -> weak-copyleft" || fail "cpe-lib class='$(lclassx cpe-lib)', expected weak-copyleft"
+[ "$(lclassx cpe-with-lib)" = "weak-copyleft" ] && pass "the WITH spelling of the same exception -> weak-copyleft" || fail "cpe-with-lib class='$(lclassx cpe-with-lib)', expected weak-copyleft"
+[ "$(lclassx bare-gpl-lib)" = "strong-copyleft" ] && pass "a GPL without an exception is still strong-copyleft" || fail "bare-gpl-lib class='$(lclassx bare-gpl-lib)', expected strong-copyleft"
+# The exception test is anchored on GPL: the word WITH alone must not pull a
+# non-GPL license up into copyleft.
+[ "$(lclassx with-noise-lib)" = "uncategorized" ] && pass "a non-GPL license carrying WITH is not pulled into copyleft" || fail "with-noise-lib class='$(lclassx with-noise-lib)', expected uncategorized"
 # A licenseReview-flagged component still gets a class: the two properties coexist.
 lr=$(jq -r '.components[] | select(.name=="llama-model")
     | [(.properties // [])[] | select(.name=="bomlens:licenseReview") | .value] | first // "ABSENT"' "$WORK/lc.json")
