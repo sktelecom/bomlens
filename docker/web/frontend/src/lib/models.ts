@@ -65,6 +65,10 @@ export interface ModelAssessment {
   license?: AssessmentGrade;
   security?: AssessmentGrade;
   datasets?: AssessmentGrade;
+  /** Stamped when the model states no training data at all, in a usage the
+   *  terms of that data would reach. Absent when it declares its datasets —
+   *  those are judged on the `datasets` axis instead. */
+  trainingData?: AssessmentGrade;
   /** The usage the verdict was graded against, when one was specified. */
   usageContext?: UsageContext;
   /** Human-readable grounds, split from the "; "-joined property value. */
@@ -194,6 +198,7 @@ function readAssessment(one: (key: string) => string | undefined): ModelAssessme
     license: grade(one("bomlens:assessment:license")),
     security: grade(one("bomlens:assessment:security")),
     datasets: grade(one("bomlens:assessment:datasets")),
+    trainingData: grade(one("bomlens:assessment:trainingData")),
     usageContext: usageContext(one("bomlens:assessment:usageContext")),
     reasons: splitReasons(one("bomlens:assessment:reasons")),
   };

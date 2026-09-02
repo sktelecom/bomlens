@@ -532,6 +532,7 @@
     "assessLicense": "라이선스",
     "assessSecurity": "파일 보안",
     "assessDatasets": "데이터셋",
+    "assessTrainingData": "학습 데이터",
     "assessNotEvaluated": "평가 안 됨",
     "gradeOk": "제약 신호 없음",
     "gradeConditional": "조건부 사용",

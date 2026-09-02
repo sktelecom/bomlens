@@ -212,6 +212,29 @@ describe("parseModelCards", () => {
     expect(m.lineageConflictWith).toBe("meta-llama/Llama-3-8B");
   });
 
+  it("reads the training-data axis a model with no declared datasets carries", () => {
+    // A model that states no training set is graded on that fact instead of on
+    // its datasets, so the two axes never appear together.
+    const bom = {
+      components: [
+        {
+          type: "machine-learning-model",
+          name: "m",
+          properties: [
+            { name: "bomlens:assessment:overall", value: "review" },
+            { name: "bomlens:assessment:license", value: "ok" },
+            { name: "bomlens:assessment:trainingData", value: "review" },
+            { name: "bomlens:assessment:axes", value: "license,trainingData" },
+          ],
+        },
+      ],
+    };
+    const m = parseModelCards(bom).models[0];
+    expect(m.assessment?.trainingData).toBe("review");
+    expect(m.assessment?.datasets).toBeUndefined();
+    expect(m.assessment?.overall).toBe("review");
+  });
+
   it("leaves the assessment absent when the pipeline stamped none", () => {
     const m = parseModelCards(ML_BOM).models[0];
     expect(m.assessment).toBeUndefined();

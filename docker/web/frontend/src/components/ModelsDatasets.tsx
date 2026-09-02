@@ -231,6 +231,7 @@ function AssessmentBlock({
     { key: "license", label: t("models.assessLicense"), grade: a.license },
     { key: "security", label: t("models.assessSecurity"), grade: a.security },
     { key: "datasets", label: t("models.assessDatasets"), grade: a.datasets },
+    { key: "trainingData", label: t("models.assessTrainingData"), grade: a.trainingData },
   ];
 
   return (

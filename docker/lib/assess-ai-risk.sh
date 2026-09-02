@@ -237,6 +237,24 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
                               end)) ] }
         end;
 
+  # A model that declares no training data at all is a different fact from one
+  # whose declared datasets all check out: nothing was checked. The openness
+  # enrichment already records it as openness:training-data=undisclosed, and this
+  # axis is what carries that into the verdict, so a reader of `overall` alone is
+  # not told a model is fine when the terms of what it learned from were never
+  # stated. `review` (not caution) because the terms are unknown, not known-bad —
+  # the same rule the license axis applies to a license the registry cannot place.
+  # Internal use and outputs-only are the scenarios those terms do not reach, so
+  # they are judged without this axis, the same way the license conditions are
+  # filtered by scenario.
+  def training_data_axis($p):
+      if ($ctx == "internal" or $ctx == "outputs-only") then null
+      elif ([ $p[] | select(.name == "openness:training-data") | .value ][0]) == "undisclosed"
+        then { verdict: "review",
+               reasons: ["training data undisclosed: the terms of the data this model learned from were not declared"] }
+      else null
+      end;
+
   # One definition, applied wherever the model actually sits: the AIBOM generator
   # writes its scan job into metadata.component and leaves the model in
   # components[], while a spec-shaped AI SBOM (hand-written, or from a supplier)
@@ -252,12 +270,18 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
             reasons: ($a0.reasons + ($ex | map(.r))) } as $a
         | (assess_security($p0)) as $s
         | (datasets_axis(.["bom-ref"] // "")) as $dax
+        # Declared datasets are the better evidence: when they exist they were
+        # resolved and judged one by one, so the undisclosed axis would only
+        # restate what the datasets axis already answered.
+        | (if $dax == null then training_data_axis($p0) else null end) as $tdx
         | (["license"]
            + (if $s != null then ["security"] else [] end)
-           + (if $dax != null then ["datasets"] else [] end)) as $axes
+           + (if $dax != null then ["datasets"] else [] end)
+           + (if $tdx != null then ["trainingData"] else [] end)) as $axes
         | (([$a.verdict]
             + (if $s != null then [$s.verdict] else [] end)
-            + (if $dax != null then [$dax.verdict] else [] end))
+            + (if $dax != null then [$dax.verdict] else [] end)
+            + (if $tdx != null then [$tdx.verdict] else [] end))
            | max_by(vrank[.])) as $overall
         | .properties = (strip_assessment + [
             { name: "bomlens:assessment:axes",         value: ($axes | join(",")) }
@@ -269,12 +293,14 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
           ]
           + (if $s != null then [{ name: "bomlens:assessment:security", value: $s.verdict }] else [] end)
           + (if $dax != null then [{ name: "bomlens:assessment:datasets", value: $dax.verdict }] else [] end)
+          + (if $tdx != null then [{ name: "bomlens:assessment:trainingData", value: $tdx.verdict }] else [] end)
           + [
             { name: "bomlens:assessment:overall",      value: $overall },
             { name: "bomlens:assessment:reasons",
               value: (($a.reasons
                        + (if $s != null then $s.reasons else [] end)
-                       + (if $dax != null then $dax.reasons else [] end))[0:8] | join("; ")) }
+                       + (if $dax != null then $dax.reasons else [] end)
+                       + (if $tdx != null then $tdx.reasons else [] end))[0:8] | join("; ")) }
           ])
       elif .type == "data" then
         (data_parts) as $d

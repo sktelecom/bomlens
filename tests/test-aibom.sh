@@ -547,7 +547,9 @@ rs=$(mprop bomlens:hf:scan:repoStatus)
 case "$rs" in *scansDone*) pass "repo-level rollup recorded verbatim (never judged)" ;; *) fail "repoStatus='$rs'" ;; esac
 bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
 [ "$(mprop bomlens:assessment:security)" = "ok" ] && pass "safe scan assesses the security axis ok" || fail "security axis='$(mprop bomlens:assessment:security)', expected ok"
-[ "$(mprop bomlens:assessment:axes)" = "license,security" ] && pass "axes record license,security" || fail "axes='$(mprop bomlens:assessment:axes)'"
+# This fixture declares no training data, so the trainingData axis rides along;
+# what this line checks is that the security axis is recorded beside the license.
+[ "$(mprop bomlens:assessment:axes)" = "license,security,trainingData" ] && pass "axes record license,security" || fail "axes='$(mprop bomlens:assessment:axes)'"
 run_scan dangerous
 [ "$(mprop bomlens:hf:scan:status)" = "unsafe" ] && pass "a dangerous pickle import reads unsafe" || fail "scan status='$(mprop bomlens:hf:scan:status)', expected unsafe"
 iss=$(mprop bomlens:hf:scan:issue)
@@ -572,7 +574,58 @@ ENRICH_HF_SECURITY=false HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=fals
 [ ! -s "$WORK/tree-calls.txt" ] && pass "ENRICH_HF_SECURITY=false skips the tree lookup" || fail "the tree API was called despite the gate"
 [ "$(mprop bomlens:hf:scan:status)" = "" ] && pass "no scan status is stamped when the lookup is off" || fail "scan status stamped despite the gate"
 bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
-[ "$(mprop bomlens:assessment:axes)" = "license" ] && pass "the security axis is omitted, not guessed, when unavailable" || fail "axes='$(mprop bomlens:assessment:axes)'"
+[ "$(mprop bomlens:assessment:axes)" = "license,trainingData" ] && pass "the security axis is omitted, not guessed, when unavailable" || fail "axes='$(mprop bomlens:assessment:axes)'"
+
+echo "== a model that declares no training data is not assessed as fine =="
+# The openness enrichment records an unstated training set as
+# openness:training-data=undisclosed. Before this axis existed, a permissive
+# model licence alone produced overall=ok, so a reader who looked only at the
+# verdict was told a model was fine for a product while the terms of the data it
+# learned from had never been stated. Cellpose is the case in point: BSD-3-Clause
+# code and model, CC-BY-NC training data declared nowhere a tool can read.
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/td.json"
+jq 'def state($v): if .type == "machine-learning-model" then
+        .licenses = [{"license": {"id": "BSD-3-Clause"}}]
+        | .properties = (((.properties // []) | map(select(.name != "openness:training-data")))
+                         + [{"name": "openness:training-data", "value": $v}])
+      else . end;
+    .metadata.component |= state("undisclosed")
+    | .components = ((.components // []) | map(state("undisclosed")))' \
+   "$WORK/td.json" > "$WORK/td.tmp" && mv "$WORK/td.tmp" "$WORK/td.json"
+tdprop() { jq -r --arg n "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | first // ""' "$WORK/td.json"; }
+
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/td.json" >/dev/null 2>&1
+[ "$(tdprop bomlens:assessment:trainingData)" = "review" ] \
+    && pass "undisclosed training data is assessed as review, not ok" \
+    || fail "trainingData axis='$(tdprop bomlens:assessment:trainingData)', expected review"
+[ "$(tdprop bomlens:assessment:overall)" = "review" ] \
+    && pass "a permissive licence alone no longer makes the model ok for a product" \
+    || fail "overall='$(tdprop bomlens:assessment:overall)', expected review"
+case "$(tdprop bomlens:assessment:reasons)" in
+    *"training data undisclosed"*) pass "the verdict says which fact was missing" ;;
+    *) fail "reasons='$(tdprop bomlens:assessment:reasons)'" ;;
+esac
+
+# Internal use and outputs-only are the scenarios a training set's terms do not
+# reach, so they are judged without the axis rather than warned at every run.
+AI_USAGE_CONTEXT=internal bash "$LIB/assess-ai-risk.sh" "$WORK/td.json" >/dev/null 2>&1
+[ "$(tdprop bomlens:assessment:overall)" = "ok" ] \
+    && pass "internal use is judged without the training-data axis" \
+    || fail "internal overall='$(tdprop bomlens:assessment:overall)', expected ok"
+
+# A model that states its training set is judged on the datasets themselves, so
+# the undisclosed axis must not fire on top of it.
+jq 'def state($v): if .type == "machine-learning-model" then
+        .properties = (((.properties // []) | map(select(.name != "openness:training-data")))
+                       + [{"name": "openness:training-data", "value": $v}])
+      else . end;
+    .metadata.component |= state("open-data")
+    | .components = ((.components // []) | map(state("open-data")))' \
+   "$WORK/td.json" > "$WORK/td.tmp" && mv "$WORK/td.tmp" "$WORK/td.json"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/td.json" >/dev/null 2>&1
+[ "$(tdprop bomlens:assessment:trainingData)" = "" ] \
+    && pass "a model that declares its training data gets no undisclosed axis" \
+    || fail "trainingData axis='$(tdprop bomlens:assessment:trainingData)', expected none"
 
 echo "== dataset tag signals and visibility feed the datasets axis =="
 # A publisher tag like "pii" is a declared risk marker; a gated repository is
