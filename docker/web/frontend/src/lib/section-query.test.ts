@@ -29,6 +29,7 @@ describe("components query", () => {
       needsReview: true,
       eolOnly: true,
       outdatedOnly: true,
+      licenseUnclear: true,
     };
     const sort: ComponentSort = { key: "risk", dir: "desc" };
     const back = componentsFromQuery(componentsToQuery(filters, sort));

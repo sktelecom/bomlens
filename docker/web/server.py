@@ -738,6 +738,9 @@ def scanmeta(run_id):
 # Row caps so a huge SBOM/scan can't bloat the SSE 'done' payload. The counts
 # (sbom.components, severity totals) stay exact; only the detail lists are capped.
 MAX_COMPONENT_ROWS = 2000
+# Warning lines kept per scan. More than this and the screen stops being a
+# summary; the full log is still streamed while the scan runs.
+MAX_SCAN_WARNINGS = 12
 MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
@@ -1891,6 +1894,9 @@ def scan_detail(run_id):
         # UI can offer "re-scan with the same settings". None for pre-feature
         # scans that have no sidecar.
         "scanConfig": scanmeta(run_id),
+        # Warnings the scan emitted, recovered from the same sidecar so a
+        # re-opened result says what a live one said.
+        "scanWarnings": (scanmeta(run_id) or {}).get("warnings") or [],
     }
 
 
@@ -3820,6 +3826,21 @@ class Handler(BaseHTTPRequestHandler):
             # from any mode), so both callbacks are always wired, not chosen by mode.
             on_cvedb_progress = lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p}))
             on_deepcve_progress = lambda p: sse("progress", json.dumps({"phase": "deepcve", "percent": p}))
+            # Warnings the scan emitted, kept for the result screen. The log
+            # itself is streamed and never stored, so a scan re-opened later had
+            # no way to say that it had warned about anything — and these are
+            # exactly the lines that decide how far to trust the numbers
+            # ("no package manifest detected", "0 components", a sparse-result
+            # notice for C/C++ or Swift). Deduplicated and capped: a repeated
+            # line says nothing more the second time.
+            scan_warnings = []
+
+            def note_log(ln):
+                if isinstance(ln, str) and ln.lstrip().startswith("[WARN]"):
+                    text = ln.strip()
+                    if text not in scan_warnings and len(scan_warnings) < MAX_SCAN_WARNINGS:
+                        scan_warnings.append(text)
+                sse("log", json.dumps(ln))
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
@@ -3828,7 +3849,7 @@ class Handler(BaseHTTPRequestHandler):
                 # just like an in-process scan.
                 rc = run_sibling_scan(
                     sibling["image"], env["MODE"], run_out,
-                    lambda ln: sse("log", json.dumps(ln)),
+                    note_log,
                     upload_file=sibling.get("upload_file"),
                     model_id=sibling.get("model_id"),
                     source_root=sibling.get("source_root"),
@@ -3856,7 +3877,7 @@ class Handler(BaseHTTPRequestHandler):
                             if piece:
                                 _emit_or_log(
                                     piece,
-                                    lambda ln: sse("log", json.dumps(ln)),
+                                    note_log,
                                     on_cvedb_progress,
                                     on_deepcve_progress,
                                 )
@@ -3891,7 +3912,11 @@ class Handler(BaseHTTPRequestHandler):
                 # The inputs + toggles this scan ran with (no secrets); also saved
                 # as the run-folder sidecar so a re-opened scan carries it too.
                 "scanConfig": scan_config,
+                "scanWarnings": scan_warnings,
             }
+            if scan_warnings:
+                scan_config["warnings"] = scan_warnings
+                write_scanmeta(run_out, scan_config)
             sse("done", json.dumps(done))
         except Exception as exc:  # noqa: BLE001
             # The summary helpers are defended against malformed artifacts, so a

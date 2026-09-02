@@ -20,6 +20,7 @@ import {
   type SortDir,
 } from "@/lib/components";
 import { componentCsvRows, csvFilename, downloadCsv, toCsv } from "@/lib/csv";
+import { licenseNeedsDecision } from "@/lib/licenses";
 import {
   COMPONENT_COLUMNS,
   COMPONENT_VIEW_KEY,
@@ -193,6 +194,10 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
   const anyVendored = useMemo(() => items.some((c) => c.vendored), [items]);
   const anyEol = useMemo(() => items.some((c) => c.eol === "true"), [items]);
   const anyOutdated = useMemo(() => items.some((c) => c.outdated === "true"), [items]);
+  const anyLicenseUnclear = useMemo(
+    () => items.some((c) => licenseNeedsDecision(c.licenses)),
+    [items],
+  );
 
   const filtered = useMemo(
     () => selectComponents(items, filters, sort),
@@ -329,6 +334,14 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
       checked: filters.outdatedOnly,
       onToggle: () => patch({ outdatedOnly: !filters.outdatedOnly }),
     },
+    // Offered only when there is something to narrow to: on a tree whose licences
+    // all resolved, the filter would return the whole table and say nothing.
+    anyLicenseUnclear && {
+      id: "licenseUnclear",
+      label: t("result.filterLicenseUnclear"),
+      checked: filters.licenseUnclear,
+      onToggle: () => patch({ licenseUnclear: !filters.licenseUnclear }),
+    },
   ].filter(Boolean) as CheckMenuItem[];
 
   const columnItems: CheckMenuItem[] = COMPONENT_COLUMNS.filter(
@@ -443,6 +456,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 needsReview: false,
                 eolOnly: false,
                 outdatedOnly: false,
+                licenseUnclear: false,
               })
             }
             className="rounded text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

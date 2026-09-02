@@ -8,6 +8,7 @@ import {
   EMPTY_FILTERS,
   LICENSE_BADGE_LIMIT,
   compareComponents,
+  hasActiveFilters,
   licenseBadges,
   matchesFilters,
   riskRank,
@@ -132,5 +133,26 @@ describe("licenseBadges", () => {
   it("defaults to the shared limit", () => {
     const many = ["MIT", "Apache-2.0", "BSD-3-Clause"];
     expect(licenseBadges(many).shown).toHaveLength(LICENSE_BADGE_LIMIT);
+  });
+});
+
+describe("licence-decision filter", () => {
+  const item = (name: string, licenses: string[]) =>
+    ({ name, group: "", version: "1", type: "library", purl: "", licenses }) as ComponentItem;
+
+  it("narrows to the components whose licence is still open", () => {
+    const rows = [
+      item("flask", ["BSD-3-Clause"]),
+      item("python-dateutil", ["Apache-2.0", "BSD License"]),
+      item("mystery", []),
+    ];
+    const kept = rows.filter((c) =>
+      matchesFilters(c, { ...EMPTY_FILTERS, licenseUnclear: true }),
+    );
+    expect(kept.map((c) => c.name)).toEqual(["python-dateutil", "mystery"]);
+  });
+
+  it("counts as an active filter so the reset affordance appears", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, licenseUnclear: true })).toBe(true);
   });
 });

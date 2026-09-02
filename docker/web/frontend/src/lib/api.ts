@@ -479,6 +479,9 @@ export interface DoneEvent {
   /** The settings this scan ran with, for the "Re-scan" action. Absent on
    *  older payloads / history that predate the field. */
   scanConfig?: ScanConfig;
+  /** Warning lines the scan emitted, deduplicated and capped. These decide how
+   *  far a reader should trust the numbers, and used to vanish with the log. */
+  scanWarnings?: string[];
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */

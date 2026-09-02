@@ -7,6 +7,7 @@
  * review" filters) is unit tested independently of rendering.
  */
 import type { ComponentItem, Severity } from "./api";
+import { licenseNeedsDecision } from "./licenses";
 
 export interface ComponentFilters {
   query: string;
@@ -23,6 +24,9 @@ export interface ComponentFilters {
   /** Only components behind the latest patch in their cycle (outdated === "true").
    *  Distinct from eolOnly: an outdated component is still supported. */
   outdatedOnly: boolean;
+  /** Only components whose licence a person still has to decide: none declared,
+   *  or a name that is not an identifier we can place. */
+  licenseUnclear: boolean;
 }
 
 export const EMPTY_FILTERS: ComponentFilters = {
@@ -34,6 +38,7 @@ export const EMPTY_FILTERS: ComponentFilters = {
   needsReview: false,
   eolOnly: false,
   outdatedOnly: false,
+  licenseUnclear: false,
 };
 
 export type ComponentSortKey = "name" | "version" | "type" | "scope" | "risk";
@@ -81,6 +86,7 @@ export function matchesFilters(c: ComponentItem, f: ComponentFilters): boolean {
   if (f.needsReview && !c.vendored) return false;
   if (f.eolOnly && c.eol !== "true") return false;
   if (f.outdatedOnly && c.outdated !== "true") return false;
+  if (f.licenseUnclear && !licenseNeedsDecision(c.licenses)) return false;
   return true;
 }
 
@@ -94,7 +100,8 @@ export function hasActiveFilters(f: ComponentFilters): boolean {
       f.directOnly ||
       f.needsReview ||
       f.eolOnly ||
-      f.outdatedOnly,
+      f.outdatedOnly ||
+      f.licenseUnclear,
   );
 }
 

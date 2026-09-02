@@ -326,6 +326,25 @@ export function Overview({
         </div>
       )}
 
+      {/* What the scan warned about while it ran. The log is streamed and never
+          stored, so a result opened later had no way to say it had warned at
+          all — and these are the lines that decide how far to trust the counts. */}
+      {(result.scanWarnings?.length ?? 0) > 0 && (
+        <div
+          className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
+          data-testid="scan-warnings"
+        >
+          <div className="text-sm font-medium">{t("result.scanWarningsTitle")}</div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+            {result.scanWarnings?.map((w) => (
+              <li key={w} className="break-words font-mono">
+                {w.replace(/^\[WARN\]\s*/, "")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Versions the resolver chose, not versions anyone installed. The numbers
           in the components table look specific either way, so without this the
           reader has no way to tell which kind they are looking at — and reads a

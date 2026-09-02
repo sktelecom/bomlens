@@ -40,6 +40,7 @@ const COMPONENT_FLAGS = {
   review: "needsReview",
   eol: "eolOnly",
   outdated: "outdatedOnly",
+  licensecheck: "licenseUnclear",
 } as const satisfies Record<string, keyof ComponentFilters>;
 
 function dirOf(v: string | undefined, fallback: SortDir): SortDir {

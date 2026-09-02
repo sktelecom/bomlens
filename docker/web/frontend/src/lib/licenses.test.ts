@@ -8,6 +8,7 @@ import {
   componentConflict,
   conflictGroups,
   isCopyleft,
+  licenseNeedsDecision,
   licenseGroups,
   licenseRiskSummary,
   licenseRiskTier,
@@ -297,5 +298,29 @@ describe("conflictGroups", () => {
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].components.map((x) => x.name)).toEqual(["a", "b"]);
+  });
+});
+
+describe("licenseNeedsDecision", () => {
+  // The rows a person has to resolve by hand. Measured on real trees: 3 of 39
+  // components in a small example, 57 of 113 in a research project.
+  it("flags a component that declares no licence at all", () => {
+    expect(licenseNeedsDecision([])).toBe(true);
+  });
+
+  it("flags a name that is not an identifier we can place", () => {
+    // Seen verbatim on python-dateutil, which carries all three.
+    expect(licenseNeedsDecision(["BSD License"])).toBe(true);
+    expect(licenseNeedsDecision(["Dual License"])).toBe(true);
+  });
+
+  it("leaves a placed licence alone", () => {
+    expect(licenseNeedsDecision(["MIT"])).toBe(false);
+    expect(licenseNeedsDecision(["Apache-2.0", "BSD-3-Clause"])).toBe(false);
+    expect(licenseNeedsDecision(["GPL-3.0-only"])).toBe(false);
+  });
+
+  it("flags a component where only one of several licences is unplaceable", () => {
+    expect(licenseNeedsDecision(["Apache-2.0", "BSD License"])).toBe(true);
   });
 });

@@ -680,4 +680,4 @@ HTMLASSESS
     echo "</body></html>"
 } > "$HTML"
 
-echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL}${OUTBOUND_LIC:+, license-conflict incompatible=${LC_INCOMPAT}}, malicious=${MAL_COUNT})"
+echo "[risk] generated: $MD, $HTML (conformance=${CONF_RESULT}, vulns total=${TOTAL}, crit=${C}, high=${H}, copyleft=${COPYLEFT_TOTAL} strong/network + ${WK} weak${OUTBOUND_LIC:+, license-conflict incompatible=${LC_INCOMPAT}}, malicious=${MAL_COUNT})"

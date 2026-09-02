@@ -189,3 +189,93 @@ test("a scan that could not be judged says nothing about pinning", async ({ page
 
   await expect(page.getByTestId("version-pinning")).toHaveCount(0);
 });
+
+// 20-c: the rows a person has to resolve by hand, reachable as a filter rather
+// than by eye. Measured: 57 of 113 components in a research project.
+const MIXED_LICENCES = {
+  ...base,
+  mode: "SOURCE",
+  sbom: {
+    components: 3,
+    componentList: [
+      { name: "flask", version: "3.0.0", group: "", purl: "pkg:pypi/flask", type: "library", licenses: ["BSD-3-Clause"] },
+      { name: "python-dateutil", version: "2.9.0", group: "", purl: "pkg:pypi/python-dateutil", type: "library", licenses: ["Apache-2.0", "BSD License"] },
+      { name: "mystery", version: "1.0", group: "", purl: "pkg:pypi/mystery", type: "library", licenses: [] },
+    ],
+  },
+};
+
+test("the licence-decision filter narrows to the rows a person has to resolve", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, MIXED_LICENCES);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+  await page.getByRole("link", { name: /^Components/ }).first().click();
+
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await page.getByRole("checkbox", { name: "Licence to decide" }).check();
+  await page.keyboard.press("Escape");
+
+  await expect(page.getByText("python-dateutil", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("mystery", { exact: true }).first()).toBeVisible();
+  // A placed licence is not something anyone has to decide.
+  await expect(page.getByText("flask", { exact: true })).toHaveCount(0);
+});
+
+// Every licence placed, but something else to filter on — so the Filters menu is
+// open for inspection and the absence of this one chip is the thing being tested.
+const ALL_LICENCES_PLACED = {
+  ...base,
+  mode: "SOURCE",
+  sbom: {
+    components: 2,
+    componentList: [
+      { name: "flask", version: "3.0.0", group: "", purl: "pkg:pypi/flask", type: "library", licenses: ["BSD-3-Clause"], vulnCount: 1, maxSeverity: "HIGH" },
+      { name: "jinja2", version: "3.1.6", group: "", purl: "pkg:pypi/jinja2", type: "library", licenses: ["BSD-3-Clause"] },
+    ],
+  },
+};
+
+test("the filter is not offered when every licence was placed", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, ALL_LICENCES_PLACED);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+  await page.getByRole("link", { name: /^Components/ }).first().click();
+
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await expect(page.getByRole("checkbox", { name: "Licence to decide" })).toHaveCount(0);
+});
+
+// 20-d: the scan log is streamed and never stored, so a result opened later had
+// no way to say it had warned. These are the lines that decide how far to trust
+// the counts.
+const WITH_WARNINGS = {
+  ...base,
+  mode: "SOURCE",
+  scanWarnings: [
+    "[WARN] No package manifest detected; using cdxgen all-in-one (results may be sparse).",
+    "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source).",
+  ],
+  sbom: { components: 0, componentList: [] },
+};
+
+test("warnings the scan emitted survive onto the result screen", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, WITH_WARNINGS);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  const box = page.getByTestId("scan-warnings");
+  await expect(box).toBeVisible();
+  await expect(box).toContainText("No package manifest detected");
+  await expect(box).toContainText("SBOM has 0 components");
+  // The bracket tag is noise once the lines sit under a heading that says what
+  // they are.
+  await expect(box).not.toContainText("[WARN]");
+});
+
+test("a scan that warned about nothing shows no warning list", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, PINNED);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  await expect(page.getByTestId("scan-warnings")).toHaveCount(0);
+});
