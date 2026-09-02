@@ -311,6 +311,37 @@ export function Overview({
         </div>
       )}
 
+      {/* Zero components is the one result a reader reliably misreads: it looks
+          like "nothing to worry about" when it almost always means the scan had
+          nothing to read. The CLI says so twice in its log; before this the web
+          UI said nothing at all. An AI scan is excluded — a model SBOM legitimately
+          carries no components, the model itself being the document. */}
+      {!ai && result.sbom && result.sbom.components === 0 && (
+        <div
+          className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
+          data-testid="zero-components"
+        >
+          <div className="text-sm font-medium">{t("result.zeroComponentsTitle")}</div>
+          <p className="mt-1 text-xs">{t("result.zeroComponentsBody")}</p>
+        </div>
+      )}
+
+      {/* Versions the resolver chose, not versions anyone installed. The numbers
+          in the components table look specific either way, so without this the
+          reader has no way to tell which kind they are looking at — and reads a
+          vulnerability count that was measured against a fresh install. */}
+      {result.sbom?.versionPinning === "unpinned" && (
+        <div
+          className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground"
+          data-testid="version-pinning"
+        >
+          <div className="text-sm font-medium text-foreground">
+            {t("result.unpinnedTitle")}
+          </div>
+          <p className="mt-1 text-xs">{t("result.unpinnedBody")}</p>
+        </div>
+      )}
+
       {!ai && result.sbom?.suggestIdentifyVendored && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
           <div className="text-sm font-medium">{t("result.vendoredHintTitle")}</div>

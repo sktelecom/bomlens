@@ -2126,6 +2126,56 @@ else
     fail "the SPDX file was rewritten for a scan that has no containers"
 fi
 
+echo "== version pinning: what the reported versions actually mean =="
+# When a project states ranges and ships no lock file, the resolver picks what is
+# newest at scan time. The SBOM then carries specific numbers a reader takes for
+# what is installed on their machine, and the vulnerability count inherits the
+# same basis. Measured on a real repository: 113 components all resolved to the
+# newest release, 3 vulnerabilities found against those.
+PINDIR="$WORK/pinning"
+pin_verdict() {
+    # $1 = subdirectory under PINDIR, already populated
+    local d="$PINDIR/$1"
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"x","version":"1"}},"components":[]}\n' > "$d/bom.json"
+    bash "$LIB/detect-version-pinning.sh" "$d" "$d/bom.json" >/dev/null 2>&1
+    jq -r '[.metadata.component.properties[]? | select(.name=="bomlens:source:versionPinning") | .value] | first // "none"' "$d/bom.json"
+}
+
+rm -rf "$PINDIR"; mkdir -p "$PINDIR"/{lockfile,exact,ranges,npm,nolock,java,empty}
+: > "$PINDIR/lockfile/requirements.txt"; : > "$PINDIR/lockfile/poetry.lock"
+printf 'flask==3.0.0\nnumpy==1.26.2\n# a comment\n' > "$PINDIR/exact/requirements.txt"
+printf 'flask>=3.0\nnumpy\n' > "$PINDIR/ranges/requirements.txt"
+printf '{}' > "$PINDIR/npm/package.json"; printf '{}' > "$PINDIR/npm/package-lock.json"
+printf '{}' > "$PINDIR/nolock/package.json"
+printf '<project/>' > "$PINDIR/java/pom.xml"
+: > "$PINDIR/empty/requirements.txt"
+
+for case in "lockfile:pinned" "exact:pinned" "ranges:unpinned" "npm:pinned" \
+            "nolock:unpinned" "java:none" "empty:none"; do
+    dir="${case%%:*}"; want="${case##*:}"
+    got="$(pin_verdict "$dir")"
+    if [ "$got" = "$want" ]; then
+        pass "$dir reads as $want"
+    else
+        fail "$dir read as '$got', expected '$want'"
+    fi
+done
+
+# A tree nobody can judge must record nothing rather than guess: Maven and Gradle
+# declare versions in the build file and have no lock of their own, so either
+# verdict would be made up.
+if jq -e '[.metadata.component.properties[]?] | length == 0' \
+   "$PINDIR/java/bom.json" >/dev/null 2>&1; then
+    pass "an unjudgeable tree has no property written at all"
+else
+    fail "a property was written for a tree that cannot be judged"
+fi
+
+# Idempotent: post-processing can run twice over the same document.
+bash "$LIB/detect-version-pinning.sh" "$PINDIR/ranges" "$PINDIR/ranges/bom.json" >/dev/null 2>&1
+n=$(jq '[.metadata.component.properties[]? | select(.name=="bomlens:source:versionPinning")] | length' "$PINDIR/ranges/bom.json")
+[ "$n" = "1" ] && pass "re-running keeps one pinning property" || fail "pinning properties=$n, expected 1"
+
 echo "== spdx: the document says which component it describes =="
 # syft converts every input the way it converts an image: the document DESCRIBES
 # one root package that CONTAINS the rest. A CycloneDX file has no such wrapper,

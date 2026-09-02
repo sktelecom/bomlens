@@ -840,6 +840,16 @@ esac
 if [ ! -f "${OUT_PREFIX}_scancode.json" ] && [ -n "$SRC_TREE_DIR" ]; then
     bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" || true
 fi
+
+# Whether the tree pinned the versions its SBOM reports. Source scans only: an
+# image or a firmware carries what is installed, so there is nothing resolved at
+# scan time to warn about. The CLI reaches this file as POSTPROCESS with
+# SOURCE_SCAN set, the web UI as SOURCE — both are the same scan and both need
+# the answer. Best-effort: an unjudgeable tree records nothing.
+if [ -n "$SRC_TREE_DIR" ] && { [ "$SCAN_MODE" = "SOURCE" ] \
+   || { [ "$SCAN_MODE" = "POSTPROCESS" ] && [ "${SOURCE_SCAN:-false}" = "true" ]; }; }; then
+    bash "$LIBDIR/detect-version-pinning.sh" "$SRC_TREE_DIR" "$OUTPUT_FILE" || true
+fi
 # Collect the file tree if any source-having mode produced one (the modes above,
 # or FIRMWARE from scan-firmware.sh).
 [ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")

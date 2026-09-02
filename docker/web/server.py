@@ -1022,7 +1022,17 @@ def sbom_summary(run_id):
     # other scan the root is the scanned project itself, which is not one of its
     # own components and must stay out of the count.
     _root = _as_dict(_as_dict(data.get("metadata")).get("component"))
-    if _root.get("type") == "machine-learning-model":
+    # A dataset scan is the same shape one level over: the published item IS the
+    # document, components[] is empty, and without folding it in the scan reports
+    # nothing at all. It qualifies on the marker the dataset collectors stamp, so
+    # an ordinary SBOM that happens to carry a `data` root is not swept in.
+    _root_collected = any(
+        _as_dict(p).get("name") == "bomlens:dataset:collectedBy"
+        for p in _as_list(_root.get("properties"))
+    )
+    if _root.get("type") == "machine-learning-model" or (
+        _root.get("type") == "data" and _root_collected
+    ):
         comps = [_root] + comps
     risk_by_purl, risk_by_nv = _component_risk_index(run_id)
     scope_by_ref, has_deps = _scope_index(data)
@@ -1360,6 +1370,19 @@ def sbom_summary(run_id):
         # CycloneDX root component type — drives the honest scan-kind subtitle and
         # works on re-open too, where the scan MODE isn't stored.
         "componentType": meta_comp.get("type"),
+        # Whether the scanned tree pinned the versions this SBOM reports, from
+        # detect-version-pinning.sh. "unpinned" means the resolver picked what was
+        # newest at scan time, so the versions shown are a fresh install's answer
+        # rather than what is on the reader's machine — and the vulnerability
+        # count carries the same gap. Absent when the tree could not be judged.
+        "versionPinning": next(
+            (
+                p.get("value")
+                for p in _as_list(meta_comp.get("properties"))
+                if _as_dict(p).get("name") == "bomlens:source:versionPinning"
+            ),
+            None,
+        ),
         "directCount": direct_count,
         "transitiveCount": transitive_count,
         "eolCount": eol_count,

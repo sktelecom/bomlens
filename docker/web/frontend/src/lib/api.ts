@@ -133,6 +133,9 @@ export interface SbomSummary {
   /** CycloneDX root component type (application/firmware/container/…) — drives
    *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
   componentType?: string | null;
+  /** Whether the scanned source pinned its versions ("pinned" | "unpinned").
+   *  Absent for a tree that could not be judged, and for every non-source scan. */
+  versionPinning?: string | null;
   /** Direct/transitive dependency counts across the whole SBOM (0 when the SBOM
    *  has no dependency graph). Drives the Overview dependency tile. */
   directCount?: number;

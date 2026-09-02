@@ -72,9 +72,14 @@ export function deriveScanContext(result: DoneEvent | null): ScanContext {
  * generated AIBOM).
  */
 export function isAiScan(result: DoneEvent): boolean {
-  return (result.sbom?.componentList ?? []).some(
-    (c) => c.type === "machine-learning-model",
-  );
+  if ((result.sbom?.componentList ?? []).some((c) => c.type === "machine-learning-model")) {
+    return true;
+  }
+  // A dataset scan carries no model at all: the published item is the document,
+  // and `data` as a root type is what only that scan produces (every other mode
+  // roots at application / firmware / container / operating-system). Without
+  // this the AI section stays hidden on exactly the scan it exists for.
+  return result.sbom?.componentType === "data";
 }
 
 /**
