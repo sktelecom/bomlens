@@ -88,6 +88,24 @@ test("classifyPullFailure recognises each failure mode", () => {
   assert.equal(classifyPullFailure(""), "unknown");
 });
 
+test("a missing version tag is not reported as a network problem", () => {
+  // 앱이 자기 버전 태그를 받으므로, 발행이 늦은 릴리스에서는 네트워크가 멀쩡한데도
+  // pull만 실패한다. 그때 네트워크 안내를 띄우면 사용자가 엉뚱한 곳을 뒤진다.
+  assert.equal(
+    classifyPullFailure("ghcr.io/sktelecom/bomlens:9.9.9: not found: manifest unknown"),
+    "notag",
+  );
+  assert.equal(
+    classifyPullFailure("manifest for ghcr.io/sktelecom/bomlens:9.9.9 not found"),
+    "notag",
+  );
+  // 비공개 이미지는 존재해도 manifest를 숨기고 인증 오류를 먼저 낸다. 그쪽이 우선이다.
+  assert.equal(
+    classifyPullFailure("denied: manifest unknown"),
+    "auth",
+  );
+});
+
 test("disk and dns win over the broader proxy pattern", () => {
   // 프록시 환경에서 디스크가 차면 두 신호가 같이 나올 수 있다. 실제 조치가 갈리므로
   // 더 특정적인 쪽을 골라야 한다.

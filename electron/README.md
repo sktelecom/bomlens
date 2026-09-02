@@ -11,8 +11,12 @@ Docker 컨테이너로 실행되며, 이 앱은 Docker 점검과 이미지 다�
 ## 동작 방식
 
 1. Docker 설치와 실행 여부를 점검한다. 없으면 안내 화면을 띄운다(한/영 모두 지원).
-2. 첫 실행이면 스캐너 이미지(`ghcr.io/sktelecom/bomlens:latest`)를 받고 진행을 표시한다.
-   레이어 진행 요약과 실패 사유별 안내(프록시/DNS/인증/디스크)는 `lib/pullprogress.mjs`가 만든다.
+2. 첫 실행이면 스캐너 이미지를 받고 진행을 표시한다. 태그는 앱 자신의 버전이다
+   (`ghcr.io/sktelecom/bomlens:<package.json의 version>`). `:latest`는 릴리스가 아니라 main
+   최신 빌드를 가리키므로, 그것을 받으면 사용자가 설치한 버전과 실제로 도는 스캐너가 어긋난다.
+   버전을 읽지 못하는 개발 실행에서만 `:latest`로 돌아간다. `SBOM_SCANNER_IMAGE`로 덮어쓸 수 있다.
+   레이어 진행 요약과 실패 사유별 안내(프록시/DNS/인증/디스크/태그 없음)는
+   `lib/pullprogress.mjs`가 만든다.
 3. `MODE=UI` 컨테이너를 띄운다. 마운트 구성은 `scripts/sbom-ui.bat`과 같다(엔진 소켓과
    홈 디렉터리 아래 `sbom-output` 출력 폴더). 엔진 마운트는 Windows 명명 파이프가 아니라
    유닉스 소켓 `/var/run/docker.sock`을 쓴다 — Rancher Desktop이 명명 파이프를
@@ -43,7 +47,7 @@ Docker 엔진이 실행 중이어야 한다. 이미지를 미리 받아 두면 �
 돌리면 락 때문에 실패한다. 먼저 앱을 닫고 실행한다.
 
 ```bash
-docker pull ghcr.io/sktelecom/bomlens:latest
+docker pull ghcr.io/sktelecom/bomlens:1.11.6   # electron/package.json의 version과 같은 태그
 ```
 
 시작 화면 언어는 시스템 로캘을 따른다(한국어면 한국어, 아니면 영어). `SBOM_LANG=en` 또는

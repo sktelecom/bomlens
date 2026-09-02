@@ -10,14 +10,39 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const DEFAULT_IMAGE =
-  process.env.SBOM_SCANNER_IMAGE ?? "ghcr.io/sktelecom/bomlens:latest";
+// 이 앱이 배포된 버전. package.json은 asar 루트에 있고 이 파일은 그 아래 lib/에 있으므로,
+// 패키징된 앱에서도 상대 경로가 그대로 성립한다. 읽지 못하면 null(개발 실행 등).
+function readAppVersion(req = createRequire(import.meta.url)) {
+  try {
+    const v = req("../package.json")?.version;
+    return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+// 앱이 받아 쓸 이미지 태그.
+//
+// 왜 `:latest`가 아닌가: 그 태그는 릴리스가 아니라 main 최신 빌드를 가리킨다. 릴리스 앱이
+// 그것을 받으면 사용자가 설치한 버전과 실제로 도는 스캐너가 어긋나고, 앱이 백그라운드로
+// 다시 받으므로 같은 앱이 날마다 다른 스캐너를 돌리게 된다. 그러면 사용자가 신고한 결과를
+// 버전으로 재현할 수 없고, 릴리스 검증이 데스크톱 앱 경로를 보증하지 못한다.
+//
+// 버전을 읽지 못하는 실행(소스에서 띄운 개발 앱)에서만 `:latest`로 돌아간다.
+export const APP_VERSION = readAppVersion();
+
+export function imageRef(name, { version = APP_VERSION } = {}) {
+  return `ghcr.io/sktelecom/${name}:${version ?? "latest"}`;
+}
+
+export const DEFAULT_IMAGE = process.env.SBOM_SCANNER_IMAGE ?? imageRef("bomlens");
 
 // 데스크톱 앱이 띄운 UI 컨테이너 식별 라벨. 앱이 강제 종료되면 --rm 컨테이너도 살아남는데,
 // 다음 기동 때 이 라벨로 고아를 찾아 정리한다(cleanupOrphans).
@@ -44,12 +69,11 @@ export class ContainerError extends Error {
 // Opt-in scan images the base UI container launches as SIBLING containers (via
 // the mounted host Docker socket) for firmware and AI-model inputs — the GPL
 // firmware tools and the heavy aibom deps can't live in the permissive-only
-// base image. Kept in sync with server.py's SBOM_FIRMWARE_IMAGE / SBOM_AIBOM_IMAGE
-// defaults; passed into the container as env so both sides agree on the refs.
-export const FIRMWARE_IMAGE =
-  process.env.SBOM_FIRMWARE_IMAGE ?? "ghcr.io/sktelecom/bomlens-firmware:latest";
-export const AIBOM_IMAGE =
-  process.env.SBOM_AIBOM_IMAGE ?? "ghcr.io/sktelecom/bomlens-aibom:latest";
+// base image. Passed into the container as env so both sides agree on the refs, and
+// pinned to the app's own version for the same reason DEFAULT_IMAGE is: a sibling left
+// on `:latest` drifts away from the base image the app just launched.
+export const FIRMWARE_IMAGE = process.env.SBOM_FIRMWARE_IMAGE ?? imageRef("bomlens-firmware");
+export const AIBOM_IMAGE = process.env.SBOM_AIBOM_IMAGE ?? imageRef("bomlens-aibom");
 
 // 결과 저장 폴더. 두 엔진(Rancher/Docker Desktop) 모두 기본 공유하는 홈 디렉터리 아래.
 // SBOM_OUTPUT_DIR로 베이스를 바꿀 수 있다(실행별 하위 폴더는 server.py가 그 아래에 만든다).

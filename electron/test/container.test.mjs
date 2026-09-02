@@ -4,11 +4,13 @@
 // container.mjs의 순수 로직 단위 테스트(electron 비의존). 실제 Docker 기동/E2E는
 // Windows에서 tests/windows-e2e-checklist.md와 desktop 워크플로우로 검증한다.
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import {
   AIBOM_IMAGE,
+  APP_VERSION,
   cleanupOrphans,
   DEFAULT_IMAGE,
   DESKTOP_LABEL,
@@ -20,10 +22,13 @@ import {
   detectWsl2Docker,
   dockerStatus,
   findFreePort,
+  imageRef,
   resetDockerBin,
   resolveDockerBin,
   scanMountArgs,
 } from "../lib/container.mjs";
+
+const pkg = createRequire(import.meta.url)("../package.json");
 
 // cleanupOrphans용 가짜 run: docker 호출을 기록하고 ps 응답만 주입한다.
 function fakeRun(psResult) {
@@ -66,10 +71,32 @@ test("defaultOutputDir honours SBOM_OUTPUT_DIR when set", () => {
   }
 });
 
-test("DEFAULT_IMAGE points at the bomlens image by default", () => {
-  // 환경변수 오버라이드가 없을 때의 기본값을 검증.
+test("DEFAULT_IMAGE pins the app's own version, not :latest", () => {
+  // `:latest`는 릴리스가 아니라 main 최신 빌드를 가리키므로 릴리스 앱이 그것을 받으면
+  // 설치한 버전과 도는 스캐너가 어긋난다. 기본값은 이 앱의 package.json 버전이어야 한다.
   if (!process.env.SBOM_SCANNER_IMAGE) {
-    assert.equal(DEFAULT_IMAGE, "ghcr.io/sktelecom/bomlens:latest");
+    assert.equal(DEFAULT_IMAGE, `ghcr.io/sktelecom/bomlens:${APP_VERSION}`);
+    assert.notEqual(DEFAULT_IMAGE, "ghcr.io/sktelecom/bomlens:latest");
+  }
+});
+
+test("APP_VERSION is the packaged app version", () => {
+  assert.equal(APP_VERSION, pkg.version);
+});
+
+test("imageRef falls back to :latest when the version is unknown", () => {
+  // 소스에서 띄운 개발 앱은 버전을 읽지 못할 수 있다. 그때만 예전 동작으로 돌아간다.
+  assert.equal(imageRef("bomlens", { version: null }), "ghcr.io/sktelecom/bomlens:latest");
+  assert.equal(imageRef("bomlens", { version: "1.2.3" }), "ghcr.io/sktelecom/bomlens:1.2.3");
+});
+
+test("sibling images are pinned to the same version as the base image", () => {
+  // 형제가 :latest에 남아 있으면 방금 띄운 베이스 이미지와 어긋난다.
+  if (!process.env.SBOM_FIRMWARE_IMAGE) {
+    assert.equal(FIRMWARE_IMAGE, `ghcr.io/sktelecom/bomlens-firmware:${APP_VERSION}`);
+  }
+  if (!process.env.SBOM_AIBOM_IMAGE) {
+    assert.equal(AIBOM_IMAGE, `ghcr.io/sktelecom/bomlens-aibom:${APP_VERSION}`);
   }
 });
 
@@ -219,16 +246,6 @@ test("scanMountArgs keeps a Windows folder path intact in mount and env", () => 
     args[3],
     "SBOM_UI_SCAN_ROOTS=/scan-targets/extracted-rootfs|C:\\Users\\me\\extracted-rootfs\n",
   );
-});
-
-test("sibling image refs default to the firmware/aibom images", () => {
-  // server.py의 SBOM_FIRMWARE_IMAGE/SBOM_AIBOM_IMAGE 기본값과 일치해야 한다.
-  if (!process.env.SBOM_FIRMWARE_IMAGE) {
-    assert.equal(FIRMWARE_IMAGE, "ghcr.io/sktelecom/bomlens-firmware:latest");
-  }
-  if (!process.env.SBOM_AIBOM_IMAGE) {
-    assert.equal(AIBOM_IMAGE, "ghcr.io/sktelecom/bomlens-aibom:latest");
-  }
 });
 
 // dockerStatus의 -1(spawn 실패, 진짜 못 찾음) vs 그 밖의 0이 아닌 코드(바이너리는 찾아서

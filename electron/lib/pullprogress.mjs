@@ -71,5 +71,10 @@ export function classifyPullFailure(logTail = "", reason = "exit") {
   )
     return "proxy";
   if (/unauthorized|authentication required|pull access denied|denied:/i.test(s)) return "auth";
+  // 앱은 자기 버전 태그를 받는다(DEFAULT_IMAGE). 그 태그가 레지스트리에 아직 없으면
+  // (발행이 늦거나 실패한 릴리스) 네트워크는 멀쩡한데 pull만 실패하므로, 네트워크 안내를
+  // 띄우면 사용자가 엉뚱한 곳을 뒤진다. auth 뒤에 둔다 — 비공개 이미지는 존재해도
+  // manifest를 숨기고 인증 오류를 먼저 내보내기 때문이다.
+  if (/manifest unknown|manifest for .* not found|not found: manifest/i.test(s)) return "notag";
   return "unknown";
 }
