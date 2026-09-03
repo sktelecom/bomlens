@@ -345,15 +345,18 @@ jobs:
   #   - web-e2e: main pushes, dispatch, AND pull requests that touch the web
   #     stack (docker/web/**, image entry, its own harness) — the layer where a
   #     PR regression is most user-visible and the always-on contract suite
-  #     cannot see container wiring.
-  #   - full-e2e / docs-walkthrough: main pushes and dispatch (scanner PRs
-  #     already run the real-Docker integration suite); the nightly run bounds
-  #     drift on quiet days to 24h. A PR can opt in by adding the
-  #     run-heavy-e2e label (e.g. a risky scanner or docs change). Renovate
-  #     applies that label to every tool-pin bump (renovate.json manages only
-  #     the scanner tool ARGs / cdxgen images), so a version bump that quietly
-  #     shrinks the SBOM is caught by the component-count checks in full-e2e
-  #     instead of merging on the default checks alone.
+  #     cannot see container wiring. Kept on every push deliberately, unlike
+  #     the other two below: it is cheap (~1 minute) and the one layer other
+  #     pushes cannot exercise incidentally.
+  #   - full-e2e / docs-walkthrough: dispatch only, plus PRs that opt in with
+  #     the run-heavy-e2e label (e.g. a risky scanner or docs change).
+  #     Renovate applies that label to every tool-pin bump (renovate.json
+  #     manages only the scanner tool ARGs / cdxgen images), so a version bump
+  #     that quietly shrinks the SBOM is caught by the component-count checks
+  #     in full-e2e instead of merging on the default checks alone. Not on
+  #     main pushes: nightly.yml already runs both, over ALL bundled examples
+  #     for full-e2e, so the daily floor is unchanged while a merge no longer
+  #     queues behind them on the single runner.
   web-e2e:
     name: Web UI E2E
     needs: [changes]
@@ -367,9 +370,6 @@ jobs:
       suites: web-e2e
 
   # 33 minutes of the single Linux runner — by far the most expensive job here.
-  # Not on main pushes: nightly.yml already runs this same suite every day over
-  # ALL bundled examples (the push variant was cut down to three), so the daily
-  # floor is unchanged while a merge no longer blocks the queue for half an hour.
   # Reach it earlier with the run-heavy-e2e label on the PR.
   full-e2e:
     name: Full CLI E2E
@@ -389,7 +389,6 @@ jobs:
   docs-walkthrough:
     name: Docs Walkthrough
     if: >-
-      github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.heavy == 'true') ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'run-heavy-e2e'))
