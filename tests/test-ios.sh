@@ -67,7 +67,15 @@ fi
 # --- (2) Docker: identify-cocoapods.sh parses a real Podfile.lock via syft -----------
 echo "== iOS-2: identify-cocoapods.sh parses Podfile.lock via syft, offline (Docker) =="
 IMG="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+# The run below is --network none on purpose (the identification must need no
+# `pod` and no network), which means the image has to be on the machine already.
+# Treat a missing image the same as a missing Docker: skipped, not failed. A
+# machine that never had the image cannot answer this question either way, and
+# reporting that as a defect sends someone looking for a bug in the parser.
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 \
+   && ! docker image inspect "$IMG" >/dev/null 2>&1; then
+    echo "  SKIP: $IMG is not on this machine — pull it to exercise the syft-backed CocoaPods test"
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     # Mount the current-branch script over the image so the test tracks source, not a
     # possibly-stale published image. --network none proves no `pod`/network dependency.
     if docker run --rm --network none \

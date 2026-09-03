@@ -273,6 +273,17 @@ jobs:
       - name: Vendored-OSS adversarial tests
         run: bash tests/test-vendored-adversarial.sh
 
+      # The CocoaPods case runs the scanner image with --network none, to prove the
+      # identification needs no `pod` and no network. That leaves the image itself
+      # as the one thing the test cannot fetch for itself, and it used to rely on
+      # the runner happening to have it cached — which stopped being true the
+      # moment a disk guard started pruning images between runs. Pull it here, and
+      # let the test skip rather than fail when the pull cannot happen (a fork PR
+      # with no registry access, or an offline runner).
+      - name: Fetch the scanner image the iOS test drives
+        continue-on-error: true
+        run: docker pull ghcr.io/sktelecom/bomlens:latest
+
       - name: iOS lockfile coverage (CocoaPods merge; syft when Docker present)
         run: bash tests/test-ios.sh
 
