@@ -28,12 +28,19 @@ import { loadSbom } from "@/lib/sbomGraph";
 import { cn } from "@/lib/utils";
 
 /** Badge tone per pipeline grade — the grade word itself is always shown, so
- *  the color is a reinforcement, never the only signal. */
-const GRADE_TONE: Record<AssessmentGrade, "positive" | "high" | "critical" | "info"> = {
+ *  the color is a reinforcement, never the only signal.
+ *
+ *  The tone ordering has to track the pipeline's own severity ranking
+ *  (assess-ai-risk.sh: caution > review > conditional > ok — a known blocker
+ *  outranks an unknown, which outranks a condition, which outranks a clear
+ *  signal). Get that ordering wrong here and the two readings disagree: a
+ *  reader sees "review" rendered milder than "conditional" and reasonably
+ *  concludes it's the safer of the two, when the pipeline ranks it worse. */
+const GRADE_TONE: Record<AssessmentGrade, "positive" | "medium" | "high" | "critical"> = {
   ok: "positive",
-  conditional: "high",
+  conditional: "medium",
+  review: "high",
   caution: "critical",
-  review: "info",
 };
 
 /** A stamped grade as word + tone (verbatim from the SBOM property). */
