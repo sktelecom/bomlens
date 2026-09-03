@@ -2825,6 +2825,73 @@ echo '{"bomFormat":"CycloneDX"}' > "$OUT2/spdxnone_1.0/spdxnone_1.0_bom.json"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/spdx-export?id=spdxnone_1.0")
 [ "$code" = "503" ] && pass "/spdx-export reports 503 when no converter is available" || fail "/spdx-export unavailable returned $code (expected 503)"
 
+echo "== concurrent scans of the same project do not share a run folder =="
+# Two scans of the same project+version resolved to the same run folder, and the
+# artifacts inside are named from project/version rather than from the folder,
+# so both containers wrote the same filenames in the same place. Post-processing
+# rewrites each artifact in place, so the moves interleaved and the surviving
+# file mixed both runs. Measured: log4j-core 2.14.1 reports 14 vulnerabilities
+# alone and 0 in both tabs when scanned twice at once.
+if python3 - "$SERVER" <<'CLAIMPY'
+import importlib.util, sys
+from datetime import datetime
+spec = importlib.util.spec_from_file_location("server", sys.argv[1])
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+
+claim = server.claim_run_id
+FIXED = datetime(2026, 9, 3, 14, 0, 0)
+
+# Nothing in flight: the plain prefix, exactly as before.
+assert claim("app_1.0", set()) == "app_1.0"
+
+# One in flight: the second scan is pushed onto its own folder.
+active = {"app_1.0"}
+second = claim("app_1.0", active, now=FIXED)
+assert second != "app_1.0", second
+assert second.startswith("app_1.0_"), second
+
+# Three tabs at once. The timestamp is second-resolution, so the second and
+# third would collide on it alone — which is the case this exists for, and the
+# one a two-tab test would pass straight through.
+active = set()
+ids = []
+for _ in range(3):
+    got = claim("race_1", active, now=FIXED)
+    active.add(got)          # the caller registers under the same lock
+    ids.append(got)
+assert len(set(ids)) == 3, ids
+
+# A finished scan of another project is irrelevant.
+assert claim("other_2.0", {"app_1.0"}) == "other_2.0"
+
+# ?timestamp=true still opts in explicitly, with nothing in flight.
+forced = claim("app_1.0", set(), now=FIXED, force_suffix=True)
+assert forced.startswith("app_1.0_"), forced
+assert forced != "app_1.0"
+
+# Every id has to survive the path barrier the write side applies.
+for rid in ids + [second, forced]:
+    assert server.scan_id_ok(rid), rid
+print("ok")
+CLAIMPY
+then
+    pass "a run folder is claimed per concurrent scan, three-way collision included"
+else
+    fail "concurrent scans still resolve to the same run folder"
+fi
+
+# The claim is released on every exit, including a client that closed the stream
+# mid-scan. A name left behind would push every later scan of that project onto
+# a suffixed folder for the life of the process.
+n_add=$(grep -c "_scan_active.add(" "$SERVER")
+n_del=$(grep -c "_scan_active.discard(" "$SERVER")
+if [ "$n_add" = "1" ] && [ "$n_del" -ge "2" ]; then
+    pass "the claim is released on the early-return path and in the finally"
+else
+    fail "claim/release are unbalanced (add=$n_add, discard=$n_del)"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

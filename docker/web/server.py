@@ -2577,6 +2577,46 @@ _PULL_LOG_TAIL = 4096
 _pull_lock = threading.Lock()
 _pull_active = set()
 
+# Run folders currently being written. Two scans of the same project+version
+# resolve to the same folder, and the artifacts inside are named from
+# project/version rather than from the folder (entrypoint.sh), so the two
+# containers write the same filenames in the same place. Post-processing
+# rewrites each artifact in place — `jq … > tmp && mv tmp file` — so the moves
+# interleave and the surviving file is a mixture of both runs. Measured: a
+# project with log4j-core 2.14.1 reports 14 vulnerabilities when scanned alone
+# and 0 in both tabs when scanned twice at once, because a security report
+# written after the vulnerabilities were found is overwritten by the other run's
+# earlier stage.
+#
+# Only concurrency is separated here. Re-scanning a finished project still
+# overwrites, which is what the CLI does too (`--timestamp` opts out) and is a
+# product decision rather than a correctness one.
+_scan_lock = threading.Lock()
+_scan_active = set()
+
+
+def claim_run_id(prefix, active, now=None, force_suffix=False):
+    """Pick a free run folder for `prefix`, given the folders in flight.
+
+    Pure so the collision cases can be tested without a server. `active` is the
+    set of run ids currently being written; the caller adds the returned id to
+    it under the same lock, or the next request will pick the same name.
+
+    The timestamp alone is not enough: it is second-resolution, and simultaneous
+    tabs are exactly the case this exists for. Three tabs at once would give the
+    second and third the same suffix, so a counter breaks the remaining tie.
+    """
+    if not force_suffix and prefix not in active:
+        return prefix
+    stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    base = "%s_%s" % (prefix, stamp)
+    candidate = base
+    n = 2
+    while candidate in active:
+        candidate = "%s-%d" % (base, n)
+        n += 1
+    return candidate
+
 
 def _pull_image(image, on_log, on_progress=None, cancel=None):
     """Pull an image, reporting layer progress. Returns (exit code, failure key).
@@ -3182,15 +3222,27 @@ class Handler(BaseHTTPRequestHandler):
         # other. Files inside stay named by the {prefix} (entrypoint.sh uses
         # PROJECT/VERSION), so the folder name and the file prefix can differ.
         prefix = output_prefix(project, version)
-        run_id = prefix
-        if g("timestamp") == "true":
-            run_id = "%s_%s" % (prefix, datetime.now().strftime("%Y%m%d-%H%M%S"))
+        # Claim the folder under the lock and register it in the same breath: a
+        # request that only checked would hand the same name to whatever arrived
+        # while it was deciding. Released in the `finally` below, on every exit
+        # including the client closing the stream mid-scan — a name left behind
+        # would push every later scan of that project onto a suffixed folder for
+        # the life of the process.
+        with _scan_lock:
+            run_id = claim_run_id(prefix, _scan_active,
+                                  force_suffix=g("timestamp") == "true")
+            _scan_active.add(run_id)
+        scan_claimed = run_id
         # Route through run_dir so the same path-injection barrier the read side
         # uses (scan_id_ok allowlist + realpath boundary) gates makedirs. run_id
         # already derives from the sanitized project/version, but resolving it
         # here keeps the write path traversal-safe and analyzer-visible.
         run_out = run_dir(run_id)
         if run_out is None:
+            # Claimed above, so release it here: this path returns before the
+            # try/finally that would otherwise do it.
+            with _scan_lock:
+                _scan_active.discard(scan_claimed)
             self._send(400, json.dumps({"error": "invalid run id"}))
             return
         os.makedirs(run_out, exist_ok=True)
@@ -3866,6 +3918,11 @@ class Handler(BaseHTTPRequestHandler):
                                     "sbom": None, "security": None,
                                     "conformance": None}))
         finally:
+            # Free the run folder for the next scan of this project. Every exit
+            # passes here: a finished scan, a failure, and a client that closed
+            # the stream mid-scan.
+            with _scan_lock:
+                _scan_active.discard(scan_claimed)
             # Remove uploaded/cloned/extracted trees; keep generated artifacts
             # (entrypoint wrote them into the run folder run_out).
             token_dir = upload_token_dir(token)
