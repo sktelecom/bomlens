@@ -541,7 +541,7 @@
     "assessLicense": "License",
     "assessSecurity": "File security",
     "assessDatasets": "Datasets",
-    "assessTrainingData": "Training data",
+    "assessTrainingData": "Training-data terms",
     "assessNotEvaluated": "Not evaluated",
     "gradeOk": "No restriction signals",
     "gradeConditional": "Conditional use",
