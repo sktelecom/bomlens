@@ -39,6 +39,13 @@ PRUNE_DIRS=".git node_modules .svn .hg .venv venv __pycache__ \
 .gradle .mvn target build dist out vendor bower_components .next .nuxt \
 .tox .pytest_cache .mypy_cache .idea .vscode .terraform .cache"
 
+# Individual files that are OS/Finder/Explorer bookkeeping, not source: they
+# show up in every scan of a folder anyone has browsed on their desktop, carry
+# no license or SBOM information, and have nothing to do with the project.
+# Directory pruning above does not touch these — they are files, not
+# directories.
+EXCLUDE_FILES=".DS_Store Thumbs.db desktop.ini .directory"
+
 # Build the find prune expression: -name X -o -name Y … wrapped in ( ) -prune.
 prune_expr=()
 first=1
@@ -47,6 +54,17 @@ for d in $PRUNE_DIRS; do
         prune_expr+=(-name "$d"); first=0
     else
         prune_expr+=(-o -name "$d")
+    fi
+done
+
+# Same shape, for the file-name exclusion below.
+exclude_files_expr=()
+first=1
+for f in $EXCLUDE_FILES; do
+    if [ "$first" -eq 1 ]; then
+        exclude_files_expr+=(-name "$f"); first=0
+    else
+        exclude_files_expr+=(-o -name "$f")
     fi
 done
 
@@ -64,9 +82,11 @@ trap 'rm -f "$tmp"' EXIT
         \( -type d \( "${prune_expr[@]}" \) -prune \) -o \
         \( -type d -print \) 2>/dev/null \
         | sed -e 's#^\./##' -e '/^$/d' -e 's/^/d\t/'
-    # Files: same prune so we never enter the noise dirs, then tag with "f".
+    # Files: same directory prune, plus the OS-bookkeeping filename exclusion,
+    # then tag with "f".
     find . -mindepth 1 \
         \( -type d \( "${prune_expr[@]}" \) -prune \) -o \
+        \( -type f \( "${exclude_files_expr[@]}" \) -prune \) -o \
         \( -type f -print \) 2>/dev/null \
         | sed -e 's#^\./##' -e '/^$/d' -e 's/^/f\t/'
     # Symlinks, tagged "l". Without these a container image or a firmware rootfs

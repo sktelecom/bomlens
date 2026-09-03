@@ -3634,6 +3634,12 @@ printf 'pruned\n' > "$snap_dir/tree/node_modules/dep/index.js"
 printf 'ELF\0\0\0binary payload\n' > "$snap_dir/tree/src/app.bin"
 python3 -c "import sys; open(sys.argv[1],'w').write('x' * 300000)" "$snap_dir/tree/big.txt"
 ln -s /etc/passwd "$snap_dir/tree/link.txt"
+# OS Finder/Explorer bookkeeping (BL-ADV: macOS artifacts leaking into the
+# source-tree view). Every folder anyone has browsed on their desktop has one
+# of these; they carry no license or SBOM information.
+printf 'ds-store-bytes\n' > "$snap_dir/tree/.DS_Store"
+printf 'ds-store-bytes\n' > "$snap_dir/tree/src/.DS_Store"
+printf 'thumbs\n' > "$snap_dir/tree/Thumbs.db"
 (
     cd "$snap_dir/out" || exit 1
     bash "$LIB/source-file-tree.sh" "$snap_dir/tree" snap_files.json >/dev/null 2>&1
@@ -3647,7 +3653,7 @@ else
 fi
 got=$(jq -r '[.files[].path] | sort | join(",")' "$snap_out" 2>/dev/null)
 [ "$got" = "LICENSE,big.txt,package.json,src/main.go" ] \
-    && pass "text files captured; node_modules pruned by the shared listing" \
+    && pass "text files captured; node_modules pruned, .DS_Store/Thumbs.db excluded, by the shared listing" \
     || fail "unexpected captured set: '$got'"
 got=$(jq -c '[.files[] | select(.path == "src/main.go") | .content]' "$snap_out" 2>/dev/null)
 [ "$got" = '["package main\n"]' ] && pass "content is the real file body, newline included" \
