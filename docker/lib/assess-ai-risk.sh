@@ -67,8 +67,12 @@ case "$CTX" in
     *) echo "[assess] unknown AI_USAGE_CONTEXT '$CTX'; assessing without a scenario." >&2; CTX="" ;;
 esac
 
+# Same en/ko normalization generate-risk-report.sh applies, so a garbage or
+# unset value reads as English rather than aborting the assessment.
+case "${REPORT_LANG:-en}" in ko) LANG_TAG="ko" ;; *) LANG_TAG="en" ;; esac
+
 TMP=$(mktemp)
-jq --arg ctx "$CTX" --slurpfile kb "$KB" '
+jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
   $kb[0].licenseTerms as $terms
   | $kb[0].datasetTagSignals as $dsig
 
@@ -77,6 +81,25 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
   | def norm($s): (($s // "") | ascii_downcase | gsub("[ ._/-]+"; " ")
                    | sub("^ +"; "") | sub(" +$"; ""));
   def vrank: {"caution": 4, "review": 3, "conditional": 2, "ok": 1};
+
+  # The reason SENTENCES below carry the license-terms registry own license
+  # family names, scan-tool output and free-text quotes verbatim in every
+  # language — those are facts from elsewhere, not ours to translate, and
+  # mistranslating a license family name is worse than leaving it be. What
+  # this localizes is the fixed connective wording BomLens itself writes
+  # around them: axis names, verdict words and the usage-scenario phrase. The
+  # verdict words match the grade badge in the web UI
+  # (models.gradeOk/Caution/Review/Conditional) word for word, so the same
+  # finding never reads as two different things depending on whether it is
+  # seen as a badge or as reason text.
+  def T($en; $ko): if $lang == "ko" then $ko else $en end;
+  def VW($v): if $lang == "ko" then
+      {"caution": "주의", "review": "검토 필요", "conditional": "조건부 사용", "ok": "제약 신호 없음"}[$v]
+    else $v end;
+  def UW($c): if $lang == "ko" then
+      {"internal": "내부 검토·연구", "product": "제품 탑재",
+       "redistribute": "파인튜닝·재배포", "outputs-only": "산출물만 이용"}[$c]
+    else $c end;
 
   # First entry whose ids match exactly, else the first whose regex matches —
   # in registry file order (specific families come before generic ones there).
@@ -97,12 +120,14 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
     lic_strings as $ls
     | if ($ls | length) == 0 then
         { verdict: "review", keys: [],
-          reasons: ["no license declared (review)"] }
+          reasons: [T("no license declared (review)";
+                      "라이선스 미선언 (" + VW("review") + ")")] }
       else
         [ $ls[] | . as $l | (match_entry($l)) as $e
           | if $e == null then
               { v: "review", k: null,
-                r: "license \($l): not in the license-terms registry (review)" }
+                r: T("license \($l): not in the license-terms registry (review)";
+                     "라이선스 \($l): 등록된 라이선스 조건 목록에 없음 (" + VW("review") + ")") }
             else
               # Scenario tailoring: an explicit per-scenario verdict wins;
               # otherwise a conditional entry none of whose conditions bind
@@ -114,8 +139,10 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
                    then "ok" else $e.verdict end))
                else $e.verdict end) as $v
               | { v: $v, k: $e.key,
-                  r: ("license \($l): \($e.name) (\($v)"
-                      + (if $ctx != "" then " for \($ctx) use" else "" end) + ")") }
+                  r: T("license \($l): \($e.name) (\($v)"
+                       + (if $ctx != "" then " for \($ctx) use" else "" end) + ")";
+                      "라이선스 \($l): \($e.name) ("
+                       + (if $ctx != "" then UW($ctx) + " 시 " else "" end) + VW($v) + ")") }
             end ] as $per
         | { verdict: ($per | map(.v) | max_by(vrank[.])),
             keys:    ($per | map(.k) | map(select(. != null)) | unique),
@@ -134,12 +161,15 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
     | ($p | map(select(.name == "bomlens:lineage:conflict"))           | (.[0].value // "")) as $lc
     | ($p | map(select(.name == "bomlens:lineage:conflictWith"))       | (.[0].value // "")) as $lw
     | (if $cs == "matched" then
-         [{ v: $cv, r: "custom license text: restrictive wording found — \($cq) (\($cv))" }]
+         [{ v: $cv, r: T("custom license text: restrictive wording found — \($cq) (\($cv))";
+                         "라이선스 원문 검토: 제약 문구 발견 — \($cq) (" + VW($cv) + ")") }]
        elif $cs == "no-known-restriction" then
-         [{ v: "review", r: "custom license text: no known restrictive wording matched; human review still required (review)" }]
+         [{ v: "review", r: T("custom license text: no known restrictive wording matched; human review still required (review)";
+                              "라이선스 원문 검토: 알려진 제약 문구는 없었으나 사람이 직접 확인해야 함 (" + VW("review") + ")") }]
        else [] end)
     + (if $lc == "true" then
-         [{ v: "caution", r: "lineage: conditions of base model \($lw) may be inherited but are not declared here (caution)" }]
+         [{ v: "caution", r: T("lineage: conditions of base model \($lw) may be inherited but are not declared here (caution)";
+                               "계보: 기반 모델 \($lw)의 조건을 물려받을 수 있으나 여기에는 선언되지 않음 (" + VW("caution") + ")") }]
        else [] end);
 
   # File-security axis for a model, from either of two sources — and both when
@@ -159,14 +189,19 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
     | (if $st == "" then []
        elif ($st == "unsafe" or $st == "suspicious") then
          [{ v: "caution",
-            r: "file security: HuggingFace scan flags \($st) content (caution)" }]
+            r: T("file security: HuggingFace scan flags \($st) content (caution)";
+                 "파일 보안: HuggingFace 스캔에서 \($st) 콘텐츠로 판정됨 (" + VW("caution") + ")") }]
        elif $st == "safe" then
-         [{ v: "ok", r: "file security: HuggingFace scan reports all files safe (ok)" }]
+         [{ v: "ok", r: T("file security: HuggingFace scan reports all files safe (ok)";
+                          "파일 보안: HuggingFace 스캔에서 모든 파일이 안전하다고 보고함 (" + VW("ok") + ")") }]
        else
          [{ v: "review",
-            r: ("file security: scan \($st)"
-                + (if $pk > 0 then ", pickle-format weights present" else "" end)
-                + " (review)") }]
+            r: T(("file security: scan \($st)"
+                  + (if $pk > 0 then ", pickle-format weights present" else "" end)
+                  + " (review)");
+                 ("파일 보안: 스캔 상태 \($st)"
+                  + (if $pk > 0 then ", pickle 형식 가중치 포함" else "" end)
+                  + " (" + VW("review") + ")")) }]
        end) as $hf
     # A clean local scan answers one question — does loading this file run code
     # — and the reason says so rather than implying the file was cleared of
@@ -175,22 +210,30 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
     | (if $ls == "" then []
        elif $ls == "unsafe" then
          [{ v: "caution",
-            r: ("file security: local pickle scan found code-execution globals"
-                + (if $lf != "" then " — \($lf)" else "" end) + " (caution)") }]
+            r: T(("file security: local pickle scan found code-execution globals"
+                  + (if $lf != "" then " — \($lf)" else "" end) + " (caution)");
+                 ("파일 보안: 로컬 pickle 스캔에서 코드 실행 가능한 전역 객체 발견"
+                  + (if $lf != "" then " — \($lf)" else "" end) + " (" + VW("caution") + ")")) }]
        elif $ls == "suspicious" then
          [{ v: "review",
-            r: ("file security: local pickle scan found globals that need review"
-                + (if $lf != "" then " — \($lf)" else "" end) + " (review)") }]
+            r: T(("file security: local pickle scan found globals that need review"
+                  + (if $lf != "" then " — \($lf)" else "" end) + " (review)");
+                 ("파일 보안: 로컬 pickle 스캔에서 검토가 필요한 전역 객체 발견"
+                  + (if $lf != "" then " — \($lf)" else "" end) + " (" + VW("review") + ")")) }]
        elif $ls == "clean" then
          [{ v: "ok",
-            r: ("file security: local pickle scan found no code-execution globals "
-                + "(pickle analysis only, not a malware scan) (ok)") }]
+            r: T("file security: local pickle scan found no code-execution globals "
+                 + "(pickle analysis only, not a malware scan) (ok)";
+                 "파일 보안: 로컬 pickle 스캔에서 코드 실행 전역 객체 없음 "
+                 + "(pickle 분석일 뿐 악성코드 검사는 아님) (" + VW("ok") + ")") }]
        elif $ls == "not-applicable" then
          [{ v: "ok",
-            r: "file security: this weight format does not execute code on load (ok)" }]
+            r: T("file security: this weight format does not execute code on load (ok)";
+                 "파일 보안: 이 가중치 형식은 로드 시 코드를 실행하지 않음 (" + VW("ok") + ")") }]
        else
          [{ v: "review",
-            r: "file security: local pickle scan could not read the file (review)" }]
+            r: T("file security: local pickle scan could not read the file (review)";
+                 "파일 보안: 로컬 pickle 스캔이 파일을 읽지 못함 (" + VW("review") + ")") }]
        end) as $loc
     | ($hf + $loc) as $per
     | if ($per | length) == 0 then null
@@ -205,8 +248,12 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
     ([ $p[] | select(.name == "bomlens:dataset:signal") | .value ] | unique) as $sigs
     | ($p | map(select(.name == "bomlens:dataset:visibility")) | (.[0].value // "")) as $vis
     | ([ $sigs[] as $sg | ($dsig[] | select(.signal == $sg))
-         | { v: .verdict, r: "dataset signal \($sg) (\(.verdict))" } ]
-       + (if $vis != "" then [{ v: "review", r: "dataset visibility \($vis): access-restricted (review)" }] else [] end)) as $per
+         | { v: .verdict, r: T("dataset signal \($sg) (\(.verdict))";
+                               "데이터셋 신호 \($sg) (" + VW(.verdict) + ")") } ]
+       + (if $vis != "" then
+            [{ v: "review", r: T("dataset visibility \($vis): access-restricted (review)";
+                                 "데이터셋 공개 범위 \($vis): 접근 제한됨 (" + VW("review") + ")") }]
+          else [] end)) as $per
     | if ($per | length) == 0 then null
       else { verdict: ($per | map(.v) | max_by(vrank[.])), reasons: ($per | map(.r)) }
       end;
@@ -237,11 +284,12 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
       [ ($deps[$ref] // [])[] | $dmap[.] // empty ] as $mds
       | if ($mds | length) == 0 then null
         else ($mds | map(.overall) | max_by(vrank[.])) as $w
+           | (if $w == "ok" then ""
+              else " (" + (([ $mds[] | select(.overall == $w) | .name ][0:3]) | join(", ")) + ")"
+              end) as $named
            | { verdict: $w,
-               reasons: [ ("datasets: \($mds | length) referenced, worst \($w)"
-                           + (if $w == "ok" then ""
-                              else " (" + (([ $mds[] | select(.overall == $w) | .name ][0:3]) | join(", ")) + ")"
-                              end)) ] }
+               reasons: [ T("datasets: \($mds | length) referenced, worst \($w)" + $named;
+                            "데이터셋: \($mds | length)개 참조, 최악 등급 " + VW($w) + $named) ] }
         end;
 
   # A model that declares no training data at all is a different fact from one
@@ -258,7 +306,8 @@ jq --arg ctx "$CTX" --slurpfile kb "$KB" '
       if ($ctx == "internal" or $ctx == "outputs-only") then null
       elif ([ $p[] | select(.name == "openness:training-data") | .value ][0]) == "undisclosed"
         then { verdict: "review",
-               reasons: ["training data undisclosed: the terms of the data this model learned from were not declared"] }
+               reasons: [T("training data undisclosed: the terms of the data this model learned from were not declared";
+                           "학습 데이터 미공개: 이 모델이 학습한 데이터의 이용 조건이 선언되지 않음")] }
       else null
       end;
 

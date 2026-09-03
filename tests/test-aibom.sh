@@ -1168,6 +1168,43 @@ jq '(.components[] | select(.type=="machine-learning-model")) |= del(.licenses)'
 bash "$LIB/assess-ai-risk.sh" "$WORK/as.json" >/dev/null 2>&1
 noli=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as.json")
 case "$noli" in *"no license declared"*) pass "a model without a license falls to review with the reason recorded" ;; *) fail "no-license reason='$noli'" ;; esac
+
+# REPORT_LANG=ko localizes the connective wording BomLens writes around the
+# reason (axis names, verdict words), never the registry's own license-family
+# name or an identifier — same split generate-risk-report.sh makes for its
+# tables. Default (unset) must stay byte-identical to the English above; that
+# is the case just tested, so this only has to prove ko diverges correctly.
+jq --arg l "CC-BY-NC-4.0" '(.components[] | select(.type=="machine-learning-model") | .licenses) = [{"license":{"name":$l}}]' \
+    "$FIX/aibom-owasp-1_7.json" > "$WORK/as_ko.json"
+REPORT_LANG=ko AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/as_ko.json" >/dev/null 2>&1
+ko_reason=$(jq -r '.components[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as_ko.json")
+case "$ko_reason" in
+    *"CC-BY-NC-4.0"*"제품 탑재"*"주의"*) pass "ko reason keeps the license id, localizes usage + verdict words" ;;
+    *) fail "ko reason='$ko_reason'" ;;
+esac
+case "$ko_reason" in
+    *"for product use"*|*"(caution"*) fail "ko reason still carries English connective wording" "$ko_reason" ;;
+    *) pass "no leftover English connective wording in the ko reason" ;;
+esac
+# The verdict WORD in the reason text matches the grade badge word the web UI
+# renders for "caution" (models.gradeCaution) — so the same finding never
+# reads as two different things depending on whether it is seen as a badge or
+# as reason text (this is the whole point of routing both through VW/GRADE_TONE
+# ordering rather than letting them drift independently). It sits at the close
+# of the usage-scenario parenthetical ("... 시 주의)"), not alone in its own.
+case "$ko_reason" in *"주의)"*) pass "the ko verdict word matches the web UI's caution grade label" ;; *) fail "ko reason='$ko_reason'" ;; esac
+# A model without a license, in ko: same fact, localized.
+jq '(.components[] | select(.type=="machine-learning-model")) |= del(.licenses)' "$FIX/aibom-owasp-1_7.json" > "$WORK/as_ko2.json"
+REPORT_LANG=ko bash "$LIB/assess-ai-risk.sh" "$WORK/as_ko2.json" >/dev/null 2>&1
+ko_noli=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as_ko2.json")
+case "$ko_noli" in *"라이선스 미선언"*"검토 필요"*) pass "ko no-license reason is fully localized" ;; *) fail "ko no-license reason='$ko_noli'" ;; esac
+# A garbage REPORT_LANG reads as English, the same normalization
+# generate-risk-report.sh applies — never aborts the assessment.
+jq '(.components[] | select(.type=="machine-learning-model")) |= del(.licenses)' "$FIX/aibom-owasp-1_7.json" > "$WORK/as_bad.json"
+REPORT_LANG=fr bash "$LIB/assess-ai-risk.sh" "$WORK/as_bad.json" >/dev/null 2>&1
+bad_reason=$(jq -r '([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[] | select(.name=="bomlens:assessment:reasons") | .value' "$WORK/as_bad.json")
+case "$bad_reason" in *"no license declared"*) pass "an unrecognised REPORT_LANG falls back to English" ;; *) fail "bad-lang reason='$bad_reason'" ;; esac
+
 # Dataset (data) components are assessed too; an unresolved dataset without a
 # license reads review, never a guessed verdict.
 cp "$FIX/aibom-datasets-1_7.json" "$WORK/asds.json"
