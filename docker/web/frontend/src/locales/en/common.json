@@ -227,7 +227,7 @@
     "componentsCount": "{{shown}} of {{total}} components",
     "truncated": "first {{count}} rows shown",
     "noMatch": "No matching rows.",
-    "licenseNone": "Unknown",
+    "licenseNone": "No license declared",
     "filterHasVulns": "Has vulnerabilities",
     "filterDirectOnly": "Direct only",
     "filterNeedsReview": "Needs review",
