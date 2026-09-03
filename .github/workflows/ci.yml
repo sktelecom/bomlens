@@ -11,6 +11,10 @@ on:
     types: [ opened, synchronize, reopened, labeled ]
   workflow_dispatch:
     inputs:
+      heavy:
+        description: "Also run the heavy E2E suites (web, full CLI, docs walkthrough). Off by default: they take ~40 min of the one Linux runner, and a targeted dispatch (baselines, screenshots) should not queue behind them"
+        type: boolean
+        default: false
       firmware:
         description: "Also build the firmware image and run the firmware e2e group in full-e2e"
         type: boolean
@@ -344,16 +348,22 @@ jobs:
     needs: [changes]
     if: >-
       !cancelled() && (
-        github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.heavy == 'true') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.web == 'true'))
     uses: ./.github/workflows/heavy-e2e.yml
     with:
       suites: web-e2e
 
+  # 33 minutes of the single Linux runner — by far the most expensive job here.
+  # Not on main pushes: nightly.yml already runs this same suite every day over
+  # ALL bundled examples (the push variant was cut down to three), so the daily
+  # floor is unchanged while a merge no longer blocks the queue for half an hour.
+  # Reach it earlier with the run-heavy-e2e label on the PR.
   full-e2e:
     name: Full CLI E2E
     if: >-
-      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.heavy == 'true') ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'run-heavy-e2e'))
     uses: ./.github/workflows/heavy-e2e.yml
@@ -361,14 +371,15 @@ jobs:
       suites: full-e2e
       firmware: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.firmware == 'true' }}
       deep_license: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deep_license == 'true' }}
-      # On push, scan a representative subset (npm/pip/gomod) to bound runtime;
-      # manual dispatch (ONLY empty) scans every bundled example.
-      examples_only: ${{ github.event_name == 'push' && 'nodejs python go' || '' }}
+      # Empty: scan every bundled example. Both remaining triggers are opted
+      # into deliberately, so neither wants the cut-down set.
+      examples_only: ""
 
   docs-walkthrough:
     name: Docs Walkthrough
     if: >-
-      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.heavy == 'true') ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'run-heavy-e2e'))
     uses: ./.github/workflows/heavy-e2e.yml
