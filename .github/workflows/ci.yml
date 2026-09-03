@@ -649,6 +649,13 @@ jobs:
             echo "::error::Dispatch a reseed from a feature branch. Baselines are committed to the branch they were dispatched from, and main takes changes through a PR."
             exit 1
           fi
+          # This job runs in a container, so the checkout is owned by a different
+          # uid than the one git sees here and it refuses the repository as unsafe.
+          # actions/checkout does register it, but under a HOME it only overrides
+          # for the length of its own step — by the time this step runs, that
+          # setting is gone and every git command fails with "not in a git
+          # directory". Register it again for this step.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A docker/web/frontend/tests/ui/
