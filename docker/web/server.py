@@ -597,6 +597,14 @@ def scanoss_capable():
     return shutil.which("scanoss-py") is not None
 
 
+def deep_license_capable():
+    """Deep license detection (scancode) is only built in with SBOM_DEEP_LICENSE.
+    Unlike firmware/aibom/deep-cve there is no sibling image for it — a source
+    tree has to be mounted where the scan already runs, not in a second
+    container — so this is the whole offer: no sibling fallback to check."""
+    return shutil.which("scancode") is not None
+
+
 def aibom_capable():
     """AI-model SBOM generation (OWASP AIBOM Generator) lives only in the opt-in
     bomlens-aibom image — mirror scan-aibom.sh's detection."""
@@ -2825,6 +2833,9 @@ class Handler(BaseHTTPRequestHandler):
                 # the firmware/aibom image as a SIBLING container (docker socket).
                 "firmware": firmware_usable(),
                 "scanoss": scanoss_capable(),
+                # No sibling fallback (see deep_license_capable): false hides the
+                # toggle outright rather than promising a pull that never comes.
+                "deepLicense": deep_license_capable(),
                 "docker": docker_capable(),
                 "aibom": aibom_usable(),
                 # Deep CVE matching (maven NVD-CPE via grype) offered on uploaded

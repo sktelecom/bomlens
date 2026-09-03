@@ -223,7 +223,11 @@ export function useScanForm({
   // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
   // models, where there is nothing to scan and the toggle would be a no-op.
-  const showDeepLicense = isSourceScan;
+  // Also gated on the running image actually having scancode: unlike
+  // firmware/aibom/deep-cve there is no sibling image to fall back on, so a
+  // false here means the toggle would silently do nothing (BL-ADV-020) —
+  // hide it instead of offering a control that can't act.
+  const showDeepLicense = isSourceScan && Boolean(capabilities.deepLicense);
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;

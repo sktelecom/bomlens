@@ -55,10 +55,10 @@ const SBOM = {
 };
 
 async function openScan(page: Page, done: object) {
-  // scanoss on so the source-scan toggles (deep license / vendored) render —
-  // needed to prove deepLicense prefills.
+  // scanoss and deepLicense on so the source-scan toggles (deep license /
+  // vendored) render — needed to prove deepLicense prefills.
   await page.route("**/capabilities", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: true, docker: true }) }),
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: true, deepLicense: true, docker: true }) }),
   );
   await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
   await page.route("**/scans", (r) =>

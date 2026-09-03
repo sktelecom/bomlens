@@ -688,6 +688,10 @@ export interface Capabilities {
   firmware: boolean;
   /** scanoss-py present (built with SBOM_SCANOSS) — enables --identify-vendored. */
   scanoss?: boolean;
+  /** scancode present (built with SBOM_DEEP_LICENSE) — enables the deep-license
+   *  toggle. No sibling fallback exists for it, so false hides the toggle
+   *  outright rather than offering something that silently does nothing. */
+  deepLicense?: boolean;
   docker: boolean;
   /** AI-model input offerable here — generator built in OR sibling-reachable. */
   aibom?: boolean;
