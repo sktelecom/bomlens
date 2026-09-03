@@ -757,6 +757,47 @@ jobs:
     if: always()
 
     steps:
+      # The runner is a single WSL2 machine with no image lifecycle of its own.
+      # Every integration and example run pulls the cdxgen language images and a
+      # release pulls more, and nothing ever removed them: 90 GB had accumulated
+      # by the time anyone looked, 87 of it reclaimable, and a full disk had
+      # already blocked one release. This runs after every other job on this
+      # runner has finished, so nothing is using what it removes.
+      #
+      # A week of retention keeps the images a same-week run would pull again —
+      # the point is to stop unbounded growth, not to make every run pay a fresh
+      # download. Failure here is not a CI failure: a machine that could not be
+      # tidied still ran the tests correctly.
+      - name: Reclaim runner disk
+        if: always()
+        continue-on-error: true
+        run: |
+          # `docker system df` prints one line per resource type, so it is
+          # reported as a block rather than folded into a table cell.
+          before=$(docker system df 2>/dev/null || echo "unavailable")
+          docker image prune -af --filter until=168h >/dev/null 2>&1 || true
+          docker builder prune -f --filter until=168h >/dev/null 2>&1 || true
+          after=$(docker system df 2>/dev/null || echo "unavailable")
+          {
+            echo "### Runner disk"
+            echo ""
+            echo "<details><summary>docker system df — before</summary>"
+            echo ""
+            echo '```'
+            echo "$before"
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "After the prune:"
+            echo ""
+            echo '```'
+            echo "$after"
+            echo '```'
+            echo ""
+            df -h / | tail -1 | awk '{print "Root filesystem: " $4 " free of " $2 " (" $5 " used)"}'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Generate summary
         run: |
           echo "## CI Test Results" >> $GITHUB_STEP_SUMMARY
