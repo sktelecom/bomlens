@@ -270,6 +270,10 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
   // The registry's own Korean label, when the reader is reading Korean. The
   // contract stays English; this is the translation riding alongside it.
   const label = (isKo && check.labelKo) || check.label;
+  // Same rule for the measurement line. A Korean requirement name followed by
+  // "no packages to measure" was the shape the conformance screen had for every
+  // check this pipeline writes itself.
+  const detail = (isKo && check.detailKo) || check.detail;
   const missing = dedupeMissing(check.missing ?? []);
   const overflow = missingOverflow(check);
   // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
@@ -286,8 +290,8 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
           {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} /> : null}
-          {check.detail && !notMet ? (
-            <span className="text-xs tabular-nums text-muted-foreground">{check.detail}</span>
+          {detail && !notMet ? (
+            <span className="text-xs tabular-nums text-muted-foreground">{detail}</span>
           ) : null}
           <span className="sr-only">{t(key)}</span>
         </div>
@@ -296,8 +300,8 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             <span className="font-medium">{t("crosswalk.refs")}</span> {regText}
           </div>
         ) : null}
-        {check.detail && notMet ? (
-          <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{check.detail}</div>
+        {detail && notMet ? (
+          <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{detail}</div>
         ) : null}
         {what && notMet ? (
           // Only where there is something to do. A met element's description is

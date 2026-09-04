@@ -1549,6 +1549,10 @@ def conformance_summary(run_id):
             # write themselves, whose labels carry a threshold or a spec version
             # and so cannot be looked up whole.
             "labelKo": str(c.get("label_ko") or ""),
+            # The detail line in Korean ("측정할 패키지 없음"), written by the same
+            # join that fills label_ko. Without it a Korean reader got a Korean
+            # requirement name followed by an English measurement.
+            "detailKo": str(c.get("detail_ko") or ""),
             # Why an element is unjudgeable: "not-applicable" means this document
             # holds nothing to measure (an ML-BOM has no packages, so package
             # coverage says nothing about it). validate-sbom.sh sets it and the

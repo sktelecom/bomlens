@@ -281,8 +281,13 @@ export interface ConformanceCheck {
   /** The Korean label the registry declares for this element. The rest of this
    *  contract stays English by design, so the translation rides alongside `label`
    *  rather than replacing it. Empty for checks whose label carries a threshold
-   *  or a spec version and so cannot be looked up whole. */
+   *  or a spec version and so cannot be looked up whole. Every check now carries
+   *  one: the pipeline matches a threshold-bearing label against the same
+   *  catalog its reports use. */
   labelKo?: string;
+  /** The Korean detail line ("측정할 패키지 없음"), from the same join. Empty when
+   *  the detail is a bare value (a timestamp, a purl) that needs no translation. */
+  detailKo?: string;
 }
 
 /** What a person has to establish for one element. */

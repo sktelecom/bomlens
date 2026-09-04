@@ -691,6 +691,79 @@ fi
 # automated source (source "na") are counted separately as review items — a
 # well-formed AIBOM should not read as "30 warnings" just because a dozen G7
 # elements are checkable only by a human.
+# Korean wording for every check, carried alongside the English contract.
+#
+# Registry rows ship label_ko with their elements. The checks this file writes
+# itself do not: their labels carry a threshold ("PURL coverage (>= 90%)") or a
+# spec version, so they cannot be looked up whole and are matched by pattern
+# against the same catalog the reports use. Details are matched the same way.
+#
+# This runs regardless of REPORT_LANG. The reader's language is chosen in the
+# client, long after the scan, so shipping only one language's wording is what
+# left the conformance screen showing English prose under a Korean heading for
+# the seventeen format checks.
+KO_CATALOG="${REPORT_STRINGS_KO:-$(dirname "$0")/i18n/report-strings.ko.json}"
+KO_REG="${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"
+KO_REG_CISA="${CISA_REGISTRY:-$(dirname "$0")/cisa-registry.json}"
+[ -f "$KO_REG_CISA" ] || KO_REG_CISA="$KO_REG"
+if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
+    if KO_JOINED=$(printf '%s' "$CHECKS" | jq -c --slurpfile cat "$KO_CATALOG" \
+            --slurpfile reg "$KO_REG" --slurpfile reg2 "$KO_REG_CISA" '
+
+      ($cat[0]) as $C
+      | (([ ($reg[0], $reg2[0]) | .clusters[].elements[] | select(.label_ko != null) | {(.id): .label_ko} ] | add) // {}) as $RK
+      | def llabel($id; $en):
+          if ($RK[$id] != null) then $RK[$id]
+          elif ($en|test("^Spec version \\(CycloneDX ")) then ($C["conformance.label.spec_cdx"] | gsub("%v%"; ($en|capture("^Spec version \\(CycloneDX (?<v>.+)\\)$").v)))
+          elif ($en|test("^Spec version \\(")) then ($C["conformance.label.spec_other"] | gsub("%v%"; ($en|capture("^Spec version \\((?<v>.+)\\)$").v)))
+          elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          elif ($en|test("^License coverage ")) then ($C["conformance.label.license"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          elif ($en|test("^Hash coverage ")) then ($C["conformance.label.hash"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
+          # These four capture the threshold from ">= N%" rather than the first
+          # run of digits: "SHA-512 checksum coverage" would otherwise report 512.
+          elif ($en|test("^SHA-512 checksum coverage ")) then ($C["conformance.label.sha512"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Component creator coverage ")) then ($C["conformance.label.creator"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Component filename coverage ")) then ($C["conformance.label.filename"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^Source or distribution URI coverage ")) then ($C["conformance.label.artifact_uri"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          elif ($en|test("^File component identifier coverage ")) then ($C["conformance.label.file_identifier"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          else ($C["conformance.label_exact"][$en] // $en) end;
+        def ldetail($d):
+          if $d=="present" then $C["conformance.detail.present"]
+          elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
+          elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
+          elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
+          elif $d=="no package components (file inventory only)" then $C["conformance.detail.files_only"]
+          elif $d=="no file components" then $C["conformance.detail.no_files"]
+          elif $d=="nothing to measure" then $C["conformance.detail.nothing"]
+          elif $d=="requires inspecting the delivered files (no automated source in this scan)" then $C["conformance.detail.file_props_review"]
+          elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]
+          elif $d=="not CycloneDX or SPDX" then $C["conformance.detail.not_cdx_spdx"]
+          elif $d=="could not evaluate" then $C["conformance.detail.could_not_eval"]
+          elif $d=="no components" then $C["conformance.detail.no_subject_components"]
+          elif ($d|test("^[0-9]+/[0-9]+ component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.subject_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+/[0-9]+ model component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.model_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ tool\\(s\\)$")) then ($C["conformance.detail.tool"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ edge\\(s\\)$")) then ($C["conformance.detail.edge"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ untraceable$")) then ($C["conformance.detail.untraceable"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ malformed$")) then ($C["conformance.detail.malformed"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ found$")) then ($C["conformance.detail.found"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ accepted SPDXVersion line\\(s\\)$")) then ($C["conformance.detail.spdxver"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ package\\(s\\)$")) then ($C["conformance.detail.package"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^names=[0-9]+, versions=[0-9]+$")) then ($d|capture("names=(?<a>[0-9]+), versions=(?<b>[0-9]+)")) as $m | ($C["conformance.detail.names_versions"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ purl ref\\(s\\) for [0-9]+ package\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+) purl ref\\(s\\) for (?<b>[0-9]+)")) as $m | ($C["conformance.detail.purl_refs"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
+          elif ($d|test("^[0-9]+ relationship\\(s\\)$")) then ($C["conformance.detail.relationship"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          else $d end;
+      map(.label_ko = (if (.label_ko // "") != "" then .label_ko else llabel(.id; .label) end)
+          | .detail_ko = ldetail(.detail))
+    ' 2>/dev/null); then
+        CHECKS="$KO_JOINED"
+    else
+        echo "[validate] WARN: Korean labels unavailable; the report stays English." >&2
+    fi
+fi
+
 RESULT=$(echo "$CHECKS" | jq -r 'if any(.[]; .required and .status=="fail") then "fail" else "pass" end')
 N_FAIL=$(echo "$CHECKS" | jq '[.[] | select(.required and .status=="fail")] | length')
 # no-generic is advisory (untraceable-component visibility), counted on its own
@@ -846,53 +919,13 @@ if [ "$REPORT_LANG" = "ko" ]; then
     [ -f "$REG_CISA" ] || REG_CISA="$REG"
     # Localize per-row label + detail into a render copy (status/missing/guidance/
     # evidence/regulations untouched, so the render loops below are unchanged).
-    RCHECKS=$(printf '%s' "$CHECKS" | jq -c --slurpfile cat "$KO_CAT" --slurpfile reg "$REG" --slurpfile reg2 "$REG_CISA" '
-      ($cat[0]) as $C
-      | (([ ($reg[0], $reg2[0]) | .clusters[].elements[] | select(.label_ko != null) | {(.id): .label_ko} ] | add) // {}) as $RK
-      | def llabel($id; $en):
-          if ($RK[$id] != null) then $RK[$id]
-          elif ($en|test("^Spec version \\(CycloneDX ")) then ($C["conformance.label.spec_cdx"] | gsub("%v%"; ($en|capture("^Spec version \\(CycloneDX (?<v>.+)\\)$").v)))
-          elif ($en|test("^Spec version \\(")) then ($C["conformance.label.spec_other"] | gsub("%v%"; ($en|capture("^Spec version \\((?<v>.+)\\)$").v)))
-          elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
-          elif ($en|test("^License coverage ")) then ($C["conformance.label.license"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
-          elif ($en|test("^Hash coverage ")) then ($C["conformance.label.hash"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
-          # These four capture the threshold from ">= N%" rather than the first
-          # run of digits: "SHA-512 checksum coverage" would otherwise report 512.
-          elif ($en|test("^SHA-512 checksum coverage ")) then ($C["conformance.label.sha512"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
-          elif ($en|test("^Component creator coverage ")) then ($C["conformance.label.creator"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
-          elif ($en|test("^Component filename coverage ")) then ($C["conformance.label.filename"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
-          elif ($en|test("^Source or distribution URI coverage ")) then ($C["conformance.label.artifact_uri"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
-          elif ($en|test("^File component identifier coverage ")) then ($C["conformance.label.file_identifier"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
-          else ($C["conformance.label_exact"][$en] // $en) end;
-        def ldetail($d):
-          if $d=="present" then $C["conformance.detail.present"]
-          elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
-          elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
-          elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
-          elif $d=="no package components (file inventory only)" then $C["conformance.detail.files_only"]
-          elif $d=="no file components" then $C["conformance.detail.no_files"]
-          elif $d=="nothing to measure" then $C["conformance.detail.nothing"]
-          elif $d=="requires inspecting the delivered files (no automated source in this scan)" then $C["conformance.detail.file_props_review"]
-          elif $d=="no machine-learning-model components" then $C["conformance.detail.no_models"]
-          elif $d=="not CycloneDX or SPDX" then $C["conformance.detail.not_cdx_spdx"]
-          elif $d=="could not evaluate" then $C["conformance.detail.could_not_eval"]
-          elif $d=="no components" then $C["conformance.detail.no_subject_components"]
-          elif ($d|test("^[0-9]+/[0-9]+ component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.subject_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
-          elif ($d|test("^[0-9]+/[0-9]+ model component\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+)/(?<b>[0-9]+)")) as $m | ($C["conformance.detail.model_components"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
-          elif ($d|test("^[0-9]+ tool\\(s\\)$")) then ($C["conformance.detail.tool"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ edge\\(s\\)$")) then ($C["conformance.detail.edge"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ untraceable$")) then ($C["conformance.detail.untraceable"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ malformed$")) then ($C["conformance.detail.malformed"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ found$")) then ($C["conformance.detail.found"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ accepted SPDXVersion line\\(s\\)$")) then ($C["conformance.detail.spdxver"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ package\\(s\\)$")) then ($C["conformance.detail.package"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^names=[0-9]+, versions=[0-9]+$")) then ($d|capture("names=(?<a>[0-9]+), versions=(?<b>[0-9]+)")) as $m | ($C["conformance.detail.names_versions"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
-          elif ($d|test("^[0-9]+ purl ref\\(s\\) for [0-9]+ package\\(s\\)$")) then ($d|capture("^(?<a>[0-9]+) purl ref\\(s\\) for (?<b>[0-9]+)")) as $m | ($C["conformance.detail.purl_refs"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
-          elif ($d|test("^[0-9]+ relationship\\(s\\)$")) then ($C["conformance.detail.relationship"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          else $d end;
-      map(.label = llabel(.id; .label) | .detail = ldetail(.detail)
+    # The Korean label and detail were computed once when the checks were built
+    # (see the localization join above) and ride on the rows as label_ko /
+    # detail_ko. Rendering is then a swap, so the report and the JSON can never
+    # disagree about the wording.
+    RCHECKS=$(printf '%s' "$CHECKS" | jq -c '
+      map((if (.label_ko // "") != "" then .label = .label_ko else . end)
+          | (if (.detail_ko // "") != "" then .detail = .detail_ko else . end)
           | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end))
     ') || RCHECKS="$CHECKS"
     # Crosswalk: swap the framework display titles and the disclaimer for their

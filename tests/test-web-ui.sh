@@ -1545,6 +1545,17 @@ assert {"framework", "ref", "basis"} <= set(base_mapped[0]["regulations"][0]), b
 # client render the row in Korean without translating the contract.
 assert all("labelKo" in x for x in checks), "labelKo not exposed"
 assert any(x["labelKo"] for x in g7), "no G7 element carries its Korean label"
+# The checks this pipeline writes itself carry a threshold or a spec version in
+# their label, so they cannot be looked up whole. They are matched by pattern
+# against the same catalog the reports use, and every check now arrives with a
+# Korean label and detail. Without them a Korean reader got seventeen English
+# requirement names, each followed by an English measurement, under a Korean
+# heading.
+assert all("detailKo" in x for x in checks), "detailKo not exposed"
+assert all(x["labelKo"] for x in base), (
+    "every format check carries a Korean label",
+    [x["id"] for x in base if not x["labelKo"]])
+assert any(x["detailKo"] for x in base), "no format check carries a Korean detail"
 # Why an element could not be judged. validate-sbom.sh marks the checks with
 # nothing in this document to measure (package coverage over an ML-BOM that has
 # no packages) as naKind "not-applicable", and both CLI reports render them as
