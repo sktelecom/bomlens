@@ -1004,6 +1004,14 @@ def _scope_index(data):
     refs = set(adjacency)
     for targets in adjacency.values():
         refs.update(targets)
+    # The root component is not a dependency of itself. It is in `refs` only
+    # because it keys the graph. A software scan never showed this: its root
+    # lives in metadata, not components[], so nothing matched the stray entry.
+    # An AI scan folds the root model INTO the component list, so the model was
+    # labelled a transitive dependency of its own SBOM ("3 direct · 1 transitive"
+    # for three datasets).
+    if meta_ref:
+        refs.discard(meta_ref)
     return {ref: ("direct" if ref in direct else "transitive") for ref in refs}, True
 
 
@@ -1541,6 +1549,13 @@ def conformance_summary(run_id):
             # write themselves, whose labels carry a threshold or a spec version
             # and so cannot be looked up whole.
             "labelKo": str(c.get("label_ko") or ""),
+            # Why an element is unjudgeable: "not-applicable" means this document
+            # holds nothing to measure (an ML-BOM has no packages, so package
+            # coverage says nothing about it). validate-sbom.sh sets it and the
+            # CLI reports render those rows as N/A; without it here the UI drew
+            # them as ordinary warnings and counted them into the mandatory
+            # denominator and the "needs a person" tally.
+            "naKind": str(c.get("naKind") or ""),
         }
         # Any check can carry a regulatory-crosswalk mapping (validate-sbom.sh
         # joins docker/lib/regulation-crosswalk.json by check id): the named

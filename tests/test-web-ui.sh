@@ -1443,6 +1443,41 @@ rm -f "$OUT"/evil_scal_1.0_* "$OUT"/evil_field_1.0_*
 
 rm -f "$OUT"/demo_1.0_* "$OUT"/flat_1.0_* "$OUT"/bad_1.0_*
 
+echo "== the root component is not a dependency of itself =="
+# An AI scan folds the root model INTO components[], unlike a software scan whose
+# root lives only in metadata. The root also keys the dependency graph, so it was
+# picked up as a transitive dependency of its own SBOM: three referenced datasets
+# were reported as "3 direct · 1 transitive" and the model carried a scope badge.
+cat > "$OUT/mlroot_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"bom-ref":"root-model","type":"machine-learning-model",
+   "name":"root-model","version":"1.0"}},
+ "components":[
+   {"bom-ref":"root-model","type":"machine-learning-model","name":"root-model","version":"1.0"},
+   {"bom-ref":"ds-a","type":"data","name":"ds-a","version":"1"},
+   {"bom-ref":"ds-b","type":"data","name":"ds-b","version":"1"}],
+ "dependencies":[{"ref":"root-model","dependsOn":["ds-a","ds-b"]},
+   {"ref":"ds-a","dependsOn":[]},{"ref":"ds-b","dependsOn":[]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("mlroot_1.0")
+assert s["directCount"] == 2, ("both datasets are direct", s)
+assert s["transitiveCount"] == 0, ("the root is not a transitive dep of itself", s)
+rows = {r["name"]: r for r in s["componentList"]}
+assert rows["ds-a"]["scope"] == "direct", rows["ds-a"]
+assert "scope" not in rows["root-model"] or not rows["root-model"]["scope"], (
+    "the root component carries no scope", rows["root-model"])
+PY
+then
+    pass "the root model is excluded from the dependency scope index"
+else
+    fail "the root model is excluded from the dependency scope index"
+fi
+rm -f "$OUT"/mlroot_1.0_*
+
 echo "== conformance checks exposure (G7 split) =="
 # Generate a real conformance report for the AI fixture, then check that
 # conformance_summary surfaces the per-check array with the G7 (g7-*) checks.
@@ -1510,6 +1545,16 @@ assert {"framework", "ref", "basis"} <= set(base_mapped[0]["regulations"][0]), b
 # client render the row in Korean without translating the contract.
 assert all("labelKo" in x for x in checks), "labelKo not exposed"
 assert any(x["labelKo"] for x in g7), "no G7 element carries its Korean label"
+# Why an element could not be judged. validate-sbom.sh marks the checks with
+# nothing in this document to measure (package coverage over an ML-BOM that has
+# no packages) as naKind "not-applicable", and both CLI reports render them as
+# N/A. Dropping the field here made the UI draw them as ordinary warnings, count
+# them into the mandatory denominator (6/8 instead of 6/6) and fold them into the
+# "needs a person" tally (21 instead of 14).
+assert all("naKind" in x for x in checks), "naKind not exposed"
+na = [x for x in checks if x["naKind"] == "not-applicable"]
+assert len(na) >= 1, "an ML-BOM with no packages must mark package checks N/A"
+assert all(x["source"] == "na" for x in na), ("N/A rows carry source na", na[0])
 cisa = [x for x in checks if x["id"].startswith("cisa-")]
 assert len(cisa) >= 20, ("the 2026 minimum elements should be measured too", len(cisa))
 assert any(x["labelKo"] for x in cisa), "no CISA element carries its Korean label"
