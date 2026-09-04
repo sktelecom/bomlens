@@ -1090,15 +1090,27 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
 
-  // Headline tally comes straight from the check statuses: 6 of 8 auto-covered,
-  // 2 advisory and 1 needing human review (the source:"na" element).
+  // Coverage of the baseline itself: 6 of the 8 auto-covered elements are
+  // present. It counts every G7 check, so a filter must not change it.
   await expect(page.getByText("6/8 present")).toBeVisible();
-  await expect(page.getByText(/2 advisory/)).toBeVisible();
-  await expect(page.getByText(/1 need review/).first()).toBeVisible();
-  // G7 checks are grouped into their clusters (headers rendered).
-  await expect(page.getByText("Models", { exact: true })).toBeVisible();
-  // The na element carries a "Review needed" provenance badge.
+  // How the rest split by what a reader can do about them: two the scan could
+  // fill, one only a person can settle. These are the filter chips, over the
+  // whole document rather than one baseline, and they replace the per-card
+  // "advisory / need review" counts that said the same thing three times.
+  await expect(page.getByRole("button", { name: /^Can be fixed \d+$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Needs a person \d+$/ })).toBeVisible();
+  // The element no scan can settle carries a "Review needed" provenance badge,
+  // and lives under the chip that says so.
+  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
   await expect(page.getByText("Review needed").first()).toBeVisible();
+  // Clearing the chip shows every check again, grouped into its clusters. The
+  // groups fold, and an unfiltered panel opens only the ones holding something
+  // to act on, so open them all for the assertions below.
+  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
+  await page
+    .locator("main details")
+    .evaluateAll((els) => els.forEach((e) => ((e as HTMLDetailsElement).open = true)));
+  await expect(page.getByText("Models", { exact: true }).first()).toBeVisible();
   // Base checks are split out under their own heading.
   await expect(page.getByText("Format conformance")).toBeVisible();
   // The 2026 minimum elements are their own block, grouped by cluster, and their

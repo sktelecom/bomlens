@@ -183,6 +183,8 @@ export function ResultSection({
         <ConformancePanel
           conformance={result.conformance}
           aiProfile={result.aiProfile ?? null}
+          scanId={scanId}
+          results={result.results}
         />
       ) : null;
 

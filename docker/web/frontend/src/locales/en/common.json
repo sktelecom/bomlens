@@ -1041,5 +1041,19 @@
       "cisa-component": "Component data",
       "cisa-practices": "Practices and processes"
     }
+  },
+  "conf": {
+    "kind": {
+      "pass": "Met",
+      "actionable": "Can be fixed",
+      "review": "Needs a person",
+      "na": "Not applicable"
+    },
+    "searchPlaceholder": "Search requirements and references",
+    "showingAll": "Showing all {{count}} checks.",
+    "showingFiltered": "Showing {{count}} of {{total}} checks.",
+    "noMatch": "No check matches this filter.",
+    "report": "Report ({{ext}})",
+    "hiddenByFilter": "{{count}} more match this search under another filter."
   }
 }

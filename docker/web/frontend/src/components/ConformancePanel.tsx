@@ -1,18 +1,25 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { CircleAlert, CircleCheck, CircleMinus, CircleX } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleMinus, CircleX, Download } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
-import type {
-  AiProfile,
-  ConformanceCheck,
-  ConformanceSummary,
+import {
+  fileUrl,
+  type AiProfile,
+  type ConformanceCheck,
+  type ConformanceSummary,
+  type ResultFile,
 } from "@/lib/api";
 import {
+  checkKind,
+  type CheckKind,
   CISA_CLUSTER_ORDER,
   crosswalkTotals,
   dedupeMissing,
@@ -20,9 +27,11 @@ import {
   groupG7ByCluster,
   isNotApplicable,
   isRegistryCheck,
+  kindTally,
+  matchesQuery,
+  registryTally,
   missingOverflow,
   profileCard,
-  registryTally,
   sortByAttention,
   splitChecks,
   verdictTally,
@@ -387,33 +396,163 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
   );
 }
 
+const KIND_TONE: Record<CheckKind, "success" | "medium" | "info" | "none"> = {
+  pass: "success",
+  actionable: "medium",
+  review: "info",
+  na: "none",
+};
+
 /**
- * SBOM conformance — the supplier-SBOM verdict plus the base CycloneDX format
- * checks, and (only when the SBOM carries an AI model) the G7 AI minimum-element
- * checks as a sub-block. The headline "N / total present" and the advisory count
- * come straight from the check statuses (no invented numbers); G7 is advisory.
+ * One filter chip. Built like the severity legend so the two screens are read
+ * the same way, but with no bar above it: these four are a classification, not a
+ * scale, and a bar would give most of its width to "passed", the one band
+ * nobody came here to look at.
+ */
+function KindChip({
+  kind,
+  count,
+  selected,
+  onSelect,
+}: {
+  kind: CheckKind;
+  count: number;
+  selected: CheckKind | null;
+  onSelect: (k: CheckKind) => void;
+}) {
+  const { t } = useTranslation();
+  const isSel = selected === kind;
+  return (
+    <button
+      type="button"
+      disabled={count === 0}
+      aria-pressed={isSel}
+      onClick={() => onSelect(kind)}
+      className={cn(
+        "rounded-full transition duration-fast ease-out-soft",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        count === 0 ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:opacity-80",
+        isSel && "ring-2 ring-foreground ring-offset-1",
+        Boolean(selected) && !isSel && "opacity-60",
+      )}
+    >
+      <Badge tone={KIND_TONE[kind]} variant={kind === "na" ? "muted" : undefined}>
+        {t(`conf.kind.${kind}`)} {count}
+      </Badge>
+    </button>
+  );
+}
+
+/** A named group of checks, folded away when it holds nothing to act on. */
+function CheckGroup({
+  title,
+  checks,
+  defaultOpen,
+  trailing,
+}: {
+  title: string;
+  checks: ConformanceCheck[];
+  defaultOpen: boolean;
+  trailing?: React.ReactNode;
+}) {
+  if (checks.length === 0) return null;
+  return (
+    <Disclosure
+      defaultOpen={defaultOpen}
+      summaryClassName="text-xs font-semibold text-foreground"
+      summary={
+        <span className="flex flex-wrap items-baseline gap-x-2">
+          <span>{title}</span>
+          <span className="text-xs font-normal tabular-nums text-muted-foreground">
+            {checks.length}
+          </span>
+          {trailing}
+        </span>
+      }
+    >
+      <ul className="mt-2 divide-y rounded-md border">
+        {sortByAttention(checks).map((c) => (
+          <CheckRow key={c.id} check={c} />
+        ))}
+      </ul>
+    </Disclosure>
+  );
+}
+
+/**
+ * SBOM conformance: the supplier-SBOM verdict, the base CycloneDX format
+ * checks, the 2026 SBOM minimum elements and (when the SBOM carries a model) the
+ * G7 AI minimum elements.
+ *
+ * Ninety-one checks over twelve groups ran to twelve screens with no filter, no
+ * search and nothing folded, and drew every unmet check the same way, so the
+ * twelve a reader can act on sat among fourteen only a person can settle and
+ * seven this document has nothing to measure for. The chips split those four
+ * apart and start on the actionable ones; the groups fold; the search covers the
+ * requirement names and the regulation references.
  */
 export function ConformancePanel({
   conformance,
   aiProfile,
+  scanId,
+  results = [],
 }: {
   conformance: ConformanceSummary;
   /** AI compliance profile card (AI SBOMs only); null otherwise. */
   aiProfile?: AiProfile | null;
+  /** Scoping for the report download links; omit to hide them. */
+  scanId?: string | null;
+  /** This scan's artifacts, to offer the same report as a file. */
+  results?: ResultFile[];
 }) {
   const { t } = useTranslation();
   const checks = conformance.checks ?? [];
+  const tally = useMemo(() => kindTally(checks), [checks]);
+  // Open on the checks a reader can do something about. When there are none,
+  // opening on an empty list would say "nothing here" about a document that has
+  // plenty to show, so the unfiltered list is the honest start.
+  const [kind, setKind] = useState<CheckKind | null>(
+    tally.actionable > 0 ? "actionable" : null,
+  );
+  const [query, setQuery] = useState("");
+
+  const reports = useMemo(
+    () =>
+      results
+        .filter((r) => r.name.includes("_conformance.") && !r.name.endsWith(".json"))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [results],
+  );
+
   if (checks.length === 0) {
     return <EmptyState>{t("g7.empty")}</EmptyState>;
   }
 
-  const { base, cisa, g7 } = splitChecks(checks);
-  const g7t = registryTally(g7);
+  const keep = (c: ConformanceCheck) =>
+    (kind === null || checkKind(c) === kind) && matchesQuery(c, query);
+  const shown = checks.filter(keep);
+  // Coverage of each advisory baseline, always over ALL of its checks: "32/41
+  // present" answers how much of G7 this SBOM documents, which a filtered view
+  // must not change.
+  const all = splitChecks(checks);
+  const cisaT = registryTally(all.cisa);
+  const g7t = registryTally(all.g7);
+  // A search that finds nothing because a chip is narrowing it should say so:
+  // the reader typed a requirement they expect to exist, and "no match" alone
+  // reads as "this SBOM has no such check".
+  const hiddenByChip =
+    kind !== null && query
+      ? checks.filter((c) => matchesQuery(c, query)).length - shown.length
+      : 0;
+  const { base, cisa, g7 } = splitChecks(shown);
   const g7groups = groupG7ByCluster(g7);
-  const cisaT = registryTally(cisa);
   const cisaGroups = groupByCluster(cisa, CISA_CLUSTER_ORDER);
   const verdict = verdictTally(checks);
   const pass = conformance.result === "pass";
+  // Re-mount the folds when the filter changes so their default open state is
+  // recomputed; Disclosure captures it once, on purpose.
+  const foldKey = `${kind ?? "all"}:${query}`;
+  const openByDefault = kind !== null || Boolean(query);
 
   return (
     <div className="space-y-6">
@@ -425,142 +564,148 @@ export function ConformancePanel({
           <Badge tone={pass ? "success" : "critical"}>
             {pass ? t("result.verdictPass") : t("result.verdictFail")}
           </Badge>
+          <div className="flex-1" />
+          {scanId
+            ? reports.map((r) => (
+                <Button key={r.name} variant="outline" size="sm" asChild>
+                  <a href={fileUrl(scanId, r.name)} download={r.name}>
+                    <Download className="h-3.5 w-3.5" />
+                    {t("conf.report", { ext: r.name.split(".").pop()?.toUpperCase() })}
+                  </a>
+                </Button>
+              ))
+            : null}
         </div>
         {/* Says what "conformance" here measures — SBOM format/submission
             requirements, not regulatory compliance — so the section title is not
             read as a compliance verdict. */}
         <p className="max-w-3xl text-sm text-muted-foreground">{t("g7.panelIntro")}</p>
-        {/* What blocks this SBOM, before anything else. The mandatory checks
-            decide the verdict on their own — an advisory baseline can be wholly
-            unmet without changing it — and they used to sit below every advisory
-            row, which on an AI SBOM meant the bottom of a very long page. */}
         <p className="text-sm text-foreground">
           <span className="font-medium">
             {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
           </span>
-          {verdict.advisoryGap > 0 ? (
-            <span className="text-muted-foreground">
-              {" · "}
-              {t("g7.verdictGap", { count: verdict.advisoryGap })}
-            </span>
-          ) : null}
-          {verdict.review > 0 ? (
-            <span className="text-muted-foreground">
-              {" · "}
-              {t("g7.verdictReview", { count: verdict.review })}
-            </span>
-          ) : null}
         </p>
       </div>
 
-      {base.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <div className="text-sm font-semibold text-foreground">{t("g7.formatTitle")}</div>
-            <span className="text-xs text-muted-foreground">
-              {t("g7.baseMandatory", {
-                passed: verdict.mandatoryPassed,
-                total: verdict.mandatoryTotal,
-              })}
-            </span>
-          </div>
-          <ul className="divide-y rounded-md border">
-            {sortByAttention(base).map((c) => (
-              <CheckRow key={c.id} check={c} />
-            ))}
-          </ul>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(["actionable", "review", "na", "pass"] as const).map((k) => (
+            <KindChip
+              key={k}
+              kind={k}
+              count={tally[k]}
+              selected={kind}
+              onSelect={(picked) => setKind((cur) => (cur === picked ? null : picked))}
+            />
+          ))}
+          <div className="flex-1" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("conf.searchPlaceholder")}
+            aria-label={t("conf.searchPlaceholder")}
+            className="h-8 w-full max-w-xs text-sm"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {kind === null && !query
+            ? t("conf.showingAll", { count: checks.length })
+            : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
+          {hiddenByChip > 0 && shown.length > 0
+            ? ` ${t("conf.hiddenByFilter", { count: hiddenByChip })}`
+            : null}
+        </p>
+      </div>
+
+      {shown.length === 0 ? (
+        <EmptyState
+          hint={
+            hiddenByChip > 0
+              ? t("conf.hiddenByFilter", { count: hiddenByChip })
+              : undefined
+          }
+        >
+          {t("conf.noMatch")}
+        </EmptyState>
+      ) : (
+        <div className="space-y-6" key={foldKey}>
+          <CheckGroup
+            title={t("g7.formatTitle")}
+            checks={base}
+            defaultOpen={openByDefault || base.some((c) => checkKind(c) === "actionable")}
+            trailing={
+              <span className="text-xs font-normal text-muted-foreground">
+                {t("g7.baseMandatory", {
+                  passed: verdict.mandatoryPassed,
+                  total: verdict.mandatoryTotal,
+                })}
+              </span>
+            }
+          />
+
+          {conformance.regulatoryCrosswalk &&
+          conformance.regulatoryCrosswalk.frameworks.length > 0 &&
+          kind === null &&
+          !query ? (
+            <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
+          ) : null}
+
+          {cisa.length > 0 && (
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <div className="text-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
+                  <div className="text-lg font-semibold tabular-nums text-foreground">
+                    {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("cisa.allAdvisory")}</p>
+                </div>
+                <div className="space-y-3">
+                  {cisaGroups.map((group) => (
+                    <CheckGroup
+                      key={group.cluster}
+                      title={t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                      checks={group.checks}
+                      defaultOpen={
+                        openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
+                      }
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {aiProfile && kind === null && !query ? <AiProfileCard profile={aiProfile} /> : null}
+
+          {g7.length > 0 && (
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
+                  <div className="text-lg font-semibold tabular-nums text-foreground">
+                    {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
+                </div>
+                <div className="space-y-3">
+                  {g7groups.map((group) => (
+                    <CheckGroup
+                      key={group.cluster}
+                      title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                      checks={group.checks}
+                      defaultOpen={
+                        openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
+                      }
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
-
-      {conformance.regulatoryCrosswalk &&
-      conformance.regulatoryCrosswalk.frameworks.length > 0 ? (
-        <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
-      ) : null}
-
-      {cisa.length > 0 && (
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <div className="text-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
-              <div className="text-2xl font-semibold tabular-nums text-foreground">
-                {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
-              </div>
-              {cisaT.review > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  · {t("g7.review", { count: cisaT.review })}
-                </span>
-              )}
-              {cisaT.notApplicable > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  · {t("g7.notApplicable", { count: cisaT.notApplicable })}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">{t("cisa.allAdvisory")}</p>
-            <div className="space-y-4">
-              {cisaGroups.map((group) => (
-                <div key={group.cluster} className="space-y-2">
-                  <div className="text-xs font-semibold text-foreground">
-                    {t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                  </div>
-                  <ul className="divide-y rounded-md border">
-                    {sortByAttention(group.checks).map((c) => (
-                      <CheckRow key={c.id} check={c} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {aiProfile ? <AiProfileCard profile={aiProfile} /> : null}
-
-      {g7.length > 0 && (
-        <Card>
-          <CardContent className="space-y-4 p-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-              <div className="text-2xl font-semibold tabular-nums text-foreground">
-                {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
-              </div>
-              {g7t.advisory > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  · {t("g7.advisory", { count: g7t.advisory })}
-                </span>
-              )}
-              {g7t.review > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  · {t("g7.review", { count: g7t.review })}
-                </span>
-              )}
-              {g7t.notApplicable > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  · {t("g7.notApplicable", { count: g7t.notApplicable })}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
-            <div className="space-y-4">
-              {g7groups.map((group) => (
-                <div key={group.cluster} className="space-y-2">
-                  <div className="text-xs font-semibold text-foreground">
-                    {t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                  </div>
-                  <ul className="divide-y rounded-md border">
-                    {group.checks.map((c) => (
-                      <CheckRow key={c.id} check={c} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-
     </div>
   );
 }

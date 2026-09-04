@@ -70,30 +70,46 @@ async function open(page: Page, section: string) {
   );
   await page.goto(`/?ui=next#/scan/demo_4.0/${section}`);
   await page.getByRole("navigation").first().waitFor();
+  if (section === "conformance") {
+    // The panel opens on the checks a reader can act on. Evidence belongs to a
+    // met check, so show those.
+    await page.getByRole("button", { name: /^Met \d+$/ }).click();
+  }
+}
+
+/** The evidence fold itself, not the check group that contains it: both are
+ *  `<details>` and both contain the text. */
+function evidenceFold(page: Page) {
+  // The group also contains that summary, so it matches too; the innermost one
+  // is the evidence fold.
+  return page
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Met with:" }) })
+    .last();
 }
 
 test("a collapsible section shows that it can be opened, and opens", async ({ page }) => {
   await open(page, "conformance");
 
-  const evidence = page.locator("details", { hasText: "Met with:" }).first();
+  const evidence = evidenceFold(page);
   await expect(evidence).toBeVisible();
   // The chevron is the affordance: without it the row reads as plain text.
-  await expect(evidence.locator("summary svg")).toBeVisible();
+  await expect(evidence.locator("> summary svg")).toBeVisible();
   await expect(evidence).not.toHaveAttribute("open", /.*/);
 
-  await evidence.locator("summary").click();
+  await evidence.locator("> summary").click();
   await expect(evidence).toHaveAttribute("open", "");
   await expect(evidence.getByText("metadata.supplier.name")).toBeVisible();
 
-  await evidence.locator("summary").click();
+  await evidence.locator("> summary").click();
   await expect(evidence).not.toHaveAttribute("open", /.*/);
 });
 
 test("a collapsible section opens from the keyboard", async ({ page }) => {
   await open(page, "conformance");
-  const evidence = page.locator("details", { hasText: "Met with:" }).first();
+  const evidence = evidenceFold(page);
 
-  await evidence.locator("summary").focus();
+  await evidence.locator("> summary").focus();
   await page.keyboard.press("Enter");
   await expect(evidence).toHaveAttribute("open", "");
 });

@@ -6,12 +6,15 @@ import { describe, expect, it } from "vitest";
 import type { AiProfile, ConformanceCheck } from "./api";
 import {
   baseTally,
+  checkKind,
   clusterOf,
   crosswalkTotals,
   dedupeMissing,
   elementCoverage,
   g7Tally,
   groupG7ByCluster,
+  kindTally,
+  matchesQuery,
   missingOverflow,
   profileCard,
   sortByAttention,
@@ -351,5 +354,64 @@ describe("profileCard", () => {
       frameworkCount: 2,
       crosswalk: { total: 14, present: 8, gap: 4, review: 2, failed: 0 },
     });
+  });
+});
+
+describe("checkKind / kindTally", () => {
+  // Status alone does not say what a reader can do: a warn can be an element the
+  // scan could fill, one only a person can settle, or one this document has
+  // nothing to measure for.
+  it("separates the three kinds of unmet check", () => {
+    const checks = [
+      chk({ id: "a", status: "pass" }),
+      chk({ id: "b", status: "warn", source: "auto" }),
+      chk({ id: "c", status: "fail", required: true, source: "declared" }),
+      chk({ id: "d", status: "warn", source: "na" }),
+      chk({ id: "e", status: "warn", source: "na", naKind: "not-applicable" }),
+    ];
+    expect(checks.map(checkKind)).toEqual([
+      "pass",
+      "actionable",
+      "actionable",
+      "review",
+      "na",
+    ]);
+    expect(kindTally(checks)).toEqual({ pass: 1, actionable: 2, review: 1, na: 1 });
+  });
+
+  it("counts a mandatory failure as actionable, not as an advisory gap", () => {
+    // verdictTally.advisoryGap deliberately excludes required checks; the filter
+    // must not, or the one check that blocks the SBOM would have no chip.
+    const failed = chk({ id: "x", status: "fail", required: true, source: "auto" });
+    expect(checkKind(failed)).toBe("actionable");
+  });
+});
+
+describe("matchesQuery", () => {
+  const row = chk({
+    id: "purl",
+    label: "PURL coverage (>= 90%)",
+    labelKo: "PURL 포함률 (90% 이상)",
+    detail: "no packages to measure",
+    regulations: [
+      { framework: "bsi-tr-03183-2", short: "BSI TR-03183-2", ref: "Section 5.2.4", basis: "" },
+    ],
+  });
+
+  it("matches every word in any field, in any order", () => {
+    // "BSI 5.2.4" combines a framework and a section number stored apart; a
+    // single substring match found nothing for the most natural thing to type.
+    expect(matchesQuery(row, "BSI 5.2.4")).toBe(true);
+    expect(matchesQuery(row, "5.2.4 bsi")).toBe(true);
+    expect(matchesQuery(row, "purl coverage")).toBe(true);
+  });
+
+  it("matches the Korean label so a Korean reader can search what they see", () => {
+    expect(matchesQuery(row, "포함률")).toBe(true);
+  });
+
+  it("requires all words, and an empty query matches everything", () => {
+    expect(matchesQuery(row, "BSI 9.9.9")).toBe(false);
+    expect(matchesQuery(row, "   ")).toBe(true);
   });
 });

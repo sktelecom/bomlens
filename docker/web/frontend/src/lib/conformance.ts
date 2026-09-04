@@ -213,6 +213,61 @@ export function verdictTally(checks: ConformanceCheck[]): VerdictTally {
   };
 }
 
+/**
+ * What a reader can do about a check: the axis the conformance screen filters
+ * on. The status alone does not answer it: a `warn` can be an element the scan
+ * could fill, one only a person can settle, or one this document has nothing to
+ * measure for, and drawing all three the same way buried the twelve a reader can
+ * act on among thirty-three.
+ */
+export type CheckKind = "pass" | "actionable" | "review" | "na";
+
+export function checkKind(check: ConformanceCheck): CheckKind {
+  if (isNotApplicable(check)) return "na";
+  if (check.status === "pass") return "pass";
+  // No automated source: no scan settles this, a person has to establish it.
+  if (check.source === "na") return "review";
+  return "actionable";
+}
+
+export type KindTally = Record<CheckKind, number>;
+
+export function kindTally(checks: ConformanceCheck[]): KindTally {
+  const out: KindTally = { pass: 0, actionable: 0, review: 0, na: 0 };
+  for (const c of checks) out[checkKind(c)] += 1;
+  return out;
+}
+
+/**
+ * Free-text match over what a reader would search for: the requirement name (in
+ * either language), the measurement, and the regulation references. Someone
+ * chasing "BSI 5.2.2" is looking for the checks that cite it.
+ */
+export function matchesQuery(check: ConformanceCheck, query: string): boolean {
+  // Every word has to appear, in any order and any field. A reader chasing
+  // "BSI 5.2.2" is combining a framework with a section number that are stored
+  // apart and rendered as "BSI TR-03183-2 Section 5.2.2"; a single substring
+  // match found nothing for the most natural thing to type.
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const hay = [
+    check.label,
+    check.labelKo ?? "",
+    check.detail ?? "",
+    check.detailKo ?? "",
+    check.id,
+    ...(check.regulations ?? []).flatMap((r) => [
+      r.framework ?? "",
+      r.short ?? "",
+      r.short_ko ?? "",
+      r.ref ?? "",
+    ]),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((term) => hay.includes(term));
+}
+
 export function g7Tally(g7: ConformanceCheck[]): G7Tally {
   const notApplicable = g7.filter(isNotApplicable).length;
   const review = g7.filter(

@@ -1041,5 +1041,19 @@
       "cisa-component": "구성요소 데이터",
       "cisa-practices": "운영 원칙"
     }
+  },
+  "conf": {
+    "kind": {
+      "pass": "충족",
+      "actionable": "조치 가능",
+      "review": "사람이 확인",
+      "na": "해당 없음"
+    },
+    "searchPlaceholder": "검사 항목과 참조 규정 검색",
+    "showingAll": "검사 {{count}}건을 모두 표시합니다.",
+    "showingFiltered": "검사 {{total}}건 중 {{count}}건을 표시합니다.",
+    "noMatch": "이 조건에 맞는 검사가 없습니다.",
+    "report": "보고서 ({{ext}})",
+    "hiddenByFilter": "다른 필터에 이 검색과 일치하는 항목이 {{count}}건 더 있습니다."
   }
 }
