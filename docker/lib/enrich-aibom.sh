@@ -138,6 +138,61 @@ def model_components(doc):
     return found
 
 
+CARD_TEXT_CAP = 256 * 1024
+LIMITATION_CAP = 12
+
+
+def _reads_as_sentence(text):
+    """Whether a harvested fragment can stand as a statement on its own.
+
+    A value cut out of a heading keeps the marks of where it was cut: it starts
+    mid-sentence (lowercase, or a conjunction) or still carries the markdown
+    around it. Neither is a judgement about the content, only about whether this
+    is a whole sentence at all.
+    """
+    t = str(text or "").strip()
+    if len(t) < 12 or "**" in t or t.startswith(("-", "*", "#")):
+        return False
+    first = t.split()[0].lower() if t.split() else ""
+    if first in ("and", "or", "but", "with", "of", "to", "the"):
+        # "the" starts plenty of real sentences, but a fragment beginning with a
+        # bare article after a cut heading is the common shape here, and the cost
+        # of dropping a true one is an empty field rather than a false claim.
+        return t[0].isupper()
+    return t[0].isupper() or t[0].isdigit()
+
+
+def card_limitations(text):
+    """Bullet items under a heading that is about limitations and nothing else.
+
+    "Limitations", "Limitations and Biases", "Known limitations" all describe
+    limitations. "Performance and Limitations" does not: it opens with what the
+    model does well, and nothing in the text says where that stops and the
+    limitations begin. Sections like the latter return nothing on purpose.
+    """
+    lines = str(text or "").splitlines()
+    for i, line in enumerate(lines):
+        m = re.match(r"^#{1,6}\s+(.+?)\s*$", line)
+        if not m:
+            continue
+        title = m.group(1).strip()
+        if not re.match(r"^(known\s+|technical\s+)?limitations?\b", title, re.IGNORECASE):
+            continue
+        out = []
+        for nxt in lines[i + 1:]:
+            if re.match(r"^#{1,6}\s+", nxt):
+                break
+            b = re.match(r"^\s*[-*+]\s+(.*\S)\s*$", nxt)
+            if not b:
+                continue
+            item = re.sub(r"\*\*(.+?)\*\*", r"\1", b.group(1))
+            item = re.sub(r"[*_`]", "", item).strip()
+            if item:
+                out.append(item[:500])
+        return out[:LIMITATION_CAP]
+    return []
+
+
 models = model_components(sbom)
 if not models:
     print("[enrich] no machine-learning-model component; nothing to enrich.", file=sys.stderr)
@@ -652,6 +707,68 @@ if hf_info is not None:
                 lic_props.append({"name": "bomlens:license:customScan", "value": "no-known-restriction"})
             lic_props.append({"name": "bomlens:license:customScan:file", "value": lic_file})
             print(f"[enrich] custom license text scanned: {len(hits)} restrictive pattern(s).", file=sys.stderr)
+
+    # ---- Model card: limitations and description ----------------------------
+    # The generator harvests limitations with a regex over the whole README
+    # (limitation[s]?[:\s]+([^.]+)): whatever follows the word, up to the first
+    # full stop. On a card whose section is "Limitations and Biases" that yields
+    # a heading fragment ("and Biases - **Factual reliability"); on one titled
+    # "Performance and Limitations" it yields the section's opening sentence,
+    # which says what the model does WELL. Both reached the reader as the model's
+    # stated limitations.
+    #
+    # Read the card ourselves and keep only what is structurally unambiguous: the
+    # bullet list under a heading that is about limitations and nothing else. A
+    # heading naming a second subject yields nothing rather than a sentence we
+    # cannot vouch for. An empty field reads as "not documented", which is true;
+    # the old one read as documented and was wrong.
+    card_text = ""
+    try:
+        from huggingface_hub import hf_hub_download
+        _p = hf_hub_download(model_id, "README.md")
+        with open(_p, "r", errors="replace") as fh:
+            card_text = fh.read(CARD_TEXT_CAP)
+    except Exception as e:
+        print(f"[enrich] model card text unavailable: {e}", file=sys.stderr)
+
+    harvested = card_limitations(card_text) if card_text else []
+    for m in models:
+        mc = m.get("modelCard")
+        if not isinstance(mc, dict):
+            continue
+        cons = mc.get("considerations")
+        if not isinstance(cons, dict):
+            continue
+        current = [str(x) for x in (cons.get("technicalLimitations") or [])]
+        if harvested:
+            cons["technicalLimitations"] = harvested
+        elif card_text:
+            # The card was read and holds no limitations section we can trust.
+            cons.pop("technicalLimitations", None)
+        else:
+            # No card to check against: drop only what is visibly not a
+            # statement: a fragment starting mid-sentence, or one carrying the
+            # markdown it was cut out of.
+            kept = [x for x in current if _reads_as_sentence(x)]
+            if kept:
+                cons["technicalLimitations"] = kept
+            else:
+                cons.pop("technicalLimitations", None)
+        if not cons:
+            mc.pop("considerations", None)
+    if harvested:
+        print(f"[enrich] model card: {len(harvested)} limitation(s) from the card's own list.",
+              file=sys.stderr)
+
+    # "No description available" is the generator's placeholder, not a
+    # description. Carried into the SBOM it becomes a sentence the UI renders as
+    # the model's summary and the conformance report counts as a filled field.
+    for m in models:
+        for holder in (m, m.get("modelCard") if isinstance(m.get("modelCard"), dict) else None):
+            if not isinstance(holder, dict):
+                continue
+            if str(holder.get("description") or "").strip().lower() == "no description available":
+                holder.pop("description", None)
 
     # ---- Base-model lineage -------------------------------------------------
     # A fine-tune inherits its base model's terms even when its own tag says

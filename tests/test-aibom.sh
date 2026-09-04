@@ -576,6 +576,91 @@ ENRICH_HF_SECURITY=false HF_TREE_CALLS="$WORK/tree-calls.txt" ENRICH_CDXGEN=fals
 bash "$LIB/assess-ai-risk.sh" "$WORK/scan.json" >/dev/null 2>&1
 [ "$(mprop bomlens:assessment:axes)" = "license,trainingData" ] && pass "the security axis is omitted, not guessed, when unavailable" || fail "axes='$(mprop bomlens:assessment:axes)'"
 
+echo "== model card: limitations come from the card's own list, or not at all =="
+# The generator harvests limitations with a regex over the whole README
+# (limitation[s]?[:\s]+([^.]+)), taking whatever follows the word up to the first
+# full stop. Measured on three real cards that produced: a heading fragment
+# ("and Biases - **Factual reliability"), a sentence about what the model does
+# WELL (from a "Performance and Limitations" section), and a paragraph of usage
+# advice. All three were displayed to the reader as the model's stated
+# limitations. The fixture carries the third.
+mk_card_stub() {  # $1 = card file to serve, or "" for a repo with no card
+    cat > "$WORK/hfstub/huggingface_hub.py" <<STUB
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(siblings=[_S("model.safetensors", "a" * 64)], gated=False, private=False,
+              tags=["fill-mask"], card_data={"license": "apache-2.0"})
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False):
+        return MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+
+
+def hf_hub_download(repo_id, filename):
+    card = "$1"
+    if not card or filename != "README.md":
+        raise RuntimeError("404 not found")
+    return card
+STUB
+}
+lims() { jq -r '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .modelCard.considerations.technicalLimitations // []] | .[0] | join("|")' "$1"; }
+
+mk_card_stub "$FIX/model-card-limitations.md"
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/card.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/card.json" google-bert/bert-base-uncased >/dev/null 2>&1
+got=$(lims "$WORK/card.json")
+case "$got" in
+    "Factual reliability."*"Modality. Text-only"*"Bias."*)
+        pass "a limitations section's bullets replace the harvested fragment" ;;
+    *) fail "limitations from the card list" "$got" ;;
+esac
+case "$got" in
+    *'**'*) fail "markdown emphasis is stripped from a limitation" "$got" ;;
+    *) pass "markdown emphasis is stripped from a limitation" ;;
+esac
+
+# A heading that names a second subject ("Performance and Limitations") opens with
+# prose about the model's strengths, and nothing in the text says where that stops.
+# Nothing is claimed rather than the wrong thing: an empty field reads as "not
+# documented", which is true.
+mk_card_stub "$FIX/model-card-mixed-heading.md"
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/card.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/card.json" google-bert/bert-base-uncased >/dev/null 2>&1
+[ -z "$(lims "$WORK/card.json")" ] \
+    && pass "a mixed-subject heading yields no limitations rather than its opening sentence" \
+    || fail "mixed heading" "$(lims "$WORK/card.json")"
+
+# No card to check against: only what is visibly not a statement is dropped.
+mk_card_stub ""
+cp "$FIX/aibom-owasp-1_7.json" "$WORK/card.json"
+jq '(.components[] | select(.type=="machine-learning-model") | .modelCard.considerations.technicalLimitations) = ["and Biases - **Factual reliability"]' \
+    "$WORK/card.json" > "$WORK/card2.json" && mv "$WORK/card2.json" "$WORK/card.json"
+ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/card.json" google-bert/bert-base-uncased >/dev/null 2>&1
+[ -z "$(lims "$WORK/card.json")" ] \
+    && pass "a fragment cut out of a heading is dropped when no card can be read" \
+    || fail "fragment kept" "$(lims "$WORK/card.json")"
+
+# "No description available" is the generator's placeholder. Carried through it
+# becomes the model's summary on screen and a filled field in the conformance report.
+desc=$(jq -r '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .description // ""] | .[0]' "$WORK/card.json")
+[ -z "$desc" ] && pass "the placeholder description is not carried into the SBOM" || fail "description='$desc'"
+
 echo "== a model that declares no training data is not assessed as fine =="
 # The openness enrichment records an unstated training set as
 # openness:training-data=undisclosed. Before this axis existed, a permissive
