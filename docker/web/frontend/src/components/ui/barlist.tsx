@@ -84,7 +84,7 @@ export function BarList({
               {it.badge}
               <span className="truncate">{it.label}</span>
             </span>
-            <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-muted-foreground">
+            <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-foreground">
               {it.value}
             </span>
           </div>

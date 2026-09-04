@@ -162,9 +162,21 @@ export function Sidebar({
                           // the count at foreground contrast there, like the label.
                           active ? "text-foreground" : "text-muted-foreground",
                         )}
+                        // Every badge sits in the same place in the same type,
+                        // but they are not the same kind of number: components
+                        // is a count, conformance is passed-over-mandatory, and
+                        // dependencies is a direct/transitive split. Say which,
+                        // for the two that are not plain counts.
                         title={
                           section.id === "dependencies"
                             ? t("nav.depSplitTitle")
+                            : section.id === "conformance"
+                              ? t("nav.conformanceSplitTitle")
+                              : undefined
+                        }
+                        aria-label={
+                          section.id === "conformance"
+                            ? t("nav.conformanceSplitTitle")
                             : undefined
                         }
                       >

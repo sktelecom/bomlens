@@ -180,3 +180,69 @@ describe("riskyComponentCount", () => {
     expect(riskyComponentCount(result())).toBe(0);
   });
 });
+
+describe("needsAttention on an AI scan", () => {
+  // An AI scan reaches none of the software conditions: no vulnerability report,
+  // conformance passes, nothing malicious or vendored. The Overview said nothing
+  // at all while the model carried the one verdict the scan exists to produce.
+  it("raises a model the pipeline graded caution or review", () => {
+    const items = needsAttention(
+      result({ sbom: { components: 1, componentList: [], assessCounts: { review: 1 } } }),
+    );
+    expect(items.map((i) => i.id)).toContain("modelRisk");
+    const model = items.find((i) => i.id === "modelRisk")!;
+    expect(model).toMatchObject({ count: 1, tone: "info", target: "models" });
+  });
+
+  it("weighs caution above review", () => {
+    const items = needsAttention(
+      result({
+        sbom: { components: 2, componentList: [], assessCounts: { caution: 1, review: 1 } },
+      }),
+    );
+    expect(items.find((i) => i.id === "modelRisk")).toMatchObject({ count: 2, tone: "high" });
+  });
+
+  it("says nothing when every grade is ok", () => {
+    const items = needsAttention(
+      result({ sbom: { components: 1, componentList: [], assessCounts: { ok: 3 } } }),
+    );
+    expect(items.map((i) => i.id)).not.toContain("modelRisk");
+  });
+
+  it("offers the conformance elements a passing SBOM can still fill", () => {
+    // Distinct from the failed-mandatory item: this SBOM passes and has
+    // documentation gaps a person can close, which is what the advisory
+    // baselines are for.
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "pass",
+          checks: [
+            { id: "a", label: "a", detail: "", required: false, status: "warn", source: "auto" },
+            { id: "b", label: "b", detail: "", required: false, status: "warn", source: "na" },
+            { id: "c", label: "c", detail: "", required: false, status: "pass", source: "auto" },
+          ],
+        },
+      }),
+    );
+    const gap = items.find((i) => i.id === "conformanceGap")!;
+    // Only the one with an automated source: the na row needs a person, not a fix.
+    expect(gap).toMatchObject({ count: 1, tone: "info", target: "conformance" });
+  });
+
+  it("does not repeat the gap when the verdict already failed", () => {
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "fail",
+          checks: [
+            { id: "a", label: "a", detail: "", required: true, status: "fail", source: "auto" },
+          ],
+        },
+      }),
+    );
+    expect(items.map((i) => i.id)).toContain("conformance");
+    expect(items.map((i) => i.id)).not.toContain("conformanceGap");
+  });
+});

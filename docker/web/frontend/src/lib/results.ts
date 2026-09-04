@@ -137,7 +137,11 @@ export function sectionCounts(
     conformance: conformanceCount(result),
     licenses: licenses.size > 0 ? licenses.size : undefined,
     artifacts: result.results.length,
-    models: componentList.filter((c) => c.type === "machine-learning-model")
-      .length,
+    // The section is "Models & datasets" and shows both, so the badge counts
+    // both. Counting only the models left a scan reading "1" beside a screen
+    // holding one model and three datasets.
+    models: componentList.filter(
+      (c) => c.type === "machine-learning-model" || c.type === "data",
+    ).length,
   };
 }

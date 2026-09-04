@@ -144,7 +144,7 @@ function ArtifactCard({
     <div
       className={
         "rounded-lg border bg-card p-4 transition-all duration-fast ease-out-soft hover:bg-accent/40 hover:shadow-md" +
-        (primary ? " border-primary/60 ring-1 ring-primary/30" : "")
+        (primary ? " border-primary/60 ring-1 ring-primary/30 lg:col-span-2" : "")
       }
     >
       <div className="flex items-start gap-3">
@@ -171,12 +171,15 @@ function ArtifactCard({
           <p className="mt-0.5 text-xs text-muted-foreground">
             {t(artifact.descKey)}
           </p>
-          <span className="mt-1 block truncate font-mono text-xs text-muted-foreground/80">
+          <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">
             {baseName(formats)}
           </span>
         </div>
       </div>
 
+      {/* Downloads on one row, the two per-card actions on their own. In a
+          two-column grid the spacer between them pushed View and Copy link onto
+          a ragged second line whenever a card carried three format chips. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {formats.map((fmt) => (
           <DownloadChip
@@ -201,7 +204,9 @@ function ArtifactCard({
         {artifact.spdxExportable && spdxAvailable && (
           <SpdxExportButton scanId={scanId} onExported={onExported} />
         )}
-        <div className="flex-1" />
+      </div>
+
+      <div className="mt-2 flex items-center justify-end gap-1 border-t pt-2">
         {view && (
           <Button variant="ghost" size="sm" onClick={() => onView(view)}>
             <Eye className="h-4 w-4" />
@@ -262,15 +267,22 @@ export function ResultsList({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
+          {/* Count what is on screen. The header said "10 artifacts" over four
+              cards, because it counted files while the cards group a report's
+              formats together; the file count follows, where it explains the
+              chips rather than contradicting the cards. */}
           {t("result.artifactCount", {
-            count: results.length,
+            count: artifacts.length,
             size: formatBytes(totalBytes),
           })}
+          <span className="text-xs">
+            {t("result.artifactFiles", { count: results.length })}
+          </span>
         </div>
         <Button
           asChild
           variant="outline"
-          className="text-brand hover:text-brand"
+          className="text-brand-strong hover:text-brand-strong"
           onClick={() => toast(t("result.downloadStarted"))}
         >
           <a href={downloadAllUrl(scanId)} download>
@@ -280,7 +292,10 @@ export function ResultsList({
         </Button>
       </div>
 
-      <div className="space-y-3">
+      {/* Two columns: the cards are short and were stacked one per row, so four
+          of them filled a screen and left the lower half empty. The headline
+          deliverable keeps the full width. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {artifacts.map((a) => (
           <ArtifactCard
             key={a.key}

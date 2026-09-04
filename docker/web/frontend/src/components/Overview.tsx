@@ -63,6 +63,8 @@ const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
   conformance: FileCheck2,
   vulns: ShieldAlert,
   review: Eye,
+  modelRisk: Cpu,
+  conformanceGap: FileCheck2,
 };
 
 /** Icon per provenance kind, so the input reads at a glance. */
@@ -412,14 +414,15 @@ export function Overview({
             <ul className="flex flex-col gap-1">
               {attention.map((item) => {
                 const Icon = ATTN_ICON[item.id];
-                const label =
-                  item.id === "malicious"
-                    ? t("overview.attnMalicious", { count: item.count })
-                    : item.id === "conformance"
-                      ? t("overview.attnConformance", { count: item.count })
-                      : item.id === "vulns"
-                        ? t("overview.attnVulns", { count: item.count })
-                        : t("overview.attnReview", { count: item.count });
+                const ATTN_KEY: Record<AttentionItem["id"], string> = {
+                  malicious: "overview.attnMalicious",
+                  conformance: "overview.attnConformance",
+                  vulns: "overview.attnVulns",
+                  review: "overview.attnReview",
+                  modelRisk: "overview.attnModelRisk",
+                  conformanceGap: "overview.attnConformanceGap",
+                };
+                const label = t(ATTN_KEY[item.id], { count: item.count });
                 return (
                   <li key={item.id}>
                     <a
@@ -532,8 +535,11 @@ function JumpCards({
   scanId: string | null;
 }) {
   const { t } = useTranslation();
+  // Models AND datasets: the tile carries the section's name, and counting only
+  // the models left it reading "1" next to a rail badge of 4 for the same
+  // screen. Kept in step with sectionCounts.
   const modelCount = (result.sbom?.componentList ?? []).filter(
-    (c) => c.type === "machine-learning-model",
+    (c) => c.type === "machine-learning-model" || c.type === "data",
   ).length;
   const direct = result.sbom?.directCount ?? 0;
   const transitive = result.sbom?.transitiveCount ?? 0;
@@ -575,15 +581,23 @@ function JumpCards({
     ...(result.security
       ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
       : []),
-    // Only when the SBOM has a real dependency graph (flat firmware/image SBOMs
-    // have no direct/transitive split, so the tile would be a meaningless 0).
-    ...(hasDeps && depTotal > 0
+    // The rail keeps this section whenever the scan produced a dependency view,
+    // so hiding the tile made the two disagree about whether the section exists.
+    // It stays, and says what it has: a count with its split, a count alone when
+    // nothing is transitive (an AI scan's root model is not a dependency of
+    // itself), or that no relationships were recorded.
+    ...(hasDeps
       ? [
           {
             id: "dependencies" as SectionId,
             icon: GitBranch,
             value: depTotal,
-            sub: t("overview.depBreakdown", { direct, transitive }),
+            sub:
+              depTotal === 0
+                ? t("overview.depNone")
+                : transitive === 0
+                  ? undefined
+                  : t("overview.depBreakdown", { direct, transitive }),
           },
         ]
       : []),

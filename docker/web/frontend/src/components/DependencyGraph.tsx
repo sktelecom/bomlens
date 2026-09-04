@@ -140,6 +140,7 @@ export function DependencyGraph({
                 id: n.id,
                 label: n.label,
                 direct: n.direct ? "1" : "0",
+                root: n.root ? "1" : "0",
                 vuln: n.vuln ?? "",
               },
             })),
@@ -167,6 +168,19 @@ export function DependencyGraph({
                 "text-background-shape": "roundrectangle",
                 width: 10,
                 height: 10,
+              },
+            },
+            // The scanned component itself: same accent as a direct dependency
+            // but hollow, so it reads as the thing the arrows start from rather
+            // than as one more package in the list.
+            {
+              selector: 'node[root = "1"]',
+              style: {
+                "background-color": c.bg,
+                "border-width": 3,
+                "border-color": c.direct,
+                width: 16,
+                height: 16,
               },
             },
             {
@@ -362,6 +376,13 @@ export function DependencyGraph({
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-brand bg-card"
+            aria-hidden
+          />
+          {t("deps.legendRoot")}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-hidden />
           {t("deps.direct")}
         </span>
@@ -376,7 +397,7 @@ export function DependencyGraph({
           />
           {t("deps.legendVuln")}
         </span>
-        <span className="text-muted-foreground/80">
+        <span className="text-muted-foreground">
           {t("deps.arrowHint")} {t("deps.interactHint")} {t("deps.keyboardHint")}
         </span>
       </div>

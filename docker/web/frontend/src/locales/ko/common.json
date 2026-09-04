@@ -316,7 +316,8 @@
     "csvCvss": "CVSS",
     "csvEpss": "EPSS",
     "csvKev": "악용 확인",
-    "csvTitle": "제목"
+    "csvTitle": "제목",
+    "artifactFiles": "(파일 {{count}}개)"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -346,7 +347,8 @@
     "zoomIn": "확대",
     "zoomOut": "축소",
     "fit": "화면에 맞추기",
-    "savePng": "PNG로 저장"
+    "savePng": "PNG로 저장",
+    "legendRoot": "스캔한 구성요소"
   },
   "sourceTree": {
     "loading": "소스 트리를 불러오는 중…",
@@ -441,7 +443,8 @@
     "helpDocs": "문서",
     "helpDemo": "온라인 데모",
     "helpVersion": "버전 {{version}}",
-    "helpVersionUnknown": "이 빌드에는 버전이 기록되지 않았습니다"
+    "helpVersionUnknown": "이 빌드에는 버전이 기록되지 않았습니다",
+    "conformanceSplitTitle": "측정한 필수 검사 중 통과한 개수"
   },
   "shell": {
     "newScan": "새 스캔",
@@ -507,7 +510,10 @@
     "topRisk": "위험이 큰 컴포넌트",
     "topRiskOf": "취약점 있는 {{total}}개 중 {{shown}}개",
     "topRiskAll": "전체 컴포넌트",
-    "attnMalicious": "악성 패키지 {{count}}개 — 제거하고 자격 증명을 교체하세요"
+    "attnMalicious": "악성 패키지 {{count}}개 — 제거하고 자격 증명을 교체하세요",
+    "attnModelRisk": "라이선스나 보안 검토가 필요한 모델·데이터셋 {{count}}건",
+    "attnConformanceGap": "채울 수 있는 적합성 항목 {{count}}건",
+    "depNone": "기록된 관계 없음"
   },
   "models": {
     "loading": "모델 정보를 불러오는 중…",

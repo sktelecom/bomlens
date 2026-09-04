@@ -211,3 +211,41 @@ describe("parseSbomGraph", () => {
     expect(g.nodes[0].label).toBe("acme/loose@0.1");
   });
 });
+
+describe("the document's own component", () => {
+  // It keys the dependency graph but is not listed in components[], so it
+  // resolved to nothing and its node fell back to the raw ref: an AI SBOM drew
+  // its root as "pkg:huggingface/skt/A.X-K2@9af2e3d0", long enough to run under
+  // the node beside it. It is also neither direct nor transitive, and the
+  // legend has no colour that means "a dependency of itself".
+  const sbom = {
+    bomFormat: "CycloneDX",
+    specVersion: "1.6",
+    metadata: {
+      component: { "bom-ref": "pkg:huggingface/skt/model@abc", type: "machine-learning-model", name: "model", version: "abc" },
+    },
+    components: [
+      { "bom-ref": "dataset:one", type: "data", name: "org/one", version: "1" },
+    ],
+    dependencies: [
+      { ref: "pkg:huggingface/skt/model@abc", dependsOn: ["dataset:one"] },
+      { ref: "dataset:one", dependsOn: [] },
+    ],
+  };
+
+  it("is labelled by its name, not by its raw ref", () => {
+    const g = parseSbomGraph(sbom);
+    const root = g.nodes.find((n) => n.id === "pkg:huggingface/skt/model@abc")!;
+    expect(root.label).toBe("model@abc");
+  });
+
+  it("is marked as the root and counted as neither direct nor transitive", () => {
+    const g = parseSbomGraph(sbom);
+    const root = g.nodes.find((n) => n.id === "pkg:huggingface/skt/model@abc")!;
+    expect(root.root).toBe(true);
+    expect(root.direct).toBe(false);
+    const dataset = g.nodes.find((n) => n.id === "dataset:one")!;
+    expect(dataset.root).toBe(false);
+    expect(dataset.direct).toBe(true);
+  });
+});

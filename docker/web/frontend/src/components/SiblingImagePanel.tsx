@@ -81,7 +81,7 @@ export function SiblingImagePanel({ imageKey }: { imageKey: PullImageKey }) {
         <span>{t("image.ready")}</span>
         {status.version && (
           <span
-            className="font-mono text-[10px] text-muted-foreground/80"
+            className="font-mono text-[10px] text-muted-foreground"
             title={t("nav.helpVersion", { version: status.version })}
             data-testid="sibling-image-version"
           >

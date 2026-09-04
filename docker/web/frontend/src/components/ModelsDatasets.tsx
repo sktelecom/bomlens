@@ -317,8 +317,11 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
             {m.version ? <span className="text-muted-foreground"> {m.version}</span> : null}
           </span>
           {m.assessment && <GradeBadge grade={m.assessment.overall} />}
+          {/* Outlined, not filled: a licence id is a fact about the model, and
+              in the same grey fill as the verdict beside it the two read as one
+              kind of thing. */}
           {m.licenses.map((l) => (
-            <Badge key={l} variant="muted">
+            <Badge key={l} variant="outline">
               {l}
             </Badge>
           ))}
@@ -338,7 +341,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
           {m.architecture && <Field label={t("models.architecture")}>{m.architecture}</Field>}
           {m.task && <Field label={t("models.task")}>{m.task}</Field>}
           {m.supplier && <Field label={t("models.supplier")}>{m.supplier}</Field>}

@@ -8,11 +8,11 @@
  */
 import type { ComponentItem, DoneEvent } from "./api";
 import { riskRank } from "./components";
-import { baseTally, splitChecks } from "./conformance";
+import { baseTally, kindTally, splitChecks } from "./conformance";
 import type { SectionId } from "./nav";
 
 export interface AttentionItem {
-  id: "malicious" | "conformance" | "vulns" | "review";
+  id: "malicious" | "conformance" | "vulns" | "review" | "modelRisk" | "conformanceGap";
   /** How many findings of this kind. */
   count: number;
   /** Badge tone / severity of the item. */
@@ -63,9 +63,44 @@ export function needsAttention(result: DoneEvent): AttentionItem[] {
     }
   }
 
+  // A model the pipeline graded caution or review. An AI scan reached none of
+  // the conditions above. It has no vulnerability report, its conformance
+  // passes, and its components are neither malicious nor vendored, so the
+  // Overview said nothing at all while the model carried the one verdict the
+  // scan exists to produce.
+  const grades = result.sbom?.assessCounts;
+  if (grades) {
+    const caution = grades.caution ?? 0;
+    const review = grades.review ?? 0;
+    if (caution + review > 0) {
+      items.push({
+        id: "modelRisk",
+        count: caution + review,
+        tone: caution > 0 ? "high" : "info",
+        target: "models",
+      });
+    }
+  }
+
   const vendored = (result.sbom?.componentList ?? []).filter((c) => c.vendored).length;
   if (vendored > 0) {
     items.push({ id: "review", count: vendored, tone: "info", target: "components" });
+  }
+
+  // Conformance elements the scan itself could fill. Distinct from the failed
+  // mandatory check above: this SBOM passes and still has documentation gaps a
+  // person can close, which is the whole point of the advisory baselines. Last,
+  // and informational, because nothing here blocks the SBOM.
+  if (conf && conf.result !== "fail") {
+    const actionable = kindTally(conf.checks ?? []).actionable;
+    if (actionable > 0) {
+      items.push({
+        id: "conformanceGap",
+        count: actionable,
+        tone: "info",
+        target: "conformance",
+      });
+    }
   }
 
   return items;

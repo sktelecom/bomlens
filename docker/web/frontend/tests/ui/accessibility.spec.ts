@@ -131,6 +131,55 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+// Artifacts and Licenses were never scanned. Both carried text under the AA
+// floor: the artifact cards' filename line and the download-all link (brand red
+// as text, 4.4:1 light and 4.19:1 dark), and the count that sits ON a licence
+// distribution bar, read against the fill rather than the page.
+const ARTIFACT_DONE = {
+  ...DONE,
+  results: [
+    { name: "demo_1.0_bom.json", size: 2048 },
+    { name: "demo_1.0_risk-report.html", size: 7100 },
+    { name: "demo_1.0_risk-report.md", size: 1900 },
+    { name: "demo_1.0_NOTICE.txt", size: 1200 },
+  ],
+  sbom: {
+    ...DONE.sbom,
+    componentList: [
+      ...DONE.sbom.componentList,
+      { name: "mpl-thing", version: "1.0", group: "", purl: "pkg:pypi/mpl-thing", type: "library", licenses: ["MPL-2.0"], scope: "direct" },
+      { name: "gpl-thing", version: "1.0", group: "", purl: "pkg:pypi/gpl-thing", type: "library", licenses: ["GPL-3.0-only"], scope: "direct" },
+    ],
+  },
+};
+
+for (const section of ["artifacts", "licenses"] as const) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`the ${section} section clears the contrast floor, ${theme}`, async ({ page }) => {
+      await seedThemeLang(page, theme, "en");
+      await page.route("**/capabilities", (r) =>
+        r.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ firmware: false, scanoss: false, docker: true, spdxExport: false }),
+        }),
+      );
+      await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+      await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+      await page.route("**/scan?id=demo_1.0", (r) =>
+        r.fulfill({ contentType: "application/json", body: JSON.stringify(ARTIFACT_DONE) }),
+      );
+      await page.goto(`/?ui=next#/scan/demo_1.0/${section}`);
+      await page.getByRole("navigation").first().waitFor();
+      await waitForSettled(page.locator("main"));
+
+      const axe = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      expect(axe.violations).toEqual([]);
+    });
+  }
+}
+
 test("the dependency tree carries tree semantics and moves under the arrow keys", async ({ page }) => {
   // The graph view tells keyboard users to switch here, so this view has to be
   // navigable. It used to offer a row of identically-named Expand buttons, no

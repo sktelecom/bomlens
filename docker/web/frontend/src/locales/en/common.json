@@ -316,7 +316,8 @@
     "csvCvss": "CVSS",
     "csvEpss": "EPSS",
     "csvKev": "Known exploited",
-    "csvTitle": "Title"
+    "csvTitle": "Title",
+    "artifactFiles": "({{count}} files)"
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -346,7 +347,8 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Fit to view",
-    "savePng": "Save as PNG"
+    "savePng": "Save as PNG",
+    "legendRoot": "Scanned component"
   },
   "sourceTree": {
     "loading": "Loading source tree…",
@@ -441,7 +443,8 @@
     "helpDocs": "Documentation",
     "helpDemo": "Live demo",
     "helpVersion": "Version {{version}}",
-    "helpVersionUnknown": "Version not stamped in this build"
+    "helpVersionUnknown": "Version not stamped in this build",
+    "conformanceSplitTitle": "Mandatory checks passed, out of the mandatory checks measured"
   },
   "shell": {
     "newScan": "New scan",
@@ -507,7 +510,10 @@
     "topRisk": "Highest risk components",
     "topRiskOf": "{{shown}} of {{total}} with vulnerabilities",
     "topRiskAll": "All components",
-    "attnMalicious": "{{count}} known-malicious package(s) — remove and rotate credentials"
+    "attnMalicious": "{{count}} known-malicious package(s) — remove and rotate credentials",
+    "attnModelRisk": "{{count}} model or dataset needs a licence or security review",
+    "attnConformanceGap": "{{count}} conformance element(s) can be filled in",
+    "depNone": "no relationships recorded"
   },
   "models": {
     "loading": "Loading model details…",

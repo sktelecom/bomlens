@@ -43,6 +43,10 @@ export interface GraphNode {
   licenses: string[];
   /** true when this node is a direct dependency of the root component. */
   direct: boolean;
+  /** The document's own component: neither direct nor transitive, it is the
+   *  thing that was scanned. Drawn as neither would say it is a dependency of
+   *  itself, and the legend has no colour that means that. */
+  root?: boolean;
   /** worst severity of this package's known vulnerabilities, if any. */
   vuln?: Severity;
 }
@@ -124,6 +128,15 @@ export function parseSbomGraph(sbom: RawSbom, vulnOf?: VulnLookup): SbomGraph {
     if (c["bom-ref"]) byRef.set(c["bom-ref"], c);
     if (c.purl) byRef.set(c.purl, c);
   }
+  // The document's own component keys the dependency graph but does not appear
+  // in components[]. Unresolved, its node fell back to the raw ref: an AI SBOM
+  // drew its root as "pkg:huggingface/skt/A.X-K2@9af2e3d0", a label long enough
+  // to run under the node beside it.
+  const rootComp = sbom.metadata?.component;
+  if (rootComp && typeof rootComp === "object") {
+    const rootRef = rootComp["bom-ref"] || rootComp.purl;
+    if (rootRef && !byRef.has(rootRef)) byRef.set(rootRef, rootComp);
+  }
 
   const meta = (ref: string) => {
     const c = byRef.get(ref);
@@ -186,6 +199,7 @@ export function parseSbomGraph(sbom: RawSbom, vulnOf?: VulnLookup): SbomGraph {
       type: m.type,
       licenses: m.licenses,
       direct: directRefs.has(id),
+      root: metaRef ? id === metaRef : false,
       vuln: m.vuln,
     };
   });

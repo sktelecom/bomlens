@@ -151,6 +151,9 @@ export interface SbomSummary {
   /** Components that are known-malicious packages. Absent when none — the tile
    *  appears only when there is something to act on. */
   maliciousCount?: number;
+  /** How many model/dataset components the pipeline stamped with each risk grade
+   *  (assess-ai-risk.sh). Present on AI scans only. */
+  assessCounts?: Partial<Record<"ok" | "conditional" | "caution" | "review", number>>;
   /** The outbound license the project declares on its root component. Absent
    *  when none was declared, which is what turns the conflict check off. */
   outboundLicense?: string;
