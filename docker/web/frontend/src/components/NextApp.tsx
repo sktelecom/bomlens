@@ -189,7 +189,10 @@ export function NextApp() {
         if (parseHash(window.location.hash).kind !== "scan") return; // navigated away
         if (!done) {
           // Artifacts missing (e.g. a live-only scan that was never stored, or a
-          // deleted one) — fall back to the New scan screen.
+          // deleted one). Falling back to the scan list is right, but doing it
+          // silently left whoever followed a stale link staring at a list with
+          // no idea why: say which scan could not be opened.
+          toast(t("recent.scanNotFound", { id }));
           window.location.hash = homeHash();
           return;
         }

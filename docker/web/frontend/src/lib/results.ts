@@ -119,8 +119,21 @@ export function sectionCounts(
   for (const c of componentList) for (const l of c.licenses) licenses.add(l);
   return {
     components: result.sbom?.components ?? 0,
-    dependencies: direct + transitive > 0 ? `${direct}/${transitive}` : undefined,
-    vulnerabilities: result.security?.TOTAL ?? 0,
+    // The split is what makes this badge worth more than the component count,
+    // but only while there is something on both sides of it. An AI scan's root
+    // model is not a dependency of itself, so every AI scan has a transitive
+    // count of zero and "3/0" printed a zero that carried no information.
+    dependencies:
+      direct + transitive === 0
+        ? undefined
+        : transitive === 0
+          ? `${direct}`
+          : `${direct}/${transitive}`,
+    // No security report means the scan never asked, which is not the same as
+    // asking and finding nothing. Writing 0 claimed the second. The section
+    // itself says so ("no report was generated"); the badge must not contradict
+    // it before the reader gets there. Same rule the dependency badge uses.
+    vulnerabilities: result.security ? result.security.TOTAL : undefined,
     conformance: conformanceCount(result),
     licenses: licenses.size > 0 ? licenses.size : undefined,
     artifacts: result.results.length,

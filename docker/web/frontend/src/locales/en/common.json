@@ -189,6 +189,10 @@
         "title": "Conformance report",
         "desc": "Format validation of the submitted SBOM."
       },
+      "aiProfile": {
+        "title": "AI compliance profile",
+        "desc": "The G7 minimum elements, licenses needing review and regulatory crosswalk, gathered for this model."
+      },
       "security": {
         "title": "Security report",
         "desc": "Known vulnerabilities (CVE) found in the components."
@@ -978,6 +982,7 @@
     "sevDown": "Better than the previous scan",
     "delete": "Delete",
     "deleted": "Scan deleted",
+    "scanNotFound": "Scan “{{id}}” was not found. It may have been deleted.",
     "confirmDeleteTitle": "Delete this scan?",
     "confirmDeleteBody": "The output files for {{scan}} are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",
     "typeAi": "AI model",

@@ -15,6 +15,7 @@
  */
 import {
   BadgeCheck,
+  Cpu,
   FileJson,
   FileSignature,
   FileText,
@@ -95,10 +96,21 @@ const GROUPS: GroupSpec[] = [
     match: (n) => n.includes("_conformance"),
   },
   {
+    // The AI compliance profile (generate-ai-profile.sh re-aggregates the
+    // conformance + SBOM artifacts). It matched no group, so on an AI scan the
+    // header counted ten files while the cards offered eight: the profile was
+    // reachable only inside the download-all ZIP.
+    key: "aiProfile",
+    Icon: Cpu,
+    primary: false,
+    rank: 4,
+    match: (n) => n.includes("_ai-profile"),
+  },
+  {
     key: "security",
     Icon: ShieldCheck,
     primary: false,
-    rank: 4,
+    rank: 5,
     // _security_epss.json is the raw EPSS feed the pipeline enriches with —
     // an internal intermediate, not a report format; listing it produced two
     // identical "JSON" chips on the card. Still in the download-all ZIP.
@@ -108,7 +120,7 @@ const GROUPS: GroupSpec[] = [
     key: "license",
     Icon: FileText,
     primary: false,
-    rank: 5,
+    rank: 6,
     match: (n) => n.includes("_scancode"),
   },
 ];
@@ -173,7 +185,7 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
       descKey: "result.kind.signature.desc",
       Icon: FileSignature,
       primary: false,
-      rank: 6,
+      rank: 7,
       formats: [toFormat(sig)],
     });
   }

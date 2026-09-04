@@ -127,9 +127,25 @@ describe("sectionCounts", () => {
     expect(counts.vulnerabilities).toBe(7);
   });
 
-  it("defaults missing data to zero", () => {
+  it("defaults a missing component count to zero", () => {
     const counts = sectionCounts(makeResult({ sbom: null, security: null }));
     expect(counts.components).toBe(0);
+  });
+
+  it("omits the vulnerability badge when no security report was generated", () => {
+    // A scan that never ran a vulnerability check is not a scan that found
+    // nothing. Writing 0 claimed the second and contradicted the section, which
+    // says the report was not generated.
+    const counts = sectionCounts(makeResult({ security: null }));
+    expect(counts.vulnerabilities).toBeUndefined();
+  });
+
+  it("keeps a zero when the scan did look and found nothing", () => {
+    const counts = sectionCounts(
+      makeResult({
+        security: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 0 },
+      }),
+    );
     expect(counts.vulnerabilities).toBe(0);
   });
 
@@ -150,6 +166,16 @@ describe("sectionCounts", () => {
     );
     expect(counts.dependencies).toBe("1/2"); // direct / transitive
     expect(counts.licenses).toBe(2); // MIT, Apache-2.0
+  });
+
+  it("drops the split when nothing is transitive", () => {
+    // An AI scan's root model is not a dependency of itself, so every AI scan
+    // has a transitive count of zero; "3/0" printed a zero carrying no
+    // information.
+    const counts = sectionCounts(
+      makeResult({ sbom: { components: 4, directCount: 3, transitiveCount: 0 } }),
+    );
+    expect(counts.dependencies).toBe("3");
   });
 
   it("omits dependency/license badges when there's nothing to show", () => {

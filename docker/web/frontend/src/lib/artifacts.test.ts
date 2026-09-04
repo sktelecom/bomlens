@@ -40,6 +40,21 @@ describe("groupArtifacts", () => {
     ]);
   });
 
+  it("gives the AI compliance profile a card of its own", () => {
+    // It matched no group, so an AI scan's header counted ten files while the
+    // cards offered eight: the profile was reachable only inside the ZIP.
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`),
+      file(`${PREFIX}_ai-profile.json`),
+      file(`${PREFIX}_ai-profile.md`),
+      file(`${PREFIX}_conformance.json`),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom", "conformance", "aiProfile"]);
+    const profile = groups.find((g) => g.key === "aiProfile")!;
+    expect(profile.formats.map((f) => f.ext)).toEqual(["md", "json"]);
+    expect(profile.formats.every((f) => f.viewable)).toBe(true);
+  });
+
   it("flags the risk report as the single primary deliverable", () => {
     const groups = groupArtifacts(RESULTS);
     expect(groups.filter((g) => g.primary).map((g) => g.key)).toEqual(["riskReport"]);
