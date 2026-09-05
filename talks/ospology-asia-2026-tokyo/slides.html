@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BomLens — OSPOlogy Asia 2026 (Tokyo)</title>
+<!--
+  Self-contained offline deck. No external requests: fonts are a system stack,
+  images are inlined as data URIs, all CSS/JS is here. Opens with a double-click
+  (file://). Single light theme on purpose — a projected deck is shown as
+  authored, not adapted to a viewer's OS theme.
+  Keys:  ← / → / Space  move   ·   f  fullscreen
+         b  backup screenshot (on live slides)      ·   o  overview grid
+-->
+<style>
+  :root{
+    /* SK brand gradient is the one bold accent, used sparingly. */
+    --sk-red:#EA002C; --sk-orange:#F47725;
+    --grad:linear-gradient(120deg,var(--sk-red),var(--sk-orange));
+    /* Warm, red-leaning neutrals — chosen, not defaulted grey. */
+    --ink:#1b1614; --ink-2:#5c534e; --ink-3:#8a807a;
+    --paper:#fbfaf9; --paper-2:#f3efec; --line:#e6ded9;
+    --card:#ffffff;
+    --live:#EA002C;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",
+           Arial,"Noto Sans","Noto Sans JP",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  /* Stage: a fixed 16:9 canvas scaled to fit any projector. */
+  #stage{position:fixed;inset:0;overflow:hidden;background:var(--paper)}
+  /* Margin-centered absolute box: the 1280x720 deck stays centered even when the
+     viewport is narrower than it (mobile), where grid/flex centering of an
+     oversized item can drift to one side. scale() keeps its origin at center. */
+  #deck{
+    position:absolute;left:50%;top:50%;margin:-360px 0 0 -640px;
+    width:1280px;height:720px;overflow:hidden;
+    background:var(--paper);
+    box-shadow:0 24px 80px -30px rgba(27,22,20,.35);
+  }
+  .slide{position:absolute;inset:0;opacity:0;visibility:hidden;
+    transition:opacity .28s ease}
+  .slide.active{opacity:1;visibility:visible}
+  .slide-inner{position:absolute;inset:0;padding:74px 92px 96px;
+    display:flex;flex-direction:column}
+
+  /* Recurring device: a thin SK-gradient rule under the eyebrow. */
+  .eyebrow{display:flex;align-items:center;gap:14px;
+    text-transform:uppercase;letter-spacing:.16em;font-size:15px;
+    font-weight:700;color:var(--ink-3);padding-bottom:14px;margin-bottom:26px;
+    border-bottom:2px solid transparent;
+    border-image:var(--grad) 1}
+  .ey-text{white-space:nowrap}
+  .live-chip{font-family:var(--sans);letter-spacing:.08em;color:#fff;
+    background:var(--live);border-radius:999px;padding:5px 12px;font-size:13px;
+    box-shadow:0 2px 10px -2px rgba(234,0,44,.6)}
+
+  .headline{font-weight:800;letter-spacing:-.02em;line-height:1.02;
+    text-wrap:balance;margin:0 0 8px}
+  h2.headline{font-size:56px}
+  .content{margin-top:22px;max-width:62ch}
+
+  .lede{font-size:30px;line-height:1.28;color:var(--ink);margin:0 0 18px;
+    text-wrap:pretty}
+  .muted{color:var(--ink-2)}
+  .cue{font-family:var(--mono);font-size:18px;color:var(--sk-red);
+    margin-top:26px;letter-spacing:.01em}
+  .cue::before{content:"→ ";opacity:.7}
+
+  /* Slide 2 statement */
+  [data-kind="statement"] .content{max-width:64ch}
+  .big{font-size:34px;line-height:1.25;font-weight:600;margin:0 0 14px;
+    text-wrap:pretty}
+  .turn{font-size:26px;margin-top:30px;font-weight:700;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent}
+
+  /* Points list */
+  ul.points{list-style:none;margin:0;padding:0;display:flex;
+    flex-direction:column;gap:20px}
+  ul.points li{font-size:26px;line-height:1.3;padding-left:30px;position:relative;
+    color:var(--ink-2)}
+  ul.points li b{color:var(--ink);font-weight:700}
+  ul.points li::before{content:"";position:absolute;left:0;top:.55em;
+    width:12px;height:12px;border-radius:3px;background:var(--grad)}
+  .boundary{margin-top:34px;font-size:18px;color:var(--ink-3);
+    letter-spacing:.02em}
+
+  /* Cards — use the full width so the 2×2 grid breathes and never spills into
+     the footer (the narrow reading column would crush it vertically). */
+  [data-kind="cards"] .content{max-width:none}
+  [data-kind="diagram"] .content{max-width:none;margin-top:10px}
+  [data-kind="diagram"] svg{display:block;width:100%;max-width:1080px;height:auto;margin:0 auto}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:32px 36px;box-shadow:0 10px 30px -24px rgba(27,22,20,.5)}
+  .card-h{font-size:24px;font-weight:800;letter-spacing:-.01em;margin-bottom:12px}
+  .card p{margin:0;font-size:20px;line-height:1.45;color:var(--ink-2)}
+  .card b{color:var(--sk-red)}
+  .acro{margin-top:18px;font-size:14px;line-height:1.4;color:var(--ink-3);letter-spacing:.01em;text-wrap:pretty}
+  ul.reg-list.reg-2col{display:grid;grid-template-columns:1fr 1fr;gap:26px 56px}
+
+  /* Benchmark evidence line (demo 3) */
+  .evidence{margin-top:22px;font-size:18px;line-height:1.35;color:var(--ink-3);
+    border-top:1px solid var(--line);padding-top:14px;text-wrap:pretty}
+  .evidence b{color:var(--ink-2);font-weight:700}
+
+  /* Regulation landscape */
+  [data-kind="reg"] .content{max-width:none}
+  .reg-cols{display:grid;grid-template-columns:1.15fr .85fr;gap:34px;
+    align-items:start}
+  .reg-label{font-size:15px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;padding-bottom:10px;margin-bottom:16px;
+    border-bottom:2px solid}
+  .reg-now{color:var(--sk-red);border-color:var(--sk-red)}
+  .reg-next{color:var(--ink-3);border-color:var(--line)}
+  ul.reg-list{list-style:none;margin:0;padding:0;display:flex;
+    flex-direction:column;gap:18px}
+  ul.reg-list li{font-size:21px;line-height:1.25;color:var(--ink-2)}
+  ul.reg-list li b{display:block;color:var(--ink);font-weight:700}
+  .reg-when{display:block;margin-top:5px;font-family:var(--mono);
+    font-size:15px;color:var(--ink-3);letter-spacing:.01em}
+  [data-kind="reg"] .reg-col:last-child ul.reg-list li b{color:var(--ink-2)}
+  .reg-open{margin-top:20px;font-size:16px;color:var(--ink-3);font-style:normal}
+  [data-kind="reg"] .stamp{margin-top:30px;font-size:19px}
+
+  .stamp{margin-top:26px;font-size:20px;color:var(--ink-2);
+    border-left:3px solid;border-image:var(--grad) 1;padding-left:16px;
+    text-wrap:pretty}
+  .stamp b{color:var(--ink)}
+
+  /* Try-it slide */
+  .cmd{font-family:var(--mono);font-size:23px;background:#1b1614;color:#fbfaf9;
+    padding:20px 26px;border-radius:12px;display:inline-block;margin:6px 0 34px;
+    box-shadow:0 14px 34px -20px rgba(27,22,20,.8)}
+  .cmd::before{content:"$ ";color:var(--sk-orange)}
+  .links{display:flex;flex-direction:column;gap:14px;font-size:23px}
+  .links .k{display:inline-block;width:110px;text-transform:uppercase;
+    font-size:14px;letter-spacing:.14em;color:var(--ink-3);font-weight:700}
+  .links .dim{color:var(--ink-3);font-size:18px}
+
+  /* Title + thanks — and the text-led slides — sit optically centred, so the
+     readable column's spare room reads as intentional margin, not a top-left
+     pull. Dense layouts (cards, reg) stay top-aligned. */
+  [data-kind="title"] .slide-inner,
+  [data-kind="thanks"] .slide-inner,
+  [data-kind="statement"] .slide-inner,
+  [data-kind="points"] .slide-inner,
+  [data-kind="live"] .slide-inner,
+  [data-kind="try"] .slide-inner,
+  [data-kind="diagram"] .slide-inner,
+  [data-kind="cards"] .slide-inner,
+  [data-kind="reg"] .slide-inner{justify-content:center}
+  [data-kind="title"] .eyebrow{border-image:none;border-bottom:none;
+    margin-bottom:30px;color:var(--ink-2)}
+  .brandmark{margin-bottom:20px}
+  .brandmark svg{width:88px;height:88px;display:block}
+  h1.headline{font-size:96px;background:var(--grad);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;margin:0}
+  [data-kind="title"] .lede{font-size:28px;max-width:30ch;margin-top:14px}
+  .byline{margin-top:30px;font-size:22px;font-weight:600;color:var(--ink)}
+  .byline .sep{color:var(--sk-orange);margin:0 12px}
+  .meta{margin-top:10px;font-family:var(--mono);font-size:16px;color:var(--ink-3)}
+  [data-kind="thanks"] h2.headline{font-size:74px;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent}
+  .jp{font-size:30px;color:var(--ink-2);margin:6px 0 0}
+  .qa{font-size:22px;color:var(--ink-3);margin:22px 0 0;letter-spacing:.02em}
+
+  /* Backup screenshot overlay (live slides) */
+  .backup{position:absolute;inset:0;background:rgba(27,22,20,.92);
+    display:grid;place-items:center;padding:40px;z-index:5}
+  /* The author rule above beats the UA [hidden] display:none, so restore it
+     with a higher-specificity attribute selector — otherwise the fallback
+     screenshot shows unbidden on every live slide. */
+  .backup[hidden]{display:none}
+  .backup img{max-width:100%;max-height:100%;border-radius:10px;
+    box-shadow:0 20px 60px -20px #000}
+
+  /* Footer: logo mark, running title, slide number + progress */
+  .foot{position:absolute;left:92px;right:92px;bottom:34px;display:flex;
+    align-items:center;justify-content:space-between;
+    font-size:14px;color:var(--ink-3);letter-spacing:.02em}
+  .foot .fmark{display:flex;align-items:center;gap:10px;font-weight:700;
+    color:var(--ink-2)}
+  .foot .fmark svg{height:22px;width:auto}
+  .foot .fnum{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  #progress{position:absolute;left:0;bottom:0;height:4px;width:0;
+    background:var(--grad);transition:width .28s ease}
+
+
+  /* Overview grid */
+  #overview{position:fixed;inset:0;background:var(--paper);z-index:50;
+    display:none;grid-template-columns:repeat(4,1fr);gap:16px;padding:40px;
+    align-content:start;overflow:auto}
+  #overview.open{display:grid}
+  .ov{aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;
+    background:#fff;padding:12px;cursor:pointer;overflow:hidden;position:relative;
+    font-size:11px;color:var(--ink-2);transition:border-color .15s}
+  .ov:hover,.ov:focus{border-color:var(--sk-red);outline:none}
+  .ov .ovn{position:absolute;top:6px;right:8px;font-family:var(--mono);
+    color:var(--ink-3)}
+  .ov .ovh{font-weight:800;color:var(--ink);font-size:14px;margin-top:14px;
+    line-height:1.15}
+
+  .hint{position:fixed;left:16px;bottom:12px;font-size:12px;color:var(--ink-3);
+    font-family:var(--mono);z-index:30;opacity:.6}
+  :focus-visible{outline:3px solid var(--sk-orange);outline-offset:3px}
+</style>
+</head>
+<body>
+<div id="stage"><div id="deck">
+
+    <section class="slide" data-kind="title" data-index="1">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">OSPOlogy Asia 2026 · Tokyo · 27 July 2026</span></div>
+        <div class="brandmark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="BomLens">
+  <defs>
+    <linearGradient id="bomlens-mark-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EA002C"/>
+      <stop offset="1" stop-color="#F47725"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#bomlens-mark-grad)"/>
+  <g transform="translate(12 12)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+    <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+    <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+    <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+    <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+    <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+  </g>
+</svg></div><h1 class="headline">BomLens</h1>
+        <div class="content">
+           <p class="lede">An open-source, one-click SBOM tool for
+           supply-chain security and regulatory compliance.</p>
+           <div class="byline">
+             <span>Haksung Jang</span><span class="sep">/</span>
+             <span>SK&nbsp;Telecom · OSPO Manager</span>
+           </div>
+           <div class="meta">Apache-2.0 · github.com/sktelecom/bomlens</div>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-1"></template>
+
+    <section class="slide" data-kind="statement" data-index="2">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">Why it exists</span></div>
+        <h2 class="headline">A mandate with no tool</h2>
+        <div class="content">
+           <p class="big">SK&nbsp;Telecom now requires its suppliers to submit an
+           SBOM.</p>
+           <p class="big muted">Those suppliers — often with no security team —
+           had no simple way to make one.</p>
+           <p class="turn">BomLens is that tool. Everything else follows from
+           this one fact.</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-2"></template>
+
+    <section class="slide" data-kind="points" data-index="3">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">What it is</span></div>
+        <h2 class="headline">Local-first. One image. Every input.</h2>
+        <div class="content">
+           <ul class="points">
+             <li><b>No account, no server</b> — nothing you scan is uploaded.</li>
+             <li><b>One Docker image → 7 scan modes</b> — source, containers,
+                 binaries, firmware, received SBOMs, AI models.</li>
+             <li><b>Three ways in</b> — a double-click desktop app, a browser
+                 UI, the CLI.</li>
+             <li><b>Bilingual</b> — full docs in English and Korean.</li>
+           </ul>
+           <p class="boundary">Not a governance portal · not SaaS · not a
+           compliance verdict.</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-3"></template>
+
+    <section class="slide" data-kind="cards" data-index="4">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">What's different</span></div>
+        <h2 class="headline">Coverage, not just a scan</h2>
+        <div class="content">
+           <div class="cards">
+             <div class="card">
+               <div class="card-h">One image, many ecosystems</div>
+               <p>Where cdxgen's official image finds <b>0</b> Ruby and <b>5</b>
+               Rust components, ours finds <b>9</b> and <b>180</b>. Real builds,
+               not manifest parsing — exact transitive versions, lockfile or
+               not.</p>
+             </div>
+             <div class="card">
+               <div class="card-h">Generation, then risk</div>
+               <p>Notice, security report, risk report and conformance — all in
+               one run.</p>
+             </div>
+           </div>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-4"></template>
+
+    <section class="slide" data-kind="live" data-index="5">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 1 of 6</span></div>
+        <h2 class="headline">One folder → a full SBOM</h2>
+        <div class="content">
+           <p class="lede">A Java/Maven project folder, in the desktop app. No
+           command line. SBOM, open-source notice and security report in a
+           single run.</p>
+           <p class="cue">Open the desktop app · pick the project folder</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-5"></template>
+
+    <section class="slide" data-kind="live" data-index="6">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 2 of 6</span></div>
+        <h2 class="headline">What the scan tells you</h2>
+        <div class="content">
+           <p class="lede">Components. Vulnerabilities with EPSS and CISA&nbsp;KEV.
+           Licenses classified by copyleft strength.</p>
+           <p class="cue">Overview → Components → Dependencies → Vulnerabilities → Licenses</p>
+           <p class="acro">EPSS — Exploit Prediction Scoring System · CISA KEV — the U.S. CISA Known Exploited Vulnerabilities catalog</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-6"></template>
+
+    <section class="slide" data-kind="live" data-index="7">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 3 of 6</span></div>
+        <h2 class="headline">14 lines in, 39 components out</h2>
+        <div class="content">
+           <p class="lede">A public repo pins <b>14</b> direct dependencies —
+           no lockfile, no local checkout. A real install inside the container
+           surfaces <b>39</b> components, transitive versions exact.</p>
+           <p class="cue">same app · paste a Git URL · 39 components</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-7"></template>
+
+    <section class="slide" data-kind="reg" data-index="8">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">Where this lands</span></div>
+        <h2 class="headline">The rules are arriving now</h2>
+        <div class="content">
+           <div class="reg-col">
+             <div class="reg-label reg-now">Checked today</div>
+             <ul class="reg-list reg-2col">
+               <li><b>SBOM minimum elements</b>
+                 <span class="reg-when">EU CRA (BSI TR-03183-2) &amp; US NTIA fields · PURL &amp; dependency coverage · live in demo 4</span></li>
+               <li><b>G7 minimum elements for AI</b>
+                 <span class="reg-when">51 checks · 41 automated, 10 for human review</span></li>
+               <li><b>EU AI Act</b> — Annex IV crosswalk
+                 <span class="reg-when">obligations from 2 Aug 2026 · 23 elements mapped</span></li>
+               <li><b>Korea AI Framework Act</b> — Articles 31–35
+                 <span class="reg-when">in force since 22 Jan 2026</span></li>
+             </ul>
+           </div>
+           <p class="stamp">A regulation lands on a customer; the customer passes
+           it to its suppliers as "send us an SBOM." <b>So the next two demos
+           check an SBOM against exactly these rules — it makes gaps visible, it
+           does not certify compliance.</b></p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-8"></template>
+
+    <section class="slide" data-kind="live" data-index="9">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 4 of 6</span></div>
+        <h2 class="headline">Validate what a supplier sent</h2>
+        <div class="content">
+           <p class="lede">Two SBOMs a supplier might send. One in <b>SPDX</b>
+           fails the minimum elements — no version, PURLs on 25%, no dependency
+           graph. One in <b>CycloneDX</b> passes — yet carries <b>6 critical</b>
+           known-exploitable vulnerabilities. Completeness isn't safety.</p>
+           <p class="cue">Upload SPDX → the gaps · upload CycloneDX → the CVEs</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-9"></template>
+
+    <section class="slide" data-kind="live" data-index="10">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 5 of 6</span></div>
+        <h2 class="headline">Can you use this AI model?</h2>
+        <div class="content">
+           <p class="lede">Two HuggingFace models, from an AI team's seat. One is
+           clean. The other — <b>CC-BY-NC</b>, pickle-format — BomLens flags
+           <b>caution</b> before you build on it. Each becomes a CycloneDX ML-BOM
+           checked against the <b>G7 minimum elements</b> and the
+           <b>EU&nbsp;AI&nbsp;Act</b>.</p>
+           <p class="stamp">EU AI Act obligations start <b>2&nbsp;August&nbsp;2026</b>.
+           A preparation aid — not a compliance certificate.</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-10"></template>
+
+    <section class="slide" data-kind="diagram" data-index="11">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">How it fits</span></div>
+        <h2 class="headline">Generate locally, govern centrally</h2>
+        <div class="content">
+           <svg viewBox="0 0 1000 372" width="100%" role="img"
+                aria-label="BomLens generates a standard CycloneDX SBOM locally; TRUSCA ingests it for org-wide governance">
+             <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4"
+               orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#EA002C"/></marker></defs>
+             <rect x="6" y="66" width="392" height="230" rx="18" fill="#fff" stroke="#e6ded9" stroke-width="1.5"/>
+             <text x="32" y="108" font-size="27" font-weight="800" fill="#1b1614">BomLens</text>
+             <text x="32" y="136" font-size="15" fill="#8a807a">On your machine · local-first</text>
+             <text x="32" y="182" font-size="16" fill="#5c534e">Source · container image · firmware ·</text>
+             <text x="32" y="206" font-size="16" fill="#5c534e">received SBOM · AI model</text>
+             <text x="32" y="244" font-size="16" font-weight="700" fill="#1b1614">→ generate SBOM + assess risk</text>
+             <text x="32" y="276" font-size="15" fill="#8a807a">No account · no server</text>
+             <line x1="398" y1="182" x2="602" y2="182" stroke="#EA002C" stroke-width="3" marker-end="url(#ah)"/>
+             <text x="500" y="162" font-size="15" fill="#EA002C" text-anchor="middle" font-family="ui-monospace,monospace">standard CycloneDX</text>
+             <rect x="602" y="66" width="392" height="230" rx="18" fill="#fff" stroke="#e6ded9" stroke-width="1.5"/>
+             <text x="628" y="108" font-size="27" font-weight="800" fill="#1b1614">TRUSCA</text>
+             <text x="628" y="136" font-size="15" fill="#8a807a">Governance portal · a separate project</text>
+             <text x="628" y="182" font-size="16" fill="#5c534e">Ingests SBOMs across suppliers</text>
+             <text x="628" y="220" font-size="16" font-weight="700" fill="#1b1614">Components · Vulnerabilities · Compliance</text>
+             <text x="628" y="252" font-size="15" fill="#8a807a">Org-wide policy &amp; history</text>
+             <text x="202" y="340" font-size="15" fill="#5c534e" text-anchor="middle">generate &amp; assess — local</text>
+             <text x="798" y="340" font-size="15" fill="#5c534e" text-anchor="middle">govern — org-wide</text>
+           </svg>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-11"></template>
+
+    <section class="slide" data-kind="live" data-index="12">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="live-chip">▶ LIVE</span><span class="ey-text">Live demo · 6 of 6</span></div>
+        <h2 class="headline">Close the loop: hand it to governance</h2>
+        <div class="content">
+           <p class="lede">Local-first is deliberate — but one laptop can't
+           govern a whole supply chain. BomLens emits standard CycloneDX, so the
+           SBOM flows into any portal that reads it — here, TRUSCA by
+           TrustedOSS.</p>
+           <p class="cue">Upload the demo-1 SBOM to TRUSCA · read it back</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-12"></template>
+
+    <section class="slide" data-kind="statement" data-index="13">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">Full circle</span></div>
+        <h2 class="headline">The mandate, now with a tool</h2>
+        <div class="content">
+           <p class="lede">A regulation lands on a customer. The customer turns it
+           into "send us an SBOM." That request reaches a supplier with no
+           tooling — which is exactly where we started.</p>
+           <p class="lede muted">The difference now is the tool. Your source never
+           leaves the laptop; the standard SBOM is the one thing built to travel
+           onward.</p>
+           <p class="boundary">It makes gaps visible — it does not certify compliance.</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-13"></template>
+
+    <section class="slide" data-kind="try" data-index="14">
+      <div class="slide-inner">
+        <div class="eyebrow"><span class="ey-text">Try it</span></div>
+        <h2 class="headline">Your first SBOM, no command line</h2>
+        <div class="content">
+           <p class="lede">Download the desktop app, double-click, and scan — it
+           checks Docker, pulls the image, and opens the UI. No console.</p>
+           <div class="links">
+             <div><span class="k">Download</span> github.com/sktelecom/bomlens/releases
+               <span class="dim">· Windows .exe · double-click</span></div>
+             <div><span class="k">Repo</span> github.com/sktelecom/bomlens</div>
+             <div><span class="k">Docs</span> sktelecom.github.io/bomlens
+               <span class="dim">· English &amp; 한국어</span></div>
+             <div><span class="k">License</span> Apache-2.0</div>
+           </div>
+           <p class="acro">Prefer the command line? docker pull ghcr.io/sktelecom/bomlens:latest</p>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-14"></template>
+
+    <section class="slide" data-kind="thanks" data-index="15">
+      <div class="slide-inner">
+        
+        <h2 class="headline">Thank you</h2>
+        <div class="content">
+           <p class="jp">ありがとうございます</p>
+           <p class="qa">Questions?</p>
+           <div class="byline">
+             <span>Haksung Jang</span><span class="sep">/</span>
+             <span>SK&nbsp;Telecom · OSPO Manager</span>
+           </div>
+           <div class="meta">github.com/sktelecom/bomlens</div>
+         </div>
+        
+      </div>
+    </section>
+    <template id="note-15"></template>
+  <div class="foot">
+    <span class="fmark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="BomLens">
+  <defs>
+    <linearGradient id="bomlens-mark-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EA002C"/>
+      <stop offset="1" stop-color="#F47725"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#bomlens-mark-grad)"/>
+  <g transform="translate(12 12)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+    <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+    <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+    <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+    <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+    <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+  </g>
+</svg> <span>BomLens · SBOM for supply-chain security</span></span>
+    <span class="fnum"><span id="cur">1</span> / 15</span>
+  </div>
+  <div id="progress"></div>
+</div></div>
+
+
+<div id="overview" aria-label="Slide overview"></div>
+<div class="hint">← → move · f full · o overview</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var total=slides.length, i=0;
+  var cur=document.getElementById('cur'), prog=document.getElementById('progress');
+  var overview=document.getElementById('overview');
+
+  function headFor(idx){
+    var h=slides[idx].querySelector('.headline');
+    return h?h.textContent:('Slide '+(idx+1));
+  }
+  function show(n){
+    i=Math.max(0,Math.min(total-1,n));
+    slides.forEach(function(s,x){s.classList.toggle('active',x===i);});
+    cur.textContent=i+1;
+    prog.style.width=((i)/(total-1)*100)+'%';
+    // hide any open backup when leaving a slide
+    slides.forEach(function(s){var b=s.querySelector('.backup');
+      if(b){b.hidden=true;b.setAttribute('aria-hidden','true');}});
+  }
+  function toggleBackup(){
+    var b=slides[i].querySelector('.backup'); if(!b) return;
+    var open=b.hidden; b.hidden=!open;
+    b.setAttribute('aria-hidden', open?'false':'true');
+  }
+  function fs(){
+    var el=document.documentElement;
+    if(!document.fullscreenElement){ if(el.requestFullscreen){ el.requestFullscreen(); } }
+    else if(document.exitFullscreen){ document.exitFullscreen(); }
+  }
+  function buildOverview(){
+    overview.innerHTML='';
+    slides.forEach(function(s,x){
+      var d=document.createElement('button'); d.className='ov';
+      d.innerHTML='<span class="ovn">'+(x+1)+'</span><div class="ovh">'+headFor(x)+'</div>';
+      d.addEventListener('click',function(){overview.classList.remove('open');show(x);});
+      overview.appendChild(d);
+    });
+  }
+  function toggleOverview(){
+    if(!overview.dataset.built){buildOverview();overview.dataset.built='1';}
+    overview.classList.toggle('open');
+  }
+
+  document.addEventListener('keydown',function(e){
+    if(e.metaKey||e.ctrlKey||e.altKey) return;
+    switch(e.key){
+      case 'ArrowRight': case ' ': case 'PageDown': e.preventDefault(); show(i+1); break;
+      case 'ArrowLeft': case 'PageUp': e.preventDefault(); show(i-1); break;
+      case 'Home': show(0); break;
+      case 'End': show(total-1); break;
+      case 'f': case 'F': fs(); break;
+      case 'b': case 'B': toggleBackup(); break;
+      case 'o': case 'O': toggleOverview(); break;
+      case 'Escape': overview.classList.remove('open'); break;
+    }
+  });
+  // Click / tap to advance.
+  document.getElementById('deck').addEventListener('click',function(e){
+    if(e.clientX < window.innerWidth*0.25) show(i-1); else show(i+1);
+  });
+
+  // Scale the fixed 1280x720 canvas to the viewport. Robust on mobile: prefer
+  // the visual viewport, re-fit on orientation change and after load, and guard
+  // against a zero/NaN scale when the viewport isn't settled yet at first paint.
+  function fit(){
+    var vv=window.visualViewport;
+    var w=vv?vv.width:(document.documentElement.clientWidth||window.innerWidth);
+    var h=vv?vv.height:(document.documentElement.clientHeight||window.innerHeight);
+    var k=Math.min(w/1280, h/720);
+    if(!(k>0)) k=(w/1280)||1;
+    var deck=document.getElementById('deck');
+    deck.style.transform='scale('+k+')';
+    deck.style.transformOrigin='center center';
+  }
+  window.addEventListener('resize',fit);
+  window.addEventListener('orientationchange',function(){setTimeout(fit,200);});
+  window.addEventListener('load',fit);
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',fit);}
+  fit(); show(0);
+  setTimeout(fit,300);
+})();
+</script>
+</body>
+</html>

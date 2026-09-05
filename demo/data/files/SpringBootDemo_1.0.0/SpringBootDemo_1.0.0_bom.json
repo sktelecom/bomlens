@@ -1,0 +1,6750 @@
+{
+  "annotations": [
+    {
+      "annotator": {
+        "component": {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "type": "application",
+          "version": "12.8.3"
+        }
+      },
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
+      ],
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Saturday, September 5, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-09-05T03:24:07Z"
+    }
+  ],
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:maven/ch.qos.logback/logback-classic@1.4.11?type=jar",
+      "description": "logback-classic module",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/logback"
+        }
+      ],
+      "group": "ch.qos.logback",
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-1.0"
+          }
+        },
+        {
+          "license": {
+            "id": "LGPL-2.1-only",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/LGPL-2.1-only"
+          }
+        }
+      ],
+      "name": "logback-classic",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "QOS.ch",
+      "purl": "pkg:maven/ch.qos.logback/logback-classic@1.4.11?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.4.11",
+      "cpe": "cpe:2.3:a:qos:logback:1.4.11:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/ch.qos.logback/logback-core@1.4.11?type=jar",
+      "description": "logback-core module",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/logback"
+        }
+      ],
+      "group": "ch.qos.logback",
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-1.0"
+          }
+        },
+        {
+          "license": {
+            "id": "LGPL-2.1-only",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/LGPL-2.1-only"
+          }
+        }
+      ],
+      "name": "logback-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "QOS.ch",
+      "purl": "pkg:maven/ch.qos.logback/logback-core@1.4.11?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.4.11",
+      "cpe": "cpe:2.3:a:qos:logback:1.4.11:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.16.0?type=jar",
+      "description": "Core annotations used for value types, used by Jackson data binding package.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/FasterXML/jackson-annotations"
+        }
+      ],
+      "group": "com.fasterxml.jackson.core",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "jackson-annotations",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "FasterXML",
+      "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.16.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.16.0",
+      "cpe": "cpe:2.3:a:fasterxml:jackson-annotations:2.16.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.16.0?type=jar",
+      "description": "Core Jackson processing abstractions (aka Streaming API), implementation for JSON",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/FasterXML/jackson-core"
+        }
+      ],
+      "group": "com.fasterxml.jackson.core",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "jackson-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.16.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.16.0",
+      "cpe": "cpe:2.3:a:fasterxml:jackson-core:2.16.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+      "description": "General data-binding functionality for Jackson: works on core streaming API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/FasterXML/jackson-databind"
+        }
+      ],
+      "group": "com.fasterxml.jackson.core",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "jackson-databind",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.16.0",
+      "cpe": "cpe:2.3:a:fasterxml:jackson-databind:2.16.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar",
+      "description": "Add-on module for Jackson (http://jackson.codehaus.org) to support\nJDK 8 data types.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/FasterXML/jackson-modules-java8"
+        }
+      ],
+      "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
+      "name": "jackson-datatype-jdk8",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.15.3",
+      "cpe": "cpe:2.3:a:fasterxml:datatype:2.15.3:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
+      "description": "Add-on module to support JSR-310 (Java 8 Date & Time API) data types.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/FasterXML/jackson-modules-java8"
+        }
+      ],
+      "group": "com.fasterxml.jackson.datatype",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
+      "name": "jackson-datatype-jsr310",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.15.3",
+      "cpe": "cpe:2.3:a:fasterxml:datatype:2.15.3:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar",
+      "description": "Add-on module for Jackson (http://jackson.codehaus.org) to support\nintrospection of method/constructor parameter names, without having to add explicit property name annotation.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/FasterXML/jackson-modules-java8"
+        }
+      ],
+      "group": "com.fasterxml.jackson.module",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+          }
+        }
+      ],
+      "name": "jackson-module-parameter-names",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.15.3",
+      "cpe": "cpe:2.3:a:fasterxml:module:2.15.3:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar",
+      "description": "Library for introspecting types with full generic information\nincluding resolving of field and method types.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/FasterXML/java-classmate"
+        }
+      ],
+      "group": "com.fasterxml",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "classmate",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "fasterxml.com",
+      "purl": "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.5.1",
+      "cpe": "cpe:2.3:a:fasterxml:fasterxml:1.5.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.h2database/h2@2.2.224?type=jar",
+      "description": "H2 Database Engine",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/h2database/h2database"
+        }
+      ],
+      "group": "com.h2database",
+      "licenses": [
+        {
+          "license": {
+            "id": "MPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/MPL-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "EPL-1.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-1.0"
+          }
+        }
+      ],
+      "name": "h2",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.h2database/h2@2.2.224?type=jar",
+      "scope": "required",
+      "tags": [
+        "database"
+      ],
+      "type": "library",
+      "version": "2.2.224",
+      "cpe": "cpe:2.3:a:h2database:h2:2.2.224:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
+      "description": "istack common utility code",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-istack-commons"
+        }
+      ],
+      "group": "com.sun.istack",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "istack-commons-runtime",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "4.1.1",
+      "cpe": "cpe:2.3:a:sun:istack:4.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/com.zaxxer/HikariCP@5.0.1?type=jar",
+      "description": "Ultimate JDBC Connection Pool",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "com.zaxxer",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "HikariCP",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Zaxxer.com",
+      "purl": "pkg:maven/com.zaxxer/HikariCP@5.0.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "jdbc"
+      ],
+      "type": "library",
+      "version": "5.0.1",
+      "cpe": "cpe:2.3:a:zaxxer:zaxxer:5.0.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/io.micrometer/micrometer-commons@1.12.0?type=jar",
+      "description": "Module containing common code",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "io.micrometer",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "micrometer-commons",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/io.micrometer/micrometer-commons@1.12.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.12.0",
+      "cpe": "cpe:2.3:a:micrometer:micrometer:1.12.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/io.micrometer/micrometer-observation@1.12.0?type=jar",
+      "description": "Module containing Observation related code",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "io.micrometer",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "micrometer-observation",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/io.micrometer/micrometer-observation@1.12.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.12.0",
+      "cpe": "cpe:2.3:a:micrometer:micrometer:1.12.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/smallrye/jandex/"
+        }
+      ],
+      "group": "io.smallrye",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/smallrye/jandex/blob/main/LICENSE.txt"
+          }
+        }
+      ],
+      "name": "jandex",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.1.2",
+      "cpe": "cpe:2.3:a:smallrye:smallrye:3.1.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.2?type=jar",
+      "description": "${project.name} ${spec.version} Specification",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/jakartaee/jaf-api"
+        }
+      ],
+      "group": "jakarta.activation",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "jakarta.activation-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Eclipse Foundation",
+      "purl": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.2?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.1.2",
+      "cpe": "cpe:2.3:a:activation:activation:2.1.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
+      "description": "Jakarta Annotations API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/common-annotations-api"
+        }
+      ],
+      "group": "jakarta.annotation",
+      "licenses": [
+        {
+          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
+        }
+      ],
+      "name": "jakarta.annotation-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "The dependency's license was not recognised."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Eclipse Foundation",
+      "purl": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.1.1",
+      "cpe": "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
+      "description": "Jakarta Dependency Injection",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/injection-api"
+        }
+      ],
+      "group": "jakarta.inject",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "jakarta.inject-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Eclipse Foundation",
+      "purl": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.0.1",
+      "cpe": "cpe:2.3:a:inject:inject:2.0.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
+      "description": "Eclipse Enterprise for Java (EE4J) is an open source initiative to create standard APIs,\nimplementations of those APIs, and technology compatibility kits for Java runtimes\nthat enable development, deployment, and management of server-side and cloud-native applications.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jpa-api.git"
+        }
+      ],
+      "group": "jakarta.persistence",
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "jakarta.persistence-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited, Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Eclipse Foundation",
+      "purl": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "3.1.0",
+      "cpe": "cpe:2.3:a:persistence:persistence:3.1.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
+      "description": "Jakarta Transactions",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jta-api"
+        }
+      ],
+      "group": "jakarta.transaction",
+      "licenses": [
+        {
+          "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
+        }
+      ],
+      "name": "jakarta.transaction-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "The dependency's license was not recognised."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "EE4J Community",
+      "purl": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.0.1",
+      "cpe": "cpe:2.3:a:transaction:transaction:2.0.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.1?type=jar",
+      "description": "Jakarta XML Binding API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-api.git"
+        }
+      ],
+      "group": "jakarta.xml.bind",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "jakarta.xml.bind-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "xml"
+      ],
+      "type": "library",
+      "version": "4.0.1",
+      "cpe": "cpe:2.3:a:xml:bind:4.0.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/net.bytebuddy/byte-buddy@1.14.7?type=jar",
+      "description": "Byte Buddy is a Java library for creating Java classes at run time.\r\nThis artifact is a build of Byte Buddy with all ASM dependencies repackaged into its own name space.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "net.bytebuddy",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "byte-buddy",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/net.bytebuddy/byte-buddy@1.14.7?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.14.7",
+      "cpe": "cpe:2.3:a:bytebuddy:bytebuddy:1.14.7:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.antlr/antlr4-runtime@4.10.1?type=jar",
+      "description": "The ANTLR 4 Runtime",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/antlr/antlr4/tree/master"
+        }
+      ],
+      "group": "org.antlr",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-2-Clause"
+          }
+        }
+      ],
+      "name": "antlr4-runtime",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "ANTLR",
+      "purl": "pkg:maven/org.antlr/antlr4-runtime@4.10.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "4.10.1",
+      "cpe": "cpe:2.3:a:antlr:antlr:4.10.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.commons/commons-lang3@3.14.0?type=jar",
+      "description": "Apache Commons Lang, a package of Java utility classes for the\nclasses that are in java.lang's hierarchy, or are considered to be so\nstandard as to justify existence in java.lang.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://gitbox.apache.org/repos/asf?p=commons-lang.git"
+        }
+      ],
+      "group": "org.apache.commons",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "commons-lang3",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.commons/commons-lang3@3.14.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.14.0",
+      "cpe": "cpe:2.3:a:apache:commons:3.14.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar",
+      "description": "The Apache Log4j API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.apache.logging.log4j",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "log4j-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "2.21.1",
+      "cpe": "cpe:2.3:a:apache:log4j:2.21.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.21.1?type=jar",
+      "description": "The Apache Log4j binding between Log4j 2 API and SLF4J.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.apache.logging.log4j",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "log4j-to-slf4j",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.21.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "api",
+        "framework",
+        "slf4j"
+      ],
+      "type": "framework",
+      "version": "2.21.1",
+      "cpe": "cpe:2.3:a:apache:log4j:2.21.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar",
+      "description": "Core Tomcat implementation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.apache.tomcat.embed",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "tomcat-embed-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "tomcat"
+      ],
+      "type": "framework",
+      "version": "10.1.16",
+      "cpe": "cpe:2.3:a:apache:embed:10.1.16:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.16?type=jar",
+      "description": "Core Tomcat implementation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.apache.tomcat.embed",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "tomcat-embed-el",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.16?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "tomcat"
+      ],
+      "type": "framework",
+      "version": "10.1.16",
+      "cpe": "cpe:2.3:a:apache:embed:10.1.16:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.16?type=jar",
+      "description": "Core Tomcat implementation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.apache.tomcat.embed",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "tomcat-embed-websocket",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.16?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "tomcat"
+      ],
+      "type": "framework",
+      "version": "10.1.16",
+      "cpe": "cpe:2.3:a:apache:embed:10.1.16:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.aspectj/aspectjweaver@1.9.20.1?type=jar",
+      "description": "The AspectJ weaver applies aspects to Java classes. It can be used as a Java agent in order to apply load-time\nweaving (LTW) during class-loading and also contains the AspectJ runtime classes.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse/org.aspectj"
+        }
+      ],
+      "group": "org.aspectj",
+      "licenses": [
+        {
+          "license": {
+            "id": "EPL-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Copyleft Limited"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/EPL-2.0"
+          }
+        }
+      ],
+      "name": "aspectjweaver",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Copyleft Limited"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.aspectj/aspectjweaver@1.9.20.1?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "1.9.20.1",
+      "cpe": "cpe:2.3:a:aspectj:aspectj:1.9.20.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar",
+      "description": "${project.name} Implementation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/angus-activation"
+        }
+      ],
+      "group": "org.eclipse.angus",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "angus-activation",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.0.0",
+      "cpe": "cpe:2.3:a:eclipse:angus_mail:2.0.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar",
+      "description": "JAXB Core module. Contains sources required by XJC, JXC and Runtime modules.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-ri.git"
+        }
+      ],
+      "group": "org.glassfish.jaxb",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "jaxb-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Unstated License"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "4.0.2",
+      "cpe": "cpe:2.3:a:glassfish:jaxb:4.0.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar",
+      "description": "JAXB (JSR 222) Reference Implementation",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.glassfish.jaxb",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "jaxb-runtime",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "4.0.2",
+      "cpe": "cpe:2.3:a:glassfish:jaxb:4.0.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar",
+      "description": "TXW is a library that allows you to write XML documents.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.glassfish.jaxb",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "txw2",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar",
+      "scope": "required",
+      "tags": [
+        "xml"
+      ],
+      "type": "library",
+      "version": "4.0.2",
+      "cpe": "cpe:2.3:a:glassfish:jaxb:4.0.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar",
+      "description": "Common reflection code used in support of annotation processing",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "http://github.com/hibernate/hibernate-commons-annotations"
+        }
+      ],
+      "group": "org.hibernate.common",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        }
+      ],
+      "name": "hibernate-commons-annotations",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Hibernate.org",
+      "purl": "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.0.6.Final",
+      "cpe": "cpe:2.3:a:hibernate:common:6.0.6.Final:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.hibernate.orm/hibernate-core@6.3.1.Final?type=jar",
+      "description": "Hibernate's core ORM functionality",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/hibernate/hibernate-orm"
+        }
+      ],
+      "group": "org.hibernate.orm",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        }
+      ],
+      "name": "hibernate-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "Hibernate.org",
+      "purl": "pkg:maven/org.hibernate.orm/hibernate-core@6.3.1.Final?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "orm"
+      ],
+      "type": "framework",
+      "version": "6.3.1.Final",
+      "cpe": "cpe:2.3:a:hibernate:orm:6.3.1.Final:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar",
+      "description": "The JBoss Logging Framework",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/jboss-logging/jboss-logging"
+        }
+      ],
+      "group": "org.jboss.logging",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "jboss-logging",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "JBoss by Red Hat",
+      "purl": "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "logging"
+      ],
+      "type": "framework",
+      "version": "3.5.0.Final",
+      "cpe": "cpe:2.3:a:jboss:logging:3.5.0.Final:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar",
+      "description": "JUL to SLF4J bridge",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "org.slf4j",
+      "name": "jul-to-slf4j",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "The component declares no license."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "QOS.ch",
+      "purl": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "slf4j"
+      ],
+      "type": "framework",
+      "version": "2.0.9",
+      "cpe": "cpe:2.3:a:slf4j:slf4j:2.0.9:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar",
+      "description": "The slf4j API",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/slf4j"
+        }
+      ],
+      "group": "org.slf4j",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "slf4j-api",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "publisher": "QOS.ch",
+      "purl": "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "slf4j"
+      ],
+      "type": "framework",
+      "version": "2.0.2",
+      "cpe": "cpe:2.3:a:slf4j:slf4j:2.0.2:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.2.0?type=jar",
+      "description": "Spring Boot AutoConfigure",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-autoconfigure",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar",
+      "description": "Starter for aspect-oriented programming with Spring AOP and AspectJ",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-aop",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "aop",
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
+      "description": "Starter for using Spring Data JPA with Hibernate",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-data-jpa",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar",
+      "description": "Starter for using JDBC with the HikariCP connection pool",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-jdbc",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "jdbc"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar",
+      "description": "Starter for reading and writing json",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-json",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar",
+      "description": "Starter for logging using Logback. Default logging starter",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-logging",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "logging"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar",
+      "description": "Starter for using Tomcat as the embedded servlet container. Default servlet container starter used by spring-boot-starter-web",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-tomcat",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "tomcat"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+      "description": "Starter for building web, including RESTful, applications using Spring MVC. Uses Tomcat as the default embedded container",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter-web",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "mvc",
+        "tomcat"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
+      "description": "Core starter, including auto-configuration support, logging and YAML",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot-starter",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "logging"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar",
+      "description": "Spring Boot",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-boot"
+        }
+      ],
+      "group": "org.springframework.boot",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-boot",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-boot"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "3.2"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2024-12-31"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "3.2.12"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "VMware, Inc.",
+      "purl": "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_boot:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
+      "description": "Core Spring concepts underpinning every Spring Data module.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-data-commons"
+        }
+      ],
+      "group": "org.springframework.data",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-data-commons",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:3.2.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:3.2.0:*:*:*:*:*:*:*\"]"
+        }
+      ],
+      "publisher": "Pivotal Software, Inc.",
+      "purl": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
+      "description": "Spring Data module for JPA repositories.",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-data-jpa"
+        }
+      ],
+      "group": "org.springframework.data",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://github.com/spring-projects/spring-data-jpa/blob/main/LICENSE.txt"
+          }
+        }
+      ],
+      "name": "spring-data-jpa",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:3.2.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:3.2.0:*:*:*:*:*:*:*\"]"
+        }
+      ],
+      "purl": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "3.2.0",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:3.2.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-aop@6.1.1?type=jar",
+      "description": "Spring AOP",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-aop",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-aop@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-aspects@6.1.1?type=jar",
+      "description": "Spring Aspects",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-aspects",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-aspects@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-beans@6.1.1?type=jar",
+      "description": "Spring Beans",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-beans",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-beans@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-context@6.1.1?type=jar",
+      "description": "Spring Context",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-context",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-context@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar",
+      "description": "Spring Core",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
+      "description": "Spring Expression Language (SpEL)",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-expression",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-jcl@6.1.1?type=jar",
+      "description": "Spring Commons Logging Bridge",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-jcl",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-jcl@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "logging"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-jdbc@6.1.1?type=jar",
+      "description": "Spring JDBC",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-jdbc",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-jdbc@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-orm@6.1.0?type=jar",
+      "description": "Spring Object/Relational Mapping",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-orm",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.0:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-orm@6.1.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.0",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-tx@6.1.0?type=jar",
+      "description": "Spring Transaction",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-tx",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.0:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.0:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-tx@6.1.0?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.0",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.0:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-web@6.1.1?type=jar",
+      "description": "Spring Web",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-web",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-web@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+      "description": "Spring Web MVC",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/spring-projects/spring-framework"
+        }
+      ],
+      "group": "org.springframework",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "spring-webmvc",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        },
+        {
+          "name": "bomlens:cpeAlternates",
+          "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:6.1.1:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:6.1.1:*:*:*:*:*:*:*\"]"
+        },
+        {
+          "name": "bomlens:eol",
+          "value": "true"
+        },
+        {
+          "name": "bomlens:eol:product",
+          "value": "spring-framework"
+        },
+        {
+          "name": "bomlens:eol:cycle",
+          "value": "6.1"
+        },
+        {
+          "name": "bomlens:eol:date",
+          "value": "2025-06-30"
+        },
+        {
+          "name": "bomlens:eol:source",
+          "value": "endoflife.date@2026-09-05"
+        },
+        {
+          "name": "bomlens:currency:latestPatch",
+          "value": "6.1.21"
+        },
+        {
+          "name": "bomlens:currency:outdated",
+          "value": "true"
+        }
+      ],
+      "publisher": "Spring IO",
+      "purl": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
+      "scope": "required",
+      "tags": [
+        "framework",
+        "web"
+      ],
+      "type": "framework",
+      "version": "6.1.1",
+      "cpe": "cpe:2.3:a:vmware:spring_framework:6.1.1:*:*:*:*:*:*:*"
+    },
+    {
+      "bom-ref": "pkg:maven/org.yaml/snakeyaml@2.2?type=jar",
+      "description": "YAML 1.1 parser and emitter for Java",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "pom.xml",
+            "confidence": 0.5,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.5,
+                "technique": "manifest-analysis",
+                "value": "pom.xml"
+              }
+            ]
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://bitbucket.org/snakeyaml/snakeyaml/src"
+        }
+      ],
+      "group": "org.yaml",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "name": "snakeyaml",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "pom.xml"
+        },
+        {
+          "name": "cdx:license:category",
+          "value": "Permissive"
+        },
+        {
+          "name": "bomlens:licenseClass",
+          "value": "permissive"
+        },
+        {
+          "name": "bomlens:licenseConflict",
+          "value": "compatible"
+        },
+        {
+          "name": "bomlens:licenseConflict:why",
+          "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "maven-groupid"
+        }
+      ],
+      "purl": "pkg:maven/org.yaml/snakeyaml@2.2?type=jar",
+      "scope": "required",
+      "type": "library",
+      "version": "2.2",
+      "cpe": "cpe:2.3:a:yaml:yaml:2.2:*:*:*:*:*:*:*"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar",
+        "pkg:maven/com.h2database/h2@2.2.224?type=jar",
+        "pkg:maven/org.apache.commons/commons-lang3@3.14.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar"
+      ],
+      "ref": "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
+        "pkg:maven/org.springframework/spring-web@6.1.1?type=jar",
+        "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar",
+        "pkg:maven/org.yaml/snakeyaml@2.2?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/ch.qos.logback/logback-classic@1.4.11?type=jar",
+        "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.21.1?type=jar",
+        "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/ch.qos.logback/logback-core@1.4.11?type=jar"
+      ],
+      "ref": "pkg:maven/ch.qos.logback/logback-classic@1.4.11?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/ch.qos.logback/logback-core@1.4.11?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.21.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.apache.logging.log4j/log4j-api@2.21.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.yaml/snakeyaml@2.2?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar",
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar",
+        "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.15.3?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.15.3?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.15.3?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.16?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.16?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.16?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.16?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.16?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/io.micrometer/micrometer-observation@1.12.0?type=jar",
+        "pkg:maven/org.springframework/spring-beans@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework/spring-web@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-beans@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/io.micrometer/micrometer-commons@1.12.0?type=jar"
+      ],
+      "ref": "pkg:maven/io.micrometer/micrometer-observation@1.12.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/io.micrometer/micrometer-commons@1.12.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.springframework/spring-aop@6.1.1?type=jar",
+        "pkg:maven/org.springframework/spring-context@6.1.1?type=jar",
+        "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-aop@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-context@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.hibernate.orm/hibernate-core@6.3.1.Final?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar",
+        "pkg:maven/org.springframework/spring-aspects@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.aspectj/aspectjweaver@1.9.20.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.aspectj/aspectjweaver@1.9.20.1?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/com.zaxxer/HikariCP@5.0.1?type=jar",
+        "pkg:maven/org.springframework/spring-jdbc@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.zaxxer/HikariCP@5.0.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-jdbc@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar",
+        "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
+        "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
+        "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
+        "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
+        "pkg:maven/net.bytebuddy/byte-buddy@1.14.7?type=jar",
+        "pkg:maven/org.antlr/antlr4-runtime@4.10.1?type=jar",
+        "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar",
+        "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar",
+        "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar"
+      ],
+      "ref": "pkg:maven/org.hibernate.orm/hibernate-core@6.3.1.Final?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/net.bytebuddy/byte-buddy@1.14.7?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar"
+      ],
+      "ref": "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
+        "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar",
+        "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar"
+      ],
+      "ref": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.antlr/antlr4-runtime@4.10.1?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
+        "pkg:maven/org.springframework/spring-orm@6.1.0?type=jar",
+        "pkg:maven/org.springframework/spring-tx@6.1.0?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework.data/spring-data-jpa@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-orm@6.1.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-tx@6.1.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-aspects@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.h2database/h2@2.2.224?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.apache.commons/commons-lang3@3.14.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.16.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.16.0?type=jar"
+      ],
+      "ref": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.16.0?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.16.0?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.2?type=jar"
+      ],
+      "ref": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.2?type=jar"
+    },
+    {
+      "dependsOn": [
+        "pkg:maven/org.springframework/spring-jcl@6.1.1?type=jar"
+      ],
+      "ref": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.springframework/spring-jcl@6.1.1?type=jar"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar",
+      "group": "com.example",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "SpringBootDemo",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "/app/pom.xml"
+        }
+      ],
+      "type": "application",
+      "version": "1.0.0"
+    },
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "maven"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "ch.qos.logback\\ncom.fasterxml\\ncom.fasterxml.jackson.core\\ncom.fasterxml.jackson.datatype\\ncom.fasterxml.jackson.module\\ncom.h2database\\ncom.jayway.jsonpath\\ncom.sun.istack\\ncom.vaadin.external.google\\ncom.zaxxer\\nio.micrometer\\nio.smallrye\\njakarta.activation\\njakarta.annotation\\njakarta.inject\\njakarta.persistence\\njakarta.transaction\\njakarta.xml.bind\\nnet.bytebuddy\\nnet.minidev\\norg.antlr\\norg.apache.commons\\norg.apache.logging.log4j\\norg.apache.tomcat.embed\\norg.apiguardian\\norg.aspectj\\norg.assertj\\norg.awaitility\\norg.eclipse.angus\\norg.glassfish.jaxb\\norg.hamcrest\\norg.hibernate.common\\norg.hibernate.orm\\norg.jboss.logging\\norg.junit.jupiter\\norg.junit.platform\\norg.mockito\\norg.objenesis\\norg.opentest4j\\norg.ow2.asm\\norg.projectlombok\\norg.skyscreamer\\norg.slf4j\\norg.springframework\\norg.springframework.boot\\norg.springframework.data\\norg.xmlunit\\norg.yaml"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "pom.xml"
+      },
+      {
+        "name": "bomlens:undeclared-fields",
+        "value": "unknown-to-author"
+      }
+    ],
+    "timestamp": "2026-09-05T03:24:07Z",
+    "tools": {
+      "components": [
+        {
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ],
+          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
+          "group": "@cyclonedx",
+          "name": "cdxgen",
+          "publisher": "OWASP Foundation",
+          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "type": "application",
+          "version": "12.8.3"
+        },
+        {
+          "name": "BomLens",
+          "publisher": "SK Telecom",
+          "type": "application",
+          "version": "1.11.7"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:3e542f42-a123-4d92-9a0f-be75773bd9ab",
+  "services": [],
+  "specVersion": "1.6",
+  "version": 1
+}

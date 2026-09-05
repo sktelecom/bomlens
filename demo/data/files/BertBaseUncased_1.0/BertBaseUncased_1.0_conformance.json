@@ -1,0 +1,2860 @@
+{
+  "project": "BertBaseUncased",
+  "format": "CycloneDX",
+  "result": "pass",
+  "generatedAt": "2026-09-05T03:24:42Z",
+  "untraceableComponents": 0,
+  "checks": [
+    {
+      "id": "spec-version",
+      "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)",
+      "required": true,
+      "status": "pass",
+      "detail": "CycloneDX 1.7",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 4",
+          "basis": "an SBOM must be JSON or XML and valid against CycloneDX 1.6+ or SPDX 3.0.1+",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "사양 버전 (CycloneDX 1.3/1.4/1.5/1.6/1.7)",
+      "detail_ko": "CycloneDX 1.7"
+    },
+    {
+      "id": "timestamp",
+      "label": "Timestamp (metadata.timestamp)",
+      "required": true,
+      "status": "pass",
+      "detail": "2026-09-05T03:24:39+00:00",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.1",
+          "basis": "required SBOM-level field: date and time of the SBOM data compilation",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "타임스탬프 (metadata.timestamp)",
+      "detail_ko": "2026-09-05T03:24:39+00:00"
+    },
+    {
+      "id": "tools",
+      "label": "Tool info (metadata.tools)",
+      "required": true,
+      "status": "pass",
+      "detail": "2 tool(s)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.1",
+          "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "도구 정보 (metadata.tools)",
+      "detail_ko": "도구 2개"
+    },
+    {
+      "id": "top-component",
+      "label": "Top-level component name+version",
+      "required": true,
+      "status": "pass",
+      "detail": "bert-base-uncased@86b5e093",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.1",
+          "basis": "the primary component the SBOM describes has to be identifiable",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "최상위 구성요소 이름+버전",
+      "detail_ko": "bert-base-uncased@86b5e093"
+    },
+    {
+      "id": "name-version",
+      "label": "Component name+version coverage (100%)",
+      "required": true,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component fields: component name and component version",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "구성요소 이름+버전 포함률 (100%)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "purl",
+      "label": "PURL coverage (>= 90%)",
+      "required": true,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.4",
+          "basis": "additional field: other unique identifiers such as PURL or CPE, required where they exist",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "PURL 포함률 (90% 이상)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "file-identifier",
+      "label": "File component identifier coverage (hash, >= 80%, recommended)",
+      "required": false,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no file components",
+      "missing": [],
+      "regulations": [],
+      "label_ko": "파일 구성요소 식별자 포함률 (해시, 80% 이상, 권장)",
+      "detail_ko": "파일 구성요소 없음"
+    },
+    {
+      "id": "no-generic",
+      "label": "Traceable PURL (no pkg:generic, advisory)",
+      "required": false,
+      "status": "pass",
+      "detail": "0 untraceable",
+      "missing": [],
+      "regulations": [],
+      "label_ko": "추적 가능한 PURL (pkg:generic 없음, 권고)",
+      "detail_ko": "추적 불가 0개"
+    },
+    {
+      "id": "purl-syntax",
+      "label": "PURL syntax (pkg:type/[namespace/]name)",
+      "required": true,
+      "status": "pass",
+      "detail": "0 malformed",
+      "missing": [],
+      "regulations": [],
+      "label_ko": "PURL 형식 (pkg:type/[namespace/]name)",
+      "detail_ko": "형식 오류 0개"
+    },
+    {
+      "id": "os-purl-namespace",
+      "label": "OS package PURL distribution (pkg:rpm/<distro>/name)",
+      "required": true,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "pass",
+      "detail": "no OS package identifiers",
+      "missing": [],
+      "regulations": [],
+      "label_ko": "OS 패키지 PURL 배포판 (pkg:rpm/<배포판>/이름)",
+      "detail_ko": "OS 패키지 식별자 없음"
+    },
+    {
+      "id": "transitive",
+      "label": "Transitive dependencies (graph edges)",
+      "required": true,
+      "source": "auto",
+      "naKind": "",
+      "status": "pass",
+      "detail": "2 edge(s)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.1; 5.2.2",
+          "basis": "dependencies on other components must be enumerated; the guideline requires recursive resolution within the scope of delivery, which is stricter than the CRA top-level minimum",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "전이 의존성 (의존 그래프)",
+      "detail_ko": "의존 관계 2개"
+    },
+    {
+      "id": "license",
+      "label": "License coverage (>= 80%, recommended)",
+      "required": false,
+      "source": "auto",
+      "naKind": "",
+      "status": "pass",
+      "detail": "100% (2/2)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the distribution licence under which the component may be used",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "라이선스 포함률 (80% 이상, 권장)",
+      "detail_ko": "100% (2/2)"
+    },
+    {
+      "id": "hash",
+      "label": "Hash coverage (>= 50%, recommended)",
+      "required": false,
+      "source": "auto",
+      "naKind": "",
+      "status": "pass",
+      "detail": "50% (1/2)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: a cryptographic checksum of the deployable component",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "해시 포함률 (50% 이상, 권장)",
+      "detail_ko": "50% (1/2)"
+    },
+    {
+      "id": "hash-algorithm",
+      "label": "SHA-512 checksum coverage (>= 80%, recommended)",
+      "required": false,
+      "source": "auto",
+      "naKind": "",
+      "status": "warn",
+      "detail": "0% (0/2)",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "the deployable-component checksum is specified as SHA-512",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "SHA-512 체크섬 포함률 (80% 이상, 권장)",
+      "detail_ko": "0% (0/2)"
+    },
+    {
+      "id": "component-creator",
+      "label": "Component creator coverage (>= 80%, recommended)",
+      "required": false,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the entity that created and maintains the component, as an email address or URL",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "구성요소 작성자 포함률 (80% 이상, 권장)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "component-filename",
+      "label": "Component filename coverage (>= 80%, recommended)",
+      "required": false,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component field: the actual filename of the component",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "구성요소 파일명 포함률 (80% 이상, 권장)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "artifact-uri",
+      "label": "Source or distribution URI coverage (>= 80%, recommended)",
+      "required": false,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.4",
+          "basis": "additional fields: the source code URI and the URI of the deployable form, required where they exist",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "소스 또는 배포 URI 포함률 (80% 이상, 권장)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "file-properties",
+      "label": "Delivered-file properties (executable/archive/structured)",
+      "required": false,
+      "source": "na",
+      "naKind": "not-applicable",
+      "status": "warn",
+      "detail": "no packages to measure",
+      "missing": [],
+      "regulations": [
+        {
+          "framework": "bsi-tr-03183-2",
+          "ref": "Section 5.2.2",
+          "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file",
+          "short": "BSI TR-03183-2",
+          "short_ko": "BSI TR-03183-2"
+        }
+      ],
+      "label_ko": "배포 파일 속성 (실행 파일/압축 파일/구조화 파일)",
+      "detail_ko": "측정할 패키지 없음"
+    },
+    {
+      "id": "g7-meta-author",
+      "label": "SBOM author",
+      "label_ko": "SBOM 작성자",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-meta-version",
+      "label": "SBOM version",
+      "label_ko": "SBOM 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-format-name",
+      "label": "SBOM data format name",
+      "label_ko": "SBOM 데이터 형식 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-format-version",
+      "label": "SBOM data format version",
+      "label_ko": "SBOM 데이터 형식 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-signature",
+      "label": "SBOM author signature",
+      "label_ko": "SBOM 작성자 서명",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "declared",
+      "role": "sbom-author",
+      "guidance": {
+        "snippet": "\"signature\": {\n  \"algorithm\": \"ES256\",\n  \"value\": \"MEUCIQD…\"\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.7/json/#signature"
+      },
+      "regulations": [],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-meta-tool-name",
+      "label": "SBOM tool name",
+      "label_ko": "SBOM 생성 도구 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-tool-version",
+      "label": "SBOM tool version",
+      "label_ko": "SBOM 생성 도구 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-gen-context",
+      "label": "SBOM generation context",
+      "label_ko": "SBOM 생성 맥락",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "inferred",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-meta-timestamp",
+      "label": "SBOM timestamp",
+      "label_ko": "SBOM 타임스탬프",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-meta-dependency",
+      "label": "SBOM dependency relationship",
+      "label_ko": "SBOM 의존성 관계",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "metadata",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-slp-name",
+      "label": "System name",
+      "label_ko": "시스템 이름",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "declared",
+      "role": "system-producer",
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "general description: what the AI system is and its intended purpose",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제31조",
+          "basis": "transparency: the system must be identifiable as AI-operated to users",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-slp-components",
+      "label": "System components",
+      "label_ko": "시스템 구성요소",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "inferred",
+      "role": "system-producer",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-slp-producer",
+      "label": "System producer",
+      "label_ko": "시스템 제작자",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "declared",
+      "role": "system-producer",
+      "regulations": [],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-slp-version",
+      "label": "System version",
+      "label_ko": "시스템 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "inferred",
+      "role": "system-producer",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-slp-timestamp",
+      "label": "System timestamp",
+      "label_ko": "시스템 타임스탬프",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "inferred",
+      "role": "system-producer",
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-slp-data-flow",
+      "label": "System data flow",
+      "label_ko": "시스템 데이터 흐름",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "na",
+      "role": "system-producer",
+      "reviewGuide": {
+        "how": "Write down how data moves through the system: where an input comes from, what the model receives, and where its output goes. Confirm the description matches how the system is actually deployed.",
+        "how_ko": "데이터가 시스템 안에서 어떻게 흐르는지 적습니다. 입력이 어디서 오고, 모델이 무엇을 받고, 출력이 어디로 가는지입니다. 적어 둔 내용이 실제 배포 구성과 맞는지 확인합니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "description of how data moves through and around the system",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제35조",
+          "basis": "data flows are an input to the fundamental-rights impact assessment",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-slp-data-usage",
+      "label": "System data usage",
+      "label_ko": "시스템 데이터 사용",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "na",
+      "role": "system-producer",
+      "reviewGuide": {
+        "how": "State what the system does with the data it receives — whether it is stored, passed to another component, or used for further training. Check this against the privacy notice you publish.",
+        "how_ko": "시스템이 받은 데이터를 어떻게 쓰는지 밝힙니다. 저장하는지, 다른 구성요소로 넘기는지, 추가 학습에 쓰는지입니다. 공개하는 개인정보 처리방침과 어긋나지 않는지 확인합니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "how data is used by the system",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제35조",
+          "basis": "data usage informs the fundamental-rights impact assessment",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-slp-io",
+      "label": "System input/output properties",
+      "label_ko": "시스템 입출력 속성",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "na",
+      "role": "system-producer",
+      "reviewGuide": {
+        "how": "Describe the input and output the system accepts and produces — formats, size limits, and anything it refuses. A person confirms this because a model card lists modalities, not the system's actual interface.",
+        "how_ko": "시스템이 받는 입력과 내놓는 출력을 적습니다. 형식과 크기 제한, 받지 않는 입력까지 포함합니다. 모델 카드에는 처리 방식만 적히고 시스템의 실제 인터페이스는 드러나지 않아 사람이 확인해야 합니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "how the system interacts with hardware/software and its input-output surface",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-slp-app-area",
+      "label": "Intended application area",
+      "label_ko": "적용 대상 분야",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "slp",
+      "source": "na",
+      "role": "system-producer",
+      "reviewGuide": {
+        "how": "State the field the system is intended for and the uses that are out of scope. This is a decision, not a fact a tool can read, and regulators ask for it directly.",
+        "how_ko": "시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "intended purpose and application area of the system",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제33조",
+          "basis": "whether the system is high-impact AI is judged by its application area",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-model-name",
+      "label": "Model name",
+      "label_ko": "모델 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\"\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-id",
+      "label": "Model identifier",
+      "label_ko": "모델 식별자",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ],
+      "cluster": "models",
+      "source": "auto",
+      "role": "sbom-author",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\",\n  \"purl\": \"pkg:huggingface/Qwen/Qwen2.5-0.5B\"\n}",
+        "docUrl": "https://github.com/package-url/purl-spec"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-version",
+      "label": "Model version",
+      "label_ko": "모델 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"name\": \"Qwen2.5-0.5B\",\n  \"version\": \"0.5B\"\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-timestamp",
+      "label": "Model timestamp",
+      "label_ko": "모델 타임스탬프",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "inferred",
+      "role": "model-producer",
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-producer",
+      "label": "Model producer",
+      "label_ko": "모델 제작자",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "inferred",
+      "role": "model-producer",
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-description",
+      "label": "Model description",
+      "label_ko": "모델 설명",
+      "required": false,
+      "status": "warn",
+      "detail": "0/1 model component(s)",
+      "missing": [
+        "bert-base-uncased"
+      ],
+      "evidence": [],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"machine-learning-model\",\n  \"description\": \"0.5B-parameter causal language model.\"\n}",
+        "docUrl": "https://huggingface.co/docs/hub/model-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "general description of the model",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "모델 구성요소 0/1개"
+    },
+    {
+      "id": "g7-model-hash-value",
+      "label": "Model hash value",
+      "label_ko": "모델 해시 값",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "auto",
+      "role": "sbom-author",
+      "guidance": {
+        "snippet": "\"hashes\": [\n  { \"alg\": \"SHA-256\", \"content\": \"9f86d081884c7d65…\" }\n]",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-hash-alg",
+      "label": "Model hash algorithm",
+      "label_ko": "모델 해시 알고리즘",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [
+        "SHA-256"
+      ],
+      "cluster": "models",
+      "source": "auto",
+      "role": "sbom-author",
+      "guidance": {
+        "snippet": "\"hashes\": [\n  { \"alg\": \"SHA-256\", \"content\": \"9f86d081884c7d65…\" }\n]",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-card",
+      "label": "Model properties (model card)",
+      "label_ko": "모델 속성 (모델 카드)",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [
+        "bert"
+      ],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"architectureFamily\": \"transformer\",\n    \"modelArchitecture\": \"Qwen2ForCausalLM\"\n  }\n}",
+        "docUrl": "https://huggingface.co/docs/hub/model-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(b)-(c)",
+          "basis": "design specifications, algorithmic logic and system architecture",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-io",
+      "label": "Model input-output properties",
+      "label_ko": "모델 입출력 속성",
+      "required": false,
+      "status": "warn",
+      "detail": "0/1 model component(s)",
+      "missing": [
+        "bert-base-uncased"
+      ],
+      "evidence": [],
+      "cluster": "models",
+      "source": "inferred",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"inputs\": [ { \"format\": \"text\" } ],\n    \"outputs\": [ { \"format\": \"text\" } ]\n  }\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(3)",
+          "basis": "capabilities and limitations of the model's functioning (input-output behaviour)",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "모델 구성요소 0/1개"
+    },
+    {
+      "id": "g7-model-training",
+      "label": "Model training properties",
+      "label_ko": "모델 학습 속성",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "inferred",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"modelCard\": {\n  \"modelParameters\": {\n    \"datasets\": [ { \"ref\": \"dataset:wikipedia\" } ],\n    \"modelArchitecture\": \"Qwen2ForCausalLM\"\n  }\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "training methodologies, techniques and the training datasets used",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제32조",
+          "basis": "safety: lifecycle risk identification covers how the model was trained",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-license",
+      "label": "Model license",
+      "label_ko": "모델 라이선스",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [
+        "Apache-2.0"
+      ],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"licenses\": [\n  { \"license\": { \"id\": \"Apache-2.0\" } }\n]",
+        "docUrl": "https://huggingface.co/docs/hub/repositories-licenses"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-model-openness",
+      "label": "Model license — openness (weight/architecture/data/training)",
+      "label_ko": "모델 라이선스 — 공개성 (가중치/구조/데이터/학습)",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [
+        "open-architecture",
+        "open-data",
+        "open-weight",
+        "openness:architecture=open-architecture",
+        "openness:training-data=open-data",
+        "openness:training=undisclosed",
+        "openness:weights=open-weight"
+      ],
+      "cluster": "models",
+      "source": "inferred",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"properties\": [\n  { \"name\": \"openness:weights\", \"value\": \"open-weight\" },\n  { \"name\": \"openness:training-data\", \"value\": \"open-data\" }\n]",
+        "docUrl": "https://isitopen.ai/"
+      },
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-model-extref",
+      "label": "Model external references",
+      "label_ko": "모델 외부 참조",
+      "required": false,
+      "status": "pass",
+      "detail": "1/1 model component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "models",
+      "source": "auto",
+      "role": "model-producer",
+      "guidance": {
+        "snippet": "\"externalReferences\": [\n  { \"type\": \"distribution\", \"url\": \"https://huggingface.co/Qwen/Qwen2.5-0.5B\" }\n]",
+        "docUrl": "https://cyclonedx.org/docs/1.7/json/#components_items_externalReferences"
+      },
+      "regulations": [],
+      "detail_ko": "모델 구성요소 1/1개"
+    },
+    {
+      "id": "g7-ds-name",
+      "label": "Dataset name",
+      "label_ko": "데이터셋 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [
+        "bookcorpus",
+        "wikipedia"
+      ],
+      "cluster": "dp",
+      "source": "auto",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"bom-ref\": \"dataset:wikipedia\",\n  \"name\": \"wikipedia\"\n}",
+        "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "the datasets (datasheets) the model was trained on",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-description",
+      "label": "Dataset description",
+      "label_ko": "데이터셋 설명",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "inferred",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"description\": \"Cleaned Wikipedia article dumps.\"\n}",
+        "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "description of the training data and its main characteristics",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-content",
+      "label": "Dataset content",
+      "label_ko": "데이터셋 내용",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "inferred",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"data\": [ {\n    \"type\": \"dataset\",\n    \"description\": \"English Wikipedia, article text only.\",\n    \"contents\": { \"url\": \"https://huggingface.co/datasets/wikipedia\" }\n  } ]\n}",
+        "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "what the training data contains (scope and main characteristics)",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-identifier",
+      "label": "Dataset identifier",
+      "label_ko": "데이터셋 식별자",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "inferred",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"bom-ref\": \"dataset:wikipedia\",\n  \"purl\": \"pkg:huggingface/datasets/wikipedia\"\n}",
+        "docUrl": "https://github.com/package-url/purl-spec"
+      },
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-hash",
+      "label": "Dataset hash",
+      "label_ko": "데이터셋 해시",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "auto",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"hashes\": [ { \"alg\": \"SHA-256\", \"content\": \"3b7a…c19f\" } ]\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-provenance",
+      "label": "Dataset provenance",
+      "label_ko": "데이터셋 출처",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "inferred",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"data\": [ {\n    \"type\": \"dataset\",\n    \"governance\": { \"custodians\": [ { \"organization\": { \"name\": \"Wikimedia\" } } ] }\n  } ]\n}",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "provenance of the data: where it came from and how it was acquired and selected",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-statistics",
+      "label": "Dataset statistical properties",
+      "label_ko": "데이터셋 통계 속성",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "na",
+      "role": "dataset-creator",
+      "reviewGuide": {
+        "how": "Give the size and shape of the training data — record counts, class balance, and any known skew. These numbers explain the model's limits, so state them even when they are unflattering.",
+        "how_ko": "학습 데이터의 규모와 구성을 적습니다. 건수, 분류별 비율, 알고 있는 치우침입니다. 이 수치가 모델의 한계를 설명하므로 불리한 내용이라도 밝힙니다.",
+        "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "main characteristics of the data (statistical properties)",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-ds-sensitivity",
+      "label": "Dataset sensitivity (PII/copyright)",
+      "label_ko": "데이터셋 민감도 (개인정보/저작권)",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "na",
+      "role": "dataset-creator",
+      "reviewGuide": {
+        "how": "Judge whether the training data holds personal information or third-party copyrighted work, and record what you filtered out and how. Where the answer is unclear, take it to your privacy and legal contacts before release.",
+        "how_ko": "학습 데이터에 개인정보나 타인의 저작물이 섞였는지 판단하고, 무엇을 어떻게 걸러냈는지 기록합니다. 판단이 서지 않으면 공개 전에 개인정보 담당 부서와 법무에 확인합니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "data characteristics including sensitive or personal data",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제35조",
+          "basis": "data sensitivity is central to the fundamental-rights impact assessment",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-ds-dependency",
+      "label": "Dataset dependency relationship",
+      "label_ko": "데이터셋 의존성 관계",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "auto",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "\"dependencies\": [ {\n  \"ref\": \"pkg:huggingface/google-bert/bert-base-uncased\",\n  \"dependsOn\": [ \"dataset:huggingface/wikipedia\" ]\n} ]",
+        "docUrl": "https://cyclonedx.org/capabilities/mlbom/"
+      },
+      "regulations": [],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-ds-license",
+      "label": "Dataset license",
+      "label_ko": "데이터셋 라이선스",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "dp",
+      "source": "inferred",
+      "role": "dataset-creator",
+      "guidance": {
+        "snippet": "{\n  \"type\": \"data\",\n  \"name\": \"wikipedia\",\n  \"licenses\": [ { \"license\": { \"id\": \"CC-BY-SA-3.0\" } } ]\n}",
+        "docUrl": "https://huggingface.co/docs/hub/datasets-cards"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(d)",
+          "basis": "how the training data was acquired (rights to use it)",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "g7-infra-software",
+      "label": "Infrastructure software (dependencies)",
+      "label_ko": "인프라 소프트웨어 (의존성)",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "infrastructure",
+      "source": "auto",
+      "role": "system-producer",
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(c)",
+          "basis": "software components and computational resources used",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-infra-hardware",
+      "label": "Infrastructure hardware (HBOM link)",
+      "label_ko": "인프라 하드웨어 (HBOM 연결)",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "infrastructure",
+      "source": "declared",
+      "role": "system-producer",
+      "guidance": {
+        "snippet": "\"externalReferences\": [\n  { \"type\": \"bom\", \"url\": \"https://example.com/hbom.json\" }\n]",
+        "docUrl": "https://cyclonedx.org/capabilities/hbom/"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(1)",
+          "basis": "the hardware on which the system runs",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-sec-controls",
+      "label": "Security controls",
+      "label_ko": "보안 통제",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "sp",
+      "source": "na",
+      "role": "producer",
+      "reviewGuide": {
+        "how": "List the controls that protect the model and its data — who can reach the weights, how the training environment is isolated, how artefacts are signed. These live in your operations, not in the SBOM.",
+        "how_ko": "모델과 데이터를 보호하는 통제 수단을 적습니다. 가중치에 누가 접근할 수 있는지, 학습 환경을 어떻게 분리하는지, 산출물에 어떻게 서명하는지입니다. SBOM이 아니라 운영 쪽에 있는 정보입니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(h)",
+          "basis": "cybersecurity controls built into the system",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제32조",
+          "basis": "safety: risk-mitigation controls across the lifecycle",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-sec-compliance",
+      "label": "Security compliance",
+      "label_ko": "보안 준수",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "sp",
+      "source": "na",
+      "role": "producer",
+      "reviewGuide": {
+        "how": "Name the security standard or internal policy this model was built under, and who signed off. Point at the assessment record rather than restating it here.",
+        "how_ko": "이 모델이 어떤 보안 표준이나 사내 정책을 따라 만들어졌는지, 누가 승인했는지 밝힙니다. 내용을 옮겨 적기보다 점검 기록을 가리키는 편이 낫습니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-sec-policy",
+      "label": "Cybersecurity policy information",
+      "label_ko": "사이버보안 정책 정보",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "sp",
+      "source": "na",
+      "role": "producer",
+      "reviewGuide": {
+        "how": "Give the route for reporting a vulnerability in this model and who answers it. A published model needs a contact that outlives the person who trained it.",
+        "how_ko": "이 모델의 취약점을 어디로 신고하고 누가 답하는지 적습니다. 공개한 모델에는 학습한 사람이 자리를 옮겨도 유지되는 연락처가 필요합니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(5)",
+          "basis": "risk-management system (Article 9) documentation",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제32조",
+          "basis": "safety: the required risk-management framework",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-sec-vulns",
+      "label": "Vulnerability referencing",
+      "label_ko": "취약점 참조",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "sp",
+      "source": "auto",
+      "role": "sbom-author",
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(h)",
+          "basis": "cybersecurity: known vulnerabilities affecting the system",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제32조",
+          "basis": "safety: monitoring and responding to AI-related risks",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "g7-kpi-security",
+      "label": "Security metrics",
+      "label_ko": "보안 지표",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "kpi",
+      "source": "na",
+      "role": "producer",
+      "reviewGuide": {
+        "how": "Record what you measured on the security side — adversarial or jailbreak testing, refusal rates, red-team results — with the method and the date. If nothing was measured, say so plainly.",
+        "how_ko": "보안 쪽에서 무엇을 측정했는지 기록합니다. 적대적 입력이나 우회 시도 시험, 거부율, 모의 공격 결과를 방법·시점과 함께 적습니다. 측정하지 않았다면 하지 않았다고 그대로 밝힙니다.",
+        "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
+      },
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(h)",
+          "basis": "cybersecurity measures and their metrics",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        },
+        {
+          "framework": "kr-ai-framework-act",
+          "ref": "제32조",
+          "basis": "safety: security metrics feed the risk-management system",
+          "short": "AI Framework Act",
+          "short_ko": "AI 기본법"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "g7-kpi-operational",
+      "label": "Operational performance KPIs",
+      "label_ko": "운영 성능 지표(KPI)",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "kpi",
+      "source": "inferred",
+      "role": "model-producer",
+      "regulations": [
+        {
+          "framework": "eu-ai-act",
+          "ref": "Annex IV(2)(g)",
+          "basis": "validation and testing metrics for accuracy and robustness; performance-metric appropriateness",
+          "short": "EU AI Act",
+          "short_ko": "EU 인공지능법"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "cisa-sbom-author",
+      "label": "SBOM author",
+      "label_ko": "SBOM 작성자",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "declared",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"authors\": [ { \"name\": \"Example Manufacturing Co., Ltd.\" } ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_authors"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Author",
+          "basis": "the name of the entity that creates the SBOM data for the target component",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "cisa-sbom-author-signature",
+      "label": "SBOM author signature",
+      "label_ko": "SBOM 작성자 서명",
+      "required": false,
+      "status": "warn",
+      "detail": "not present in the SBOM",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "declared",
+      "role": "",
+      "reviewGuide": {
+        "how": "A signature delivered beside the SBOM rather than inside it does not appear here, because this report reads one file. If the SBOM arrived with a detached signature, verify it against the sender's key before treating the contents as theirs, and record that you did. A signature carried inside the document is read automatically and this row will say so.",
+        "how_ko": "SBOM 안이 아니라 파일 옆에 따로 온 서명은 이 보고서에 나타나지 않습니다. 보고서가 파일 하나만 읽기 때문입니다. 분리 서명과 함께 받았다면 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다. 문서 안에 담긴 서명은 자동으로 읽히며 그 경우 이 행에 표시됩니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Author Signature",
+          "basis": "a digital signature attributable to the SBOM author",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "SBOM에 없음"
+    },
+    {
+      "id": "cisa-sbom-format-name",
+      "label": "SBOM data format name",
+      "label_ko": "SBOM 데이터 형식 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Data Format Name",
+          "basis": "the name of the data format used to represent the SBOM data",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-format-version",
+      "label": "SBOM data format version",
+      "label_ko": "SBOM 데이터 형식 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Data Format Version",
+          "basis": "the version of the data format named above",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-generation-context",
+      "label": "SBOM generation context",
+      "label_ko": "SBOM 생성 시점",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"lifecycles\": [ { \"phase\": \"post-build\" } ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_lifecycles"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Generation Context",
+          "basis": "the lifecycle phase and data available when the SBOM was generated, such as before or after build",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-timestamp",
+      "label": "SBOM timestamp",
+      "label_ko": "SBOM 생성 시각",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Timestamp",
+          "basis": "the date and time of the most recent update to the SBOM data, following RFC 9557",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-tool-name",
+      "label": "SBOM tool name",
+      "label_ko": "SBOM 생성 도구 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Tool Name",
+          "basis": "the tool the SBOM author used to generate or amend the SBOM",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-tool-version",
+      "label": "SBOM tool version",
+      "label_ko": "SBOM 생성 도구 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"tools\": { \"components\": [\n    { \"type\": \"application\", \"name\": \"Example Scanner\", \"version\": \"3.1.0\" }\n  ] }\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_tools"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Tool Version",
+          "basis": "the version of that tool, stated as unknown when no identifier is available",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-sbom-version",
+      "label": "SBOM version",
+      "label_ko": "SBOM 문서 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-metadata",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "SBOM Version",
+          "basis": "an identifier distinguishing this SBOM from earlier iterations for the same component and version",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-component-name",
+      "label": "Component name",
+      "label_ko": "구성요소 이름",
+      "required": false,
+      "status": "pass",
+      "detail": "3/3 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Name",
+          "basis": "the name the component producer assigned to the component",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 3/3"
+    },
+    {
+      "id": "cisa-component-version",
+      "label": "Component version",
+      "label_ko": "구성요소 버전",
+      "required": false,
+      "status": "pass",
+      "detail": "3/3 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Version",
+          "basis": "the producer's version identifier, stated as unknown when none was provided",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 3/3"
+    },
+    {
+      "id": "cisa-component-producer",
+      "label": "Component producer",
+      "label_ko": "구성요소 생산자",
+      "required": false,
+      "status": "pass",
+      "detail": "3/3 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"version\": \"1.2.3\",\n  \"publisher\": \"The Example Project\"\n} ]",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_publisher"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Producer",
+          "basis": "the entity that creates, defines and identifies the component; replaces the 2021 element Supplier Name",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 3/3"
+    },
+    {
+      "id": "cisa-component-identifiers",
+      "label": "Component identifiers",
+      "label_ko": "구성요소 식별자",
+      "required": false,
+      "status": "warn",
+      "detail": "2/3 component(s)",
+      "missing": [
+        "bookcorpus"
+      ],
+      "evidence": [
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Identifiers",
+          "basis": "at least one software identifier such as PURL or CPE, or an intrinsic one such as a hash",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 2/3"
+    },
+    {
+      "id": "cisa-component-license",
+      "label": "Component license",
+      "label_ko": "구성요소 라이선스",
+      "required": false,
+      "status": "pass",
+      "detail": "3/3 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component License",
+          "basis": "the identifiers for the licenses under which the component is available",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 3/3"
+    },
+    {
+      "id": "cisa-component-hash-value",
+      "label": "Component hash value",
+      "label_ko": "구성요소 해시 값",
+      "required": false,
+      "status": "warn",
+      "detail": "2/3 component(s)",
+      "missing": [
+        "bookcorpus"
+      ],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"components\": [ {\n  \"name\": \"libexample\",\n  \"hashes\": [ { \"alg\": \"SHA-256\", \"content\": \"3b7c…\" } ]\n} ]",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#components_items_hashes"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Hash Value",
+          "basis": "the hash of the executable component artifact, stated as unknown when the artifact is out of reach",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 2/3"
+    },
+    {
+      "id": "cisa-component-hash-algorithm",
+      "label": "Component hash algorithm",
+      "label_ko": "구성요소 해시 알고리즘",
+      "required": false,
+      "status": "pass",
+      "detail": "3/3 component(s)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Hash Algorithm",
+          "basis": "the algorithm that produced the hash, named by its IANA hash function textual name",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "구성요소 3/3"
+    },
+    {
+      "id": "cisa-component-dependency-relationship",
+      "label": "Component dependency relationship",
+      "label_ko": "구성요소 의존 관계",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-component",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Component Dependency Relationship",
+          "basis": "the relationship between two components where one is necessary for the operation of the other",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-machine-processable-data",
+      "label": "Machine-processable data",
+      "label_ko": "기계 판독 가능 데이터",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "auto",
+      "role": "",
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Machine-Processable Data",
+          "basis": "the SBOM uses a widely used, open, machine-processable format",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-coverage",
+      "label": "Coverage",
+      "label_ko": "포함 범위",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that the SBOM lists every component making up the software, transitive dependencies included. No tool can confirm this from the document alone — the document cannot show what was left out of it. Compare it against the build's own dependency resolution, or against the manifests the software is built from.",
+        "how_ko": "SBOM이 소프트웨어를 이루는 구성요소를 이행 의존성까지 빠짐없이 담았는지 확인합니다. 문서만 보고는 어떤 도구도 판정할 수 없습니다. 문서는 자기가 빠뜨린 것을 보여 주지 못하기 때문입니다. 빌드가 실제로 해석한 의존성이나 빌드에 쓰인 매니페스트와 대조합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Coverage",
+          "basis": "information for every component making up the target software, including transitive dependencies, with no minimum depth",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "cisa-accommodation-of-updates",
+      "label": "Accommodation of updates to SBOM data",
+      "label_ko": "SBOM 데이터 갱신 수용",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that there is a way to correct SBOM data after it has been published, and that corrections go out promptly. This is a practice of the organisation issuing the SBOM, not a field in it.",
+        "how_ko": "발행한 SBOM 데이터를 나중에 정정할 방법이 있고 정정본이 지체 없이 나가는지 확인합니다. 문서 안의 필드가 아니라 SBOM을 발행하는 조직의 관행에 대한 항목입니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Accommodation of Updates to SBOM Data",
+          "basis": "corrections and updates to published SBOM data are accommodated and issued promptly",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "cisa-distribution-and-delivery",
+      "label": "Distribution and delivery",
+      "label_ko": "배포와 전달",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that whoever needs the SBOM can get it promptly, and that any access control keeps unauthorized parties out without blocking authorized ones or preventing the data from being loaded into their security tools.",
+        "how_ko": "SBOM이 필요한 쪽이 지체 없이 받을 수 있는지, 접근 통제가 권한 없는 쪽을 막되 권한 있는 쪽의 수신이나 보안 도구로의 반입까지 막지는 않는지 확인합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Distribution and Delivery",
+          "basis": "the SBOM is available promptly to those who need it, with access controls that do not block authorized parties",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    },
+    {
+      "id": "cisa-explicit-unknowns",
+      "label": "Explicitly identifying unknown information",
+      "label_ko": "미상 정보의 명시",
+      "required": false,
+      "status": "pass",
+      "detail": "present",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "auto",
+      "role": "",
+      "guidance": {
+        "snippet": "\"metadata\": {\n  \"properties\": [\n    { \"name\": \"bomlens:undeclared-fields\", \"value\": \"unknown-to-author\" }\n  ]\n}",
+        "docUrl": "https://cyclonedx.org/docs/1.6/json/#metadata_properties"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Explicitly Identifying Unknown Information",
+          "basis": "a value that is absent is stated as unknown to the author or as withheld, and the two are distinguished",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "있음"
+    },
+    {
+      "id": "cisa-frequency",
+      "label": "Frequency",
+      "label_ko": "갱신 주기",
+      "required": false,
+      "status": "warn",
+      "detail": "requires human review (no automated source)",
+      "missing": [],
+      "evidence": [],
+      "cluster": "cisa-practices",
+      "source": "na",
+      "role": "",
+      "reviewGuide": {
+        "how": "Establish that each software version or update has an SBOM of its own, and that a revised SBOM is issued when the component data changes or an error in it is found.",
+        "how_ko": "소프트웨어 버전이나 업데이트마다 자기 SBOM이 있는지, 구성요소 데이터가 바뀌거나 오류를 발견했을 때 정정본을 다시 내는지 확인합니다.",
+        "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
+      },
+      "regulations": [
+        {
+          "framework": "us-sbom-minimum-elements",
+          "ref": "Frequency",
+          "basis": "each software version or update has an associated SBOM, and a corrected SBOM is reissued when data changes",
+          "short": "CISA 2026",
+          "short_ko": "CISA 2026"
+        }
+      ],
+      "detail_ko": "사람 검토 필요 (자동 확인 불가)"
+    }
+  ],
+  "regulatoryCrosswalk": {
+    "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk covers only the documentation elements an SBOM can carry; obligations that an SBOM cannot express — bias and fairness assessment, risk management, human oversight — are out of its scope and must be met through separate documents. It makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
+    "frameworks": [
+      {
+        "id": "eu-ai-act",
+        "title": "EU AI Act — Annex IV technical documentation",
+        "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV",
+        "total": 23,
+        "present": 7,
+        "gap": 7,
+        "review": 9,
+        "failed": 0,
+        "elements": [
+          {
+            "id": "g7-slp-name",
+            "label": "System name",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-data-flow",
+            "label": "System data flow",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-data-usage",
+            "label": "System data usage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-slp-io",
+            "label": "System input/output properties",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-slp-app-area",
+            "label": "Intended application area",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-model-description",
+            "label": "Model description",
+            "status": "warn",
+            "source": "auto",
+            "detail": "0/1 model component(s)",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-model-card",
+            "label": "Model properties (model card)",
+            "status": "pass",
+            "source": "auto",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "Annex IV(2)(b)-(c)"
+            ]
+          },
+          {
+            "id": "g7-model-io",
+            "label": "Model input-output properties",
+            "status": "warn",
+            "source": "inferred",
+            "detail": "0/1 model component(s)",
+            "refs": [
+              "Annex IV(3)"
+            ]
+          },
+          {
+            "id": "g7-model-training",
+            "label": "Model training properties",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-name",
+            "label": "Dataset name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-description",
+            "label": "Dataset description",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-content",
+            "label": "Dataset content",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-provenance",
+            "label": "Dataset provenance",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-statistics",
+            "label": "Dataset statistical properties",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-sensitivity",
+            "label": "Dataset sensitivity (PII/copyright)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-ds-license",
+            "label": "Dataset license",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "present",
+            "refs": [
+              "Annex IV(2)(d)"
+            ]
+          },
+          {
+            "id": "g7-infra-software",
+            "label": "Infrastructure software (dependencies)",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(c)"
+            ]
+          },
+          {
+            "id": "g7-infra-hardware",
+            "label": "Infrastructure hardware (HBOM link)",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(1)"
+            ]
+          },
+          {
+            "id": "g7-sec-controls",
+            "label": "Security controls",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-sec-policy",
+            "label": "Cybersecurity policy information",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(5)"
+            ]
+          },
+          {
+            "id": "g7-sec-vulns",
+            "label": "Vulnerability referencing",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-kpi-security",
+            "label": "Security metrics",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Annex IV(2)(h)"
+            ]
+          },
+          {
+            "id": "g7-kpi-operational",
+            "label": "Operational performance KPIs",
+            "status": "warn",
+            "source": "inferred",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "Annex IV(2)(g)"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "kr-ai-framework-act",
+        "title": "AI Framework Act (Korea)",
+        "source": "인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)",
+        "total": 10,
+        "present": 1,
+        "gap": 2,
+        "review": 7,
+        "failed": 0,
+        "elements": [
+          {
+            "id": "g7-slp-name",
+            "label": "System name",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "제31조"
+            ]
+          },
+          {
+            "id": "g7-slp-data-flow",
+            "label": "System data flow",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-slp-data-usage",
+            "label": "System data usage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-slp-app-area",
+            "label": "Intended application area",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제33조"
+            ]
+          },
+          {
+            "id": "g7-model-training",
+            "label": "Model training properties",
+            "status": "pass",
+            "source": "inferred",
+            "detail": "1/1 model component(s)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-ds-sensitivity",
+            "label": "Dataset sensitivity (PII/copyright)",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제35조"
+            ]
+          },
+          {
+            "id": "g7-sec-controls",
+            "label": "Security controls",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-sec-policy",
+            "label": "Cybersecurity policy information",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-sec-vulns",
+            "label": "Vulnerability referencing",
+            "status": "warn",
+            "source": "auto",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "제32조"
+            ]
+          },
+          {
+            "id": "g7-kpi-security",
+            "label": "Security metrics",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "제32조"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bsi-tr-03183-2",
+        "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
+        "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
+        "total": 14,
+        "present": 7,
+        "gap": 1,
+        "review": 6,
+        "failed": 0,
+        "elements": [
+          {
+            "id": "spec-version",
+            "label": "Spec version (CycloneDX 1.3/1.4/1.5/1.6/1.7)",
+            "status": "pass",
+            "source": null,
+            "detail": "CycloneDX 1.7",
+            "refs": [
+              "Section 4"
+            ]
+          },
+          {
+            "id": "timestamp",
+            "label": "Timestamp (metadata.timestamp)",
+            "status": "pass",
+            "source": null,
+            "detail": "2026-09-05T03:24:39+00:00",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "tools",
+            "label": "Tool info (metadata.tools)",
+            "status": "pass",
+            "source": null,
+            "detail": "2 tool(s)",
+            "refs": [
+              "Section 5.2.1"
+            ]
+          },
+          {
+            "id": "top-component",
+            "label": "Top-level component name+version",
+            "status": "pass",
+            "source": null,
+            "detail": "bert-base-uncased@86b5e093",
+            "refs": [
+              "Section 5.1"
+            ]
+          },
+          {
+            "id": "name-version",
+            "label": "Component name+version coverage (100%)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "purl",
+            "label": "PURL coverage (>= 90%)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "transitive",
+            "label": "Transitive dependencies (graph edges)",
+            "status": "pass",
+            "source": "auto",
+            "detail": "2 edge(s)",
+            "refs": [
+              "Section 5.1; 5.2.2"
+            ]
+          },
+          {
+            "id": "license",
+            "label": "License coverage (>= 80%, recommended)",
+            "status": "pass",
+            "source": "auto",
+            "detail": "100% (2/2)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash",
+            "label": "Hash coverage (>= 50%, recommended)",
+            "status": "pass",
+            "source": "auto",
+            "detail": "50% (1/2)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "hash-algorithm",
+            "label": "SHA-512 checksum coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": "auto",
+            "detail": "0% (0/2)",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-creator",
+            "label": "Component creator coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "component-filename",
+            "label": "Component filename coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          },
+          {
+            "id": "artifact-uri",
+            "label": "Source or distribution URI coverage (>= 80%, recommended)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.4"
+            ]
+          },
+          {
+            "id": "file-properties",
+            "label": "Delivered-file properties (executable/archive/structured)",
+            "status": "warn",
+            "source": "na",
+            "detail": "no packages to measure",
+            "refs": [
+              "Section 5.2.2"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "us-sbom-minimum-elements",
+        "title": "US SBOM minimum elements",
+        "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA",
+        "total": 23,
+        "present": 15,
+        "gap": 4,
+        "review": 4,
+        "failed": 0,
+        "elements": [
+          {
+            "id": "cisa-sbom-author",
+            "label": "SBOM author",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "SBOM Author"
+            ]
+          },
+          {
+            "id": "cisa-sbom-author-signature",
+            "label": "SBOM author signature",
+            "status": "warn",
+            "source": "declared",
+            "detail": "not present in the SBOM",
+            "refs": [
+              "SBOM Author Signature"
+            ]
+          },
+          {
+            "id": "cisa-sbom-format-name",
+            "label": "SBOM data format name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Data Format Name"
+            ]
+          },
+          {
+            "id": "cisa-sbom-format-version",
+            "label": "SBOM data format version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Data Format Version"
+            ]
+          },
+          {
+            "id": "cisa-sbom-generation-context",
+            "label": "SBOM generation context",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Generation Context"
+            ]
+          },
+          {
+            "id": "cisa-sbom-timestamp",
+            "label": "SBOM timestamp",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Timestamp"
+            ]
+          },
+          {
+            "id": "cisa-sbom-tool-name",
+            "label": "SBOM tool name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Tool Name"
+            ]
+          },
+          {
+            "id": "cisa-sbom-tool-version",
+            "label": "SBOM tool version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Tool Version"
+            ]
+          },
+          {
+            "id": "cisa-sbom-version",
+            "label": "SBOM version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "SBOM Version"
+            ]
+          },
+          {
+            "id": "cisa-component-name",
+            "label": "Component name",
+            "status": "pass",
+            "source": "auto",
+            "detail": "3/3 component(s)",
+            "refs": [
+              "Component Name"
+            ]
+          },
+          {
+            "id": "cisa-component-version",
+            "label": "Component version",
+            "status": "pass",
+            "source": "auto",
+            "detail": "3/3 component(s)",
+            "refs": [
+              "Component Version"
+            ]
+          },
+          {
+            "id": "cisa-component-producer",
+            "label": "Component producer",
+            "status": "pass",
+            "source": "auto",
+            "detail": "3/3 component(s)",
+            "refs": [
+              "Component Producer"
+            ]
+          },
+          {
+            "id": "cisa-component-identifiers",
+            "label": "Component identifiers",
+            "status": "warn",
+            "source": "auto",
+            "detail": "2/3 component(s)",
+            "refs": [
+              "Component Identifiers"
+            ]
+          },
+          {
+            "id": "cisa-component-license",
+            "label": "Component license",
+            "status": "pass",
+            "source": "auto",
+            "detail": "3/3 component(s)",
+            "refs": [
+              "Component License"
+            ]
+          },
+          {
+            "id": "cisa-component-hash-value",
+            "label": "Component hash value",
+            "status": "warn",
+            "source": "auto",
+            "detail": "2/3 component(s)",
+            "refs": [
+              "Component Hash Value"
+            ]
+          },
+          {
+            "id": "cisa-component-hash-algorithm",
+            "label": "Component hash algorithm",
+            "status": "pass",
+            "source": "auto",
+            "detail": "3/3 component(s)",
+            "refs": [
+              "Component Hash Algorithm"
+            ]
+          },
+          {
+            "id": "cisa-component-dependency-relationship",
+            "label": "Component dependency relationship",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Component Dependency Relationship"
+            ]
+          },
+          {
+            "id": "cisa-machine-processable-data",
+            "label": "Machine-processable data",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Machine-Processable Data"
+            ]
+          },
+          {
+            "id": "cisa-coverage",
+            "label": "Coverage",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Coverage"
+            ]
+          },
+          {
+            "id": "cisa-accommodation-of-updates",
+            "label": "Accommodation of updates to SBOM data",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Accommodation of Updates to SBOM Data"
+            ]
+          },
+          {
+            "id": "cisa-distribution-and-delivery",
+            "label": "Distribution and delivery",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Distribution and Delivery"
+            ]
+          },
+          {
+            "id": "cisa-explicit-unknowns",
+            "label": "Explicitly identifying unknown information",
+            "status": "pass",
+            "source": "auto",
+            "detail": "present",
+            "refs": [
+              "Explicitly Identifying Unknown Information"
+            ]
+          },
+          {
+            "id": "cisa-frequency",
+            "label": "Frequency",
+            "status": "warn",
+            "source": "na",
+            "detail": "requires human review (no automated source)",
+            "refs": [
+              "Frequency"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

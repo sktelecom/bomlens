@@ -1,0 +1,22 @@
+Third-party Open Source Licenses for BertBaseUncased
+Generated: 2026-09-05T03:24:43Z
+Total components: 2 · Distinct licenses: 2
+
+This product includes the following open source software.
+Each component lists its source/download location and copyright/attribution.
+================================================================================
+
+License: CC-BY-SA-3.0
+Components (1):
+  - wikipedia@97a0b052 [dataset]
+      Source: https://huggingface.co/datasets/wikipedia
+      Copyright: holders not captured in SBOM — see source (https://huggingface.co/datasets/wikipedia)
+
+License: unknown
+Components (1):
+  - bookcorpus@d917559b [dataset]
+      Source: https://huggingface.co/datasets/bookcorpus
+      Copyright: holders not captured in SBOM — see source (https://huggingface.co/datasets/bookcorpus)
+
+
+================================================================================
