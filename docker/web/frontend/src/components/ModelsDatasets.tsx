@@ -15,39 +15,20 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
+import type { ConformanceSummary } from "@/lib/api";
+import { checkKind, groupG7ByCluster, registryTally, splitChecks } from "@/lib/conformance";
 import {
   type AiModelData,
   type AssessmentGrade,
-  GRADE_LABEL_KEY,
+  GradeBadge,
   type ModelAssessment,
   type ModelCard,
   parseModelCards,
   USAGE_LABEL_KEY,
 } from "@/lib/models";
 import { loadSbom } from "@/lib/sbomGraph";
+import { CheckGroup } from "./ConformancePanel";
 import { cn } from "@/lib/utils";
-
-/** Badge tone per pipeline grade — the grade word itself is always shown, so
- *  the color is a reinforcement, never the only signal.
- *
- *  The tone ordering has to track the pipeline's own severity ranking
- *  (assess-ai-risk.sh: caution > review > conditional > ok — a known blocker
- *  outranks an unknown, which outranks a condition, which outranks a clear
- *  signal). Get that ordering wrong here and the two readings disagree: a
- *  reader sees "review" rendered milder than "conditional" and reasonably
- *  concludes it's the safer of the two, when the pipeline ranks it worse. */
-const GRADE_TONE: Record<AssessmentGrade, "positive" | "medium" | "high" | "critical"> = {
-  ok: "positive",
-  conditional: "medium",
-  review: "high",
-  caution: "critical",
-};
-
-/** A stamped grade as word + tone (verbatim from the SBOM property). */
-function GradeBadge({ grade }: { grade: AssessmentGrade }) {
-  const { t } = useTranslation();
-  return <Badge tone={GRADE_TONE[grade]}>{t(GRADE_LABEL_KEY[grade])}</Badge>;
-}
 
 /**
  * Models & Datasets — the AI surface. Fetches the raw ML-BOM, parses each
@@ -58,10 +39,19 @@ function GradeBadge({ grade }: { grade: AssessmentGrade }) {
 export function ModelsDatasets({
   scanId,
   sbomFile,
+  conformance,
 }: {
   /** The scan's run_id, scoping the artifact fetch to its run folder. */
   scanId: string | null;
   sbomFile: string;
+  /** The G7 minimum-element checks, when BomLens generated this AI SBOM
+   *  itself (AIBOM/model-file/dataset) rather than reviewing one someone
+   *  submitted — an uploaded AI SBOM shows its G7 checks on the Conformance
+   *  screen instead (a real submission-review verdict), so callers pass null
+   *  there to avoid showing the rollup twice. The headline (risk grade, G7
+   *  count, crosswalk) is AiSummaryCard's job, shown once at the top of
+   *  Overview for any AI scan — this is only the detailed cluster listing. */
+  conformance?: ConformanceSummary | null;
 }) {
   const { t } = useTranslation();
   const [data, setData] = useState<AiModelData | null>(null);
@@ -211,6 +201,58 @@ export function ModelsDatasets({
       {hasAssessment && (
         <p className="text-xs text-muted-foreground">{t("models.disclaimer")}</p>
       )}
+      {conformance ? <G7Disclosure conformance={conformance} /> : null}
+    </div>
+  );
+}
+
+/**
+ * What this model's own card/listing discloses, measured against the G7
+ * minimum elements — for an AI SBOM BomLens generated itself (AIBOM, a model
+ * file scan, a dataset scan). Reuses the Conformance screen's own cluster
+ * rendering (CheckGroup): the data and its grouping are identical to what an
+ * uploaded AI SBOM shows on the Conformance screen, only the destination
+ * differs. The headline rollup is AiSummaryCard's job (top of Overview, any
+ * AI scan); this is only the detail. Unlike a self-generated software SBOM's
+ * format checklist (which is tautological — BomLens always fills its own
+ * timestamp/tool fields), a gap here is the model's PUBLISHER not having
+ * disclosed something in the card BomLens read to build this SBOM — a real
+ * finding about the model, not a self-grade of BomLens's own document, so it
+ * keeps its checklist framing rather than being softened into plain
+ * description. */
+function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
+  const { t } = useTranslation();
+  const { g7 } = splitChecks(conformance.checks ?? []);
+  if (g7.length === 0) return null;
+  const g7t = registryTally(g7);
+  const g7groups = groupG7ByCluster(g7);
+  return (
+    <div className="space-y-3 border-t pt-6">
+      <div className="space-y-1">
+        <div className="text-sm font-semibold text-foreground">{t("models.g7SectionTitle")}</div>
+        <p className="max-w-3xl text-xs text-muted-foreground">{t("models.g7SectionIntro")}</p>
+      </div>
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
+            <div className="text-lg font-semibold tabular-nums text-foreground">
+              {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
+          </div>
+          <div className="space-y-3">
+            {g7groups.map((group) => (
+              <CheckGroup
+                key={group.cluster}
+                title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                checks={group.checks}
+                defaultOpen={group.checks.some((c) => checkKind(c) === "actionable")}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

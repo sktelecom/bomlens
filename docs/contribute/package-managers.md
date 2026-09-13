@@ -118,7 +118,7 @@ Confirm every item before submitting a PR that adds a new language.
 
 - [ ] Detection rules and image routing are added to `docker/lib/source-detect.sh`.
 - [ ] If transitive dependency preparation is needed, it is reflected in `docker/lib/build-prep.sh`.
-- [ ] An example project exists under `examples/{언어}/`.
+- [ ] An example project exists under `examples/{language}/`.
 - [ ] The example project includes a lock file.
 - [ ] A test block is added to `tests/test-scan.sh` (or a standalone `tests/test-<name>.sh` if the case doesn't fit the source-scan pattern).
 - [ ] The full `./tests/test-scan.sh` run passes.

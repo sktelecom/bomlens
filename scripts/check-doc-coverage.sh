@@ -45,8 +45,11 @@ doc_path_ko() {
   [ -n "$en" ] && echo "${en%.md}.ko.md"
 }
 
-# Modes that are internal plumbing, not a user-facing input form.
-INTERNAL="MERGE POSTPROCESS UI"
+# Modes that are internal plumbing, not a user-facing input form. DIFF joins
+# MERGE here for the same reason: it is reached by a flag operating on
+# already-generated files (--diff), not a --target input form the by-input /
+# architecture / pipeline-by-input pages walk through.
+INTERNAL="MERGE POSTPROCESS UI DIFF"
 
 # Coverage manifest — one line per user-facing mode:
 #   MODE :: en pattern :: ko pattern :: comma-separated docs that must mention it

@@ -995,6 +995,21 @@ c_kind=$(curl -s -o /dev/null -w '%{http_code}' -F "file=@$WORK/sample.zip" "$BA
 [ "$c_kind" = "400" ] && pass "unknown upload kind rejected (400)" || fail "bogus kind returned $c_kind (expected 400)"
 c_ext=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=zip" -F "file=@$WORK/payload.txt" "$BASE/upload?kind=zip")
 [ "$c_ext" = "415" ] && pass "wrong extension rejected (415)" || fail ".txt as zip returned $c_ext (expected 415)"
+# An XML SBOM is refused here rather than in the container: the pipeline reads
+# JSON only, so accepting the file just spends a scan to fail. The answer has to
+# name the format and the fix, not read as "unsupported file type".
+printf '<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.6"/>\n' > "$WORK/supplier.xml"
+xml_body=$(curl -s -o "$WORK/xml-resp.json" -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier.xml" "$BASE/upload?kind=sbom")
+[ "$xml_body" = "415" ] && pass "XML SBOM upload rejected (415)" || fail ".xml as sbom returned $xml_body (expected 415)"
+xml_err=$(python3 -c "import json;print(json.load(open('$WORK/xml-resp.json')).get('error',''))" 2>/dev/null)
+case "$xml_err" in
+    *"not supported yet"*) pass "the 415 names XML and tells the user to convert to JSON" ;;
+    *) fail "XML upload error text unexpected" "got '$xml_err'" ;;
+esac
+# A JSON SBOM upload is unaffected by that guard.
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1}\n' > "$WORK/supplier.json"
+c_json=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier.json" "$BASE/upload?kind=sbom")
+[ "$c_json" = "200" ] && pass "JSON SBOM upload still accepted (200)" || fail ".json as sbom returned $c_json (expected 200)"
 
 # Regression: the filename sanitizer used to be an ASCII-only allowlist
 # (re.sub(r"[^A-Za-z0-9._-]", "_", ...)), so a Korean filename — the common

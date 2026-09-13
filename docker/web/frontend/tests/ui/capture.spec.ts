@@ -425,7 +425,12 @@ const CONFORMANCE_DONE = {
   ok: true,
   mode: "ANALYZE",
   id: "model_1.0",
-  results: [{ name: "model_1.0_bom.json", size: 200 }],
+  // The Conformance section only exists for a submitted document under
+  // review (nav.ts gates it on this artifact, not on `mode`).
+  results: [
+    { name: "model_1.0_bom.json", size: 200 },
+    { name: "model_1.0_input.json", size: 100 },
+  ],
   security: null,
   conformance: {
     result: "pass",

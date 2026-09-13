@@ -130,7 +130,8 @@ export interface SbomSummary {
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
   /** Set when cdxgen couldn't run and the scan fell back to syft (direct deps
-   *  only), e.g. "disk-space" | "cdxgen-unavailable". Drives a result banner. */
+   *  only): "oom" | "disk-space" | "network" | "cdxgen-unavailable". Drives a
+   *  result banner. */
   sbomToolDegraded?: string | null;
   /** CycloneDX root component type (application/firmware/container/…) — drives
    *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
@@ -391,6 +392,46 @@ export interface AiProfileCrosswalkFramework {
   review: number;
 }
 
+/** One condition attached to a model's risk verdict (assess-ai-risk.sh). */
+export interface AiRiskCondition {
+  id: string;
+  label: string;
+  label_ko: string;
+}
+
+/** One model's risk verdict, re-aggregated by generate-ai-profile.sh from the
+ *  registry's summaries/conditions (assess-ai-risk.sh is the source of truth
+ *  for the grade itself; this is a read of what it stamped). */
+export interface AiRiskModel {
+  name: string;
+  version: string;
+  license: string;
+  overall: "ok" | "conditional" | "caution" | "review";
+  usageContext: string;
+  /** Only the axes actually evaluated for this model. */
+  axes: Partial<Record<"license" | "security" | "datasets", "ok" | "conditional" | "caution" | "review">>;
+  reasons: string[];
+  summary: string;
+  summary_ko: string;
+  conditions: AiRiskCondition[];
+  sourceUrls: string[];
+}
+
+/**
+ * Model risk assessment rollup (assess-ai-risk.sh verdicts re-aggregated by
+ * generate-ai-profile.sh). Present only when the pipeline stamped an
+ * assessment; absent on older runs and non-assessed scans, and the AI summary
+ * card falls back to `SbomSummary.assessCounts` in that case. Guidance, not
+ * legal advice — the disclaimer travels with the data.
+ */
+export interface AiRiskAssessment {
+  usageContext: string;
+  disclaimer: string;
+  disclaimer_ko: string;
+  counts: Record<"ok" | "conditional" | "caution" | "review", number>;
+  models: AiRiskModel[];
+}
+
 /**
  * AI compliance profile — a card-sized rollup gathered from a run's
  * `_ai-profile.json` (generate-ai-profile.sh re-aggregates the conformance + SBOM
@@ -421,6 +462,8 @@ export interface AiProfile {
     disclaimer: string;
     frameworks: AiProfileCrosswalkFramework[];
   };
+  /** Model risk assessment rollup, when the pipeline stamped one. */
+  riskAssessment?: AiRiskAssessment;
 }
 
 /**

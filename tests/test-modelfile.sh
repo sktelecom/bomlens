@@ -101,6 +101,74 @@ with zipfile.ZipFile(p("model.npz"), "w") as z:
 
 with open(p("random.bin"), "wb") as f:
     f.write(b"\xde\xad\xbe\xef" * 64)
+
+# GGUF chat templates: a known Jinja2 sandbox-escape gadget chain, and a clean
+# multi-turn loop with none of the gadget tokens.
+risky_template = "{{ ''.__class__.__mro__[1].__subclasses__() }}"
+clean_template = "{% for message in messages %}{{ message.content }}{% endfor %}"
+
+def gguf_with_template(name, template):
+    kvs = [kv_str("general.architecture", "llama")]
+    if template is not None:
+        kvs.append(kv_str("tokenizer.chat_template", template))
+    with open(p(name), "wb") as f:
+        f.write(b"GGUF" + struct.pack("<I", 3) + struct.pack("<Q", 0) + struct.pack("<Q", len(kvs)))
+        for k in kvs:
+            f.write(k)
+
+gguf_with_template("template_risk.gguf", risky_template)
+gguf_with_template("template_clean.gguf", clean_template)
+
+# Keras HDF5: the model_config JSON attribute is just readable text in the
+# file, so a synthetic file only needs the HDF5 magic and that text somewhere
+# in it — an HDF5 parser is not required to test a byte scan of one.
+def keras_h5(name, layer_class):
+    # The bytes an HDF5 root-group attribute named "model_config" holds are
+    # just the UTF-8 JSON text below, unwrapped -- exactly what a real Keras
+    # .h5 file puts on disk for that attribute.
+    config = json.dumps({"class_name": "Sequential",
+                          "config": {"layers": [{"class_name": layer_class, "config": {}}]}})
+    with open(p(name), "wb") as f:
+        f.write(b"\x89HDF\r\n\x1a\n")
+        f.write(b"\x00" * 32)
+        f.write(config.encode())
+        f.write(b"\x00" * 32)
+
+keras_h5("lambda.h5", "Lambda")
+keras_h5("dense.h5", "Dense")
+
+# .keras: a zip with config.json (+ metadata.json), matching the Keras 3
+# archive layout inspect_zip() looks for. config.json is parsed as plain JSON,
+# never executed.
+def keras_zip(name, layer_class):
+    config = {"class_name": "Sequential",
+              "config": {"layers": [{"class_name": "InputLayer", "config": {}},
+                                     {"class_name": layer_class, "config": {}}]}}
+    with zipfile.ZipFile(p(name), "w") as z:
+        z.writestr("metadata.json", json.dumps({"keras_version": "3.0.0"}))
+        z.writestr("config.json", json.dumps(config))
+        z.writestr("model.weights.h5", b"\x89HDF\r\n\x1a\n" + b"\x00" * 16)
+
+keras_zip("lambda.keras", "Lambda")
+keras_zip("dense.keras", "Dense")
+
+# ONNX: no real protobuf library involved, just the exact byte pattern
+# parse_onnx()/find_onnx_external_data_locations() looks for: field1 "location"
+# (key) immediately followed by field2 (value), the same order every onnx
+# writer that serializes fields in field-number order produces.
+def onnx_bytes(location):
+    body = b"\x08\x07"  # ir_version varint, satisfies sniff_format's onnx heuristic
+    if location is not None:
+        loc = location.encode()
+        body += b"\x0a\x08location\x12" + bytes([len(loc)]) + loc
+    return body
+
+with open(p("escape.onnx"), "wb") as f:
+    f.write(onnx_bytes("../../etc/passwd"))
+with open(p("safe.onnx"), "wb") as f:
+    f.write(onnx_bytes("weights/model.onnx.data"))
+with open(p("noext.onnx"), "wb") as f:
+    f.write(onnx_bytes(None))
 PY
 
 read_one() { python3 "$READER" "$WORK/$1" "$WORK/$1.bom.json" "${2:-1.0}" "scan-$1" 2>"$WORK/$1.err"; }
@@ -123,6 +191,22 @@ if read_one model.gguf; then
     fi
 else
     fail "GGUF file refused" "$(cat "$WORK/model.gguf.err")"
+fi
+
+echo "== a file with no tokenizer.chat_template key carries no template-risk property =="
+[ -z "$(prop model.gguf bomlens:modelfile:ggufTemplateRisk)" ] && pass "no chat template -> no ggufTemplateRisk" || fail "ggufTemplateRisk stamped without a template"
+
+echo "== GGUF chat template: a pure string scan for known Jinja2 sandbox-escape gadgets =="
+if read_one template_risk.gguf; then
+    r=$(prop template_risk.gguf bomlens:modelfile:ggufTemplateRisk)
+    [ "$r" = "__class__,__mro__,__subclasses__" ] && pass "gadget tokens found and sorted" || fail "ggufTemplateRisk='$r'"
+else
+    fail "template_risk.gguf refused" "$(cat "$WORK/template_risk.gguf.err")"
+fi
+if read_one template_clean.gguf; then
+    [ -z "$(prop template_clean.gguf bomlens:modelfile:ggufTemplateRisk)" ] && pass "a plain loop template is not flagged" || fail "clean template wrongly flagged"
+else
+    fail "template_clean.gguf refused" "$(cat "$WORK/template_clean.gguf.err")"
 fi
 
 echo "== safetensors: tensor shapes, dtypes and the optional metadata block =="
@@ -169,6 +253,53 @@ if read_one model.npz; then
     [ -z "$(prop model.npz bomlens:weights:pickleFiles)" ] && pass "npz is not counted as pickle-format on its own" || fail "npz wrongly flagged as pickle-format"
 else
     fail "npz refused" "$(cat "$WORK/model.npz.err")"
+fi
+
+echo "== Keras .h5: a Lambda layer in the model_config attribute text is found by a bounded byte scan =="
+if read_one lambda.h5; then
+    [ "$(prop lambda.h5 bomlens:modelfile:format)" = "keras-h5" ] && pass "HDF5 magic -> keras-h5" || fail "lambda.h5 misread"
+    [ "$(prop lambda.h5 bomlens:weights:marshalledCode)" = "1" ] && pass "Lambda layer flagged as marshalled-code risk" || fail "bomlens:weights:marshalledCode missing"
+else
+    fail "lambda.h5 refused" "$(cat "$WORK/lambda.h5.err")"
+fi
+if read_one dense.h5; then
+    [ "$(prop dense.h5 bomlens:modelfile:format)" = "keras-h5" ] && pass "a plain Dense layer .h5 still reads as keras-h5" || fail "dense.h5 misread"
+    [ -z "$(prop dense.h5 bomlens:weights:marshalledCode)" ] && pass "no Lambda layer -> not flagged" || fail "dense.h5 wrongly flagged"
+else
+    fail "dense.h5 refused" "$(cat "$WORK/dense.h5.err")"
+fi
+
+echo "== Keras .keras: config.json is parsed as JSON only, never executed =="
+if read_one lambda.keras; then
+    [ "$(prop lambda.keras bomlens:modelfile:format)" = "keras-zip" ] && pass "config.json+metadata.json -> keras-zip" || fail "lambda.keras misread"
+    [ "$(prop lambda.keras bomlens:weights:marshalledCode)" = "1" ] && pass "Lambda layer found in config.json" || fail "bomlens:weights:marshalledCode missing"
+else
+    fail "lambda.keras refused" "$(cat "$WORK/lambda.keras.err")"
+fi
+if read_one dense.keras; then
+    [ "$(prop dense.keras bomlens:modelfile:format)" = "keras-zip" ] && pass "dense.keras reads as keras-zip" || fail "dense.keras misread"
+    [ -z "$(prop dense.keras bomlens:weights:marshalledCode)" ] && pass "no Lambda layer -> not flagged" || fail "dense.keras wrongly flagged"
+else
+    fail "dense.keras refused" "$(cat "$WORK/dense.keras.err")"
+fi
+
+echo "== ONNX external_data: a location escaping the model's own directory is flagged =="
+if read_one escape.onnx; then
+    [ "$(prop escape.onnx bomlens:modelfile:format)" = "onnx" ] && pass "escape.onnx reads as onnx" || fail "escape.onnx misread"
+    e=$(prop escape.onnx bomlens:modelfile:onnxExternalDataEscape)
+    [ "$e" = "../../etc/passwd" ] && pass "the escaping location is named" || fail "onnxExternalDataEscape='$e'"
+else
+    fail "escape.onnx refused" "$(cat "$WORK/escape.onnx.err")"
+fi
+if read_one safe.onnx; then
+    [ -z "$(prop safe.onnx bomlens:modelfile:onnxExternalDataEscape)" ] && pass "a safe relative location is not flagged" || fail "safe.onnx wrongly flagged"
+else
+    fail "safe.onnx refused" "$(cat "$WORK/safe.onnx.err")"
+fi
+if read_one noext.onnx; then
+    [ -z "$(prop noext.onnx bomlens:modelfile:onnxExternalDataEscape)" ] && pass "no external_data reference -> nothing flagged" || fail "noext.onnx wrongly flagged"
+else
+    fail "noext.onnx refused" "$(cat "$WORK/noext.onnx.err")"
 fi
 
 echo "== a file we cannot identify is refused, not described =="
@@ -267,7 +398,7 @@ esac
 echo "== the status vocabulary is the same on both sides =="
 py_states=$(grep -oE '^#   (clean|suspicious|unsafe|not-applicable|error)' "$LIB/scan-model-file-security.py" \
             | awk '{print $2}' | sort | tr '\n' ' ')
-ts_states=$(sed -n '/LOCAL_SCAN_STATUSES/,/\]/p' "$ROOT_DIR/docker/web/frontend/src/lib/models.ts" \
+ts_states=$(sed -n '/LOCAL_SCAN_STATUSES/,/\]/p' "$ROOT_DIR/docker/web/frontend/src/lib/models.tsx" \
             | grep -oE '"[a-z-]+"' | tr -d '"' | sort | tr '\n' ' ')
 [ "$py_states" = "$ts_states" ] && pass "scanner and web UI agree on the status values" \
     || fail "status vocabulary drifted" "scanner: $py_states / ui: $ts_states"
@@ -284,6 +415,11 @@ if python3 -c "import picklescan" 2>/dev/null; then
     else
         fail "no finding recorded for the malicious pickle"
     fi
+
+    echo "== a Keras Lambda finding lands in the same verdict vocabulary, not run through picklescan =="
+    [ "$(run_scan lambda.h5)" = "suspicious" ] && pass "a Lambda layer reads suspicious, like a custom pickle global" || fail "lambda.h5 did not read suspicious"
+    [ "$(prop lambda.h5 bomlens:localscan:tool)" = "bomlens-modelfile-scan" ] && pass "the tool name does not claim picklescan ran" || fail "localscan:tool wrongly names picklescan"
+    [ "$(run_scan dense.h5)" = "clean" ] && pass "no Lambda layer reads clean" || fail "dense.h5 did not read clean"
 else
     echo "  SKIP: picklescan not installed (pip install picklescan) — verdict mapping still covered above"
 fi

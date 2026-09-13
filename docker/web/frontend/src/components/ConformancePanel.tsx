@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
 import {
   fileUrl,
-  type AiProfile,
   type ConformanceCheck,
   type ConformanceSummary,
   type ResultFile,
@@ -31,7 +30,6 @@ import {
   matchesQuery,
   registryTally,
   missingOverflow,
-  profileCard,
   sortByAttention,
   splitChecks,
   verdictTally,
@@ -56,78 +54,6 @@ function statusOf(check: ConformanceCheck) {
 /** For rows that carry a status without the rest of a check (crosswalk elements). */
 function statusOfValue(s: string) {
   return STATUS[s as keyof typeof STATUS] ?? STATUS.warn;
-}
-
-/** AI compliance summary card — a compact one-glance rollup shown at the top of
- *  the Conformance section when an AI profile exists. Consumes only the profile
- *  summary counts (no big arrays). Documentation aid, not a compliance verdict. */
-function AiProfileCard({ profile }: { profile: AiProfile }) {
-  const { t } = useTranslation();
-  const m = profileCard(profile);
-  const verdictTone =
-    m.result === "pass"
-      ? "success"
-      : m.result === "fail"
-        ? "critical"
-        : m.result === "warn"
-          ? "medium"
-          : "info";
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm font-semibold text-foreground">
-            {t("aiProfile.title")}
-          </div>
-          <Badge tone={verdictTone}>
-            {t(`aiProfile.verdict.${m.result}`, { defaultValue: m.result })}
-          </Badge>
-        </div>
-        <p className="text-xs text-muted-foreground">{t("aiProfile.note")}</p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border p-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              {t("aiProfile.g7Label")}
-            </div>
-            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-              {t("aiProfile.g7Value", { present: m.g7Present, auto: m.g7Auto })}
-            </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {t("aiProfile.g7Detail", { gap: m.g7Gap, review: m.g7Review })}
-            </div>
-          </div>
-          <div className="rounded-md border p-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              {t("aiProfile.licenseLabel")}
-            </div>
-            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-              {t("aiProfile.licenseValue", { count: m.licenseTotal })}
-            </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {t("aiProfile.licenseDetail", {
-                behavioral: m.licenseBehavioral,
-                nonCommercial: m.licenseNonCommercial,
-              })}
-            </div>
-          </div>
-          <div className="rounded-md border p-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              {t("aiProfile.crosswalkLabel")}
-            </div>
-            <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-              {t("aiProfile.crosswalkValue", { count: m.frameworkCount })}
-            </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {t("aiProfile.crosswalkDetail", {
-                present: m.crosswalk.present,
-                total: m.crosswalk.total,
-              })}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 /** "Regulatory crosswalk" sub-block inside the conformance panel — one row per
@@ -444,7 +370,7 @@ function KindChip({
 }
 
 /** A named group of checks, folded away when it holds nothing to act on. */
-function CheckGroup({
+export function CheckGroup({
   title,
   checks,
   defaultOpen,
@@ -493,13 +419,10 @@ function CheckGroup({
  */
 export function ConformancePanel({
   conformance,
-  aiProfile,
   scanId,
   results = [],
 }: {
   conformance: ConformanceSummary;
-  /** AI compliance profile card (AI SBOMs only); null otherwise. */
-  aiProfile?: AiProfile | null;
   /** Scoping for the report download links; omit to hide them. */
   scanId?: string | null;
   /** This scan's artifacts, to offer the same report as a file. */
@@ -576,9 +499,14 @@ export function ConformancePanel({
               ))
             : null}
         </div>
-        {/* Says what "conformance" here measures — SBOM format/submission
-            requirements, not regulatory compliance — so the section title is not
-            read as a compliance verdict. */}
+        {/* Says what "conformance" here measures — this SBOM's own fields
+            against format and regulatory requirements, not a judgment of the
+            scanned software or (for a self-generated SBOM) a verdict BomLens
+            passes on its own document — so the section title and its "SBOM
+            Validation" name are not read as a compliance verdict on the
+            scanned software. Reachable for every scan except a self-generated
+            AI SBOM, whose G7 rollup lives on Models & datasets instead (see
+            nav.ts) to avoid showing it twice. */}
         <p className="max-w-3xl text-sm text-muted-foreground">{t("g7.panelIntro")}</p>
         <p className="text-sm text-foreground">
           <span className="font-medium">
@@ -676,8 +604,6 @@ export function ConformancePanel({
               </CardContent>
             </Card>
           )}
-
-          {aiProfile && kind === null && !query ? <AiProfileCard profile={aiProfile} /> : null}
 
           {g7.length > 0 && (
             <Card>

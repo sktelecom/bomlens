@@ -798,7 +798,7 @@ cat > "$atmp/rr_security.json" <<'EOF'
 ]}]}
 EOF
 printf 'License: MIT\n' > "$atmp/rr_NOTICE.txt"
-bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" >/dev/null 2>&1
+bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" ANALYZE >/dev/null 2>&1
 if grep -q "7 days" "$atmp/rr_risk-report.md" && grep -q "30 days" "$atmp/rr_risk-report.md"; then
     pass "risk report: Critical-7d / High-30d deadlines present (md, en default)"
 else
@@ -820,7 +820,7 @@ else
     fail "risk report: surfaces unmet conformance items (en default)"
 fi
 # REPORT_LANG=ko renders the same report in Korean (deadlines + unmet-items note).
-REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" >/dev/null 2>&1
+REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" ANALYZE >/dev/null 2>&1
 if grep -q "7일 이내" "$atmp/rr_risk-report.md" && grep -q "30일 이내" "$atmp/rr_risk-report.md" \
    && grep -q "포맷 검증 미충족 항목" "$atmp/rr_risk-report.md" && grep -q 'lang="ko"' "$atmp/rr_risk-report.html"; then
     pass "risk report (ko): deadlines + unmet-items note localized"
@@ -905,6 +905,8 @@ else
         else
             fail "nodejs SOURCE: Open-source risk analysis report generated (all-modes default)"
         fi
+        # Conformance check now runs on generation modes too (not only ANALYZE/AI SBOM).
+        [ -f "$w/testapp_1.0_conformance.json" ] && pass "nodejs SOURCE: conformance artifact generated" || fail "nodejs SOURCE: conformance artifact generated"
         rm -rf "$w"
     else
         skip "nodejs example not found"
@@ -1026,6 +1028,7 @@ else
         fail "alpine image scan: valid SBOM" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; [ "$VERBOSE" = true ] && sed 's/^/        /' "$w/_scan.log"
     fi
     [ -f "$w/alpinetest_3.19_NOTICE.txt" ] && pass "alpine image scan: notice produced" || fail "alpine image scan: notice produced"
+    [ -f "$w/alpinetest_3.19_conformance.json" ] && pass "alpine image scan: conformance artifact produced" || fail "alpine image scan: conformance artifact produced"
     rm -rf "$w"
 fi
 

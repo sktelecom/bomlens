@@ -94,6 +94,7 @@ The file's own header is the only source, and no image is pulled — this runs i
 | GGUF | model name, license, architecture, quantization, tensor count |
 | safetensors | tensor count, dtypes, parameter count, plus whatever the optional `__metadata__` block declares (often a license) |
 | PyTorch (`.pt`/`.pth`/`.ckpt`), pickle | the archive layout, and that the weights are pickle-format |
+| Keras (`.h5`/`.keras`) | the format itself, and whether a `Lambda` layer is present |
 | npz, npy | the member list |
 | ONNX | the format itself (deeper metadata needs a protobuf parser) |
 
@@ -101,19 +102,19 @@ Every format contributes the file size and a SHA-256 over the whole file, which 
 
 #### Does loading it run code?
 
-Pickle is not a data format. Loading one runs whatever the stream tells the interpreter to run, which is why a checkpoint in that format is a risk of its own — separate from its license, and separate from any CVE. For a model on HuggingFace, BomLens reports what the Hub's own scan found. A file nobody published has no such record, so the scan runs here instead, with [picklescan](https://github.com/mmaitre314/picklescan) — the same tool the Hub uses.
+Pickle is not a data format. Loading one runs whatever the stream tells the interpreter to run, which is why a checkpoint in that format is a risk of its own — separate from its license, and separate from any CVE. A Keras `.h5`/`.keras` file carries the same kind of risk in a different shape: a `Lambda` layer can embed a Python function serialized with `marshal`, which runs when Keras deserializes the layer. For a model on HuggingFace, BomLens reports what the Hub's own scan found. A file nobody published has no such record, so the scan runs here instead — [picklescan](https://github.com/mmaitre314/picklescan) for the pickle formats (the same tool the Hub uses), and a plain text check for the `Lambda` marker for Keras, since nothing needs deserializing to find that.
 
 The verdict lands on the model component and feeds the file-security axis of the risk assessment:
 
 | Verdict | Meaning | Assessment |
 | --- | --- | --- |
-| Code-execution globals found | a dangerous global such as `os.system` is reachable | caution |
-| Globals that need a look | something that could be code, typically a custom class | review |
-| No code-execution globals | the pickle payload was parsed and held nothing of the kind | ok |
+| Code-execution globals found | a dangerous global such as `os.system` is reachable in the pickle stream | caution |
+| Something that needs a look | a pickle global that could be code (typically a custom class), or a Keras file with a `Lambda` layer | review |
+| No code-execution risk found | the pickle payload held nothing of the kind, or no `Lambda` layer was found in the Keras file | ok |
 | Format does not execute code | GGUF, safetensors, ONNX, plain npy | ok |
 | Could not be read | the file did not parse | review |
 
-Two things worth knowing about the middle rows. "Globals that need a look" is common in perfectly legitimate checkpoints — a model class of its own is enough to trigger it — so it asks for a human rather than raising an alarm. And a clean result answers one question only: it says the weights do not execute code on load, not that the file has been cleared of everything. It is a pickle analysis, not a malware scan.
+Two things worth knowing about the middle rows. "Something that needs a look" is common in perfectly legitimate checkpoints — a model class of its own, or a `Lambda` layer used for an ordinary activation function, is enough to trigger it — so it asks for a human rather than raising an alarm. And a clean result answers one question only: it says the weights do not execute code on load by this specific path, not that the file has been cleared of everything. For pickle it is a pickle analysis, not a malware scan; for Keras it is a text search for the `Lambda` marker, not a parse of the model config.
 
 An `.npz` is opened and only the members that actually hold a pickle are examined: a numpy array of dtype `object` stores its contents as a pickle, which is how a payload hides in what looks like a numeric archive. A file with no such member is reported as not applicable rather than as clean, because nothing was examined.
 
@@ -194,7 +195,7 @@ If you are preparing a model for release inside a company, the approval steps an
 
 "G7 Software Bill of Materials for AI — Minimum Elements" is a guideline published in May 2026 under the G7, led by Germany's BSI and Italy's ACN. It defines 50 minimum elements, grouped into seven clusters, that an SBOM for an AI model should carry: who made the model, what it is, what data it was trained on, how it is secured, and how it performs. It is a non-binding recommendation, not a regulation.
 
-It still matters for regulation. The EU AI Act's high-risk and transparency obligations apply from 2 August 2026, and the technical documentation its Annex IV asks for overlaps substantially with the G7 clusters. BomLens does not certify compliance with either text. What the conformance report gives you is visibility: element by element, it shows what your model's documentation already covers and what a person still has to supply — a concrete way to prepare, not a compliance verdict.
+It still matters for regulation. The EU AI Act's high-risk and transparency obligations apply from 2 August 2026, and the technical documentation its Annex IV asks for overlaps substantially with the G7 clusters. What the conformance report gives you is visibility: element by element, it shows what your model's documentation already covers and what a person still has to supply — a concrete way to prepare, not a compliance verdict (see [Limits](#limits) for what it does not certify).
 
 BomLens shows the 50 elements as 51 checks. Model openness (whether weights, architecture, training data and training process are disclosed) is one facet of the Model license element in the G7 text, but it is worth seeing on its own, so it gets a separate row.
 
@@ -224,7 +225,7 @@ For an AI SBOM, two more frameworks map onto the G7 elements:
 - EU AI Act — the technical-documentation sections of Annex IV (Regulation (EU) 2024/1689, Article 11(1)).
 - AI Framework Act (Korea) — the Act's articles on transparency (제31조), safety and risk management (제32조), high-impact AI (제33·34조), and impact assessment (제35조). The Act sets framework-level duties, so these links are coarser than the EU ones.
 
-The crosswalk is a preparation aid, not a compliance verdict. BomLens does not certify compliance with any of these texts, and the report says so in the section itself. Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups findings the checks already produced.
+The crosswalk is a preparation aid, not a compliance verdict (see [Limits](#limits)). Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups findings the checks already produced.
 
 The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by check id — the G7 element ids for the AI checks and the plain CycloneDX check ids for the base format checks. It is deliberately conservative: only checks with a defensible correspondence are mapped (38 today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when a check is renamed.
 
@@ -266,7 +267,7 @@ The verdicts are guidance, not legal advice, and every report that prints them s
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model.
 - Dataset entries record what a dataset declares about itself. Whether the declared license is the right one, and whether a derived dataset is compatible with the ones it came from, is a judgement the report leaves to a reviewer.
 - A compound SPDX license expression (`MIT OR Apache-2.0`) is assessed as a whole rather than by resolving the choice, so a dual-licensed model can read `review` where either option alone would be `ok`. The direction is deliberately cautious — it never under-warns — but it may over-flag; the report names the exact expression so a reviewer can confirm.
-- The conformance report does not certify compliance with the EU AI Act or any other regulation. It makes documentation gaps visible so a person can close them.
+- The conformance report does not certify compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. It makes documentation gaps visible so a person can close them.
 - It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).
 - The model id must be `org/model`. A collection name or a full URL will not resolve.
 

@@ -292,6 +292,18 @@ export function NextApp() {
     if (window.location.hash !== newHash()) window.location.hash = newHash();
   }, [enterHome]);
 
+  // External lookup's top-bar icon (see TopBar.onLookup): the hash router
+  // bails out entirely while a scan is running (`route()`'s first line), the
+  // same way it does for `#/new` and `#/scan/*` — that guard exists because a
+  // live run has no id yet and owns the running-scan view itself. So reaching
+  // Lookup mid-run needs the same imperative reset-then-navigate shape
+  // goToNewScan uses instead of relying on the plain `<a href>` alone.
+  const goToLookup = useCallback(() => {
+    setHomeView("lookup");
+    if (loadedIdRef.current !== null || status !== "idle") resetToHome();
+    if (window.location.hash !== lookupHash()) window.location.hash = lookupHash();
+  }, [status, resetToHome]);
+
   // Run the router on mount and on real navigations (hashchange) only — never on
   // a bare status change. Re-running it on status change would, when a scan
   // started from #/new fails (status → error while the hash is still #/new),
@@ -496,6 +508,7 @@ export function NextApp() {
       homeHref={homeHash()}
       showHomeLink={!(isHome && homeView === "recent")}
       lookupHref={lookupEnabled ? lookupHash() : undefined}
+      onLookup={lookupEnabled ? goToLookup : undefined}
       onNewScan={goToNewScan}
       project={isHome ? undefined : projectInfo}
       search={

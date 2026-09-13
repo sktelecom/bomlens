@@ -44,7 +44,7 @@ import {
 } from "@/lib/overview";
 import { type ProvenanceKind, provenanceOf } from "@/lib/provenance";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
-import { conformanceCount, isAiScan, sbomFileName } from "@/lib/results";
+import { conformanceCount, inputSbomFileName, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +77,20 @@ const PROVENANCE_ICON: Record<ProvenanceKind, LucideIcon> = {
   sbom: FileJson,
   model: Cpu,
 };
+
+/** Which body copy explains why cdxgen fell back to a direct-deps-only scan. */
+function sbomDegradedBodyKey(reason: string): string {
+  switch (reason) {
+    case "disk-space":
+      return "result.sbomDegradedDisk";
+    case "oom":
+      return "result.sbomDegradedOom";
+    case "network":
+      return "result.sbomDegradedNetwork";
+    default:
+      return "result.sbomDegradedBody";
+  }
+}
 
 function ProvenanceIcon({
   kind,
@@ -218,7 +232,14 @@ export function Overview({
   const attention = needsAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
   const ai = isAiScan(result);
-  const hasConformance = Boolean(result.conformance?.checks?.length);
+  // Mirrors nav.ts's gate on the Conformance section itself: a jump card that
+  // opened a section the sidebar doesn't show would be a dead end. A
+  // self-generated AI SBOM's G7 rollup has its own entry points instead
+  // (AiSummaryCard above, and the "models" jump card below) — every other
+  // scan, supplied or self-generated software, shows the section.
+  const hasConformance =
+    Boolean(result.conformance?.checks?.length) &&
+    (Boolean(inputSbomFileName(result)) || !ai);
   const comparison = scanId ? scanComparison(recent, scanId) : null;
   const provenance = provenanceOf(result.scanConfig);
 
@@ -306,13 +327,6 @@ export function Overview({
           </CardContent>
         </Card>
       )}
-      {ai && (
-        <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
-          <div className="text-sm font-medium text-foreground">{t("result.aiScanTitle")}</div>
-          <p className="mt-1 text-xs">{t("result.aiScanBody")}</p>
-        </div>
-      )}
-
       {/* Zero components is the one result a reader reliably misreads: it looks
           like "nothing to worry about" when it almost always means the scan had
           nothing to read. The CLI says so twice in its log; before this the web
@@ -373,15 +387,29 @@ export function Overview({
       {result.sbom?.sbomToolDegraded && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
           <div className="text-sm font-medium">{t("result.sbomDegradedTitle")}</div>
-          <p className="mt-1 text-xs">
-            {t(
-              result.sbom.sbomToolDegraded === "disk-space"
-                ? "result.sbomDegradedDisk"
-                : "result.sbomDegradedBody",
-            )}
-          </p>
+          <p className="mt-1 text-xs">{t(sbomDegradedBodyKey(result.sbom.sbomToolDegraded))}</p>
         </div>
       )}
+
+      {/* An empty dependency graph is a real pipeline defect: cdxgen ran, but
+          a later step dropped the graph before it reached the SBOM (the
+          failure mode carry-dependencies.py exists to prevent for firmware
+          merges) — the same causal-banner treatment sbomToolDegraded already
+          gives a different cause, rather than leaving it to the Conformance
+          screen's own "transitive" row alone. hasConformance is false only
+          for a self-generated AI SBOM (its G7 rollup lives on Models &
+          datasets instead, with no "transitive" check to speak of), so this
+          is effectively dormant there and never fires for the software scans
+          it was written for now that the Conformance screen shows for them. */}
+      {!hasConformance &&
+        result.conformance?.checks?.some(
+          (c) => c.id === "transitive" && c.status === "fail",
+        ) && (
+          <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
+            <div className="text-sm font-medium">{t("result.sbomGraphEmptyTitle")}</div>
+            <p className="mt-1 text-xs">{t("result.sbomGraphEmptyBody")}</p>
+          </div>
+        )}
 
       {result.scanoss?.status === "unavailable" && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">

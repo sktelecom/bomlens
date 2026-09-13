@@ -707,18 +707,22 @@ cd "$TEST_DIR" || true
 # ========================================================
 print_test "Test 9/15: RootFS directory analysis"
 
-mkdir -p rootfs-test/usr/bin
+# etc/ plus at least two of bin/sbin/usr/lib/var is what _is_rootfs_dir() looks
+# for (scan-sbom.sh): etc/ alone, or etc/ plus only one of those, still reads as
+# an ordinary source tree and is routed to SOURCE instead, which would stop
+# this test from exercising the ROOTFS (syft) path it is meant to cover.
+mkdir -p rootfs-test/etc rootfs-test/usr/bin rootfs-test/var
 cd rootfs-test || true
 
 # Create minimal rootfs structure
 echo "test" > usr/bin/test-file
 
 if run_scan_with_logs "test-rootfs" "TestRootFS" "1.0.0" "--target ."; then
-    if FOUND=$(find_bom_file "TestRootFS" "1.0.0"); then
+    if FOUND=$(find_bom_file "TestRootFS" "1.0.0") && grep -q "Mode: ROOTFS" "$LOG_DIR/test-rootfs.log"; then
         print_success "RootFS Directory"
         PASSED=$((PASSED + 1))
     else
-        print_error "RootFS Directory (SBOM file not generated)"
+        print_error "RootFS Directory (SBOM file not generated, or not routed to ROOTFS)"
         show_failure_log "test-rootfs"
         FAILED=$((FAILED + 1))
     fi
@@ -729,6 +733,38 @@ else
 fi
 
 cd "$TEST_DIR" || true
+
+# ========================================================
+# Test 9b: a plain source directory named directly with --target must be
+# routed to SOURCE (cdxgen), not ROOTFS (syft) — issue #47. Before the fix,
+# every directory --target (other than a Yocto build dir) was hard-routed to
+# ROOTFS regardless of what it held, so cdxgen never ran and the resulting
+# SBOM carried no resolved dependencies, licenses or hashes.
+# ========================================================
+print_test "Test 9b/15: --target directory routes to SOURCE, not ROOTFS"
+
+mkdir -p dirtarget-src/app
+cat > dirtarget-src/app/package.json <<'EOF'
+{ "name": "dirtarget-app", "version": "1.0.0", "dependencies": { "express": "^4.18.0" } }
+EOF
+
+if run_scan_with_logs "test-dirtarget" "DirTarget" "1.0.0" "--target dirtarget-src/app"; then
+    DT_BOM=$(find_bom_file "DirTarget" "1.0.0" || true)
+    if [ -n "$DT_BOM" ] \
+       && grep -q "Mode: SOURCE" "$LOG_DIR/test-dirtarget.log" \
+       && assert_bom_sane "$DT_BOM" "DirTarget"; then
+        print_success "--target directory (routed to SOURCE, cdxgen ran)"
+        PASSED=$((PASSED + 1))
+    else
+        print_error "--target directory (not routed to SOURCE, or SBOM missing/malformed)"
+        show_failure_log "test-dirtarget"
+        FAILED=$((FAILED + 1))
+    fi
+else
+    print_error "--target directory (Scan failed)"
+    show_failure_log "test-dirtarget"
+    FAILED=$((FAILED + 1))
+fi
 
 # ========================================================
 # Test 10: Example projects validation

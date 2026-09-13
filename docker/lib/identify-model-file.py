@@ -16,13 +16,18 @@
 #
 # What each format yields differs, and the difference is reported rather than
 # smoothed over:
-#   GGUF         name, license, architecture, quantization, tensor count
+#   GGUF         name, license, architecture, quantization, tensor count, and
+#                (best-effort) a chat-template Jinja sandbox-escape check
 #   safetensors  tensor count, dtypes, parameter count, and whatever the
 #                optional __metadata__ block declares (often nothing)
 #   pytorch-zip  the archive layout, and that the weights are pickle-format
 #   pickle       that the weights are pickle-format
 #   npz          the member list
-#   onnx         the format alone (deep metadata needs a protobuf parser)
+#   onnx         the format alone, plus a check for an external-data path that
+#                escapes the model's own directory (deep metadata needs a real
+#                protobuf parser and stays out of scope)
+#   keras-h5     the format alone, plus a best-effort scan for a Lambda layer
+#   keras-zip    the format alone, plus config.json checked for a Lambda layer
 # A field the file does not carry is left out. Guessing a license or a model
 # name onto a supply-chain document is worse than an honest blank.
 #
@@ -33,7 +38,8 @@
 #
 # Deliberately stdlib-only, so it runs in the base image with no new dependency
 # and works offline. The pickle SECURITY verdict is not here — this only records
-# that a file is pickle-format; opcode analysis is a separate step.
+# that a file is pickle-format (or a Keras file carries a Lambda layer, the
+# marshal-code equivalent); opcode/bytecode analysis is a separate step.
 
 import datetime
 import hashlib
@@ -52,6 +58,19 @@ MAX_STRING = 4 * 1024 * 1024        # one metadata string
 MAX_KV_PAIRS = 100000               # GGUF key/value pairs
 MAX_ST_HEADER = 128 * 1024 * 1024   # safetensors JSON header
 HASH_BLOCK = 4 * 1024 * 1024
+
+# ONNX external_data is graph metadata, not the multi-gigabyte tensors it can
+# point at, so a reference beyond this many bytes into the file is treated as
+# not found rather than followed — the same "refuse rather than guess" stance
+# as the other caps above.
+MAX_ONNX_SCAN = 64 * 1024 * 1024
+MAX_ONNX_LOCATION = 4096            # a path is not multi-kilobyte; longer is noise
+
+# Keras stores its model config (where a Lambda layer's marshalled function
+# would show up) as HDF5 attribute text or a small JSON file, never inside the
+# bulk tensor data. Bounding the .h5 scan keeps this a header read, not a scan
+# of the weights themselves.
+MAX_KERAS_SCAN = 8 * 1024 * 1024
 
 # 1.7, not the docker/lib/cdx-version.sh bash constant (1.6): AI/dataset
 # SBOMs use 1.7 for the `data` component type and richer machine-learning-model
@@ -74,6 +93,8 @@ EXT_CLAIMS = {
     ".npz": "npz",
     ".npy": "npy",
     ".onnx": "onnx",
+    ".h5": "keras-h5",
+    ".keras": "keras-zip",
 }
 
 # The formats whose weights are a Python pickle, i.e. the ones that execute code
@@ -83,6 +104,39 @@ PICKLE_FORMATS = ("pickle", "pytorch-zip")
 GGUF_MAGIC = b"GGUF"
 NPY_MAGIC = b"\x93NUMPY"
 ZIP_MAGIC = b"PK\x03\x04"
+HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
+
+# StringStringEntryProto{key, value} inside a TensorProto.external_data entry:
+# field 1 (key) wire type 2 (length-delimited), length 8, the ASCII bytes of
+# "location", then field 2 (value) wire type 2. Protobuf serializes fields in
+# ascending field-number order, so key comes before value in every onnx file
+# this has been checked against; the varint right after this marker is the
+# value string's length. This is a byte pattern, not a protobuf parser.
+ONNX_LOCATION_KEY = b"\x0a\x08location\x12"
+
+# Known Jinja2 sandbox-escape / SSTI attribute-chain gadgets. Presence of one of
+# these in a chat template is a string match, nothing more: it does not prove a
+# template is malicious (a doc comment could quote one) and its absence does
+# not prove a template is safe (a gadget can be built without any single one of
+# these tokens). __class__/__mro__/__subclasses__/__base__/__bases__ walk the
+# type hierarchy to reach an unsandboxed builtin; __globals__/__builtins__ reach
+# a function's global namespace directly; lipsum/cycler/joiner are Jinja2's own
+# globals that are known to expose __init__.__globals__ when dunder attribute
+# access on plain objects is blocked; the rest are the usual code-execution
+# sinks such a chain is built to reach.
+GGUF_TEMPLATE_GADGETS = (
+    "__class__", "__mro__", "__subclasses__", "__base__", "__bases__",
+    "__globals__", "__builtins__", "__getattribute__", "__init__.__globals__",
+    "__import__", "lipsum", "cycler", "joiner",
+    "os.popen", "os.system", "subprocess", "popen(", "eval(", "exec(",
+    "compile(", "getattr(",
+)
+
+# Keras writes a layer's serialized form as {"class_name": <type>, "config":
+# ...} (serialize_keras_object always emits class_name first), so this literal
+# text is what a Lambda layer's entry in the model config looks like whether it
+# was written by json.dumps with or without a space after the colon.
+KERAS_LAMBDA_MARKERS = (b'"class_name": "Lambda"', b'"class_name":"Lambda"')
 
 # GGUF value types that carry a fixed-width payload, and how many bytes each is.
 GGUF_FIXED = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
@@ -100,6 +154,10 @@ GGUF_KEYS = {
     "general.organization": "organization",
     "general.basename": "basename",
     "general.size_label": "sizeLabel",
+    # Not lifted into a property directly (a chat template is often several KB
+    # of Jinja and no consumer of this SBOM wants it verbatim on a component) —
+    # parse_gguf() reads it, runs the gadget scan, and drops the raw text.
+    "tokenizer.chat_template": "chatTemplate",
 }
 
 
@@ -171,6 +229,16 @@ def _gguf_read_value(handle, vtype):
     return None
 
 
+def gguf_template_gadgets(text):
+    """Known Jinja2 sandbox-escape gadget substrings present in a chat template.
+
+    A pure string scan: the template is never rendered, compiled or eval'd.
+    Matching is a signal for a human to look, not a verdict — see the caveats
+    on GGUF_TEMPLATE_GADGETS above.
+    """
+    return sorted({gadget for gadget in GGUF_TEMPLATE_GADGETS if gadget in text})
+
+
 def parse_gguf(path):
     """GGUF header: version, tensor count, and the general.* metadata keys.
 
@@ -203,6 +271,11 @@ def parse_gguf(path):
                     _gguf_skip_value(handle, vtype)
         except (ValueError, struct.error, OSError):
             out["headerTruncated"] = "true"
+    template = out.pop("chatTemplate", None)
+    if template:
+        gadgets = gguf_template_gadgets(template)
+        if gadgets:
+            out["ggufTemplateRisk"] = ",".join(gadgets)
     return out
 
 
@@ -271,6 +344,13 @@ def inspect_zip(path):
     out["archiveMembers"] = str(len(names))
     if any(n.endswith("data.pkl") for n in names):
         return "pytorch-zip", out
+    # Keras 3's .keras archive: config.json (the model architecture) alongside
+    # metadata.json and/or model.weights.h5. Checked by name only — nothing in
+    # the archive is opened here; detect_keras_lambda_zip() reads config.json
+    # later, and only as JSON, never as code.
+    if "config.json" in names and (
+            "metadata.json" in names or any(n.startswith("model.weights") for n in names)):
+        return "keras-zip", out
     npy = [n for n in names if n.endswith(".npy")]
     if npy:
         out["arrays"] = str(len(npy))
@@ -283,6 +363,8 @@ def sniff_format(path, head):
     extra = {}
     if head.startswith(GGUF_MAGIC):
         return "gguf", extra
+    if head.startswith(HDF5_MAGIC):
+        return "keras-h5", extra
     if head.startswith(ZIP_MAGIC):
         return inspect_zip(path)
     if head.startswith(NPY_MAGIC):
@@ -307,6 +389,132 @@ def sniff_format(path, head):
     if head[:1] == b"\x08" and os.path.splitext(path)[1].lower() == ".onnx":
         return "onnx", extra
     return "unknown", extra
+
+
+def _read_varint(data, pos):
+    """Decode one protobuf varint starting at pos.
+
+    Returns (value, next_pos), or None if the buffer runs out or the varint
+    runs past 5 bytes (35 bits — far more than MAX_ONNX_LOCATION could ever
+    need, so a longer one is corruption or hostile input either way).
+    """
+    value = 0
+    for i in range(5):
+        if pos + i >= len(data):
+            return None
+        byte = data[pos + i]
+        value |= (byte & 0x7F) << (7 * i)
+        if not byte & 0x80:
+            return value, pos + i + 1
+    return None
+
+
+def find_onnx_external_data_locations(path):
+    """Best-effort scan for ONNX external_data 'location' string values.
+
+    Not a protobuf parser: onnx.proto's StringStringEntryProto{key, value} is a
+    tag+length-prefixed string field like any other, so a key of "location"
+    immediately followed by the value field is the identical byte sequence
+    every onnx writer that serializes fields in field-number order produces
+    (see ONNX_LOCATION_KEY). A file that serializes the pair in a different
+    order is invisible to this scan — a false negative, not a wrong answer,
+    matching the rest of this module's stance of reporting what was found
+    rather than guessing at what was not. Bounded to MAX_ONNX_SCAN bytes so a
+    hostile file cannot turn this into an unbounded read.
+    """
+    with open(path, "rb") as handle:
+        data = handle.read(MAX_ONNX_SCAN)
+    locations = []
+    start = 0
+    while True:
+        idx = data.find(ONNX_LOCATION_KEY, start)
+        if idx == -1:
+            break
+        value_pos = idx + len(ONNX_LOCATION_KEY)
+        parsed = _read_varint(data, value_pos)
+        if parsed is None:
+            start = idx + 1
+            continue
+        length, body = parsed
+        if 0 < length <= MAX_STRING and body + length <= len(data):
+            try:
+                locations.append(data[body:body + length].decode("utf-8"))
+            except UnicodeDecodeError:
+                pass
+        start = body
+    return locations
+
+
+def path_escapes_dir(base_dir, rel_path):
+    """True if rel_path, resolved against base_dir, would land outside it.
+
+    Same normalize + realpath + prefix-check shape the web layer trusts for
+    output-path traversal (safe_prefix_path in docker/web/server.py): an
+    absolute path or a '..' climb is caught by the resolved path failing to sit
+    under the base directory, not by scanning the string for '..' — which a
+    mixed separator or a symlink could dodge.
+    """
+    if not rel_path:
+        return False
+    base_real = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base_dir, rel_path))
+    return candidate != base_real and not candidate.startswith(base_real + os.sep)
+
+
+def parse_onnx(path):
+    """ONNX external_data references, checked for an escape out of the model's
+    own directory. Everything else about the graph needs a real protobuf
+    parser and stays out of scope, per this module's stdlib-only policy."""
+    out = {}
+    base_dir = os.path.dirname(os.path.abspath(path)) or "."
+    for location in find_onnx_external_data_locations(path):
+        if path_escapes_dir(base_dir, location):
+            out["onnxExternalDataEscape"] = location[:MAX_ONNX_LOCATION]
+            break
+    return out
+
+
+def detect_keras_lambda_h5(path):
+    """Best-effort, bounded scan of an HDF5 file's raw bytes for a serialized
+    Keras Lambda layer.
+
+    Not an HDF5 parser: Keras writes the full model architecture as JSON text
+    into a root-group attribute ("model_config"), and an attribute that size
+    sits in the file as an uncompressed, literally readable string — no
+    marshal.dumps() bytecode is decoded, only the surrounding JSON key every
+    Keras layer serializes with (see KERAS_LAMBDA_MARKERS). A model_config
+    large enough to spill past MAX_KERAS_SCAN, or a build that renamed the key,
+    is missed and reported as absent rather than guessed at.
+    """
+    with open(path, "rb") as handle:
+        chunk = handle.read(MAX_KERAS_SCAN)
+    return any(marker in chunk for marker in KERAS_LAMBDA_MARKERS)
+
+
+def _config_has_lambda(node):
+    """Walk a Keras config tree (dicts/lists from json.loads only, nothing
+    executable) looking for a layer whose class_name is Lambda."""
+    if isinstance(node, dict):
+        if node.get("class_name") == "Lambda":
+            return True
+        return any(_config_has_lambda(value) for value in node.values())
+    if isinstance(node, list):
+        return any(_config_has_lambda(item) for item in node)
+    return False
+
+
+def detect_keras_lambda_zip(path):
+    """config.json inside a .keras archive, parsed as JSON and walked for a
+    Lambda layer — never deserialized as anything executable."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            raw = archive.read("config.json")
+            if len(raw) > MAX_ST_HEADER:
+                return False
+            config = json.loads(raw.decode("utf-8", "replace"))
+    except (zipfile.BadZipFile, KeyError, OSError, ValueError):
+        return False
+    return _config_has_lambda(config)
 
 
 def sha256_file(path):
@@ -354,9 +562,16 @@ def build_bom(path, version, scan_name, fmt, facts, digest):
         # came from.
         props.append({"name": "bomlens:weights:pickleFiles", "value": "1"})
 
+    if facts.get("kerasLambdaLayer"):
+        # Same risk conversation as a pickle-format weight file: a Lambda
+        # layer's config can carry marshal.dumps()'d Python bytecode that runs
+        # when Keras deserializes the layer on load.
+        props.append({"name": "bomlens:weights:marshalledCode", "value": "1"})
+
     for key in ("ggufVersion", "architecture", "quantization", "tensors", "parameters",
                 "dtypes", "weightFormat", "organization", "basename", "sizeLabel",
-                "modelVersion", "archiveMembers", "arrays", "headerTruncated"):
+                "modelVersion", "archiveMembers", "arrays", "headerTruncated",
+                "onnxExternalDataEscape", "ggufTemplateRisk"):
         if facts.get(key):
             props.append({"name": "bomlens:modelfile:" + key, "value": facts[key]})
 
@@ -445,6 +660,14 @@ def main():
         facts.update(parse_gguf(path))
     elif fmt == "safetensors":
         facts.update(parse_safetensors(path))
+    elif fmt == "onnx":
+        facts.update(parse_onnx(path))
+    elif fmt == "keras-h5":
+        if detect_keras_lambda_h5(path):
+            facts["kerasLambdaLayer"] = "true"
+    elif fmt == "keras-zip":
+        if detect_keras_lambda_zip(path):
+            facts["kerasLambdaLayer"] = "true"
 
     if fmt == "unknown":
         # Refuse rather than emit a model component for a file we could not
@@ -453,8 +676,9 @@ def main():
         sys.stderr.write("[modelfile] ERROR: not a recognized model file: %s\n"
                          % os.path.basename(path))
         sys.stderr.write("[modelfile]   Recognized: GGUF, safetensors, PyTorch (.pt/.pth/.ckpt),\n")
-        sys.stderr.write("[modelfile]   pickle, npz, npy, ONNX. A model directory or archive\n")
-        sys.stderr.write("[modelfile]   should be scanned as a source folder instead.\n")
+        sys.stderr.write("[modelfile]   pickle, npz, npy, ONNX, Keras (.h5/.keras). A model\n")
+        sys.stderr.write("[modelfile]   directory or archive should be scanned as a source folder\n")
+        sys.stderr.write("[modelfile]   instead.\n")
         return 3
 
     digest = sha256_file(path)

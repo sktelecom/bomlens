@@ -22,6 +22,10 @@ const DONE = {
   mode: "SOURCE",
   id: "demo_4.0",
   // No artifacts: the Artifacts section's empty state is one of the three.
+  // The Conformance section this spec also opens only exists for a submitted
+  // document under review (nav.ts gates it on an _input.json artifact) — see
+  // open() below, which adds one just for that section rather than here,
+  // so this fixture's own "no artifacts" case stays true for the others.
   results: [],
   security: null,
   conformance: {
@@ -65,8 +69,12 @@ async function open(page: Page, section: string) {
   await page.route("**/scans", (r) =>
     r.fulfill({ contentType: "application/json", body: "[]" }),
   );
+  const fixture =
+    section === "conformance"
+      ? { ...DONE, results: [{ name: "demo_4.0_input.json", size: 1 }] }
+      : DONE;
   await page.route("**/scan?id=demo_4.0", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(fixture) }),
   );
   await page.goto(`/?ui=next#/scan/demo_4.0/${section}`);
   await page.getByRole("navigation").first().waitFor();

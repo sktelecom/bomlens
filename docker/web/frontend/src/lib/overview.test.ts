@@ -72,8 +72,12 @@ describe("needsAttention", () => {
   });
 
   it("flags a failed conformance and leads the list", () => {
+    // Only reachable at all when the Conformance section itself is (a
+    // submitted SBOM under review — nav.ts gates on the same _input.json
+    // artifact this fixture carries).
     const items = needsAttention(
       result({
+        results: [{ name: "acme_1.0.0_input.json", size: 1 }],
         conformance: {
           result: "fail",
           format: "CycloneDX",
@@ -105,6 +109,53 @@ describe("needsAttention", () => {
       }),
     );
     expect(items).toEqual([]);
+  });
+
+  it("flags a failed conformance on a plain generated SBOM too", () => {
+    // No _input.json and no AI component, but the Conformance section still
+    // shows for this scan (nav.ts), so the target is a real destination.
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "fail",
+          checks: [
+            { id: "transitive", label: "Transitive deps", required: true, status: "fail", detail: "" },
+          ],
+        },
+        security: sev({ CRITICAL: 1, TOTAL: 1 }),
+      }),
+    );
+    expect(items.map((i) => i.id)).toEqual(["conformance", "vulns"]);
+  });
+
+  it("offers a conformance gap on a plain generated SBOM too", () => {
+    const items = needsAttention(
+      result({
+        conformance: {
+          result: "pass",
+          checks: [
+            { id: "a", label: "a", detail: "", required: false, status: "warn", source: "auto" },
+          ],
+        },
+      }),
+    );
+    expect(items.map((i) => i.id)).toContain("conformanceGap");
+  });
+
+  it("still excludes both for a self-generated AI SBOM (its rollup lives on Models & datasets)", () => {
+    const items = needsAttention(
+      result({
+        sbom: { components: 1, componentList: [comp({ type: "machine-learning-model" })] },
+        conformance: {
+          result: "fail",
+          checks: [
+            { id: "a", label: "a", detail: "", required: true, status: "fail", source: "auto" },
+          ],
+        },
+      }),
+    );
+    expect(items.map((i) => i.id)).not.toContain("conformance");
+    expect(items.map((i) => i.id)).not.toContain("conformanceGap");
   });
 
   it("flags vendored components for review and orders vulns first", () => {
@@ -213,9 +264,33 @@ describe("needsAttention on an AI scan", () => {
   it("offers the conformance elements a passing SBOM can still fill", () => {
     // Distinct from the failed-mandatory item: this SBOM passes and has
     // documentation gaps a person can close, which is what the advisory
-    // baselines are for.
+    // baselines are for. An actual AI-scan signal (a model component) is
+    // required here — this is the case the section stays reachable for on a
+    // generated (non-supplied) SBOM.
+    // No _input.json: this AI SBOM is BomLens's own (AIBOM/model-file/dataset),
+    // not a submission under review, so there is no "conformance" section to
+    // send the reader to — its G7 gaps surface on Models & datasets instead.
     const items = needsAttention(
       result({
+        sbom: { components: 1, componentList: [comp({ type: "machine-learning-model" })] },
+        conformance: {
+          result: "pass",
+          checks: [
+            { id: "a", label: "a", detail: "", required: false, status: "warn", source: "auto" },
+            { id: "b", label: "b", detail: "", required: false, status: "warn", source: "na" },
+            { id: "c", label: "c", detail: "", required: false, status: "pass", source: "auto" },
+          ],
+        },
+      }),
+    );
+    expect(items.map((i) => i.id)).not.toContain("conformanceGap");
+  });
+
+  it("does still offer the gap for a submitted AI SBOM under review", () => {
+    const items = needsAttention(
+      result({
+        results: [{ name: "model_1.0_input.json", size: 1 }],
+        sbom: { components: 1, componentList: [comp({ type: "machine-learning-model" })] },
         conformance: {
           result: "pass",
           checks: [
@@ -231,9 +306,10 @@ describe("needsAttention on an AI scan", () => {
     expect(gap).toMatchObject({ count: 1, tone: "info", target: "conformance" });
   });
 
-  it("does not repeat the gap when the verdict already failed", () => {
+  it("does not flag a failed conformance on a plain generated AI SBOM", () => {
     const items = needsAttention(
       result({
+        sbom: { components: 1, componentList: [comp({ type: "machine-learning-model" })] },
         conformance: {
           result: "fail",
           checks: [
@@ -242,7 +318,7 @@ describe("needsAttention on an AI scan", () => {
         },
       }),
     );
-    expect(items.map((i) => i.id)).toContain("conformance");
+    expect(items.map((i) => i.id)).not.toContain("conformance");
     expect(items.map((i) => i.id)).not.toContain("conformanceGap");
   });
 });

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.10] - 2026-09-13
+
+### Added
+
+- `--diff <old.json> <new.json>` compares two already-generated AI-model SBOMs and reports drift: a `bomlens:assessment:*` verdict that got worse, a changed declared license, or a SHA-256 weight-file hash that no longer matches under the same model name/purl/HuggingFace id. Needs no `--project`/`--version` or scan target; writes `<new>_model-diff.json`.
+- `--verify-weights`, opt-in with `--model`: downloads only the repo's pickle-format weight files (`.bin`/`.pt`/`.pth`/`.ckpt` — the ones that execute code on load) and runs the same local picklescan verification `--model-file` already runs, instead of only trusting HuggingFace's own scan. Stamps `bomlens:localscan:*` on the model component, worst-status-wins across files.
+- The model-file reader (`--model-file`) now recognizes Keras `.h5`/`.keras` files and checks them for a `Lambda` layer, the marshalled-code equivalent of a pickle-format risk; recognizes an ONNX external-data reference that escapes the model's own directory; and checks a GGUF chat template for known Jinja2 sandbox-escape gadget patterns. All three are static, header/config-only checks — no code is executed, unmarshalled, or rendered.
+- The submission-format conformance check now also runs on the SBOM a scan itself generates (SOURCE, POSTPROCESS, ROOTFS, IMAGE, BINARY, FIRMWARE, MERGE), not only when validating an already-supplied document with `--analyze`. A scan's own output can now be checked before submission without a separate `--analyze` pass.
+- The SBOM Validation section (renamed from "SBOM conformance") now shows for every scan, self-generated ones included, and its intro line states up front that it checks the SBOM's own fields against format and regulatory requirements rather than judging the scanned software. A self-generated AI SBOM's G7 minimum-element disclosure stays on Models & datasets only, so it isn't shown twice.
+- An AI scan's Overview now leads with a summary card: risk verdict, G7 headline, and regulatory crosswalk.
+- The web UI diagnoses why a sibling container scan failed (out of memory, network, or disk, via `docker inspect`) instead of surfacing a bare exit code, and a real pipeline defect (an empty dependency graph) now surfaces as a causal Overview banner.
+- Conformance thresholds (`PURL_MIN_PCT`, `LICENSE_MIN_PCT`, `HASH_MIN_PCT`, `FIELD_MIN_PCT`) are now tunable from the CLI/web UI instead of fixed, and documented.
+- A scan now stamps `bomlens:os-context-ambiguous` when packages from more than one OS were voted on during distro detection, and `bomlens:os-context-unmatched` when rpm/deb/apk packages exist but none carry a distro version.
+- A CycloneDX/SPDX XML input is now named and refused with a clear message ("XML SBOMs are not supported yet") instead of the generic "unrecognized SBOM format" error, in both the CLI and the web upload handler.
+
+### Fixed
+
+- The top-bar External lookup icon did not respond while a scan was running, because the hash router ignores navigation during a run the same way it does for New scan.
+- `--target <directory>` always fell through to ROOTFS unless it looked like a Yocto build directory, so cdxgen never ran on a plainly named source folder, silently dropping resolved licenses, hashes, and the dependency graph.
+- The SBOM Validation filter chip labels read as vague and bureaucratic in Korean; reworded to match the wording already used elsewhere in the docs.
+- A ROOTFS scan's syft failure was silently discarded instead of stating its cause, and a `--target` directory that routes to ROOTFS with no package database now warns, matching the existing archive-path warning.
+
 ## [v1.11.9] - 2026-09-09
 
 ### Added

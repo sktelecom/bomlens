@@ -240,6 +240,33 @@ test.describe("the capability gate", () => {
     ).toBeVisible();
     await expect(page).toHaveURL(/#\/lookup$/);
   });
+
+  // Regression: the hash router bails out entirely while a scan is running
+  // (it doesn't yet own an id, and run()'s own done handler sets the URL), so
+  // the plain `<a href="#/lookup">` alone changed the address bar but left the
+  // Scanning screen on-screen — the icon looked unresponsive. TopBar.onLookup
+  // (NextApp.goToLookup) resets state imperatively first, the same way New
+  // scan already does, so this reaches the screen instead of only the URL.
+  test("the top-bar entry point works mid-scan, not just when idle", async ({ page }) => {
+    await baseStubs(page);
+    // Hold the stream open so the running view (and its Scanning screen) stays up.
+    await page.route("**/scan-stream**", async (r) => {
+      await new Promise((res) => setTimeout(res, 5000));
+      await r.fulfill({ contentType: "text/event-stream", body: "event: done\ndata: {}\n\n" });
+    });
+    await page.goto("/?ui=next#/new");
+    await page.fill("#project", "demo");
+    await page.fill("#version", "1.0");
+    await page.getByTestId("run-scan").click();
+    await expect(page.getByText("Scanning…")).toBeVisible();
+
+    await page.getByTestId("external-lookup-link").click();
+
+    await expect(
+      page.getByRole("heading", { name: "External vulnerability lookup" }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/#\/lookup$/);
+  });
 });
 
 test.describe("GlobalSearch routing", () => {

@@ -6,17 +6,20 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터
 
 ## 개요
 
-여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 7가지 입력 형태마다 동일한 3종 산출물을 발행하는 방법을 정리합니다. (AI 모델은 약간 다릅니다. ML-BOM이고 보안 보고서가 없습니다. 시나리오 7 참고.)
+여러 팀에서 산출물을 소스, ZIP, 기존 SBOM, 펌웨어 등 서로 다른 형태로 받습니다. 이 가이드는 7가지 입력 형태마다 동일한 4종 산출물을 발행하는 방법을 정리합니다. (AI 모델은 약간 다릅니다. ML-BOM이고 보안 보고서가 없습니다. 시나리오 7 참고.)
 
-### 3종 산출물
+### 4종 산출물
 
 | 산출물 | 파일 | 의미 |
 |--------|------|------|
 | 오픈소스 고지문 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스 의무 이행을 위한 고지문 |
 | SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 구성요소 명세 |
 | 오픈소스위험분석보고서 | `{Project}_{Version}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
+| 적합성 보고서 | `{Project}_{Version}_conformance.{json,md,html}` | 제출 품질 기준 충족 여부와 누락 항목 |
 
-어떤 입력 형태든 `--all --generate-only`를 붙이면 위 3종이 한 번에 생성됩니다(위험분석보고서는 기본 생성이며 `--no-report`로만 끕니다).
+적합성 보고서 파일은 항상 생성되지만, 웹 UI에서 통과/실패를 판정하는 화면은 검사 대상이 공급받은 SBOM일 때(`--analyze` 경로)만 나타납니다. 자기가 생성한 SBOM이 자기를 채점하는 건 대부분의 검사 항목에서 의미 있는 신호가 아니기 때문입니다. 자체 생성 스캔이라면 파일을 직접 열어 보거나, 결과물을 다시 `--analyze`로 넣어 화면으로 확인하세요. [적합성 보고서 읽기](supplier-sbom.ko.md#적합성-보고서-읽기)를 참고하세요.
+
+어떤 입력 형태든 `--all --generate-only`를 붙이면 위 4종이 한 번에 생성됩니다(전부 기본 생성이며 `--no-report`로만 끕니다).
 
 ## 공통 준비
 
@@ -40,11 +43,11 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 
 | 입력 형태 | 모드 | 핵심 명령(요약) | 산출물 |
 |-----------|------|-----------------|--------|
-| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 위험분석보고서 |
+| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 위험분석보고서, 적합성 보고서 |
 | 소스 ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | 〃 |
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
-| 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃 + 적합성 보고서 |
-| Yocto 빌드 디렉터리 | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | 〃 + 적합성 보고서 |
+| 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃(단 SBOM은 새로 생성이 아니라 입력을 변환한 것) |
+| Yocto 빌드 디렉터리 | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | 〃 |
 | 빌드 산출물(`.jar`, `.deb` 등) | BINARY | `$SBOM --target app.jar --all --generate-only` | 〃 |
 | 설치 파일(`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | 〃 |
 | 모바일 앱(`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | 〃 |
@@ -64,15 +67,16 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 <!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/sktelecom/bomlens" \
+  --git "https://github.com/docker/getting-started-app" \
   --all --generate-only
 ```
 
 - 특정 브랜치/태그: `--branch v1.2.3`
 - 비공개 저장소: `GIT_TOKEN=ghp_xxx $SBOM ... --git https://github.com/org/private ...` (토큰은 로그에 남지 않음)
 - 얕은 클론(`--depth 1`)으로 임시 디렉터리에 받은 뒤 분석하고, 산출물만 현재 디렉터리 아래 `{Project}_{Version}/` 하위 폴더에 남깁니다.
+- `examples/`, `fixtures/`, `test-data/` 같은 하위 폴더를 자체적으로 가진 모노레포는, 스캔 범위를 특정 하위 폴더로 좁히는 옵션이 아직 없어서 제품에 실제로 포함되지 않는 컴포넌트까지 섞여 들어올 수 있습니다. 이런 구분이 중요하다면 여러 프로젝트를 한데 묶은 저장소 대신 실제 앱 저장소를 `--git`으로 바로 가리키세요 — 무관한 데모 의존성으로 부풀려진 컴포넌트 목록은(최악의 경우 실제로는 무관한 예제의 안 쓰이는 개발 의존성 하나가 osv.dev에 악성으로 플래그된 경우까지 포함해) 이후 이 결과를 받아 보는 모두에게 고지문과 위험 보고서의 신뢰도를 떨어뜨립니다.
 
-**산출물**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`
+**산출물**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`, `team1-app_1.0.0_conformance.{json,md,html}`
 
 ## 시나리오 2 — 소스 ZIP
 
@@ -88,7 +92,7 @@ $SBOM --project team2-app --version 1.0.0 \
 - 지원 형식: `.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`
 - zip-slip(경로 탈출) 검사 후 임시 디렉터리에 해제하며, 최상위 폴더가 하나면 자동으로 그 안으로 진입합니다.
 
-**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
 
 ## 시나리오 3 — 로컬 C/C++ 소스 디렉터리
 
@@ -100,11 +104,11 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 ```
 
 - 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하고, 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 고급 스캔 옵션의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(`--build-arg SBOM_DEEP_LICENSE=true`로 빌드한 이미지가 있어야 하며, 기본 공개 이미지에는 ScanCode가 없어 `--deep-license`가 조용히 건너뛰어집니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 고급 스캔 옵션의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 위험분석보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 위험분석보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
-**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
 
 ## 시나리오 4 — 기존 SBOM JSON
 
@@ -156,7 +160,7 @@ $SBOM --project team6-fw --version 1.0.0 \
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 자세한 동작과 한계는 [펌웨어 분석](../guides/firmware.ko.md)을 참고하세요.
 
-**산출물**: 고지문, SBOM, 위험분석보고서 (3종)
+**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
 
 ## 시나리오 7 — AI 모델(HuggingFace)
 
@@ -209,11 +213,12 @@ $SBOM --project internal-llm --version 1.0.0 \
 - SBOM에 담기는 내용은 형식마다 다릅니다. GGUF는 이름과 라이선스, 아키텍처를 담고 있고 safetensors는 대개 텐서 정보와 dtype만 있습니다. 어떤 형식이든 파일의 SHA-256은 기록하며, 이 값이 받은 파일과 문서를 잇습니다. 파일이 선언하지 않은 값은 추측하지 않고 비워 둡니다.
 - 산출물은 위와 같고, 모델 카드에서 오던 정보만 빠집니다.
 
-## 산출물 3종 해석
+## 산출물 4종 해석
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
 - **SBOM**: CycloneDX 1.6. 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
-- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
+- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약과 포맷 적합성 결과도 담습니다.
+- **적합성 보고서**: SBOM이 제출 품질 기준(필수 항목, PURL 보유율, 전이 의존성 등)을 충족하는지 항목별로 점검한 결과입니다. 파일은 다른 세 산출물과 함께 기본 생성되지만, 화면은 `--analyze` 경로에서만 나타납니다(위 설명 참고). 자세한 읽는 법은 공급사 SBOM 검증 가이드의 [적합성 보고서 읽기](supplier-sbom.ko.md#적합성-보고서-읽기)를 참고하세요.
 
 ## 웹 UI로 한 번에
 
@@ -248,7 +253,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 둘 다 느리고 기본은 꺼져 있으니 필요할 때만 켜세요. ScanCode는 `--build-arg SBOM_DEEP_LICENSE=true`로 빌드한 이미지에서만 쓸 수 있습니다. 토글 전체 목록과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md)를 참고하세요.
 
-실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서(필요하면 적합성 보고서까지)를 화면에서 보거나 내려받을 수 있습니다. 적합성 결과(적합/부적합)는 상단 카드로 표시됩니다.
+실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서를 화면에서 보거나 내려받을 수 있습니다. 적합성 보고서 파일도 내려받을 수 있지만, 판정 화면은 업로드한 SBOM을 분석한 경우(`--analyze`)에만 나타납니다.
 
 > 펌웨어 업로드 탭은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 동작 방식과 이미지 태그를
 > 바꾸는 방법은 [펌웨어 분석 가이드](firmware.ko.md)를 참고하세요.

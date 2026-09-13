@@ -27,7 +27,7 @@ The first time, install and download take a while. Roughly:
 - First download of the scanner image (about 250 MB): usually a minute or two (varies by network, only the first time)
 - First scan of a project, which fetches a language image (0.6–1.7 GB): a few more minutes, also once per language
 
-Once set up, opening the app and scanning afterward takes 1–2 minutes.
+Once set up, opening the app and scanning afterward takes 1–2 minutes for a project with a lock file already committed. Without one, cdxgen resolves dependencies itself before it can scan them (see the [web UI reference](../reference/ui.md#new-scan)), which took 6–7 minutes in repeated testing on a Node.js project with no `package-lock.json`.
 
 ## Walkthrough
 
@@ -51,7 +51,7 @@ flowchart TD
 
 ![Click "More info" on the SmartScreen warning and proceed with "Run anyway"](../images/smartscreen.png)
 
-![The desktop app startup screen, showing image download and preparation progress](../images/desktop-startup.png)
+![The desktop app startup screen, showing image download and preparation progress](../images/desktop-startup-en.png)
 
 If Docker is not installed or is stopped, the app tells you what to do instead of starting a scan.
 
@@ -71,7 +71,7 @@ To check that everything is ready, double-click `scripts\check-setup.bat` in the
 
 ![The console window on the first run of sbom-ui.bat, showing the image download notice](../images/bat-console.png)
 
-![The BomLens web UI](../images/web-ui.png)
+![The BomLens web UI](../images/web-ui-en.png)
 
 ## If the app won't open on macOS
 
@@ -106,7 +106,7 @@ From here the desktop app and the web UI are the same.
 
 > To scan a folder already on your disk instead of a ZIP, the desktop app has an **Add folder** button. On the `sbom-ui.bat` path, set `SBOM_UI_MOUNT_DIR` to that folder before running so the web UI can reach it (the CLI equivalent is `--ui --mount <dir>`).
 
-![The scan result overview — components, vulnerabilities and licenses](../images/web-ui-scan.png)
+![The scan result overview — components, vulnerabilities and licenses](../images/web-ui-scan-en.png)
 
 When the scan finishes, download the notice from the results screen as per-format chips (`HTML`, `TXT`). The SBOM (`..._bom.json`) and the risk report (`..._risk-report.html`) generated alongside are available on the same screen, and you can also download everything as a single ZIP. Downloaded files are saved to the results folder as well. For what each file is and when it appears, see the [artifacts reference](../reference/artifacts.md).
 

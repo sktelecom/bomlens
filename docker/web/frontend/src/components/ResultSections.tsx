@@ -9,6 +9,7 @@ import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import {
   inputSbomFileName,
+  isAiScan,
   sbomFileName,
   scancodeFileName,
   sourceSnapshotFileName,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/results";
 import { scanHash, type RouteQuery } from "@/lib/route";
 
+import { AiSummaryCard } from "./AiSummaryCard";
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { ConformancePanel } from "./ConformancePanel";
@@ -73,7 +75,10 @@ export function ResultSection({
   switch (section) {
     case "overview":
       return (
-        <Overview result={result} scanId={scanId} recent={recent} onPick={onPick} />
+        <div className="space-y-6">
+          {isAiScan(result) && <AiSummaryCard result={result} scanId={scanId} />}
+          <Overview result={result} scanId={scanId} recent={recent} onPick={onPick} />
+        </div>
       );
 
     case "components":
@@ -173,16 +178,26 @@ export function ResultSection({
 
     case "models": {
       const sbomFile = sbomFileName(result);
+      // A submitted AI SBOM shows its G7 checks on the Conformance screen
+      // instead (that is a real review of someone else's document); only a
+      // self-generated AI SBOM's disclosure gaps belong here.
+      const supplied = Boolean(inputSbomFileName(result));
       return sbomFile ? (
-        <ModelsDatasets scanId={scanId} sbomFile={sbomFile} />
+        <ModelsDatasets
+          scanId={scanId}
+          sbomFile={sbomFile}
+          conformance={supplied ? null : result.conformance}
+        />
       ) : null;
     }
 
     case "conformance":
+      // nav.ts shows this section for every scan except a self-generated AI
+      // SBOM, whose G7 rollup lives in Models & datasets above instead (to
+      // avoid showing it twice) — see that file for the full gate.
       return result.conformance ? (
         <ConformancePanel
           conformance={result.conformance}
-          aiProfile={result.aiProfile ?? null}
           scanId={scanId}
           results={result.results}
         />

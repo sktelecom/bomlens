@@ -58,6 +58,11 @@ interface TopBarProps {
    *  demo, which has no server to ask. Reachable whether or not a scan is
    *  loaded, so this lives in the chrome rather than the section rail. */
   lookupHref?: string;
+  /** Leave a running scan (backgrounding it, same as New scan does) and open
+   *  External lookup, in addition to the `#/lookup` navigation `lookupHref`
+   *  already carries — needed because the hash router ignores navigation
+   *  while a scan is running (see `NextApp.goToLookup`). */
+  onLookup?: () => void;
 }
 
 const SEVERITY_DOT: Record<NonNullable<RecentScanLink["topSeverity"]>, string> = {
@@ -89,6 +94,7 @@ export function TopBar({
   onDeleteRecent,
   version,
   lookupHref,
+  onLookup,
 }: TopBarProps) {
   const { t, i18n } = useTranslation();
   // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
@@ -170,6 +176,7 @@ export function TopBar({
         {lookupHref && (
           <a
             href={lookupHref}
+            onClick={onLookup}
             aria-label={t("nav.lookupTitle")}
             title={t("nav.lookupTitle")}
             data-testid="external-lookup-link"

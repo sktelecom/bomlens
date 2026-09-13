@@ -52,7 +52,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 | **SCANOSS** | `1.54.2` | Stage 2 | Identify vendored open source in C/C++ source with no package manager | `--identify-vendored` |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | Generates the open source notice (NOTICE) | `--notice` / `--all` |
 | **Trivy** | `v0.74.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
-| **Cosign** | `v2.6.5` | Stage 2 | Detached SBOM signature | `--sign` |
+| **Cosign** | `v3.1.3` | Stage 2 | Detached SBOM signature | `--sign` |
 | **curl** | — | Stage 2 | Upload to Dependency-Track | Default (unless `--generate-only`) |
 
 > Versions are pinned as `ARG`s in `docker/Dockerfile`. To keep the image lean, ScanCode is an **opt-in** build arg (`--build-arg SBOM_DEEP_LICENSE=true`). The SCANOSS client is included by default; build with `--build-arg SBOM_SCANOSS=false` to drop it. Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in `bomlens-firmware` image, and AI-model SBOM generation (OWASP AIBOM Generator) in `bomlens-aibom`. For the per-input tool flow, see [Pipeline by input type](pipeline-by-input.md).

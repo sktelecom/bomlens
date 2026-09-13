@@ -28,7 +28,7 @@ git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-The folder you run from is the output base — each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090`. To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+The folder you run from is the output base — each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only — on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
@@ -129,9 +129,12 @@ BomLens needs only a Docker *engine* — not a specific product.
 | Item | Minimum |
 |------|---------|
 | Docker | 20.10+ |
+| Memory | 4 GB+ allocated to the Docker engine |
 | Disk | 4 GB+ (for the Docker image) |
 | OS | Linux, macOS, Windows |
 | Arch | AMD64, ARM64 |
+
+The memory figure is for the engine itself (the VM behind Docker Desktop, Rancher Desktop, or Colima on macOS), not the host machine. Tools like Colima default to 2 GB, which is enough for a manifest-only scan but too tight for languages where BomLens has to run an actual build to resolve transitive dependencies (Java/Gradle, Java/Maven). Under 4 GB, that build step can be killed for running out of memory, and the scan silently falls back to a shallower, direct-dependencies-only result — check the scan's warnings for a note about this before trusting a thin dependency graph.
 
 If you already run a Docker engine (Docker Desktop, Rancher Desktop, docker-ce in WSL2, anything), just confirm it works:
 

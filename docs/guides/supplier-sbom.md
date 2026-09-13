@@ -61,7 +61,7 @@ Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), th
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | components grouped by license |
 | Risk report | `{Project}_{Version}_risk-report.{md,html}` | conformance, vulnerabilities, and licenses combined, with response deadlines |
 
-Unlike a self-generated SBOM, a received SBOM additionally produces a conformance report, and its summary goes into section 1 of the risk report.
+A self-generated scan produces the same conformance report file by default too (see [Input scenarios](by-input.md#the-four-deliverables)), and its summary goes into section 1 of the risk report either way. The pass/fail screen described below, though, only appears on the `--analyze` path: a self-generated SBOM grading itself is not a meaningful signal for most of its checks. To see it on screen for your own output, feed the generated SBOM back in with `--analyze`.
 
 ## Reading the conformance report
 

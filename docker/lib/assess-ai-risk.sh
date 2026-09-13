@@ -175,11 +175,13 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
   # File-security axis for a model, from either of two sources — and both when
   # both ran. bomlens:hf:scan:* is what HuggingFace itself found (ClamAV +
   # picklescan), stamped by enrich-aibom.sh. bomlens:localscan:* is what we
-  # found by running picklescan here, stamped by scan-model-file-security.py;
-  # it is the only source for a model file that was never published, where no
-  # Hub API has an answer. Where both exist the worse verdict wins, and each
-  # reason names which scan it came from. null when neither recorded anything —
-  # the axis is then simply not evaluated, never assumed safe.
+  # found here — a picklescan run for pickle-format weights, or (for a Keras
+  # .h5/.keras file) the Lambda-layer/marshalled-code scan translated into the
+  # same vocabulary — stamped by scan-model-file-security.py; it is the only
+  # source for a model file that was never published, where no Hub API has an
+  # answer. Where both exist the worse verdict wins, and each reason names
+  # which scan it came from. null when neither recorded anything — the axis is
+  # then simply not evaluated, never assumed safe.
   def assess_security($p):
     ($p | map(select(.name == "bomlens:hf:scan:status")) | (.[0].value // "")) as $st
     | ($p | map(select(.name == "bomlens:localscan:status")) | (.[0].value // "")) as $ls
@@ -210,30 +212,30 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
     | (if $ls == "" then []
        elif $ls == "unsafe" then
          [{ v: "caution",
-            r: T(("file security: local pickle scan found code-execution globals"
+            r: T(("file security: local file scan found a code-execution risk"
                   + (if $lf != "" then " — \($lf)" else "" end) + " (caution)");
-                 ("파일 보안: 로컬 pickle 스캔에서 코드 실행 가능한 전역 객체 발견"
+                 ("파일 보안: 로컬 파일 스캔에서 코드 실행 위험 발견"
                   + (if $lf != "" then " — \($lf)" else "" end) + " (" + VW("caution") + ")")) }]
        elif $ls == "suspicious" then
          [{ v: "review",
-            r: T(("file security: local pickle scan found globals that need review"
+            r: T(("file security: local file scan found something that needs review"
                   + (if $lf != "" then " — \($lf)" else "" end) + " (review)");
-                 ("파일 보안: 로컬 pickle 스캔에서 검토가 필요한 전역 객체 발견"
+                 ("파일 보안: 로컬 파일 스캔에서 검토가 필요한 항목 발견"
                   + (if $lf != "" then " — \($lf)" else "" end) + " (" + VW("review") + ")")) }]
        elif $ls == "clean" then
          [{ v: "ok",
-            r: T("file security: local pickle scan found no code-execution globals "
-                 + "(pickle analysis only, not a malware scan) (ok)";
-                 "파일 보안: 로컬 pickle 스캔에서 코드 실행 전역 객체 없음 "
-                 + "(pickle 분석일 뿐 악성코드 검사는 아님) (" + VW("ok") + ")") }]
+            r: T("file security: local file scan found no code-execution risk "
+                 + "(static analysis only, not a malware scan) (ok)";
+                 "파일 보안: 로컬 파일 스캔에서 코드 실행 위험 없음 "
+                 + "(정적 분석일 뿐 악성코드 검사는 아님) (" + VW("ok") + ")") }]
        elif $ls == "not-applicable" then
          [{ v: "ok",
             r: T("file security: this weight format does not execute code on load (ok)";
                  "파일 보안: 이 가중치 형식은 로드 시 코드를 실행하지 않음 (" + VW("ok") + ")") }]
        else
          [{ v: "review",
-            r: T("file security: local pickle scan could not read the file (review)";
-                 "파일 보안: 로컬 pickle 스캔이 파일을 읽지 못함 (" + VW("review") + ")") }]
+            r: T("file security: local file scan could not read the file (review)";
+                 "파일 보안: 로컬 파일 스캔이 파일을 읽지 못함 (" + VW("review") + ")") }]
        end) as $loc
     | ($hf + $loc) as $per
     | if ($per | length) == 0 then null

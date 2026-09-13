@@ -11,6 +11,7 @@
 #   - SPDX (JSON/Tag-Value)  -> `syft convert` to cyclonedx-json
 #   - syft failure on SPDX-JSON -> jq fallback (.packages[] -> .components[],
 #     preserving name/version/purl/license) so license analysis still works.
+#   - XML (CycloneDX / SPDX RDF) -> refused by name: convert to JSON and retry.
 #
 # See docs/supplier-sbom-analysis.md §5. normalize-sbom.sh / generate-notice.sh
 # need NO SPDX branch because everything downstream sees CycloneDX.
@@ -51,6 +52,11 @@ elif jq -e '(.["@context"]? // "" | tostring | test("spdx.org/rdf/3")) or (.["@g
     FORMAT="SPDX-3.0"
 elif grep -q '^SPDXVersion:' "$INPUT" 2>/dev/null; then
     FORMAT="SPDX-TagValue"
+elif head -c 4096 "$INPUT" 2>/dev/null | grep -qi -e '^[[:space:]]*<?xml' -e '<bom[ >]' -e '<rdf:RDF'; then
+    # CycloneDX XML and SPDX RDF/XML are recognized only to say so: they fall
+    # through to a named error instead of "unrecognized format", which sent
+    # users looking for a corrupted file rather than a format conversion.
+    FORMAT="unsupported-xml"
 fi
 
 # --------------------------------------------------------
@@ -98,6 +104,13 @@ case "$FORMAT" in
             echo "[convert] ERROR: cannot convert $FORMAT without syft." >&2
             exit 1
         fi
+        ;;
+    unsupported-xml)
+        echo "[convert] ERROR: XML SBOMs are not supported yet: $INPUT" >&2
+        echo "[convert]        This looks like CycloneDX or SPDX in XML. Convert it to JSON and retry, e.g." >&2
+        echo "[convert]          cyclonedx convert --input-file bom.xml --output-file bom.json" >&2
+        echo "[convert]        or export JSON from the tool that produced it." >&2
+        exit 1
         ;;
     *)
         echo "[convert] ERROR: unrecognized SBOM format (not CycloneDX or SPDX): $INPUT" >&2

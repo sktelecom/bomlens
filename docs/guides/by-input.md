@@ -6,17 +6,20 @@ description: How BomLens produces an SBOM, an open-source notice, and a risk rep
 
 ## Overview
 
-An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same three deliverables for each of seven input forms. (An AI model differs slightly — an ML-BOM and no security report; see Scenario 7.)
+An open-source compliance manager receives deliverables from many teams in different forms. This guide shows how to produce the same four deliverables for each of seven input forms. (An AI model differs slightly — an ML-BOM and no security report; see Scenario 7.)
 
-### The three deliverables
+### The four deliverables
 
 | Deliverable | File | Meaning |
 |-------------|------|---------|
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | the notice that satisfies license obligations |
 | SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 component inventory |
 | Open-source risk report | `{Project}_{Version}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
+| Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the SBOM meets the submission quality criteria, and what is missing |
 
-For any input form, adding `--all --generate-only` produces all three at once (the risk report is on by default and is only turned off with `--no-report`).
+The conformance report's file is always produced, but the web UI only shows it as a dedicated pass/fail screen when the input being checked is a supplied SBOM (the `--analyze` path); a self-generated SBOM grading itself is not a meaningful pass/fail signal for most of its checks. For a self-generated scan, open the file directly, or feed the output back in with `--analyze` to see it on screen. See [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report).
+
+For any input form, adding `--all --generate-only` produces all four at once (they are on by default and are only turned off with `--no-report`).
 
 ## Common setup
 
@@ -40,11 +43,11 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 
 | Input form | Mode | Core command (summary) | Deliverables |
 |------------|------|------------------------|--------------|
-| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | notice, SBOM, risk report |
+| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | notice, SBOM, risk report, conformance report |
 | Source ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | same |
 | Local directory (C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | same |
-| Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same + conformance report |
-| Yocto build directory | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | same + conformance report |
+| Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same, but the SBOM is the converted input rather than freshly generated |
+| Yocto build directory | ANALYZE | `$SBOM --target ~/poky/build --generate-only` | same |
 | Build artifact (`.jar`, `.deb`, …) | BINARY | `$SBOM --target app.jar --all --generate-only` | same |
 | Installer (`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | same |
 | Mobile app (`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | same |
@@ -64,15 +67,16 @@ A team handed you a GitHub repository. Pass the URL directly, no manual `git clo
 <!-- runnable -->
 ```bash
 $SBOM --project team1-app --version 1.0.0 \
-  --git "https://github.com/sktelecom/bomlens" \
+  --git "https://github.com/docker/getting-started-app" \
   --all --generate-only
 ```
 
 - Specific branch/tag: `--branch v1.2.3`
 - Private repository: `GIT_TOKEN=ghp_xxx $SBOM ... --git https://github.com/org/private ...` (the token never appears in logs)
 - A shallow clone (`--depth 1`) is fetched to a temp directory and analyzed; only the deliverables remain, in a `{Project}_{Version}/` subfolder under the current directory.
+- A monorepo with its own `examples/`, `fixtures/`, or `test-data/` subfolders can pull in components that never ship in the product, because there is no option yet to scope the scan to one subfolder. Point `--git` at the specific app repository rather than an umbrella repository when that distinction matters — a component list padded with unrelated demo dependencies (and, in the worst case, one of them flagged as malicious by osv.dev when it is really just an unused dev dependency of an unrelated example) undermines the notice and risk report for everyone downstream.
 
-**Deliverables**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`
+**Deliverables**: `team1-app_1.0.0_NOTICE.{txt,html}`, `team1-app_1.0.0_bom.json`, `team1-app_1.0.0_risk-report.{md,html}`, `team1-app_1.0.0_conformance.{json,md,html}`
 
 ## Scenario 2 — Source ZIP
 
@@ -88,7 +92,7 @@ $SBOM --project team2-app --version 1.0.0 \
 - Supported: `.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`
 - It is extracted to a temp directory after a zip-slip (path-escape) check; a single top-level folder is entered automatically.
 
-**Deliverables**: notice, SBOM, risk report (three)
+**Deliverables**: notice, SBOM, risk report, conformance report (four)
 
 ## Scenario 3 — Local C/C++ source directory
 
@@ -100,11 +104,11 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 ```
 
 - With a package manager (Conan `conanfile.txt` / vcpkg `vcpkg.json`), dependencies resolve and appear in the SBOM.
-- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license`, and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow — OS rootfs, application, and static-link dependencies as separate layers — see the [server SBOM guide](server-delivery.md). In the web UI, `--deep-license` is the **License scan (ScanCode)** toggle under Advanced scan options; it scans your own source files (`/src`), not the declared dependencies, and is slow, so turn it on only when you need per-file license detection.
+- Pure CMake/Make sources have no manager metadata, so the SBOM can be sparse. Enrich first-party license headers with `--deep-license` (needs an image built with `--build-arg SBOM_DEEP_LICENSE=true` — the default published image does not carry ScanCode, and `--deep-license` is silently skipped without it), and analyze build output (a staging/rootfs with installed libraries) separately with `$SBOM --target <build-dir> --all --generate-only` (syft). For a full server SBOM workflow — OS rootfs, application, and static-link dependencies as separate layers — see the [server SBOM guide](server-delivery.md). In the web UI, `--deep-license` is the **License scan (ScanCode)** toggle under Advanced scan options; it scans your own source files (`/src`), not the declared dependencies, and is slow, so turn it on only when you need per-file license detection.
 - When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
-**Deliverables**: notice, SBOM, risk report (three)
+**Deliverables**: notice, SBOM, risk report, conformance report (four)
 
 ## Scenario 4 — Existing SBOM JSON
 
@@ -156,7 +160,7 @@ $SBOM --project team6-fw --version 1.0.0 \
 - Recognized extensions (`.bin/.img/.squashfs/.ubi/...`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - For behavior and limits, see the [firmware analysis guide](../guides/firmware.md).
 
-**Deliverables**: notice, SBOM, risk report (three)
+**Deliverables**: notice, SBOM, risk report, conformance report (four)
 
 ## Scenario 7 — AI model (HuggingFace)
 
@@ -209,11 +213,12 @@ $SBOM --project internal-llm --version 1.0.0 \
 - What lands in the SBOM depends on the format. GGUF carries a name, a license and an architecture; safetensors usually carries only tensor shapes and dtypes. Every format contributes the file's SHA-256, which is what ties the document to the artifact you received. A field the file does not declare is left empty rather than guessed.
 - Deliverables are the same as above, minus what the model card would have supplied.
 
-## Reading the three deliverables
+## Reading the four deliverables
 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
 - **SBOM**: CycloneDX 1.6. The artifact you upload to a vulnerability-management system.
-- **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and (for supplier SBOMs) the format conformance result.
+- **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and the format conformance result.
+- **Conformance report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three; the web UI shows it as a screen only on the `--analyze` path (see above). See [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report) in the supplier SBOM guide.
 
 ## All at once in the web UI
 
@@ -248,7 +253,7 @@ For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced sc
 
 Both are slow and off by default, so enable them only when needed. ScanCode is available only in an image built with `--build-arg SBOM_DEEP_LICENSE=true`. For the full list of toggles and per-target availability, see the [Web UI reference](../reference/ui.md).
 
-As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report (plus the conformance report when relevant). The conformance result (pass/fail) is shown as a card at the top.
+As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report. The conformance report file is downloadable too; its pass/fail screen only appears when the input was an uploaded SBOM (`--analyze`) rather than a fresh scan.
 
 > The firmware upload tab appears automatically whenever the Docker engine is running. See the
 > [firmware guide](firmware.md) for how it works and how to point it at a different image tag.

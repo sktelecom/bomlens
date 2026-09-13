@@ -1283,6 +1283,47 @@ JSON
 python3 "$OSCTX" "$WORK/osc-owrt.json" >/dev/null 2>&1
 osc_on=$(jq '[.components[]|select(.type=="operating-system")]|length' "$WORK/osc-owrt.json")
 [ "$osc_on" = "0" ] && pass "OpenWRT SBOM gets no synthesized OS (Trivy has no OpenWRT advisories)" || fail "OpenWRT SBOM gained $osc_on OS component(s)"
+# (f) two distros in one SBOM: the majority still becomes the OS component, but
+# the packages voted down are matched against the wrong advisory DB — say so
+# instead of dropping them silently.
+osc_prop() { jq -r --arg n "$1" '[.metadata.properties[]?|select(.name==$n)]|.[0].value // "NONE"' "$2"; }
+cat > "$WORK/osc-mixed.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"openssl","version":"3.0.2","purl":"pkg:deb/ubuntu/openssl@3.0.2-0ubuntu1?arch=amd64&distro=ubuntu-22.04"},
+ {"type":"library","name":"bash","version":"5.1-6","purl":"pkg:deb/ubuntu/bash@5.1-6ubuntu1?arch=amd64&distro=ubuntu-22.04"},
+ {"type":"library","name":"zlib1g","version":"1.2.13","purl":"pkg:deb/debian/zlib1g@1.2.13-1?arch=amd64&distro=debian-12"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-mixed.json" >/dev/null 2>&1
+[ "$(osc_of "$WORK/osc-mixed.json")" = "ubuntu 22.04" ] && pass "mixed-distro SBOM still synthesizes the majority OS (ubuntu 22.04)" || fail "mixed OS='$(osc_of "$WORK/osc-mixed.json")', expected 'ubuntu 22.04'"
+osc_amb=$(osc_prop "bomlens:os-context-ambiguous" "$WORK/osc-mixed.json")
+case "$osc_amb" in
+  *ubuntu:22.04*debian:12*) pass "mixed-distro SBOM carries bomlens:os-context-ambiguous with the vote tally" ;;
+  *) fail "bomlens:os-context-ambiguous missing/unexpected" "got '$osc_amb'" ;;
+esac
+# Re-running replaces the property instead of appending a second copy.
+python3 "$OSCTX" "$WORK/osc-mixed.json" >/dev/null 2>&1
+osc_ambn=$(jq '[.metadata.properties[]?|select(.name=="bomlens:os-context-ambiguous")]|length' "$WORK/osc-mixed.json")
+[ "$osc_ambn" = "1" ] && pass "os-context-ambiguous is stamped once on re-run" || fail "ambiguous property count=$osc_ambn after second run, expected 1"
+# (g) OS packages present but none carries a distro version: nothing can be
+# matched at all, which is worth a signal — unlike a source SBOM, where there is
+# nothing to match in the first place (that one must stay silent).
+python3 "$OSCTX" "$WORK/osc-deb.json" >/dev/null 2>&1
+osc_unm=$(osc_prop "bomlens:os-context-unmatched" "$WORK/osc-deb.json")
+[ "$osc_unm" != "NONE" ] && pass "deb PURLs with no distro version carry bomlens:os-context-unmatched ($osc_unm)" || fail "bomlens:os-context-unmatched missing on version-less deb SBOM"
+cat > "$WORK/osc-bare-deb.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"openssl","version":"1.1.1","purl":"pkg:deb/openssl@1.1.1"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-bare-deb.json" >/dev/null 2>&1
+osc_bare=$(osc_prop "bomlens:os-context-unmatched" "$WORK/osc-bare-deb.json")
+[ "$osc_bare" != "NONE" ] && pass "namespace-less deb PURL carries bomlens:os-context-unmatched ($osc_bare)" || fail "bomlens:os-context-unmatched missing on namespace-less deb SBOM"
+# (h) the plain cases stay clean: no distro packages at all, and a single distro.
+osc_mvn_u=$(osc_prop "bomlens:os-context-unmatched" "$WORK/osc-maven.json")
+[ "$osc_mvn_u" = "NONE" ] && pass "maven-only SBOM gets no os-context-unmatched (no noise on source scans)" || fail "maven-only SBOM was marked unmatched: '$osc_mvn_u'"
+for _p in bomlens:os-context-ambiguous bomlens:os-context-unmatched; do
+  _v=$(osc_prop "$_p" "$WORK/osc-centos.json")
+  [ "$_v" = "NONE" ] && pass "single-distro SBOM carries no $_p" || fail "$_p present on a single-distro SBOM: '$_v'"
+done
 echo "== F-1c: maven CPE enrichment — groupId-derived NVD cpe:2.3 =="
 MVNCPE="$LIB/enrich-maven-cpe.py"
 cat > "$WORK/mvn.json" <<'JSON'
@@ -1930,6 +1971,41 @@ fi
 bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/spdx3-cf" "supplier" >/dev/null 2>&1
 [ -f "$WORK/spdx3-cf_conformance.json" ] && jq -e '.checks|length>0' "$WORK/spdx3-cf_conformance.json" >/dev/null 2>&1 \
     && pass "SPDX 3.0 produces a conformance report" || fail "SPDX 3.0 conformance not produced"
+
+echo "== input-format: an XML SBOM is refused by name, not as 'unrecognized' =="
+# The pipeline reads JSON only. An XML CycloneDX used to fall into the generic
+# "unrecognized SBOM format" branch, which sends the user looking for a corrupt
+# file instead of for a format conversion. It is recognized in order to be
+# refused with what to do next; parsing XML is still out of scope.
+cat > "$WORK/supplier-bom.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" version="1">
+  <components>
+    <component type="library"><name>openssl</name><version>3.0.2</version></component>
+  </components>
+</bom>
+XML
+xml_out=$(bash "$LIB/convert-to-cdx.sh" "$WORK/supplier-bom.xml" "$WORK/xml-out.json" 2>&1); xml_rc=$?
+[ "$xml_rc" != "0" ] && pass "CycloneDX XML input fails (exit $xml_rc)" || fail "convert-to-cdx.sh accepted XML input (exit 0)"
+echo "$xml_out" | grep -q 'not supported yet' \
+    && pass "the XML error names the format instead of 'unrecognized SBOM format'" || fail "XML error text unexpected" "$xml_out"
+echo "$xml_out" | grep -qi 'json' \
+    && pass "the XML error tells the user to convert to JSON" || fail "XML error gives no next step" "$xml_out"
+echo "$xml_out" | grep -q 'unrecognized SBOM format' \
+    && fail "XML still falls through to the generic unknown-format branch" "$xml_out" || pass "XML does not reach the generic unknown-format branch"
+# SPDX RDF/XML lands in the same branch (no <bom> root, but it is still XML).
+cat > "$WORK/supplier-rdf.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><spdx:SpdxDocument/></rdf:RDF>
+XML
+rdf_out=$(bash "$LIB/convert-to-cdx.sh" "$WORK/supplier-rdf.xml" "$WORK/rdf-out.json" 2>&1 || true)
+echo "$rdf_out" | grep -q 'not supported yet' \
+    && pass "SPDX RDF/XML gets the same named error" || fail "SPDX RDF/XML error text unexpected" "$rdf_out"
+# A genuinely unknown (non-XML, non-SBOM) input keeps the original message.
+printf 'this is not an SBOM at all\n' > "$WORK/notsbom.txt"
+txt_out=$(bash "$LIB/convert-to-cdx.sh" "$WORK/notsbom.txt" "$WORK/notsbom-out.json" 2>&1 || true)
+echo "$txt_out" | grep -q 'unrecognized SBOM format' \
+    && pass "a non-XML unknown input still reports 'unrecognized SBOM format'" || fail "unknown-format branch changed" "$txt_out"
 
 echo "== UNKNOWN is not carried as if it were a version =="
 

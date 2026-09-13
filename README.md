@@ -53,6 +53,8 @@ git clone https://github.com/sktelecom/bomlens.git && cd bomlens
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
+> **PowerShell**: don't paste the block above as-is — `.sh` has no default handler there, so it fails silently with no error and no output. Double-click `scripts\sbom-ui.bat` instead.
+
 Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
 
 ### CLI (advanced)
@@ -62,7 +64,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest   # aliases: sbom-generator and sbo
 ./scripts/scan-sbom.sh --project MyApp --version 1.0.0 --target examples/nodejs --all --generate-only
 ```
 
-On Windows, run the same command through `scripts\scan-sbom.bat` (Git for Windows required). Outputs land in a `{Project}_{Version}/` subfolder, prefixed `{Project}_{Version}_…`: `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}`, and `security.{json,md,html}`; add `--spdx` for an SPDX 2.3 copy. Other inputs and every option are in the [CLI reference](docs/reference/cli.md) and the [input-scenarios guide](docs/guides/by-input.md).
+**PowerShell**: `docker pull` above works as-is, but the second line does not — `./scripts/scan-sbom.sh` has no default handler in PowerShell and fails silently with no error and no output. Run the same command through `scripts\scan-sbom.bat` instead (Git for Windows required). Outputs land in a `{Project}_{Version}/` subfolder, prefixed `{Project}_{Version}_…`: `bom.json` (SBOM), `NOTICE.{txt,html}`, `risk-report.{md,html}`, and `security.{json,md,html}`; add `--spdx` for an SPDX 2.3 copy. Other inputs and every option are in the [CLI reference](docs/reference/cli.md) and the [input-scenarios guide](docs/guides/by-input.md).
 
 ## Contributing & License
 

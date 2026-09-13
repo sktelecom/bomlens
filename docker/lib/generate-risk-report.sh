@@ -6,7 +6,7 @@
 # generate-risk-report.sh — assemble a supplier-facing risk report by RE-AGGREGATING
 # artifacts already produced by the pipeline (no new scan is run).
 #
-# Usage: generate-risk-report.sh <out_prefix> <project_name>
+# Usage: generate-risk-report.sh <out_prefix> <project_name> [scan_mode]
 #   reads  <out_prefix>_conformance.json   (validate-sbom.sh)
 #          <out_prefix>_security.json       (scan-security.sh / Trivy)
 #          <out_prefix>_NOTICE.txt          (generate-notice.sh)
@@ -15,10 +15,14 @@
 # Aggregates a supply-chain risk view: conformance verdict + vulnerability triage
 # with recommended Critical-7-day / High-30-day remediation deadlines. Missing
 # inputs are skipped gracefully. See docs/supplier-sbom-analysis.md §6.
+#
+# scan_mode selects the report kind (see the "Report kind" block below); pass
+# the caller's $SCAN_MODE. Omitting it is treated as a self-generated scan.
 set -e
 
 OUT_PREFIX="$1"
 PROJECT="${2:-project}"
+SCAN_MODE="${3:-}"
 
 if [ -z "$OUT_PREFIX" ]; then
     echo "[risk] out_prefix required (usage: generate-risk-report.sh <out_prefix> <project_name>)" >&2
@@ -79,20 +83,23 @@ if [ -f "${OUT_PREFIX}_bom.json" ] && jq empty "${OUT_PREFIX}_bom.json" >/dev/nu
 fi
 
 # --------------------------------------------------------
-# Report kind: with a conformance artifact this is a SUPPLIER SBOM review
-# (validate an externally-submitted SBOM format); without one it is a
-# SELF-GENERATED open-source risk analysis report (source/firmware/image/
-# binary/rootfs scan). The format-validation section only applies to the
-# supplier case. Section numbering is assigned once here; the titles and every
-# other user-facing string are set in the localization block below.
+# Report kind: on the ANALYZE path this is a SUPPLIER SBOM review (validate an
+# externally-submitted SBOM format); otherwise it is a SELF-GENERATED
+# open-source risk analysis report (source/firmware/image/binary/rootfs/AI
+# scan), even though a conformance artifact now exists there too (every
+# generation mode self-checks against the same criteria). The format-
+# validation section only applies to the supplier case: a self-generated SBOM
+# grading its own format is not a meaningful pass/fail signal for most checks.
+# Section numbering is assigned once here; the titles and every other
+# user-facing string are set in the localization block below.
 # --------------------------------------------------------
-if [ "$CONF_RESULT" = "N/A" ]; then
+if [ "$SCAN_MODE" = "ANALYZE" ] && [ "$CONF_RESULT" != "N/A" ]; then
+    HAS_CONF=true
+    S_CONF=1; S_VULN=2; S_LIC=3; S_NEXT=4
+else
     HAS_CONF=false
     # Self mode: no format-validation section, so numbering starts at vulnerabilities.
     S_CONF=""; S_VULN=1; S_LIC=2; S_NEXT=3
-else
-    HAS_CONF=true
-    S_CONF=1; S_VULN=2; S_LIC=3; S_NEXT=4
 fi
 
 # --------------------------------------------------------

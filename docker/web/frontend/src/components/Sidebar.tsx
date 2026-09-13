@@ -40,9 +40,10 @@ interface SidebarProps {
 // The gap and horizontal padding are tighter than a comfortable default on
 // purpose. The rail is a fixed 15rem, and `main` is sized from what is left
 // (1040px at the 1280px capture viewport), so widening the rail would resize
-// every section screenshot. The longest label — "SBOM conformance" beside its
-// 13/16 badge — needed 133px and had 128px, so the row reclaims 8px from its
-// own spacing instead: 2px at each of the two gaps, 2px at each side padding.
+// every section screenshot. The longest label once needed 133px against a
+// 128px budget, so the row reclaims 8px from its own spacing instead: 2px at
+// each of the two gaps, 2px at each side padding. Re-check this budget before
+// lengthening any label — nav.ts carries a note on the one that hit it.
 const RAIL_ROW =
   "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-sm " +
   "transition-colors duration-fast ease-out-soft " +

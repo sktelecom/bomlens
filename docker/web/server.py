@@ -103,6 +103,8 @@ UPLOAD_EXTS = {
     # .spdx.tar.zst is what a Yocto SPDX 2.2 build deploys, and the only SBOM
     # such a build produces — there is no .spdx.json beside it to send instead.
     # Named in full rather than as .tar.zst, which would admit any zstd tarball.
+    # .xml stays listed so an XML SBOM is answered by name (see the upload
+    # handler) rather than by the generic "unsupported file type".
     "sbom": (".json", ".xml", ".spdx", ".cdx.json", ".spdx.json", ".spdx.tar.zst"),
     "zip": (".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar"),
     # Build artifacts a supplier ships instead of source. The list is measured,
@@ -1390,8 +1392,9 @@ def sbom_summary(run_id):
         for p in meta_props
     )
     # sbom-tool-degraded: set by entrypoint.sh when cdxgen couldn't run and the
-    # scan fell back to syft (direct deps only) — e.g. "disk-space". Drives a
-    # result banner so the thin dependency graph has a visible reason.
+    # scan fell back to syft (direct deps only) — "oom", "disk-space", "network"
+    # or the generic "cdxgen-unavailable". Drives a result banner so the thin
+    # dependency graph has a visible reason.
     degraded = next(
         (
             p.get("value")
@@ -3697,6 +3700,17 @@ class Handler(BaseHTTPRequestHandler):
             shutil.rmtree(dest_dir, ignore_errors=True)
             self._send(415, json.dumps({
                 "error": "unsupported file type for %s (got %s)" % (kind, safe_fn)
+            }))
+            return
+        if kind == "sbom" and lower.endswith(".xml"):
+            # The pipeline reads CycloneDX/SPDX JSON only. Refusing here rather
+            # than in the converter saves starting a container to fail, and says
+            # what to do instead of "unrecognized format".
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            self._send(415, json.dumps({
+                "error": "XML SBOMs are not supported yet (got %s). "
+                         "Convert it to CycloneDX or SPDX JSON and upload that."
+                         % safe_fn
             }))
             return
         final_path = os.path.join(dest_dir, safe_fn)

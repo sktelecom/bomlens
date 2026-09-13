@@ -133,8 +133,6 @@
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
     "noSecurityHint": "이 스캔에는 취약점 보고서가 없습니다. 대조를 하지 않은 것이므로, 비어 있다는 것이 취약점이 없다는 뜻은 아닙니다.",
-    "aiScanTitle": "AI 모델 SBOM (ML-BOM)",
-    "aiScanBody": "HuggingFace 모델 메타데이터로 생성된 AI SBOM입니다. 모델과 데이터셋 중심이라 일반 소프트웨어보다 컴포넌트 수가 적습니다.",
     "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
     "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"복사해 넣은 오픈소스 탐지\"를 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
     "zeroComponentsTitle": "컴포넌트를 찾지 못했습니다",
@@ -145,6 +143,10 @@
     "sbomDegradedTitle": "직접 의존성만 — 전이 의존성 분석이 실행되지 않음",
     "sbomDegradedBody": "전이 의존성 분석기(cdxgen)가 실행되지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. Docker가 사용 가능한지 확인한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
     "sbomDegradedDisk": "전이 의존성 분석기(cdxgen)가 Docker 디스크 공간 부족으로 실행되지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. 공간을 확보(예: \"docker system prune\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
+    "sbomDegradedOom": "전이 의존성 분석기(cdxgen)가 메모리 부족으로 강제 종료돼, 이 SBOM에는 직접 의존성만 담겼습니다. Docker 엔진에 메모리를 더 할당(Docker Desktop은 설정의 Resources, macOS의 Colima는 \"colima start --memory N\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
+    "sbomDegradedNetwork": "전이 의존성 분석기(cdxgen)가 실제 의존성 트리를 확인하는 데 필요한 패키지 저장소(Maven Central, npm, PyPI 등)에 접근하지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. Docker 엔진에서 프록시나 방화벽 설정을 확인한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
+    "sbomGraphEmptyTitle": "의존성 그래프가 비어 있습니다",
+    "sbomGraphEmptyBody": "전이 의존성 분석기는 정상적으로 실행됐지만, 이후 처리 과정에서 의존성 관계가 사라진 것으로 보입니다. 다시 스캔해도 계속 비어 있다면 결함일 수 있으니 알려주세요.",
     "scanossUnavailableTitle": "SCANOSS 검색이 완료되지 않았습니다",
     "scanossUnavailableBody": "호출 한도 초과, 네트워크 문제, 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 실행하면 결과가 나올 수 있습니다.",
     "scanossNoMatchTitle": "복사된 오픈소스를 찾지 못했습니다",
@@ -187,7 +189,7 @@
       },
       "conformance": {
         "title": "적합성 보고서",
-        "desc": "제출한 SBOM의 포맷 검증 결과입니다."
+        "desc": "이 스캔이 만든 SBOM의 형식 검증 결과입니다."
       },
       "aiProfile": {
         "title": "AI 준수 프로필",
@@ -436,7 +438,7 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "licenses": "라이선스",
-    "conformance": "SBOM 적합성",
+    "conformance": "SBOM 규제 검사",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물",
     "inputSbom": "제출된 SBOM",
@@ -607,18 +609,40 @@
     "usageRedistribute": "파인튜닝·재배포",
     "usageOutputsOnly": "산출물만 이용",
     "localScan": "불러올 때 코드 실행",
-    "localScan_clean": "pickle 데이터에서 코드를 실행하는 항목을 찾지 못함",
-    "localScan_suspicious": "확인이 필요한 항목 있음",
+    "localScan_clean": "코드를 실행하는 위험 요소를 찾지 못함",
+    "localScan_suspicious": "확인이 필요한 항목 발견",
     "localScan_unsafe": "코드를 실행하는 항목 발견",
     "localScan_not_applicable": "이 가중치 형식은 불러올 때 코드를 실행하지 않음",
     "localScan_error": "이 검사를 위해 파일을 읽지 못함",
     "customLicenseQuote": "커스텀 라이선스 발췌",
     "lineageConflict": "선언된 라이선스가 상위 모델 {{name}}의 라이선스와 충돌합니다.",
-    "disclaimer": "이 판정은 법적 자문이 아닌 안내입니다."
+    "disclaimer": "이 판정은 법적 자문이 아닌 안내입니다.",
+    "g7SectionTitle": "이 모델이 공개한 정보",
+    "g7SectionIntro": "G7 최소 요소 기준으로, 이 모델의 카드나 배포 페이지가 무엇을 밝히고 무엇을 밝히지 않았는지입니다. BomLens가 만든 문서가 아니라 모델을 공개한 쪽의 공개 수준을 보여줍니다."
+  },
+  "aiSummary": {
+    "title": "AI 모델 SBOM",
+    "modelsCount": "모델 {{count}}개",
+    "datasetsCount": "데이터셋 {{count}}개",
+    "riskLabel": "모델 위험 판정",
+    "riskUnknown": "판정 안 됨",
+    "conditionCount": "조건 {{count}}건",
+    "licenseReviewCount": "라이선스 검토 {{count}}건",
+    "g7Label": "G7 최소 요소",
+    "g7Value": "{{auto}}개 중 {{present}}개 충족",
+    "g7Detail": "미비 {{gap}}개, 검토 대상 {{review}}개",
+    "g7None": "G7 검사 없음",
+    "crosswalkLabel": "규제 대응 범위",
+    "crosswalkValue": "프레임워크 {{count}}개",
+    "crosswalkDetail": "매핑 요소 {{present}}/{{total}}개 충족",
+    "countLine": "모델 {{models}}개, 데이터셋 {{datasets}}개",
+    "viewModels": "모델 상세 보기",
+    "viewConformance": "적합성 검사 보기",
+    "disclaimer": "문서화 준비용 안내이며 법적 판단이 아닙니다."
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
-    "panelIntro": "이 SBOM이 형식·제출 요건을 얼마나 갖췄는지 검증합니다. 규제 대응표는 참고용이며, 규정 준수를 판정하지 않습니다.",
+    "panelIntro": "이 SBOM이 CycloneDX 형식과 SBOM 관련 규제가 요구하는 필수 항목을 얼마나 채웠는지 점검한 결과입니다. 규제 대응표는 참고용이며, 규정 준수 여부를 판정하지 않습니다.",
     "subtitle": "AI G7 최소 요소",
     "present": "{{present}}/{{total}} 충족",
     "advisory": "권고 {{count}}건",
@@ -969,25 +993,6 @@
     "review": "검토 필요",
     "failed": "실패"
   },
-  "aiProfile": {
-    "title": "AI 준수 개요",
-    "note": "AI SBOM 분석 결과를 문서 검토용으로 한눈에 모은 요약입니다. 규정 준수 여부를 판정하지 않습니다.",
-    "verdict": {
-      "pass": "통과",
-      "warn": "권고",
-      "fail": "미달",
-      "unknown": "알 수 없음"
-    },
-    "g7Label": "G7 최소 요소",
-    "g7Value": "{{auto}}개 중 {{present}}개 충족",
-    "g7Detail": "미비 {{gap}}개, 검토 대상 {{review}}개",
-    "licenseLabel": "라이선스 검토 대상",
-    "licenseValue": "{{count}}개 표시",
-    "licenseDetail": "행위 제한 {{behavioral}}개, 비상업용 {{nonCommercial}}개",
-    "crosswalkLabel": "규제 대응 범위",
-    "crosswalkValue": "프레임워크 {{count}}개",
-    "crosswalkDetail": "매핑 요소 {{present}}/{{total}}개 충족"
-  },
   "licenses": {
     "empty": "감지된 라이선스가 없습니다.",
     "emptyHint": "스캔이 구성요소를 찾지 못해 분류할 대상이 없습니다. 라이선스 화면은 같은 목록에서 라이선스를 읽습니다.",
@@ -1094,8 +1099,8 @@
   "conf": {
     "kind": {
       "pass": "충족",
-      "actionable": "조치 가능",
-      "review": "사람이 확인",
+      "actionable": "채울 수 있음",
+      "review": "판단 필요",
       "na": "해당 없음"
     },
     "searchPlaceholder": "검사 항목과 참조 규정 검색",

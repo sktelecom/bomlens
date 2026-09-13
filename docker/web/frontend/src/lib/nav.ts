@@ -144,14 +144,31 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.compliance",
     sections: [
       { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
-      // Supplier-SBOM conformance: shown whenever an ANALYZE produced a
-      // conformance report, regardless of AI content. The G7 AI minimum-element
-      // checks (when present) render as a sub-block inside this section.
+      // A conformance report exists for every mode (a mandatory checklist run
+      // against whatever SBOM the scan ends with) and the section shows it
+      // for every one of them — a self-generated SBOM's own checklist is a
+      // real thing to show a reader, not a verdict BomLens passes on itself:
+      // the self-grading confusion an earlier design tried to solve by
+      // hiding the section here is instead solved by the section's own
+      // label and intro line naming what is actually being checked (the
+      // document's own fields, not the scanned software or a submission
+      // review) — see nav.conformance and g7.panelIntro.
+      //
+      // The one case still routed elsewhere: a self-generated AI SBOM's G7
+      // minimum-element rollup. That grades the model PUBLISHER's own
+      // disclosure (BomLens only transcribes the model card), a real finding
+      // rather than a self-grade either way, but showing it a second time
+      // here would duplicate what Models & datasets already carries
+      // (AiSummaryCard + this section's own CheckGroup rendering, reused
+      // there) — so hasInputSbom still gates it for that one case.
+      // nav.conformance ("SBOM Validation" in English) is close to the rail's
+      // per-row width budget — see the RAIL_ROW comment in Sidebar.tsx —
+      // check the rendered rail before lengthening it further.
       {
         id: "conformance",
         labelKey: "nav.conformance",
         icon: FileCheck2,
-        requires: (c) => c.hasConformance,
+        requires: (c) => c.hasConformance && (c.hasInputSbom || !c.isAiScan),
       },
     ],
   },

@@ -28,16 +28,33 @@ set -e
 #   - MODELFILE   : read one AI model file's own header -> ML-BOM (offline)
 #   - ANALYZE     : validate + convert a supplier SBOM -> conformance + risk report
 #   - MERGE       : combine several CycloneDX SBOMs (layered server delivery)
+#   - DIFF        : compare two already-generated AI-model SBOMs (drift report)
 #   - POSTPROCESS : consume an already-generated SBOM
 # then runs the common pipeline: normalize -> notice -> security -> sign.
 # ========================================================
 
 SCAN_MODE="${MODE:-POSTPROCESS}"
+LIBDIR="/usr/local/lib/sbom"
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
+fi
+
+# --- DIFF mode: compare two already-generated SBOMs, no project metadata or
+# common pipeline needed — it reads two files and writes one report. Kept out
+# of the shared PROJECT_NAME/VERSION pipeline below entirely: unlike MERGE (a
+# generator that produces a new SBOM under --project/--version), this produces
+# no SBOM at all, so there is nothing for normalize/notice/security/sign to do.
+if [ "$SCAN_MODE" = "DIFF" ]; then
+    if [ -z "$DIFF_OLD" ] || [ -z "$DIFF_NEW" ]; then
+        echo "[ERROR] DIFF_OLD and DIFF_NEW are required for DIFF mode."
+        exit 1
+    fi
+    OUT="/host-output/${DIFF_OUT_NAME:-model-diff.json}"
+    python3 "$LIBDIR/diff-ai-model.py" "$DIFF_OLD" "$DIFF_NEW" "$OUT"
+    exit $?
 fi
 
 if [ -z "$PROJECT_NAME" ] || [ -z "$PROJECT_VERSION" ]; then
@@ -49,7 +66,6 @@ SAFE_PROJECT=$(echo "${PROJECT_NAME}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/
 SAFE_VERSION=$(echo "${PROJECT_VERSION}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
-LIBDIR="/usr/local/lib/sbom"
 
 # Report language for the human-facing conformance + AI-profile reports. Only
 # en (default) or ko; the report generators read REPORT_LANG directly, so export
@@ -133,9 +149,15 @@ generate_sbom_cdxgen() {
     fi
     # Capture the sibling output for diagnosis while still streaming it live, so
     # an out-of-disk extraction failure can be reported specifically (rather than
-    # a bare rc=125) and recorded for the UI.
-    local logf; logf=$(mktemp)
-    docker run --rm -u 0:0 \
+    # a bare rc=125) and recorded for the UI. --rm is dropped in favor of an
+    # explicit --cidfile + docker rm below: an out-of-memory kill (rc=137) needs
+    # `docker inspect`'s own OOMKilled flag to confirm, which --rm's automatic
+    # cleanup would remove before we could read it — guessing from rc=137 alone
+    # would misreport a plain `kill -9` or an OOM on a different process in the
+    # same container as memory exhaustion.
+    local logf cidf; logf=$(mktemp); cidf=$(mktemp); rm -f "$cidf"
+    docker run -u 0:0 \
+        --cidfile "$cidf" \
         --volumes-from "$self" \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
@@ -145,18 +167,32 @@ generate_sbom_cdxgen() {
         --entrypoint sh "$img" \
         -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION" 2>&1 | tee "$logf"
     rc=${PIPESTATUS[0]}
+    local cid=""
+    [ -s "$cidf" ] && cid=$(cat "$cidf")
     if [ "$rc" -ne 0 ]; then
-        if grep -qi "no space left on device" "$logf"; then
+        if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
+            CDXGEN_FAIL_REASON="oom"
+            echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
+        elif grep -qi "no space left on device" "$logf"; then
             CDXGEN_FAIL_REASON="disk-space"
             echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
+        elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$logf"; then
+            # Build tools resolve the real dependency tree by reaching Maven
+            # Central / npmjs / PyPI etc. from inside the sibling container;
+            # a proxy, firewall or offline host breaks that even though the
+            # scan's own network access (cloning the repo) already worked.
+            CDXGEN_FAIL_REASON="network"
+            echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
         else
             CDXGEN_FAIL_REASON="cdxgen-unavailable"
             echo "[WARN] cdxgen sibling container failed (rc=$rc)."
         fi
-        rm -f "$logf"
+        [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
+        rm -f "$logf" "$cidf"
         return 1
     fi
-    rm -f "$logf"
+    [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
+    rm -f "$logf" "$cidf"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
         mv "$bom_path" "$outdir/$out"
     fi
@@ -314,12 +350,20 @@ EOF
         # into submounts), and walking them is slow and can error out. They
         # never hold packages, so excluding them is safe for extracted
         # rootfs trees too.
+        # Capture stderr to a temp file instead of discarding it: on failure the
+        # cause (permission denied, unreadable path, ...) is otherwise invisible.
+        # It must stay off stdout, which carries the SBOM JSON on success.
+        ROOTFS_SYFT_LOG=$(mktemp)
         if ! syft "dir:$TARGET_DIR" -o "cyclonedx-json@$CDX_SPEC_VERSION" \
                 --exclude './proc/**' --exclude './sys/**' \
                 --exclude './dev/**' --exclude './run/**' \
-                > "$OUTPUT_FILE" 2>/dev/null; then
-            echo "[ERROR] syft directory scan failed."; exit 1
+                > "$OUTPUT_FILE" 2>"$ROOTFS_SYFT_LOG"; then
+            echo "[ERROR] syft directory scan failed."
+            [ -s "$ROOTFS_SYFT_LOG" ] && cat "$ROOTFS_SYFT_LOG" >&2
+            rm -f "$ROOTFS_SYFT_LOG"
+            exit 1
         fi
+        rm -f "$ROOTFS_SYFT_LOG"
         ;;
 
     FIRMWARE)
@@ -354,6 +398,17 @@ EOF
         # Best-effort — a missing network or tool just leaves those fields unfilled,
         # and the G7 conformance step then reports them honestly as not present.
         run_optional_step enrich-aibom bash "$LIBDIR/enrich-aibom.sh" "$OUTPUT_FILE" "$MODEL_ID"
+        # --verify-weights (opt-in, off by default): download only the
+        # pickle-format weight files (.bin/.pt/.pth/.ckpt) and run the same
+        # local picklescan verification MODE=MODELFILE runs, instead of only
+        # trusting the Hub's own scan. Real network + disk cost, unlike the
+        # metadata-only enrich-aibom.sh step above, which is why it needs an
+        # explicit opt-in. Best-effort: a network failure or missing
+        # huggingface_hub degrades to "not verified" rather than failing the scan.
+        if [ "${VERIFY_MODEL_WEIGHTS:-false}" = "true" ]; then
+            run_optional_step verify-weights python3 "$LIBDIR/verify-model-weights.py" \
+                "$OUTPUT_FILE" "$MODEL_ID"
+        fi
         ;;
 
     DATASET)
@@ -498,7 +553,7 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/ANALYZE/MERGE/POSTPROCESS/UI)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/ANALYZE/MERGE/POSTPROCESS/UI/DIFF)"
         exit 1
         ;;
 esac
@@ -846,13 +901,22 @@ if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
     run_optional_step assess-ai-risk bash "$LIBDIR/assess-ai-risk.sh" "$OUTPUT_FILE"
 fi
 
-# AI SBOM: G7 minimum-element conformance on the generated SBOM. validate-sbom.sh
-# detects the machine-learning-model component and appends the G7 checks (model
-# id/license/card/integrity, datasets, openness — all advisory). Best-effort
-# (exit 0); the resulting _conformance.* files are collected by the [ -f ] guard
-# in the risk-report block below.
+# Conformance check on the generated SBOM. For AI SBOM modes this is the G7
+# minimum-element checklist (validate-sbom.sh detects the machine-learning-model
+# component and appends those checks — model id/license/card/integrity, datasets,
+# openness, all advisory). For the other generation modes it is the same SKT
+# submission format check ANALYZE already runs on a supplied SBOM, so a scan's
+# own output can be self-checked before submission instead of requiring a
+# separate --analyze pass. Best-effort (exit 0); the resulting _conformance.*
+# files are collected by the [ -f ] guard in the risk-report block below.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS|ROOTFS|IMAGE|BINARY|FIRMWARE|MERGE) CONFORMANCE_GEN_MODE=true ;;
+    *) CONFORMANCE_GEN_MODE=false ;;
+esac
 if [ "$AI_MODEL_SCAN" = "true" ]; then
     echo "[2/2] ai: G7 minimum-element conformance"
+    run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+elif [ "$CONFORMANCE_GEN_MODE" = "true" ]; then
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
 fi
 
@@ -977,8 +1041,10 @@ fi
 # Risk report (오픈소스위험분석보고서): always for ANALYZE, and for every other
 # mode when GENERATE_REPORT=true (the CLI/UI default, opt-out via --no-report).
 # It re-aggregates the notice + security artifacts already produced above.
-# Conformance artifacts exist in ANALYZE and AIBOM; the [ -f ] guard skips them
-# in other modes, and generate-risk-report.sh drops the 포맷 검증 section accordingly.
+# Conformance artifacts now exist in every generation mode (ANALYZE, the AI SBOM
+# modes, and SOURCE/POSTPROCESS/ROOTFS/IMAGE/BINARY/FIRMWARE/MERGE); the [ -f ]
+# guard only matters for the remaining modes (UI/DIFF), where generate-risk-report.sh
+# drops the 포맷 검증 section accordingly.
 # Placed before SPDX export/signing below: on failure, run_optional_step stamps
 # $OUTPUT_FILE, and a stamp written after cosign has already signed it would
 # invalidate that signature (the .sig would no longer verify against the
@@ -987,7 +1053,7 @@ if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; the
     for ext in json md html; do
         [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
     done
-    run_optional_step generate-risk-report bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME"
+    run_optional_step generate-risk-report bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME" "$SCAN_MODE"
     [ -f "${OUT_PREFIX}_risk-report.md" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.md")
     [ -f "${OUT_PREFIX}_risk-report.html" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.html")
 fi

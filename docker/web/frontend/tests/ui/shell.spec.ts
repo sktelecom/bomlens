@@ -752,7 +752,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation").getByRole("link", { name: /validation/i })).toHaveCount(0);
 
   // Overview leads; switching to Components shows the table content.
   await page.getByRole("link", { name: /^Components/ }).first().click();
@@ -977,11 +977,18 @@ for (const { theme, lang } of COMBOS) {
 
 // An AI scan: the SBOM carries a machine-learning-model component, so the rail
 // exposes Models & Datasets. /file returns the matching ML-BOM (CycloneDX 1.7).
+// The Conformance section only shows for a document actually submitted for
+// review (nav.ts gates it on the _input.json artifact, not on `mode` — see
+// that file's comment), so this ANALYZE fixture carries one, matching what a
+// real ANALYZE run always writes.
 const AI_DONE = {
   ok: true,
   mode: "ANALYZE",
   id: "model_1.0",
-  results: [{ name: "model_1.0_bom.json", size: 200 }],
+  results: [
+    { name: "model_1.0_bom.json", size: 200 },
+    { name: "model_1.0_input.json", size: 100 },
+  ],
   security: null,
   conformance: {
     result: "pass",
@@ -1026,7 +1033,8 @@ const AI_DONE = {
       ],
     },
   },
-  // AI compliance profile card rollup (summary view: no per-element detail).
+  // AI compliance profile card rollup (summary view: no per-element detail) —
+  // feeds the Overview's AI summary card, not the conformance panel itself.
   aiProfile: {
     conformanceResult: "warn",
     g7: {
@@ -1042,6 +1050,24 @@ const AI_DONE = {
       frameworks: [
         { id: "eu-ai-act", title: "EU AI Act — Annex IV", total: 2, present: 1, gap: 1, review: 0 },
         { id: "kr-ai-framework-act", title: "Korean AI Framework Act", total: 1, present: 1, gap: 0, review: 0 },
+      ],
+    },
+    // Model risk verdict (assess-ai-risk.sh, re-aggregated by generate-ai-profile.sh).
+    riskAssessment: {
+      usageContext: "internal",
+      disclaimer: "Guidance, not legal advice.",
+      disclaimer_ko: "이 판정은 법적 자문이 아닌 안내입니다.",
+      counts: { ok: 0, conditional: 1, caution: 0, review: 0 },
+      models: [
+        {
+          name: "bert-base-uncased", version: "86b5e093", license: "Apache-2.0", overall: "conditional",
+          usageContext: "internal", axes: { license: "conditional" },
+          reasons: ["Non-commercial clause present"],
+          summary: "A non-commercial clause allows internal testing only.",
+          summary_ko: "비상업 조항이 있어 사내 시험 용도로만 조건부 허용됩니다.",
+          conditions: [{ id: "internal-only", label: "Internal use only", label_ko: "사내 용도로만 사용" }],
+          sourceUrls: ["https://huggingface.co/google-bert/bert-base-uncased"],
+        },
       ],
     },
   },
@@ -1154,9 +1180,9 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // The badge counts the mandatory checks — the ones that decide the verdict —
   // so it means the same thing on every scan. It used to show G7 coverage here
   // and all-check passes elsewhere, two answers to two different questions.
-  await expect(page.getByRole("navigation").getByRole("link", { name: /conformance/i })).toContainText("1/1");
+  await expect(page.getByRole("navigation").getByRole("link", { name: /validation/i })).toContainText("1/1");
   await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /validation/i }).click();
 
   // Coverage of the baseline itself: 6 of the 8 auto-covered elements are
   // present. It counts every G7 check, so a filter must not change it.
@@ -1203,12 +1229,6 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(unmet.getByText(/lifecycle phase|생성/)).toBeVisible();
   await expect(page.getByText("Model license — openness (weight/architecture/data/training)")).toBeVisible();
 
-  // AI compliance summary card (from aiProfile) is at the top of the section.
-  await expect(page.getByText("AI compliance profile")).toBeVisible();
-  await expect(page.getByText("G7 minimum elements", { exact: true })).toBeVisible();
-  await expect(page.getByText("License review flags")).toBeVisible();
-  await expect(page.getByText("Regulatory coverage")).toBeVisible();
-
   // Regulatory crosswalk sub-block (from conformance.regulatoryCrosswalk). Exact,
   // The framework row opens to the requirements it counted. The elements were
   // already in the payload and nothing read them, so the table stated four
@@ -1227,6 +1247,73 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+});
+
+// The AI summary card leads the Overview for an AI scan — the entry point into
+// Models & datasets and Conformance, not a replacement for either. It rolls up
+// the model risk verdict (from aiProfile.riskAssessment), the G7 headline and
+// the regulatory crosswalk (both via lib/conformance's profileCard), so a
+// reader sees "this model needs review" before opening either section.
+test("the AI summary card leads the Overview with the risk verdict, G7 and crosswalk tiles", async ({ page }) => {
+  await stubAiAndRun(page);
+
+  const card = page.getByTestId("ai-summary");
+  await expect(card).toBeVisible();
+  await expect(card.getByText("bert-base-uncased")).toBeVisible();
+  await expect(card.getByText("Conditional use").first()).toBeVisible(); // header badge + tile value both say it
+  await expect(card.getByText("Model risk verdict")).toBeVisible();
+  await expect(card.getByText(/1 condition/)).toBeVisible();
+  await expect(card.getByText(/2 license/)).toBeVisible(); // licenseReview.total folded into the tile
+  await expect(card.getByText("A non-commercial clause allows internal testing only.")).toBeVisible();
+  await expect(card.getByText("G7 minimum elements", { exact: true })).toBeVisible();
+  await expect(card.getByText("6 of 8 present")).toBeVisible();
+  await expect(card.getByText("Regulatory coverage")).toBeVisible();
+  await expect(card.getByText("Guidance, not legal advice.")).toBeVisible();
+
+  // The card itself is axe-clean on the Overview it leads. (The Conformance
+  // panel it links into has its own axe coverage above, exercised through its
+  // own filter states — this test's job is the card, not that panel.)
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+
+  // The two links jump straight into the sections this card summarizes — a
+  // section switch (hash change), not a page scroll.
+  const modelsLink = card.getByRole("link", { name: "View model details" });
+  const conformanceLink = card.getByRole("link", { name: "View conformance checks" });
+  await expect(modelsLink).toHaveAttribute("href", /\/models$/);
+  await expect(conformanceLink).toHaveAttribute("href", /\/conformance$/);
+
+  // The section it leads into is unaffected — Models & datasets and the
+  // Conformance panel still render their own full detail.
+  await conformanceLink.click();
+  await expect(page.getByText("6/8 present")).toBeVisible();
+});
+
+test("the AI summary card omits the G7 and crosswalk tiles without an AI profile", async ({ page }) => {
+  const bare = { ...AI_DONE, aiProfile: null };
+  await seedThemeLang(page, "light", "en");
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(AI_SBOM) }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(bare)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "model");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // The card itself never disappears for an AI scan — it falls back to the
+  // model/dataset count line instead of the G7 and crosswalk tiles.
+  const card = page.getByTestId("ai-summary");
+  await expect(card).toBeVisible();
+  await expect(card.getByText("G7 minimum elements", { exact: true })).toHaveCount(0);
+  await expect(card.getByText("Regulatory coverage")).toHaveCount(0);
+  await expect(card.getByRole("link", { name: "View model details" })).toBeVisible();
 });
 
 // The rail is a fixed width, so a label plus its count badge has a hard budget.
@@ -1259,10 +1346,11 @@ for (const lang of ["en", "ko"] as const) {
   });
 }
 
-// A conformance report that has G7 checks but no aiProfile and no crosswalk (a
-// plain re-open of an older AI scan, or a non-AI SBOM path): neither the summary
-// card nor the crosswalk sub-block renders — only the G7 and format checks do.
-test("conformance without a profile or crosswalk omits the AI card and crosswalk", async ({ page }) => {
+// A conformance report that has G7 checks but no crosswalk (a plain re-open of
+// an older AI scan, or a non-AI SBOM path): the crosswalk sub-block does not
+// render — only the G7 and format checks do. (The AI summary card lives on the
+// Overview now, not this panel; see the summary-card tests above.)
+test("conformance without a crosswalk omits the crosswalk sub-block", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   const bare = {
     ...AI_DONE,
@@ -1281,12 +1369,11 @@ test("conformance without a profile or crosswalk omits the AI card and crosswalk
   await page.fill("#project", "model");
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
-  await page.getByRole("navigation").getByRole("link", { name: /conformance/i }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /validation/i }).click();
 
   // The G7 section still renders (proves we reached the conformance panel)…
   await expect(page.getByText("6/8 present")).toBeVisible();
-  // …but neither the AI card nor the crosswalk sub-block is present.
-  await expect(page.getByText("AI compliance profile")).toHaveCount(0);
+  // …but the crosswalk sub-block is not present.
   // Exact — the panel intro mentions the regulatory crosswalk, so a substring
   // match would find it even when the crosswalk block itself is absent.
   await expect(page.getByText("Regulatory crosswalk", { exact: true })).toHaveCount(0);
@@ -1298,7 +1385,10 @@ for (const { theme, lang } of COMBOS) {
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
     // "6/8" and the CycloneDX label are the same in every locale. Scoped to
     // <main> — the rail's conformance badge carries the same 6/8 figure.
-    await expect(page.getByText("CycloneDX")).toBeVisible();
+    // Exact: the panel's intro line also contains "CycloneDX" as a substring
+    // (it names the format the checks are against), so a loose match resolves
+    // to both and violates strict mode.
+    await expect(page.getByText("CycloneDX", { exact: true })).toBeVisible();
     await expect(page.locator("main").getByText(/6\s*\/\s*8/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a

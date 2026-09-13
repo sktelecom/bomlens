@@ -21,11 +21,20 @@
 # What is ours is deciding WHICH bytes to hand it, since the tool will happily
 # scan a file that holds no pickle at all and report nothing wrong.
 #
+# Keras (.h5/.keras) is not pickle at all — the equivalent risk is a Lambda
+# layer carrying marshal.dumps()'d bytecode, which identify-model-file.py
+# already looked for (header-bytes-only) and recorded as
+# bomlens:weights:marshalledCode. This step's only job for that format is
+# translating that flag into the same status vocabulary below; no picklescan
+# call is involved, and bomlens:localscan:tool says so.
+#
 # Verdicts (bomlens:localscan:status):
 #   unsafe          a dangerous global (os.system, subprocess, …) is reachable
 #   suspicious      globals that could be code, e.g. a custom class — a human
-#                   has to look. Common in legitimate checkpoints.
-#   clean           pickle bytes were parsed and held nothing of the kind
+#                   has to look. Common in legitimate checkpoints. Also used
+#                   for a detected Keras Lambda layer, for the same reason.
+#   clean           pickle bytes were parsed and held nothing of the kind (or,
+#                   for Keras, no Lambda layer was found)
 #   not-applicable  the format does not execute code on load (GGUF,
 #                   safetensors, ONNX, plain npy)
 #   error           the file could not be parsed; explicitly NOT a pass
@@ -50,8 +59,17 @@ MAX_NPZ_BYTES = 64 * 1024 * 1024
 # in step with identify-model-file.py, which is what wrote the property.
 PICKLE_FORMATS = ("pickle", "pytorch-zip")
 
+# Formats whose code-execution risk is a Keras Lambda layer, not a pickle.
+# Kept in step with identify-model-file.py's EXT_CLAIMS/sniff_format.
+KERAS_FORMATS = ("keras-h5", "keras-zip")
 
-def tool_version():
+
+def tool_version(fmt=None):
+    if fmt in KERAS_FORMATS:
+        # This verdict is a translation of the static Lambda-layer scan
+        # identify-model-file.py already ran; picklescan was never invoked on
+        # this file, so naming it here would credit a tool that never ran.
+        return "bomlens-modelfile-scan"
     try:
         from importlib.metadata import version
         return "picklescan@%s" % version("picklescan")
@@ -87,8 +105,14 @@ def npy_object_payload(raw):
     return raw[start + hlen:]
 
 
-def scan(path, fmt):
-    """(status, findings) for one model file."""
+def scan(path, fmt, marshalled_code=False):
+    """(status, findings) for one model file.
+
+    marshalled_code is the bomlens:weights:marshalledCode flag
+    identify-model-file.py already stamped for a Keras file; it is the only
+    input the Keras branch below needs, since the detection itself already
+    happened there.
+    """
     from picklescan.scanner import scan_file_path, scan_pickle_bytes
 
     def verdict(result):
@@ -132,6 +156,15 @@ def scan(path, fmt):
             return "not-applicable", []
         return worst, found
 
+    if fmt in KERAS_FORMATS:
+        # A human still has to look — a Lambda layer is common in legitimate
+        # checkpoints (a custom activation function is enough), same as a
+        # custom class reachable from a pickle. This is a translation of the
+        # header-bytes scan identify-model-file.py already ran, not a new scan.
+        if marshalled_code:
+            return "suspicious", ["Keras Lambda layer with embedded marshalled code"]
+        return "clean", []
+
     return "not-applicable", []
 
 
@@ -157,9 +190,11 @@ def main():
     props = component.setdefault("properties", [])
     fmt = next((p.get("value") for p in props
                 if p.get("name") == "bomlens:modelfile:format"), "")
+    marshalled_code = any(p.get("name") == "bomlens:weights:marshalledCode"
+                           and p.get("value") == "1" for p in props)
 
     try:
-        status, findings = scan(model_path, fmt)
+        status, findings = scan(model_path, fmt, marshalled_code)
     except ImportError:
         sys.stderr.write("[modelscan] picklescan is not installed in this image; "
                          "no local security verdict.\n")
@@ -173,7 +208,7 @@ def main():
     # --byte-stable output stays byte-identical.
     props[:] = [p for p in props if not str(p.get("name", "")).startswith("bomlens:localscan:")]
     props.append({"name": "bomlens:localscan:status", "value": status})
-    props.append({"name": "bomlens:localscan:tool", "value": tool_version()})
+    props.append({"name": "bomlens:localscan:tool", "value": tool_version(fmt)})
     if findings:
         props.append({"name": "bomlens:localscan:findings",
                       "value": "; ".join(findings[:MAX_FINDINGS])})

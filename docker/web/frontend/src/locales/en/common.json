@@ -133,8 +133,6 @@
     "vulnerabilities": "Vulnerabilities",
     "noSecurity": "Security report was not generated",
     "noSecurityHint": "This scan carries no vulnerability report, so nothing here was checked against advisory data. An empty section is not the same as a clean result.",
-    "aiScanTitle": "AI model SBOM (ML-BOM)",
-    "aiScanBody": "Generated from HuggingFace model metadata. It centers on the model and its datasets, so it has fewer components than a typical software scan.",
     "vendoredHintTitle": "Few components found — is this C/C++ embedded source?",
     "vendoredHintBody": "Open source is often copied (vendored) into C/C++ sources that have no package manager, where a normal scan can't see it. Turn on \"Detect copied-in open source\" under Advanced scan options and run again. Only file fingerprints are sent — your source stays local.",
     "zeroComponentsTitle": "No components were found",
@@ -145,6 +143,10 @@
     "sbomDegradedTitle": "Direct dependencies only — deep resolution didn't run",
     "sbomDegradedBody": "The transitive-dependency analyzer (cdxgen) couldn't run, so this SBOM lists only direct dependencies. Make sure Docker is available and re-scan for the full dependency graph.",
     "sbomDegradedDisk": "The transitive-dependency analyzer (cdxgen) ran out of Docker disk space, so this SBOM lists only direct dependencies. Free space (e.g. \"docker system prune\") and re-scan for the full dependency graph.",
+    "sbomDegradedOom": "The transitive-dependency analyzer (cdxgen) was killed for running out of memory, so this SBOM lists only direct dependencies. Give the Docker engine more memory (Docker Desktop: Settings > Resources; Colima on macOS: \"colima start --memory N\") and re-scan for the full dependency graph.",
+    "sbomDegradedNetwork": "The transitive-dependency analyzer (cdxgen) couldn't reach the package registries (Maven Central, npm, PyPI, …) it needs to resolve the real dependency tree, so this SBOM lists only direct dependencies. Check proxy/firewall access from the Docker engine and re-scan for the full dependency graph.",
+    "sbomGraphEmptyTitle": "The dependency graph is empty",
+    "sbomGraphEmptyBody": "The transitive-dependency analyzer ran successfully, but the dependency relationships appear to have been lost in a later processing step. If a re-scan still comes up empty, please report it as a defect.",
     "scanossUnavailableTitle": "SCANOSS search didn't complete",
     "scanossUnavailableBody": "The OSSKB lookup was blocked (rate limit, no network, or no token). The free OSSKB endpoint is rate-limited for anonymous use — add a SCANOSS token under Advanced scan options and run again to get results.",
     "scanossNoMatchTitle": "No copied open source found",
@@ -187,7 +189,7 @@
       },
       "conformance": {
         "title": "Conformance report",
-        "desc": "Format validation of the submitted SBOM."
+        "desc": "Format validation of this scan's SBOM."
       },
       "aiProfile": {
         "title": "AI compliance profile",
@@ -436,7 +438,7 @@
     "sourceTree": "Source tree",
     "vulnerabilities": "Vulnerabilities",
     "licenses": "Licenses",
-    "conformance": "SBOM conformance",
+    "conformance": "SBOM Validation",
     "models": "Models & datasets",
     "artifacts": "Artifacts",
     "inputSbom": "Submitted SBOM",
@@ -607,18 +609,40 @@
     "usageRedistribute": "Fine-tune & redistribute",
     "usageOutputsOnly": "Outputs only",
     "localScan": "Load-time code execution",
-    "localScan_clean": "No code-execution globals found in the pickle payload",
-    "localScan_suspicious": "Globals that need a look",
+    "localScan_clean": "No code-execution risk found",
+    "localScan_suspicious": "Something found that needs a look",
     "localScan_unsafe": "Code-execution globals found",
     "localScan_not_applicable": "This weight format does not execute code on load",
     "localScan_error": "The file could not be read for this check",
     "customLicenseQuote": "Custom license excerpt",
     "lineageConflict": "The declared license conflicts with the upstream model {{name}}.",
-    "disclaimer": "This assessment is guidance, not legal advice."
+    "disclaimer": "This assessment is guidance, not legal advice.",
+    "g7SectionTitle": "What this model discloses",
+    "g7SectionIntro": "Against the G7 minimum elements, what this model's card or listing does and doesn't disclose. This measures the publisher's own disclosure, not a document BomLens wrote."
+  },
+  "aiSummary": {
+    "title": "AI model SBOM",
+    "modelsCount": "{{count}} models",
+    "datasetsCount": "{{count}} datasets",
+    "riskLabel": "Model risk verdict",
+    "riskUnknown": "Not assessed",
+    "conditionCount": "{{count}} condition(s)",
+    "licenseReviewCount": "{{count}} license(s) to review",
+    "g7Label": "G7 minimum elements",
+    "g7Value": "{{present}} of {{auto}} present",
+    "g7Detail": "{{gap}} gap, {{review}} to review",
+    "g7None": "No G7 checks",
+    "crosswalkLabel": "Regulatory coverage",
+    "crosswalkValue": "{{count}} frameworks",
+    "crosswalkDetail": "{{present}}/{{total}} elements mapped present",
+    "countLine": "{{models}} model(s), {{datasets}} dataset(s)",
+    "viewModels": "View model details",
+    "viewConformance": "View conformance checks",
+    "disclaimer": "Documentation-preparation guidance, not a legal or compliance verdict."
   },
   "g7": {
     "empty": "No conformance checks were recorded.",
-    "panelIntro": "Checks how well this SBOM meets the format and submission requirements. The regulatory crosswalk is for reference and makes no compliance determination.",
+    "panelIntro": "Checks how well this SBOM's fields meet the CycloneDX format and SBOM-related regulatory requirements. The regulatory crosswalk is for reference and makes no compliance determination.",
     "subtitle": "G7 minimum elements for AI",
     "present": "{{present}}/{{total}} present",
     "advisory": "{{count}} advisory",
@@ -968,25 +992,6 @@
     "advisory": "Advisory",
     "review": "Review needed",
     "failed": "Failed"
-  },
-  "aiProfile": {
-    "title": "AI compliance profile",
-    "note": "A one-glance rollup of the AI SBOM findings for documentation review — it makes no compliance determination.",
-    "verdict": {
-      "pass": "Pass",
-      "warn": "Advisory",
-      "fail": "Fail",
-      "unknown": "Unknown"
-    },
-    "g7Label": "G7 minimum elements",
-    "g7Value": "{{present}} of {{auto}} present",
-    "g7Detail": "{{gap}} gap, {{review}} to review",
-    "licenseLabel": "License review flags",
-    "licenseValue": "{{count}} flagged",
-    "licenseDetail": "{{behavioral}} behavioral-use, {{nonCommercial}} non-commercial",
-    "crosswalkLabel": "Regulatory coverage",
-    "crosswalkValue": "{{count}} frameworks",
-    "crosswalkDetail": "{{present}}/{{total}} elements mapped present"
   },
   "licenses": {
     "empty": "No licenses were detected.",

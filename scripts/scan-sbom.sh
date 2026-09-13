@@ -91,6 +91,7 @@ FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""
 YOCTO_BUILD_DIR=""
 IDENTIFY_VENDORED="false"
 DEEP_CVE="false"
+VERIFY_WEIGHTS="false"
 SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 # HuggingFace read credential for --model (private/gated repos). Absorb the older
 # huggingface_hub name here so the container boundary carries one name only.
@@ -101,6 +102,7 @@ GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
 MERGE_ROOT=""
+DIFF_OLD=""; DIFF_NEW=""
 OUTPUT_BASE=""; TIMESTAMP="false"
 UI_MOUNTS=()
 
@@ -128,6 +130,15 @@ while [[ "$#" -gt 0 ]]; do
             done
             continue ;;   # we already consumed our args; skip the trailing shift
         --merge-root) MERGE_ROOT="$2"; shift ;;
+        --diff)
+            # Fixed 2-arg flag (not variadic like --merge): a drift comparison
+            # always has exactly one older and one newer SBOM. Checked here,
+            # before the shift, so a missing second file is a clear error
+            # instead of `shift 2` failing on too few remaining arguments.
+            DIFF_OLD="${2:-}"; DIFF_NEW="${3:-}"
+            [ -n "$DIFF_OLD" ] && [ -n "$DIFF_NEW" ] || {
+                echo "[ERROR] --diff requires two files: --diff <old.json> <new.json>"; exit 1; }
+            shift 2 ;;
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
         --no-report) NO_REPORT="true" ;;
@@ -142,6 +153,7 @@ while [[ "$#" -gt 0 ]]; do
         --deep-license) DEEP_LICENSE="true" ;;
         --deep-cve) DEEP_CVE="true"; GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
+        --verify-weights) VERIFY_WEIGHTS="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --lang) REPORT_LANG="$2"; shift ;;
@@ -230,6 +242,16 @@ Options:
                          component (e.g. an ML-BOM's 1.7 + modelCard) instead of
                          writing a fresh 1.6 root. Must be one of the --merge
                          files; the root is renamed to --project/--version.
+  --diff <old.json> <new.json>
+                         Compare two already-generated AI-model SBOMs (--model
+                         or --model-file output) and report drift: a risk
+                         verdict that got worse, a changed declared license, or
+                         a SHA-256 weight-file hash that no longer matches under
+                         the same model name/purl/HuggingFace id — the last one
+                         means the artifact behind a stable name silently
+                         changed. No --project/--version or scan target needed;
+                         writes <new>_model-diff.json next to the newer file
+                         (or under --output-dir).
   --generate-only        Save locally without uploading
   --trusca <project_id>  Upload the SBOM to TRUSCA's native ingest endpoint
                          (shorthand for --upload-target trusca with the id).
@@ -254,6 +276,16 @@ Options:
                          that has no package manager. Matches file fingerprints
                          against the OSSKB service (opt-in image; sends hashes,
                          not source). See docs/guides/identify-vendored.md
+  --verify-weights       With --model: download the repo's pickle-format weight
+                         files (.bin/.pt/.pth/.ckpt — the ones that execute code
+                         on load) and run the same local picklescan verification
+                         --model-file runs on a supplied file, instead of only
+                         trusting HuggingFace's own scan (bomlens:hf:scan:*).
+                         safetensors/GGUF/ONNX weights are never downloaded: they
+                         cannot execute code on load. A real network/disk cost
+                         (bounded by AIBOM_VERIFY_MAX_FILES / AIBOM_VERIFY_MAX_BYTES,
+                         default 5 files / 2 GiB each), so this is opt-in, unlike
+                         the metadata-only file-security lookup.
   --byte-stable          Deterministic SBOM output
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
@@ -484,6 +516,50 @@ fi
 [ "${#UI_MOUNTS[@]}" -eq 0 ] || { echo "[ERROR] --mount requires --ui."; exit 1; }
 
 # ========================================================
+# Model drift/diff mode — reads two already-generated SBOMs and writes a
+# comparison report. No --project/--version and no scan target: there is
+# nothing to generate here, so this runs and exits before the requirement
+# check below (the same shape UI mode takes above).
+# ========================================================
+if [ -n "$DIFF_OLD" ]; then
+    docker_check
+    [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
+    [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
+    DIFF_OLD_DIR="$(cd "$(dirname "$DIFF_OLD")" && pwd)"; DIFF_OLD_FN="$(basename "$DIFF_OLD")"
+    DIFF_NEW_DIR="$(cd "$(dirname "$DIFF_NEW")" && pwd)"; DIFF_NEW_FN="$(basename "$DIFF_NEW")"
+    DIFF_OUT_DIR="${OUTPUT_BASE:-$(pwd)}"
+    mkdir -p "$DIFF_OUT_DIR"
+    # The report is named after the NEWER file, not --project/--version (there
+    # is none here): "<name>_bom.json" -> "<name>_model-diff.json", so a scan
+    # bundle's own naming carries over without inventing a second identity for
+    # the same artifact.
+    DIFF_REPORT_NAME="${DIFF_NEW_FN%.json}"
+    DIFF_REPORT_NAME="${DIFF_REPORT_NAME%_bom}_model-diff.json"
+    ensure_image_fresh "$POSTPROCESS_IMAGE"
+    "${DOCKER_ENV[@]}" docker run --rm \
+        -v "$(hostpath "$DIFF_OLD_DIR/$DIFF_OLD_FN")":/diff/old.json:ro \
+        -v "$(hostpath "$DIFF_NEW_DIR/$DIFF_NEW_FN")":/diff/new.json:ro \
+        -v "$(hostpath "$DIFF_OUT_DIR")":/host-output \
+        -e MODE=DIFF -e DIFF_OLD=/diff/old.json -e DIFF_NEW=/diff/new.json \
+        -e DIFF_OUT_NAME="$DIFF_REPORT_NAME" \
+        "$POSTPROCESS_IMAGE"
+    RC=$?
+    # diff-ai-model.py already reported its own reason on a real failure (bad
+    # file, unreadable JSON, nothing to compare); only an exit-0-but-no-file
+    # result means the /host-output mount itself did not reach the host.
+    if [ "$RC" -eq 0 ] && [ ! -f "$DIFF_OUT_DIR/$DIFF_REPORT_NAME" ]; then
+        echo "[ERROR] diff report not found on host: $DIFF_OUT_DIR/$DIFF_REPORT_NAME"
+        echo "  The container ran but no artifact reached this folder."
+        echo "  Likely cause: this folder is outside Docker Desktop file sharing"
+        echo "  (or Colima's home-only mount — /tmp is not shared to the VM)."
+        echo "  Run from a shared path (e.g. under your home directory) and retry."
+        exit 1
+    fi
+    [ "$RC" -eq 0 ] && echo "[INFO] Model diff report: $DIFF_OUT_DIR/$DIFF_REPORT_NAME"
+    exit "$RC"
+fi
+
+# ========================================================
 # Validate
 # ========================================================
 [ -n "$PROJECT_NAME" ] && [ -n "$PROJECT_VERSION" ] || { echo "[ERROR] --project and --version are required ($0 --help)."; exit 1; }
@@ -562,12 +638,13 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
-        "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}"
+        "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -1276,7 +1353,29 @@ elif [ -n "$TARGET" ]; then
         # Same as an uploaded SBOM: the risk report needs license + vulnerability data.
         GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
         fi
-    elif [ -d "$TARGET" ]; then MODE="ROOTFS";
+    elif [ -d "$TARGET" ]; then
+        if _is_rootfs_dir "$TARGET"; then
+            # Looks like a real root filesystem (etc/ plus two of bin/sbin/usr/lib/var):
+            # syft reads its package database directly, same as an archive that
+            # unpacked to one (see INGEST_ROOTFS above).
+            if ! has_package_db "$TARGET"; then
+                echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
+                echo "       so there is no installed-package list to read. Re-run with"
+                echo "       --firmware to identify the binaries by signature instead"
+                echo "       (opt-in image: docker build --build-arg SBOM_FIRMWARE=true)."
+            fi
+            MODE="ROOTFS"
+        else
+            # An ordinary source tree pointed at directly, e.g. `--target
+            # examples/nodejs`. MODE is already "SOURCE" by default (set above,
+            # before this elif chain), but SCAN_INPUT_DIR still defaults to the
+            # current directory ($(pwd), set earlier near SOURCE_DIR) — without
+            # this, cdxgen would silently scan the current directory instead of
+            # the folder the user named. Resolve to an absolute path so it
+            # survives any later `cd`.
+            MODE="SOURCE"
+            SCAN_INPUT_DIR="$(cd "$TARGET" && pwd)"
+        fi
     else MODE="IMAGE"; fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
     echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
@@ -1284,6 +1383,10 @@ fi
 
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ]; then
     echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+fi
+
+if [ "$VERIFY_WEIGHTS" = "true" ] && [ "$MODE" != "AIBOM" ]; then
+    echo "[ERROR] --verify-weights applies to AI model scans only (use it with --model)."; exit 1
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
@@ -1351,10 +1454,17 @@ case "$MODE" in
               fi ;;
     MERGE)    META_SOURCE="";                META_TARGET=""; META_LABEL="" ;;
     *)
-        # SOURCE covers three different inputs: a clone, an extracted archive,
-        # and the current folder. GIT_URL is what distinguishes the first.
+        # SOURCE covers four different inputs: a clone, an extracted archive,
+        # a folder named directly with --target, and the current folder.
+        # GIT_URL is what distinguishes the first.
         if [ -n "$GIT_URL" ]; then
             META_SOURCE="git-url";    META_TARGET="$GIT_URL"; META_LABEL=""
+        elif [ -n "$TARGET" ] && [ -d "$TARGET" ]; then
+            # A directory named directly (not an archive) that did not look like a
+            # root filesystem — same shape as the web UI's folder-picker "deep
+            # source scan" input, so it reuses that source value rather than the
+            # file-oriented "zip-upload".
+            META_SOURCE="scan-target-src"; META_TARGET=""; META_LABEL="$TARGET"
         elif [ -n "$TARGET" ]; then
             META_SOURCE="zip-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")"
         else

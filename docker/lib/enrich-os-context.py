@@ -41,6 +41,11 @@
 #
 # Accuracy first: only namespaces/qualifiers we can name a Trivy distro for are
 # voted on; an unrecognized distro or a version-less PURL is left untouched.
+# Two document properties make the judgement call visible instead of silent:
+#   - bomlens:os-context-ambiguous  — packages from more than one distro were
+#     voted on; the majority still wins, the tally says what was set aside.
+#   - bomlens:os-context-unmatched  — rpm/deb/apk packages are present but none
+#     named a distro version, so no OS component (and no distro CVEs) at all.
 # Best-effort: any failure leaves the SBOM unchanged and never aborts the scan.
 # Idempotent: re-running is a no-op once the OS component exists and its version is
 # already normalized.
@@ -74,6 +79,10 @@ DEB_TO_OS = {"debian": "debian", "ubuntu": "ubuntu"}
 # too ("11"), while alpine (3.17) and ubuntu (18.04) keep their full release id.
 RHEL_LIKE = {"centos", "rocky", "redhat", "alma", "fedora", "amazon"}
 DEB_MAJOR_ONLY = {"debian"}
+
+# PURL types that carry an OS package. Used only to tell "this SBOM has no OS
+# packages at all" from "it has them but none named a distro version".
+OS_PKG_PREFIXES = ("pkg:rpm/", "pkg:deb/", "pkg:apk/")
 
 
 def _ns(purl, prefix):
@@ -126,7 +135,12 @@ def _classify(purl):
 
 
 def infer_os(purls):
-    """Vote a dominant (os_name, version) from distro PURLs. None if none map."""
+    """Vote a dominant (os_name, version) from distro PURLs. None if none map.
+
+    `distinct` counts the distinct (os_name, version) keys that got a vote: more
+    than one means the winner is a majority over other distros that were dropped,
+    which the caller reports rather than hiding. `summary` is that tally, highest
+    first."""
     votes = {}
     for p in purls:
         key = _classify(p)
@@ -134,9 +148,11 @@ def infer_os(purls):
             votes[key] = votes.get(key, 0) + 1
     if not votes:
         return None
-    (os_name, version), n = max(votes.items(), key=lambda kv: kv[1])
+    ranked = sorted(votes.items(), key=lambda kv: (-kv[1], kv[0]))
+    (os_name, version), n = ranked[0]
     return {"name": os_name, "version": version, "votes": n,
-            "total": sum(votes.values())}
+            "total": sum(votes.values()), "distinct": len(votes),
+            "summary": ", ".join("%s:%s(%d)" % (k[0], k[1], c) for k, c in ranked)}
 
 
 def enrich(path):
@@ -174,8 +190,26 @@ def enrich(path):
 
     os_info = infer_os(purls)
     if not os_info:
-        return  # no recognizable distro packages (non-OS SBOM, an unsupported
-        # distro like OpenWRT, or deb/apk PURLs with no distro= version qualifier)
+        # An SBOM with no OS packages at all (a source scan) has nothing to
+        # report; one that HAS them and still matched nothing does — those
+        # packages carry no distro version, so their CVEs cannot be matched.
+        unmatched = _os_pkg_tally(purls)
+        if unmatched:
+            _set_property(doc, "bomlens:os-context-unmatched", unmatched)
+            _write(path, doc)
+            print(f"[os-context] OS packages present but no distro version found "
+                  f"({unmatched}); no operating-system component synthesized, so "
+                  f"distro CVEs will not be matched.", file=sys.stderr)
+        return
+
+    if os_info["distinct"] > 1:
+        # The majority winner still becomes the OS component (one component is
+        # what Trivy can use); the losing distros are named so a reader knows the
+        # SBOM mixes them and part of it is matched against the wrong advisories.
+        _set_property(doc, "bomlens:os-context-ambiguous", os_info["summary"])
+        print(f"[os-context] WARN: distro packages from {os_info['distinct']} "
+              f"distributions ({os_info['summary']}); matching against the "
+              f"majority only.", file=sys.stderr)
 
     components.append({
         "type": "operating-system",
@@ -187,6 +221,35 @@ def enrich(path):
     print(f"[os-context] synthesized operating-system component "
           f"{os_info['name']} {os_info['version']} "
           f"({os_info['votes']}/{os_info['total']} distro packages) for CVE matching.")
+
+
+def _os_pkg_tally(purls):
+    """"deb(12), rpm(1)" for the OS package PURLs present, or "" if there are none."""
+    counts = {}
+    for p in purls:
+        for prefix in OS_PKG_PREFIXES:
+            if p.startswith(prefix):
+                t = prefix[len("pkg:"):-1]
+                counts[t] = counts.get(t, 0) + 1
+    return ", ".join("%s(%d)" % (t, n)
+                     for t, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _set_property(doc, name, value):
+    """Set one document property, replacing any entry of the same name — same
+    rule as mark_document_status in pipeline-step.sh, so a re-run or an already
+    stamped supplier SBOM does not accumulate duplicates."""
+    meta = doc.get("metadata")
+    if not isinstance(meta, dict):
+        meta = {}
+        doc["metadata"] = meta
+    props = meta.get("properties")
+    if not isinstance(props, list):
+        props = []
+    props = [p for p in props
+             if not (isinstance(p, dict) and p.get("name") == name)]
+    props.append({"name": name, "value": value})
+    meta["properties"] = props
 
 
 def _write(path, doc):
