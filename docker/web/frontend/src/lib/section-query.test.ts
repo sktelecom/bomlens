@@ -9,6 +9,7 @@ import {
   componentsFromQuery,
   componentsToQuery,
   DEFAULT_VULN_SORT,
+  dependenciesFromQuery,
   vulnsFromQuery,
   vulnsToQuery,
   type ComponentSort,
@@ -84,6 +85,28 @@ describe("vulnerabilities query", () => {
     const query = vulnsToQuery("", "", { key: "nvdSeverity", dir: "desc" });
     expect(query).toEqual({ sort: "nvdSeverity", dir: "desc" });
     expect(vulnsFromQuery(query).sort).toEqual({ key: "nvdSeverity", dir: "desc" });
+  });
+});
+
+describe("dependencies query", () => {
+  it("is absent with no query at all", () => {
+    expect(dependenciesFromQuery(undefined)).toBeNull();
+  });
+
+  it("is absent when q is missing, even if version is present", () => {
+    // version alone can't drive findPathToRef, which requires a name.
+    expect(dependenciesFromQuery({ version: "6.16.0" })).toBeNull();
+  });
+
+  it("carries name only when no version was given", () => {
+    expect(dependenciesFromQuery({ q: "qs" })).toEqual({ name: "qs" });
+  });
+
+  it("carries name and version together", () => {
+    expect(dependenciesFromQuery({ q: "qs", version: "6.15.3" })).toEqual({
+      name: "qs",
+      version: "6.15.3",
+    });
   });
 });
 

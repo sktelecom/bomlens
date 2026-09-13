@@ -14,8 +14,9 @@ description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호�
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | 같은 이미지의 별칭 (이전 이름, 같은 다이제스트) |
 | `ghcr.io/sktelecom/bomlens-firmware` | 펌웨어 분석용 (GPL 도구 포함, opt-in) (legacy alias: sbom-scanner-firmware) |
 | `ghcr.io/sktelecom/bomlens-deep-cve` | 심층 CVE 매칭용 grype 포함 (opt-in). CLI의 `--deep-cve`와 웹 UI의 심층 CVE 매칭 토글이 쓰며, 둘 다 지금 실행 중인 이미지가 이 이미지가 아니면 곁들임 컨테이너로 자동으로 내려받습니다 |
+| `ghcr.io/sktelecom/bomlens-aibom` | AI 모델 ML-BOM 생성용 (opt-in, legacy alias: sbom-scanner-aibom). `--model`/`--model-file`과 웹 UI의 AI 모델 타일이 쓰며, 곁들임 컨테이너로 자동으로 내려받습니다 |
 
-`latest`와 버전 태그를 제공하며, `linux/amd64`와 `linux/arm64`를 지원합니다. 이미지는 cosign으로 서명되어 발행됩니다.
+`latest`와 버전 태그를 제공합니다. `ghcr.io/sktelecom/bomlens`와 `bomlens-aibom`(및 별칭)은 `linux/amd64`와 `linux/arm64`를 모두 지원하고, `bomlens-firmware`와 `bomlens-deep-cve`는 `linux/amd64`만 발행돼 `arm64` 호스트(Apple Silicon 맥, Arm 서버)에서는 amd64 에뮬레이션 계층 없이 pull이 실패합니다. 이미지는 cosign으로 서명되어 발행됩니다.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -29,9 +30,11 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 |------|------|------|
 | syft | v1.51.0 | 이미지, 바이너리, 디렉터리 스캔 |
 | Trivy | v0.74.0 | 취약점 보고서 |
-| cosign | v2.6.5 | SBOM 서명 |
+| cosign | v3.1.3 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
+| docker CLI | 29.7.2 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
+| cdxgen | 12.8.4 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
 
@@ -152,6 +155,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | ingest release 라벨 |
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
+| `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | 소스 스캔: `1`로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌 |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. 1.7을 추가로 허용 |

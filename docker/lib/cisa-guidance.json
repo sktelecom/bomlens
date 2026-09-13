@@ -28,8 +28,8 @@
   },
   "review": {
     "cisa-sbom-author-signature": {
-      "how": "A signature delivered beside the SBOM rather than inside it does not appear here, because this report reads one file. If the SBOM arrived with a detached signature, verify it against the sender's key before treating the contents as theirs, and record that you did. A signature carried inside the document is read automatically and this row will say so.",
-      "how_ko": "SBOM 안이 아니라 파일 옆에 따로 온 서명은 이 보고서에 나타나지 않습니다. 보고서가 파일 하나만 읽기 때문입니다. 분리 서명과 함께 받았다면 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다. 문서 안에 담긴 서명은 자동으로 읽히며 그 경우 이 행에 표시됩니다.",
+      "how": "A signature carried inside the document, or a detached one sitting next to the SBOM as <sbom-filename>.sig (cosign's own convention, e.g. from --sign), is detected automatically and this row will say so. A detached signature under a different name or location is not visible here, because this report only looks for that one convention. Verify it against the sender's key before treating the contents as theirs, and record that you did.",
+      "how_ko": "문서 안에 담긴 서명이나, cosign(예: --sign)이 SBOM 옆에 <SBOM 파일명>.sig로 남기는 분리 서명은 자동으로 인식되며 그 경우 이 행에 표시됩니다. 다른 이름이나 위치의 분리 서명은 이 보고서가 그 한 가지 관례만 찾기 때문에 나타나지 않습니다. 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다.",
       "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
     },
     "cisa-coverage": {

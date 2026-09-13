@@ -265,3 +265,73 @@ export function parseSbomGraph(sbom: RawSbom, vulnOf?: VulnLookup): SbomGraph {
     componentCount: components.length,
   };
 }
+
+/** Where one tree node sits: the dot-joined child-index path `DependencyTree`
+ *  uses as its row key (e.g. "0.2.1" = tree[0].children[2].children[1]), and
+ *  every ancestor's own path, so a caller can expand exactly the branches that
+ *  lead to it without expanding anything else. */
+export interface TreePathResult {
+  /** The matched node's own path (for scrolling/focusing its row). */
+  target: string;
+  /** Every ancestor's path, root-to-parent order (to add to the tree's open
+   *  set). Does not include `target` itself. */
+  ancestors: string[];
+}
+
+/**
+ * Find one path from a root to the first node matching `name` (and `version`,
+ * when given). Cost is proportional to the number of dependency edges, not the
+ * component count: most of a large SBOM's components carry no edges at all
+ * (measured on a 60,126-component firmware scan, only 772 were wired into
+ * `dependencies[]`), so this stays cheap even at that scale, and does not need
+ * pre-computation or a cache: a fresh search per click is fine.
+ *
+ * A package can sit under more than one parent (two direct dependencies both
+ * pulling in the same transitive one). This returns the first path a
+ * depth-first walk finds, not every path, a known, documented limitation
+ * (the same one `DependencyTree`'s own doc comment already notes: "the same
+ * package can sit under two parents").
+ *
+ * Two passes: first requires an exact version match (when `version` is
+ * given), then falls back to a name-only match. This matters when the same
+ * name resolves to two different versions in the tree (e.g. a dependency
+ * conflict where one branch still pulls a vulnerable version while another
+ * already resolved to the fix), so searching for the vulnerable one by name
+ * alone could land on the already-fixed sibling instead.
+ */
+export function findPathToRef(
+  tree: TreeNode[],
+  target: { name: string; version?: string },
+): TreePathResult | null {
+  const exact = findFirstMatch(
+    tree,
+    (node) => node.name === target.name && !!target.version && node.version === target.version,
+  );
+  if (exact) return exact;
+  return findFirstMatch(tree, (node) => node.name === target.name);
+}
+
+/**
+ * Find the first node (depth-first, same order the tree renders) satisfying
+ * `predicate`. The general form `findPathToRef` is built on; also used
+ * directly for the Dependencies tree's own search box, where the match is a
+ * substring on the name rather than an exact name+version pair.
+ */
+export function findFirstMatch(
+  tree: TreeNode[],
+  predicate: (node: TreeNode) => boolean,
+): TreePathResult | null {
+  const walk = (nodes: TreeNode[], prefix: string, ancestors: string[]): TreePathResult | null => {
+    for (let i = 0; i < nodes.length; i += 1) {
+      const node = nodes[i];
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      if (predicate(node)) return { target: path, ancestors };
+      if (!node.cycle) {
+        const found = walk(node.children, path, [...ancestors, path]);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return walk(tree, "", []);
+}

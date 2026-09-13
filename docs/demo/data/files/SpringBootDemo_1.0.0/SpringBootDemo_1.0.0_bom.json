@@ -21,8 +21,8 @@
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 9, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-09-09T12:04:18Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, September 13, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-09-13T11:15:43Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -3426,7 +3426,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3547,7 +3547,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3669,7 +3669,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3790,7 +3790,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3912,7 +3912,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4033,7 +4033,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4155,7 +4155,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4277,7 +4277,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4400,7 +4400,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4522,7 +4522,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4840,7 +4840,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4965,7 +4965,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5090,7 +5090,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5215,7 +5215,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5340,7 +5340,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5465,7 +5465,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5590,7 +5590,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5716,7 +5716,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5841,7 +5841,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5966,7 +5966,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6091,7 +6091,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6216,7 +6216,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-09"
+          "value": "endoflife.date@2026-09-13"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6717,7 +6717,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-09T12:04:18Z",
+    "timestamp": "2026-09-13T11:15:43Z",
     "tools": {
       "components": [
         {
@@ -6738,12 +6738,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.9"
+          "version": "1.11.10"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:8b5ba605-bc81-489c-91a2-05b39ae8c937",
+  "serialNumber": "urn:uuid:7867a9c8-b9f3-431d-a4af-56e5437c5963",
   "services": [],
   "specVersion": "1.6",
   "version": 1

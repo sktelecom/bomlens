@@ -189,12 +189,7 @@ $SBOM --project cell-imaging-data --version 1.0.0 \
   --usage product --generate-only
 ```
 
-- The page URL, the DOI, or the item number all work. To read a specific version rather than the latest, give the URL or DOI that names it (`.../33412285/2`, `10.6084/m9.figshare.33413521.v1`).
-- No account and no opt-in image: the public item endpoint answers without authentication and the mapping ships in the base image.
-- The item becomes a CycloneDX `data` component carrying its licence, its DOI, its authors, and an MD5 digest per file. A licence the item states as one we can place (the Creative Commons deeds, MIT, Apache 2.0, the GPLs, CC0) becomes an SPDX id; anything else is kept verbatim rather than guessed at.
-- `--usage` applies here as it does to a model: a non-commercial deed reads differently for internal research than for something you ship.
-- An institutional DOI that does not carry "figshare" (`10.25916/sut.33412285.v1`) cannot be told apart from any other DOI, so give the item URL for those.
-- A private, embargoed or withdrawn item cannot be read without an account, and is reported as an error rather than described as a dataset with no licence.
+The page URL, the DOI, or the item number all work, and no account or opt-in image is needed. For version selection, the licence-to-SPDX mapping, and how a private or embargoed item is handled, see [Scanning a published dataset](ai-model.md#scanning-a-published-dataset) in the AI model guide.
 
 **Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, conformance check
 
@@ -208,10 +203,9 @@ $SBOM --project internal-llm --version 1.0.0 \
   --generate-only
 ```
 
-- Reads the file's own header. No network, no HuggingFace account, and the base image — there is no opt-in image to pull.
-- Recognized formats: GGUF, safetensors, PyTorch (`.pt`/`.pth`/`.ckpt`), pickle, npz, npy, ONNX. A file it cannot identify is refused rather than described.
-- What lands in the SBOM depends on the format. GGUF carries a name, a license and an architecture; safetensors usually carries only tensor shapes and dtypes. Every format contributes the file's SHA-256, which is what ties the document to the artifact you received. A field the file does not declare is left empty rather than guessed.
-- Deliverables are the same as above, minus what the model card would have supplied.
+Reads the file's own header; no network, no HuggingFace account, and no opt-in image. For the recognized formats, what each one contributes to the SBOM, and the pickle/Keras code-execution check, see [Scanning a model file](ai-model.md#scanning-a-model-file) in the AI model guide.
+
+Deliverables are the same as Scenario 7's, minus what the model card would have supplied.
 
 ## Reading the four deliverables
 
@@ -246,12 +240,7 @@ Pick a scan target at the top of the UI and provide the matching input.
 
 This table lists what the input scenarios in this guide cover; the full set (11 targets) is in the [web UI reference](../reference/ui.md#new-scan).
 
-For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced scan options** section offers toggles that change how the source is analyzed rather than which files are produced:
-
-- **License scan (ScanCode)** — the UI equivalent of `--deep-license`. Scans your own source files for per-file license text and headers (1st-party). It does not download or scan the declared dependencies.
-- **File-level identification (SCANOSS)** — finds third-party open source copied straight into the tree (mainly C/C++). See [Identify bundled open source](identify-vendored.md).
-
-Both are slow and off by default, so enable them only when needed. ScanCode is available only in an image built with `--build-arg SBOM_DEEP_LICENSE=true`. For the full list of toggles and per-target availability, see the [Web UI reference](../reference/ui.md).
+For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced scan options** section offers toggles (License scan / ScanCode, File-level identification / SCANOSS) that change how the source is analyzed rather than which files are produced, both off by default. See [Advanced scan options](../reference/ui.md#new-scan) in the Web UI reference for what each one does and per-target availability.
 
 As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report. The conformance report file is downloadable too; its pass/fail screen only appears when the input was an uploaded SBOM (`--analyze`) rather than a fresh scan.
 

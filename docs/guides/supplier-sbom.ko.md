@@ -23,6 +23,8 @@ description: 외부에서 받은 SBOM(CycloneDX/SPDX)이 요구사항을 충족�
 
 > 위 허용 포맷 범위는 SK텔레콤 제출 기준의 기본값입니다. 조직이 다른 범위를 허용한다면 `CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS`(AI SBOM), `SPDX_SPEC_VERSIONS` 환경 변수(공백으로 구분한 목록)로 덮어쓸 수 있습니다. 목록은 [Docker 이미지 환경 변수](../reference/docker-image.ko.md)에 있습니다.
 
+위 표의 `pkg:generic` 금지 항목은 도구 자체의 기본값이 아니라 `skt-submission` 적합성 검사 기준(`--conformance-profile skt-submission`)입니다. 기본 검사 기준은 `pkg:generic`을 권고 사항으로만 다루고 PURL 포함률도 100%가 아니라 90%를 기준으로 삼습니다. 웹 UI의 제출 전 점검 화면은 이미 `skt-submission`을 기본값으로 쓰지만 CLI는 그렇지 않으므로, 이 표 기준으로 검사하려면 플래그를 직접 붙여야 합니다.
+
 ## 한 번에 실행하기
 
 ### 웹 UI에서
@@ -47,6 +49,7 @@ Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 
 ```bash
 ./scripts/scan-sbom.sh --project supplier-app --version 2.0.0 \
   --analyze "./supplier-sbom.json" \
+  --conformance-profile skt-submission \
   --generate-only
 ```
 

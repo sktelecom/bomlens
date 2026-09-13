@@ -46,6 +46,16 @@ const EMPTY_SOURCE = {
   sbom: { components: 0, componentList: [] },
 };
 
+/** A source scan that found nothing AND whose dependency analyzer also
+ *  couldn't run: the shape that made the two banners contradict each other
+ *  (G-1). "Direct dependencies only" implies there ARE direct dependencies,
+ *  which isn't true when components is 0. */
+const EMPTY_SOURCE_DEGRADED = {
+  ...base,
+  mode: "SOURCE",
+  sbom: { components: 0, componentList: [], sbomToolDegraded: "disk-space" },
+};
+
 /** The same scan with a manifest present — the banner must stay away. */
 const NORMAL_SOURCE = {
   ...base,
@@ -105,6 +115,23 @@ test("a scan with no components warns instead of reading as clean", async ({ pag
   // "0 components" is what the reader already saw.
   await expect(banner).toContainText(/warning, not a clean result/i);
   await expect(banner).toContainText(/requirements\.txt/);
+});
+
+test("G-1: a zero-component scan does not also claim direct dependencies were found", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, EMPTY_SOURCE_DEGRADED);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  // The zero-components banner still shows, and folds in the degraded cause
+  // instead of leaving it unmentioned.
+  const banner = page.getByTestId("zero-components");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText(/couldn't run, so even direct dependencies/i);
+
+  // The separate "direct dependencies only" banner must NOT also render: at
+  // 0 components its own claim (dependencies were found, just not resolved
+  // transitively) would contradict the banner above.
+  await expect(page.getByText("Direct dependencies only")).toHaveCount(0);
 });
 
 test("a scan that found components shows no such warning", async ({ page }) => {

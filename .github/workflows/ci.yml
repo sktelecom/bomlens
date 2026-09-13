@@ -863,6 +863,11 @@ jobs:
       - name: Check artifact registry sync
         run: bash scripts/check-artifact-registry-sync.sh
 
+      # Renovate bumps docker/Dockerfile's tool-version ARGs on its own
+      # schedule; nothing else forces the Docker image reference to follow.
+      - name: Check Docker image version documentation coverage
+        run: bash scripts/check-doc-image-version-coverage.sh
+
       # Korean prose gate: translation-ese and terminology rules over the
       # public docs surface (scripts/ko-style; decisions recorded in
       # docs/korean-style-guide.md). S1/S2 findings fail the job. The

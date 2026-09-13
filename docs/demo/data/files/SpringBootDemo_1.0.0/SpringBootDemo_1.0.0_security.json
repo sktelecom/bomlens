@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a0860e-1c78-7940-8b6a-2ecffbee23cb",
-  "CreatedAt": "2026-09-09T12:04:26.872607718Z",
+  "ReportID": "01a09a7b-14d4-7414-9cc1-064e3a05c6d7",
+  "CreatedAt": "2026-09-13T11:15:52.660268995Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1636,6 +1636,8 @@
             "https://access.redhat.com/errata/RHSA-2026:54435",
             "https://access.redhat.com/errata/RHSA-2026:54622",
             "https://access.redhat.com/errata/RHSA-2026:62260",
+            "https://access.redhat.com/errata/RHSA-2026:66488",
+            "https://access.redhat.com/errata/RHSA-2026:66545",
             "https://access.redhat.com/security/cve/CVE-2026-54513",
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
@@ -1660,7 +1662,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-09-02T13:18:02.49Z"
+          "LastModifiedDate": "2026-09-11T13:18:15.873Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -2008,8 +2010,8 @@
           },
           "CVSS": {
             "bitnami": {
-              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
-              "V3Score": 9.8
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+              "V3Score": 10
             },
             "ghsa": {
               "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:H",
@@ -2840,7 +2842,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 3,
             "ghsa": 3,
             "oracle-oval": 3,
@@ -3349,8 +3351,8 @@
           },
           "CVSS": {
             "bitnami": {
-              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
-              "V3Score": 7.5
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+              "V3Score": 7.4
             },
             "ghsa": {
               "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
@@ -4838,7 +4840,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 2,
+            "amazon": 3,
             "bitnami": 2,
             "ghsa": 1,
             "oracle-oval": 3,

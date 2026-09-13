@@ -480,6 +480,27 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("AI_USAGE_CONTEXT") for a in captured["args"]), captured["args"]
 
+# CONFORMANCE_PROFILE reaches the deep-cve sibling ANALYZE runs on when the base
+# image lacks grype: a missed forward would silently re-grade a submission
+# under review against the wrong thresholds. Forwarded only as one of the two
+# recognized values, same allowlist rule as AI_USAGE_CONTEXT above.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"CONFORMANCE_PROFILE": "skt-submission"},
+)
+assert rc == 0, rc
+assert "CONFORMANCE_PROFILE=skt-submission" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"CONFORMANCE_PROFILE": "bogus; rm -rf /"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("CONFORMANCE_PROFILE") for a in captured["args"]), captured["args"]
+
 # HF_TOKEN: inherited from THIS container's environment (never posted to the UI)
 # and forwarded by name only, so the secret stays out of the docker-run argv.
 HF_SENTINEL = "hf_sentinel_do_not_leak_9f3a"
@@ -572,6 +593,43 @@ then
     pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"
 else
     fail "sibling dispatch guard failed (see assertion above)"
+fi
+
+echo "== scan-stream log/error cleanup: ANSI stripped, git failures classified =="
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# A colored notice (cdxgen and friends) must reach on_log with the CSI
+# sequences gone, not just the ESC byte: this codebase saw a real case where
+# only the ESC byte was dropped upstream, leaving literal "[1;35m...[0m".
+logs = []
+server._emit_or_log("\x1b[1;35mNotice: something\x1b[0m", logs.append)
+assert logs == ["Notice: something"], logs
+server._emit_or_log("plain line, no color", logs.append)
+assert logs[-1] == "plain line, no color", logs
+
+# git failure classification: only the two patterns this codebase has actually
+# confirmed (missing/private repo, network) get a key; anything else is None,
+# and the caller then falls back to showing the raw text unclassified.
+assert server._classify_git_failure(
+    "fatal: could not read Username for 'https://github.com': terminal prompts disabled"
+) == "run.errorGitNotFoundOrPrivate"
+assert server._classify_git_failure(
+    "remote: Repository not found."
+) == "run.errorGitNotFoundOrPrivate"
+assert server._classify_git_failure(
+    "fatal: unable to access '...': Could not resolve host: github.com"
+) == "run.errorGitNetwork"
+assert server._classify_git_failure("fatal: some other git error entirely") is None
+assert server._classify_git_failure("") is None
+assert server._classify_git_failure(None) is None
+PY
+then
+    pass "ANSI stripped from scan log lines, git failures classified into i18n keys"
+else
+    fail "scan-stream log/error cleanup failed (see assertion above)"
 fi
 
 echo "== safe_extract_zip rejects members that are unsafe once bind-mounted onto Windows =="
@@ -2710,6 +2768,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "API_KEY=${API_KEY:-}"
   echo "TRUSCA_PROJECT_ID=${TRUSCA_PROJECT_ID:-}"
   echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"
+  echo "CONFORMANCE_PROFILE=${CONFORMANCE_PROFILE:-}"
   echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
@@ -2886,7 +2945,7 @@ import sys, json
 evs = json.load(sys.stdin)
 errs = [e for e in evs if e['event'] == 'error']
 dones = [e for e in evs if e['event'] == 'done']
-assert errs and 'Docker socket' in errs[0]['data'], evs
+assert errs and 'Docker socket' in errs[0]['data']['detail'], evs
 assert len(dones) == 1, evs
 d = dones[0]['data']
 assert d['ok'] is False and d['sbom'] is None and isinstance(d['results'], list), d
@@ -2900,7 +2959,7 @@ events=$(sse_events "project=weird&version=1.0&source=carrier-pigeon")
 if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
-assert any(e['event'] == 'error' and 'unknown input type' in e['data'] for e in evs), evs
+assert any(e['event'] == 'error' and 'unknown input type' in e['data']['detail'] for e in evs), evs
 assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
 "; then
     pass "unknown source is rejected in-stream"
@@ -2912,7 +2971,7 @@ events=$(sse_events "project=gitfail&version=1.0&source=git-url&target=file:///n
 if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
-assert any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+assert any(e['event'] == 'error' and 'git clone failed' in e['data']['detail'] for e in evs), evs
 assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
 "; then
     pass "failed git clone reports error + done ok:false"
@@ -2939,7 +2998,7 @@ if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
 errs = [e for e in evs if e['event'] == 'error']
-assert errs and 'unsafe path in archive' in str(errs[0]['data']), evs
+assert errs and 'unsafe path in archive' in errs[0]['data']['detail'], evs
 assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
 "; then
     pass "zip-slip member (../../../../tmp/...) is rejected, not extracted"
@@ -2964,7 +3023,7 @@ if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
 errs = [e for e in evs if e['event'] == 'error']
-assert errs and 'unsafe path in archive' in str(errs[0]['data']), evs
+assert errs and 'unsafe path in archive' in errs[0]['data']['detail'], evs
 assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
 "; then
     pass "tar member (../evil-tar-slip.txt) is rejected, not extracted"
@@ -2987,7 +3046,7 @@ if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
 errs = [e for e in evs if e['event'] == 'error']
-assert errs and 'unsafe link in archive' in str(errs[0]['data']), evs
+assert errs and 'unsafe link in archive' in errs[0]['data']['detail'], evs
 assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False
 "; then
     pass "tar symlink member pointing outside the archive is rejected"
@@ -3277,6 +3336,46 @@ if grep -q '^MODE=ANALYZE$' "$WORK/stub-env" \
 else
     fail "wrong scan environment for a Yocto build directory" "$(cat "$WORK/stub-env")"
 fi
+# ANALYZE with no explicit conformance_profile defaults to skt-submission (a
+# document under submission review), not the "default" a generated SBOM gets.
+if grep -q '^CONFORMANCE_PROFILE=skt-submission$' "$WORK/stub-env"; then
+    pass "ANALYZE defaults the conformance profile to skt-submission"
+else
+    fail "ANALYZE conformance profile default" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== conformance_profile param (-> CONFORMANCE_PROFILE) =="
+echo ok > "$STUB_MODE_FILE"
+# No param, not ANALYZE -> the "default" profile (matches the CLI's default).
+rm -f "$WORK/stub-env"
+sse_events "project=cp1&version=1.0&source=current-dir" >/dev/null
+if grep -q '^CONFORMANCE_PROFILE=default$' "$WORK/stub-env"; then
+    pass "no conformance_profile param -> default profile for a generated SBOM"
+else
+    fail "conformance profile default for a generated SBOM" "$(cat "$WORK/stub-env")"
+fi
+# An explicit choice is honored regardless of mode.
+rm -f "$WORK/stub-env"
+sse_events "project=cp2&version=1.0&source=current-dir&conformance_profile=skt-submission" >/dev/null
+if grep -q '^CONFORMANCE_PROFILE=skt-submission$' "$WORK/stub-env"; then
+    pass "an explicit conformance_profile is honored"
+else
+    fail "explicit conformance_profile" "$(cat "$WORK/stub-env")"
+fi
+# An unrecognized value is not a client error (unlike usage=): it warns and
+# falls back to the per-mode default, same rule scan-sbom.sh applies to an
+# unknown --conformance-profile.
+rm -f "$WORK/stub-env"
+events=$(sse_events "project=cp3&version=1.0&source=current-dir&conformance_profile=bogus")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is True, evs
+" && grep -q '^CONFORMANCE_PROFILE=default$' "$WORK/stub-env"; then
+    pass "an unrecognized conformance_profile falls back to default, scan still runs"
+else
+    fail "unrecognized conformance_profile handling" "$events / $(cat "$WORK/stub-env" 2>/dev/null)"
+fi
 
 # A picked folder that is not a Yocto build must still be a directory scan —
 # the detection may not take over an ordinary rootfs target.
@@ -3302,7 +3401,7 @@ nev=$(sse_events "project=nosbom&version=1.0&source=rootfs-dir&target=$NOSBOMROO
 if echo "$nev" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
-errs = [e['data'] for e in evs if e['event'] == 'error']
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
 done = [e['data'] for e in evs if e['event'] == 'done']
 assert errs and 'neither an SPDX SBOM' in errs[0], evs
 assert 'create-spdx-3.0' in errs[0], errs

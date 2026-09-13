@@ -14,8 +14,9 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | Aliases of the same image (former names, same digest) |
 | `ghcr.io/sktelecom/bomlens-firmware` | Firmware analysis (includes GPL tools, opt-in) (legacy alias: sbom-scanner-firmware) |
 | `ghcr.io/sktelecom/bomlens-deep-cve` | Bundles grype for deep CVE matching (opt-in). Used by the CLI's `--deep-cve` and by the web UI's Deep CVE matching toggle, both of which pull it automatically as a sibling container when it is not already the running image |
+| `ghcr.io/sktelecom/bomlens-aibom` | Generates an AI-model ML-BOM (opt-in, legacy alias: sbom-scanner-aibom). Used by `--model`/`--model-file` and the web UI's AI model tile, pulled automatically as a sibling container |
 
-`latest` and version tags are available, and both `linux/amd64` and `linux/arm64` are supported. Images are signed with cosign before publishing.
+`latest` and version tags are available. `ghcr.io/sktelecom/bomlens` and `bomlens-aibom` (and their aliases) support both `linux/amd64` and `linux/arm64`; `bomlens-firmware` and `bomlens-deep-cve` are published for `linux/amd64` only, so pulling them on an `arm64` host (an Apple Silicon Mac, an Arm server) fails without an amd64 emulation layer. Images are signed with cosign before publishing.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -29,9 +30,11 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 |------|------|------|
 | syft | v1.51.0 | Scans images, binaries, and directories |
 | Trivy | v0.74.0 | Vulnerability report |
-| cosign | v2.6.5 | SBOM signing |
+| cosign | v3.1.3 | SBOM signing |
 | jq | — | SBOM normalization and notice generation |
 | ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
+| docker CLI | 29.7.2 | Starts a sibling cdxgen container when the web UI runs a source scan |
+| cdxgen | 12.8.4 | Model pedigree enrichment (`bomlens-aibom` image only) |
 
 Tool versions are pinned with `ARG` in `docker/Dockerfile`.
 
@@ -152,6 +155,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `TRUSCA_RELEASE` | — | `PROJECT_VERSION` | Ingest release label |
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven source scans: set `1` to keep the full resolved graph instead of filtering to compile/runtime scope |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js source scans: set `1` to keep the full dev-plus-production graph instead of the production-only set |
+| `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android source scans (Android SDK image): set `1` to keep the full graph, build and test tooling included, instead of filtering to the release runtime classpath |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | Source scans: set `1` to leave the resolved tree in place. By default the scan restores the files its resolvers rewrote (`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`) and removes the build directories they created, so the scanned project is handed back as it was |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM), which additionally allow 1.7 |

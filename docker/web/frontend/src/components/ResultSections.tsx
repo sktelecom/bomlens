@@ -64,6 +64,10 @@ export function ResultSection({
       tier?: LicenseRiskTier;
       license?: string;
       term?: string;
+      /** Paired with `term` for a "View in Dependencies" jump, when the
+       *  package name alone would be ambiguous (the same name resolved to two
+       *  different versions in the tree). */
+      version?: string;
     },
   ) => void;
   /** An artifact was produced after the scan (the on-demand SPDX export), so
@@ -95,6 +99,11 @@ export function ResultSection({
               ? (name) => onPick("vulnerabilities", { term: name })
               : undefined
           }
+          onPickDependency={
+            onPick
+              ? (name, version) => onPick("dependencies", { term: name, version })
+              : undefined
+          }
         />
       );
 
@@ -107,6 +116,11 @@ export function ResultSection({
           onQueryChange={onQueryChange}
           onPickComponent={
             onPick ? (name) => onPick("components", { term: name }) : undefined
+          }
+          onPickDependency={
+            onPick
+              ? (name, version) => onPick("dependencies", { term: name, version })
+              : undefined
           }
         />
       ) : (
@@ -135,6 +149,7 @@ export function ResultSection({
           scanId={scanId}
           sbomFile={sbomFile}
           components={result.sbom?.componentList ?? []}
+          query={query}
         />
       ) : null;
     }

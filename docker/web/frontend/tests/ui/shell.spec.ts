@@ -938,6 +938,92 @@ test("overview has no axe violations", async ({ page }) => {
   expect(results.violations).toEqual([]);
 });
 
+// A second scan of the same project ("demo"), earlier than DONE, with a
+// smaller and different component/vulnerability set: curl is gone in DONE
+// (removed), openssl and readline are new to DONE (added), zlib moved from
+// 1.1.0 to DONE's 1.2.0 (version-changed), and the one CVE here (curl) isn't
+// in DONE's list (resolved) while DONE's two CVEs aren't in this one (new).
+const PREV_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "demo_0.9",
+  results: [{ name: "demo_0.9_bom.json", size: 80 }],
+  security: {
+    CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 1, UNKNOWN: 0, TOTAL: 1,
+    vulnerabilities: [
+      { id: "CVE-2024-0003", severity: "LOW", pkg: "curl", installed: "7.80.0", fixed: "7.81.0", title: "minor issue" },
+    ],
+  },
+  conformance: null,
+  sbom: {
+    components: 2,
+    componentList: [
+      { name: "zlib", version: "1.1.0", group: "", purl: "pkg:github/madler/zlib", type: "library", licenses: ["Zlib"] },
+      { name: "curl", version: "7.80.0", group: "", purl: "pkg:generic/curl@7.80.0", type: "library", licenses: ["MIT"] },
+    ],
+  },
+};
+
+const RECENT_WITH_PREVIOUS = [
+  { id: "demo_1.0", project: "demo", version: "1.0", components: 3, maxSeverity: "CRITICAL", isAiScan: false, componentType: null, inputSource: null, generatedAt: 2000 },
+  { id: "demo_0.9", project: "demo", version: "0.9", components: 2, maxSeverity: "LOW", isAiScan: false, componentType: null, inputSource: null, generatedAt: 1000 },
+];
+
+async function stubAndRunWithPreviousScan(page: Page, theme: Theme = "light", lang: Lang = "en") {
+  await seedThemeLang(page, theme, lang);
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(RECENT_WITH_PREVIOUS) }),
+  );
+  await page.route("**/scan?id=demo_0.9", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(PREV_DONE) }),
+  );
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("Overview shows what changed since the previous scan of the same project", async ({ page }) => {
+  await stubAndRunWithPreviousScan(page);
+  await expect(page.locator("main h1")).toBeVisible();
+
+  // The component/vulnerability breakdown loads in a second pass (it needs
+  // the previous scan's full lists); wait past the "computing" placeholder,
+  // which never contains the "·" separator the ready summary always does.
+  const compSummary = page.getByTestId("comp-change-summary");
+  const vulnSummary = page.getByTestId("vuln-change-summary");
+  await expect(compSummary).toContainText("·");
+  await expect(vulnSummary).toContainText("·");
+
+  await expect(compSummary).toHaveText("2 new · 1 removed · 1 updated");
+  await expect(vulnSummary).toHaveText("2 new · 1 resolved");
+
+  // The counts alone don't say which components or CVEs moved; opening each
+  // disclosure names them.
+  await compSummary.click();
+  await expect(page.getByText("openssl@3.0.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("readline@8.2", { exact: true })).toBeVisible();
+  await expect(page.getByText("curl@7.80.0", { exact: true })).toBeVisible();
+  await expect(page.getByText("zlib moved from 1.1.0 to 1.2.0", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("comp-diff-all-link")).toBeVisible();
+
+  await vulnSummary.click();
+  await expect(page.getByText("CVE-2024-0001 (openssl)", { exact: true })).toBeVisible();
+  await expect(page.getByText("CVE-2024-0002 (zlib)", { exact: true })).toBeVisible();
+  await expect(page.getByText("CVE-2024-0003 (curl)", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("vuln-diff-all-link")).toBeVisible();
+});
+
 test("Overview warns when the SBOM degraded to syft (disk space)", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
@@ -966,6 +1052,24 @@ test("Overview warns when the SBOM degraded to syft (disk space)", async ({ page
 // waits on language-agnostic anchors — section links by href, the Tree toggle by
 // test id, and data values (package names, scores, licence ids) that don't
 // translate — so the same flow drives every locale.
+// The comparison card is conditional on a previous scan of the same project,
+// which the plain overview baseline below never has, so it never appears
+// there. A dedicated fixture covers the card on its own.
+for (const { theme, lang } of COMBOS) {
+  test(`overview comparison card matches baseline: ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRunWithPreviousScan(page, theme, lang);
+    await expect(page.locator("main h1")).toBeVisible();
+    const compSummary = page.getByTestId("comp-change-summary");
+    const vulnSummary = page.getByTestId("vuln-change-summary");
+    await expect(compSummary).toContainText("·");
+    // Captured open: the names are the point of this card, not just the counts.
+    await compSummary.click();
+    await vulnSummary.click();
+    await expect(page.getByTestId("comp-diff-all-link")).toBeVisible();
+    await captureMain(page, "overview-comparison", theme, lang);
+  });
+}
+
 for (const { theme, lang } of COMBOS) {
   test(`overview section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);
@@ -1645,6 +1749,39 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   expect(results.violations).toEqual([]);
 });
 
+// finding-1: a vulnerable transitive package's row in Vulnerabilities/
+// Components had no way to reach its position in the dependency tree. The
+// reader had to hand-expand branches hunting for it. "View in Dependencies"
+// closes that loop: it should land on the exact row, its ancestors already
+// open, not just "somewhere in the Dependencies section".
+test("View zlib in Dependencies jumps to its row, openssl already expanded", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+  // zlib (root -> openssl -> zlib in SBOM above) is the transitive case; the
+  // link lives in the expanded row detail, same as View in Components.
+  await page.getByText("CVE-2024-0002").click();
+  await page.getByRole("button", { name: "View zlib in Dependencies" }).click();
+
+  await expect(page).toHaveURL(/#\/scan\/.*\/dependencies\?q=zlib&version=1\.2\.0/);
+  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  await expect(zlibRow).toBeVisible();
+  await expect(zlibRow).toBeFocused();
+});
+
+test("Dependencies tree search box jumps to a match and reports a miss", async ({ page }) => {
+  await stubAndRun(page);
+  await page.getByRole("link", { name: /^Dependencies/ }).first().click();
+  await page.getByRole("button", { name: "Tree", exact: true }).click();
+
+  const search = page.getByRole("textbox", { name: /Search packages/i });
+  await search.fill("zlib");
+  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  await expect(zlibRow).toBeFocused();
+
+  await search.fill("no-such-package");
+  await expect(page.getByText(/No package matches/i)).toBeVisible();
+});
+
 for (const { theme, lang } of COMBOS) {
   test(`dependencies tree matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);
@@ -1738,6 +1875,59 @@ test("Vulnerabilities table shows the disposition status and NVD severity, when 
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);
+});
+
+// Two CVEs on the same installed package that share the same fixed version
+// look, in the table alone, like two unrelated rows: the reader has to notice
+// the coincidence by comparing the Fixed column by hand. The bundle summary
+// should say so up front and let a click filter straight to them.
+const UPGRADE_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "upgrade_1.0",
+  results: [{ name: "upgrade_1.0_bom.json", size: 100 }],
+  security: {
+    CRITICAL: 1, HIGH: 2, MEDIUM: 0, LOW: 0, UNKNOWN: 0, TOTAL: 3,
+    vulnerabilities: [
+      { id: "CVE-2024-3001", severity: "CRITICAL", pkg: "qs", installed: "6.15.3", fixed: "6.16.0", title: "prototype pollution" },
+      { id: "CVE-2024-3002", severity: "HIGH", pkg: "qs", installed: "6.15.3", fixed: "6.16.0", title: "array limit bypass" },
+      // Different package, own single CVE: not part of any bundle (a group of
+      // one is not a "bundle") and must not appear in the summary.
+      { id: "CVE-2024-3003", severity: "HIGH", pkg: "lodash", installed: "4.17.20", fixed: "4.17.21", title: "prototype pollution" },
+    ],
+  },
+  conformance: null,
+  sbom: { components: 2, componentList: [] },
+};
+
+async function stubUpgradeAndRun(page: Page) {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(UPGRADE_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "upgrade");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("Vulnerabilities table bundles CVEs one upgrade resolves together", async ({ page }) => {
+  await stubUpgradeAndRun(page);
+  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+
+  const bundle = page.getByRole("button", { name: "Upgrade qs to 6.16.0 to resolve 2 CVEs" });
+  await expect(bundle).toBeVisible();
+  // lodash's single CVE is not a bundle and must not appear in the summary.
+  await expect(page.getByText(/Upgrade lodash/)).toHaveCount(0);
+
+  // Clicking the bundle filters the table down to just its two rows.
+  await bundle.click();
+  await expect(page.getByText("CVE-2024-3001")).toBeVisible();
+  await expect(page.getByText("CVE-2024-3002")).toBeVisible();
+  await expect(page.getByText("CVE-2024-3003")).toHaveCount(0);
 });
 
 for (const { theme, lang } of COMBOS) {

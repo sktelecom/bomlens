@@ -1,40 +1,55 @@
-# BomLens 데스크톱 앱 (Electron)
+# BomLens desktop app (Electron)
 
-콘솔 없이 더블클릭으로 BomLens 웹 UI를 여는 데스크톱 앱이다. 스캐너 자체는 여전히
-Docker 컨테이너로 실행되며, 이 앱은 Docker 점검과 이미지 다운로드, 컨테이너 기동과 정리를
-대신 처리한다.
+> **한국어**: [electron/README.ko.md](README.ko.md)
 
-> 일반 사용자는 빌드할 필요 없이 [최신 릴리스](https://github.com/sktelecom/bomlens/releases/latest)에서
-> `BomLens-Setup.exe`(또는 `.dmg`)를 받아 설치하면 된다. 아직 미서명이라 Windows에서
-> SmartScreen 경고가 뜨면 "추가 정보"를 누르고 "실행"을 고른다. 아래 내용은 개발자용 빌드 안내다.
+A desktop app that opens the BomLens web UI with a double-click, no console
+required. The scanner itself still runs as a Docker container; this app takes
+care of checking Docker, pulling the image, and starting and cleaning up the
+container.
 
-## 동작 방식
+> Most users don't need to build anything. Download `BomLens-Setup.exe` (or
+> `.dmg`) from the [latest release](https://github.com/sktelecom/bomlens/releases/latest)
+> and install it. It isn't code-signed yet, so if Windows SmartScreen warns
+> you, click "More info" and then "Run anyway". The rest of this document is
+> for developers building from source.
 
-1. Docker 설치와 실행 여부를 점검한다. 없으면 안내 화면을 띄운다(한/영 모두 지원).
-2. 첫 실행이면 스캐너 이미지를 받고 진행을 표시한다. 태그는 앱 자신의 버전이다
-   (`ghcr.io/sktelecom/bomlens:<package.json의 version>`). `:latest`는 릴리스가 아니라 main
-   최신 빌드를 가리키므로, 그것을 받으면 사용자가 설치한 버전과 실제로 도는 스캐너가 어긋난다.
-   버전을 읽지 못하는 개발 실행에서만 `:latest`로 돌아간다. `SBOM_SCANNER_IMAGE`로 덮어쓸 수 있다.
-   레이어 진행 요약과 실패 사유별 안내(프록시/DNS/인증/디스크/태그 없음)는
-   `lib/pullprogress.mjs`가 만든다.
-3. `MODE=UI` 컨테이너를 띄운다. 마운트 구성은 `scripts/sbom-ui.bat`과 같다(엔진 소켓과
-   홈 디렉터리 아래 `sbom-output` 출력 폴더). 엔진 마운트는 Windows 명명 파이프가 아니라
-   유닉스 소켓 `/var/run/docker.sock`을 쓴다 — Rancher Desktop이 명명 파이프를
-   `invalid volume name`으로 거부하기 때문이다(`lib/container.mjs`의 `engineMount()` 참고).
-4. 컨테이너의 `/capabilities`가 200을 반환하면 그 localhost 주소를 창에 로드한다.
-5. 앱을 닫으면 컨테이너를 정리한다.
+## How it works
 
-핵심 로직은 `lib/container.mjs`(순수 Node)에 있어 electron 없이도 검증할 수 있다.
+1. It checks whether Docker is installed and running. If not, it shows a
+   guidance screen (available in both Korean and English).
+2. On first run it pulls the scanner image and shows progress. The tag
+   matches the app's own version (`ghcr.io/sktelecom/bomlens:<version from package.json>`).
+   `:latest` points at the newest build on `main`, not a release, so pulling
+   it would run a scanner that doesn't match the version the user installed.
+   The app falls back to `:latest` only in development runs where it can't
+   read a version. You can override the image with `SBOM_SCANNER_IMAGE`.
+   Layer-by-layer progress summaries and guidance for specific failure
+   causes (proxy, DNS, auth, disk, missing tag) come from
+   `lib/pullprogress.mjs`.
+3. It starts a `MODE=UI` container. The mount configuration matches
+   `scripts/sbom-ui.bat` (the engine socket and an `sbom-output` output
+   folder under the home directory). The engine mount uses the Unix socket
+   `/var/run/docker.sock` rather than a Windows named pipe, because Rancher
+   Desktop rejects named pipes with `invalid volume name` (see
+   `engineMount()` in `lib/container.mjs`).
+4. Once the container's `/capabilities` endpoint returns 200, it loads that
+   localhost address into the window.
+5. When you close the app, it cleans up the container.
 
-시작할 때 보이는 화면이다. 진행 상황을 로그로 보여주고, 준비가 끝나면 UI로 전환한다.
+The core logic lives in `lib/container.mjs` (plain Node), so it can be
+verified without Electron.
 
-![데스크톱 앱 시작 화면](../docs/images/desktop-startup.png)
+This is the screen you see on startup. It shows progress as a log and
+switches to the UI once everything is ready.
 
-Docker가 없거나 꺼져 있으면 스캔 대신 안내 화면을 띄운다.
+![Desktop app startup screen](../docs/images/desktop-startup.png)
 
-![Docker가 없을 때의 안내 화면](../docs/images/desktop-docker-missing.png)
+If Docker is missing or not running, the app shows a guidance screen instead
+of scanning.
 
-## 개발
+![Guidance screen when Docker is missing](../docs/images/desktop-docker-missing.png)
+
+## Development
 
 ```bash
 cd electron
@@ -42,92 +57,113 @@ npm install
 npm start
 ```
 
-Docker 엔진이 실행 중이어야 한다. 이미지를 미리 받아 두면 첫 기동이 빠르다.
-앱은 단일 인스턴스만 허용하므로, 앱을 켜 둔 채 스모크 테스트(`npm run test:smoke`)를
-돌리면 락 때문에 실패한다. 먼저 앱을 닫고 실행한다.
+The Docker engine must be running. Pulling the image ahead of time makes the
+first startup faster. The app only allows a single instance, so running the
+smoke test (`npm run test:smoke`) while the app is open fails on the lock.
+Close the app first.
 
 ```bash
-docker pull ghcr.io/sktelecom/bomlens:1.11.6   # electron/package.json의 version과 같은 태그
+docker pull ghcr.io/sktelecom/bomlens:<version>   # same tag as electron/package.json's version
 ```
 
-시작 화면 언어는 시스템 로캘을 따른다(한국어면 한국어, 아니면 영어). `SBOM_LANG=en` 또는
-`SBOM_LANG=ko`로 강제할 수 있다. 웹 UI 자체 언어는 화면 우측 상단 KO/EN 토글로 바꾼다.
+The startup screen's language follows the system locale (Korean if the
+system is Korean, English otherwise). You can force it with `SBOM_LANG=en`
+or `SBOM_LANG=ko`. The web UI's own language is switched with the KO/EN
+toggle in the top-right corner of the screen.
 
 ```bash
 SBOM_LANG=en npm start
 ```
 
-앱은 시작할 때 GitHub 최신 릴리스를 확인해 새 버전이 있으면 다운로드 안내 대화상자를
-띄운다(`lib/update.mjs`). 실패는 조용히 무시되어 부팅에 영향을 주지 않는다. 개발
-실행(`npm start`)에서는 꺼져 있고, `SBOM_FORCE_UPDATE_CHECK=1`로 켜서 확인할 수 있다.
+On startup, the app checks GitHub for the latest release and, if a newer
+version exists, shows a dialog with a download link (`lib/update.mjs`).
+Failures are silently ignored and don't affect startup. This check is off
+in development runs (`npm start`); turn it on with
+`SBOM_FORCE_UPDATE_CHECK=1` to test it.
 
-부팅 진행 로그는 상태 화면과 함께 `startup.log` 파일에도 남는다(실행마다 새로 쓴다).
-Electron의 `app.getName()`은 `productName`이 아니라 `package.json`의 `name` 필드를 따르므로,
-패키징된 앱과 `npm start` 개발 실행 모두 위치가 같다: Windows
-`%APPDATA%\sbom-generator-desktop\startup.log`, macOS
-`~/Library/Application Support/sbom-generator-desktop/startup.log`.
+Startup progress is logged to the status screen and also written to a
+`startup.log` file (overwritten on each run). Electron's `app.getName()`
+follows `package.json`'s `name` field rather than `productName`, so both the
+packaged app and `npm start` development runs write to the same location:
+`%APPDATA%\sbom-generator-desktop\startup.log` on Windows,
+`~/Library/Application Support/sbom-generator-desktop/startup.log` on macOS.
 
-## 빌드 (인스톨러)
+## Building (installer)
 
 ```bash
 npm install
-npm run dist          # 현재 OS 기본 타깃
+npm run dist          # default target for the current OS
 npm run dist:win      # Windows NSIS
 ```
 
-산출물은 `dist-electron/`에 생성된다. 멀티플랫폼 빌드는 CI(`.github/workflows/desktop.yml`)가
-`windows-latest`와 `macos-latest`에서 수행한다. 1차 빌드는 미서명이다.
+Artifacts are written to `dist-electron/`. Multi-platform builds run in CI
+(`.github/workflows/desktop.yml`) on `windows-latest` and `macos-latest`.
+The initial build is unsigned.
 
-## 코드 서명
+## Code signing
 
-미서명 인스톨러는 Windows SmartScreen과 macOS Gatekeeper 경고를 띄운다. CI 워크플로우는
-아래 저장소 시크릿이 설정되면 자동으로 서명하고 공증하도록 배선돼 있다. 시크릿이 없으면
-지금처럼 미서명으로 빌드된다. 별도의 설정 파일 수정은 필요 없다.
+Unsigned installers trigger Windows SmartScreen and macOS Gatekeeper
+warnings. The CI workflow is wired to sign and notarize automatically once
+the repository secrets below are set. Without them, it builds unsigned as it
+does now. No separate configuration file changes are needed.
 
-Windows와 macOS 인증서는 반드시 서로 다른 시크릿에 넣는다. 범용 `CSC_LINK`는 macOS
-빌드도 읽기 때문에, Windows용 `.pfx`를 거기 넣으면 macos 러너가 Apple 인증서로 임포트를
-시도해 빌드가 실패한다.
+Keep the Windows and macOS certificates in separate secrets. The generic
+`CSC_LINK` is also read by the macOS build, so putting a Windows `.pfx`
+there makes the macOS runner try to import it as an Apple certificate and
+fail the build.
 
-| 시크릿 | 용도 |
+| Secret | Purpose |
 |--------|------|
-| `WIN_CSC_LINK` | Windows Authenticode 인증서(base64 인코딩한 `.pfx`) |
-| `WIN_CSC_KEY_PASSWORD` | Windows 인증서 비밀번호 |
-| `CSC_LINK` | macOS Developer ID Application 인증서(base64 인코딩한 `.p12`) |
-| `CSC_KEY_PASSWORD` | macOS 인증서 비밀번호 |
-| `APPLE_ID` | macOS 공증에 쓸 Apple ID |
-| `APPLE_APP_SPECIFIC_PASSWORD` | 위 Apple ID의 앱 암호(appleid.apple.com에서 발급) |
-| `APPLE_TEAM_ID` | Apple Developer 팀 ID(멤버십 페이지) |
+| `WIN_CSC_LINK` | Windows Authenticode certificate (base64-encoded `.pfx`) |
+| `WIN_CSC_KEY_PASSWORD` | Windows certificate password |
+| `CSC_LINK` | macOS Developer ID Application certificate (base64-encoded `.p12`) |
+| `CSC_KEY_PASSWORD` | macOS certificate password |
+| `APPLE_ID` | Apple ID used for macOS notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for that Apple ID (issued at appleid.apple.com) |
+| `APPLE_TEAM_ID` | Apple Developer team ID (from the membership page) |
 
-`APPLE_*` 3종은 전부 넣거나 전부 뺀다. 일부만 설정하면 electron-builder가 설정 오류로
-빌드를 실패시킨다. 3종이 모두 없으면 공증만 건너뛰고 서명은 진행된다(공증 자체는 서명이
-성공한 빌드에서만 시도된다). 시크릿은 저장소 Settings의 Secrets and variables에서 추가한다.
+Set all three `APPLE_*` secrets or none of them. Setting only some causes
+electron-builder to fail the build with a configuration error. If all three
+are missing, notarization is skipped but signing still proceeds (notarization
+is only attempted on a build that signed successfully). Add secrets under
+the repository's Settings, Secrets and variables.
 
-### 인증서 발급 절차 (사람이 진행)
+### Getting certificates (a human has to do this)
 
-macOS부터. Apple Developer Program 가입이 필요하다(연 99달러).
+Start with macOS. It requires an Apple Developer Program membership ($99 a
+year).
 
-1. 가입 주체를 정한다. 조직 가입(SK Telecom)은 D-U-N-S 번호와 법인 검증이 필요해 수일에서
-   수주가 걸리지만 Gatekeeper에 회사 이름이 표기된다. 개인 가입은 빠르지만 개인 이름이
-   표기되어 조직 배포에 어울리지 않는다. 조직 가입을 권장한다.
-2. Account Holder 권한으로 Developer ID Application 인증서를 발급하고 키체인에서 `.p12`로
-   내보낸 뒤 base64로 인코딩해 `CSC_LINK`에, 비밀번호를 `CSC_KEY_PASSWORD`에 넣는다.
-3. appleid.apple.com에서 앱 암호를 발급해(2단계 인증 필요) `APPLE_ID`,
-   `APPLE_APP_SPECIFIC_PASSWORD`에 넣고, 멤버십 페이지의 팀 ID를 `APPLE_TEAM_ID`에 넣는다.
+1. Decide who enrolls. Enrolling as an organization (SK Telecom) requires a
+   D-U-N-S number and legal entity verification, which takes days to weeks,
+   but Gatekeeper then shows the company name. Enrolling as an individual is
+   faster, but shows a personal name, which doesn't fit organizational
+   distribution. An organization enrollment is recommended.
+2. With Account Holder privileges, issue a Developer ID Application
+   certificate, export it as a `.p12` from Keychain, base64-encode it into
+   `CSC_LINK`, and put its password in `CSC_KEY_PASSWORD`.
+3. Issue an app-specific password at appleid.apple.com (requires
+   two-factor authentication) for `APPLE_ID` and
+   `APPLE_APP_SPECIFIC_PASSWORD`, and put the team ID from the membership
+   page into `APPLE_TEAM_ID`.
 
-Windows는 두 경로 중에서 고른다.
+For Windows, choose one of two paths.
 
-- Azure Trusted Signing(권장): 월 10달러 수준으로 저렴하고 파일 인증서가 필요 없다. Azure
-  구독과 3년 이상 조직 이력 검증이 필요하다. electron-builder 26이 기본 지원하지만
-  `azureSignOptions`를 설정 파일에 상주시킬 수 없어(있으면 무조건 Azure 경로로 감), 채택이
-  결정되면 워크플로우에서 조건 주입하는 후속 변경이 필요하다.
-- OV Authenticode: 연 200~500달러. 2023년 6월부터 개인키의 HSM 보관이 강제되어 파일
-  `.pfx` 발급이 사실상 막혔으므로, CI에서 쓰려면 DigiCert KeyLocker 같은 클라우드 HSM
-  상품이 필요하다. 발급받으면 `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`에 넣는다.
+- Azure Trusted Signing (recommended): around $10 a month, and no file
+  certificate is needed. It requires an Azure subscription and at least
+  three years of verified organizational history. electron-builder 26
+  supports it out of the box, but `azureSignOptions` can't live permanently
+  in the config file (having it there forces the Azure path
+  unconditionally), so adopting this needs a follow-up change that injects
+  it conditionally from the workflow.
+- OV Authenticode: $200 to $500 a year. Since June 2023, private keys must
+  be kept in an HSM, which has effectively ended issuance of a `.pfx` file,
+  so using it in CI needs a cloud HSM product such as DigiCert KeyLocker.
+  Once issued, put it in `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`.
 
-어느 경로든 SmartScreen 평판은 서명 후에도 다운로드가 쌓여야 해소된다(EV 인증서만 즉시
-확보).
+Either way, SmartScreen reputation only clears once downloads accumulate
+after signing (only an EV certificate clears it immediately).
 
-### 서명 확인 (첫 서명 릴리스 후)
+### Verifying signatures (after the first signed release)
 
 ```bash
 # macOS
@@ -141,6 +177,7 @@ xcrun stapler validate BomLens-Setup.dmg
 Get-AuthenticodeSignature BomLens-Setup.exe
 ```
 
-서명이 자리 잡으면 후속으로 검토할 것: 사용자 문서의 Gatekeeper 우회 안내
-(`docs/start/no-cli.md`) 축소, 그리고 electron-updater 기반 완전 자동 업데이트 도입
-(macOS 자동 업데이트는 서명된 앱에서만 동작하므로 서명이 선결 조건이다).
+Once signing is in place, revisit these follow-up items: trim the Gatekeeper
+bypass instructions in the user docs (`docs/start/no-cli.md`), and add fully
+automatic updates through electron-updater (macOS auto-update only works on
+a signed app, so signing is a prerequisite).

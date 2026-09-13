@@ -44,6 +44,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
+| `--conformance-profile <default\|skt-submission>` | `default` | 적합성 검사 엄격도. `skt-submission`은 PURL 포함률 100%를 요구하고 `pkg:generic` 식별자가 하나라도 있으면 실패로 판정한다(SKT 공급사 제출 심사 기준과 동일). 웹 UI의 제출 전 점검 화면은 `skt-submission`이 기본값이지만 CLI는 아니므로, `--analyze`와 함께 명시적으로 지정해야 한다 |
 | `--deep-license` | false | scancode 정밀 라이선스 탐지 (opt-in 이미지) |
 | `--deep-cve` | false | grype의 NVD CPE 매칭으로 두 번째 대조를 더한다 (opt-in `bomlens-deep-cve` 이미지, 자동으로 내려받음). BomLens는 Maven 컴포넌트에만 NVD 대조가 가능한 CPE를 붙여 주므로, Trivy가 놓치는 NVD 전용 CVE는 대부분 오래된 Maven 라이브러리에서 나온다. `--security`를 자동으로 켠다. NVD 실시간 버전 범위로 확인하지 못한 결과는 보고서에 버전 미검증으로 표시된다 — [정밀 CVE 대조 가이드](../guides/reports.ko.md) 참고 |
 | `--identify-vendored` | false | 패키지 매니저가 없는 C/C++ 소스에 복사돼 들어간(vendored) 오픈소스를 식별. 파일 지문을 OSSKB 서비스와 대조 (발행 이미지에 포함; 소스가 아니라 해시 전송). [내장 오픈소스 식별 가이드](../guides/identify-vendored.ko.md) 참고 |
@@ -68,11 +69,12 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | 데스크톱 앱과 웹 UI의 산출물 베이스(CLI는 대신 `--output-dir` 사용). 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장 |
 | `SBOM_UI_MOUNT_DIR` | — | CLI 인자를 받지 않는 Windows 실행 파일 `sbom-ui.bat`용: 웹 UI의 디렉터리 경로 입력에 읽기 전용 대상으로 추가할 폴더 하나(`--ui --mount`의 더블클릭 대응). `& ^ | < >` 가 없는 경로를 쓸 것 — 런처는 이런 문자가 있으면 잘못된 마운트를 Docker에 넘기는 대신 거부한다 |
 | `SBOM_LANG` | 시스템 로캘 | Windows 런처와 데스크톱 앱의 언어. `en` 또는 `ko`. 한국어가 아니면 영어로 표시된다 |
+| `SBOM_BASH` | 자동 감지 | `scan-sbom.bat`용: Git Bash의 `bash.exe` 경로를 직접 지정(예: `C:\Program Files\Git\bin\bash.exe`). 런처가 PATH의 git으로 자동 감지를 시도했으나 WSL이나 WindowsApps 별칭이 아닌 실제 Git Bash를 못 찾았을 때 쓴다 |
 | `SBOM_PULL` | `missing` | 스캐너 이미지 다운로드 정책. `scan-sbom.sh`와 Windows 런처 모두에 적용된다. `missing`(기본)은 이미지가 없을 때만 받고, 이미 있으면 백그라운드에서 조용히 최신 여부를 확인한다(시간 상한을 두고 최선을 다하는 방식이라, 확인이 멎거나 오프라인이면 그냥 포기하고 로컬 이미지로 진행한다). `always`는 매번 멈춰서 다시 받고, 실패하면 실행 자체를 중단한다. `never`는 네트워크를 전혀 쓰지 않고, 이미지가 없으면 실행을 중단한다 |
 | `SBOM_IMAGE_TAR` | — | `docker save`로 만든 이미지 tar 경로. Windows 런처가 pull 대신 이 파일을 불러온다. 스크립트 옆에 `bomlens-image.tar`가 있으면 자동으로 사용한다. `SBOM_PULL=never`와 함께 쓰면 완전 오프라인 설치가 된다 |
 | `CVE_BIN_TOOL_MODE` | `auto` | 펌웨어 CVE 매칭 방식. `auto`는 번들 CVE 데이터베이스가 있으면 그걸 쓰고, 없으면 네트워크에 닿을 때 NVD에서 내려받음. `offline`은 번들 데이터베이스로만 매칭. `online`은 항상 네트워크에서 갱신. `components-only`는 CVE 매칭을 건너뛰고 구성요소만 담은 SBOM을 생성 |
 | `CVE_BIN_TOOL_HOME` | `/opt/cve-bin-tool-home` | 번들 cve-bin-tool CVE 데이터베이스 위치. cve-bin-tool은 캐시를 `HOME` 기준으로 잡으므로 `$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db`를 읽음 |
-| `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD` | 펌웨어 스캔에서 비활성화할 cve-bin-tool 데이터 출처. `GAD`(GitLab Advisory)는 번들된 cve-bin-tool에서 fetch 시 크래시를 일으켜 기본 비활성화 |
+| `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD,OSV` | 펌웨어 스캔에서 비활성화할 cve-bin-tool 데이터 출처. GAD(GitLab Advisory)와 OSV는 식별 과정이 네트워크로 나가지 않도록 기본 비활성화 |
 | `SCANOSS_API_URL` | OSSKB 무료 API | `--identify-vendored`의 엔드포인트. 에어갭·대량 사용 시 SCANOSS 상용·자체 호스팅 엔드포인트로 지정 |
 | `SCANOSS_API_KEY` | — | `SCANOSS_API_URL`이 요구하는 경우의 자격 증명 |
 | `SCANOSS_MIN_FILES` | `2` | 라이브러리를 보고하기 위해 매치돼야 하는 최소 파일 수. 단발성 다운스트림 포크 노이즈를 거른다. `1`로 두면 단일 파일 매치도 모두 유지 |
@@ -83,6 +85,8 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `AIBOM_VERIFY_MAX_BYTES` | `2147483648`(2GiB) | `--verify-weights`에서 이 크기를 넘는 가중치 파일(저장소가 선언한 크기든 실제로 내려받은 크기든)은 내려받거나 스캔하지 않고 건너뛴다 |
 | `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
 | `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
+| `GOTOOLCHAIN` | `auto` | Go 소스 스캔에서 모듈을 해석할 Go 툴체인. 기본값에서는 `go.mod`가 스캐너 이미지보다 새 Go를 요구하면 그 버전을 내려받는다. `local`이면 이미지에 든 Go만 쓰고, 이런 프로젝트는 의존성 해석이 실패한다 |
+| `GOPROXY` | `https://proxy.golang.org,direct` | Go 소스 스캔에서 모듈과 툴체인을 내려받을 프록시. `proxy.golang.org`에 접근할 수 없는 사내망에서 지정한다. `GOSUMDB`도 같은 방식으로 전달된다 |
 | `PROJECT_LICENSE` | — | `--license`와 같다. 프로젝트의 배포 라이선스를 SPDX 식별자로 지정한다. `bomlens:licenseConflict` 판정과 위험 보고서의 충돌 절을 만든다 |
 | `SBOM_AUTHOR` | — | `--sbom-author`와 같다. SBOM을 생성한 주체를 `metadata.authors`에 기록한다 |
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
@@ -96,6 +100,8 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `TRUSCA_RELEASE` | `--version` 값 | ingest release 라벨 |
 | `EXTERNAL_LOOKUP` | `true` | `--ui`와 함께: 웹 UI의 CVE·패키지 조회 기능을 켠다. 필요할 때 osv.dev로 조회한다. 폐쇄망에서는 `false`로 끈다 |
 | `SBOM_UPLOAD_TTL_HOURS` | `24` | `--ui`와 함께: 스캔을 시작하지 않은 업로드 파일(선택만 하고 방치된 업로드)을 보관하는 시간. 최소 1로 제한된다 |
+
+`BOMLENS_MAVEN_FULL_GRAPH` 같은 소스 스캔 의존성 해석 옵션은 [Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)에 정리돼 있습니다. `scan-sbom.sh`를 실행하는 셸에서 설정하면 같은 방식으로 의존성 해석에 적용됩니다.
 
 Windows에서는 명령 프롬프트에서 설정한 환경변수가 더블클릭 실행에는 적용되지 않습니다.
 그래서 런처는 `UI_PORT`, `SBOM_LANG`, `SBOM_PULL`, `SBOM_IMAGE_TAR`, `SBOM_SCANNER_IMAGE`,
@@ -125,7 +131,7 @@ Windows에서는 명령 프롬프트에서 설정한 환경변수가 더블클�
 스캐너 이미지는 `SBOM_SCANNER_IMAGE` 환경변수로 재정의합니다.
 
 ```bash
-SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.11.8" \
+SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:<version>" \
   ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --generate-only
 ```
 

@@ -430,9 +430,10 @@ RUN timeout 120 python3 /tmp/build-eol-index.py \
 
 # Bundle an OSV malicious-package snapshot beside enrich-malicious.sh, for the
 # same reason as the EOL bundle above: the check must run OFFLINE at scan time.
-# This one is far heavier to build than the EOL bundle — the source archives are
-# ~275 MB — so it gets its own layer and a much larger timeout, and the reduced
-# index it writes is ~12 MB (232k packages, measured 2026-07-28). Its own layer
+# This one is far heavier to build than the EOL bundle: the source archives are
+# ~275 MB, so it gets its own layer and a much larger timeout. The reduced
+# index it writes is ~13 MB (238k packages, of which 30 carry a version range
+# rather than an open verdict, measured 2026-09-13). Its own layer
 # also means a rebuild that changes nothing else reuses the cached download
 # instead of fetching it again, which matters on the multi-architecture publish
 # where every stage would otherwise pay for it twice.

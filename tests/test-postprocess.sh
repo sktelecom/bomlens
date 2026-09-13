@@ -127,7 +127,15 @@ fi
 # it was found in. The fixture has: a .so (basename kept), a .jar (kept), a GitHub
 # Action found in ci.yml (skipped — .yml is not an artifact), an npm dep found in
 # package-lock.json (skipped), a component that already has the field (untouched),
-# and one with no location property (nothing to take).
+# and one with no location property and no ecosystem fallback (nothing to take).
+#
+# cdxgen never sets a syft:location property at all (it is a syft-only field), so
+# a cdxgen-backed source scan (Maven, npm, PyPI, ...) always falls into the "no
+# location" branch above. For those, a second fallback derives the filename from
+# the purl itself, but only where the ecosystem's packaging convention makes it a
+# fact rather than a guess: Maven's repository layout names the file
+# <artifact>-<version>[-<classifier>].<type> (type defaults to "jar"); an npm
+# install is a directory, not a single file, so npm stays unfilled on purpose.
 fnf() { jq -r --arg n "$1" '[.components[]|select(.name==$n)][0] | ([.properties[]?|select(.name=="bsi:component:filename").value] | .[0] // "")' "$WORK/fn.json"; }
 cp "$FIX/syft-location-filenames.json" "$WORK/fn.json"
 bash "$LIB/normalize-sbom.sh" "$WORK/fn.json" >/dev/null 2>&1
@@ -136,7 +144,11 @@ bash "$LIB/normalize-sbom.sh" "$WORK/fn.json" >/dev/null 2>&1
 [ -z "$(fnf actions/checkout)" ] && pass "a manifest path (ci.yml) is NOT taken as a filename" || fail "actions/checkout wrongly filled with '$(fnf actions/checkout)'"
 [ -z "$(fnf left-pad)" ] && pass "a lockfile path (package-lock.json) is NOT taken as a filename" || fail "left-pad wrongly filled with '$(fnf left-pad)'"
 [ "$(fnf already-named)" = "custom-name.so" ] && pass "an existing bsi:component:filename is never overwritten" || fail "already-named filename='$(fnf already-named)', expected custom-name.so"
-[ -z "$(fnf no-location)" ] && pass "no location property -> no filename invented" || fail "no-location wrongly filled with '$(fnf no-location)'"
+[ -z "$(fnf no-location)" ] && pass "no location property and no ecosystem fallback -> no filename invented" || fail "no-location wrongly filled with '$(fnf no-location)'"
+[ "$(fnf maven-no-location)" = "maven-no-location-1.2.3.jar" ] && pass "a Maven purl with no syft:location falls back to <artifact>-<version>.jar" || fail "maven-no-location filename='$(fnf maven-no-location)', expected maven-no-location-1.2.3.jar"
+[ "$(fnf maven-war-no-location)" = "maven-war-no-location-4.5.6.war" ] && pass "the purl's own ?type= qualifier picks the extension over the jar default" || fail "maven-war-no-location filename='$(fnf maven-war-no-location)', expected maven-war-no-location-4.5.6.war"
+[ "$(fnf maven-classifier-no-location)" = "maven-classifier-no-location-7.8.9-sources.jar" ] && pass "a ?classifier= qualifier is inserted between version and extension" || fail "maven-classifier-no-location filename='$(fnf maven-classifier-no-location)', expected maven-classifier-no-location-7.8.9-sources.jar"
+[ -z "$(fnf npm-no-location)" ] && pass "an npm purl with no syft:location is NOT guessed (an install is a directory, not a file)" || fail "npm-no-location wrongly filled with '$(fnf npm-no-location)'"
 # The property the field rides on must be singular — a second run must not append a
 # duplicate bsi:component:filename (idempotence, like enrich-staleness).
 bash "$LIB/normalize-sbom.sh" "$WORK/fn.json" >/dev/null 2>&1
@@ -791,6 +803,82 @@ if [ "$(jq '[.components[0].properties[] | select(.name=="bomlens:malicious")] |
     pass "re-running replaces rather than appends the malicious properties"
 else
     fail "malicious properties duplicated on re-run" "$(jq -c '.components[0].properties' "$WORK/mal.json")"
+fi
+
+echo "== malicious packages: a range-limited advisory is compared against the component's own version =="
+# Real case: OSV MAL-2023-462 names no explicit versions for pkg:npm/fsevents,
+# only a SEMVER range (introduced 1.0.0, fixed 1.2.11). Before this fix, the
+# absence of an explicit version list made every fsevents version malicious,
+# including 2.3.3, released years after the fix. fsevents is pulled in widely
+# by JS build tooling, so that false positive reached a lot of scans.
+cat > "$WORK/mal-range-index.json" <<'MALRANGEJSON'
+{
+  "_snapshot": "2026-09-14",
+  "_ecosystems": ["npm"],
+  "packages": {
+    "pkg:npm/fsevents": "MAL-2023-462",
+    "pkg:npm/unparseable-range": "MAL-0000-3"
+  },
+  "versions": {},
+  "ranges": {
+    "pkg:npm/fsevents": [[{"introduced": "1.0.0"}, {"fixed": "1.2.11"}]],
+    "pkg:npm/unparseable-range": [[{"introduced": "1.0.0"}, {"fixed": "2.0.0"}]]
+  }
+}
+MALRANGEJSON
+cat > "$WORK/mal-range.json" <<'MALRANGESBOM'
+{
+  "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+  "components": [
+    { "type": "library", "name": "fsevents", "version": "1.2.10", "purl": "pkg:npm/fsevents@1.2.10" },
+    { "type": "library", "name": "fsevents", "version": "2.3.3", "purl": "pkg:npm/fsevents@2.3.3" },
+    { "type": "library", "name": "fsevents", "version": "1.2.11", "purl": "pkg:npm/fsevents@1.2.11" },
+    { "type": "library", "name": "fsevents", "version": "1.2.11-beta", "purl": "pkg:npm/fsevents@1.2.11-beta" },
+    { "type": "library", "name": "unparseable-range", "version": "v1.5.0", "purl": "pkg:npm/unparseable-range@v1.5.0" }
+  ]
+}
+MALRANGESBOM
+MALICIOUS_DATA_FILE="$WORK/mal-range-index.json" bash "$LIB/enrich-malicious.sh" "$WORK/mal-range.json" >/dev/null 2>&1
+mal_range_of() { jq -r --arg n "$1" --arg v "$2" --arg p "$3" '[.components[] | select(.name==$n and .version==$v)
+    | ((.properties // [])[] | select(.name==$p) | .value)] | first // "none"' "$WORK/mal-range.json"; }
+# fsevents 1.2.10: inside the malicious window (>= introduced, < fixed).
+if [ "$(mal_range_of fsevents 1.2.10 bomlens:malicious)" = "true" ]; then
+    pass "malicious range: fsevents 1.2.10 (before the fix) -> malicious"
+else
+    fail "fsevents 1.2.10 not flagged" "$(jq -c '.components[0].properties' "$WORK/mal-range.json")"
+fi
+# fsevents 2.3.3: released long after 1.2.11 fixed it. This is the false
+# positive the fix exists to close.
+if [ "$(mal_range_of fsevents 2.3.3 bomlens:malicious)" = "none" ]; then
+    pass "malicious range: fsevents 2.3.3 (after the fix) -> not malicious"
+else
+    fail "fsevents 2.3.3 was still flagged malicious" "$(jq -c '.components[1].properties' "$WORK/mal-range.json")"
+fi
+# fsevents 1.2.11: the fixed version itself is already clean.
+if [ "$(mal_range_of fsevents 1.2.11 bomlens:malicious)" = "none" ]; then
+    pass "malicious range: fsevents 1.2.11 (the fix itself) -> not malicious"
+else
+    fail "fsevents 1.2.11 was flagged malicious" "$(jq -c '.components[2].properties' "$WORK/mal-range.json")"
+fi
+# fsevents 1.2.11-beta: stripped to its numeric core this ties the "fixed"
+# boundary, but semver orders a pre-release before the release it precedes,
+# so this version is still inside the affected window. The stripped
+# comparison cannot see that, so it must not guess "clean" here either.
+if [ "$(mal_range_of fsevents 1.2.11-beta bomlens:malicious)" = "none" ] \
+   && [ "$(mal_range_of fsevents 1.2.11-beta bomlens:malicious:rangeUnknown)" = "true" ]; then
+    pass "malicious range: fsevents 1.2.11-beta (ties the fixed boundary) -> rangeUnknown, not clean"
+else
+    fail "fsevents 1.2.11-beta boundary tie not handled as rangeUnknown" "$(jq -c '.components[3].properties' "$WORK/mal-range.json")"
+fi
+# A version the comparator cannot parse as plain dotted digits (a "v" prefix,
+# a Go pseudo-version, ...) is never guessed at either way: not flagged
+# malicious, but marked so a reader knows the advisory could not be ruled
+# out either.
+if [ "$(mal_range_of unparseable-range v1.5.0 bomlens:malicious)" = "none" ] \
+   && [ "$(mal_range_of unparseable-range v1.5.0 bomlens:malicious:rangeUnknown)" = "true" ]; then
+    pass "malicious range: an unparseable version is left unflagged and marked rangeUnknown"
+else
+    fail "unparseable-range version not handled as rangeUnknown" "$(jq -c '.components[4].properties' "$WORK/mal-range.json")"
 fi
 
 echo "== license-conflict: expression parsing and outbound-license verdicts =="
@@ -2537,6 +2625,97 @@ jq -e '.checks[] | select(.id=="purl-syntax") | .missing | index("commons-lang3:
 pb_cov=$(jq -r '.checks[] | select(.id=="purl") | .status' "$WORK/pbad_conformance.json")
 [ "$pb_cov" = "pass" ] && pass "PURL coverage stays green (syntax is a separate check)" || fail "purl coverage='$pb_cov', expected pass"
 
+echo "== CONFORMANCE_PROFILE: skt-submission tightens PURL/no-generic; default stays as before =="
+
+# A pkg:generic component under the default profile: no-generic warns, does
+# not fail the SBOM, and the label stays "advisory".
+jq '.components += [{"type":"library","name":"mystery","version":"1.0","purl":"pkg:generic/mystery@1.0"}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/prof-generic.json"
+bash "$LIB/validate-sbom.sh" "$WORK/prof-generic.json" "$WORK/profd" "supplier" >/dev/null 2>&1
+profd=$(jq -r '"\(.result)|\(.checks[]|select(.id=="no-generic")|"\(.required)|\(.status)|\(.label)")"' "$WORK/profd_conformance.json")
+[ "$profd" = 'pass|false|warn|Traceable PURL (no pkg:generic, advisory)' ] \
+    && pass "default profile: pkg:generic warns, advisory, overall pass" \
+    || fail "default profile no-generic: '$profd'"
+
+# The same SBOM under skt-submission: no-generic becomes required and fails
+# the SBOM. PURL coverage itself stays "pass" (every component, including the
+# generic one, carries a purl); pkg:generic is a traceability defect the
+# no-generic check owns, not an absence purl coverage measures.
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/prof-generic.json" "$WORK/profs" "supplier" >/dev/null 2>&1
+profs=$(jq -r '"\(.result)|\(.checks[]|select(.id=="no-generic")|"\(.required)|\(.status)|\(.label)")|\(.checks[]|select(.id=="purl")|.status)"' "$WORK/profs_conformance.json")
+[ "$profs" = 'fail|true|fail|Traceable PURL (no pkg:generic)|pass' ] \
+    && pass "skt-submission profile: pkg:generic fails (required), overall fail" \
+    || fail "skt-submission profile no-generic/purl: '$profs'"
+
+# The report records which profile it was graded against, in the machine JSON
+# and in the human-readable header (md), so a reviewer can tell a "pass" from
+# the default 90% floor apart from a "pass" against the 100% submission bar.
+profd_field=$(jq -r '.profile' "$WORK/profd_conformance.json")
+profs_field=$(jq -r '.profile' "$WORK/profs_conformance.json")
+[ "$profd_field" = "default" ] && [ "$profs_field" = "skt-submission" ] \
+    && pass "the conformance JSON records the profile it was graded against" \
+    || fail "conformance JSON profile field" "default='$profd_field' skt-submission='$profs_field'"
+grep -q '^- Profile: default$' "$WORK/profd_conformance.md" \
+    && grep -q '^- Profile: skt-submission$' "$WORK/profs_conformance.md" \
+    && pass "the conformance markdown header records the profile" \
+    || fail "conformance markdown profile line" \
+         "$(grep '^- Profile:' "$WORK/profd_conformance.md" "$WORK/profs_conformance.md")"
+
+# PURL_MIN_PCT itself: 9 of 10 extra package components carry a purl (91%,
+# rounded), clearing the default 90% floor but not skt-submission's 100%.
+jq --argjson extra '[
+    {"type":"library","name":"p1","version":"1","purl":"pkg:npm/p1@1"},
+    {"type":"library","name":"p2","version":"1","purl":"pkg:npm/p2@1"},
+    {"type":"library","name":"p3","version":"1","purl":"pkg:npm/p3@1"},
+    {"type":"library","name":"p4","version":"1","purl":"pkg:npm/p4@1"},
+    {"type":"library","name":"p5","version":"1","purl":"pkg:npm/p5@1"},
+    {"type":"library","name":"p6","version":"1","purl":"pkg:npm/p6@1"},
+    {"type":"library","name":"p7","version":"1","purl":"pkg:npm/p7@1"},
+    {"type":"library","name":"p8","version":"1","purl":"pkg:npm/p8@1"},
+    {"type":"library","name":"p9","version":"1","purl":"pkg:npm/p9@1"},
+    {"type":"library","name":"p10","version":"1"}
+  ]' '.components += $extra' "$FIX/good-cyclonedx.json" > "$WORK/prof-threshold.json"
+bash "$LIB/validate-sbom.sh" "$WORK/prof-threshold.json" "$WORK/proftd" "supplier" >/dev/null 2>&1
+proftd=$(jq -r '.checks[]|select(.id=="purl")|.status' "$WORK/proftd_conformance.json")
+[ "$proftd" = "pass" ] && pass "default profile: 91% PURL coverage clears the 90% floor" || fail "default profile PURL coverage: $proftd"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/prof-threshold.json" "$WORK/profts" "supplier" >/dev/null 2>&1
+profts=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl")|.status)"' "$WORK/profts_conformance.json")
+[ "$profts" = "fail|fail" ] && pass "skt-submission profile: the same 91% fails the 100% floor" || fail "skt-submission profile PURL coverage: $profts"
+
+# A clean SBOM (no pkg:generic, full PURL coverage) still passes skt-submission.
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/profc" "supplier" >/dev/null 2>&1
+profc=$(jq -r '.result' "$WORK/profc_conformance.json")
+[ "$profc" = "pass" ] && pass "skt-submission profile: a clean SBOM still passes" || fail "clean SBOM under skt-submission: result=$profc"
+
+# An unknown profile value warns on stderr and falls back to the default
+# thresholds rather than aborting.
+prof_unknown_err=$(CONFORMANCE_PROFILE=bogus bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/profu" "supplier" 2>&1 >/dev/null)
+prof_unknown_res=$(jq -r '.result' "$WORK/profu_conformance.json")
+if printf '%s' "$prof_unknown_err" | grep -q "unknown CONFORMANCE_PROFILE 'bogus'" && [ "$prof_unknown_res" = "pass" ]; then
+    pass "an unknown CONFORMANCE_PROFILE warns and falls back to default"
+else
+    fail "unknown CONFORMANCE_PROFILE handling" "stderr='$prof_unknown_err' result=$prof_unknown_res"
+fi
+
+# operating-system components (distribution-identity, not an installable
+# package) are excluded from the PURL/name-version denominator, in both
+# profiles. A rootfs/image scan's mandatory distro-identity component has
+# no purl scheme to carry and must not by itself cap coverage below 100%,
+# checked here at literal 100% (not just "pass", which the default profile's
+# 90% floor could clear without excluding the OS component at all).
+jq '.components += [{"type":"operating-system","name":"debian","version":"12.15"}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/prof-os.json"
+bash "$LIB/validate-sbom.sh" "$WORK/prof-os.json" "$WORK/profosd" "supplier" >/dev/null 2>&1
+profosd=$(jq -r '"\(.checks[]|select(.id=="purl")|.detail)|\(.checks[]|select(.id=="name-version")|.detail)"' "$WORK/profosd_conformance.json")
+[ "$profosd" = "100% (2/2)|2/2" ] \
+    && pass "default profile: operating-system component excluded, PURL/name-version both 100%" \
+    || fail "default profile operating-system-component exclusion" "$profosd"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/prof-os.json" "$WORK/profos" "supplier" >/dev/null 2>&1
+profos=$(jq -r '"\(.checks[]|select(.id=="purl")|.detail)|\(.checks[]|select(.id=="name-version")|.detail)"' "$WORK/profos_conformance.json")
+[ "$profos" = "100% (2/2)|2/2" ] \
+    && pass "skt-submission profile: operating-system component excluded, PURL/name-version both 100%" \
+    || fail "skt-submission profile operating-system-component exclusion" "$profos"
+
 # SPDX JSON: version range + purl syntax over externalRefs locators.
 jq '.spdxVersion="SPDX-2.1"' "$FIX/good-spdx.json" > "$WORK/spdx-old.json"
 bash "$LIB/validate-sbom.sh" "$WORK/spdx-old.json" "$WORK/sdo" "supplier" >/dev/null 2>&1
@@ -2664,6 +2843,34 @@ grep -q "detached signature" "$WORK/sg_conformance.md" \
 REPORT_LANG=ko bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sgk" "supplier" >/dev/null 2>&1
 grep -q "^## 사람이 확인할 항목" "$WORK/sgk_conformance.md" \
     && pass "the Korean report renders the section too" || fail "ko markdown has no review section"
+
+# A detached signature IS visible when it follows cosign's own convention: a
+# "<sbom-filename>.sig" file sitting right next to the SBOM this run is looking
+# at. This is what ANALYZE sees for a supplier submission that shipped its .sig
+# alongside the SBOM, and what a same-run --sign scan sees on its own re-check
+# after signing (entrypoint.sh calls validate-sbom.sh a second time then).
+cp "$FIX/good-cyclonedx.json" "$WORK/sg-adjacent.json"
+: > "$WORK/sg-adjacent.json.sig"
+bash "$LIB/validate-sbom.sh" "$WORK/sg-adjacent.json" "$WORK/sga" "supplier" >/dev/null 2>&1
+sga=$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | .status' "$WORK/sga_conformance.json")
+[ "$sga" = "pass" ] && pass "an adjacent <sbom>.sig file is credited without an embedded .signature" || fail "adjacent .sig: '$sga'"
+
+# A same-run signing attempt that fails must not read the same as "signing was
+# never asked for": the supplier asked for one and it did not happen.
+SIGN_SBOM=true SIGN_FAILED=1 bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sgf" "supplier" >/dev/null 2>&1
+sgf=$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | "\(.status)|\(.detail)|\(.detail_ko)"' "$WORK/sgf_conformance.json")
+[ "$sgf" = "warn|signature requested but failed|서명 요청됨, 서명 실패" ] \
+    && pass "a failed signing attempt is distinguished from 'never asked for one'" || fail "sign-failed row: '$sgf'"
+REPORT_LANG=ko SIGN_SBOM=true SIGN_FAILED=1 bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sgfk" "supplier" >/dev/null 2>&1
+grep -q "서명 요청됨, 서명 실패" "$WORK/sgfk_conformance.md" \
+    && pass "the sign-failed wording renders in the Korean markdown report" || fail "ko markdown missing the sign-failed detail"
+# A successful same-run signing attempt (SIGN_FAILED=0, no .sig at this call
+# since it is the pre-signing pass) must still read as the plain "not present"
+# gap, not as a failure. The row only turns pass/fail once the post-signing
+# re-check (with the adjacent .sig or its absence) runs.
+SIGN_SBOM=true SIGN_FAILED=0 bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/sgp" "supplier" >/dev/null 2>&1
+sgp=$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | .detail' "$WORK/sgp_conformance.json")
+[ "$sgp" = "not present in the SBOM" ] && pass "SIGN_FAILED=0 before the .sig exists reads as the ordinary gap, not a false pass" || fail "pre-signing pass detail: '$sgp'"
 
 echo "== conformance: the 2026 SBOM minimum elements are measured on every SBOM =="
 # The baseline applies to all software, not to a subset, so its registry declares
@@ -3998,6 +4205,28 @@ got=$(jq -r '[.files[].path] | join(",")' "$link_dir/out/link_source.json" 2>/de
     && pass "no symlink was followed for its content" \
     || fail "snapshot captured content through a link: '$got'"
 
+echo "== source tree: a named exclude directory is left out (BUG-005) =="
+# A "current folder" scan can end up with its own output subfolder sitting
+# inside the tree being walked (see entrypoint.sh's SRC_TREE_EXCLUDE
+# detection). source-file-tree.sh's own part of that fix is simple: when the
+# caller names a directory, prune it like the built-in noise list, whatever
+# its position or depth.
+excl_dir="$WORK/exclude"
+rm -rf "$excl_dir"; mkdir -p "$excl_dir/tree/MyApp_1.0.0" "$excl_dir/out"
+echo 'console.log(1)' > "$excl_dir/tree/index.js"
+echo '{}' > "$excl_dir/tree/MyApp_1.0.0/MyApp_1.0.0_bom.json"
+bash "$LIB/source-file-tree.sh" "$excl_dir/tree" "$excl_dir/out/excl_files.json" "MyApp_1.0.0" >/dev/null 2>&1
+got=$(jq -r '[.files[].path] | sort | join(",")' "$excl_dir/out/excl_files.json" 2>/dev/null)
+[ "$got" = "index.js" ] \
+    && pass "the named directory and its contents are pruned from the tree" \
+    || fail "tree with an exclude name was '$got'"
+# Without a third argument, nothing new is pruned: the exclude is opt-in.
+bash "$LIB/source-file-tree.sh" "$excl_dir/tree" "$excl_dir/out/noexcl_files.json" >/dev/null 2>&1
+got=$(jq -r '[.files[].path] | sort | join(",")' "$excl_dir/out/noexcl_files.json" 2>/dev/null)
+[ "$got" = "MyApp_1.0.0,MyApp_1.0.0/MyApp_1.0.0_bom.json,index.js" ] \
+    && pass "no exclude argument leaves the directory in the tree" \
+    || fail "tree with no exclude was '$got'"
+
 echo "== unpack-scan-target: open an archive, refuse what is not one =="
 # A build artifact is one packed file, so without unpacking there is nothing to
 # show. Archives are opened; an ELF binary is refused with a reason rather than
@@ -4610,6 +4839,36 @@ if [ "$(jq '.components | length' "$WORK/real-sample.json" 2>/dev/null)" = "$(jq
 else
     fail "normalize-sbom.sh dropped or added components on a real document"
 fi
+
+echo "== build-prep options: every BOMLENS_* switch it reads is passed on by each launch path =="
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
+# The list in source-detect.sh must name exactly the switches build-prep.sh reads,
+# or a new switch silently never reaches the cdxgen container.
+_read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u | tr '\n' ' ')
+_listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
+[ -n "$_read" ] && [ "$_read" = "$_listed" ] \
+    && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
+    || fail "BUILD_PREP_ENV_NAMES is out of sync with build-prep.sh" "reads [$_read], listed [$_listed]"
+_args=$(bash -c '. "$1"; build_prep_env_args' _ "$DETECT")
+case "$_args" in
+    *=*) fail "build_prep_env_args put a value on the docker command" "got [$_args]" ;;
+    "-e BOMLENS_"*) pass "build_prep_env_args passes names only" ;;
+    *) fail "build_prep_env_args output unexpected" "got [$_args]" ;;
+esac
+grep -q '"${prep_env\[@\]}"' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "entrypoint.sh passes the build-prep options to the cdxgen container" \
+    || fail "entrypoint.sh no longer passes the build-prep options"
+grep -q '"${PREP_ENV_FLAGS\[@\]}"' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && grep -q '^        \$PREP_ENV_ARGS \\$' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && pass "scan-sbom.sh passes the build-prep options on the --ui and stage-1 paths" \
+    || fail "scan-sbom.sh no longer passes the build-prep options on both paths"
+# Documented as "set 1": only 1 or true switch an option on.
+_opt=$(sed -n '/^opted_out() /p' "$PREP")
+_on=""; for v in 1 true 0 false ""; do bash -c "$_opt; opted_out \"\$1\"" _ "$v" && _on="${_on}[$v]"; done
+[ "$_on" = "[1][true]" ] \
+    && pass "an opt-out switch counts as set only for 1 or true" \
+    || fail "opt-out switch values treated as set: $_on"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

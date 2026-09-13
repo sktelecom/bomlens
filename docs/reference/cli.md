@@ -44,6 +44,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--lang <en\|ko>` | `en` | Language for the human-facing conformance and AI-profile reports (`.md`/`.html`). The SBOM and the JSON reports stay English regardless |
+| `--conformance-profile <default\|skt-submission>` | `default` | Conformance check strictness. `skt-submission` requires 100% PURL coverage and fails on any `pkg:generic` identifier, matching the SKT supplier submission review. The web UI's submission-review screen defaults to `skt-submission`; the CLI does not, so pair it with `--analyze` explicitly |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
 | `--deep-cve` | false | Add a second CVE-matching pass via grype's NVD CPE matcher (opt-in `bomlens-deep-cve` image, pulled automatically). Recovers NVD-only CVEs that Trivy misses, mostly for older Maven libraries, since BomLens attaches an NVD-matchable CPE to Maven components specifically; implies `--security`. Findings not verified against the live NVD version range are flagged version-unverified in the report — see the [deep CVE matching guide](../guides/reports.md) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
@@ -70,11 +71,12 @@ Environment variables adjust the behavior.
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | Output base for the desktop app and web UI (the CLI uses `--output-dir` instead). Each scan still lands in a `{Project}_{Version}/` subfolder under it |
 | `SBOM_UI_MOUNT_DIR` | — | For the Windows launcher `sbom-ui.bat`, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of `--ui --mount`). Use a path without `& ^ | < >` — the launcher rejects those rather than passing a mangled mount to Docker |
 | `SBOM_LANG` | system locale | `en` or `ko`, for the Windows launchers and the desktop app. Anything that is not Korean gets English |
+| `SBOM_BASH` | auto-detected | For `scan-sbom.bat`: explicit path to Git Bash's `bash.exe` (e.g. `C:\Program Files\Git\bin\bash.exe`), when the launcher's own detection (deriving it from `git` on PATH) fails to find one that is not WSL's or a WindowsApps alias |
 | `SBOM_PULL` | `missing` | Scanner image download policy, honored by both `scan-sbom.sh` and the Windows launcher. `missing` (default) pulls only when the image is absent, and otherwise quietly refreshes an already-present `:latest` in the background (bounded, best-effort — a stalled or offline check gives up and the run proceeds with the local image either way). `always` blocks and re-pulls every run, failing the run if the pull fails. `never` never touches the network, failing the run if the image is absent |
 | `SBOM_IMAGE_TAR` | — | Path to an image tar from `docker save`. The Windows launcher loads it instead of pulling; a file named `bomlens-image.tar` next to the scripts is picked up automatically. Combined with `SBOM_PULL=never` this gives a fully offline install |
 | `CVE_BIN_TOOL_MODE` | `auto` | Firmware CVE matching. `auto` uses the bundled CVE database if present, otherwise downloads from NVD when the network is reachable. `offline` matches only against the bundled database. `online` always updates from the network. `components-only` skips CVE matching and emits a component-only SBOM |
 | `CVE_BIN_TOOL_HOME` | `/opt/cve-bin-tool-home` | Location of the bundled cve-bin-tool CVE database. cve-bin-tool reads `$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db` (it keys the cache off `HOME`) |
-| `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD` | cve-bin-tool data sources to disable during a firmware scan. `GAD` (GitLab Advisory) is disabled by default because it crashes the bundled cve-bin-tool on fetch |
+| `CVE_BIN_TOOL_DISABLE_SOURCES` | `GAD,OSV` | cve-bin-tool data sources to disable during a firmware scan. GAD (GitLab Advisory) and OSV are disabled by default so identification does not reach out over the network |
 | `SCANOSS_API_URL` | OSSKB free API | Endpoint for `--identify-vendored`. Point at a SCANOSS commercial or self-hosted endpoint for air-gapped or high-volume use |
 | `SCANOSS_API_KEY` | — | Credential for `SCANOSS_API_URL`, if the endpoint requires one |
 | `SCANOSS_MIN_FILES` | `2` | Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set `1` to keep every single-file match |
@@ -85,6 +87,8 @@ Environment variables adjust the behavior.
 | `AIBOM_VERIFY_MAX_BYTES` | `2147483648` (2 GiB) | With `--verify-weights`: a weight file larger than this (by the repo's declared size, or by its actual downloaded size if that differs) is skipped rather than downloaded/scanned |
 | `COSIGN_KEY` | — | Path to the signing key used by `--sign` |
 | `FETCH_LICENSE` | `true` | Resolve dependency licenses during source scans. Set `false` to skip the lookup and run faster |
+| `GOTOOLCHAIN` | `auto` | Go source scans: which Go toolchain resolves the modules. By default, when `go.mod` asks for a newer Go than the scanner image carries, that version is downloaded. Set `local` to use only the image's own Go; dependency resolution then fails for such a project |
+| `GOPROXY` | `https://proxy.golang.org,direct` | Go source scans: proxy for module and toolchain downloads, for a network that cannot reach `proxy.golang.org`. `GOSUMDB` is passed on the same way |
 | `PROJECT_LICENSE` | — | Same as `--license`. The outbound license the project is distributed under, as an SPDX id. Drives the `bomlens:licenseConflict` verdicts and the risk report's conflict section |
 | `SBOM_AUTHOR` | — | Same as `--sbom-author`. The entity that generated the SBOM, recorded in `metadata.authors` |
 | `SECURITY_ENRICH` | `true` | Enrich the security report with EPSS and CISA KEV signals. Set `false` on air-gapped networks to skip the external lookups |
@@ -98,6 +102,8 @@ Environment variables adjust the behavior.
 | `TRUSCA_RELEASE` | `--version` value | Ingest release label |
 | `EXTERNAL_LOOKUP` | `true` | With `--ui`: enable the web UI's CVE/package lookup, which queries OSV.dev on demand. Set `false` for air-gapped runs |
 | `SBOM_UPLOAD_TTL_HOURS` | `24` | With `--ui`: how long an uploaded file is kept if no scan is ever started with it (a picked-then-abandoned upload). Clamped to at least 1 |
+
+Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way.
 
 On Windows, environment variables set in a command prompt do not survive a
 double-click. The launchers therefore also read `UI_PORT`, `SBOM_LANG`,
@@ -128,7 +134,7 @@ To restore the previous flat layout, where every file is written directly in the
 Override the scanner image with `SBOM_SCANNER_IMAGE`.
 
 ```bash
-SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:1.11.8" \
+SBOM_SCANNER_IMAGE="ghcr.io/sktelecom/bomlens:<version>" \
   ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --generate-only
 ```
 

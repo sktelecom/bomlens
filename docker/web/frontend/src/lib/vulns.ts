@@ -6,15 +6,19 @@
  * then severity. Pure and unit tested so "most severe / highest-scored first"
  * is verifiable independently of the table.
  */
-import { SEVERITY_ORDER, type VulnItem } from "./api";
+import { SEVERITY_ORDER, type Severity, type VulnItem } from "./api";
 
 export type VulnSortKey = "severity" | "cvss" | "epss" | "nvdSeverity";
 export type SortDir = "asc" | "desc";
 
 /** Higher = more severe (CRITICAL highest). Unknown/absent severities sort last. */
-function severityValue(v: VulnItem): number {
-  const i = SEVERITY_ORDER.indexOf(v.severity);
+function severityRank(s: Severity | undefined): number {
+  const i = s ? SEVERITY_ORDER.indexOf(s) : -1;
   return i === -1 ? 0 : SEVERITY_ORDER.length - i;
+}
+
+function severityValue(v: VulnItem): number {
+  return severityRank(v.severity);
 }
 
 /** CVSS as a comparable number; missing scores sort below any real score. */
@@ -74,4 +78,59 @@ export function sortVulns(
   sort: { key: VulnSortKey; dir: SortDir } = { key: "severity", dir: "desc" },
 ): VulnItem[] {
   return [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir));
+}
+
+/** Two or more CVEs on the same installed package that share the same fixed
+ *  version: one upgrade resolves all of them. */
+export interface UpgradeGroup {
+  pkg: string;
+  installed: string;
+  fixed: string;
+  vulnIds: string[];
+  /** Worst severity among the grouped CVEs (for sorting/highlighting). */
+  maxSeverity: Severity;
+}
+
+/**
+ * Group vulnerabilities that a single upgrade would resolve together.
+ *
+ * The key is package + installed version + fixed version, not package name
+ * alone: the same name can resolve to two different installed versions in
+ * one SBOM (a dependency conflict, qs@6.15.3 and qs@6.16.0 coexisting is a
+ * real, measured case), and grouping by name only would silently merge CVEs
+ * against unrelated installs. A CVE with no fixed version is not groupable
+ * (there is nothing to upgrade to) and is dropped from every group; a group
+ * of exactly one CVE is not a "bundle" and is dropped too: the summary
+ * exists to answer "what fixes more than one thing at once".
+ *
+ * Sorted worst-severity-first, then by how many CVEs the upgrade resolves
+ * (most first): the reader is choosing where to spend one upgrade, so the
+ * biggest, most severe win should lead.
+ */
+export function groupByUpgrade(vulns: VulnItem[]): UpgradeGroup[] {
+  const byKey = new Map<string, VulnItem[]>();
+  for (const v of vulns) {
+    if (!v.fixed) continue;
+    const key = `${v.pkg}::${v.installed}::${v.fixed}`;
+    const list = byKey.get(key);
+    if (list) list.push(v);
+    else byKey.set(key, [v]);
+  }
+
+  const groups: UpgradeGroup[] = [];
+  for (const [key, list] of byKey) {
+    if (list.length < 2) continue;
+    const [pkg, installed, fixed] = key.split("::");
+    let worst = list[0];
+    for (const v of list) {
+      if (severityValue(v) > severityValue(worst)) worst = v;
+    }
+    groups.push({ pkg, installed, fixed, vulnIds: list.map((v) => v.id), maxSeverity: worst.severity });
+  }
+
+  return groups.sort((a, b) => {
+    const sev = severityRank(b.maxSeverity) - severityRank(a.maxSeverity);
+    if (sev !== 0) return sev;
+    return b.vulnIds.length - a.vulnIds.length;
+  });
 }

@@ -12,7 +12,13 @@ import { Select } from "@/components/ui/select";
 import { FileDropzone } from "@/components/FileDropzone";
 import { SiblingImagePanel } from "@/components/SiblingImagePanel";
 import { Switch } from "@/components/ui/switch";
-import { USAGE_CONTEXTS, type UploadKind, type UsageContext } from "@/lib/api";
+import {
+  CONFORMANCE_PROFILES,
+  USAGE_CONTEXTS,
+  type ConformanceProfile,
+  type UploadKind,
+  type UsageContext,
+} from "@/lib/api";
 import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { USAGE_LABEL_KEY } from "@/lib/models";
@@ -32,6 +38,12 @@ const UPLOAD_LABEL: Record<UploadKind, string> = {
   package: "source.packageUpload",
   firmware: "source.firmwareUpload",
   model: "source.modelUpload",
+};
+
+/** i18n label key per conformance-profile value. */
+const CONFORMANCE_PROFILE_LABEL_KEY: Record<ConformanceProfile, string> = {
+  default: "options.conformanceProfileDefault",
+  "skt-submission": "options.conformanceProfileSktSubmission",
 };
 
 /** Red asterisk marking a required field; hidden from AT — the input itself
@@ -369,6 +381,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepCve,
     byteStable,
     setByteStable,
+    conformanceProfile,
+    setConformanceProfile,
+    isAnalyze,
     outboundLicense,
     setOutboundLicense,
     scanossToken,
@@ -379,6 +394,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showDeepCve,
     showByteStable,
     showOutboundLicense,
+    showConformanceProfile,
     capabilities,
     busy,
   } = state;
@@ -453,6 +469,33 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setByteStable}
           disabled={busy}
         />
+      )}
+      {showConformanceProfile && (
+        <div className="space-y-1.5">
+          <Label htmlFor="conformance-profile">{t("options.conformanceProfile")}</Label>
+          <Select
+            id="conformance-profile"
+            value={conformanceProfile}
+            onChange={(e) =>
+              setConformanceProfile(e.target.value as ConformanceProfile)
+            }
+            disabled={busy}
+          >
+            {CONFORMANCE_PROFILES.map((p) => (
+              <option key={p} value={p}>
+                {t(CONFORMANCE_PROFILE_LABEL_KEY[p])}
+              </option>
+            ))}
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {t("options.conformanceProfileHint")}
+          </p>
+          {isAnalyze && (
+            <p className="text-xs text-muted-foreground">
+              {t("options.conformanceProfileAnalyzeHint")}
+            </p>
+          )}
+        </div>
       )}
       {showOutboundLicense && (
         <div className="space-y-1.5">

@@ -217,6 +217,5 @@ nav:
       - Local-first: concepts/local-first.md
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md
-      - Release process: contribute/release-process.md
   - Talks: talks/index.md
   - Release notes: https://github.com/sktelecom/bomlens/releases

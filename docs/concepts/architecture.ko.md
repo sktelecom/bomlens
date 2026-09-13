@@ -34,7 +34,7 @@ BomLens는 두 종류의 Docker 이미지가 협력하는 2단계 파이프라�
 | **획득** | 프로젝트 언어 감지 후 **on-demand pull** | 한 번 pull해서 재사용 |
 | **이점** | 언어별 최신 toolchain을 cdxgen이 직접 관리 | 이미지가 작고, 도구 버전 고정으로 재현성 확보 |
 
-> 주류 5개 언어(java, python, node, dotnet, php)는 cdxgen 공식 이미지로 검출이 동일하고, go와 ruby, rust에서 toolchain 보강(`build-prep.sh`)이 결정적으로 우수합니다. 측정 데이터는 [README "Why a Docker image?"](https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen)를 참조하세요.
+> go와 ruby, rust는 프로젝트에 lock 파일이 커밋돼 있지 않으면 cdxgen을 실행하기 전에 `build-prep.sh`가 각각 `go mod tidy`(실패 시 `go mod download`), `bundle lock`(실패 시 `bundle install`), `cargo generate-lockfile`로 먼저 lock 파일을 만듭니다. 그래야 cdxgen이 매니페스트의 직접 의존성만이 아니라 전체 의존성 그래프를 볼 수 있습니다. cdxgen 단독 실행과 비교해 보려면 [`tests/compare-cdxgen-vs-docker.sh`](https://github.com/sktelecom/bomlens/blob/main/tests/compare-cdxgen-vs-docker.sh)를 참고하세요.
 
 ---
 

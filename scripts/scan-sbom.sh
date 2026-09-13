@@ -85,6 +85,10 @@ UI_BIND_ADDRESS="${UI_BIND_ADDRESS:-127.0.0.1}"
 # Report language for the conformance + AI-profile reports: en (default) or ko.
 # Only these two are honored; anything else is normalized to en further down.
 REPORT_LANG="${REPORT_LANG:-en}"
+# Conformance profile: default, or skt-submission for the stricter thresholds
+# the SKT supplier submission review applies (100% PURL coverage, pkg:generic
+# required). Passed through as-is; validate-sbom.sh normalizes unknown values.
+CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
@@ -157,6 +161,7 @@ while [[ "$#" -gt 0 ]]; do
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --lang) REPORT_LANG="$2"; shift ;;
+        --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -262,7 +267,7 @@ Options:
   --spdx                 Also export the SBOM as SPDX 2.3 JSON (converted from
                          the CycloneDX output; CycloneDX stays the primary format)
   --all                  --notice --security --spdx
-  --no-report            Skip the 오픈소스위험분석보고서 (risk-report). By default
+  --no-report            Skip the open-source risk report (risk-report). By default
                          the risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
   --deep-license         scancode deep license (opt-in image)
@@ -290,6 +295,11 @@ Options:
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
                          reports stay English regardless.
+  --conformance-profile <default|skt-submission>
+                         Conformance check strictness. Default: default (90%
+                         PURL coverage, pkg:generic advisory). skt-submission
+                         requires 100% PURL coverage and fails on pkg:generic,
+                         matching the SKT supplier submission review.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -504,10 +514,16 @@ if [ "$UI_MODE" = "true" ]; then
     # to keep a secret, so it comes from the environment that launched the tool.
     HF_FLAGS=()
     if [ -n "$HF_TOKEN" ]; then HF_FLAGS=(-e HF_TOKEN); fi
+    # Go toolchain and module proxy settings for Go dependency resolution. A
+    # name-only -e is skipped by docker when the variable is unset.
+    GO_ENV_FLAGS=(-e GOTOOLCHAIN -e GOPROXY -e GOSUMDB)
+    # Source-scan options for build-prep.sh; the UI container's entrypoint passes
+    # them on to the cdxgen container.
+    read -ra PREP_ENV_FLAGS <<< "$(build_prep_env_args)"
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
@@ -630,6 +646,13 @@ case "$REPORT_LANG" in
     *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
 esac
 
+# Normalize the conformance profile the same way: default or skt-submission
+# reach the container, anything else is a typo.
+case "$CONFORMANCE_PROFILE" in
+    default|skt-submission) ;;
+    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default or skt-submission); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
+esac
+
 # Common -e flags for the post-process image.
 # HOST_UID/HOST_GID let the (root) container chown artifacts back to the calling
 # user, so Linux hosts/CI runners can read them (macOS Docker maps UIDs already).
@@ -638,13 +661,13 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
-        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}"
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -1035,7 +1058,21 @@ ingest_git() {
     [ -n "$GIT_REF" ] && args+=(--branch "$GIT_REF")
     # `--` stops option parsing so a hostile URL can't smuggle git options.
     if ! GIT_TERMINAL_PROMPT=0 git "${args[@]}" -- "$clone_url" "$tmp/repo" 2>/tmp/sbom-git-err; then
-        echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+        if [ -n "$GIT_REF" ]; then
+            # `clone --branch` only resolves a branch or tag on the remote, so a
+            # commit SHA (documented as accepted alongside them, cli.md:27) fails
+            # here every time. Nothing in the error output reliably distinguishes
+            # that case from a genuinely bad ref or URL, so retry as a full clone
+            # and a local checkout, which resolves a SHA the shallow form cannot.
+            echo "[INFO] Shallow clone with --branch \"$GIT_REF\" failed; retrying as a full clone (needed to resolve a commit)..."
+            rm -rf "$tmp/repo"
+            if ! GIT_TERMINAL_PROMPT=0 git clone -- "$clone_url" "$tmp/repo" 2>>/tmp/sbom-git-err \
+                || ! git -C "$tmp/repo" checkout --quiet "$GIT_REF" 2>>/tmp/sbom-git-err; then
+                echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+            fi
+        else
+            echo "[ERROR] git clone failed for $url"; sed 's/x-access-token:[^@]*@/x-access-token:***@/g' /tmp/sbom-git-err 2>/dev/null; rm -f /tmp/sbom-git-err; exit 1
+        fi
     fi
     rm -f /tmp/sbom-git-err
     SCAN_INPUT_DIR=$(flatten_single_dir "$tmp/repo")
@@ -1487,6 +1524,20 @@ echo "  SBOM Analysis — Mode: $MODE — $PROJECT_NAME ($PROJECT_VERSION)"
 [ -n "$GIT_URL" ] && echo "  Git:    $GIT_URL${GIT_REF:+ (ref: $GIT_REF)}"
 echo "=========================================="
 
+# A "current folder" scan (no --output-dir) lands OUTPUT_HOST_DIR inside
+# SCAN_INPUT_DIR itself (the base for outputs defaults to the directory being
+# scanned, see "Where outputs go" in cli.md), so this run's own output
+# subfolder is a real child of the tree /src mounts in SOURCE mode. Detected
+# here as a plain host-side path check (both are already resolved absolute
+# paths), and passed to the container so source-file-tree.sh can leave that
+# one subfolder out, instead of listing the scan's own output as part of what
+# it scanned. RUN_NAME (not OUT_PREFIX) is the actual folder name on disk: it
+# alone carries the --timestamp suffix.
+SRC_TREE_EXCLUDE=""
+case "$OUTPUT_HOST_DIR" in
+    "$SCAN_INPUT_DIR"/*) SRC_TREE_EXCLUDE="$RUN_NAME" ;;
+esac
+
 # ========================================================
 # Stage 1: produce SBOM
 # ========================================================
@@ -1544,6 +1595,15 @@ if [ "$MODE" = "SOURCE" ]; then
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not
     # write the host-owned /app on Linux (EACCES). Per-language images are already
     # root (no-op); the resulting bom is chown'd back to the host user in stage 2.
+    # GOTOOLCHAIN goes through eval below, so only a Go toolchain name is passed on.
+    HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
+    case "$HOST_GOTOOLCHAIN" in
+        *[!A-Za-z0-9.+_-]*)
+            echo "[WARN] Ignoring GOTOOLCHAIN: not a Go toolchain name (e.g. auto, local, go1.26.0)."
+            HOST_GOTOOLCHAIN="" ;;
+    esac
+    # Names only (see build_prep_env_args), so this is safe inside the eval.
+    PREP_ENV_ARGS=$(build_prep_env_args)
     eval "$DOCKER_MSYS"docker run --rm -u 0:0 \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/app \
         -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
@@ -1555,6 +1615,8 @@ if [ "$MODE" = "SOURCE" ]; then
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
         -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+        -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
+        $PREP_ENV_ARGS \
         --entrypoint sh "\"$CDX_IMG\"" \
         -c "'sh /tmp/build-prep.sh /app \"/out/$OUTPUT_FILE\" $CDX_SPEC_VERSION'" \
         || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }
@@ -1705,7 +1767,17 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
     # It used to be announced for ANALYZE only, so an AI-model scan produced the
     # G7 report and never mentioned it.
-    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ]; then
+    #
+    # One ANALYZE case never produces it, though, and must not be announced
+    # either: a Yocto build directory with no SPDX document, read from its own
+    # manifests instead (entrypoint.sh's ANALYZE case, same YOCTO_BUILD_DIR +
+    # empty ANALYZE_SBOM test). There is no submitted document to measure
+    # conformance against there, so it is not a missing artifact: announcing it
+    # anyway told a fully successful Yocto scan "requested but not produced:
+    # conformance report" and pointed at `docker pull`/a log warning that never
+    # existed.
+    if { [ "$MODE" = "ANALYZE" ] && ! { [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; }; } \
+        || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
             || note_missing "conformance report"
     fi

@@ -3,6 +3,15 @@
 
 import { test, type Page } from "@playwright/test";
 
+// `npm run test:ui` already excludes this file by tag (--grep-invert
+// "@capture|..."), but that only holds if every invocation remembers the
+// flag: a bare `playwright test` (no grep) still discovers and runs it,
+// overwriting docs/images. This env-var gate is the backstop: it skips
+// every test in this file unless CAPTURE=1, which only `capture:ui` and
+// `capture:og` set (mirrors electron/tests/capture.spec.ts's SBOM_CAPTURE
+// gate for the same reason).
+test.skip(process.env.CAPTURE !== "1", "opt-in via CAPTURE=1 (npm run capture:ui)");
+
 // Screenshot capture for the docs (run on demand: `npm run capture:ui`, excluded
 // from the normal `test:ui` run via the @capture tag). Renders the shell states
 // deterministically with stubbed API responses and writes PNGs into
@@ -18,6 +27,41 @@ const IMAGES = "../../../docs/images";
 
 type Lang = "en" | "ko";
 type Caps = { firmware: boolean; scanoss?: boolean; docker: boolean; aibom?: boolean; spdxExport?: boolean };
+
+// UI copy a capture needs to locate on screen, kept in one place so it stays in
+// sync with src/locales/{en,ko}/common.json instead of being retyped per test.
+// Values are substrings (not full interpolated strings), chosen to survive a
+// count or version number changing inside the sentence.
+const STR: Record<Lang, {
+  scanOptions: string; // scanOptions
+  identifyVendored: string; // identifyVendored
+  vendoredHint: string; // substring of vendoredHintTitle
+  spdxExport: string; // substring of spdxExport
+  vulnCount: string; // substring of attnVulns
+}> = {
+  en: {
+    scanOptions: "Advanced scan options",
+    identifyVendored: "Detect copied-in open source",
+    vendoredHint: "C/C++ embedded source",
+    spdxExport: "Export as SPDX",
+    vulnCount: "critical or high vulnerabilities",
+  },
+  ko: {
+    scanOptions: "고급 스캔 옵션",
+    identifyVendored: "복사해 넣은 오픈소스 탐지",
+    vendoredHint: "C/C++ 임베디드 소스",
+    spdxExport: "SPDX",
+    vulnCount: "취약점",
+  },
+};
+
+// The EN file keeps its already-published name so no existing doc reference
+// breaks. The KO file is the same name with a trailing "-en" (if any) swapped
+// for "-ko", or "-ko" appended before the extension otherwise.
+function withLang(base: string, lang: Lang): string {
+  if (lang === "en") return base;
+  return base.replace(/(-en)?\.png$/, "-ko.png");
+}
 
 // Disable fade-in/slide animations so screenshots are crisp and stable.
 async function killAnim(page: Page) {
@@ -285,138 +329,146 @@ for (const lang of ["en", "ko"] as Lang[]) {
 }
 
 // ===========================================================================
-// Section images: content-only `main` screenshots (1040x664 at default vp), en.
+// Section images: content-only `main` screenshots (1040x664 at default vp).
 // ===========================================================================
 
-test("@capture overview section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
-  await runScan(page, "demo", "1.0");
-  await page.locator("main h1").waitFor();
-  await page.getByText(/critical or high vulnerabilities/).first().waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/app-results.png` });
-});
+for (const lang of ["en", "ko"] as Lang[]) {
+  const s = STR[lang];
 
-test("@capture components section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
-  await runScan(page, "demo", "1.0");
-  await NAV(page, "components").click();
-  await page.getByText("openssl", { exact: true }).first().waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-components.png` });
-});
-
-test("@capture vulnerabilities section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
-  await runScan(page, "demo", "1.0");
-  await NAV(page, "vulnerabilities").click();
-  await page.getByText("9.8", { exact: true }).waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-vulns.png` });
-});
-
-test("@capture dependencies section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
-  await runScan(page, "demo", "1.0");
-  await NAV(page, "dependencies").click();
-  // The tree view shows the openssl → zlib relationship deterministically (the
-  // graph is a Cytoscape canvas that does not snapshot stably).
-  await page.getByTestId("deps-view-tree").click();
-  await page.getByText("openssl").first().waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-dependencies.png` });
-});
-
-test("@capture licenses section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: LIC_DONE });
-  await runScan(page, "lic", "1.0");
-  await NAV(page, "licenses").click();
-  await page.getByText("some-llama-model").waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-licenses.png` });
-});
-
-test("@capture artifacts section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  // spdxExport on and no `.spdx.json` in the results, so the SBOM card shows the
-  // "Export as SPDX 2.3" action the guide points UI users at.
-  await stub(page, { firmware: false, scanoss: false, docker: true, spdxExport: true }, { done: DONE });
-  await runScan(page, "demo", "1.0");
-  await NAV(page, "artifacts").click();
-  await page.getByRole("button", { name: /Export as SPDX/ }).waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-artifacts.png` });
-});
-
-test("@capture models section (content)", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: AI_DONE, sbom: AI_SBOM });
-  await runScan(page, "model", "1.0");
-  await NAV(page, "models").click();
-  await page.getByText("bert-base-uncased").first().waitFor();
-  await killAnim(page);
-  await settleMain(page);
-  await page.locator("main").screenshot({ path: `${IMAGES}/web-ui-models.png` });
-});
-
-// ===========================================================================
-// --identify-vendored guide images (unchanged content; route fixed to #/new).
-// ===========================================================================
-
-test("@capture advanced toggle", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: true, docker: true });
-  await page.goto("/#/new");
-  await page.locator("#project").waitFor();
-  await killAnim(page);
-  // The vendored-ID toggle lives inside the collapsed "Advanced scan options"
-  // disclosure — expand it and capture the whole open section (summary +
-  // toggle) so the guide shows users where to find it, not just the switch.
-  await page.getByText("Advanced scan options").click();
-  const toggle = page.getByText("Detect copied-in open source");
-  await toggle.waitFor({ state: "visible" });
-  const section = toggle.locator("xpath=ancestor::details[1]");
-  await section.screenshot({
-    path: `${IMAGES}/web-ui-identify-vendored-en.png`,
+  test(`@capture overview section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
+    await runScan(page, "demo", "1.0");
+    await page.locator("main h1").waitFor();
+    await page.getByText(new RegExp(s.vulnCount)).first().waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("app-results.png", lang)}` });
   });
-});
 
-test("@capture result banner", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
-  await runScan(page, "trelay", "26.4.0");
-  // The banner is the amber rounded-md box that holds the suggestion text.
-  const banner = page
-    .locator("div.rounded-md")
-    .filter({ hasText: "is this C/C++ embedded source" })
-    .first();
-  await banner.waitFor({ state: "visible" });
-  await killAnim(page);
-  await settleMain(page);
-  await banner.screenshot({ path: `${IMAGES}/web-ui-vendored-banner-en.png` });
-});
+  test(`@capture components section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
+    await runScan(page, "demo", "1.0");
+    await NAV(page, "components").click();
+    await page.getByText("openssl", { exact: true }).first().waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-components.png", lang)}` });
+  });
 
-test("@capture vendored badge in components table", async ({ page }) => {
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
-  await runScan(page, "trelay", "26.4.0");
-  await NAV(page, "components").click();
-  const table = page.locator("table").first();
-  await table.waitFor({ state: "visible" });
-  await killAnim(page);
-  await table.screenshot({ path: `${IMAGES}/web-ui-vendored-badge-en.png` });
-});
+  test(`@capture vulnerabilities section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
+    await runScan(page, "demo", "1.0");
+    await NAV(page, "vulnerabilities").click();
+    await page.getByText("9.8", { exact: true }).waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-vulns.png", lang)}` });
+  });
+
+  test(`@capture dependencies section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
+    await runScan(page, "demo", "1.0");
+    await NAV(page, "dependencies").click();
+    // The tree view shows the openssl → zlib relationship deterministically (the
+    // graph is a Cytoscape canvas that does not snapshot stably).
+    await page.getByTestId("deps-view-tree").click();
+    await page.getByText("openssl").first().waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-dependencies.png", lang)}` });
+  });
+
+  test(`@capture licenses section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: LIC_DONE });
+    await runScan(page, "lic", "1.0");
+    await NAV(page, "licenses").click();
+    await page.getByText("some-llama-model").waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-licenses.png", lang)}` });
+  });
+
+  test(`@capture artifacts section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    // spdxExport on and no `.spdx.json` in the results, so the SBOM card shows the
+    // export action the guide points UI users at.
+    await stub(page, { firmware: false, scanoss: false, docker: true, spdxExport: true }, { done: DONE });
+    await runScan(page, "demo", "1.0");
+    await NAV(page, "artifacts").click();
+    await page.getByRole("button", { name: new RegExp(s.spdxExport) }).waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-artifacts.png", lang)}` });
+  });
+
+  test(`@capture models section (content) - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: AI_DONE, sbom: AI_SBOM });
+    await runScan(page, "model", "1.0");
+    await NAV(page, "models").click();
+    await page.getByText("bert-base-uncased").first().waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-models.png", lang)}` });
+  });
+}
+
+// ===========================================================================
+// --identify-vendored guide images (route fixed to #/new).
+// ===========================================================================
+
+for (const lang of ["en", "ko"] as Lang[]) {
+  const s = STR[lang];
+
+  test(`@capture advanced toggle - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: true, docker: true });
+    await page.goto("/#/new");
+    await page.locator("#project").waitFor();
+    await killAnim(page);
+    // The vendored-ID toggle lives inside the collapsed "Advanced scan options"
+    // disclosure, expand it and capture the whole open section (summary +
+    // toggle) so the guide shows users where to find it, not just the switch.
+    await page.getByText(s.scanOptions).click();
+    const toggle = page.getByText(s.identifyVendored);
+    await toggle.waitFor({ state: "visible" });
+    const section = toggle.locator("xpath=ancestor::details[1]");
+    await section.screenshot({
+      path: `${IMAGES}/${withLang("web-ui-identify-vendored-en.png", lang)}`,
+    });
+  });
+
+  test(`@capture result banner - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
+    await runScan(page, "trelay", "26.4.0");
+    // The banner is the amber rounded-md box that holds the suggestion text.
+    const banner = page
+      .locator("div.rounded-md")
+      .filter({ hasText: s.vendoredHint })
+      .first();
+    await banner.waitFor({ state: "visible" });
+    await killAnim(page);
+    await settleMain(page);
+    await banner.screenshot({ path: `${IMAGES}/${withLang("web-ui-vendored-banner-en.png", lang)}` });
+  });
+
+  test(`@capture vendored badge in components table - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
+    await runScan(page, "trelay", "26.4.0");
+    await NAV(page, "components").click();
+    const table = page.locator("table").first();
+    await table.waitFor({ state: "visible" });
+    await killAnim(page);
+    await table.screenshot({ path: `${IMAGES}/${withLang("web-ui-vendored-badge-en.png", lang)}` });
+  });
+}
 
 // An analyzed AI SBOM whose conformance report carries the base + G7 checks, so
 // the Conformance section shows the verdict with the G7 advisory sub-block.
@@ -435,18 +487,24 @@ const CONFORMANCE_DONE = {
   conformance: {
     result: "pass",
     format: "CycloneDX",
+    // labelKo/detailKo mirror what the real pipeline ships: g7-* labels come
+    // from docker/lib/g7-registry.json's label_ko (verified present for every
+    // element there); detailKo for the base checks and the "N found" / "N/N
+    // model component(s)" shapes matches docker/lib/i18n/report-strings.ko.json's
+    // ldetail() vocabulary in validate-sbom.sh. Without these two fields the KO
+    // capture would render this section in English, same as EN.
     checks: [
-      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
-      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "0%" },
-      { id: "g7-meta-author", label: "SBOM author", required: false, status: "pass", detail: "author present", cluster: "metadata", source: "auto" },
-      { id: "g7-meta-timestamp", label: "SBOM timestamp", required: false, status: "pass", detail: "1 found", cluster: "metadata", source: "auto" },
-      { id: "g7-slp-data-flow", label: "System data flow", required: false, status: "warn", detail: "no automated source", cluster: "slp", source: "na" },
-      { id: "g7-model-id", label: "Model identifier", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["pkg:huggingface/google-bert/bert-base-uncased@86b5e093"] },
-      { id: "g7-model-license", label: "Model license", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto", evidence: ["Apache-2.0"] },
-      { id: "g7-model-card", label: "Model properties (model card)", required: false, status: "pass", detail: "1/1 model component(s)", cluster: "models", source: "auto" },
-      { id: "g7-model-hash-value", label: "Model hash value", required: false, status: "warn", detail: "0/1 model component(s)", cluster: "models", source: "auto" },
-      { id: "g7-model-openness", label: "Model license — openness (weight/architecture/data/training)", required: false, status: "warn", detail: "not declared in the SBOM", cluster: "models", source: "inferred" },
-      { id: "g7-ds-name", label: "Dataset name", required: false, status: "pass", detail: "2 dataset reference(s)", cluster: "dp", source: "auto" },
+      { id: "timestamp", label: "Timestamp present", labelKo: "타임스탬프 있음", required: true, status: "pass", detail: "1 found", detailKo: "1개 발견" },
+      { id: "license", label: "License coverage (recommended)", labelKo: "라이선스 포함률 (권장)", required: false, status: "warn", detail: "0%" },
+      { id: "g7-meta-author", label: "SBOM author", labelKo: "SBOM 작성자", required: false, status: "pass", detail: "author present", detailKo: "작성자 있음", cluster: "metadata", source: "auto" },
+      { id: "g7-meta-timestamp", label: "SBOM timestamp", labelKo: "SBOM 타임스탬프", required: false, status: "pass", detail: "1 found", detailKo: "1개 발견", cluster: "metadata", source: "auto" },
+      { id: "g7-slp-data-flow", label: "System data flow", labelKo: "시스템 데이터 흐름", required: false, status: "warn", detail: "no automated source", detailKo: "자동 확인 수단 없음", cluster: "slp", source: "na" },
+      { id: "g7-model-id", label: "Model identifier", labelKo: "모델 식별자", required: false, status: "pass", detail: "1/1 model component(s)", detailKo: "모델 구성요소 1/1개", cluster: "models", source: "auto", evidence: ["pkg:huggingface/google-bert/bert-base-uncased@86b5e093"] },
+      { id: "g7-model-license", label: "Model license", labelKo: "모델 라이선스", required: false, status: "pass", detail: "1/1 model component(s)", detailKo: "모델 구성요소 1/1개", cluster: "models", source: "auto", evidence: ["Apache-2.0"] },
+      { id: "g7-model-card", label: "Model properties (model card)", labelKo: "모델 속성 (모델 카드)", required: false, status: "pass", detail: "1/1 model component(s)", detailKo: "모델 구성요소 1/1개", cluster: "models", source: "auto" },
+      { id: "g7-model-hash-value", label: "Model hash value", labelKo: "모델 해시 값", required: false, status: "warn", detail: "0/1 model component(s)", detailKo: "모델 구성요소 0/1개", cluster: "models", source: "auto" },
+      { id: "g7-model-openness", label: "Model license — openness (weight/architecture/data/training)", labelKo: "모델 라이선스 — 공개성 (가중치/구조/데이터/학습)", required: false, status: "warn", detail: "not declared in the SBOM", detailKo: "SBOM에 선언되지 않음", cluster: "models", source: "inferred" },
+      { id: "g7-ds-name", label: "Dataset name", labelKo: "데이터셋 이름", required: false, status: "pass", detail: "2 dataset reference(s)", detailKo: "데이터셋 참조 2개", cluster: "dp", source: "auto" },
     ],
   },
   sbom: {
@@ -457,14 +515,21 @@ const CONFORMANCE_DONE = {
   },
 };
 
-test("@capture conformance section", async ({ page }) => {
-  await page.setViewportSize({ width: 1040, height: 664 });
-  await seedLang(page, "en");
-  await stub(page, { firmware: false, scanoss: false, docker: true }, { done: CONFORMANCE_DONE });
-  await runScan(page, "model", "1.0");
-  await NAV(page, "conformance").click();
-  await page.getByText(/present/).first().waitFor({ state: "visible" });
-  await killAnim(page);
-  await settleMain(page);
-  await page.screenshot({ path: `${IMAGES}/web-ui-g7.png` });
-});
+// The G7 label/detail text this section renders (label/detail vs. labelKo/
+// detailKo, per ConformancePanel.tsx) so each locale's capture waits for the
+// text that will actually be on screen instead of an English-only string.
+const G7_WAIT: Record<Lang, string> = { en: "SBOM author", ko: "SBOM 작성자" };
+
+for (const lang of ["en", "ko"] as Lang[]) {
+  test(`@capture conformance section - ${lang}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1040, height: 664 });
+    await seedLang(page, lang);
+    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: CONFORMANCE_DONE });
+    await runScan(page, "model", "1.0");
+    await NAV(page, "conformance").click();
+    await page.getByText(G7_WAIT[lang]).first().waitFor({ state: "visible" });
+    await killAnim(page);
+    await settleMain(page);
+    await page.screenshot({ path: `${IMAGES}/${withLang("web-ui-g7.png", lang)}` });
+  });
+}

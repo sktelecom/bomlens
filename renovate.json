@@ -38,6 +38,55 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nCDXGEN_\\w+=\"\\$\\{CDXGEN_\\w+:-(?:ghcr\\.io/cyclonedx/cdxgen:)?(?<currentValue>[^}\"]+)\\}\""
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's syft row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| syft \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "anchore/syft"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's Trivy row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| Trivy \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "aquasecurity/trivy"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's cosign row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| cosign \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "sigstore/cosign"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's ScanCode Toolkit row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| ScanCode Toolkit \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "scancode-toolkit"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's docker CLI row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| docker CLI \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "docker/cli",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker image reference's cdxgen row (check-doc-image-version-coverage.sh fails CI if this drifts from the Dockerfile ARG).",
+      "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
+      "matchStrings": ["\\| cdxgen \\| (?<currentValue>v?[\\d.]+) \\|"],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "@cyclonedx/cdxgen"
     }
   ]
 }

@@ -156,6 +156,7 @@ generate_sbom_cdxgen() {
     # would misreport a plain `kill -9` or an OOM on a different process in the
     # same container as memory exhaustion.
     local logf cidf; logf=$(mktemp); cidf=$(mktemp); rm -f "$cidf"
+    local prep_env; read -ra prep_env <<< "$(build_prep_env_args)"
     docker run -u 0:0 \
         --cidfile "$cidf" \
         --volumes-from "$self" \
@@ -164,6 +165,8 @@ generate_sbom_cdxgen() {
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="$PROJECT_NAME" \
         -e PROJECT_VERSION="$PROJECT_VERSION" \
+        -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
+        "${prep_env[@]}" \
         --entrypoint sh "$img" \
         -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION" 2>&1 | tee "$logf"
     rc=${PIPESTATUS[0]}
@@ -969,8 +972,30 @@ esac
 # structure only, no licenses. When ScanCode already produced a _scancode.json,
 # that one wins (it carries licenses), so we skip this fallback. Best-effort:
 # never aborts.
+#
+# A "current folder" scan writes this run's own output subfolder
+# (${OUT_PREFIX}/) inside the very directory being scanned, so it is a real
+# child of SRC_TREE_DIR by the time this runs: earlier steps already wrote
+# into it. Two different launch shapes hit this, detected two different ways:
+#   - CLI, no --output-dir: OUTPUT_HOST_DIR ends up NESTED under SCAN_INPUT_DIR
+#     (a subfolder, not the same directory), so scan-sbom.sh knows both as
+#     plain host strings and sets SRC_TREE_EXCLUDE itself when that is the case.
+#   - Web UI, Current folder target: /src and /host-output are two bind mounts
+#     of the IDENTICAL host directory (server.py launches with
+#     `-v $(pwd):/src -v $(pwd):/host-output`), which two different container
+#     paths can't reveal. So when the host did not already set
+#     SRC_TREE_EXCLUDE, fall back to comparing device+inode, which is exactly
+#     the same location in that shape (and reliably different in the CLI's
+#     nested one, where this fallback correctly finds nothing to do).
+if [ -z "${SRC_TREE_EXCLUDE:-}" ] && [ -n "$SRC_TREE_DIR" ] && [ -d /host-output ]; then
+    src_dev_ino="$(stat -c '%d:%i' "$SRC_TREE_DIR" 2>/dev/null)"
+    out_dev_ino="$(stat -c '%d:%i' /host-output 2>/dev/null)"
+    if [ -n "$src_dev_ino" ] && [ "$src_dev_ino" = "$out_dev_ino" ]; then
+        SRC_TREE_EXCLUDE="$OUT_PREFIX"
+    fi
+fi
 if [ ! -f "${OUT_PREFIX}_scancode.json" ] && [ -n "$SRC_TREE_DIR" ]; then
-    run_optional_step source-file-tree bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json"
+    run_optional_step source-file-tree bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" "${SRC_TREE_EXCLUDE:-}"
 fi
 
 # Whether the tree pinned the versions its SBOM reports. Source scans only: an
@@ -1128,11 +1153,33 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
                 echo "[ERROR] cosign could not sign the SPDX SBOM."; SIGN_FAILED=1
             fi
         fi
+        # The conformance sidecar files (generated earlier, before signing could
+        # run at all) still say the SBOM author signature element is missing.
+        # That was true then, but the signing outcome above is the fact that
+        # actually matters now. Re-run validate-sbom.sh so the report reflects
+        # it: the script only ever reads $OUTPUT_FILE and writes the
+        # ${OUT_PREFIX}_conformance.* sidecar files, so re-running it after
+        # signing cannot touch the just-signed SBOM, which would invalidate the
+        # signature. Unlike run_optional_step, whose failure path stamps
+        # $OUTPUT_FILE, this call is unwrapped so a failure here cannot do that
+        # either. Skipped when this mode never produced a conformance report.
+        if [ -f "${OUT_PREFIX}_conformance.json" ]; then
+            SIGN_FAILED="$SIGN_FAILED" bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" \
+                || echo "[WARN] could not refresh the conformance report's signature status after signing." >&2
+        fi
         # A requested signature that was not produced is a failure on a
-        # supply-chain tool — do not exit 0 leaving the user to believe their
+        # supply-chain tool. Do not exit 0 leaving the user to believe their
         # SBOM is signed when no .sig exists.
         if [ "$SIGN_FAILED" != "0" ]; then
             echo "[ERROR] --sign was requested but a signature could not be produced. The SBOM and other artifacts were still written."
+            # The refreshed conformance report above only lives in the container;
+            # the next sync_artifacts pass (near the end of this script) is what
+            # copies it to the host, and exit below skips straight past that.
+            # Run it here too so a supplier reading the failure still gets the
+            # accurate report, not the pre-signing snapshot. Re-copying files
+            # this run already sent to the host (the SBOM, NOTICE, ...) is a
+            # harmless no-op (see sync_artifacts's own comment).
+            sync_artifacts
             exit 1
         fi
     else

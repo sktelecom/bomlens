@@ -311,17 +311,22 @@ function handlers(): ScanHandlers & {
   logs: string[];
   done: DoneEvent[];
   errors: (string | undefined)[];
+  errorKeys: (string | null | undefined)[];
   progress: ScanProgress[];
 } {
   const logs: string[] = [];
   const done: DoneEvent[] = [];
   const errors: (string | undefined)[] = [];
+  const errorKeys: (string | null | undefined)[] = [];
   const progress: ScanProgress[] = [];
   return {
-    logs, done, errors, progress,
+    logs, done, errors, errorKeys, progress,
     onLog: (l) => logs.push(l),
     onDone: (d) => done.push(d),
-    onError: (m) => errors.push(m),
+    onError: (m, k) => {
+      errors.push(m);
+      errorKeys.push(k);
+    },
     onProgress: (p) => progress.push(p),
   };
 }
@@ -411,8 +416,27 @@ describe("startScan", () => {
   it("surfaces a structured error event with its message", () => {
     const h = handlers();
     startScan(PARAMS, h);
-    FakeEventSource.last!.emit("error", JSON.stringify("clone failed"));
+    FakeEventSource.last!.emit(
+      "error",
+      JSON.stringify({ detail: "clone failed", key: null }),
+    );
     expect(h.errors).toEqual(["clone failed"]);
+    expect(h.errorKeys).toEqual([null]);
+  });
+
+  // The server classifies some failures (e.g. a git clone against a missing
+  // or private repo) into an i18n key alongside the raw detail: both must
+  // reach the handler so the UI can show a friendly headline with the detail
+  // folded underneath.
+  it("passes through a classified error's key alongside its detail", () => {
+    const h = handlers();
+    startScan(PARAMS, h);
+    FakeEventSource.last!.emit(
+      "error",
+      JSON.stringify({ detail: "git clone failed: ...", key: "run.errorGitNotFoundOrPrivate" }),
+    );
+    expect(h.errors).toEqual(["git clone failed: ..."]);
+    expect(h.errorKeys).toEqual(["run.errorGitNotFoundOrPrivate"]);
   });
 
   it("ignores a native (data-less) error event", () => {

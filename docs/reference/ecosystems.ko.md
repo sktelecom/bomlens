@@ -61,6 +61,7 @@ jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 ```
 
 > 주의: cdxgen은 전체 빌드 그래프를 해석하므로, BomLens는 SBOM을 배포 대상 집합인 compile·runtime 스코프로 걸러 test·provided 도구(JUnit, Lombok 등)를 덜어냅니다. 결과가 전체 빌드가 아니라 실제 배포되는 구성을 반영하도록 하려는 것입니다. 전체 해석 그래프를 그대로 두려면 `BOMLENS_MAVEN_FULL_GRAPH=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
+> `<optional>true</optional>`로 선언한 runtime 의존성도 cdxgen이 test 스코프와 같은 태그를 붙이므로 함께 빠집니다.
 
 ---
 

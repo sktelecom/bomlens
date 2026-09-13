@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Disclosure } from "@/components/ui/disclosure";
 import type { ScanProgress } from "@/lib/api";
 import { SCAN_STAGES, stageStatuses } from "@/lib/scanProgress";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export function ScanRunning({
   progress,
   projectLabel,
   errorMessage,
+  errorKey,
   newScanHref,
   onNewScan,
   onRetry,
@@ -50,6 +52,10 @@ export function ScanRunning({
   projectLabel?: string;
   /** Failure message to surface prominently (falls back to a generic line). */
   errorMessage?: string | null;
+  /** i18n key for a friendlier headline than `errorMessage`, when the server
+   *  could classify the failure (e.g. a git clone against a missing or
+   *  private repo). `errorMessage` still shows, folded under "show detail". */
+  errorKey?: string | null;
   /** Hash for the New scan screen — the always-available recovery CTA. */
   newScanHref?: string;
   /** Reset to a blank New scan form. Needed alongside `newScanHref`: a scan
@@ -101,9 +107,28 @@ export function ScanRunning({
               <TriangleAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
               {t("run.failedTitle")}
             </div>
-            <p className="text-sm text-muted-foreground">
-              {errorMessage || t("run.failedBody")}
-            </p>
+            {errorKey ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">{t(errorKey)}</p>
+                {errorMessage && (
+                  <Disclosure
+                    summary={
+                      <span className="text-xs text-muted-foreground">
+                        {t("run.showDetail")}
+                      </span>
+                    }
+                  >
+                    <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                      {errorMessage}
+                    </p>
+                  </Disclosure>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {errorMessage || t("run.failedBody")}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {onRetry && (
                 <button type="button" onClick={onRetry} className={cn(buttonVariants())}>

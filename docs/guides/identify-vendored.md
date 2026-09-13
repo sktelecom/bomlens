@@ -28,7 +28,7 @@ Matches are recorded read-only, tagged with their source and confidence. BomLens
 
 ## Prerequisites
 
-The published `bomlens` image (v1.4.0 and later) already includes the SCANOSS client, so no extra setup is needed. If you build the image yourself with a minimal configuration, add the build arg:
+The published `bomlens` image already includes the SCANOSS client, so no extra setup is needed. If you build the image yourself with a minimal configuration, add the build arg:
 
 ```bash
 docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker

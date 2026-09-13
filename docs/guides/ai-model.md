@@ -124,6 +124,24 @@ If the scan cannot run at all, no verdict is written and the assessment simply h
 
 Two things, by construction. It has no model card, so the G7 checks that ask about training data, intended use and evaluation report as gaps — accurately, since the file says nothing about them. And it describes one file: a model split into shards is currently scanned a shard at a time.
 
+### Scanning a published dataset
+
+Research data is published where the paper put it, which for a great deal of science is a repository like Figshare rather than a model hub. Hand `--model` the item instead of a HuggingFace id:
+
+```bash
+./scripts/scan-sbom.sh --project cell-imaging-data --version 1.0.0 \
+  --model "https://figshare.com/articles/dataset/Title/33412285" \
+  --usage product --generate-only
+```
+
+The page URL, the DOI, or the item number all work. To read a specific version rather than the latest, give the URL or DOI that names it (`.../33412285/2`, `10.6084/m9.figshare.33413521.v1`). No account and no opt-in image are needed: the public item endpoint answers without authentication, and the mapping ships in the base image.
+
+The item becomes a CycloneDX `data` component carrying its licence, its DOI, its authors, and an MD5 digest per file. A licence the item states as one BomLens can place (the Creative Commons deeds, MIT, Apache 2.0, the GPLs, CC0) becomes an SPDX id; anything else is kept verbatim rather than guessed at. `--usage` applies here as it does to a model: a non-commercial deed reads differently for internal research than for something you ship.
+
+An institutional DOI that does not carry "figshare" (`10.25916/sut.33412285.v1`) cannot be told apart from any other DOI, so give the item URL for those. A private, embargoed or withdrawn item cannot be read without an account, and is reported as an error rather than described as a dataset with no licence.
+
+**Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, conformance check.
+
 ## Reading the result
 
 In the web UI, an AI/ML SBOM adds two sections to the left rail.

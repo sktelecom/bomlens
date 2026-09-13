@@ -1,65 +1,104 @@
-# Java Maven 프로젝트 예제
+# Java Maven Example
 
 > **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
 
-Spring Boot 기반 간단한 REST API 애플리케이션입니다. SBOM 생성 테스트를 위한 예제로 사용됩니다.
+This example demonstrates SBOM generation for a Spring Boot REST API built with Maven.
 
-## 프로젝트 정보
+## Project Structure
 
-- 언어: Java 17
-- 빌드 도구: Maven 3.x
-- 프레임워크: Spring Boot 3.2.0
-- 주요 의존성:
-  - Spring Boot Starter Web
-  - Spring Boot Starter Data JPA
-  - H2 Database
-  - Lombok
-  - Apache Commons Lang3
-  - Jackson
+- `pom.xml`: Maven dependencies (Java 17, Spring Boot 3.2.0)
+- `src/main/java/`: Java source code
 
-## 사전 요구사항
+## Dependencies
 
-- Java 17 이상
-- Maven 3.6 이상 (또는 Docker)
+- **Spring Boot Starter Web** (3.2.0): REST API framework
+- **Spring Boot Starter Data JPA** (3.2.0): JPA/Hibernate data access
+- **H2 Database** (2.2.224): in-memory database (runtime scope)
+- **Lombok** (1.18.30): boilerplate reduction (provided scope)
+- **Apache Commons Lang3** (3.14.0): general utilities
+- **Jackson Databind** (2.16.0): JSON processing
+- **Spring Boot Starter Test** (3.2.0): testing framework (test scope)
 
-## SBOM 생성
+## Generate SBOM
 
-### 방법 1: BomLens 스크립트 사용 (권장)
-
-> **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/start/first-scan.ko.md) 참고.
+> **Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](../../docs/start/first-scan.md).
 
 ```bash
-# 프로젝트 디렉토리로 이동
 cd examples/java-maven
-
-# SBOM 생성
-../../scripts/scan-sbom.sh \
-  --project "JavaMavenExample" \
-  --version "1.0.0" \
-  --generate-only
+../../scripts/scan-sbom.sh --project "JavaMavenExample" --version "1.0.0" --generate-only
 ```
 
-결과는 `JavaMavenExample_1.0.0/` 폴더에 저장됩니다(`JavaMavenExample_1.0.0_bom.json` 등).
+## Expected Output
 
-### 방법 2: Docker 직접 사용
+The scan writes its outputs into a `JavaMavenExample_1.0.0/` folder. The main SBOM, `JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json`, lists roughly 50-80 components (including transitive dependencies):
+<!-- expected-components: 50-80 -->
+
+- Spring Boot: spring-boot-starter-web, spring-core, spring-context, and related modules
+- Database: h2, hibernate-core, spring-data-jpa
+- Logging: logback-classic, slf4j-api
+- Utilities: commons-lang3, jackson-databind
+- Servlet container: tomcat-embed-core
+
+### Sample Components
+
+- org.springframework.boot:spring-boot-starter-web
+- com.h2database:h2
+- org.apache.commons:commons-lang3
+- com.fasterxml.jackson.core:jackson-databind
+
+## Build and Run (Optional)
+
+Requires Java 17+ and Maven 3.6+ (the scan itself only needs Docker).
 
 ```bash
-docker run --rm \
-  -v "$(pwd)":/src \
-  -v "$(pwd)":/host-output \
-  -e MODE=SOURCE \
-  -e UPLOAD_ENABLED=false \
-  -e HOST_OUTPUT_DIR=/host-output \
-  -e PROJECT_NAME="JavaMavenExample" \
-  -e PROJECT_VERSION="1.0.0" \
-  ghcr.io/sktelecom/bomlens:latest
+mvn spring-boot:run
+# or build a jar and run it directly
+mvn clean package
+java -jar target/sbom-example-app-1.0.0.jar
+# Visit http://localhost:8080
 ```
 
-이 방법은 스크립트와 달리 출력 폴더에 바로(하위 폴더 없이) 저장됩니다.
+## Validate Results
 
-### 방법 3: Maven 플러그인 사용
+```bash
+# Count components
+jq '.components | length' JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json
 
-pom.xml에 CycloneDX 플러그인 추가:
+# List Spring-related dependencies
+jq -r '.components[] | select(.name | contains("spring")) | "\(.name)@\(.version)"' JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json
+```
+
+## Common Issues
+
+### Maven build fails
+
+```bash
+./mvnw clean package
+# or force a dependency refresh
+mvn clean install -U
+```
+
+### SBOM is empty
+
+```bash
+ls -la pom.xml
+mvn dependency:tree
+```
+
+**Solution:** confirm `pom.xml` is where the scan expects it, and that the dependency tree resolves.
+
+### Java version error
+
+The project targets Java 17.
+
+```bash
+java -version
+export JAVA_HOME=/path/to/jdk-17
+```
+
+### Generating an SBOM with the Maven plugin instead
+
+Add the CycloneDX Maven plugin to `pom.xml`:
 
 ```xml
 <build>
@@ -81,109 +120,10 @@ pom.xml에 CycloneDX 플러그인 추가:
 </build>
 ```
 
-실행:
+Then `mvn clean package` writes the SBOM to `target/bom.json`.
 
-```bash
-mvn clean package
-# 결과: target/bom.json
-```
+## Next Steps
 
-## 애플리케이션 실행
-
-### 로컬에서 실행
-
-```bash
-# Maven으로 실행
-mvn spring-boot:run
-
-# 또는 JAR 빌드 후 실행
-mvn clean package
-java -jar target/sbom-example-app-1.0.0.jar
-```
-
-접속 주소는 http://localhost:8080 입니다.
-
-### Docker로 실행
-
-```bash
-# Dockerfile 생성 (간단한 예시)
-cat > Dockerfile <<EOF
-FROM eclipse-temurin:17-jre-alpine
-COPY target/sbom-example-app-1.0.0.jar app.jar
-ENTRYPOINT ["java", "-jar", "/app.jar"]
-EOF
-
-# 빌드 및 실행
-mvn clean package
-docker build -t java-example:latest .
-docker run -p 8080:8080 java-example:latest
-```
-
-## 생성된 SBOM 확인
-
-```bash
-# SBOM 파일 확인
-ls -lh JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json
-
-# 컴포넌트 개수 확인 (jq 필요)
-cat JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json | jq '.components | length'
-
-# 주요 의존성 확인
-cat JavaMavenExample_1.0.0/JavaMavenExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("spring")) | "\(.name)@\(.version)"'
-```
-
-예상 컴포넌트 수는 약 50-80개입니다(전이적 의존성 포함).
-<!-- expected-components: 50-80 -->
-
-## 예상 SBOM 내용
-
-생성된 SBOM에는 다음과 같은 정보가 포함됩니다:
-
-- Spring Boot 관련: spring-boot-starter-web, spring-core, spring-context 등
-- 데이터베이스: h2, hibernate-core, spring-data-jpa 등
-- 로깅: logback-classic, slf4j-api 등
-- 유틸리티: commons-lang3, jackson-databind 등
-- 서블릿: tomcat-embed-core 등
-
-## 문제 해결
-
-### Maven 빌드 실패
-
-```bash
-# Maven wrapper 사용
-./mvnw clean package
-
-# 의존성 강제 업데이트
-mvn clean install -U
-```
-
-### SBOM이 비어있음
-
-```bash
-# pom.xml 위치 확인
-ls -la pom.xml
-
-# Maven 의존성 확인
-mvn dependency:tree
-```
-
-### Java 버전 오류
-
-```bash
-# Java 버전 확인
-java -version
-
-# Java 17 이상 필요
-# JAVA_HOME 환경변수 설정
-export JAVA_HOME=/path/to/jdk-17
-```
-
-## 다음 단계
-
-- [사용 가이드](../../docs/reference/cli.ko.md) - 상세한 사용법
-- [시작하기](../../docs/start/first-scan.ko.md) - 첫 SBOM 생성
-- [Docker 가이드](../../docker/README.md) - Docker 이미지 사용법
-
-## 참고
-
-이 예제는 SBOM 생성 테스트 목적으로 만들어졌습니다. 실제 프로덕션 환경에서는 보안 설정, 에러 처리, 테스트 등을 추가해야 합니다.
+- Add more Maven dependencies to `pom.xml` and re-scan
+- Compare this SBOM with the Gradle example's output for equivalent libraries
+- Point `pom.xml` at a private/internal repository and confirm the scan still resolves it

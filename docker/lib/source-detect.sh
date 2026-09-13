@@ -30,6 +30,20 @@ ANDROID_API_DEFAULT="${ANDROID_API_DEFAULT:-34}"
 # to skip the extra network lookups for a faster, license-sparse scan.
 FETCH_LICENSE="${FETCH_LICENSE:-true}"
 
+# Source-scan options that build-prep.sh reads. build-prep runs inside the cdxgen
+# container, so every path that starts it (scan-sbom.sh stage 1, the web UI
+# container, generate_sbom_cdxgen in entrypoint.sh) passes these on by name.
+# docker skips a name-only -e whose variable is unset.
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH"
+
+# Prints "-e NAME" for each name above. Names only, never values, so the output
+# is safe to splice into the eval'd docker command in scan-sbom.sh.
+build_prep_env_args() {
+    local n out=""
+    for n in $BUILD_PREP_ENV_NAMES; do out="$out -e $n"; done
+    printf '%s' "${out# }"
+}
+
 detect_lang() {
     local d="$1" langs=""
     # Android: build.gradle with android plugin, or AndroidManifest.xml

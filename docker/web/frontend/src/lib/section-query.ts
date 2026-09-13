@@ -115,3 +115,16 @@ export function licensesFromQuery(query: RouteQuery | undefined): {
   const found = LICENSE_TIER_ORDER.find((x) => x === query?.tier);
   return { tier: found ?? "" };
 }
+
+/** A "View in Dependencies" jump: which package to expand to and focus. Only
+ *  ever set by another section routing in (see `NextApp.handleFilterPick`);
+ *  the Dependencies panel itself never writes this back to the URL, so there
+ *  is no matching `dependenciesToQuery`. The query is built directly by the
+ *  section that originates the jump, the same way `q`/`severity`/`tier` are. */
+export function dependenciesFromQuery(
+  query: RouteQuery | undefined,
+): { name: string; version?: string } | null {
+  const name = query?.q;
+  if (!name) return null;
+  return query?.version ? { name, version: query.version } : { name };
+}

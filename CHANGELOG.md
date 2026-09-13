@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.11.11] - 2026-09-14
+
+### Added
+
+- The Dependencies tree now has a search box, and a vulnerable package's row in Vulnerabilities/Components carries a "View in Dependencies" link that jumps straight to it in the tree, ancestors already expanded, instead of leaving the reader to hand-expand branches looking for it.
+- The Vulnerabilities screen now shows a bundle summary when two or more CVEs on the same installed package share the same fixed version, naming the single upgrade that resolves all of them, instead of leaving the reader to notice the coincidence by comparing the Fixed column row by row.
+- The Overview comparison against the previous scan of the same project now names what changed (components added/removed/version-changed, vulnerabilities new/resolved), instead of only a net component-count delta and a worst-severity direction that a like-for-like swap could leave looking unchanged.
+- `--conformance-profile` (`CONFORMANCE_PROFILE`) selects `default` or `skt-submission`. `skt-submission` requires 100% PURL coverage and fails on any `pkg:generic` purl. The conformance report records the profile, and the web UI's New Scan advanced options can set it. Operating-system components no longer count toward the PURL and name-version coverage denominator.
+
+### Fixed
+
+- `BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_NODE_FULL_GRAPH`, `BOMLENS_ANDROID_FULL_GRAPH` and `BOMLENS_KEEP_BUILD_OUTPUT` are passed to dependency resolution from the CLI and the web UI, and count as set only for `1` or `true`.
+- A Go source scan could not resolve dependencies when `go.mod` required a newer Go than the cdxgen Go image carries (for example `go 1.26.0`): `go list` failed, leaving only the modules named in `go.mod`, or no SBOM. The required toolchain is now downloaded (`GOTOOLCHAIN=auto`), the host's `GOTOOLCHAIN`, `GOPROXY` and `GOSUMDB` are passed to dependency resolution, and a failed toolchain download is reported in the scan log.
+- A scan's run log could show a literal, unrendered ANSI color code (`[1;35m...[0m`) instead of stripping it.
+- A failed git clone showed the raw git error to the user; the web UI now classifies a missing/private repository or a network failure into a plain-language message, with the raw detail still available behind "Show detail".
+- Overview could show two contradictory banners at once: "no components were found" alongside "direct dependencies only" (which implies dependencies WERE found). The second banner now stays hidden at zero components, and its cause is folded into the first banner's message instead.
+- `--branch`/`--ref` accept a commit SHA, retrying as a full clone when the shallow clone can't resolve it.
+- A Yocto build directory scanned through its manifest fallback, with no SPDX document, produces no conformance-report warning.
+- A current-folder scan's source-tree listing excludes the scan's own output subfolder, from the CLI and from the web UI's Current folder target alike.
+- `bsi:component:filename` is derived from a Maven purl's type and classifier when no location property exists. The signature check accepts an adjacent `<sbom>.sig` file and reports a same-run signing failure separately.
+- A malicious-package advisory limited to a version range marks only versions inside that range. A version that cannot be compared against the range is marked `bomlens:malicious:rangeUnknown` instead.
+- `scan-sbom.sh --help` output is English only. `docs/reference/cli.md` documents `CVE_BIN_TOOL_DISABLE_SOURCES`'s actual default (`GAD,OSV`) and adds `SBOM_BASH`.
+
 ## [v1.11.10] - 2026-09-13
 
 ### Added

@@ -21,7 +21,7 @@ import { csvFilename, downloadCsv, toCsv, vulnCsvRows } from "@/lib/csv";
 import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
 import { severityTone } from "@/lib/severity";
-import { compareVulns, type SortDir, type VulnSortKey } from "@/lib/vulns";
+import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
 
 import { SeverityBar } from "./SeverityBar";
@@ -70,6 +70,11 @@ interface Props {
   /** Open the Components section filtered to this package — the other half of
    *  the investigation loop (what does this CVE's package ship under?). */
   onPickComponent?: (name: string) => void;
+  /** Jump into the Dependencies tree, expanded to this package's installed
+   *  version. Answers "which direct dependency pulled this in, and would
+   *  upgrading it actually reach this transitive package?" without hand-
+   *  expanding a tree that can run to hundreds of branches. */
+  onPickDependency?: (name: string, version?: string) => void;
 }
 
 type Sort = { key: VulnSortKey; dir: SortDir };
@@ -137,10 +142,12 @@ function VulnDetail({
   vuln,
   links,
   onPickComponent,
+  onPickDependency,
 }: {
   vuln: VulnItem;
   links: string[];
   onPickComponent?: (name: string) => void;
+  onPickDependency?: (name: string, version?: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   if (
@@ -215,6 +222,18 @@ function VulnDetail({
           {t("result.viewInComponents", { name: vuln.pkg })}
         </button>
       ) : null}
+      {onPickDependency && vuln.pkg ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPickDependency(vuln.pkg, vuln.installed);
+          }}
+          className="ml-3 rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {t("result.viewInDependencies", { name: vuln.pkg })}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -230,6 +249,7 @@ export function VulnerabilitiesTable({
   query: urlState,
   onQueryChange,
   onPickComponent,
+  onPickDependency,
 }: Props) {
   const { t } = useTranslation();
   const items = security.vulnerabilities ?? [];
@@ -290,6 +310,10 @@ export function VulnerabilitiesTable({
     () => [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir)),
     [items, sort],
   );
+  // Which CVEs a single upgrade would resolve together, worst-severity-first.
+  // Answers "what should I fix first" before the reader has to notice the
+  // pattern by comparing Fixed-column values across separate rows.
+  const upgradeGroups = useMemo(() => groupByUpgrade(items), [items]);
   const onSort = (key: VulnSortKey) =>
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
@@ -357,6 +381,35 @@ export function VulnerabilitiesTable({
           {t("result.kernelAdvisories", { count: security.kernelCount })}
         </p>
       ) : null}
+      {upgradeGroups.length > 0 && (
+        <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
+          <div className="text-xs font-medium text-foreground">
+            {t("result.upgradeBundlesTitle")}
+          </div>
+          <ul className="space-y-1">
+            {upgradeGroups.slice(0, 5).map((g) => (
+              <li key={`${g.pkg}::${g.installed}::${g.fixed}`}>
+                <button
+                  type="button"
+                  onClick={() => setQuery(g.pkg)}
+                  className="rounded text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {t("result.upgradeBundleLine", {
+                    pkg: g.pkg,
+                    fixed: g.fixed,
+                    count: g.vulnIds.length,
+                  })}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {upgradeGroups.length > 5 && (
+            <p className="text-xs text-muted-foreground">
+              {t("result.upgradeBundlesMore", { count: upgradeGroups.length - 5 })}
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Input
           value={query}
@@ -532,6 +585,7 @@ export function VulnerabilitiesTable({
                         vuln={v}
                         links={links}
                         onPickComponent={onPickComponent}
+                        onPickDependency={onPickDependency}
                       />
                     </td>
                   </tr>

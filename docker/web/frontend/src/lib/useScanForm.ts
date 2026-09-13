@@ -15,6 +15,7 @@ import {
   stashGitCred,
   uploadFile,
   type Capabilities,
+  type ConformanceProfile,
   type ScanConfig,
   type ScanParams,
   type SourceType,
@@ -207,6 +208,17 @@ export function useScanForm({
   const effectiveSource: SourceType =
     showDeepSource && deepSource ? "scan-target-src" : source;
   const isAnalyze = source === "sbom-upload";
+  // Conformance profile. Defaults to skt-submission for a document under
+  // review (ANALYZE) and default for a generated SBOM, unless a re-scan seeds
+  // an explicit choice. A named profile (not a boolean) so a later addition
+  // (an EU CRA profile, say) is a third option, not a contract rewrite.
+  const [conformanceProfile, setConformanceProfile] = useState<ConformanceProfile>(
+    () => (initialConfig?.conformanceProfile === "skt-submission"
+      ? "skt-submission"
+      : initialConfig?.conformanceProfile === "default"
+        ? "default"
+        : isAnalyze ? "skt-submission" : "default"),
+  );
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply. True
   // of both AI inputs: the model named on HuggingFace and the model file read
@@ -235,6 +247,10 @@ export function useScanForm({
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
   const showOutboundLicense = !isAnalyze && !isAiModel;
+  // The SKT submission profile tightens the same conformance report every
+  // other SBOM/document scan already gets, so it applies wherever that report
+  // does; an AI model is graded against the separate G7 profile instead.
+  const showConformanceProfile = !isAiModel;
   // Deep CVE matching (grype's NVD-CPE matcher) applies to any scan that
   // produces or reads a package SBOM — firmware and AI models have neither
   // package purls nor a security report to extend, so it's hidden there. Also
@@ -248,7 +264,7 @@ export function useScanForm({
   const securityForced = isAnalyze || deepCveOn;
   const showScanOptions =
     showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
-    showOutboundLicense || showDeepCve;
+    showOutboundLicense || showDeepCve || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   const showUpload = true;
   const busy = running || uploading;
@@ -451,6 +467,7 @@ export function useScanForm({
       // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
       includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
+      conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
       license: showOutboundLicense ? outboundLicense.trim() : "",
       // AI-model only: grade the assessment against the chosen usage.
@@ -496,6 +513,7 @@ export function useScanForm({
     includeOsv, setIncludeOsv,
     deepCve, setDeepCve,
     byteStable, setByteStable,
+    conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
@@ -506,6 +524,7 @@ export function useScanForm({
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showOutboundLicense,
+    showConformanceProfile,
     showScanOptions, showUpload,
     options, submit,
     capabilities,

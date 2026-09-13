@@ -22,7 +22,7 @@
           "label": "SBOM author signature",
           "label_ko": "SBOM 작성자 서명",
           "source": "declared",
-          "cdxPath": "(.signature // null) != null"
+          "cdxPath": "((.signature // null) != null) or $hasSigFile"
         },
         {
           "id": "cisa-sbom-format-name",

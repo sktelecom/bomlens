@@ -88,8 +88,24 @@ SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name //
 #   - only when no bsi:component:filename already exists (never overwrite);
 #   - basename via the last "/"-segment (rindex), matching how syft writes paths;
 #   - only when that basename matches ARTIFACT_EXT_RE.
-# cdxgen has no location property at all, so this is a no-op there.
+#
+# cdxgen has no location property at all, so the syft path above is a no-op for
+# every cdxgen-backed source scan (Maven, npm, PyPI, ...). For those, fall back to
+# building the filename from the purl instead, but only where the ecosystem's own
+# packaging convention makes it a fact, not a guess:
+#   - Maven: purl carries group/artifact/version/type explicitly, and the Maven
+#     repository layout names the file <artifact>-<version>[-<classifier>].<type>
+#     deterministically (type defaults to "jar" when the purl omits it). This is
+#     the only cdxgen-sourced ecosystem currently covered.
+#   - npm: an installed dependency is a directory (node_modules/<name>), not a
+#     single file, so there is no filename to report and this stays unfilled.
+#   - PyPI: a wheel's real filename encodes the platform/ABI tag (e.g.
+#     "-cp311-cp311-manylinux...whl"), which the purl does not carry. Guessing
+#     it would be a wrong value, so this stays unfilled too.
+#   - Left unfilled here shows up as a genuine "source-unavailable" gap rather
+#     than a fabricated one.
 ARTIFACT_EXT_RE='\\.(jar|war|ear|aar|so|a|dll|dylib|deb|rpm|apk|whl|egg|gem|nupkg|tgz|crate|ko|node|pyd|exe|bin)(\\.[0-9]+)*$'
+MAVEN_PURL_RE='^pkg:maven/[^/]+/[^@]+@[^?]+'
 FILENAME_FILTER='(.components) |= (if type=="array" then map(
     if (.properties? // []) | any(.name == "bsi:component:filename") then .
     else ( [ (.properties? // [])[]
@@ -97,7 +113,18 @@ FILENAME_FILTER='(.components) |= (if type=="array" then map(
              | .value ]
            | map(select(type=="string" and (. != "")))
            | (.[0] // "") ) as $p
-      | if $p == "" then .
+      | if $p == "" then
+          ( (.purl // "") ) as $purl
+          | if ($purl | test("'"$MAVEN_PURL_RE"'")) then
+              ($purl | capture("^pkg:maven/(?<grp>[^/]+)/(?<art>[^@]+)@(?<ver>[^?]+)(\\?(?<qs>.*))?$")) as $m
+              | ( ( ($m.qs // "") | if test("(^|&)type=") then capture("(^|&)type=(?<t>[^&]+)").t else "jar" end ) ) as $ext
+              # Maven repository layout inserts the classifier (sources, javadoc,
+              # a shaded/uber-jar suffix, ...) between version and extension when
+              # the artifact carries one: <artifact>-<version>-<classifier>.<type>.
+              | ( ( ($m.qs // "") | if test("(^|&)classifier=") then ("-" + capture("(^|&)classifier=(?<c>[^&]+)").c) else "" end ) ) as $clf
+              | .properties = ((.properties // []) + [{name:"bsi:component:filename", value: ($m.art + "-" + $m.ver + $clf + "." + $ext)}])
+            else .
+            end
         else ($p | (if test("/") then .[(rindex("/")+1):] else . end)) as $base
           | if ($base != "") and ($base | test("'"$ARTIFACT_EXT_RE"'"))
             then .properties = ((.properties // []) + [{name:"bsi:component:filename", value:$base}])

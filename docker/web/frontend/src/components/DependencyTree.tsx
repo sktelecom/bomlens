@@ -1,13 +1,14 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ChevronDown, ChevronRight, Package } from "lucide-react";
+import { ChevronDown, ChevronRight, Package, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import type { Severity } from "@/lib/api";
-import type { TreeNode } from "@/lib/sbomGraph";
+import { findFirstMatch, findPathToRef, type TreeNode } from "@/lib/sbomGraph";
 
 const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -79,9 +80,15 @@ function flatten(
 export function DependencyTree({
   tree,
   hasDependencies,
+  focusTarget,
 }: {
   tree: TreeNode[];
   hasDependencies: boolean;
+  /** Jump here on mount / whenever it changes: every ancestor branch opens and
+   *  the matched row gets keyboard focus, scrolled into view. Set from a
+   *  Vulnerabilities/Components row's "View in Dependencies" link, carried in
+   *  the URL so the jump survives a reload or a shared link. */
+  focusTarget?: { name: string; version?: string } | null;
 }) {
   const { t } = useTranslation();
   // Direct dependencies start expanded, as they did when each row owned its own
@@ -90,10 +97,17 @@ export function DependencyTree({
     () => new Set(tree.map((_, i) => String(i))),
   );
   const [focused, setFocused] = useState(0);
-  // Set while a key handler moves focus, so the effect below only pulls focus
-  // when this component asked for it — never stealing it on an unrelated render.
+  // Set while a key handler (or a search/focusTarget jump) moves focus, so the
+  // effect below only pulls focus when this component asked for it, never
+  // stealing it on an unrelated render.
   const moving = useRef(false);
   const rowRefs = useRef<(HTMLLIElement | null)[]>([]);
+  const [query, setQuery] = useState("");
+  // Set by a search/focusTarget jump; consumed (and cleared) once `rows`
+  // actually contains that path. Expanding a branch is a state update, so
+  // the target row does not exist on the same render that requested it.
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [noMatch, setNoMatch] = useState(false);
 
   const rows = useMemo(() => flatten(tree, open), [tree, open]);
 
@@ -105,6 +119,7 @@ export function DependencyTree({
     if (!moving.current) return;
     moving.current = false;
     rowRefs.current[active]?.focus();
+    rowRefs.current[active]?.scrollIntoView({ block: "nearest" });
   }, [active, rows.length]);
 
   const toggle = useCallback((path: string, want?: boolean) => {
@@ -122,6 +137,55 @@ export function DependencyTree({
     moving.current = true;
     setFocused(to);
   }, []);
+
+  // Expand every ancestor of a match and queue its row for focus once it
+  // exists. Shared by the search box and `focusTarget`, same mechanism, only
+  // the match function differs (exact name+version vs. a name substring).
+  const jumpTo = useCallback(
+    (found: ReturnType<typeof findFirstMatch>) => {
+      if (!found) {
+        setNoMatch(true);
+        return;
+      }
+      setNoMatch(false);
+      setOpen((prev) => {
+        const next = new Set(prev);
+        for (const a of found.ancestors) next.add(a);
+        return next;
+      });
+      setPendingPath(found.target);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (pendingPath === null) return;
+    const i = rows.findIndex((r) => r.path === pendingPath);
+    if (i === -1) return; // branch not expanded into `rows` yet on this render
+    setPendingPath(null);
+    move(i);
+  }, [pendingPath, rows, move]);
+
+  // focusTarget arrives from another section's "View in Dependencies" link.
+  // Jump as soon as the tree has it (mount, or the target changes on the same
+  // scan, e.g. clicking a different vulnerable package without leaving here).
+  useEffect(() => {
+    if (!focusTarget) return;
+    jumpTo(findPathToRef(tree, focusTarget));
+    // Only re-run when the target itself changes, not on every `tree`
+    // identity change (the SBOM doesn't change under a mounted panel).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTarget?.name, focusTarget?.version]);
+
+  const onSearchChange = (v: string) => {
+    setQuery(v);
+    if (!v.trim()) {
+      setNoMatch(false);
+      return;
+    }
+    const needle = v.trim().toLowerCase();
+    jumpTo(findFirstMatch(tree, (n) => n.name.toLowerCase().includes(needle)));
+  };
 
   const onKeyDown = (e: React.KeyboardEvent, i: number) => {
     const row = rows[i];
@@ -184,6 +248,23 @@ export function DependencyTree({
     <div className="space-y-2">
       {!hasDependencies && (
         <p className="text-xs text-muted-foreground">{t("deps.flatFallback")}</p>
+      )}
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          type="text"
+          value={query}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={t("deps.search")}
+          className="h-8 pl-8 text-xs"
+          aria-label={t("deps.search")}
+        />
+      </div>
+      {noMatch && (
+        <p className="text-xs text-muted-foreground">{t("deps.searchNoMatch")}</p>
       )}
       <div className="max-h-[44rem] resize-y overflow-auto rounded-md border p-1">
         <ul role="tree" aria-label={t("deps.treeLabel")}>

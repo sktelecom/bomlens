@@ -1,6 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useEffect, useState } from "react";
 import {
   Biohazard,
   Boxes,
@@ -26,13 +27,15 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type {
-  ComponentItem,
-  DoneEvent,
-  RecentScan,
-  ResultFile,
-  Severity,
-  YoctoVex,
+import { Disclosure } from "@/components/ui/disclosure";
+import {
+  loadScan,
+  type ComponentItem,
+  type DoneEvent,
+  type RecentScan,
+  type ResultFile,
+  type Severity,
+  type YoctoVex,
 } from "@/lib/api";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
@@ -46,6 +49,7 @@ import { type ProvenanceKind, provenanceOf } from "@/lib/provenance";
 import { formatRelativeTime, scanComparison } from "@/lib/recent";
 import { conformanceCount, inputSbomFileName, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
+import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff } from "@/lib/scanDiff";
 import { cn } from "@/lib/utils";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
@@ -105,6 +109,19 @@ function ProvenanceIcon({
 function TrendIcon({ up, ...props }: { up: boolean } & React.ComponentProps<LucideIcon>) {
   const Icon = up ? TrendingUp : TrendingDown;
   return <Icon {...props} aria-hidden />;
+}
+
+/** A component's display label, matching the group/name convention used in
+ *  the components table and the top-risk list. */
+function compLabel(c: ComponentItem): string {
+  return c.group ? `${c.group}/${c.name}` : c.name;
+}
+
+const DIFF_LIST_CAP = 8;
+
+/** The first `DIFF_LIST_CAP` rows of a change list, plus how many were cut. */
+function capList<T>(items: T[]): { shown: T[]; more: number } {
+  return { shown: items.slice(0, DIFF_LIST_CAP), more: Math.max(0, items.length - DIFF_LIST_CAP) };
 }
 
 /** Severity tone for the risk badge, matching the components table. */
@@ -243,6 +260,48 @@ export function Overview({
   const comparison = scanId ? scanComparison(recent, scanId) : null;
   const provenance = provenanceOf(result.scanConfig);
 
+  // The comparison card above renders instantly from the Recent-scans summary
+  // (component count + worst severity, no fetch). What actually changed, which
+  // components and which CVEs, needs the previous scan's full component and
+  // vulnerability lists, which the summary doesn't carry, so it loads in a
+  // second pass and fills the card in once it lands.
+  const [changes, setChanges] = useState<{
+    components: ComponentDiff;
+    vulns: VulnDiff;
+    /** Either scan's component list was capped server-side, so the diff may
+     *  be missing rows outside what was actually shown. */
+    partial: boolean;
+  } | null>(null);
+  const [changesLoading, setChangesLoading] = useState(false);
+  useEffect(() => {
+    setChanges(null);
+    if (!comparison) return;
+    let cancelled = false;
+    setChangesLoading(true);
+    loadScan(comparison.prev.id).then((prev) => {
+      if (cancelled) return;
+      setChangesLoading(false);
+      if (!prev) return;
+      setChanges({
+        components: diffComponents(
+          prev.sbom?.componentList ?? [],
+          result.sbom?.componentList ?? [],
+        ),
+        vulns: diffVulnerabilities(
+          prev.security?.vulnerabilities ?? [],
+          result.security?.vulnerabilities ?? [],
+        ),
+        partial: Boolean(prev.sbom?.truncated || result.sbom?.truncated),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // result and scanId change together (a new scan replaces both); comparison
+    // is derived from scanId + recent, so scanId is the one stable dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanId, comparison?.prev.id]);
+
   return (
     <div className="space-y-6">
       {provenance && (
@@ -273,58 +332,262 @@ export function Overview({
           entirely when there is no earlier run to compare against. */}
       {comparison && (
         <Card>
-          <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-3 p-4">
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {t("overview.vsPrevious", {
-                  label:
-                    comparison.prev.version ||
-                    formatRelativeTime(
-                      comparison.prev.generatedAt,
-                      Date.now(),
-                      i18n.language,
-                    ),
-                })}
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  {t("overview.vsPrevious", {
+                    label:
+                      comparison.prev.version ||
+                      formatRelativeTime(
+                        comparison.prev.generatedAt,
+                        Date.now(),
+                        i18n.language,
+                      ),
+                  })}
+                </div>
+                <div className="mt-1 text-sm font-medium text-foreground">
+                  {comparison.componentsDelta === 0
+                    ? t("overview.compSame")
+                    : t("overview.compDelta", {
+                        delta:
+                          comparison.componentsDelta > 0
+                            ? `+${comparison.componentsDelta}`
+                            : `${comparison.componentsDelta}`,
+                      })}
+                </div>
               </div>
-              <div className="mt-1 text-sm font-medium text-foreground">
-                {comparison.componentsDelta === 0
-                  ? t("overview.compSame")
-                  : t("overview.compDelta", {
-                      delta:
-                        comparison.componentsDelta > 0
-                          ? `+${comparison.componentsDelta}`
-                          : `${comparison.componentsDelta}`,
-                    })}
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  {t("overview.sevTrendLabel")}
+                </div>
+                <div
+                  className={cn(
+                    "mt-1 flex items-center gap-1.5 text-sm font-medium",
+                    comparison.severityDir === "up" && "text-risk-high",
+                    comparison.severityDir === "down" && "text-risk-low",
+                    comparison.severityDir === "same" && "text-foreground",
+                  )}
+                >
+                  {comparison.severityDir !== "same" && (
+                    <TrendIcon
+                      className="h-4 w-4 shrink-0"
+                      up={comparison.severityDir === "up"}
+                    />
+                  )}
+                  {t(
+                    comparison.severityDir === "up"
+                      ? "overview.sevUp"
+                      : comparison.severityDir === "down"
+                        ? "overview.sevDown"
+                        : "overview.sevSame",
+                  )}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                {t("overview.sevTrendLabel")}
+            {/* The two figures above can hide real churn: +3/-3 components nets
+                to "no change", and a worst-severity direction says nothing
+                about which CVEs actually moved. These need the previous
+                scan's full lists (a second fetch), so they fill in a moment
+                after the row above already rendered; opening either reveals
+                what specifically moved, not just how many. */}
+            {(changesLoading || changes) && (
+              <div className="mt-4 grid gap-x-8 gap-y-4 border-t pt-3 sm:grid-cols-2">
+                <Disclosure
+                  summary={
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="text-xs text-muted-foreground">
+                        {t("overview.compChangeLabel")}
+                      </div>
+                      <div
+                        className="mt-1 text-sm font-medium text-foreground"
+                        data-testid="comp-change-summary"
+                      >
+                        {changesLoading || !changes
+                          ? t("overview.diffLoading")
+                          : t("overview.compChangeSummary", {
+                              added: changes.components.added.length,
+                              removed: changes.components.removed.length,
+                              changed: changes.components.changed.length,
+                            })}
+                      </div>
+                    </div>
+                  }
+                  summaryClassName="items-start"
+                >
+                  {changes && (
+                    <div className="mt-2 space-y-3 pl-5 text-xs">
+                      {(() => {
+                        const added = capList(changes.components.added);
+                        const removed = capList(changes.components.removed);
+                        const upgraded = capList(changes.components.changed);
+                        return (
+                          <>
+                            {added.shown.length > 0 && (
+                              <div>
+                                <div className="font-medium text-foreground">
+                                  {t("overview.compAddedHeading")}
+                                </div>
+                                <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
+                                  {added.shown.map((c) => (
+                                    <li key={compLabel(c)}>
+                                      {compLabel(c)}@{c.version}
+                                    </li>
+                                  ))}
+                                </ul>
+                                {added.more > 0 && (
+                                  <p className="mt-1 font-sans text-muted-foreground">
+                                    {t("overview.diffMore", { count: added.more })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {removed.shown.length > 0 && (
+                              <div>
+                                <div className="font-medium text-foreground">
+                                  {t("overview.compRemovedHeading")}
+                                </div>
+                                <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
+                                  {removed.shown.map((c) => (
+                                    <li key={compLabel(c)}>
+                                      {compLabel(c)}@{c.version}
+                                    </li>
+                                  ))}
+                                </ul>
+                                {removed.more > 0 && (
+                                  <p className="mt-1 font-sans text-muted-foreground">
+                                    {t("overview.diffMore", { count: removed.more })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {upgraded.shown.length > 0 && (
+                              <div>
+                                <div className="font-medium text-foreground">
+                                  {t("overview.compChangedHeading")}
+                                </div>
+                                <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                                  {upgraded.shown.map((c) => (
+                                    <li key={`${c.group}/${c.name}`} className="font-mono">
+                                      {t("overview.compChangedLine", {
+                                        name: c.group ? `${c.group}/${c.name}` : c.name,
+                                        from: c.from,
+                                        to: c.to,
+                                      })}
+                                    </li>
+                                  ))}
+                                </ul>
+                                {upgraded.more > 0 && (
+                                  <p className="mt-1 font-sans text-muted-foreground">
+                                    {t("overview.diffMore", { count: upgraded.more })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {scanId && (
+                              <a
+                                href={scanHash(scanId, "components")}
+                                data-testid="comp-diff-all-link"
+                                className="inline-block rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                {t("overview.topRiskAll")}
+                              </a>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </Disclosure>
+                <Disclosure
+                  summary={
+                    <div className="min-w-0 flex-1 text-left">
+                      <div className="text-xs text-muted-foreground">
+                        {t("overview.vulnChangeLabel")}
+                      </div>
+                      <div
+                        className="mt-1 text-sm font-medium text-foreground"
+                        data-testid="vuln-change-summary"
+                      >
+                        {changesLoading || !changes
+                          ? t("overview.diffLoading")
+                          : t("overview.vulnChangeSummary", {
+                              added: changes.vulns.new.length,
+                              resolved: changes.vulns.resolved.length,
+                            })}
+                      </div>
+                    </div>
+                  }
+                  summaryClassName="items-start"
+                >
+                  {changes && (
+                    <div className="mt-2 space-y-3 pl-5 text-xs">
+                      {(() => {
+                        const news = capList(changes.vulns.new);
+                        const resolved = capList(changes.vulns.resolved);
+                        return (
+                          <>
+                            {news.shown.length > 0 && (
+                              <div>
+                                <div className="font-medium text-foreground">
+                                  {t("overview.vulnNewHeading")}
+                                </div>
+                                <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
+                                  {news.shown.map((v) => (
+                                    <li key={v.id}>
+                                      {v.id} ({v.pkg})
+                                    </li>
+                                  ))}
+                                </ul>
+                                {news.more > 0 && (
+                                  <p className="mt-1 font-sans text-muted-foreground">
+                                    {t("overview.diffMore", { count: news.more })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {resolved.shown.length > 0 && (
+                              <div>
+                                <div className="font-medium text-foreground">
+                                  {t("overview.vulnResolvedHeading")}
+                                </div>
+                                <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
+                                  {resolved.shown.map((v) => (
+                                    <li key={v.id}>
+                                      {v.id} ({v.pkg})
+                                    </li>
+                                  ))}
+                                </ul>
+                                {resolved.more > 0 && (
+                                  <p className="mt-1 font-sans text-muted-foreground">
+                                    {t("overview.diffMore", { count: resolved.more })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {scanId && (
+                              <a
+                                href={scanHash(scanId, "vulnerabilities")}
+                                data-testid="vuln-diff-all-link"
+                                className="inline-block rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                {t("overview.allVulnerabilities")}
+                              </a>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </Disclosure>
               </div>
-              <div
-                className={cn(
-                  "mt-1 flex items-center gap-1.5 text-sm font-medium",
-                  comparison.severityDir === "up" && "text-risk-high",
-                  comparison.severityDir === "down" && "text-risk-low",
-                  comparison.severityDir === "same" && "text-foreground",
-                )}
-              >
-                {comparison.severityDir !== "same" && (
-                  <TrendIcon
-                    className="h-4 w-4 shrink-0"
-                    up={comparison.severityDir === "up"}
-                  />
-                )}
-                {t(
-                  comparison.severityDir === "up"
-                    ? "overview.sevUp"
-                    : comparison.severityDir === "down"
-                      ? "overview.sevDown"
-                      : "overview.sevSame",
-                )}
-              </div>
-            </div>
+            )}
           </CardContent>
+          {changes?.partial && (
+            <p className="border-t px-4 py-2 text-xs text-muted-foreground">
+              {t("overview.diffPartial")}
+            </p>
+          )}
         </Card>
       )}
       {/* Zero components is the one result a reader reliably misreads: it looks
@@ -338,7 +601,13 @@ export function Overview({
           data-testid="zero-components"
         >
           <div className="text-sm font-medium">{t("result.zeroComponentsTitle")}</div>
-          <p className="mt-1 text-xs">{t("result.zeroComponentsBody")}</p>
+          <p className="mt-1 text-xs">
+            {t(
+              result.sbom.sbomToolDegraded
+                ? "result.zeroComponentsBodyDegraded"
+                : "result.zeroComponentsBody",
+            )}
+          </p>
         </div>
       )}
 
@@ -384,7 +653,13 @@ export function Overview({
         </div>
       )}
 
-      {result.sbom?.sbomToolDegraded && (
+      {/* Gated on components > 0: at 0 components this banner's own claim
+          ("direct dependencies only") would contradict the zero-components
+          banner above ("nothing was found"). That banner already covers a
+          fully failed scan, folding in the degraded cause via
+          zeroComponentsBodyDegraded, so this one steps aside rather than
+          repeat a claim that isn't true here. */}
+      {result.sbom?.sbomToolDegraded && result.sbom.components > 0 && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
           <div className="text-sm font-medium">{t("result.sbomDegradedTitle")}</div>
           <p className="mt-1 text-xs">{t(sbomDegradedBodyKey(result.sbom.sbomToolDegraded))}</p>

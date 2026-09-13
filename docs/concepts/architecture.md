@@ -34,7 +34,7 @@ Previously, every language runtime plus every analysis tool lived in a single hu
 | **Acquisition** | Pulled **on demand** after detecting the project language | Pulled once and reused |
 | **Benefit** | cdxgen maintains up-to-date per-language toolchains | Small image; pinned tool versions ensure reproducibility |
 
-> For the five mainstream languages (java, python, node, dotnet, php), detection with the official cdxgen images is identical, and for go, ruby, and rust the toolchain preparation (`build-prep.sh`) is markedly better. For the measurement data, see [README "Why a Docker image?"](https://github.com/sktelecom/bomlens#why-a-docker-image-vs-plain-cdxgen).
+> For go, ruby, and rust, when the project has no committed lockfile, `build-prep.sh` resolves one before cdxgen runs: `go mod tidy` (falling back to `go mod download`), `bundle lock` (falling back to `bundle install`), and `cargo generate-lockfile`, respectively. This way cdxgen sees the full dependency graph instead of only the manifest's direct dependencies. To compare this against running cdxgen alone, see [`tests/compare-cdxgen-vs-docker.sh`](https://github.com/sktelecom/bomlens/blob/main/tests/compare-cdxgen-vs-docker.sh).
 
 ---
 

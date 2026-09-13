@@ -136,6 +136,8 @@ BomLens에 필요한 건 Docker "엔진"뿐이고, 특정 제품에 묶이지 �
 | OS | Linux, macOS, Windows |
 | 아키텍처 | AMD64, ARM64 |
 
+기본 스캐너 이미지는 두 아키텍처를 모두 지원합니다. opt-in인 `--firmware`와 `--deep-cve` 이미지는 AMD64로만 발행돼, ARM64 호스트(Apple Silicon 맥, Arm 서버)에서는 amd64 에뮬레이션 계층 없이 pull이 실패합니다. 전체 목록은 [Docker 이미지 레퍼런스](../reference/docker-image.ko.md)를 참고하세요.
+
 이 메모리 기준은 호스트 컴퓨터가 아니라 Docker 엔진 자체(Docker Desktop, Rancher Desktop, macOS의 Colima가 띄우는 가상 머신)에 해당합니다. Colima는 기본값이 2 GB인데, 매니페스트만 읽는 스캔에는 충분하지만 전이 의존성을 얻기 위해 실제로 빌드까지 실행해야 하는 언어(Java/Gradle, Java/Maven)에는 부족합니다. 4 GB 미만이면 이 빌드 단계가 메모리 부족으로 죽고, 스캔은 조용히 더 얕은 결과(직접 의존성만)로 대체됩니다. 의존성 그래프가 부실해 보인다면 스캔 결과의 경고 메시지에 관련 안내가 있는지 먼저 확인하세요.
 
 이미 Docker를 쓰고 있다면(Docker Desktop, Rancher Desktop, WSL2의 docker-ce 등 무엇이든) 동작만 확인하고 넘어가세요.

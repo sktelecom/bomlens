@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Severity, VulnItem } from "./api";
-import { compareVulns, sortVulns } from "./vulns";
+import { compareVulns, groupByUpgrade, sortVulns } from "./vulns";
 
 function v(id: string, severity: Severity, cvss: number | null, epss?: number): VulnItem {
   return { id, severity, cvss, pkg: "p", installed: "1", fixed: "", title: "", epss };
@@ -84,5 +84,82 @@ describe("tiebreak", () => {
     const b = v("CVE-1", "CRITICAL", 9.0);
     // same severity, same cvss → id ascending
     expect(compareVulns(a, b, "severity", "desc")).toBeGreaterThan(0);
+  });
+});
+
+describe("groupByUpgrade", () => {
+  function vg(
+    id: string,
+    severity: Severity,
+    pkg: string,
+    installed: string,
+    fixed: string,
+  ): VulnItem {
+    return { id, severity, cvss: null, pkg, installed, fixed, title: "" };
+  }
+
+  it("groups two or more CVEs on the same install that share a fixed version", () => {
+    const items = [
+      vg("CVE-a", "HIGH", "qs", "6.15.3", "6.16.0"),
+      vg("CVE-b", "CRITICAL", "qs", "6.15.3", "6.16.0"),
+    ];
+    const groups = groupByUpgrade(items);
+    expect(groups).toEqual([
+      {
+        pkg: "qs",
+        installed: "6.15.3",
+        fixed: "6.16.0",
+        vulnIds: ["CVE-a", "CVE-b"],
+        maxSeverity: "CRITICAL",
+      },
+    ]);
+  });
+
+  it("does not group a single CVE (not a bundle)", () => {
+    const items = [vg("CVE-a", "HIGH", "qs", "6.15.3", "6.16.0")];
+    expect(groupByUpgrade(items)).toEqual([]);
+  });
+
+  it("drops CVEs with no fixed version from every group", () => {
+    const items = [
+      vg("CVE-a", "HIGH", "qs", "6.15.3", "6.16.0"),
+      vg("CVE-b", "CRITICAL", "qs", "6.15.3", "6.16.0"),
+      vg("CVE-c", "CRITICAL", "qs", "6.15.3", ""), // no fix yet
+    ];
+    expect(groupByUpgrade(items).map((g) => g.vulnIds)).toEqual([["CVE-a", "CVE-b"]]);
+  });
+
+  // The real shape this was designed for: the same package name resolved to
+  // two different installed versions in one SBOM (measured for real, a qs
+  // dependency conflict). Grouping by name alone would wrongly merge the two.
+  it("does not merge the same package name across two different installed versions", () => {
+    const items = [
+      vg("CVE-a", "HIGH", "qs", "6.15.3", "6.16.0"),
+      vg("CVE-b", "CRITICAL", "qs", "6.15.3", "6.16.0"),
+      vg("CVE-c", "LOW", "qs", "6.16.0", "6.16.1"), // already-updated sibling, own group
+      vg("CVE-d", "LOW", "qs", "6.16.0", "6.16.1"),
+    ];
+    const groups = groupByUpgrade(items);
+    expect(groups).toHaveLength(2);
+    expect(groups.find((g) => g.installed === "6.15.3")?.vulnIds).toEqual(["CVE-a", "CVE-b"]);
+    expect(groups.find((g) => g.installed === "6.16.0")?.vulnIds).toEqual(["CVE-c", "CVE-d"]);
+  });
+
+  it("sorts worst severity first, then by how many CVEs the upgrade resolves", () => {
+    const items = [
+      // 2-CVE MEDIUM bundle
+      vg("CVE-a", "MEDIUM", "p1", "1.0", "1.1"),
+      vg("CVE-b", "MEDIUM", "p1", "1.0", "1.1"),
+      // 3-CVE HIGH bundle: worse severity should lead even though it's a
+      // different package with more CVEs than the CRITICAL one below.
+      vg("CVE-c", "HIGH", "p2", "1.0", "1.1"),
+      vg("CVE-d", "HIGH", "p2", "1.0", "1.1"),
+      vg("CVE-e", "HIGH", "p2", "1.0", "1.1"),
+      // 2-CVE CRITICAL bundle: worst severity, leads regardless of count.
+      vg("CVE-f", "CRITICAL", "p3", "1.0", "1.1"),
+      vg("CVE-g", "CRITICAL", "p3", "1.0", "1.1"),
+    ];
+    const groups = groupByUpgrade(items);
+    expect(groups.map((g) => g.pkg)).toEqual(["p3", "p2", "p1"]);
   });
 });

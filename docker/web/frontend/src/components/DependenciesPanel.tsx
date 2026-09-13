@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
+import { dependenciesFromQuery } from "@/lib/section-query";
 import { loadSbom, parseSbomGraph, type SbomGraph } from "@/lib/sbomGraph";
+import type { RouteQuery } from "@/lib/route";
 
 import { DependencyGraph } from "./DependencyGraph";
 import { DependencyTree } from "./DependencyTree";
@@ -26,17 +28,31 @@ export function DependenciesPanel({
   scanId,
   sbomFile,
   components = [],
+  query,
 }: {
   /** The scan's run_id, scoping the artifact fetch to its run folder. */
   scanId: string | null;
   sbomFile: string;
   components?: ComponentItem[];
+  /** Carries a "View in Dependencies" jump from another section (package name
+   *  + version, from a Vulnerabilities/Components row). Read once per value:
+   *  this panel does not write its own state back into the URL. */
+  query?: RouteQuery;
 }) {
   const { t } = useTranslation();
   const [graph, setGraph] = useState<SbomGraph | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [view, setView] = useState<View>("graph");
+  const focus = dependenciesFromQuery(query);
+  // A jump always means "show me the tree", even if Graph was left open from
+  // a previous visit: the graph has no equivalent jump-and-expand.
+  const [view, setView] = useState<View>(focus ? "tree" : "graph");
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (focus) setView("tree");
+    // Only react to the focus target itself changing, not every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.name, focus?.version]);
 
   const vulnIndex = useMemo(() => vulnSeverityIndex(components), [components]);
 
@@ -99,7 +115,7 @@ export function DependenciesPanel({
       {view === "graph" ? (
         <DependencyGraph nodes={graph.nodes} edges={graph.edges} />
       ) : (
-        <DependencyTree tree={graph.tree} hasDependencies={graph.hasDependencies} />
+        <DependencyTree tree={graph.tree} hasDependencies={graph.hasDependencies} focusTarget={focus} />
       )}
     </div>
   );

@@ -5,7 +5,15 @@
 #
 # source-file-tree.sh — emit a ScanCode-shaped file inventory for the source view.
 #
-# Usage: source-file-tree.sh <source_dir> <out_file>
+# Usage: source-file-tree.sh <source_dir> <out_file> [exclude_dir_name]
+#
+# exclude_dir_name is the run's own output subfolder name (e.g. "MyApp_1.0.0"),
+# passed only when the caller (scan-sbom.sh, via entrypoint.sh) has established
+# that the output base sits inside the directory being scanned: a "current
+# folder" scan whose output base defaults to the folder being scanned. Without
+# this, that subfolder is a real child of SRC by the time this script runs
+# (earlier post-processing steps already wrote into it), so the source view
+# would show the scan's own output alongside what it actually scanned.
 #
 # The web UI's source-tree panel parses ScanCode output (`_scancode.json`), but
 # ScanCode (deep-license) is opt-in and off by default, so most scans show no
@@ -22,6 +30,7 @@ set -e
 
 SRC="$1"
 OUT="$2"
+EXCLUDE_DIR="$3"
 
 [ -n "$SRC" ] && [ -d "$SRC" ] || exit 0
 [ -n "$OUT" ] || exit 0
@@ -34,10 +43,12 @@ MAX_ENTRIES="${SOURCE_TREE_MAX:-20000}"
 
 # Directories whose contents are noise for a "what's in my source" view: VCS
 # metadata, dependency caches, and common build outputs. Pruned wholesale so we
-# don't walk into them at all.
+# don't walk into them at all. EXCLUDE_DIR (this run's own output subfolder,
+# see the usage note above) is appended the same way when the caller passed one.
 PRUNE_DIRS=".git node_modules .svn .hg .venv venv __pycache__ \
 .gradle .mvn target build dist out vendor bower_components .next .nuxt \
 .tox .pytest_cache .mypy_cache .idea .vscode .terraform .cache"
+[ -n "$EXCLUDE_DIR" ] && PRUNE_DIRS="$PRUNE_DIRS $EXCLUDE_DIR"
 
 # Individual files that are OS/Finder/Explorer bookkeeping, not source: they
 # show up in every scan of a folder anyone has browsed on their desktop, carry

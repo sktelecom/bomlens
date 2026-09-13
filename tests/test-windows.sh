@@ -128,7 +128,8 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --generate-only --notice --security --all --no-report --deep-license \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
-            --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang; do
+            --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
+            --conformance-profile; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -171,6 +172,33 @@ detect_case go     go.mod           'module x\n\ngo 1.21\n'                     
 detect_case rust   Cargo.toml       '[package]\nname="x"\nversion="0.1.0"'          rust   cdxgen-debian-rust
 detect_case ruby   Gemfile          "source 'https://rubygems.org'\ngem 'rack'"     ruby   cdxgen-debian-ruby34
 detect_case php    composer.json    '{"require":{"monolog/monolog":"^3"}}'          php    cdxgen-debian-php84
+
+# Go toolchain settings reach the cdxgen container. The Go image pins
+# GOTOOLCHAIN=local, so the host value travels as HOST_GOTOOLCHAIN.
+d="$(new_proj gotoolchain)"; printf 'module x\n\ngo 1.26.0\n' > "$d/go.mod"
+GOTOOLCHAIN=local GOPROXY=https://goproxy.example scan_in "$d" --project Pgotc --version 1.0.0 --generate-only
+{ in_log "HOST_GOTOOLCHAIN=local" && in_log "-e GOPROXY" && in_log "-e GOSUMDB"; } \
+  && pass "GOTOOLCHAIN/GOPROXY/GOSUMDB passed to the cdxgen container" \
+  || { fail "GOTOOLCHAIN/GOPROXY/GOSUMDB passed to the cdxgen container" "rc=$RC"; show; }
+
+# The value goes through eval, so anything but a toolchain name is dropped.
+d="$(new_proj gotoolchainbad)"; printf 'module x\n\ngo 1.26.0\n' > "$d/go.mod"
+GOTOOLCHAIN='go1.26.0;touch x' scan_in "$d" --project Pgotcbad --version 1.0.0 --generate-only
+{ in_out "Ignoring GOTOOLCHAIN" && in_log "HOST_GOTOOLCHAIN= " && ! in_log "touch x"; } \
+  && pass "GOTOOLCHAIN that is not a toolchain name is not passed on" \
+  || { fail "GOTOOLCHAIN that is not a toolchain name is not passed on" "rc=$RC"; show; }
+
+# Source-scan options for build-prep.sh reach the cdxgen container by name only.
+d="$(new_proj prepenv)"; printf '{"name":"a"}' > "$d/package.json"
+BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_MAVEN_FULL_GRAPH=1 BOMLENS_ANDROID_FULL_GRAPH=1 BOMLENS_NODE_FULL_GRAPH=1 \
+  scan_in "$d" --project Pprepenv --version 1.0.0 --generate-only
+ok=1
+for n in BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH; do
+  in_log "-e $n" || ok=0
+  in_log "$n=" && ok=0
+done
+[ "$ok" = 1 ] && pass "BOMLENS_* source-scan options passed to the cdxgen container by name" \
+  || { fail "BOMLENS_* source-scan options passed to the cdxgen container by name" "rc=$RC"; show; }
 
 # .NET needs a *.csproj glob, swift needs Package.swift — handled specially.
 d="$(new_proj dotnet)"; printf '<Project></Project>' > "$d/app.csproj"
@@ -483,6 +511,28 @@ scan_in "$d" --project PT --version 1 --target app.out --generate-only \
     && in_log "TRUSCA_PROJECT_ID=proj-123" && in_log "bomlens-deep-cve"; } \
   && pass "--license/--sbom-author/--identify-vendored/--trusca/--deep-cve reach the container" \
   || { fail "pass-through flags reach the container"; show; }
+
+# No flag -> the container sees the default profile.
+d="$(new_proj profdefault)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project PD --version 1 --target app.out --generate-only
+in_log "CONFORMANCE_PROFILE=default" \
+  && pass "no --conformance-profile -> CONFORMANCE_PROFILE=default reaches the container" \
+  || { fail "conformance profile default pass-through"; show; }
+
+d="$(new_proj profskt)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project PS --version 1 --target app.out --generate-only \
+  --conformance-profile skt-submission
+in_log "CONFORMANCE_PROFILE=skt-submission" \
+  && pass "--conformance-profile skt-submission reaches the container" \
+  || { fail "--conformance-profile skt-submission pass-through"; show; }
+
+# An unknown profile warns and falls back to default rather than failing the scan.
+d="$(new_proj profbad)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project PB --version 1 --target app.out --generate-only \
+  --conformance-profile bogus
+{ in_out "not supported" && in_log "CONFORMANCE_PROFILE=default"; } \
+  && pass "an unknown --conformance-profile warns and falls back to default" \
+  || { fail "unknown --conformance-profile handling"; show; }
 
 # --------------------------------------------------------
 section "Windows path & filesystem adversarial matrix"

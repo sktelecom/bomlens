@@ -46,6 +46,9 @@ interface Props {
   /** Open the Vulnerabilities section filtered to this component — the other
    *  half of the investigation loop (which CVEs does this row stand for?). */
   onPickVulns?: (name: string) => void;
+  /** Jump into the Dependencies tree, expanded to this component's version:
+   *  which direct dependency pulled it in. */
+  onPickDependency?: (name: string, version?: string) => void;
 }
 
 type Sort = { key: ComponentSortKey; dir: SortDir };
@@ -142,7 +145,7 @@ function FilterChip({
 
 /** Searchable, sortable, filterable table of detected SBOM components, with
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
-export function ComponentsTable({ items, total, truncated, scanId, query, onQueryChange, onPickVulns }: Props) {
+export function ComponentsTable({ items, total, truncated, scanId, query, onQueryChange, onPickVulns, onPickDependency }: Props) {
   const { t } = useTranslation();
   const [filters, setFilters] = useState<ComponentFilters>(
     () => componentsFromQuery(query).filters,
@@ -750,6 +753,25 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                           </dd>
                         </>
                       ) : null}
+                      {onPickDependency && (
+                        <>
+                          <dt className="font-medium text-muted-foreground">{t("nav.dependencies")}</dt>
+                          <dd>
+                            {/* Same reason as View in Vulnerabilities above: the
+                                row itself is the toggle control. */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPickDependency(c.name, c.version);
+                              }}
+                              className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {t("result.viewInDependencies", { name: c.name })}
+                            </button>
+                          </dd>
+                        </>
+                      )}
                     </dl>
                   </td>
                 </tr>

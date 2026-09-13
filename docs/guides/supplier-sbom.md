@@ -23,6 +23,8 @@ The criteria check whether an SBOM is good enough for dependency review. Require
 
 > The accepted format ranges above are the SK Telecom submission defaults. If your organization accepts a different range, override them with the `CYCLONEDX_SPEC_VERSIONS`, `AI_CYCLONEDX_SPEC_VERSIONS` (AI SBOMs), and `SPDX_SPEC_VERSIONS` environment variables (space-separated lists). They are listed in the [Docker image environment variables](../reference/docker-image.md).
 
+The `pkg:generic` line above is the `skt-submission` conformance profile (`--conformance-profile skt-submission`), not the tool's own default. The default profile treats `pkg:generic` as advisory instead of a failing requirement and accepts 90% PURL coverage rather than 100%; the web UI's submission-review screen already defaults to `skt-submission`, but the CLI does not, so pass the flag explicitly when checking against this table.
+
 ## Running it all at once
 
 ### From the web UI
@@ -47,6 +49,7 @@ Pull the scanner image once (`docker pull ghcr.io/sktelecom/bomlens:latest`), th
 ```bash
 ./scripts/scan-sbom.sh --project supplier-app --version 2.0.0 \
   --analyze "./supplier-sbom.json" \
+  --conformance-profile skt-submission \
   --generate-only
 ```
 

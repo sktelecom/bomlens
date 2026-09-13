@@ -61,6 +61,7 @@ Detected file: `pom.xml`
 ```
 
 > Note: cdxgen resolves the whole build graph, so BomLens filters the SBOM to the deployable set — compile and runtime scope — and drops the test and provided toolchain (JUnit, Lombok, and the like) so the result reflects what ships rather than the full build. To keep the complete resolved graph instead, set `BOMLENS_MAVEN_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+> A runtime dependency declared with `<optional>true</optional>` is dropped as well, because cdxgen gives it the same tag as a test-scope one.
 
 ---
 

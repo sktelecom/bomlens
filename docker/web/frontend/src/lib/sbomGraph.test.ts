@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Severity } from "./api";
-import { parseSbomGraph, type RawSbom, type TreeNode } from "./sbomGraph";
+import { findFirstMatch, findPathToRef, parseSbomGraph, type RawSbom, type TreeNode } from "./sbomGraph";
 
 // A small CycloneDX SBOM with a metadata root, a dependency graph and licenses.
 // app → libA → libB; app → libC. cdxgen sets bom-ref = purl, so each component
@@ -247,5 +247,101 @@ describe("the document's own component", () => {
     const dataset = g.nodes.find((n) => n.id === "dataset:one")!;
     expect(dataset.root).toBe(false);
     expect(dataset.direct).toBe(true);
+  });
+});
+
+describe("findPathToRef", () => {
+  it("finds a direct dependency", () => {
+    const g = parseSbomGraph(BOM);
+    // app -> libA, libC: libA is tree[0], libC is tree[1].
+    const found = findPathToRef(g.tree, { name: "libC", version: "3.0" });
+    expect(found).toEqual({ target: "1", ancestors: [] });
+  });
+
+  it("finds a nested transitive dependency and lists every ancestor's path", () => {
+    const g = parseSbomGraph(BOM);
+    // app -> libA -> libB: libB sits under tree[0].children[0].
+    const found = findPathToRef(g.tree, { name: "libB", version: "2.0" });
+    expect(found).toEqual({ target: "0.0", ancestors: ["0"] });
+  });
+
+  it("returns null when nothing matches", () => {
+    const g = parseSbomGraph(BOM);
+    expect(findPathToRef(g.tree, { name: "does-not-exist" })).toBeNull();
+  });
+
+  it("prefers the exact version over a same-named sibling elsewhere in the tree", () => {
+    // A dependency-conflict shape: two branches pull different versions of the
+    // same package (measured for real on a qs@6.15.3 / qs@6.16.0 pair). Search
+    // must land on the one that was actually asked for, not just the first
+    // name match a naive walk would hit.
+    const bom: RawSbom = {
+      metadata: { component: { "bom-ref": "app" } },
+      components: [
+        { "bom-ref": "a", name: "a", version: "1" },
+        { "bom-ref": "b", name: "b", version: "1" },
+        { "bom-ref": "qs-old", name: "qs", version: "6.15.3" },
+        { "bom-ref": "qs-new", name: "qs", version: "6.16.0" },
+      ],
+      dependencies: [
+        { ref: "app", dependsOn: ["a", "b"] },
+        { ref: "a", dependsOn: ["qs-old"] }, // a pulls the vulnerable version
+        { ref: "b", dependsOn: ["qs-new"] }, // b already resolved to the fix
+        { ref: "qs-old", dependsOn: [] },
+        { ref: "qs-new", dependsOn: [] },
+      ],
+    };
+    const g = parseSbomGraph(bom);
+    const vulnerable = findPathToRef(g.tree, { name: "qs", version: "6.15.3" });
+    expect(vulnerable).toEqual({ target: "0.0", ancestors: ["0"] }); // under a
+    const fixed = findPathToRef(g.tree, { name: "qs", version: "6.16.0" });
+    expect(fixed).toEqual({ target: "1.0", ancestors: ["1"] }); // under b
+  });
+
+  it("falls back to a name-only match when no version is given", () => {
+    const g = parseSbomGraph(BOM);
+    const found = findPathToRef(g.tree, { name: "libB" });
+    expect(found).toEqual({ target: "0.0", ancestors: ["0"] });
+  });
+
+  it("falls back to a name-only match when the given version matches nothing", () => {
+    const g = parseSbomGraph(BOM);
+    const found = findPathToRef(g.tree, { name: "libB", version: "9.9.9-nope" });
+    expect(found).toEqual({ target: "0.0", ancestors: ["0"] });
+  });
+
+  it("does not recurse into a cycle placeholder (stays terminating)", () => {
+    const bom: RawSbom = {
+      metadata: { component: { "bom-ref": "root" } },
+      components: [
+        { "bom-ref": "a", name: "a", version: "1" },
+        { "bom-ref": "b", name: "b", version: "1" },
+      ],
+      dependencies: [
+        { ref: "root", dependsOn: ["a"] },
+        { ref: "a", dependsOn: ["b"] },
+        { ref: "b", dependsOn: ["a"] }, // cycle back to a
+      ],
+    };
+    const g = parseSbomGraph(bom);
+    // "a" is findable at its real position (tree[0]), not just the cycle echo.
+    expect(findPathToRef(g.tree, { name: "a", version: "1" })).toEqual({
+      target: "0",
+      ancestors: [],
+    });
+  });
+});
+
+describe("findFirstMatch", () => {
+  it("drives a substring search (the Dependencies tree's own search box)", () => {
+    const g = parseSbomGraph(BOM);
+    const found = findFirstMatch(g.tree, (n) => n.name.toLowerCase().includes("lib"));
+    // Depth-first, so the first match is libA (tree[0]), not the deeper libB.
+    expect(found).toEqual({ target: "0", ancestors: [] });
+  });
+
+  it("returns null when the predicate matches nothing", () => {
+    const g = parseSbomGraph(BOM);
+    expect(findFirstMatch(g.tree, (n) => n.name === "nope")).toBeNull();
   });
 });

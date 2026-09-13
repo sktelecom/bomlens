@@ -908,6 +908,18 @@ else
         # Conformance check now runs on generation modes too (not only ANALYZE/AI SBOM).
         [ -f "$w/testapp_1.0_conformance.json" ] && pass "nodejs SOURCE: conformance artifact generated" || fail "nodejs SOURCE: conformance artifact generated"
         rm -rf "$w"
+
+        # 3a2: BOMLENS_NODE_FULL_GRAPH=1 set on the host reaches build-prep.sh in the
+        # cdxgen container, so the production-only filter is skipped and the
+        # dev-plus-production graph is larger than the default one above.
+        w="$(BOMLENS_NODE_FULL_GRAPH=1 run_source_scan "$nodesrc")"
+        nfull=$(jq '[.components[]?]|length' "$w/testapp_1.0_bom.json" 2>/dev/null || echo 0)
+        if [ "${ncomp:-0}" -gt 0 ] && [ "${nfull:-0}" -gt "$ncomp" ]; then
+            pass "nodejs BOMLENS_NODE_FULL_GRAPH=1 keeps the full graph ($nfull > $ncomp)"
+        else
+            fail "nodejs BOMLENS_NODE_FULL_GRAPH=1 keeps the full graph" "full=$nfull default=$ncomp"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
     else
         skip "nodejs example not found"
     fi
@@ -946,6 +958,23 @@ else
         rm -rf "$w1" "$w2"
     else
         skip "go example not found"
+    fi
+
+    # 3d: go.mod requiring a newer Go than the cdxgen Go image carries. The image
+    # pins GOTOOLCHAIN=local, so without a toolchain download `go list` fails and
+    # the transitive dependency (spf13/pflag, pulled in by cobra) is missing.
+    gotc="$REPO/tests/fixtures/go-newer-toolchain"
+    if [ -d "$gotc" ]; then
+        w="$(run_source_scan "$gotc")"
+        if jq -e '[.components[]?.purl // empty] | any(startswith("pkg:golang/github.com/spf13/pflag@"))' \
+               "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "go newer toolchain: transitive dependency resolved (spf13/pflag)"
+        else
+            fail "go newer toolchain: transitive dependency resolved (spf13/pflag)" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
+    else
+        skip "go-newer-toolchain fixture not found"
     fi
 fi
 
@@ -1009,6 +1038,30 @@ else
         rm -rf "$g"
     else
         skip "git ingestion (git command or nodejs example unavailable)"
+    fi
+
+    # GIT + commit SHA: `clone --branch` only resolves a branch or tag on the
+    # remote, so a commit SHA (documented as accepted alongside them, cli.md:27)
+    # failed every time before the fix. Same offline bare-repo fixture as above,
+    # --branch given the commit's own SHA instead of a branch name.
+    if command -v git >/dev/null 2>&1 && [ -d "$EXAMPLES/nodejs" ]; then
+        gc="$(mktemp -d "$WORK_ROOT/gitsha.XXXXXX")"
+        ( cd "$gc" && git init -q proj && cp -R "$EXAMPLES/nodejs/." proj/ \
+          && cd proj && git config user.email t@t && git config user.name t \
+          && git add -A && git commit -qm init )
+        sha="$(git -C "$gc/proj" rev-parse HEAD)"
+        ( cd "$gc" && git clone -q --bare proj fixture.git )
+        ( cd "$gc" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project gitsha --version 1.0 --git "file://$gc/fixture.git" \
+            --branch "$sha" --all --generate-only ) > "$gc/_scan.log" 2>&1
+        if [ -f "$gc/gitsha_1.0_bom.json" ] && jq -e '.bomFormat=="CycloneDX"' "$gc/gitsha_1.0_bom.json" >/dev/null 2>&1; then
+            pass "git ingestion: --branch resolves a commit SHA"
+        else
+            fail "git ingestion: --branch resolves a commit SHA" "$(tail -5 "$gc/_scan.log" 2>/dev/null)"; show_log_if_verbose "$gc"
+        fi
+        rm -rf "$gc"
+    else
+        skip "git ingestion with a commit SHA (git command or nodejs example unavailable)"
     fi
 fi
 
@@ -1413,6 +1466,19 @@ else
                 pass "cosign verify-blob succeeds"
             else
                 fail "cosign verify-blob succeeds"
+            fi
+            # entrypoint.sh re-runs validate-sbom.sh once signing finishes, so the
+            # conformance report this SOURCE scan generated before signing (SOURCE
+            # is in CONFORMANCE_GEN_MODE) should end up crediting the signature:
+            # proof the re-check ran, and proof it did not touch the just-signed
+            # SBOM (verify-blob above already confirms that independently).
+            sig_conf="$w/signtest_1.0_conformance.json"
+            if [ -f "$sig_conf" ]; then
+                sig_status="$(jq -r '.checks[] | select(.id=="cisa-sbom-author-signature") | .status' "$sig_conf" 2>/dev/null)"
+                [ "$sig_status" = "pass" ] && pass "conformance report credits the signature after the post-sign re-check" \
+                    || fail "conformance report credits the signature after the post-sign re-check" "status='$sig_status'"
+            else
+                fail "conformance report credits the signature after the post-sign re-check" "no conformance report produced"
             fi
         else
             fail "cosign produced detached signature" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"

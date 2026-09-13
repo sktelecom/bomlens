@@ -494,6 +494,9 @@ export interface ScanConfig {
   identifyVendored: boolean;
   includeOsv: boolean;
   byteStable: boolean;
+  /** Conformance check strictness this scan actually ran with ("default" or
+   *  "skt-submission"). Absent on scans that predate the profile. */
+  conformanceProfile?: string;
   /** The outbound license declared for this scan (SPDX id), which switches the
    *  license-conflict check on. Empty or absent means it stayed off. */
   license?: string;
@@ -604,6 +607,18 @@ export const USAGE_CONTEXTS: UsageContext[] = [
   "outputs-only",
 ];
 
+/** Conformance check strictness. "default" is the ordinary 90%-PURL /
+ *  advisory-pkg:generic thresholds; "skt-submission" is the SKT supplier
+ *  submission review (100% PURL, pkg:generic required). Kept as a named
+ *  profile rather than a boolean so a later addition (e.g. an EU CRA
+ *  profile) is a third option here, not a rewrite of the contract. */
+export type ConformanceProfile = "default" | "skt-submission";
+
+export const CONFORMANCE_PROFILES: ConformanceProfile[] = [
+  "default",
+  "skt-submission",
+];
+
 export interface ScanParams {
   project: string;
   version: string;
@@ -622,6 +637,10 @@ export interface ScanParams {
    *  the exact `includeOsv` flag. */
   includeOsv: boolean;
   byteStable: boolean;
+  /** Conformance check strictness. Read server-side as the exact
+   *  `conformance_profile` parameter; omitted (sent empty) lets the server pick
+   *  the per-mode default ("skt-submission" for ANALYZE, "default" otherwise). */
+  conformanceProfile?: ConformanceProfile;
   /** Outbound license (SPDX id) the project ships under. Read server-side as the
    *  exact `license` parameter; empty leaves the license-conflict check off. */
   license?: string;
@@ -656,7 +675,11 @@ export interface ScanProgress {
 export interface ScanHandlers {
   onLog: (line: string) => void;
   onDone: (done: DoneEvent) => void;
-  onError: (message?: string) => void;
+  /** `key`, when present, names an i18n key for a friendlier headline than
+   *  `message` (the server's raw detail, still shown as a collapsible
+   *  "show detail"). Absent for the connection-dropped case (neither arg) and
+   *  for any server failure the server could not classify. */
+  onError: (message?: string, key?: string | null) => void;
   /** Optional determinate progress (e.g. firmware CVE DB download). */
   onProgress?: (p: ScanProgress) => void;
 }
@@ -1067,6 +1090,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
+    conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
@@ -1106,11 +1130,15 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
   });
 
   es.addEventListener("error", (e) => {
-    // Backend-emitted structured error (clone failed, bad upload, no socket…).
+    // Backend-emitted structured error (clone failed, bad upload, no socket…):
+    // always `{detail, key}` now, since every server-side sender was moved
+    // onto that shape together with this handler, so there is no bare-string
+    // case left to fall back to.
     const data = (e as MessageEvent).data;
     if (!data) return; // native EventSource error has no data; handled by onerror
     try {
-      handlers.onError(String(JSON.parse(data)));
+      const parsed = JSON.parse(data) as { detail?: string; key?: string | null };
+      handlers.onError(parsed.detail, parsed.key ?? null);
     } catch {
       handlers.onError(String(data));
     }

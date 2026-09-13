@@ -17,11 +17,13 @@
 # which is how they are told apart from ordinary advisories in the same archive.
 #
 # Size: the raw archives are ~275 MB and their malicious entries alone expand to
-# ~345 MB, which is why this reduces them to what the check actually needs — a
-# PURL keyed to its MAL id, and the affected versions when the advisory names
-# them. Measured 2026-07-28: 232,687 PURLs across eight ecosystems, 10.8 MB of
-# JSON. Most entries name no versions because every published version of the
-# package is malicious, which is also why a name match alone is usually enough.
+# ~345 MB, which is why this reduces them to what the check actually needs: a
+# PURL keyed to its MAL id, the affected versions when the advisory names them,
+# and the affected SEMVER/ECOSYSTEM ranges (introduced/fixed/last_affected)
+# when it gives those instead. Measured 2026-07-28 (before ranges were kept):
+# 232,687 PURLs across eight ecosystems, 10.8 MB of JSON. Most entries name no
+# versions and no ranges because every published version of the package is
+# malicious, which is also why a name match alone is usually enough for those.
 #
 # Best-effort, exactly like build-eol-index.py: an ecosystem whose fetch fails is
 # skipped with a warning. If NOTHING is fetched (no network in the build), no
@@ -60,18 +62,22 @@ TOTAL_BUDGET = 900
 
 
 def fetch_ecosystem(name):
-    """Return {purl: mal_id} plus {purl: [versions]} for one OSV archive.
+    """Return {purl: mal_id}, {purl: [versions]} and {purl: [ranges]} for one
+    OSV archive.
 
-    Versions are kept only when the advisory lists them explicitly. An advisory
-    with a range but no version list means the whole package is malicious, and
-    storing an open range would only make the index bigger without changing any
-    verdict.
+    Versions are kept only when the advisory lists them explicitly. When an
+    advisory instead gives a SEMVER/ECOSYSTEM range (introduced/fixed/
+    last_affected), that range is kept too: without it, a package with a fixed
+    release (most CVE-style malicious-version-range advisories, not "every
+    version is malicious" typosquats) would be flagged on every version
+    including the ones released after the fix. GIT-type ranges are dropped:
+    they bound commits, not the released versions an SBOM carries.
     """
     url = ARCHIVE.format(name)
     req = urllib.request.Request(url, headers={"Accept": "application/zip"})
     with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:  # noqa: S310 (https only)
         blob = resp.read()
-    ids, versions = {}, {}
+    ids, versions, ranges = {}, {}, {}
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         for entry in zf.namelist():
             if not entry.startswith("MAL-"):
@@ -88,7 +94,27 @@ def fetch_ecosystem(name):
                 vers = affected.get("versions") or []
                 if vers:
                     versions.setdefault(purl, sorted(set(vers))[:200])
-    return ids, versions
+                    continue
+                for rng in affected.get("ranges", []):
+                    if rng.get("type") not in ("SEMVER", "ECOSYSTEM"):
+                        continue
+                    events = [
+                        {k: v for k, v in ev.items() if k in ("introduced", "fixed", "last_affected", "limit")}
+                        for ev in rng.get("events", [])
+                    ]
+                    # A block that only ever says "introduced 0" (OSV's spelling
+                    # for "affected from the first release") and never closes
+                    # verdicts identically to the plain "no versions, no ranges"
+                    # fallback (every version malicious) for every comparable
+                    # version, so keeping it would only grow the index for a
+                    # range that can never change the answer. Any other block,
+                    # even an unclosed one with a nonzero "introduced" (affected
+                    # from THAT version on, not from the start), does change the
+                    # answer for versions before it and must be kept.
+                    trivial = events == [{"introduced": "0"}] or events == [{"introduced": "0.0.0"}]
+                    if events and not trivial:
+                        ranges.setdefault(purl, []).append(events)
+    return ids, versions, ranges
 
 
 def main():
@@ -97,7 +123,7 @@ def main():
         return 2
 
     out_path = sys.argv[1]
-    packages, versions = {}, {}
+    packages, versions, ranges = {}, {}, {}
     ok, failed, skipped = 0, [], []
     deadline = time.monotonic() + TOTAL_BUDGET
     for eco in ECOSYSTEMS:
@@ -105,13 +131,14 @@ def main():
             skipped.append(eco)
             continue
         try:
-            ids, vers = fetch_ecosystem(eco)
+            ids, vers, rngs = fetch_ecosystem(eco)
         except (urllib.error.URLError, OSError, ValueError, zipfile.BadZipFile) as exc:
             failed.append(eco)
             sys.stderr.write(f"[mal-index] WARN: could not fetch {eco}: {exc}\n")
             continue
         packages.update(ids)
         versions.update(vers)
+        ranges.update(rngs)
         ok += 1
     if skipped:
         sys.stderr.write(
@@ -131,11 +158,13 @@ def main():
         "_ecosystems": [e for e in ECOSYSTEMS if e not in failed and e not in skipped],
         "packages": packages,
         "versions": versions,
+        "ranges": ranges,
     }
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(out, fh, separators=(",", ":"), sort_keys=True)
     sys.stderr.write(
-        f"[mal-index] bundled {len(packages)} malicious package(s) from {ok} "
+        f"[mal-index] bundled {len(packages)} malicious package(s) "
+        f"({len(versions)} version-limited, {len(ranges)} range-limited) from {ok} "
         f"ecosystem(s) into {out_path} (snapshot {out['_snapshot']}); "
         f"{len(failed)} failed: {failed}\n"
     )

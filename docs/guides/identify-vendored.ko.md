@@ -28,7 +28,7 @@ OSSKB 서비스로는 파일 **지문(해시)**만 전송됩니다. 소스 코�
 
 ## 준비
 
-발행된 `bomlens` 이미지(v1.4.0 이상)에는 SCANOSS 클라이언트가 이미 포함돼 있어 별도 설정이 필요 없습니다. 이미지를 최소 구성으로 직접 빌드하는 경우에만 build arg를 추가합니다.
+발행된 `bomlens` 이미지에는 SCANOSS 클라이언트가 이미 포함돼 있어 별도 설정이 필요 없습니다. 이미지를 최소 구성으로 직접 빌드하는 경우에만 build arg를 추가합니다.
 
 ```bash
 docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker

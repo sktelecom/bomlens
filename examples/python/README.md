@@ -1,115 +1,98 @@
-# Python 프로젝트 예제
+# Python Example
 
 > **English**: A sample project for trying SBOM generation. The scan commands below are language-neutral; for English docs see [getting started](../../docs/start/first-scan.md) and the [usage guide](../../docs/reference/cli.md).
 
-Flask 기반 간단한 REST API 애플리케이션입니다. SBOM 생성 테스트를 위한 예제로 사용됩니다. Flask, Pandas, NumPy, Requests, SQLAlchemy, Pytest 등 널리 쓰이는 Python 패키지를 의존성으로 포함합니다.
+This example demonstrates SBOM generation for a Python project using pip, a Flask-based REST API with common data-processing and validation libraries.
 
-## SBOM 생성
+## Project Structure
 
-### 방법 1: BomLens 스크립트 사용 (권장)
+- `requirements.txt`: pip dependencies
+- `app.py`: a Flask app with a few JSON endpoints
 
-> **Windows**: `scan-sbom.sh` 대신 `..\..\scripts\scan-sbom.bat`를 실행하세요(Git Bash 필요). 명령줄 없이 쓰려면 `scripts\sbom-ui.bat`을 더블클릭 — [시작하기](../../docs/start/first-scan.ko.md) 참고.
+## Dependencies
+
+- **Flask** (3.0.0) and **Werkzeug** (3.0.1): web framework
+- **Pandas** (2.1.4) and **NumPy** (1.26.2): data processing
+- **Requests** (2.31.0): HTTP client
+- **Pydantic** (2.5.2): data validation
+- **SQLAlchemy** (2.0.23): database toolkit
+- pytest, pytest-cov, black, flake8: testing and lint tools
+
+## Generate SBOM
+
+> **Windows**: run `..\..\scripts\scan-sbom.bat` instead of `scan-sbom.sh` (Git Bash required). For no command line, double-click `scripts\sbom-ui.bat`; see [getting started](../../docs/start/first-scan.md).
 
 ```bash
-# 프로젝트 디렉토리로 이동
 cd examples/python
-
-# SBOM 생성
-../../scripts/scan-sbom.sh \
-  --project "PythonFlaskExample" \
-  --version "1.0.0" \
-  --generate-only
+../../scripts/scan-sbom.sh --project "PythonFlaskExample" --version "1.0.0" --generate-only
 ```
 
-결과는 `PythonFlaskExample_1.0.0/` 폴더에 저장됩니다(`PythonFlaskExample_1.0.0_bom.json` 등).
+## Expected Output
 
-### 방법 2: Docker 직접 사용
-
-```bash
-docker run --rm \
-  -v "$(pwd)":/src \
-  -v "$(pwd)":/host-output \
-  -e MODE=SOURCE \
-  -e UPLOAD_ENABLED=false \
-  -e HOST_OUTPUT_DIR=/host-output \
-  -e PROJECT_NAME="PythonFlaskExample" \
-  -e PROJECT_VERSION="1.0.0" \
-  ghcr.io/sktelecom/bomlens:latest
-```
-
-이 방법은 스크립트와 달리 출력 폴더에 바로(하위 폴더 없이) 저장됩니다.
-
-### 방법 3: cyclonedx-py 사용
-
-```bash
-# cyclonedx-py 설치
-pip install cyclonedx-bom
-
-# SBOM 생성
-cyclonedx-py requirements \
-  -i requirements.txt \
-  -o bom.json \
-  --format json
-```
-
-## 생성된 SBOM 확인
-
-```bash
-# SBOM 파일 확인
-ls -lh PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json
-
-# 컴포넌트 개수 확인 (jq 필요)
-cat PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json | jq '.components | length'
-
-# Flask 관련 의존성 확인
-cat PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json | jq -r '.components[] | select(.name | contains("flask")) | "\(.name)@\(.version)"'
-```
-
-예상 컴포넌트 수는 약 30-40개입니다(전이적 의존성 포함).
+The scan writes its outputs into a `PythonFlaskExample_1.0.0/` folder. The main SBOM, `PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json`, lists roughly 30-40 components (including transitive dependencies):
 <!-- expected-components: 30-40 -->
 
-생성된 SBOM에는 다음과 같은 정보가 포함됩니다:
-
-- 웹 프레임워크: flask, werkzeug, jinja2, itsdangerous
-- 데이터 처리: pandas, numpy, pytz
+- Web framework: flask, werkzeug, jinja2, itsdangerous
+- Data processing: pandas, numpy, pytz
 - HTTP: requests, urllib3, certifi, charset-normalizer
-- 검증: pydantic, pydantic-core
-- 데이터베이스: sqlalchemy, greenlet
-- 테스트: pytest, pytest-cov, coverage
-- 유틸리티: python-dotenv, click
+- Validation: pydantic, pydantic-core
+- Database: sqlalchemy, greenlet
+- Testing: pytest, pytest-cov, coverage
+- Utilities: python-dotenv, click
 
-## 문제 해결
+### Sample Components
 
-### SBOM이 비어있음
+- flask
+- pandas
+- numpy
+- requests
+- sqlalchemy
+
+## Build and Run (Optional)
 
 ```bash
-# requirements.txt 위치 확인
-ls -la requirements.txt
+pip install -r requirements.txt
+python app.py
+# Visit http://localhost:5000
+```
 
-# requirements.txt 생성
+## Validate Results
+
+```bash
+# Count components
+jq '.components | length' PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json
+
+# View the Flask entry
+jq -r '.components[] | select(.name | contains("flask")) | "\(.name)@\(.version)"' PythonFlaskExample_1.0.0/PythonFlaskExample_1.0.0_bom.json
+```
+
+## Common Issues
+
+### SBOM is empty
+
+```bash
+ls -la requirements.txt
 pip freeze > requirements.txt
 ```
 
-### pip 설치 실패
+**Solution:** confirm `requirements.txt` is present at the project root and lists the installed packages.
+
+### pip install fails
 
 ```bash
-# pip 업그레이드
 pip install --upgrade pip
-
-# 캐시 삭제 후 재설치
 pip install --no-cache-dir -r requirements.txt
 ```
 
-## Poetry 사용 (선택)
+### Generating an SBOM with cyclonedx-py instead
 
-Poetry(`pyproject.toml`)를 쓰는 프로젝트도 같은 방식으로 스캔할 수 있습니다. `--project` 이름만 바꿔서 방법 1 명령을 그대로 실행하면 됩니다.
+```bash
+pip install cyclonedx-bom
+cyclonedx-py requirements -i requirements.txt -o bom.json --format json
+```
 
-## 다음 단계
+## Next Steps
 
-- [사용 가이드](../../docs/reference/cli.ko.md) - 상세한 사용법
-- [시작하기](../../docs/start/first-scan.ko.md) - 첫 SBOM 생성
-- [Docker 가이드](../../docker/README.md) - Docker 이미지 사용법
-
-## 참고
-
-이 예제는 SBOM 생성 테스트 목적으로 만들어졌습니다. 실제 프로덕션 환경에서는 인증, 에러 처리, 로깅, 모니터링 등을 추가해야 합니다.
+- Add more packages to `requirements.txt` and re-scan
+- Try a Poetry project (`pyproject.toml` + `poetry.lock`); the same command works, just point `--project` at your own name
+- Compare the SBOM before and after adding a new dependency

@@ -1,76 +1,78 @@
-# Docker 이미지 가이드 (빌드와 배포)
+# Docker image guide (build and publish)
 
-BomLens Docker 이미지를 직접 빌드하고 배포하려는 기여자를 위한 가이드입니다.
+> **한국어**: [docker/README.ko.md](README.ko.md)
 
-이미지를 사용만 한다면 이 문서가 아니라 사이트의 [Docker 이미지 직접 사용](https://sktelecom.github.io/bomlens/docker-image/) 가이드를 보세요. `docker run` 예시와 환경 변수 설명이 거기에 있습니다.
+This guide is for contributors who want to build and publish the BomLens Docker image themselves.
 
-## 이미지 정보
+If you only want to use the image, see the site's [Use the Docker image directly](https://sktelecom.github.io/bomlens/docker-image/) guide instead. It has `docker run` examples and environment variable descriptions.
 
-- 대표 이름: `ghcr.io/sktelecom/bomlens` (별칭 `sbom-generator`, `sbom-scanner` — 같은 다이제스트)
-- 펌웨어 분석용: `ghcr.io/sktelecom/bomlens-firmware` (opt-in) (legacy alias: sbom-scanner-firmware)
-- 플랫폼: `linux/amd64`, `linux/arm64`
-- 베이스: `python:3.12-slim`. 언어 toolchain 없는 경량 후처리 이미지이며, 포함 도구와 버전은 `Dockerfile`의 `ARG`로 고정됩니다 (syft, Trivy, cosign, scancode 등).
+## Image information
 
-## 직접 빌드하기
+- Canonical name: `ghcr.io/sktelecom/bomlens` (aliases `sbom-generator`, `sbom-scanner`, same digest)
+- Firmware analysis: `ghcr.io/sktelecom/bomlens-firmware` (opt-in) (legacy alias: sbom-scanner-firmware)
+- Platforms: `linux/amd64`, `linux/arm64`
+- Base: `python:3.12-slim`. It is a lightweight post-processing image with no language toolchain, and the bundled tools and their versions are pinned as `ARG`s in the `Dockerfile` (syft, Trivy, cosign, scancode, and more).
 
-### 사전 요구사항
+## Building it yourself
 
-- Docker 20.10 이상
-- 디스크 공간 5GB 이상
+### Prerequisites
 
-### 로컬 빌드
+- Docker 20.10 or later
+- 5GB or more of free disk space
+
+### Local build
 
 ```bash
-# 저장소 클론
+# Clone the repository
 git clone https://github.com/sktelecom/bomlens.git
 cd bomlens/docker
 
-# 빌드
+# Build
 docker build -t sbom-scanner:local .
 
-# 빌드 시간: 약 10-15분 (네트워크 속도에 따라 다름)
+# Build time: about 10-15 minutes, depending on network speed
 ```
 
-### 빌드 확인
+### Verifying the build
 
-이미지에 실제로 들어 있는 도구로 확인합니다. cdxgen은 이 이미지에 없습니다. 소스 스캔의 cdxgen은 `scan-sbom.sh`가 필요할 때 언어별 공식 이미지를 따로 받아 실행합니다.
+Check with tools that are actually in the image. cdxgen is not in this image; for source scans, `scan-sbom.sh` pulls the per-language official cdxgen images separately when it needs one.
 
 ```bash
-# 이미지 확인
+# Check the image
 docker images | grep sbom-scanner
 
-# 테스트 실행
+# Test run
 docker run --rm --entrypoint syft sbom-scanner:local version
 docker run --rm --entrypoint trivy sbom-scanner:local --version
 ```
 
-### 빌드 옵션
+### Build options
 
-#### opt-in 도구 선택
+#### Opting in to feature tools
 
-기능별 도구는 `--build-arg`로 켭니다. 기본 빌드는 경량을 유지하기 위해 대부분 꺼져 있습니다.
+Feature-specific tools are turned on with `--build-arg`. Most of them are off by default to keep the base build lightweight.
 
-| 빌드 인자 | 기본값 | 켜면 포함되는 것 |
+| Build arg | Default | What turning it on adds |
 |-----------|--------|------------------|
-| `SBOM_FIRMWARE` | `false` | 펌웨어 분석 도구(unblob, cve-bin-tool, ubi_reader)와 CPE→CVE 인덱스 번들. `bomlens-firmware` 이미지가 이 옵션으로 빌드됩니다. NVD 데이터는 빌드 시 `fkie-cad/nvd-json-data-feeds`를 clone해 로컬에서 인덱스로 증류하므로 NVD API 키나 시크릿이 필요 없습니다 |
-| `SBOM_AIBOM` | `false` | AI 모델 SBOM 생성 도구(OWASP aibom-generator + cdxgen) |
-| `SBOM_DEEP_LICENSE` | `false` | scancode-toolkit 기반 딥 라이선스 스캔 |
-| `SBOM_SCANOSS` | `true` | vendored OSS 식별 클라이언트(scanoss.py). 실행은 런타임 `--identify-vendored`로 다시 gate됩니다 |
-| `SBOM_PDF` | `false` | 고지문 PDF 렌더러(weasyprint) |
+| `SBOM_FIRMWARE` | `false` | Firmware analysis tools (unblob, cve-bin-tool, ubi_reader) and a CPE-to-CVE index bundle. The `bomlens-firmware` image is built with this option. The NVD data is distilled into a local index at build time by cloning `fkie-cad/nvd-json-data-feeds`, so no NVD API key or secret is needed |
+| `SBOM_AIBOM` | `false` | AI model SBOM generation tools (OWASP aibom-generator + cdxgen) |
+| `SBOM_DEEP_LICENSE` | `false` | Deep license scanning based on scancode-toolkit |
+| `SBOM_SCANOSS` | `true` | Vendored OSS identification client (scanoss.py). Running it is gated again at runtime by `--identify-vendored` |
+| `SBOM_PDF` | `false` | Notice PDF renderer (weasyprint) |
 
 ```bash
-# 예: 펌웨어 분석 이미지 빌드 (NVD 키·시크릿 불필요)
+# Example: build the firmware analysis image (no NVD key or secret needed)
 docker build --build-arg SBOM_FIRMWARE=true \
   -t sbom-scanner-firmware:local .
 ```
 
-#### 캐시 없이 빌드
+#### Building without cache
 
 ```bash
 docker build --no-cache -t sbom-scanner:local .
 ```
 
-#### 특정 플랫폼용 빌드
+#### Building for a specific platform
 
 ```bash
 # AMD64 (Intel/AMD)
@@ -80,27 +82,27 @@ docker build --platform linux/amd64 -t sbom-scanner:amd64 .
 docker build --platform linux/arm64 -t sbom-scanner:arm64 .
 ```
 
-## 멀티 플랫폼 빌드
+## Multi-platform builds
 
-정식 배포는 사람이 수동으로 하지 않습니다. `main` push와 릴리스 태그에서 `.github/workflows/docker-publish.yml`이 멀티 플랫폼 빌드와 3개 이름(bomlens, sbom-generator, sbom-scanner) 배포를 수행합니다. 아래 절차는 워크플로를 우회해야 하는 예외 상황(예: 레지스트리 장애 복구, 사전 검증)용입니다.
+The official release is not done by hand. `.github/workflows/docker-publish.yml` builds for multiple platforms and publishes under three names (bomlens, sbom-generator, sbom-scanner) on every push to `main` and on release tags. The steps below are for the exceptional cases where you need to bypass the workflow: recovering from a registry outage, or a pre-release check, for example.
 
-### buildx 설정
+### Setting up buildx
 
 ```bash
-# buildx 빌더 생성
+# Create a buildx builder
 docker buildx create --name multiplatform-builder --use
 
-# 빌더 부팅
+# Boot the builder
 docker buildx inspect --bootstrap
 
-# 지원 플랫폼 확인
+# Check supported platforms
 docker buildx inspect
 ```
 
-### 멀티 플랫폼 빌드 실행
+### Running a multi-platform build
 
 ```bash
-# AMD64 + ARM64 동시 빌드
+# Build AMD64 and ARM64 together
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -t ghcr.io/sktelecom/bomlens:latest \
@@ -108,34 +110,34 @@ docker buildx build \
   .
 ```
 
-참고: `--load`는 단일 플랫폼만 가능합니다. 멀티 플랫폼은 `--push`를 사용합니다.
+Note: `--load` only works for a single platform. Use `--push` for multi-platform builds.
 
-## GitHub Container Registry 배포 (예외 상황용)
+## Publishing to GitHub Container Registry (exceptional cases)
 
-### 1. Personal Access Token 생성
+### 1. Create a Personal Access Token
 
-1. GitHub에서 Settings, Developer settings, Personal access tokens 순으로 들어가 Tokens (classic)을 엽니다.
-2. "Generate new token (classic)" 클릭
-3. 권한 선택:
-   - `write:packages` - 패키지 업로드
-   - `read:packages` - 패키지 다운로드
-4. 토큰 생성 및 저장
+1. On GitHub, go to Settings, then Developer settings, then Personal access tokens, and open Tokens (classic).
+2. Click "Generate new token (classic)".
+3. Select the scopes:
+   - `write:packages` - upload packages
+   - `read:packages` - download packages
+4. Generate the token and save it.
 
-### 2. GitHub Container Registry 로그인
+### 2. Log in to GitHub Container Registry
 
 ```bash
-# 환경변수 설정
+# Set environment variables
 export GITHUB_TOKEN="ghp_your_personal_access_token"
 export GITHUB_USERNAME="your_github_username"
 
-# 로그인
+# Log in
 echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USERNAME --password-stdin
 ```
 
-### 3. 이미지 빌드 및 푸시
+### 3. Build and push the image
 
 ```bash
-# 멀티 플랫폼 빌드 + 푸시
+# Multi-platform build + push
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -t ghcr.io/sktelecom/bomlens:latest \
@@ -143,93 +145,93 @@ docker buildx build \
   .
 ```
 
-### 4. 푸시 확인
+### 4. Confirm the push
 
 ```bash
-# 이미지 메타데이터 확인 (amd64/arm64 매니페스트가 모두 보여야 함)
+# Check the image metadata (both amd64/arm64 manifests should show up)
 docker buildx imagetools inspect ghcr.io/sktelecom/bomlens:latest
 ```
 
-### 5. 패키지 공개 설정
+### 5. Set the package to public
 
-기본적으로 패키지는 Private입니다. Public으로 변경:
+Packages are Private by default. To change to Public:
 
-1. https://github.com/orgs/sktelecom/packages 접속
-2. `bomlens` 패키지 선택 (별칭 `sbom-generator`, `sbom-scanner`도 같은 방식)
-3. "Package settings"에서 "Change visibility"를 눌러 "Public"을 고릅니다
-4. 패키지명 입력하여 확인
+1. Go to https://github.com/orgs/sktelecom/packages.
+2. Select the `bomlens` package (the same applies to the `sbom-generator` and `sbom-scanner` aliases).
+3. Under "Package settings", click "Change visibility" and choose "Public".
+4. Type the package name to confirm.
 
-## 이미지 상세 정보
+## Image details
 
-### Dockerfile 구조
+### Dockerfile structure
 
-2-스테이지 빌드입니다. 언어 toolchain은 넣지 않습니다. 소스 코드의 SBOM 생성은 `scan-sbom.sh`가 cdxgen 언어별 공식 이미지를 그때그때 받아 위임하고, 이 이미지는 후처리와 스캔을 담당합니다.
+It is a two-stage build. No language toolchain goes into it: for source code, `scan-sbom.sh` delegates SBOM generation to the per-language official cdxgen images it pulls on demand, and this image handles post-processing and scanning.
 
-- 스테이지 1 (`node:26-alpine`): 웹 UI(React SPA)를 빌드합니다. node는 이 스테이지에만 있고 결과물 `dist/`만 런타임으로 복사됩니다.
-- 스테이지 2 (`python:3.12-slim`): 실행 이미지입니다. syft(이미지/바이너리/RootFS 스캔), Trivy(보안 보고서), cosign(서명), docker CLI(웹 UI 소스 스캔이 cdxgen 형제 컨테이너를 띄울 때 사용), 그리고 entrypoint와 후처리 스크립트가 들어갑니다.
+- Stage 1 (`node:26-alpine`): builds the web UI (React SPA). Node exists only in this stage; only the `dist/` build output is copied into the runtime image.
+- Stage 2 (`python:3.12-slim`): the runtime image. It carries syft (image/binary/RootFS scanning), Trivy (security reports), cosign (signing), the docker CLI (used when the web UI's source scan starts a sibling cdxgen container), and the entrypoint and post-processing scripts.
 
-도구 버전은 `Dockerfile`의 `ARG`로 고정되며 Renovate가 업스트림 릴리스를 추적해 갱신 PR을 엽니다.
+Tool versions are pinned as `ARG`s in the `Dockerfile`, and Renovate tracks the upstream releases and opens update PRs.
 
-| 도구 | ARG | 고정 버전 |
+| Tool | ARG | Pinned version |
 |------|-----|----------|
 | syft | `SYFT_VERSION` | v1.51.0 |
 | Trivy | `TRIVY_VERSION` | v0.74.0 |
-| cosign | `COSIGN_VERSION` | v2.6.5 |
-| docker CLI | `DOCKER_CLI_VERSION` | 27.5.1 |
+| cosign | `COSIGN_VERSION` | See the [Docker image reference](../docs/reference/docker-image.md) |
+| docker CLI | `DOCKER_CLI_VERSION` | See the [Docker image reference](../docs/reference/docker-image.md) |
 | scanoss.py | `SCANOSS_VERSION` | 1.54.2 |
 | scancode-toolkit (opt-in) | `SCANCODE_VERSION` | 32.5.0 |
-| cdxgen (aibom opt-in) | `CDXGEN_VERSION` | 12.8.3 |
+| cdxgen (aibom opt-in) | `CDXGEN_VERSION` | See the [Docker image reference](../docs/reference/docker-image.md) |
 
-### 이미지 크기
+### Image size
 
-기본 빌드는 약 1GB입니다(로컬 실측 981MB). 레이어별 크기는 직접 확인하는 편이 정확합니다.
+The base build is about 1GB (981MB measured locally). For a per-layer breakdown, check it directly.
 
 ```bash
 docker history sbom-scanner:local
 ```
 
-펌웨어 이미지(`SBOM_FIRMWARE=true`)는 번들된 CVE DB(약 0.5~1.5GB)만큼 커집니다.
+The firmware image (`SBOM_FIRMWARE=true`) is larger by the size of the bundled CVE database (about 0.5-1.5GB).
 
-### 지원 아키텍처
+### Supported architectures
 
-| 아키텍처 | 플랫폼 | 사용 환경 |
+| Architecture | Platform | Used on |
 |---------|--------|----------|
-| `linux/amd64` | x86_64 | Intel/AMD 서버, WSL2 |
-| `linux/arm64` | aarch64 | Apple Silicon (M1/M2/M3), ARM 서버 |
+| `linux/amd64` | x86_64 | Intel/AMD servers, WSL2 |
+| `linux/arm64` | aarch64 | Apple Silicon (M1/M2/M3), Arm servers |
 
-Docker가 자동으로 현재 플랫폼에 맞는 이미지를 다운로드합니다.
+Docker automatically pulls the image matching the current platform.
 
-## 테스트
+## Testing
 
-### 통합 테스트
+### Integration tests
 
 ```bash
-# 테스트 스크립트 실행 (SBOM_SCANNER_IMAGE로 방금 빌드한 이미지 지정)
+# Run the test script (point SBOM_SCANNER_IMAGE at the image you just built)
 cd /path/to/bomlens
 SBOM_SCANNER_IMAGE=sbom-scanner:local ./tests/test-scan.sh
 ```
 
-테스트 시나리오:
-- Node.js 프로젝트
-- Python 프로젝트
-- Java Maven 프로젝트
-- Ruby 프로젝트
-- PHP 프로젝트
-- Rust 프로젝트
-- Docker 이미지
-- 바이너리 파일
-- RootFS 디렉터리
+Test scenarios:
+- Node.js project
+- Python project
+- Java Maven project
+- Ruby project
+- PHP project
+- Rust project
+- Docker image
+- Binary file
+- RootFS directory
 
-### 수동 테스트
+### Manual testing
 
 ```bash
-# 간단한 Node.js 프로젝트 생성
+# Create a simple Node.js project
 mkdir test-project
 cd test-project
 echo '{"name":"test","version":"1.0.0","dependencies":{"express":"4.18.0"}}' > package.json
 npm install --package-lock-only
 
-# SBOM 생성 테스트 (방금 빌드한 이미지)
+# Test SBOM generation (with the image you just built)
 docker run --rm \
   -v "$(pwd)":/src \
   -v "$(pwd)":/host-output \
@@ -240,48 +242,48 @@ docker run --rm \
   -e PROJECT_VERSION=1.0.0 \
   sbom-scanner:local
 
-# 결과 확인 (docker run 직접 실행은 출력 폴더에 바로 저장됩니다)
+# Check the result (a direct docker run saves straight into the output folder)
 ls -la TestProject_1.0.0_bom.json
 cat TestProject_1.0.0_bom.json | jq '.components | length'
 ```
 
-## 문제 해결
+## Troubleshooting
 
-### 빌드 실패
+### Build failures
 
-#### 오류: "manifest unknown"
+#### Error: "manifest unknown"
 
-원인: GitHub Container Registry에 이미지가 없음
+Cause: the image is not in GitHub Container Registry.
 
-해결:
+Fix:
 ```bash
-# 로그인 확인
+# Check that you are logged in
 docker login ghcr.io
 
-# 이미지 경로 확인
+# Check the image path
 echo ghcr.io/sktelecom/bomlens:latest
 ```
 
-#### 오류: "no space left on device"
+#### Error: "no space left on device"
 
-원인: 디스크 공간 부족
+Cause: not enough disk space.
 
-해결:
+Fix:
 ```bash
-# 사용하지 않는 이미지 정리
+# Clean up unused images
 docker system prune -a
 
-# 디스크 공간 확인
+# Check disk space
 df -h
 ```
 
-### 실행 오류
+### Runtime errors
 
-#### 오류: "Cannot connect to the Docker daemon"
+#### Error: "Cannot connect to the Docker daemon"
 
-원인: Docker 소켓이 마운트되지 않음 (IMAGE 모드)
+Cause: the Docker socket is not mounted (IMAGE mode).
 
-해결:
+Fix:
 ```bash
 # Linux/macOS
 -v /var/run/docker.sock:/var/run/docker.sock
@@ -290,49 +292,49 @@ df -h
 -v //./pipe/docker_engine://./pipe/docker_engine
 ```
 
-#### 오류: "Permission denied" (파일 쓰기)
+#### Error: "Permission denied" (writing files)
 
-원인: 컨테이너 내부 사용자 권한 문제
+Cause: a user permission mismatch inside the container.
 
-해결:
+Fix:
 ```bash
-# 현재 사용자 권한으로 실행
+# Run as the current user
 docker run --rm --user $(id -u):$(id -g) ...
 ```
 
-## 고급 사용법
+## Advanced usage
 
-### 프록시 환경에서 빌드
+### Building behind a proxy
 
 ```bash
-# 프록시 설정
+# Proxy settings
 docker build \
   --build-arg HTTP_PROXY=http://proxy.company.com:8080 \
   --build-arg HTTPS_PROXY=http://proxy.company.com:8080 \
   -t sbom-scanner:local .
 ```
 
-### 사용자 정의 entrypoint
+### Custom entrypoint
 
 ```bash
-# Bash 셸로 진입
+# Enter a Bash shell
 docker run --rm -it \
   -v "$(pwd)":/src \
   --entrypoint /bin/bash \
   sbom-scanner:local
 
-# 컨테이너 내부에서 수동 실행 (이미지에 든 syft 사용)
+# Run manually inside the container (using the syft bundled in the image)
 root@container:/src# syft dir:/src -o cyclonedx-json > bom.json
 ```
 
-## 참고 자료
+## References
 
 - **Dockerfile**: [docker/Dockerfile](Dockerfile)
-- **Entrypoint 스크립트**: [docker/entrypoint.sh](entrypoint.sh)
-- **Docker 공식 문서**: https://docs.docker.com/
+- **Entrypoint script**: [docker/entrypoint.sh](entrypoint.sh)
+- **Docker docs**: https://docs.docker.com/
 - **Docker Buildx**: https://docs.docker.com/buildx/working-with-buildx/
 
-## 문의
+## Contact
 
-- **이메일**: opensource@sktelecom.com
-- **이슈**: [GitHub Issues](https://github.com/sktelecom/bomlens/issues)
+- **Email**: opensource@sktelecom.com
+- **Issues**: [GitHub Issues](https://github.com/sktelecom/bomlens/issues)

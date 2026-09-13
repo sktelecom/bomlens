@@ -108,6 +108,10 @@ export function NextApp() {
   // The failure message surfaced on the Scan-running screen when a scan can't
   // run (stream/launch error), so it isn't buried in the log.
   const [scanError, setScanError] = useState<string | null>(null);
+  // Set alongside scanError when the server could classify the failure (e.g.
+  // a git clone that failed because the repo is missing or private): an i18n
+  // key for a friendlier headline, with scanError kept as the raw detail.
+  const [scanErrorKey, setScanErrorKey] = useState<string | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
   const [projectInfo, setProjectInfo] = useState<{
@@ -378,6 +382,7 @@ export function NextApp() {
     setStatus("running");
     setLogs([]);
     setScanError(null);
+    setScanErrorKey(null);
     setProgress(null);
     setResult(null);
     setActiveSection("overview");
@@ -402,10 +407,11 @@ export function NextApp() {
           window.history.replaceState(null, "", scanHash(id));
         }
       },
-      onError: (message) => {
+      onError: (message, key) => {
         if (message) {
           setLogs((prev) => [...prev, `✖ ${message}`]);
           setScanError(message);
+          setScanErrorKey(key ?? null);
         }
         setStatus((s) => (s === "running" ? "error" : s));
       },
@@ -453,6 +459,7 @@ export function NextApp() {
       tier?: LicenseRiskTier;
       license?: string;
       term?: string;
+      version?: string;
     },
   ) => {
     if (!loadedIdRef.current) return;
@@ -461,6 +468,10 @@ export function NextApp() {
     if (filter.severity) query.severity = filter.severity;
     if (filter.tier) query.tier = filter.tier;
     if (filter.license) query.license = filter.license;
+    // Disambiguates a "View in Dependencies" jump when the same package name
+    // resolves to two different versions in the tree (findPathToRef then
+    // requires the exact version instead of landing on the first name match).
+    if (filter.version) query.version = filter.version;
     window.location.hash = scanHash(loadedIdRef.current, section, query);
   };
 
@@ -560,6 +571,7 @@ export function NextApp() {
                 : projectInfo.name)
             }
             errorMessage={scanError}
+            errorKey={scanErrorKey}
             newScanHref={newHash()}
             onNewScan={goToNewScan}
             deepCveEnabled={retryParams?.deepCve}

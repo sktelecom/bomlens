@@ -35,8 +35,33 @@ SBOM="$1"
 OUT_PREFIX="$2"
 PROJECT="${3:-project}"
 
+# cosign (--sign) writes a DETACHED signature next to the SBOM ("$SBOM.sig"),
+# not an embedded CycloneDX .signature field (see entrypoint.sh's cosign
+# invocation). The cisa-sbom-author-signature element only ever looked at
+# .signature, so a signed submission never satisfied it. Checked once here so
+# the ANALYZE path (a supplier's own submission, .sig already sitting next to
+# it) and the generation path (this scan's own re-run after signing, see
+# entrypoint.sh) share the same signal.
+if [ -f "${SBOM}.sig" ]; then HAS_SIG_FILE=true; else HAS_SIG_FILE=false; fi
+# Set by entrypoint.sh only on the post-signing re-run, to phrase the gap
+# accurately when a requested signature failed rather than reporting it the
+# same as "signing was never asked for".
+SIGN_REQUESTED="${SIGN_SBOM:-false}"
+SIGN_ATTEMPT_FAILED="${SIGN_FAILED:-0}"
+
+# Submission profile. "skt-submission" tightens PURL coverage to 100% and
+# makes pkg:generic a required (failing) check instead of advisory; "default"
+# keeps the existing thresholds. Unknown values fall back to "default".
+CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
+case "$CONFORMANCE_PROFILE" in
+    skt-submission) _PURL_DEFAULT=100; GENERIC_REQUIRED=true ;;
+    default|"")     _PURL_DEFAULT=90;  GENERIC_REQUIRED=false ;;
+    *)              echo "[validate] WARN: unknown CONFORMANCE_PROFILE '$CONFORMANCE_PROFILE'; using default." >&2
+                     _PURL_DEFAULT=90; GENERIC_REQUIRED=false ;;
+esac
+
 # Coverage thresholds (percent). Override via env to tune strictness.
-PURL_MIN_PCT="${PURL_MIN_PCT:-90}"      # mandatory
+PURL_MIN_PCT="${PURL_MIN_PCT:-$_PURL_DEFAULT}" # mandatory
 LICENSE_MIN_PCT="${LICENSE_MIN_PCT:-80}" # recommended (warn)
 HASH_MIN_PCT="${HASH_MIN_PCT:-50}"       # recommended (warn)
 FIELD_MIN_PCT="${FIELD_MIN_PCT:-80}"     # advisory: regulatory per-component fields
@@ -132,6 +157,7 @@ cdx_checks() {
        --argjson hashmin "$HASH_MIN_PCT" \
        --argjson fieldmin "$FIELD_MIN_PCT" \
        --argjson cap "$MISSING_CAP" \
+       --argjson genericRequired "$GENERIC_REQUIRED" \
        --arg okvers "${1:-$CYCLONEDX_SPEC_VERSIONS}" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
        --arg osre "$OS_PURL_TYPE_REGEX" \
@@ -143,22 +169,29 @@ cdx_checks() {
     | (if (\$t|type)==\"array\" then (\$t|length)
        elif (\$t|type)==\"object\" then (((\$t.components//[])+(\$t.services//[]))|length)
        else 0 end) as \$tools
-    | ([ \$c[] | select(.type != \"data\" and .type != \"file\") ]) as \$pkg
+    | ([ \$c[] | select(.type != \"data\" and .type != \"file\" and .type != \"operating-system\") ]) as \$pkg
     | (\$pkg|length) as \$ptot
     | ([ \$c[] | select(.type == \"file\") ]) as \$file
     | (\$file|length) as \$ftot
     # name+version and purl coverage are package questions, so they are measured
-    # over \$pkg (every component except type \"data\" and type \"file\") rather
-    # than every component. A data component — a training dataset, say — has no
-    # package version and no purl type to carry: purl defines none for a dataset.
-    # A file component is the same case seen from the other side: a binary or
-    # firmware scan enumerates the delivered files, and purl defines no type for a
-    # file on disk either. Counting either would fail an otherwise complete SBOM
-    # for a field that cannot exist — a firmware SBOM whose packages are all
-    # identified still read as 10% PURL coverage because its file inventory sat in
-    # the denominator. Files are not exempt from identification: the file-identifier
-    # check below measures the intrinsic identifier they DO carry, a hash. License
-    # and checksum coverage still count every component, because those they can carry.
+    # over \$pkg (every component except type \"data\", \"file\" and
+    # \"operating-system\") rather than every component. A data component (a
+    # training dataset, say) has no package version and no purl type to carry:
+    # purl defines none for a dataset. A file component is the same case seen
+    # from the other side: a binary or firmware scan enumerates the delivered
+    # files, and purl defines no type for a file on disk either. An
+    # operating-system component is the same case again, one level up: it names
+    # the distribution itself (\"debian@12\"), not an installable package, and
+    # purl's schemes identify installable packages, never a distribution as a
+    # whole. Counting any of the three would fail an otherwise complete SBOM for
+    # a field that cannot exist on that component. A firmware SBOM whose
+    # packages are all identified still read as 10% PURL coverage because its
+    # file inventory sat in the denominator, and every rootfs/image scan carries
+    # exactly one operating-system component that would otherwise cap PURL
+    # coverage below 100% no matter how complete the rest of it is. Files are
+    # not exempt from identification: the file-identifier check below measures
+    # the intrinsic identifier they DO carry, a hash. License and checksum
+    # coverage still count every component, because those they can carry.
     | ([ \$pkg[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
     | ([ \$pkg[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
     # Packages that carry a CPE where they carry no PURL. The submission criteria
@@ -250,8 +283,8 @@ cdx_checks() {
         detail:(if \$ftot==0 then \"no file components\"
                 else \"\(pct(\$fhash_ok;\$ftot))% (\(\$fhash_ok)/\(\$ftot))\" end),
         missing:(\$miss_fid[0:\$cap])},
-       {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
-        status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
+       {id:\"no-generic\", label:(if \$genericRequired then \"Traceable PURL (no pkg:generic)\" else \"Traceable PURL (no pkg:generic, advisory)\" end), required:\$genericRequired,
+        status:(if (\$generic|length)==0 then \"pass\" elif \$genericRequired then \"fail\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
@@ -423,7 +456,10 @@ registry_checks() {
                 elif $m==0 then {status:"pass", detail:"\($t)/\($t) \(._slabel)(s)", missing:[]}
                 else {status:$unmet, detail:"\($t - $m)/\($t) \(._slabel)(s)", missing:(._missing[0:$cap])} end)
              elif ._present==true then {status:"pass", detail:"present", missing:[]}
-             elif ._present==false then {status:$unmet, detail:"not present in the SBOM", missing:[]}
+             elif ._present==false then
+               (if .id=="cisa-sbom-author-signature" and $signRequested and ($signFailed=="1")
+                then {status:$unmet, detail:"signature requested but failed", missing:[]}
+                else {status:$unmet, detail:"not present in the SBOM", missing:[]} end)
              else {status:"warn", detail:"requires human review (no automated source)", missing:[]} end) as $s
             | {id, label, label_ko, required, status:$s.status, detail:$s.detail,
                missing:$s.missing,
@@ -431,7 +467,9 @@ registry_checks() {
                cluster, source, role}
         )'
     local out
-    if ! out=$(jq -c --argjson cap "$MISSING_CAP" "${prog}${fold}" "$SBOM" 2>&1); then
+    if ! out=$(jq -c --argjson cap "$MISSING_CAP" --argjson hasSigFile "$HAS_SIG_FILE" \
+            --argjson signRequested "$SIGN_REQUESTED" --arg signFailed "$SIGN_ATTEMPT_FAILED" \
+            "${prog}${fold}" "$SBOM" 2>&1); then
         echo "[validate] WARN: $what registry evaluation failed; $what checks skipped this run." >&2
         echo "[validate]   $out" >&2
         echo "[]"
@@ -481,6 +519,7 @@ spdx_json_checks() {
        --argjson licmin "$LICENSE_MIN_PCT" \
        --argjson hashmin "$HASH_MIN_PCT" \
        --argjson cap "$MISSING_CAP" \
+       --argjson genericRequired "$GENERIC_REQUIRED" \
        --arg okvers "$SPDX_SPEC_VERSIONS" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
        --arg osre "$OS_PURL_TYPE_REGEX" \
@@ -538,8 +577,8 @@ spdx_json_checks() {
                 else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\"
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
         missing:(\$miss_purl[0:\$cap])},
-       {id:\"no-generic\", label:\"Traceable PURL (no pkg:generic, advisory)\", required:false,
-        status:(if (\$generic|length)==0 then \"pass\" else \"warn\" end),
+       {id:\"no-generic\", label:(if \$genericRequired then \"Traceable PURL (no pkg:generic)\" else \"Traceable PURL (no pkg:generic, advisory)\" end), required:\$genericRequired,
+        status:(if (\$generic|length)==0 then \"pass\" elif \$genericRequired then \"fail\" else \"warn\" end),
         detail:\"\(\$generic|length) untraceable\", missing:(\$generic[0:\$cap])},
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
@@ -597,7 +636,8 @@ spdx_tv_checks() {
        --argjson vers "$vers" --argjson purls "$purls" --argjson generic "$generic" \
        --argjson deps "$deps" --argjson lics "$lics" --argjson hashes "$hashes" \
        --argjson specok "$specok" --argjson purlok "$purlok" \
-       --argjson osp "$os_purls" --argjson osnsok "$os_ns_ok" --arg okvers "$SPDX_SPEC_VERSIONS" '
+       --argjson osp "$os_purls" --argjson osnsok "$os_ns_ok" --arg okvers "$SPDX_SPEC_VERSIONS" \
+       --argjson genericRequired "$GENERIC_REQUIRED" '
     [
       {id:"spec-version", label:"Spec version (\($okvers|split(" ")|join("/")))", required:true, status:(if $specok>0 then "pass" else "fail" end), detail:"\($specok) accepted SPDXVersion line(s)", missing:[]},
       {id:"timestamp", label:"Timestamp (Created:)", required:true, status:(if $ts>0 then "pass" else "fail" end), detail:"\($ts) found", missing:[]},
@@ -605,7 +645,7 @@ spdx_tv_checks() {
       {id:"top-component", label:"Document/package present", required:true, status:(if $names>0 then "pass" else "fail" end), detail:"\($names) package(s)", missing:[]},
       {id:"name-version", label:"PackageName + PackageVersion present", required:true, status:(if $names>0 and $vers>=$names then "pass" else "fail" end), detail:"names=\($names), versions=\($vers)", missing:[]},
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
-      {id:"no-generic", label:"Traceable PURL (no pkg:generic, advisory)", required:false, status:(if $generic==0 then "pass" else "warn" end), detail:"\($generic) untraceable", missing:[]},
+      {id:"no-generic", label:(if $genericRequired then "Traceable PURL (no pkg:generic)" else "Traceable PURL (no pkg:generic, advisory)" end), required:$genericRequired, status:(if $generic==0 then "pass" elif $genericRequired then "fail" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/[namespace/]name)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
       {id:"os-purl-namespace", label:"OS package PURL distribution (pkg:rpm/<distro>/name)", required:true, source:(if $osp==0 then "na" else "auto" end), naKind:(if $osp==0 then "not-applicable" else "" end), status:(if $osp<=$osnsok then "pass" else "fail" end), detail:(if $osp==0 then "no OS package identifiers" else "\($osp - $osnsok) without distribution" end), missing:[]},
       {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 or $names==0 then "pass" else "fail" end), detail:(if $deps==0 and $names==0 then "nothing to relate" else "\($deps) relationship(s)" end), missing:[]},
@@ -775,6 +815,7 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
         def ldetail($d):
           if $d=="present" then $C["conformance.detail.present"]
           elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
+          elif $d=="signature requested but failed" then $C["conformance.detail.sign_requested_failed"]
           elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]
           elif $d=="no packages to measure" then $C["conformance.detail.no_packages"]
           elif $d=="no package components (file inventory only)" then $C["conformance.detail.files_only"]
@@ -910,9 +951,9 @@ fi
 jq -n \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
    --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
-   --argjson untraceable "$N_UNTRACEABLE" '
+   --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" '
 { project: $project, format: $format, result: $result, generatedAt: $ts,
-  untraceableComponents: $untraceable, checks: $checks }
+  profile: $profile, untraceableComponents: $untraceable, checks: $checks }
 + (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
 
@@ -992,6 +1033,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_MD_GEN=$(tfmt conformance.md_generated "$GEN_AT")
     C_MD_FMT=$(tfmt conformance.md_format "$FORMAT")
     C_MD_RESULT=$(tfmt conformance.md_result "$RESULT_UP" "$N_FAIL" "$N_WARN" "$N_REVIEW" "$N_NA")
+    C_MD_PROFILE=$(tfmt conformance.md_profile "$CONFORMANCE_PROFILE")
     C_MD_UNTRACE=$(tfmt conformance.md_untraceable "$N_UNTRACEABLE")
     C_TH_STATUS=$(kstr conformance.th_status); C_TH_REQMT=$(kstr conformance.th_requirement)
     C_TH_REQD=$(kstr conformance.th_required); C_TH_DETAIL=$(kstr conformance.th_detail)
@@ -1014,7 +1056,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_FRAMEWORK=$(kstr aiprofile.th_framework)
     C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT_ESC")
     C_KIND=$(kstr conformance.kind); C_H1=$(kstr conformance.h1)
-    C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT}"
+    C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT} &middot; $(kstr conformance.meta_profile): ${CONFORMANCE_PROFILE}"
     C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
     C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
     C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
@@ -1024,6 +1066,7 @@ else
     C_MD_GEN="- Generated: ${GEN_AT}"
     C_MD_FMT="- Format: ${FORMAT}"
     C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW}, not applicable: ${N_NA})"
+    C_MD_PROFILE="- Profile: ${CONFORMANCE_PROFILE}"
     C_MD_UNTRACE="- Untraceable components (pkg:generic / custom PURL): ${N_UNTRACEABLE} — advisory, does not affect the result"
     C_TH_STATUS="Status"; C_TH_REQMT="Requirement"; C_TH_REQD="Required"; C_TH_DETAIL="Detail"
     C_TH_EVID="Evidence / how"; C_FIX_SUMMARY="How to fill this"; C_CHECK_SUMMARY="What to establish"
@@ -1046,7 +1089,7 @@ else
     C_TH_FRAMEWORK="Framework"
     C_HTML_TITLE="SBOM Conformance — ${PROJECT_ESC}"
     C_KIND="Conformance"; C_H1="SBOM Conformance Report"
-    C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT}"
+    C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT} &middot; Profile: ${CONFORMANCE_PROFILE}"
     C_PILL_RESULT="Result: ${RESULT_UP}"
     C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
     C_PILL_NA="Not applicable:"
@@ -1061,6 +1104,7 @@ fi
     echo ""
     echo "${C_MD_GEN}"
     echo "${C_MD_FMT}"
+    echo "${C_MD_PROFILE}"
     echo "${C_MD_RESULT}"
     [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "${C_MD_UNTRACE}"
     echo ""
