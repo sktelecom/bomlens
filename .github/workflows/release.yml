@@ -246,7 +246,7 @@ jobs:
           # as this project's own dependencies.
           syft scan dir:. \
             --exclude './examples/**' --exclude './electron/node_modules/**' \
-            --exclude './release-assets/**' \
+            --exclude './release-assets/**' --exclude './tests/**' \
             --source-name bomlens --source-version "$VERSION" \
             -o "cyclonedx-json=release-assets/bomlens-source-${VERSION}.cdx.json"
 

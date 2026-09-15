@@ -18,13 +18,14 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_NOTICE.pdf` | 위와 동일한 조건, 이미지에 PDF 렌더러가 포함된 경우(`--build-arg SBOM_PDF=true`) | 고지문을 PDF로 렌더링한 파일. 렌더러가 없으면 로그만 남기고 건너뜀 |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
 | `{Project}_{Version}_risk-report.md` / `.html` | 기본(전 모드) — `--no-report`로 생략 | 오픈소스위험분석보고서 |
-| `{Project}_{Version}_conformance.json` / `.md` / `.html` | 기본(모든 모드) — `--no-report`로 생략, `--analyze`는 이 값과 무관하게 항상 생성(그것이 검증 대상이므로) | 포맷 적합성 보고서. 모든 SBOM에 규제 크로스워크 집계가 함께 담긴다(EU 사이버복원력법은 BSI TR-03183-2로, 2026년판 미국 SBOM 최소 요소 — 참고용이며 준수 판정 아님). AI SBOM이면 G7 검사와 함께, 아직 비어 있는 권고 요소마다 이를 충족하는 CycloneDX 조각을 담는다. 예시는 [적합성 보고서](../samples/aether-7b-5attn_conformance.ko.html)를 참고한다 |
+| `{Project}_{Version}_conformance.json` / `.md` / `.html` | 기본(모든 모드) — `--no-report`로 생략, `--analyze`는 이 값과 무관하게 항상 생성(그것이 검증 대상이므로) | 포맷 적합성 보고서. 모든 SBOM에 규제 크로스워크 집계가 함께 담긴다(EU 사이버복원력법은 BSI TR-03183-2로, 2026년판 미국 SBOM 최소 요소 — 참고용이며 준수 판정 아님). AI SBOM이면 G7 검사와 함께, 아직 비어 있는 권고 요소마다 이를 충족하는 CycloneDX 조각을 담는다. 보고서를 만드는 중 best-effort 후처리 단계가 실패하면 그 단계 이름을 기록하므로, 통과 판정이 모든 단계가 문제없이 돌았다는 증명은 아니다. 통과/실패 판정이나 개별 검사 항목의 상태에는 영향을 주지 않는다. 예시는 [적합성 보고서](../samples/aether-7b-5attn_conformance.ko.html)를 참고한다 |
 | `{Project}_{Version}_ai-profile.json` / `.md` | AI SBOM (`--model`, 또는 모델 컴포넌트가 있는 SBOM에 `--analyze`) | AI 준수 개요: G7 요약, 메울 수 있는 공백과 참고 링크, 라이선스 표시 컴포넌트, 규제 크로스워크, 모델 위험 판정(`riskAssessment`: 모델별 ok/conditional/caution/review 판정과 조건, 근거, 사용 형태. 법적 자문이 아닌 안내). 같은 요약이 적합성 보고서 HTML 맨 위에 나오므로 별도 HTML은 만들지 않는다 |
 | `{Project}_{Version}_scancode.json` | `--deep-license` | scancode 원본 결과 |
 | `{Project}_{Version}_files.json` | 소스를 갖는 스캔(펌웨어 스캔은 항상, 다른 모드는 `--deep-license`가 아직 `_scancode.json`을 만들지 않은 경우) | 소스 트리 뷰를 뒷받침하는 ScanCode 형식 파일 트리 인벤토리(구조만, 라이선스 없음) |
 | `{Project}_{Version}_source.json` | 소스를 갖는 스캔 | 스캔한 트리의 파일 내용 스냅샷, 파일 뷰어를 뒷받침(스캔한 트리 자체는 컨테이너 종료와 함께 사라짐) |
 | `{Project}_{Version}_input.json` | `--analyze` | CycloneDX 변환이 덮어쓰기 전, 공급사 SBOM 원본의 포맷·스펙 버전·도구·작성 정보를 보존 |
 | `{Project}_{Version}_yocto_vex.json` | Yocto 빌드(빌드 디렉터리를 직접 지정하거나 그 위에 `--analyze`) | 빌드가 이미 패치했거나 무관하다고 판정한 CVE 건수 — CycloneDX 결과나 보안보고서에는 미해결 항목만 남아 있어 이 수치를 알 수 없다 |
+| `{Project}_{Version}_vex.json` | 웹 UI 전용, 취약점 화면에서 CVE에 판단(영향 있음/영향 없음/이미 고침/조사 중, 근거 메모는 선택)을 저장할 때 생긴다 | 이 스캔에 저장된 판단을 컴포넌트와 CVE 기준으로 담는다. CLI는 만들지 않으며, 해당 스캔에 첫 판단을 저장하기 전에는 없다. 다른 파일과 달리 스캔이 다시 만들지 않고, 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다. 이전 스캔에 남긴 판단은 재스캔 뒤에도 그대로 남는다 |
 | `{Project}_{Version}_vendored.cdx.json` | 소스 스캔에서 `--identify-vendored`, opt-in SCANOSS 이미지 필요 | 소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS) |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |
 | `{Project}_{Version}_bom.json.sig` | `--sign` | cosign 서명 (`--spdx`와 함께 쓰면 `_bom.spdx.json.sig`도 생성) |
@@ -48,6 +49,23 @@ components[]
   ├── version      버전
   ├── purl         Package URL (고유 식별자)
   └── licenses[]   라이선스 정보 (SPDX ID)
+compositions[]     의존성 그래프 완전성 (아래 참고)
 ```
 
 언어별 PURL 형식은 [지원 생태계](ecosystems.ko.md)를 참고하세요.
+
+## 의존성 그래프 완전성
+
+생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.
+
+| 값 | 의미 |
+|----|------|
+| `complete` | 그래프가 완전히 해석됐다는 적극적인 근거를 찾았습니다. 생태계의 lock/resolve 단계가 성공했거나 lock 파일이 이미 커밋돼 있었고, 의존 엣지가 하나 이상 있는 경우입니다. |
+| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패한 경우입니다. |
+| `unknown` | 그래프가 완전하다고 확인해 주는 근거가 SBOM에 없습니다. 어느 쪽으로도 적극적인 근거가 없을 때의 기본값이며, 예를 들면 image/rootfs/firmware/binary 스캔(syft 혼자서는 패키지 사이 의존 관계를 못 봄), AI 모델·데이터셋·병합 SBOM, Maven 소스 스캔(해석이 됐는지 저하됐는지 가릴 신뢰할 수 있는 신호가 없음)이 여기 해당합니다. `unknown`은 결함이 아닙니다. 도구가 판단할 근거를 찾지 못했다는 뜻일 뿐, 뭔가 잘못됐다는 뜻이 아닙니다. |
+
+분석 대상 공급사 SBOM이 자체 `compositions` 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.
+
+적합성 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
+
+전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다.

@@ -103,10 +103,12 @@ test("deep CVE toggle stays hidden for firmware upload and an AI model even when
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toHaveCount(0);
 
   await page.getByTestId("source-ai-model").click();
-  // An AI model has no advanced scan options at all, so the disclosure itself
-  // is absent — confirm the toggle text is gone rather than re-collapsed.
-  await expect(page.getByText("Advanced scan options")).toHaveCount(0);
+  // An AI model has no deep-CVE toggle (no package purls to extend), but the
+  // disclosure itself still renders for the SBOM author field: docmeta stamps
+  // an AI model's SBOM same as any other generated one, only ANALYZE is
+  // excluded (see useScanForm.ts's showSbomAuthor).
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toHaveCount(0);
+  await expect(page.getByLabel("SBOM author (optional)")).toBeVisible();
 });
 
 test("running with deep CVE on sends deep_cve=true on the scan request", async ({ page }) => {

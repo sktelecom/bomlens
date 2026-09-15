@@ -23,6 +23,7 @@ import {
   type UploadKind,
   type UsageContext,
 } from "@/lib/api";
+import i18n from "@/lib/i18n";
 import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
@@ -149,6 +150,11 @@ export function useScanForm({
   const [outboundLicense, setOutboundLicense] = useState(
     () => initialConfig?.license ?? "",
   );
+  // SBOM author (CycloneDX metadata.authors): the organisation or person
+  // running this scan. Free text; empty leaves the SBOM without one.
+  const [sbomAuthor, setSbomAuthor] = useState(
+    () => initialConfig?.sbomAuthor ?? "",
+  );
   // Optional upload of the generated SBOM to Dependency-Track or TRUSCA. The
   // server URL and token are never persisted (not in the re-scan sidecar), so a
   // re-scan always starts with upload off and the fields blank.
@@ -247,6 +253,12 @@ export function useScanForm({
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
   const showOutboundLicense = !isAnalyze && !isAiModel;
+  // Unlike outbound license, this applies to AI-model scans too (docmeta stamps
+  // BINARY/FIRMWARE/MODELFILE/SOURCE/POSTPROCESS/ROOTFS/IMAGE/AIBOM/DATASET/
+  // MERGE alike, see entrypoint.sh). Hidden only for ANALYZE: that mode
+  // converts a document someone else authored, and stamping our own name on it
+  // would misattribute it (entrypoint.sh's own reason for excluding ANALYZE).
+  const showSbomAuthor = !isAnalyze;
   // The SKT submission profile tightens the same conformance report every
   // other SBOM/document scan already gets, so it applies wherever that report
   // does; an AI model is graded against the separate G7 profile instead.
@@ -264,7 +276,7 @@ export function useScanForm({
   const securityForced = isAnalyze || deepCveOn;
   const showScanOptions =
     showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
-    showOutboundLicense || showDeepCve || showConformanceProfile;
+    showOutboundLicense || showSbomAuthor || showDeepCve || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   const showUpload = true;
   const busy = running || uploading;
@@ -457,6 +469,11 @@ export function useScanForm({
       token,
       cred,
       scanossCred,
+      // Which language the pipeline's own generated prose (notice, conformance,
+      // security, AI-profile reports, model/dataset risk reasons) renders in.
+      // The scan reads whatever language this shell is showing right now, not
+      // a server-side setting; server.py falls back to "en" for anything else.
+      lang: i18n.resolvedLanguage ?? i18n.language,
       // ANALYZE forces notice+security on (needed for the risk report), and so
       // does turning deep CVE on (see securityForced above). AI-model scans
       // have no package CVEs, so security is off there regardless.
@@ -470,6 +487,8 @@ export function useScanForm({
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
       license: showOutboundLicense ? outboundLicense.trim() : "",
+      // SBOM author: hidden (and so never sent) for ANALYZE (see showSbomAuthor).
+      sbomAuthor: showSbomAuthor ? sbomAuthor.trim() : "",
       // AI-model only: grade the assessment against the chosen usage.
       usage: isAiModel && usage ? usage : undefined,
       // Deep CVE matching: opt-in wherever offered (see showDeepCve); ignored
@@ -515,6 +534,7 @@ export function useScanForm({
     byteStable, setByteStable,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
+    sbomAuthor, setSbomAuthor,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
     uploadTarget, setUploadTarget,
@@ -524,6 +544,7 @@ export function useScanForm({
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showOutboundLicense,
+    showSbomAuthor,
     showConformanceProfile,
     showScanOptions, showUpload,
     options, submit,

@@ -12,6 +12,7 @@ import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
 import { dependenciesFromQuery } from "@/lib/section-query";
 import { loadSbom, parseSbomGraph, type SbomGraph } from "@/lib/sbomGraph";
 import type { RouteQuery } from "@/lib/route";
+import { cn } from "@/lib/utils";
 
 import { DependencyGraph } from "./DependencyGraph";
 import { DependencyTree } from "./DependencyTree";
@@ -93,8 +94,10 @@ export function DependenciesPanel({
         <Button
           type="button"
           size="sm"
+          variant="ghost"
           data-testid="deps-view-graph"
-          variant={view === "graph" ? "secondary" : "ghost"}
+          aria-pressed={view === "graph"}
+          className={cn(view === "graph" && "ring-2 ring-foreground ring-offset-1")}
           onClick={() => setView("graph")}
         >
           <GitFork className="h-4 w-4" />
@@ -103,8 +106,10 @@ export function DependenciesPanel({
         <Button
           type="button"
           size="sm"
+          variant="ghost"
           data-testid="deps-view-tree"
-          variant={view === "tree" ? "secondary" : "ghost"}
+          aria-pressed={view === "tree"}
+          className={cn(view === "tree" && "ring-2 ring-foreground ring-offset-1")}
           onClick={() => setView("tree")}
         >
           <ListTree className="h-4 w-4" />

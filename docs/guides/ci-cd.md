@@ -6,7 +6,7 @@ description: Integrate the scanner into CI so the SBOM refreshes on every build 
 
 An SBOM is a point-in-time snapshot of dependencies, so it must be regenerated whenever dependencies change to stay in sync with the code. In CI it refreshes on every build and release, attaches to release artifacts, and becomes the basis for a vulnerability policy gate.
 
-> **Important**: the scanner is report-only — it reports vulnerabilities but always exits successfully. To fail a build on Critical findings, add a step that inspects the generated `*_security.json` (gate example below).
+> **Important**: the scanner is report-only for vulnerabilities. It reports them but always exits successfully, so to fail a build on Critical findings, add a step that inspects the generated `*_security.json` (gate example below). Conformance is different: `--fail-on-conformance` makes the scan itself exit non-zero when this run's own conformance report says "fail" (see [Exit codes](../reference/cli.md#exit-codes)), so no separate inspection step is needed for that gate.
 
 To reduce load, split depth by trigger: on PRs generate the SBOM quickly (`--generate-only --no-report`); on `main` and releases generate everything (`--all --generate-only`) and apply the gate.
 
@@ -57,9 +57,12 @@ jobs:
           /tmp/bomlens/scripts/scan-sbom.sh \
             --project "${{ github.event.repository.name }}" \
             --version "${{ github.sha }}" \
-            --all --generate-only
+            --all --generate-only --fail-on-conformance
 
-      # The scanner is report-only and always succeeds. Fail the build here if Critical exists.
+      # `--fail-on-conformance` above already failed this step (exit 2) if the
+      # conformance report says "fail", so the vulnerability gate is the only
+      # one that needs its own inspection step:
+      # The scanner is report-only for vulnerabilities and always succeeds there. Fail the build here if Critical exists.
       # Outputs land in a {project}_{version}/ subfolder (see the CLI reference), hence the */ glob.
       - name: Fail on Critical vulnerabilities
         run: |
@@ -98,8 +101,10 @@ generate-sbom:
     - /tmp/bomlens/scripts/scan-sbom.sh
         --project "$CI_PROJECT_NAME"
         --version "$CI_COMMIT_SHA"
-        --all --generate-only
-    # Use the report-only scanner as a build gate: fail if Critical exists.
+        --all --generate-only --fail-on-conformance
+    # `--fail-on-conformance` above already fails this job (exit 2) if the
+    # conformance report says "fail". The vulnerability gate below is separate
+    # (the scanner is report-only for vulnerabilities): fail if Critical exists.
     # Outputs land in a {project}_{version}/ subfolder (see the CLI reference), hence the */ glob.
     - |
       CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' */*_security.json)

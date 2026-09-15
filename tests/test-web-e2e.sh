@@ -29,9 +29,10 @@
 # server.py guarantees we test the code under review, not a stale layer (the very
 # place regression #2 hides). The entrypoint/lib scripts come from the image.
 #
-# Deterministic, network-free source types run every time: sbom-upload, current-
-# dir, zip-upload, rootfs-dir (the last two fall back to syft/manifest-only, which
-# is enough to prove the path reaches a valid `done`). docker-image runs when
+# Deterministic source types run every time: sbom-upload, current-dir, zip-
+# upload, rootfs-dir (the last two fall back to syft/manifest-only, which is
+# enough to prove the path reaches a valid `done`; deterministic once a
+# lockfile is present, which the fixtures below provide). docker-image runs when
 # alpine can be pulled. The rest are gated and self-skip (logged, never silent):
 # firmware-upload only when unblob is in the image (SBOM_FIRMWARE=true build),
 # git-url only with WEB_GIT_E2E=1 (network clone), and ai-model / real OSSKB
@@ -95,14 +96,36 @@ cat > "$SRC/sample_bom.json" <<'JSON'
  ]}
 JSON
 # A tiny source tree (a package manifest) for the current-dir / zip SOURCE path.
+# package-lock.json alongside it, so the syft fallback path finds left-pad
+# deterministically (syft's javascript catalogers read a lockfile, not a bare
+# package.json's "dependencies" field).
 cat > "$SRC/package.json" <<'JSON'
 {"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}
 JSON
+cat > "$SRC/package-lock.json" <<'JSON'
+{"name":"demo-app","version":"1.0.0","lockfileVersion":3,"requires":true,
+ "packages":{
+   "":{"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}},
+   "node_modules/left-pad":{"version":"1.3.0",
+     "resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+     "integrity":"sha512-Xs8ynn5gmSFuvHtqQxflWCPa9AbEWZjOI6mSpQXo/PLdTQEA5MPPCf9dSXZ7NsCCz4pWzD/qxb4CJHrahOTgFA=="}
+ }}
+JSON
 
-# A subfolder under /src for the rootfs-dir (MODE=ROOTFS) path.
+# A subfolder under /src for the rootfs-dir (MODE=ROOTFS) path. Same lockfile
+# requirement as above.
 mkdir -p "$SRC/subapp"
 cat > "$SRC/subapp/package.json" <<'JSON'
 {"name":"sub-app","version":"2.0.0","dependencies":{"left-pad":"1.3.0"}}
+JSON
+cat > "$SRC/subapp/package-lock.json" <<'JSON'
+{"name":"sub-app","version":"2.0.0","lockfileVersion":3,"requires":true,
+ "packages":{
+   "":{"name":"sub-app","version":"2.0.0","dependencies":{"left-pad":"1.3.0"}},
+   "node_modules/left-pad":{"version":"1.3.0",
+     "resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+     "integrity":"sha512-Xs8ynn5gmSFuvHtqQxflWCPa9AbEWZjOI6mSpQXo/PLdTQEA5MPPCf9dSXZ7NsCCz4pWzD/qxb4CJHrahOTgFA=="}
+ }}
 JSON
 
 # Pre-seed an UNRELATED past scan in OUTPUT_DIR. Regression #2: it must never
@@ -279,7 +302,7 @@ echo "== zip-upload (MODE=SOURCE, syft fallback) — uploaded archive =="
 # dependency). The server extracts it under .uploads/<token>/ and scans as SOURCE.
 # Component discovery off the extracted tree is syft-path-dependent (min 0); what
 # this proves is that upload -> extract -> SOURCE reaches a valid, scoped done.
-( cd "$SRC" && python3 -m zipfile -c "$WORK/app.zip" package.json ) 2>/dev/null
+( cd "$SRC" && python3 -m zipfile -c "$WORK/app.zip" package.json package-lock.json ) 2>/dev/null
 ztok="$(upload zip "$WORK/app.zip")"
 if [ -z "$ztok" ]; then
     fail "zip upload returned no token"

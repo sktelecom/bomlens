@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   TrendingDown,
   TrendingUp,
+  TriangleAlert,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -53,14 +54,30 @@ import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff 
 import { cn } from "@/lib/utils";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
+import { PipelineStepsFailedNote } from "./PipelineStepsFailedNote";
 import { ResultsList } from "./ResultsList";
 import { SeverityBar } from "./SeverityBar";
 
-/** Tone → token-driven icon colour (graphical, so 3:1 is enough). */
+/** Tone → token-driven icon colour (graphical, so 3:1 is enough). Applied to
+ *  an aria-hidden Icon at the usage site, not read directly as body text.
+ *  token-lint-ignore */
 const TONE_ICON: Record<AttentionItem["tone"], string> = {
-  critical: "text-risk-critical",
-  high: "text-risk-high",
-  info: "text-risk-info",
+  critical: "text-risk-critical", // token-lint-ignore
+  high: "text-risk-high", // token-lint-ignore
+  info: "text-risk-info", // token-lint-ignore
+};
+/** Left accent + faint tint on the "Needs attention" card, keyed to the worst
+ *  tone among its items (the list is already sorted most-urgent-first, see
+ *  needsAttention()), so the one card asking for action reads as more urgent
+ *  than the purely informational cards around it (severity/license
+ *  distribution), without borrowing the full-bleed treatment a failed scan
+ *  itself gets (that would misreport a successful scan as having failed).
+ *  `info` (e.g. vendored-source review only) stays neutral: nothing failed or
+ *  crossed a severity threshold, so it does not need to visually compete. */
+const ATTN_ACCENT: Record<AttentionItem["tone"], string> = {
+  critical: "border-l-4 border-l-risk-critical bg-risk-critical/5",
+  high: "border-l-4 border-l-risk-high bg-risk-high/5",
+  info: "",
 };
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
   malicious: Biohazard,
@@ -91,6 +108,8 @@ function sbomDegradedBodyKey(reason: string): string {
       return "result.sbomDegradedOom";
     case "network":
       return "result.sbomDegradedNetwork";
+    case "cdxgen-crash":
+      return "result.sbomDegradedCrash";
     default:
       return "result.sbomDegradedBody";
   }
@@ -123,6 +142,20 @@ const DIFF_LIST_CAP = 8;
 function capList<T>(items: T[]): { shown: T[]; more: number } {
   return { shown: items.slice(0, DIFF_LIST_CAP), more: Math.max(0, items.length - DIFF_LIST_CAP) };
 }
+
+/** A comparison-card diff entry's name, linking into the section it names
+ *  filtered to that name (the same free-text `q` filter TopRisk's rows use).
+ *  text-brand-strong, not text-primary: --primary equals --foreground in both
+ *  themes (plain body text colour), so a link using it is indistinguishable
+ *  from surrounding text until hovered. text-brand-strong is the token built
+ *  for brand-red-as-text on a card background (4.5:1+ in both themes); a
+ *  handful of other screens still use text-primary for the same purpose and
+ *  share this bug, tracked separately. Underlined at rest, not just on hover:
+ *  the "moved from X to Y" line sets this link next to plain muted-foreground
+ *  text, and that colour pair is only 1.21:1 apart, far under the 3:1 axe
+ *  requires to tell a link from prose by colour alone. */
+const DIFF_ITEM_LINK_CLASS =
+  "rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /** Severity tone for the risk badge, matching the components table. */
 const SEV_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
@@ -304,6 +337,26 @@ export function Overview({
 
   return (
     <div className="space-y-6">
+      {/* A scan that ended in `done.ok=false` still lands here (the badge next
+          to the heading is the only other place this shows) with everything
+          else below rendering the empty/absent shape of a scan that produced
+          nothing. errorMessage is the scanner's own [ERROR] block when the
+          server had no other classification for the failure (see server.py's
+          _ScanErrorTracker); same title/fallback copy as the running-scan
+          failure card, so the two read consistently. */}
+      {!result.ok && (
+        <Card role="alert" className="border-destructive/40 bg-destructive/5">
+          <CardContent className="space-y-1 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <TriangleAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
+              {t("run.failedTitle")}
+            </div>
+            <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+              {result.errorMessage || t("run.failedBody")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {provenance && (
         // What was scanned. Sits above the counts because it frames them: the
         // same "71 components" means something different for a folder on disk
@@ -364,8 +417,16 @@ export function Overview({
                 <div
                   className={cn(
                     "mt-1 flex items-center gap-1.5 text-sm font-medium",
-                    comparison.severityDir === "up" && "text-risk-high",
-                    comparison.severityDir === "down" && "text-risk-low",
+                    // The graphical/badge token (used at full saturation for
+                    // icons and badge backgrounds) fails WCAG AA text contrast
+                    // on this card's background in light mode (3.56:1, needs
+                    // 4.5:1); badge.tsx already uses the -fg variant for the
+                    // same reason, and it passes here in both themes (7.31:1
+                    // light, 10.2:1 dark).
+                    comparison.severityDir === "up" && "text-risk-high-fg",
+                    // Bare token, but already passing in both themes (5.17:1
+                    // light, 6.76:1 dark), left as-is, nothing to fix.
+                    comparison.severityDir === "down" && "text-risk-low", // token-lint-ignore: body text on card, contrast checked
                     comparison.severityDir === "same" && "text-foreground",
                   )}
                 >
@@ -416,7 +477,7 @@ export function Overview({
                   summaryClassName="items-start"
                 >
                   {changes && (
-                    <div className="mt-2 space-y-3 pl-5 text-xs">
+                    <div className="mt-2 space-y-3 pl-5 text-xs" data-testid="comp-change-details">
                       {(() => {
                         const added = capList(changes.components.added);
                         const removed = capList(changes.components.removed);
@@ -429,11 +490,22 @@ export function Overview({
                                   {t("overview.compAddedHeading")}
                                 </div>
                                 <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
-                                  {added.shown.map((c) => (
-                                    <li key={compLabel(c)}>
-                                      {compLabel(c)}@{c.version}
-                                    </li>
-                                  ))}
+                                  {added.shown.map((c) =>
+                                    scanId ? (
+                                      <li key={compLabel(c)}>
+                                        <a
+                                          href={scanHash(scanId, "components", { q: compLabel(c) })}
+                                          className={DIFF_ITEM_LINK_CLASS}
+                                        >
+                                          {compLabel(c)}@{c.version}
+                                        </a>
+                                      </li>
+                                    ) : (
+                                      <li key={compLabel(c)}>
+                                        {compLabel(c)}@{c.version}
+                                      </li>
+                                    ),
+                                  )}
                                 </ul>
                                 {added.more > 0 && (
                                   <p className="mt-1 font-sans text-muted-foreground">
@@ -448,11 +520,22 @@ export function Overview({
                                   {t("overview.compRemovedHeading")}
                                 </div>
                                 <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
-                                  {removed.shown.map((c) => (
-                                    <li key={compLabel(c)}>
-                                      {compLabel(c)}@{c.version}
-                                    </li>
-                                  ))}
+                                  {removed.shown.map((c) =>
+                                    scanId ? (
+                                      <li key={compLabel(c)}>
+                                        <a
+                                          href={scanHash(scanId, "components", { q: compLabel(c) })}
+                                          className={DIFF_ITEM_LINK_CLASS}
+                                        >
+                                          {compLabel(c)}@{c.version}
+                                        </a>
+                                      </li>
+                                    ) : (
+                                      <li key={compLabel(c)}>
+                                        {compLabel(c)}@{c.version}
+                                      </li>
+                                    ),
+                                  )}
                                 </ul>
                                 {removed.more > 0 && (
                                   <p className="mt-1 font-sans text-muted-foreground">
@@ -467,15 +550,24 @@ export function Overview({
                                   {t("overview.compChangedHeading")}
                                 </div>
                                 <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                                  {upgraded.shown.map((c) => (
-                                    <li key={`${c.group}/${c.name}`} className="font-mono">
-                                      {t("overview.compChangedLine", {
-                                        name: c.group ? `${c.group}/${c.name}` : c.name,
-                                        from: c.from,
-                                        to: c.to,
-                                      })}
-                                    </li>
-                                  ))}
+                                  {upgraded.shown.map((c) => {
+                                    const name = c.group ? `${c.group}/${c.name}` : c.name;
+                                    return (
+                                      <li key={name} className="font-mono">
+                                        {scanId ? (
+                                          <a
+                                            href={scanHash(scanId, "components", { q: name })}
+                                            className={DIFF_ITEM_LINK_CLASS}
+                                          >
+                                            {name}
+                                          </a>
+                                        ) : (
+                                          name
+                                        )}{" "}
+                                        {t("overview.compChangedSuffix", { from: c.from, to: c.to })}
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
                                 {upgraded.more > 0 && (
                                   <p className="mt-1 font-sans text-muted-foreground">
@@ -488,7 +580,7 @@ export function Overview({
                               <a
                                 href={scanHash(scanId, "components")}
                                 data-testid="comp-diff-all-link"
-                                className="inline-block rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="inline-block rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 {t("overview.topRiskAll")}
                               </a>
@@ -521,7 +613,7 @@ export function Overview({
                   summaryClassName="items-start"
                 >
                   {changes && (
-                    <div className="mt-2 space-y-3 pl-5 text-xs">
+                    <div className="mt-2 space-y-3 pl-5 text-xs" data-testid="vuln-change-details">
                       {(() => {
                         const news = capList(changes.vulns.new);
                         const resolved = capList(changes.vulns.resolved);
@@ -533,11 +625,22 @@ export function Overview({
                                   {t("overview.vulnNewHeading")}
                                 </div>
                                 <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
-                                  {news.shown.map((v) => (
-                                    <li key={v.id}>
-                                      {v.id} ({v.pkg})
-                                    </li>
-                                  ))}
+                                  {news.shown.map((v) =>
+                                    scanId ? (
+                                      <li key={v.id}>
+                                        <a
+                                          href={scanHash(scanId, "vulnerabilities", { q: v.id })}
+                                          className={DIFF_ITEM_LINK_CLASS}
+                                        >
+                                          {v.id} ({v.pkg})
+                                        </a>
+                                      </li>
+                                    ) : (
+                                      <li key={v.id}>
+                                        {v.id} ({v.pkg})
+                                      </li>
+                                    ),
+                                  )}
                                 </ul>
                                 {news.more > 0 && (
                                   <p className="mt-1 font-sans text-muted-foreground">
@@ -552,11 +655,22 @@ export function Overview({
                                   {t("overview.vulnResolvedHeading")}
                                 </div>
                                 <ul className="mt-1 space-y-0.5 font-mono text-muted-foreground">
-                                  {resolved.shown.map((v) => (
-                                    <li key={v.id}>
-                                      {v.id} ({v.pkg})
-                                    </li>
-                                  ))}
+                                  {resolved.shown.map((v) =>
+                                    scanId ? (
+                                      <li key={v.id}>
+                                        <a
+                                          href={scanHash(scanId, "vulnerabilities", { q: v.id })}
+                                          className={DIFF_ITEM_LINK_CLASS}
+                                        >
+                                          {v.id} ({v.pkg})
+                                        </a>
+                                      </li>
+                                    ) : (
+                                      <li key={v.id}>
+                                        {v.id} ({v.pkg})
+                                      </li>
+                                    ),
+                                  )}
                                 </ul>
                                 {resolved.more > 0 && (
                                   <p className="mt-1 font-sans text-muted-foreground">
@@ -569,7 +683,7 @@ export function Overview({
                               <a
                                 href={scanHash(scanId, "vulnerabilities")}
                                 data-testid="vuln-diff-all-link"
-                                className="inline-block rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="inline-block rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 {t("overview.allVulnerabilities")}
                               </a>
@@ -610,6 +724,16 @@ export function Overview({
           </p>
         </div>
       )}
+
+      {/* A fact recorded in the document outranks this run's own log (unlike
+          scanWarnings below, which only exists for this run), see
+          PipelineStepsFailedNote. */}
+      <PipelineStepsFailedNote
+        steps={result.sbom?.pipelineStepsFailed ?? []}
+        more={result.sbom?.pipelineStepsFailedMore ?? 0}
+        context="scan"
+        isSuppliedDocument={Boolean(inputSbomFileName(result))}
+      />
 
       {/* What the scan warned about while it ran. The log is streamed and never
           stored, so a result opened later had no way to say it had warned at
@@ -709,7 +833,7 @@ export function Overview({
       />
 
       {attention.length > 0 && (
-        <Card>
+        <Card className={ATTN_ACCENT[attention[0].tone]}>
           <CardContent className="p-4">
             <div className="mb-2 text-sm font-semibold text-foreground">
               {t("overview.needsAttention")}
@@ -863,7 +987,9 @@ function JumpCards({
             icon: CalendarX,
             value: eolCount,
             label: t("result.eolTile"),
-            valueClass: atRiskCount > 0 ? "text-risk-critical" : undefined,
+            // Bare token, but already passing on this tile's bg-card in both
+            // themes (4.83:1 light, 6.22:1 dark); left as-is, nothing to fix.
+            valueClass: atRiskCount > 0 ? "text-risk-critical" : undefined, // token-lint-ignore: body text on card, contrast checked
             sub: atRiskCount > 0 ? t("result.eolAtRisk", { count: atRiskCount }) : undefined,
           },
         ]

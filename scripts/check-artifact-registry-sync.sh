@@ -64,6 +64,7 @@ _security.html          :: yes :: yes :: _security\.
 _conformance.json       :: yes :: yes :: _conformance
 _conformance.md         :: yes :: yes :: _conformance
 _conformance.html       :: yes :: yes :: _conformance
+_conformance.result     :: no  :: yes :: skip
 _risk-report.md         :: yes :: yes :: _risk-report
 _risk-report.html       :: yes :: yes :: _risk-report
 _scancode.json          :: yes :: yes :: _scancode\.json
@@ -75,12 +76,25 @@ _security_epss.json     :: yes :: yes :: _security_epss\.json
 _vendored.cdx.json      :: yes :: yes :: _vendored\.cdx\.json
 _ai-profile.json        :: yes :: yes :: _ai-profile
 _ai-profile.md          :: yes :: yes :: _ai-profile
-_ai-profile.html        :: no  :: yes :: skip
+_vex.json               :: yes :: yes :: _vex\.json
 _modelica.cdx.json      :: no  :: yes :: skip
 _cocoapods.cdx.json     :: no  :: yes :: skip
+_conda.cdx.json         :: no  :: yes :: skip
 _security_cvebintool.json :: no :: yes :: skip
 _security_grype.json    :: no  :: yes :: skip
 _security_yocto.json    :: no  :: yes :: skip
+"
+
+# _vex.json is deliberately absent from entrypoint.sh's KNOWN_ARTIFACT_SUFFIXES
+# below, and that is not an oversight for the forward check to catch: it is
+# the one entry here the scan pipeline never writes at all (POST /vex-verdict
+# in server.py does, after a scan is already done) and the one entry that
+# must NOT be swept by a re-scan's stale-artifact cleanup. A CVE judgement a
+# supplier recorded against last week's scan of this project/version has to
+# survive scanning it again today; every other suffix here is regenerated
+# fresh each run, which is exactly why the cleanup sweeps it first.
+CLEANUP_EXEMPT="
+_vex.json
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }
@@ -184,6 +198,40 @@ while IFS= read -r suf; do
         fail=1
     fi
 done < <(printf '%s\n' "$entrypoint_suffixes")
+
+# entrypoint.sh's own stale-artifact cleanup (KNOWN_ARTIFACT_SUFFIXES) is meant
+# to mirror the REGISTRY exactly: every suffix any producer script can write,
+# so a re-scan's leftover from a previous run's mode/options is always
+# recognized. Checked both directions: the array must have everything the
+# REGISTRY has, and nothing the REGISTRY does not.
+cleanup_suffixes=$(awk '/^KNOWN_ARTIFACT_SUFFIXES=\(/,/^\)/' "$ENTRYPOINT" \
+    | grep -v '^[[:space:]]*#' \
+    | grep -v '^KNOWN_ARTIFACT_SUFFIXES=' \
+    | grep -oE '_[A-Za-z0-9._-]+' \
+    | grep -E '^_[A-Za-z0-9._-]+$' | sort -u)
+if [ -z "$cleanup_suffixes" ]; then
+    echo "FAIL: could not find entrypoint.sh's KNOWN_ARTIFACT_SUFFIXES array (stale-artifact cleanup)."
+    fail=1
+else
+    while IFS= read -r suf; do
+        [ -z "$suf" ] && continue
+        if printf '%s\n' "$CLEANUP_EXEMPT" | grep -qFx "$suf"; then
+            continue
+        fi
+        if ! printf '%s\n' "$cleanup_suffixes" | grep -qFx "$suf"; then
+            echo "FAIL: $suf is in the REGISTRY but missing from entrypoint.sh's KNOWN_ARTIFACT_SUFFIXES, so a re-scan would not clean up a stale one."
+            fail=1
+        fi
+    done < <(printf '%s\n' "$registry_suffixes")
+    while IFS= read -r suf; do
+        [ -z "$suf" ] && continue
+        if ! printf '%s\n' "$registry_suffixes" | grep -qFx "$suf"; then
+            echo "FAIL: entrypoint.sh's KNOWN_ARTIFACT_SUFFIXES has '$suf', which is not in the REGISTRY here."
+            echo "      Add a line for it in scripts/check-artifact-registry-sync.sh."
+            fail=1
+        fi
+    done < <(printf '%s\n' "$cleanup_suffixes")
+fi
 
 if [ "$fail" -ne 0 ]; then
     echo ""

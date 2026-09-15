@@ -920,6 +920,39 @@ else
             fail "nodejs BOMLENS_NODE_FULL_GRAPH=1 keeps the full graph" "full=$nfull default=$ncomp"; show_log_if_verbose "$w"
         fi
         rm -rf "$w"
+
+        # 3a3: re-scanning the same project/version reuses the output folder.
+        # A CLI SOURCE scan writes its SBOM in two containers -- stage 1
+        # (cdxgen) here on the host, stage 2 (POSTPROCESS, entrypoint.sh)
+        # after -- and entrypoint.sh's stale-artifact cleanup runs at stage
+        # 2's startup. Regression: it could not tell stage 1's own
+        # just-written SBOM apart from a leftover of the PREVIOUS scan at the
+        # same project/version, and deleted it, so POSTPROCESS immediately
+        # failed with "SBOM not found for post-processing".
+        rescan_dir="$(mktemp -d "$WORK_ROOT/rescan.XXXXXX")"
+        cp -R "$nodesrc/." "$rescan_dir/" 2>/dev/null
+        ( cd "$rescan_dir" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project rescan --version 1.0 --generate-only ) > "$rescan_dir/_scan1.log" 2>&1
+        first_n=$(jq '[.components[]?]|length' "$rescan_dir/rescan_1.0_bom.json" 2>/dev/null || echo 0)
+        # Second scan with different options (--no-report), same project/version,
+        # same folder: stage 1's fresh SBOM must survive, and the first scan's
+        # now-stale notice/security/risk-report artifacts must be cleaned.
+        ( cd "$rescan_dir" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project rescan --version 1.0 --generate-only --no-report ) > "$rescan_dir/_scan2.log" 2>&1
+        second_n=$(jq '[.components[]?]|length' "$rescan_dir/rescan_1.0_bom.json" 2>/dev/null || echo 0)
+        if [ -f "$rescan_dir/rescan_1.0_bom.json" ] && [ "${first_n:-0}" -gt 0 ] && [ "${second_n:-0}" -eq "${first_n:-0}" ]; then
+            pass "re-scanning the same project/version: stage 1's own SBOM survives stage 2's cleanup ($second_n components)"
+        else
+            fail "re-scan lost the SBOM (stage 2 cleanup deleted stage 1's own output)" \
+                "first=$first_n second=$second_n; $(tail -5 "$rescan_dir/_scan2.log" 2>/dev/null)"
+            show_log_if_verbose "$rescan_dir"
+        fi
+        if [ -f "$rescan_dir/rescan_1.0_NOTICE.txt" ] || [ -f "$rescan_dir/rescan_1.0_security.json" ]; then
+            fail "re-scan with --no-report left the previous run's notice/security artifacts behind"
+        else
+            pass "re-scan with different options cleans the previous run's now-stale artifacts"
+        fi
+        rm -rf "$rescan_dir"
     else
         skip "nodejs example not found"
     fi
@@ -975,6 +1008,177 @@ else
         rm -rf "$w"
     else
         skip "go-newer-toolchain fixture not found"
+    fi
+
+    # 3g: cdxgen crashes on a `retract (` block right after a `replace (`
+    # block (getGoPkgComponent builds a purl with no name), unrelated to the
+    # GOTOOLCHAIN fix above. The CLI now falls back to syft (direct deps via
+    # go.sum, no cdxgen) instead of exiting 1 on a raw stack trace, and
+    # records why.
+    gra="$REPO/tests/fixtures/go-retract-after-replace"
+    if [ -d "$gra" ]; then
+        w="$(run_source_scan "$gra")"
+        if jq -e '([.components[]?.purl // empty] | any(startswith("pkg:golang/github.com/spf13/cobra@")))
+                  and ([.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value][0] == "cdxgen-crash")' \
+               "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "go retract-after-replace: cdxgen crash falls back to syft and records cdxgen-crash"
+        else
+            fail "go retract-after-replace: cdxgen crash falls back to syft and records cdxgen-crash" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        if grep -qE 'TypeError|Invalid purl|Schema validation failed' "$w/_scan.log" 2>/dev/null; then
+            fail "go retract-after-replace: raw cdxgen stack trace reached the terminal output" "$(grep -E 'TypeError|Invalid purl|Schema validation failed' "$w/_scan.log")"
+        else
+            pass "go retract-after-replace: no raw cdxgen stack trace in the terminal output"
+        fi
+        rm -rf "$w"
+    else
+        skip "go-retract-after-replace fixture not found"
+    fi
+
+    # 3h: the web UI's SOURCE mode without a docker.sock (its own no-cdxgen
+    # path, entrypoint.sh's "else" branch) against a Node project with real
+    # declared dependencies (examples/nodejs) but no committed lockfile: syft
+    # has nothing to read and resolves none of them. Runs the scanner image
+    # directly, not through scan-sbom.sh (which always has docker.sock), to
+    # exercise this exact branch with a real image rather than a stub. The
+    # scan now fails with guidance instead of reporting a near-empty SBOM as
+    # a successful, complete result when the fallback resolves none of the
+    # project's own dependencies.
+    ndocker="$REPO/examples/nodejs"
+    if [ -d "$ndocker" ]; then
+        w="$(mktemp -d "$WORK_ROOT/nodocker.XXXXXX")"
+        docker run --rm -v "$ndocker":/src:ro -v "$w":/host-output -w /host-output \
+            -e MODE=SOURCE -e PROJECT_NAME=nodocktest -e PROJECT_VERSION=1.0 \
+            "$SCANNER_IMG" > "$w/_scan.log" 2>&1
+        rc=$?
+        if [ "$rc" -ne 0 ] \
+            && grep -q "docker.sock/CLI/host-path unavailable" "$w/_scan.log" \
+            && grep -q "declared dependencies" "$w/_scan.log" \
+            && [ ! -f "$w/nodocktest_1.0_bom.json" ]; then
+            pass "no-docker syft fallback: a 0-coverage result is discarded and the scan fails with guidance"
+        else
+            fail "no-docker syft fallback: a 0-coverage result is discarded and the scan fails with guidance" "rc=$rc $(tail -10 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
+    else
+        skip "examples/nodejs not found"
+    fi
+
+    # 3e: interrupt regression, driven through the real script path (not a
+    # stub): interrupt a SOURCE scan while cdxgen is actually mid-resolve and
+    # confirm neither the cdxgen container nor build artifacts in the source
+    # tree survive it. swiftsrc has no committed Package.resolved, so cdxgen
+    # takes the real network-resolve path (git-clones its two dependencies)
+    # instead of the near-instant committed-lockfile fast path, giving the
+    # interrupt a real window to land in.
+    swiftsrc="$EXAMPLES/swift"
+    if [ -d "$swiftsrc" ]; then
+        # Pull the cdxgen swift image outside the timed window below: this is
+        # the only test in this file that uses it, so on a fresh CI runner
+        # (no local layer cache) the pull itself can take longer than a
+        # resolve step would, and the wait below is measuring build-prep.sh's
+        # own responsiveness, not network/registry variance.
+        docker pull -q "ghcr.io/cyclonedx/cdxgen-debian-swift:${CDXGEN_TAG:-v12}" >/dev/null 2>&1
+        w="$(mktemp -d "$WORK_ROOT/interrupt.XXXXXX")"
+        out="$(mktemp -d "$WORK_ROOT/interrupt-out.XXXXXX")"
+        cp -R "$swiftsrc/." "$w/"
+        ( cd "$w" && git init -q && printf '.build/\n' > .gitignore \
+              && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
+        ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+              --project interrupttest --version 1.0 --generate-only --output-dir "$out" ) \
+            > "$out/_scan.log" 2>&1 &
+        scan_pid=$!
+
+        # examples/swift has no committed Package.resolved, so build-prep.sh
+        # itself runs a real `swift package resolve` (cloning its two
+        # dependencies from GitHub) before cdxgen even starts — budget for
+        # that network step too, not just the image pull above.
+        #
+        # Stage 1's own output goes to a log file, not the terminal, so the
+        # "cdxgen" trace is no longer in _scan.log itself; the terminal only
+        # gets that log file's path (the "(log: ...)" line). Wait for that
+        # line first, then poll the file it names for the same cdxgen marker
+        # as before.
+        n=0
+        stage1_log=""
+        while [ -z "$stage1_log" ] && [ "$n" -lt 1200 ]; do
+            stage1_log="$(sed -n 's/^ *(log: \(.*\))$/\1/p' "$out/_scan.log" 2>/dev/null | head -1)"
+            if [ -z "$stage1_log" ]; then sleep 0.1; n=$((n + 1)); fi
+        done
+        while [ -n "$stage1_log" ] && ! grep -q '\[build-prep\] cdxgen' "$stage1_log" 2>/dev/null && [ "$n" -lt 1200 ]; do
+            sleep 0.1; n=$((n + 1))
+        done
+
+        if [ -z "$stage1_log" ] || ! grep -q '\[build-prep\] cdxgen' "$stage1_log" 2>/dev/null; then
+            fail "scan never reached the cdxgen stage within 120s (test setup, not the fix)" \
+                 "$(tail -20 "$out/_scan.log") $(tail -20 "$stage1_log" 2>/dev/null)"
+            kill -KILL "$scan_pid" 2>/dev/null
+        else
+            kill -TERM "$scan_pid" 2>/dev/null
+            n=0
+            while kill -0 "$scan_pid" 2>/dev/null && [ "$n" -lt 400 ]; do sleep 0.1; n=$((n + 1)); done
+            if kill -0 "$scan_pid" 2>/dev/null; then
+                fail "interrupted scan-sbom.sh did not exit within 40s of SIGTERM"
+                kill -KILL "$scan_pid" 2>/dev/null
+            else
+                pass "interrupted scan-sbom.sh exited promptly"
+            fi
+
+            # small grace: --rm's own removal can lag a moment behind `docker
+            # stop` returning.
+            leftover=""
+            n=0
+            while [ "$n" -lt 30 ]; do
+                leftover=$(docker ps -a --format '{{.Names}}' | grep '^bomlens-scan-' || true)
+                [ -z "$leftover" ] && break
+                sleep 0.2; n=$((n + 1))
+            done
+            if [ -z "$leftover" ]; then
+                pass "no bomlens-scan-* container left running after the interrupt"
+            else
+                fail "a bomlens-scan-* container was left behind after the interrupt" "$leftover"
+                docker rm -f $leftover >/dev/null 2>&1 || true
+            fi
+
+            if [ -z "$(cd "$w" && git status --ignored --short)" ]; then
+                pass "the source tree is clean (git status --ignored) after the interrupt"
+            else
+                fail "the source tree is not clean after the interrupt" \
+                     "$(cd "$w" && git status --ignored --short)"
+            fi
+        fi
+        rm -rf "$w" "$out"
+    else
+        skip "swift example not found"
+    fi
+
+    # 3f: manifests under tests/ and examples/ and the .github/workflows actions
+    # are left out by default and listed in the SBOM; the root requirements.txt
+    # still counts. BOMLENS_INCLUDE_NON_SHIPPED=1 keeps them.
+    nsm="$REPO/tests/fixtures/non-shipped-manifests"
+    if [ -d "$nsm" ]; then
+        w="$(run_source_scan "$nsm")"
+        if jq -e '([.components[]?.purl // empty]) as $p
+                  | ($p | any(startswith("pkg:pypi/six@")))
+                    and (($p | any(test("bomlens-test-fixture-only|bomlens-example-only|pkg:github/actions/checkout"))) | not)
+                    and (([.metadata.properties[]? | select(.name=="bomlens:excluded-manifests") | .value][0] // "")
+                         | contains("tests/fixtures/requirements.txt"))' \
+               "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "non-shipped manifests and workflows left out and recorded"
+        else
+            fail "non-shipped manifests and workflows left out and recorded" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
+        w="$(BOMLENS_INCLUDE_NON_SHIPPED=1 run_source_scan "$nsm")"
+        if jq -e '[.components[]?.purl // empty] | any(startswith("pkg:pypi/bomlens-test-fixture-only@"))' \
+               "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "BOMLENS_INCLUDE_NON_SHIPPED=1 keeps the non-shipped manifests"
+        else
+            fail "BOMLENS_INCLUDE_NON_SHIPPED=1 keeps the non-shipped manifests" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fi
+        rm -rf "$w"
+    else
+        skip "non-shipped-manifests fixture not found"
     fi
 fi
 
@@ -1348,6 +1552,35 @@ else
         && pass "analyze: conformance HTML report produced" \
         || fail "analyze: conformance HTML report produced"
     rm -rf "$w"
+
+    # --fail-on-conformance: a passing document exits 0 (real container run,
+    # not the stub test-windows.sh uses).
+    wp="$(mktemp -d "$WORK_ROOT/focpass.XXXXXX")"
+    cp "$REPO/tests/fixtures/good-spdx.json" "$wp/" 2>/dev/null
+    ( cd "$wp" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "focpass" --version "1.0" --analyze good-spdx.json \
+        --generate-only --fail-on-conformance ) > "$wp/_scan.log" 2>&1
+    foc_pass_rc=$?
+    [ "$foc_pass_rc" -eq 0 ] \
+        && pass "--fail-on-conformance: a passing document exits 0 (container)" \
+        || fail "--fail-on-conformance pass case (container)" "rc=$foc_pass_rc; $(tail -5 "$wp/_scan.log" 2>/dev/null)"
+    rm -rf "$wp"
+
+    # --fail-on-conformance: a document missing every mandatory field (no spec
+    # version, no timestamp, no tools, no top component, no packages) fails
+    # every required check, so the container's own conformance result is
+    # "fail" regardless of any local scoring. Exit 2 with the report already
+    # on disk to look at.
+    wf="$(mktemp -d "$WORK_ROOT/focfail.XXXXXX")"
+    printf '{"bomFormat":"CycloneDX","specVersion":"9.9","components":[]}' > "$wf/bad.json"
+    ( cd "$wf" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+        --project "focfail" --version "1.0" --analyze bad.json \
+        --generate-only --fail-on-conformance ) > "$wf/_scan.log" 2>&1
+    foc_fail_rc=$?
+    { [ "$foc_fail_rc" -eq 2 ] && [ -f "$wf/focfail_1.0_conformance.json" ]; } \
+        && pass "--fail-on-conformance: a failing document exits 2, report still written (container)" \
+        || fail "--fail-on-conformance fail case (container)" "rc=$foc_fail_rc; $(tail -5 "$wf/_scan.log" 2>/dev/null)"
+    rm -rf "$wf"
 fi
 
 # --------------------------------------------------------
@@ -1553,23 +1786,268 @@ else
 fi
 
 # --------------------------------------------------------
-# Group 8: ROOTFS mode E2E (directory target -> syft, requires image)
+# Group 8: ROOTFS mode E2E (real distribution root filesystems)
 # --------------------------------------------------------
+# The previous version of this group pointed --target at examples/nodejs,
+# which has no etc/, so _is_rootfs_dir (scripts/scan-sbom.sh) was false and
+# the scan actually took the SOURCE branch -- "ROOTFS mode E2E" never
+# exercised ROOTFS mode. This version scans real exported root filesystems
+# instead, so syft's dir: cataloger, its distro-qualified purls, and the
+# operating-system component it synthesizes from etc/os-release are all
+# exercised for real, once per package family (deb/apk/rpm).
 section "Rootfs mode E2E"
 if [ "$have_image" != 1 ]; then
     skip "rootfs mode (scanner image not available)"
 else
-    w="$(mktemp -d "$WORK_ROOT/rfs.XXXXXX")"
-    # A directory target routes to ROOTFS (syft on the tree). The bundled example
-    # has no lockfile, so component discovery may be empty — what matters here is
-    # that the directory path produces a valid, project-stamped SBOM.
+    # Digest-pinned (index/multi-arch digest, same convention as
+    # docker/Dockerfile's base images): a moved tag would silently change the
+    # library-count ranges and purl distro= values asserted below.
+    ROOTFS_DEBIAN_IMG="debian:12-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171"
+    ROOTFS_ALPINE_IMG="alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"
+    ROOTFS_ROCKY_IMG="rockylinux:9-minimal@sha256:305de618a5681ff75b1d608fd22b10f362867dff2f550a4f1d427d21cd7f42b4"
+    ROOTFS_BUSYBOX_IMG="busybox:musl@sha256:32b5cdad7cce41dfd53d0ae06baebcf8357a147ee7694dc706911c373bc30c37"
+
+    # Always removes the exported container and the (up to a few hundred MB)
+    # extracted rootfs, on pass, fail, or an early return -- a CI runner
+    # cannot be left to accumulate these across reruns. A real rootfs export
+    # (rockylinux especially) carries read-only directories from its own
+    # package database (e.g. rpm-owned usr/sbin, usr/lib at 0555): plain
+    # `rm -rf` cannot unlink through those without write permission on the
+    # parent directory first, and silently leaves the tree behind.
+    _rootfs_cleanup() {
+        [ -n "${ROOTFS_CID:-}" ] && docker rm -f "$ROOTFS_CID" >/dev/null 2>&1
+        if [ -n "${ROOTFS_WORK:-}" ] && [ -d "$ROOTFS_WORK" ]; then
+            chmod -R u+w "$ROOTFS_WORK" 2>/dev/null
+            rm -rf "$ROOTFS_WORK"
+        fi
+        ROOTFS_CID=""; ROOTFS_WORK=""
+    }
+    # A RETURN trap set inside a function outlives that function: it stays
+    # registered on the shell and fires again the next time ANY function
+    # returns, not just this one. Each case below self-clears it as the first
+    # thing the handler does. A RETURN trap also never fires at all if the
+    # process is killed (CI cancellation) or the script exits mid-case, so an
+    # EXIT trap backs it up -- set once, here, since this is the only trap in
+    # this file; _rootfs_cleanup is a no-op once the RETURN trap has already
+    # cleared ROOTFS_WORK/ROOTFS_CID.
+    trap _rootfs_cleanup EXIT
+
+    # docker export the image's index digest into a directory. Echoes the
+    # extracted rootfs path, or nothing (and fails) if the pull itself fails.
+    _rootfs_export() {
+        local image="$1" dest="$2"
+        mkdir -p "$dest"
+        if ! docker pull -q "$image" >/dev/null 2>&1; then return 1; fi
+        ROOTFS_CID="$(docker create "$image")"
+        docker export "$ROOTFS_CID" | tar -x -C "$dest"
+        docker rm "$ROOTFS_CID" >/dev/null 2>&1; ROOTFS_CID=""
+    }
+
+    # One real distro rootfs end to end: MODE=ROOTFS, syft's distro-qualified
+    # library purls, and the operating-system component it derives from
+    # etc/os-release. One function per distro family, parameterized, so a
+    # later addition can extend the same case with its own assertions instead
+    # of duplicating the scan.
+    #   label image purl_type distro_value os_name os_version lo hi
+    rootfs_distro_case() {
+        local label="$1" image="$2" purl_type="$3" distro_value="$4" \
+              os_name="$5" os_version="$6" lo="$7" hi="$8"
+        ROOTFS_WORK="$(mktemp -d "$WORK_ROOT/rfs-$label.XXXXXX")"
+        ROOTFS_CID=""
+        trap 'trap - RETURN; _rootfs_cleanup' RETURN
+
+        if ! _rootfs_export "$image" "$ROOTFS_WORK/rootfs"; then
+            skip "rootfs ($label): could not pull $image (network?)"
+            return
+        fi
+
+        ( cd "$ROOTFS_WORK" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project "rootfs$label" --version "1.0" \
+            --target "$ROOTFS_WORK/rootfs" --generate-only \
+        ) > "$ROOTFS_WORK/_scan.log" 2>&1
+        local bom="$ROOTFS_WORK/rootfs${label}_1.0_bom.json"
+        if [ ! -f "$bom" ]; then
+            fail "rootfs ($label): scan produced a bom" "$(tail -5 "$ROOTFS_WORK/_scan.log")"
+            show_log_if_verbose "$ROOTFS_WORK"; return
+        fi
+
+        if grep -q "Mode: ROOTFS" "$ROOTFS_WORK/_scan.log"; then
+            pass "rootfs ($label): a real rootfs directory routes to ROOTFS mode"
+        else
+            fail "rootfs ($label): a real rootfs directory routes to ROOTFS mode"
+        fi
+
+        local libn; libn=$(jq '[.components[]? | select(.type=="library")] | length' "$bom")
+        if [ "$libn" -ge "$lo" ] 2>/dev/null && [ "$libn" -le "$hi" ] 2>/dev/null; then
+            pass "rootfs ($label): library component count in range ($libn, expected $lo-$hi)"
+        else
+            fail "rootfs ($label): library component count in range" "got $libn, expected $lo-$hi"
+        fi
+
+        if [ "$libn" -gt 0 ] 2>/dev/null && jq -e --arg pt "pkg:$purl_type/" --arg dv "distro=$distro_value" \
+            '[.components[]? | select(.type=="library") | select((.purl // "") | (startswith($pt) and contains($dv)) | not)] | length == 0' \
+            "$bom" >/dev/null 2>&1; then
+            pass "rootfs ($label): every library purl is pkg:$purl_type/... with distro=$distro_value"
+        else
+            fail "rootfs ($label): every library purl is pkg:$purl_type/... with distro=$distro_value"
+        fi
+
+        local os_count; os_count=$(jq '[.components[]? | select(.type=="operating-system")] | length' "$bom")
+        if [ "$os_count" = "1" ] && jq -e --arg n "$os_name" --arg v "$os_version" \
+            '.components[] | select(.type=="operating-system") | .name==$n and .version==$v' \
+            "$bom" >/dev/null 2>&1; then
+            pass "rootfs ($label): one operating-system component, $os_name $os_version"
+        else
+            fail "rootfs ($label): one operating-system component, $os_name $os_version" "found $os_count"
+        fi
+
+        # cpe coverage baseline: every library component still carries a cpe
+        # (syft has done this natively since before this repo touched cpe at
+        # all -- this only guards against a future change accidentally
+        # dropping one).
+        local cpen; cpen=$(jq '[.components[]? | select(.type=="library") | select((.cpe // "") != "")] | length' "$bom")
+        if [ "$cpen" = "$libn" ]; then
+            pass "rootfs ($label): every library component still carries a cpe ($cpen/$libn)"
+        else
+            fail "rootfs ($label): every library component still carries a cpe" "$cpen/$libn"
+        fi
+
+        # At least half the library components got a bomlens:cpeSource (name-map
+        # or distro-version-strip) -- a proportion, not the exact measured count,
+        # so this does not flake when a distro point release adds or drops a
+        # no-hyphen-version package the strip rule intentionally leaves alone.
+        local cpesrcn; cpesrcn=$(jq '[.components[]? | select(.type=="library")
+            | select((.properties // []) | any(.name=="bomlens:cpeSource"))] | length' "$bom")
+        if [ "$libn" -gt 0 ] 2>/dev/null && [ "$((cpesrcn * 2))" -ge "$libn" ] 2>/dev/null; then
+            pass "rootfs ($label): at least half the library cpes were touched (name-map or version-stripped): $cpesrcn/$libn"
+        else
+            fail "rootfs ($label): at least half the library cpes were touched" "$cpesrcn/$libn"
+        fi
+
+        # A name-map-corrected component's cpe version must no longer carry the
+        # distro revision marker for this package format -- catches a future
+        # change to strip_distro_revision (or its whitelist-branch caller) that
+        # stops applying to whitelisted names.
+        local marker_re
+        case "$purl_type" in
+            deb) marker_re='\+deb|ubuntu|~' ;;
+            rpm) marker_re='\.el[0-9]|\.fc[0-9]' ;;
+            apk) marker_re='-r[0-9]' ;;
+            *) marker_re='(?!)' ;;  # matches nothing
+        esac
+        if jq -e --arg re "$marker_re" \
+            '[.components[]? | select(.type=="library")
+              | select((.properties // []) | any(.name=="bomlens:cpeSource" and .value=="name-map"))
+              | select(((.cpe // "") | split(":")[5]? // "") | test($re))] | length == 0' \
+            "$bom" >/dev/null 2>&1; then
+            pass "rootfs ($label): name-map cpes carry no leftover distro revision marker"
+        else
+            fail "rootfs ($label): name-map cpes carry no leftover distro revision marker"
+        fi
+
+        # RPM keeps its real Vendor-derived operating-system cpe; deb/apk never
+        # had one, and this step does not add one -- pins that asymmetry so it
+        # is a visible regression, not a silent drift, if it ever changes.
+        if [ "$purl_type" = "rpm" ]; then
+            if jq -e --arg n "$os_name" \
+                '.components[] | select(.type=="operating-system") | (.cpe // "") | startswith("cpe:2.3:o:" + $n + ":")' \
+                "$bom" >/dev/null 2>&1; then
+                pass "rootfs ($label): operating-system component keeps a real cpe:2.3:o:$os_name:... "
+            else
+                fail "rootfs ($label): operating-system component keeps a real cpe:2.3:o:$os_name:..."
+            fi
+        else
+            if jq -e '.components[] | select(.type=="operating-system") | (.cpe // null) == null' \
+                "$bom" >/dev/null 2>&1; then
+                pass "rootfs ($label): operating-system component has no cpe (unchanged, deb/apk never had one)"
+            else
+                fail "rootfs ($label): operating-system component has no cpe (unchanged, deb/apk never had one)"
+            fi
+        fi
+    }
+
+    rootfs_distro_case "debian" "$ROOTFS_DEBIAN_IMG" "deb" "debian-12.15" "debian" "12.15" 40 200
+    rootfs_distro_case "alpine" "$ROOTFS_ALPINE_IMG" "apk" "alpine-3.20.10" "alpine" "3.20.10" 5 40
+    rootfs_distro_case "rocky" "$ROOTFS_ROCKY_IMG" "rpm" "rocky-9.3" "rocky" "9" 50 250
+
+    # A rootfs with no apk/dpkg/rpm database still routes to ROOTFS (etc/ plus
+    # two of bin/sbin/usr/lib/var is enough), but has no packages to read --
+    # legitimately near-zero library components, and the host-side
+    # has_package_db warning should name that, rather than the generic
+    # "SBOM has 0 components" warning misleadingly suggesting the scan found
+    # nothing at all (file-type components still populate it).
+    rootfs_nopkgdb_case() {
+        ROOTFS_WORK="$(mktemp -d "$WORK_ROOT/rfs-nopkgdb.XXXXXX")"
+        ROOTFS_CID=""
+        trap 'trap - RETURN; _rootfs_cleanup' RETURN
+
+        if ! _rootfs_export "$ROOTFS_BUSYBOX_IMG" "$ROOTFS_WORK/rootfs"; then
+            skip "rootfs (no package db): could not pull $ROOTFS_BUSYBOX_IMG (network?)"
+            return
+        fi
+        ( cd "$ROOTFS_WORK" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project "rootfsnopkgdb" --version "1.0" \
+            --target "$ROOTFS_WORK/rootfs" --generate-only \
+        ) > "$ROOTFS_WORK/_scan.log" 2>&1
+        if grep -q "no package database" "$ROOTFS_WORK/_scan.log"; then
+            pass "rootfs (no package db): has_package_db warning fires"
+        else
+            fail "rootfs (no package db): has_package_db warning fires"
+        fi
+        if grep -q "SBOM has 0 components" "$ROOTFS_WORK/_scan.log"; then
+            fail "rootfs (no package db): no misleading 0-components warning"
+        else
+            pass "rootfs (no package db): no misleading 0-components warning"
+        fi
+    }
+    rootfs_nopkgdb_case
+
+    # Archive input: the same real rootfs, packed as a .tar.gz instead of
+    # passed as a directory. find_rootfs_dir (scripts/scan-sbom.sh) must find
+    # it at the archive root and route to ROOTFS the same way; the two-level
+    # nested-in-a-release-folder case is already covered at the shell-function
+    # level by tests/test-input-routing.sh, so this only needs the flat case.
+    rootfs_archive_case() {
+        ROOTFS_WORK="$(mktemp -d "$WORK_ROOT/rfs-archive.XXXXXX")"
+        ROOTFS_CID=""
+        trap 'trap - RETURN; _rootfs_cleanup' RETURN
+
+        if ! _rootfs_export "$ROOTFS_DEBIAN_IMG" "$ROOTFS_WORK/rootfs"; then
+            skip "rootfs (archive): could not pull $ROOTFS_DEBIAN_IMG (network?)"
+            return
+        fi
+        tar -czf "$ROOTFS_WORK/rootfs.tar.gz" -C "$ROOTFS_WORK/rootfs" .
+        ( cd "$ROOTFS_WORK" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
+            --project "rootfsarchive" --version "1.0" \
+            --target "$ROOTFS_WORK/rootfs.tar.gz" --generate-only \
+        ) > "$ROOTFS_WORK/_scan.log" 2>&1
+        local bom="$ROOTFS_WORK/rootfsarchive_1.0_bom.json"
+        local libn; libn=$(jq '[.components[]? | select(.type=="library")] | length' "$bom" 2>/dev/null || echo 0)
+        if grep -q "scanning as ROOTFS" "$ROOTFS_WORK/_scan.log" && [ "$libn" -ge 40 ] 2>/dev/null; then
+            pass "rootfs (archive): a .tar.gz root filesystem routes to ROOTFS ($libn library components)"
+        else
+            fail "rootfs (archive): a .tar.gz root filesystem routes to ROOTFS" "$(tail -5 "$ROOTFS_WORK/_scan.log")"
+            show_log_if_verbose "$ROOTFS_WORK"
+        fi
+    }
+    rootfs_archive_case
+
+    # Contrast case: a plain source directory passed via --target (not itself
+    # a rootfs, no nested one either) must NOT take the ROOTFS branch above --
+    # this is the one place in this suite that exercises --target pointed at a
+    # directory other than the cwd (run_source_scan always scans the cwd), so
+    # it is kept, corrected to assert what it actually exercises now that the
+    # ROOTFS name above no longer covers it.
+    w="$(mktemp -d "$WORK_ROOT/rfs-source.XXXXXX")"
     ( cd "$w" && SBOM_SCANNER_IMAGE="$SCANNER_IMG" bash "$SCAN" \
-        --project "rootfstest" --version "1.0" --target "$EXAMPLES/nodejs" --generate-only ) > "$w/_scan.log" 2>&1
-    bom="$w/rootfstest_1.0_bom.json"
-    if [ -f "$bom" ] && jq -e '.bomFormat=="CycloneDX" and .metadata.component.name=="rootfstest"' "$bom" >/dev/null 2>&1; then
-        pass "rootfs: valid CycloneDX with project metadata"
+        --project "rootfssourcedir" --version "1.0" --target "$EXAMPLES/nodejs" --generate-only ) > "$w/_scan.log" 2>&1
+    bom="$w/rootfssourcedir_1.0_bom.json"
+    if [ -f "$bom" ] && grep -q "Mode: SOURCE" "$w/_scan.log" \
+        && jq -e '.bomFormat=="CycloneDX" and .metadata.component.name=="rootfssourcedir"' "$bom" >/dev/null 2>&1; then
+        pass "rootfs (contrast): a --target directory that is not a rootfs stays on SOURCE"
     else
-        fail "rootfs: valid CycloneDX with project metadata" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+        fail "rootfs (contrast): a --target directory that is not a rootfs stays on SOURCE" "$(tail -5 "$w/_scan.log" 2>/dev/null)"
+        show_log_if_verbose "$w"
     fi
     rm -rf "$w"
 fi

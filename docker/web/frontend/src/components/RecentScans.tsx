@@ -115,8 +115,11 @@ const TH = "whitespace-nowrap px-4 py-3 text-left font-medium";
  *  for everyone else, so it is not decorative. */
 function TrendArrow({ up, label }: { up: boolean; label: string }) {
   const Icon = up ? TrendingUp : TrendingDown;
+  // Colours the aria-hidden Icon below via currentColor; the only visible
+  // text in this span is the sr-only label, read aloud, never seen.
+  const toneClass = up ? "text-risk-high" : "text-risk-low"; // token-lint-ignore
   return (
-    <span title={label} className={up ? "text-risk-high" : "text-risk-low"}>
+    <span title={label} className={toneClass}>
       <Icon className="h-3.5 w-3.5" aria-hidden />
       <span className="sr-only">{label}</span>
     </span>
@@ -139,10 +142,11 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center rounded-full border px-3.5 text-sm transition-colors duration-fast ease-out-soft",
+        "inline-flex h-9 items-center rounded-full border px-3.5 text-sm",
+        "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         active
-          ? "border-brand bg-brand/10 font-medium text-foreground"
+          ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
           : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >

@@ -94,8 +94,9 @@ describe("groupByUpgrade", () => {
     pkg: string,
     installed: string,
     fixed: string,
+    purl?: string,
   ): VulnItem {
-    return { id, severity, cvss: null, pkg, installed, fixed, title: "" };
+    return { id, severity, cvss: null, pkg, installed, fixed, title: "", purl };
   }
 
   it("groups two or more CVEs on the same install that share a fixed version", () => {
@@ -143,6 +144,22 @@ describe("groupByUpgrade", () => {
     expect(groups).toHaveLength(2);
     expect(groups.find((g) => g.installed === "6.15.3")?.vulnIds).toEqual(["CVE-a", "CVE-b"]);
     expect(groups.find((g) => g.installed === "6.16.0")?.vulnIds).toEqual(["CVE-c", "CVE-d"]);
+  });
+
+  // Two unrelated components (different ecosystems, here) can share a name,
+  // installed version and fixed version by coincidence. Without the purl in
+  // the key, this would wrongly bundle them as "one upgrade fixes both".
+  it("does not merge two different components that share name, installed and fixed version", () => {
+    const items = [
+      vg("CVE-a", "HIGH", "foo", "1.0.0", "1.0.1", "pkg:npm/foo@1.0.0"),
+      vg("CVE-b", "CRITICAL", "foo", "1.0.0", "1.0.1", "pkg:npm/foo@1.0.0"),
+      vg("CVE-c", "LOW", "foo", "1.0.0", "1.0.1", "pkg:golang/foo@1.0.0"),
+      vg("CVE-d", "LOW", "foo", "1.0.0", "1.0.1", "pkg:golang/foo@1.0.0"),
+    ];
+    const groups = groupByUpgrade(items);
+    expect(groups).toHaveLength(2);
+    expect(groups.find((g) => g.maxSeverity === "CRITICAL")?.vulnIds).toEqual(["CVE-a", "CVE-b"]);
+    expect(groups.find((g) => g.maxSeverity === "LOW")?.vulnIds).toEqual(["CVE-c", "CVE-d"]);
   });
 
   it("sorts worst severity first, then by how many CVEs the upgrade resolves", () => {

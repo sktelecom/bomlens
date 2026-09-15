@@ -94,14 +94,17 @@ export interface UpgradeGroup {
 /**
  * Group vulnerabilities that a single upgrade would resolve together.
  *
- * The key is package + installed version + fixed version, not package name
- * alone: the same name can resolve to two different installed versions in
- * one SBOM (a dependency conflict, qs@6.15.3 and qs@6.16.0 coexisting is a
- * real, measured case), and grouping by name only would silently merge CVEs
- * against unrelated installs. A CVE with no fixed version is not groupable
- * (there is nothing to upgrade to) and is dropped from every group; a group
- * of exactly one CVE is not a "bundle" and is dropped too: the summary
- * exists to answer "what fixes more than one thing at once".
+ * The key is purl (falling back to package name when Trivy resolved no
+ * purl) + installed version + fixed version, not package name alone: the
+ * same name can resolve to two different installed versions in one SBOM (a
+ * dependency conflict, qs@6.15.3 and qs@6.16.0 coexisting is a real,
+ * measured case), and grouping by name only would silently merge CVEs
+ * against unrelated installs, including two different components (a
+ * vendored copy in one ecosystem, an unrelated package in another) that
+ * happen to share both name and version. A CVE with no fixed version is not
+ * groupable (there is nothing to upgrade to) and is dropped from every
+ * group; a group of exactly one CVE is not a "bundle" and is dropped too:
+ * the summary exists to answer "what fixes more than one thing at once".
  *
  * Sorted worst-severity-first, then by how many CVEs the upgrade resolves
  * (most first): the reader is choosing where to spend one upgrade, so the
@@ -111,16 +114,19 @@ export function groupByUpgrade(vulns: VulnItem[]): UpgradeGroup[] {
   const byKey = new Map<string, VulnItem[]>();
   for (const v of vulns) {
     if (!v.fixed) continue;
-    const key = `${v.pkg}::${v.installed}::${v.fixed}`;
+    const key = `${v.purl || v.pkg}::${v.installed}::${v.fixed}`;
     const list = byKey.get(key);
     if (list) list.push(v);
     else byKey.set(key, [v]);
   }
 
   const groups: UpgradeGroup[] = [];
-  for (const [key, list] of byKey) {
+  for (const list of byKey.values()) {
     if (list.length < 2) continue;
-    const [pkg, installed, fixed] = key.split("::");
+    // Read display fields off the items rather than the grouping key: the key
+    // may carry a purl (not a readable name), and CycloneDX purls can contain
+    // "::" themselves, making the key unsafe to split back apart.
+    const { pkg, installed, fixed } = list[0];
     let worst = list[0];
     for (const v of list) {
       if (severityValue(v) > severityValue(worst)) worst = v;

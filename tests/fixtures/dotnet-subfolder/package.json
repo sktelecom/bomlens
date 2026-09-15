@@ -1,0 +1,7 @@
+{
+  "name": "dotnet-subfolder-e2e",
+  "private": true,
+  "devDependencies": {
+    "bomlens-e2e-fixture-only": "0.0.1"
+  }
+}

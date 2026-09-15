@@ -24,6 +24,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_PREP="$REPO_DIR/docker/lib/build-prep.sh"
+# build-prep.sh is bind-mounted alone into the stage-1 cdxgen container
+# (isolated from the rest of docker/lib/), so identify-conda.py has to be
+# mounted alongside it for build-prep.sh to be able to invoke it before
+# cdxgen runs (see docker/lib/identify-conda.py's own header for why this
+# has to happen before cdxgen, not only in the stage-2 post-process step).
+IDENTIFY_CONDA="$REPO_DIR/docker/lib/identify-conda.py"
 # shellcheck source=docker/lib/cdx-version.sh
 . "$REPO_DIR/docker/lib/cdx-version.sh"
 
@@ -48,9 +54,16 @@ case "$(uname -s 2>/dev/null)" in
     MINGW*|MSYS*|CYGWIN*)
         DOCKER_MSYS="MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "
         DOCKER_ENV=(env MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*')
-        hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; } ;;
+        hostpath() { cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; }
+        # A POSIX path this shell can mkdir/read directly; hostpath() (above)
+        # still does the cygpath -m conversion when this needs to reach a
+        # docker -v flag, same as every other mount in this script.
+        GUARD_STATE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/guard"
+        SCRATCH_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/tmp" ;;
     *)
-        hostpath() { printf '%s' "$1"; } ;;
+        hostpath() { printf '%s' "$1"; }
+        GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard"
+        SCRATCH_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/tmp" ;;
 esac
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
@@ -71,7 +84,7 @@ UPLOAD_TARGET="${UPLOAD_TARGET:-dependency-track}"
 TRUSCA_PROJECT_ID="${TRUSCA_PROJECT_ID:-}"
 TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
-GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""
+GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""; NESTED_ROOTFS_HINT=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
 # Tracks an EXPLICIT --security/--all, as opposed to the risk-report default
 # turning security on: only an explicit request is worth answering when a mode
@@ -89,6 +102,10 @@ REPORT_LANG="${REPORT_LANG:-en}"
 # the SKT supplier submission review applies (100% PURL coverage, pkg:generic
 # required). Passed through as-is; validate-sbom.sh normalizes unknown values.
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
+# CI gate: exit non-zero when this scan's own conformance report says "fail".
+# Host-only logic (see the check near the end of this script); nothing is
+# passed to the container for it.
+FAIL_ON_CONFORMANCE="false"
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
@@ -160,6 +177,7 @@ while [[ "$#" -gt 0 ]]; do
         --verify-weights) VERIFY_WEIGHTS="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --fail-on-conformance) FAIL_ON_CONFORMANCE="true" ;;
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --firmware) FORCE_FIRMWARE="true" ;;
@@ -292,6 +310,10 @@ Options:
                          default 5 files / 2 GiB each), so this is opt-in, unlike
                          the metadata-only file-security lookup.
   --byte-stable          Deterministic SBOM output
+  --fail-on-conformance  Exit 2 if this scan's own conformance report says
+                         "fail" (exit 3 if no conformance report was produced
+                         for this scan). Not offered with --ui. See "Exit
+                         codes" in the CLI reference.
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
                          reports stay English regardless.
@@ -476,10 +498,18 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # Web UI mode
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
+    [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
     # The web UI owns per-run subfolders itself (server.py creates them under the
     # mounted base). Honor --output-dir as that base; default to the current dir.
-    UI_BASE="${OUTPUT_BASE:-$(pwd)}"
+    # Resolved with pwd -P, the same as the CLI's own guard-state key (below):
+    # a "current-dir" scan of a symlinked path must hash to the same key a CLI
+    # scan of that path would, so a scan interrupted from one side is still
+    # found and cleaned up by a rescan from the other. mkdir -p first: an
+    # --output-dir that does not exist yet previously relied on docker's own
+    # bind-mount auto-create, which cd here would otherwise break.
+    mkdir -p "${OUTPUT_BASE:-$(pwd)}" || { echo "[ERROR] cannot create output dir: ${OUTPUT_BASE:-$(pwd)}"; exit 1; }
+    UI_BASE="$(cd "${OUTPUT_BASE:-$(pwd)}" && pwd -P)"
     # Extra --mount dirs become read-only rootfs scan targets under
     # /scan-targets/<name>. SBOM_UI_SCAN_ROOTS carries "<container>|<host>"
     # lines so server.py can allow-list them and the UI can label them by
@@ -520,10 +550,22 @@ if [ "$UI_MODE" = "true" ]; then
     # Source-scan options for build-prep.sh; the UI container's entrypoint passes
     # them on to the cdxgen container.
     read -ra PREP_ENV_FLAGS <<< "$(build_prep_env_args)"
+    # Name-only, same reason: a host override of the scan-cancel grace period
+    # must reach server.py inside the UI container (it reads the env var
+    # itself; a host-side default here would never be seen there).
+    CANCEL_ENV_FLAGS=(-e BOMLENS_CANCEL_GRACE)
+    # /bomlens-state: the same host-persistent guard-state directory
+    # the CLI path uses, so a directory scan launched through --ui can also
+    # recover a source tree a prior, too-hard-killed scan left dirty. entrypoint.sh
+    # inside this container reads SOURCE_ROOT_HOST (set below) and carries this
+    # mount to the cdxgen sibling itself via --volumes-from.
+    UI_GUARD_FLAGS=()
+    mkdir -p "$GUARD_STATE_DIR" 2>/dev/null && UI_GUARD_FLAGS=(-v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state)
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" \
+        "${UI_GUARD_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
@@ -584,6 +626,20 @@ if [ "$UPLOAD_TARGET" = "trusca" ] && [ "$GENERATE_ONLY" != "true" ] && [ -z "$T
 fi
 docker_check
 
+# A scan container whose own run never got the chance to remove it (the
+# process killed under memory pressure, a terminal force-closed, the host
+# powered off mid-scan) is left behind for good otherwise -- nothing else
+# ever cleans it up. Rather than the scan's own trap, which cannot run once
+# the process itself is gone, every run instead sweeps up what an EARLIER
+# one left behind: only ITS OWN exited containers (never a running one, so
+# two scans in flight at once never touch each other's), identified by a
+# label every scan container carries. Best-effort: a scan must still run
+# with no Docker cleanup permissions or a daemon that rejects the filter.
+_stale_cli_containers="$("${DOCKER_ENV[@]}" docker ps -aq --filter "label=bomlens.scan=cli" --filter "status=exited" 2>/dev/null)"
+if [ -n "$_stale_cli_containers" ]; then
+    echo "$_stale_cli_containers" | xargs "${DOCKER_ENV[@]}" docker rm >/dev/null 2>&1 || true
+fi
+
 SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
 SAFE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/[^a-zA-Z0-9._-]/_/g')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
@@ -606,6 +662,26 @@ mkdir -p "$OUTPUT_HOST_DIR" || { echo "[ERROR] cannot create output dir: $OUTPUT
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 
+# --fail-on-conformance judges this run's own result file, so a stale one from
+# an earlier run at the same --project/--version (this folder is reused, not
+# recreated) must not be mistaken for this run's verdict. Removed before the
+# scan runs; the final check below then trusts "exists" to mean "this run
+# produced it".
+CONFORMANCE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_conformance.result"
+[ "$FAIL_ON_CONFORMANCE" = "true" ] && rm -f "$CONFORMANCE_RESULT_FILE"
+
+# A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
+# the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
+# own stale-artifact cleanup runs at stage 2's startup and cannot otherwise
+# tell this run's own file, which stage 1 just wrote, from a leftover of an
+# earlier run at the same --project/--version (this folder is reused, not
+# recreated) -- both are just "$OUTPUT_FILE already on disk". Removing any
+# leftover here, before stage 1 runs, means stage 2 always finds either
+# nothing (stage 1 hasn't run yet) or stage 1's own fresh file; entrypoint.sh
+# is told that file's name (BOMLENS_RUN_INPUT, below) so it skips it rather
+# than mistaking it for a stale one.
+rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
+
 # Temp dirs (git clone / archive extract) are cleaned on any exit. A container
 # build step (e.g. npm install during a source scan) can leave root-owned files
 # in the mounted temp dir on Linux, where the host user cannot rm them; fall back
@@ -620,8 +696,121 @@ cleanup() {
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
+    # RUNNING_CONTAINER_NAME is set only while stage 1 (SOURCE mode) is
+    # waiting on its cdxgen container, so a Ctrl+C or `kill` reaching this
+    # script here still stops that container instead of leaving it to run
+    # unsupervised (measured -- neither one nor two Ctrl+Cs
+    # stopped it on their own, and a foreground `docker run` gives this
+    # trap no chance to run until the container exits by itself).
+    if [ -n "$RUNNING_CONTAINER_NAME" ] && command -v docker >/dev/null 2>&1; then
+        "${DOCKER_ENV[@]}" docker stop -t "${BOMLENS_CANCEL_GRACE:-30}" "$RUNNING_CONTAINER_NAME" >/dev/null 2>&1 || true
+        # No --rm on this container (an OOM check needs to inspect it after it
+        # exits, before it is gone): remove it here so a cancelled run does
+        # not leave it behind. A no-op if stage 1 already removed it itself.
+        "${DOCKER_ENV[@]}" docker rm -f "$RUNNING_CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
+    # The syft-fallback helper script (stage 1's cdxgen-crash path): a no-op
+    # once stage 1 has already removed it, so this only matters when a
+    # cancel lands while the fallback container is running. `if`, not a bare
+    # `&&`: this is the last statement cleanup() runs, and since the script
+    # itself never calls a final `exit N` (bash returns the last command's own
+    # status when it falls off the end), a false `[ -n ... ]` here would leak
+    # its own exit 1 out as the whole script's exit code on every ordinary
+    # run -- an `if` with no `else` returns 0 on a false condition instead.
+    if [ -n "$STAGE1_FALLBACK_SCRIPT" ]; then
+        rm -f "$STAGE1_FALLBACK_SCRIPT"
+    fi
 }
 trap cleanup EXIT INT TERM
+RUNNING_CONTAINER_NAME=""
+STAGE1_FALLBACK_SCRIPT=""
+
+# Host-persistent guard state: when a scan is interrupted hard
+# enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
+# crash), resolver output for ecosystems that cannot be redirected outside
+# the tree (npm's node_modules is the clearest case) can survive in the
+# source tree. This records, OUTSIDE that tree, exactly what such a run would
+# need to clean up if it never got the chance — read by build-prep.sh's
+# restore-only mode (BOMLENS_GUARD_ID, BOMLENS_GUARD_RESTORE_ONLY) below.
+# Named _ID, not _KEY: cdxgen's own security audit flagged "KEY" as
+# credential-like in a supplier's scan log, which would be a confusing thing
+# to see about an internal bookkeeping value.
+#
+# Scope: only a stable, repeatedly-scanned host path (--target / current
+# folder). A --git clone or zip extract goes into a fresh temp dir every run
+# (CLEANUP_DIRS is non-empty for those), so there is no "next scan of the
+# same tree" to hand a stale record to — setup_guard_state is a no-op there.
+#
+# The state directory is keyed by a hash of the resolved path, but a hash
+# collision (or, with the weaker cksum, a real one) must never make this
+# clean up the wrong folder's files: the recorded path is checked for an
+# exact match before anything is touched.
+guard_hash() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum 2>/dev/null | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 2>/dev/null | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+GUARD_ID=""
+setup_guard_state() {
+    [ "${#CLEANUP_DIRS[@]}" -eq 0 ] || return 0
+    mkdir -p "$GUARD_STATE_DIR" 2>/dev/null || return 0
+    local target_real key owner_file owner ps_out ps_rc recorded_path recorded_image cleanup_image
+    target_real=$(cd "$SCAN_INPUT_DIR" 2>/dev/null && pwd -P) || return 0
+    key=$(printf '%s' "$target_real" | guard_hash) || return 0
+    [ -n "$key" ] || return 0
+    owner_file="$GUARD_STATE_DIR/$key/owner"
+    if [ -f "$owner_file" ]; then
+        owner=$(cat "$owner_file" 2>/dev/null)
+        recorded_path=$(cat "$GUARD_STATE_DIR/$key/path" 2>/dev/null)
+        if [ -z "$owner" ] || [ "$recorded_path" != "$target_real" ] || ! command -v docker >/dev/null 2>&1; then
+            echo "[WARN] found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place."
+            return 0
+        fi
+        ps_out=$("${DOCKER_ENV[@]}" docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null)
+        ps_rc=$?
+        if [ "$ps_rc" -ne 0 ]; then
+            echo "[WARN] could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time."
+            return 0
+        fi
+        if [ -n "$ps_out" ]; then
+            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
+            return 0
+        fi
+        # Confirmed gone and the path matches: finish what it started
+        # (guard_restore, reused via build-prep.sh's restore-only mode)
+        # before this run's own guard takes over the same slot. Reuses that
+        # run's own cdxgen image (recorded below), or the already-local
+        # postprocess image, rather than pulling anything new just for
+        # cleanup — an offline host must not fail a scan over this.
+        recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
+        cleanup_image=""
+        if [ -n "$recorded_image" ] && "${DOCKER_ENV[@]}" docker image inspect "$recorded_image" >/dev/null 2>&1; then
+            cleanup_image="$recorded_image"
+        elif "${DOCKER_ENV[@]}" docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1; then
+            cleanup_image="$POSTPROCESS_IMAGE"
+        fi
+        if [ -z "$cleanup_image" ]; then
+            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+            return 0
+        fi
+        echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
+        "${DOCKER_ENV[@]}" docker run --rm -u 0:0 \
+            -v "$(hostpath "$SCAN_INPUT_DIR")":/app \
+            -v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state \
+            -v "$(hostpath "$BUILD_PREP")":/tmp/build-prep.sh:ro \
+            -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+            --entrypoint sh "$cleanup_image" /tmp/build-prep.sh /app >/dev/null 2>&1 || true
+    fi
+    mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
+    printf '%s\n' "$RUNNING_CONTAINER_NAME" > "$GUARD_STATE_DIR/$key/owner" 2>/dev/null || return 0
+    printf '%s\n' "$target_real" > "$GUARD_STATE_DIR/$key/path" 2>/dev/null || return 0
+    printf '%s\n' "$CDX_IMG" > "$GUARD_STATE_DIR/$key/image" 2>/dev/null || return 0
+    GUARD_ID="$key"
+}
 
 # A reproducible (--byte-stable) build must not resolve dependency licenses over
 # the network: registry availability (e.g. pkg.go.dev) varies between runs, so a
@@ -998,6 +1187,29 @@ find_rootfs_dir() {
         if _is_rootfs_dir "$d"; then printf '%s' "$d"; return 0; fi
     done
     return 1
+}
+
+# A plain directory --target that is not itself a root filesystem may still
+# have one a level or two below it (a delivery folder wrapping the actual
+# rootfs) -- the common shape find_rootfs_dir already searches for archives.
+# This does NOT change routing: auto-switching a directory --target to ROOTFS
+# on this alone would repeat, in the other direction, the bug #47 fixed (every
+# directory --target used to hard-route to ROOTFS regardless of contents,
+# silently dropping cdxgen's resolved deps/licenses/hashes) -- a source repo
+# that happens to hold a rootfs-shaped fixture folder would now be silently
+# rerouted away from a scan that would otherwise have found real components.
+# Returns nothing (and fails) when $1 is itself a rootfs -- that path already
+# routes to ROOTFS on its own, so a caller only ever needs this for the
+# directory that is NOT one, to decide whether a diagnostic is worth naming.
+#
+# docker/web/server.py has its own nested_rootfs_hint for the web UI's deep
+# source scan (scan-target-src) -- kept in sync deliberately, same shape
+# check, same fixtures in tests/test-input-routing.sh and tests/test-web-ui.sh.
+nested_rootfs_hint() {
+    local d="$1" found
+    _is_rootfs_dir "$d" && return 1
+    found=$(find_rootfs_dir "$d") || return 1
+    printf '%s' "${found#"$d"/}"
 }
 
 # Does the root filesystem record its own packages? syft reads apk/dpkg/rpm and
@@ -1412,6 +1624,12 @@ elif [ -n "$TARGET" ]; then
             # survives any later `cd`.
             MODE="SOURCE"
             SCAN_INPUT_DIR="$(cd "$TARGET" && pwd)"
+            # This folder is not itself a rootfs, but one may sit a level
+            # or two below it (nested_rootfs_hint), which is why the resulting
+            # SBOM can come back with 0 components. entrypoint.sh names it in
+            # that warning, but only once the scan is confirmed empty, never
+            # just because the folder exists.
+            NESTED_ROOTFS_HINT="$(nested_rootfs_hint "$SCAN_INPUT_DIR" || true)"
         fi
     else MODE="IMAGE"; fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
@@ -1604,11 +1822,55 @@ if [ "$MODE" = "SOURCE" ]; then
     esac
     # Names only (see build_prep_env_args), so this is safe inside the eval.
     PREP_ENV_ARGS=$(build_prep_env_args)
-    eval "$DOCKER_MSYS"docker run --rm -u 0:0 \
+    # Run in the background and wait explicitly, instead of foreground, so a
+    # Ctrl+C or `kill` is handled the moment it arrives: a shell only acts on a
+    # trap once it regains control, and while blocked on a foreground command
+    # that does not happen until the command finishes on its own (measured).
+    # `wait` returns as soon as the signal arrives, letting
+    # cleanup() (which reads RUNNING_CONTAINER_NAME) stop the container right
+    # away instead of leaving it to run unsupervised.
+    #
+    # build-prep.sh runs as "sh /tmp/build-prep.sh ARGS", not the previous
+    # "sh -c 'sh /tmp/build-prep.sh ARGS'": the extra -c layer made
+    # build-prep.sh a CHILD of the container's PID 1 instead of PID 1 itself.
+    # A container's PID 1 only gets a signal's default action when it has
+    # installed its own handler for that signal (standard Linux PID 1
+    # behavior) — the wrapper sh had none, so `docker stop`'s SIGTERM was
+    # silently dropped and build-prep.sh's own trap never ran, regardless of
+    # grace (measured: a 30s grace still ended in a forced SIGKILL every
+    # time). Invoking the script file directly makes it PID 1, so its trap is
+    # what the SIGTERM actually reaches.
+    # $$ alone can collide: two scans (CLI + web UI, or parallel CI jobs) on
+    # the same host can land on the same PID space at different times, or a
+    # container from an earlier crashed run can still be named this if it was
+    # never cleaned up.
+    RUNNING_CONTAINER_NAME="bomlens-scan-$$-$RANDOM"
+    setup_guard_state
+    GUARD_STATE_ARGS=""
+    if [ -n "$GUARD_ID" ]; then
+        GUARD_STATE_ARGS="-v \"$(hostpath "$GUARD_STATE_DIR")\":/bomlens-state -e BOMLENS_GUARD_ID=\"$GUARD_ID\""
+    fi
+    # Captured to a log file, not streamed to the terminal: cdxgen's own
+    # output is its business, not BomLens's, and a crash prints a raw Node
+    # stack trace there -- the terminal gets this progress line and, on
+    # failure, a short cause; the file is what a fallback below classifies
+    # (oom/disk-space/network, the same grep the web UI already does) and
+    # what the failure message below points a reader at for the rest.
+    # No --rm: an OOM check needs to inspect the container after it exits,
+    # before it is gone, and the exit code itself comes from `docker wait`,
+    # not the backgrounded command's own status.
+    STAGE1_LOG=$(mktemp)
+    echo "      (log: $STAGE1_LOG)"
+    STAGE1_CONTAINER="$RUNNING_CONTAINER_NAME"
+    eval "$DOCKER_MSYS"docker run -u 0:0 \
+        --name "\"$RUNNING_CONTAINER_NAME\"" \
+        --label bomlens.scan=cli \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/app \
         -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
         -v "\"$(hostpath "$BUILD_PREP")\"":/tmp/build-prep.sh:ro \
+        -v "\"$(hostpath "$IDENTIFY_CONDA")\"":/tmp/identify-conda.py:ro \
         $CACHE_MOUNTS \
+        $GUARD_STATE_ARGS \
         -e HOME=/tmp/sbomhome \
         -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
@@ -1618,8 +1880,72 @@ if [ "$MODE" = "SOURCE" ]; then
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
         --entrypoint sh "\"$CDX_IMG\"" \
-        -c "'sh /tmp/build-prep.sh /app \"/out/$OUTPUT_FILE\" $CDX_SPEC_VERSION'" \
-        || { echo "[ERROR] SBOM generation failed (stage 1)"; exit 1; }
+        /tmp/build-prep.sh /app "\"/out/$OUTPUT_FILE\"" "$CDX_SPEC_VERSION" > "$STAGE1_LOG" 2>&1 &
+    STAGE1_PID=$!
+    # || true: this script runs under `set -e`, and without the pipe through
+    # `tee` this build used to have, $STAGE1_PID is the docker run itself, so
+    # `wait` now returns ITS exit code -- a crash would trip `set -e` right
+    # here, aborting the script before any of the failure handling below
+    # runs. The real exit code comes from `docker wait` next regardless.
+    wait "$STAGE1_PID" || true
+    RUNNING_CONTAINER_NAME=""
+    STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    if [ "$STAGE1_RC" -ne 0 ] || [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+        if [ "$("${DOCKER_ENV[@]}" docker inspect -f '{{.State.OOMKilled}}' "$STAGE1_CONTAINER" 2>/dev/null)" = "true" ]; then
+            STAGE1_FAIL_REASON="oom"
+            echo "[WARN] cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG"
+        elif grep -qi "no space left on device" "$STAGE1_LOG"; then
+            STAGE1_FAIL_REASON="disk-space"
+            echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG"
+        elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$STAGE1_LOG"; then
+            STAGE1_FAIL_REASON="network"
+            echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG"
+        else
+            STAGE1_FAIL_REASON="cdxgen-crash"
+            echo "[WARN] cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)."
+        fi
+        "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
+        rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
+        ensure_image_fresh "$POSTPROCESS_IMAGE"
+        # A bind-mounted script file (matching build-prep.sh's own pattern),
+        # not a `-c` string built by host-side interpolation: the same
+        # MSYS_NO_PATHCONV mount-path rewriting that protects every other
+        # docker call in this script would otherwise also mangle a `-c`
+        # argument that happens to contain "/"-separated words on Windows
+        # Git Bash. Written under SCRATCH_DIR, not OUTPUT_HOST_DIR: that is
+        # the user's own output folder, and a script left behind there (a
+        # crash between writing it and the rm below) would linger among the
+        # scan's real artifacts. Not the system tmpdir either: a Linux VM
+        # Docker backend (Colima, some Docker Desktop setups) mounts only
+        # specific host paths into itself, and silently substitutes an empty
+        # directory for a source it cannot see.
+        mkdir -p "$SCRATCH_DIR" 2>/dev/null
+        STAGE1_FALLBACK_SCRIPT="$SCRATCH_DIR/.fallback-$$-$RANDOM.sh"
+        cat > "$STAGE1_FALLBACK_SCRIPT" <<'FALLBACK_SH'
+set -e
+. /usr/local/lib/sbom/source-detect.sh
+read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
+syft "dir:/src" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$1" > "/out/$2" 2>/dev/null
+apply_node_fallback_quality_gate "/out/$2" /src 2 || { echo "[ERROR] fallback SBOM discarded (see above)." >&2; exit 1; }
+mark_sbom_degraded "/out/$2" "$3"
+mark_sbom_excluded "/out/$2" /src
+FALLBACK_SH
+        if ! eval "$DOCKER_MSYS"docker run --rm --label bomlens.scan=cli --entrypoint bash \
+            -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro \
+            -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
+            -v "\"$(hostpath "$STAGE1_FALLBACK_SCRIPT")\"":/tmp/fallback.sh:ro \
+            "\"$POSTPROCESS_IMAGE\"" \
+            /tmp/fallback.sh "$CDX_SPEC_VERSION" "$OUTPUT_FILE" "$STAGE1_FAIL_REASON"; then
+            rm -f "$STAGE1_FALLBACK_SCRIPT"; STAGE1_FALLBACK_SCRIPT=""
+            echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
+            exit 1
+        fi
+        rm -f "$STAGE1_FALLBACK_SCRIPT"; STAGE1_FALLBACK_SCRIPT=""
+        echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+    else
+        "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
+        rm -f "$STAGE1_LOG"
+    fi
 
     echo "[2/2] Post-processing..."
     # Mount the scanned tree as /src (so deep-license/vendored see the real source)
@@ -1635,7 +1961,7 @@ if [ "$MODE" = "SOURCE" ]; then
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS $(pp_env)$(cosign_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
@@ -1708,11 +2034,15 @@ else
     ensure_image_fresh "$RUN_IMAGE"
     # VOL/ENVV/pp_env/cosign_run intentionally expand to multiple tokens (-v, -e
     # pairs), so the word splitting SC2046 flags here is required, not a bug.
+    # BOMLENS_ARTIFACT_CLEANUP=1 tells entrypoint.sh it is safe to sweep
+    # known-suffix leftovers of an earlier scan of the same project/version:
+    # this single-container run generates its whole output in one shot, so
+    # there is no stage-1 handoff the sweep could mistake for stale output.
     export_scan_secrets
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" $ENVV $(pp_env)$(cosign_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run) \
         "\"$RUN_IMAGE\""
 fi
 
@@ -1795,3 +2125,20 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     fi
 fi
 echo "=========================================="
+
+# --fail-on-conformance: judged last, after every artifact above is already on
+# disk, so a failing report can still be opened and acted on. Reads the bare
+# pass/fail sidecar validate-sbom.sh writes next to the JSON report (no jq
+# dependency on the host). Distinct from a scan failure (exit 1 elsewhere in
+# this script): 2 means the scan succeeded and its own conformance check
+# failed, 3 means this run produced no conformance report to judge at all.
+if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then
+    if [ ! -f "$CONFORMANCE_RESULT_FILE" ]; then
+        echo "[ERROR] --fail-on-conformance: this scan produced no conformance report to judge."
+        exit 3
+    fi
+    if [ "$(cat "$CONFORMANCE_RESULT_FILE")" = "fail" ]; then
+        echo "[ERROR] Conformance check failed. See ${SAFE_PROJECT}_${SAFE_VERSION}_conformance.md / .html for details."
+        exit 2
+    fi
+fi

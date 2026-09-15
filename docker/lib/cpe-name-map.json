@@ -12,6 +12,8 @@
   "libopenssl":     { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
   "openssl-util":   { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
   "libssl":         { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libssl3":        { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
+  "libcrypto3":     { "cpe_vendor": "openssl",                 "cpe_product": "openssl" },
 
   "zlib":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib",           "spdx_license": "Zlib" },
   "libz":           { "cpe_vendor": "zlib",                    "cpe_product": "zlib",           "spdx_license": "Zlib" },

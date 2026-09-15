@@ -1295,6 +1295,115 @@ case "$other" in
   *) fail "the withheld marker suppressed enrichment on another component" "got $other" ;;
 esac
 
+echo "== F-1a: distro (deb/rpm/apk) cpe version cleanup beyond the name map =="
+cat > "$WORK/distro-cpe.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"library","name":"bash","version":"5.2.15-2+b13",
+   "purl":"pkg:deb/debian/bash@5.2.15-2%2Bb13?arch=arm64",
+   "cpe":"cpe:2.3:a:bash:bash:5.2.15-2\\+b13:*:*:*:*:*:*:*"},
+  {"type":"library","name":"bsdutils","version":"1:2.38.1-5+deb12u3",
+   "purl":"pkg:deb/debian/bsdutils@1%3A2.38.1-5%2Bdeb12u3?arch=arm64",
+   "cpe":"cpe:2.3:a:bsdutils:bsdutils:1\\:2.38.1-5\\+deb12u3:*:*:*:*:*:*:*"},
+  {"type":"library","name":"base-files","version":"13ubuntu10.4",
+   "purl":"pkg:deb/ubuntu/base-files@13ubuntu10.4?arch=arm64",
+   "cpe":"cpe:2.3:a:base-files:base-files:13ubuntu10.4:*:*:*:*:*:*:*"},
+  {"type":"library","name":"audit-libs","version":"3.0.7-104.el9",
+   "purl":"pkg:rpm/rocky/audit-libs@3.0.7-104.el9?arch=aarch64",
+   "cpe":"cpe:2.3:a:rockyenterprisesoftwarefoundation:audit-libs:3.0.7-104.el9:*:*:*:*:*:*:*"},
+  {"type":"library","name":"apk-tools","version":"2.14.4-r1",
+   "purl":"pkg:apk/alpine/apk-tools@2.14.4-r1?arch=aarch64",
+   "cpe":"cpe:2.3:a:apk-tools:apk-tools:2.14.4-r1:*:*:*:*:*:*:*"},
+  {"type":"library","name":"libcrypto3","version":"3.3.7-r0",
+   "purl":"pkg:apk/alpine/libcrypto3@3.3.7-r0?arch=aarch64&upstream=openssl",
+   "cpe":"cpe:2.3:a:libcrypto3:libcrypto3:3.3.7-r0:*:*:*:*:*:*:*"},
+  {"type":"library","name":"some-maven-lib","version":"1:2.0",
+   "purl":"pkg:maven/org.example/some-maven-lib@2.0",
+   "cpe":"cpe:2.3:a:example:some-maven-lib:1\\:2.0:*:*:*:*:*:*:*"},
+  {"type":"library","name":"hyphen-upstream-deb","version":"1.2-rc1-3",
+   "purl":"pkg:deb/debian/hyphen-upstream-deb@1.2-rc1-3?arch=arm64",
+   "cpe":"cpe:2.3:a:hyphen-upstream-deb:hyphen-upstream-deb:1.2-rc1-3:*:*:*:*:*:*:*"},
+  {"type":"library","name":"hyphen-upstream-rpm","version":"1.2-rc1-3.el9",
+   "purl":"pkg:rpm/rocky/hyphen-upstream-rpm@1.2-rc1-3.el9?arch=aarch64",
+   "cpe":"cpe:2.3:a:somevendor:hyphen-upstream-rpm:1.2-rc1-3.el9:*:*:*:*:*:*:*"}
+]}
+JSON
+bash "$LIB/enrich-cpe.sh" "$WORK/distro-cpe.json" >/dev/null 2>&1
+dc_get() { jq -r --arg n "$1" --arg f "$2" '[.components[]|select(.name==$n)][0][$f] // "NONE"' "$WORK/distro-cpe.json"; }
+dc_src() { jq -r --arg n "$1" '[.components[]|select(.name==$n)][0] | [(.properties//[])[]?|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/distro-cpe.json"; }
+# (a) A whitelisted deb name (bash) gets its distro epoch/revision stripped from
+# the cpe version, same as the firmware -<digits>/-r<digits> rule but covering
+# the deb "+build" shape too.
+[ "$(dc_get bash cpe)" = "cpe:2.3:a:gnu:bash:5.2.15:*:*:*:*:*:*:*" ] \
+    && pass "whitelisted deb bash: cpe version cleaned to 5.2.15 (epoch/revision not part of NVD version)" \
+    || fail "bash cpe='$(dc_get bash cpe)'"
+# (b) A NON-whitelisted deb name (bsdutils) keeps its self-referential
+# vendor/product (not corrected -- no guessing this round) but the epoch and
+# revision are still stripped from the version.
+[ "$(dc_get bsdutils cpe)" = "cpe:2.3:a:bsdutils:bsdutils:2.38.1:*:*:*:*:*:*:*" ] \
+    && pass "non-whitelisted deb bsdutils: epoch+revision stripped, vendor/product left self-referential" \
+    || fail "bsdutils cpe='$(dc_get bsdutils cpe)'"
+[ "$(dc_src bsdutils)" = "distro-version-strip" ] \
+    && pass "bsdutils carries bomlens:cpeSource=distro-version-strip (distinct from name-map)" \
+    || fail "bsdutils cpeSource='$(dc_src bsdutils)'"
+# (c) A version with no "-" at all has no revision to remove under the narrow
+# rule and is left completely untouched (conservative: do not guess where the
+# upstream version ends without a hyphen to anchor on).
+[ "$(dc_get base-files cpe)" = "cpe:2.3:a:base-files:base-files:13ubuntu10.4:*:*:*:*:*:*:*" ] \
+    && pass "deb version with no hyphen (13ubuntu10.4) left untouched" \
+    || fail "base-files cpe='$(dc_get base-files cpe)'"
+[ "$(dc_src base-files)" = "NONE" ] \
+    && pass "untouched base-files carries no cpeSource property" \
+    || fail "base-files unexpectedly marked as '$(dc_src base-files)'"
+# (d) rpm: the real Vendor-derived vendor (rockyenterprisesoftwarefoundation) is
+# left exactly as syft set it; only the .el9 release tag and revision go.
+[ "$(dc_get audit-libs cpe)" = "cpe:2.3:a:rockyenterprisesoftwarefoundation:audit-libs:3.0.7:*:*:*:*:*:*:*" ] \
+    && pass "non-whitelisted rpm audit-libs: .el9 release stripped, real rpm vendor kept" \
+    || fail "audit-libs cpe='$(dc_get audit-libs cpe)'"
+# (e) apk: the existing -r<digits> rule also applies to non-whitelisted names now.
+[ "$(dc_get apk-tools cpe)" = "cpe:2.3:a:apk-tools:apk-tools:2.14.4:*:*:*:*:*:*:*" ] \
+    && pass "non-whitelisted apk apk-tools: -r1 stripped, vendor/product left self-referential" \
+    || fail "apk-tools cpe='$(dc_get apk-tools cpe)'"
+# (e2) libcrypto3 IS in the name map (alpine's openssl split package, purl's
+# upstream=openssl confirms it): corrected to the real openssl:openssl vendor,
+# not just version-stripped.
+[ "$(dc_get libcrypto3 cpe)" = "cpe:2.3:a:openssl:openssl:3.3.7:*:*:*:*:*:*:*" ] \
+    && pass "alpine libcrypto3 maps to openssl:openssl via the name map" \
+    || fail "libcrypto3 cpe='$(dc_get libcrypto3 cpe)'"
+[ "$(dc_src libcrypto3)" = "name-map" ] \
+    && pass "libcrypto3 carries bomlens:cpeSource=name-map" \
+    || fail "libcrypto3 cpeSource='$(dc_src libcrypto3)'"
+# (f) A non-OS purl (maven) is never touched by this pass, even with an
+# epoch-shaped version and an already-escaped colon in its cpe.
+[ "$(dc_get some-maven-lib cpe)" = "cpe:2.3:a:example:some-maven-lib:1\\:2.0:*:*:*:*:*:*:*" ] \
+    && pass "non-OS purl (maven) cpe left untouched by the distro-revision pass" \
+    || fail "some-maven-lib cpe='$(dc_get some-maven-lib cpe)'"
+# (f2) An upstream version can itself contain a hyphen (a pre-release tag like
+# "-rc1"); only the segment after the LAST hyphen is a distro revision. deb and
+# rpm share this shape.
+[ "$(dc_get hyphen-upstream-deb cpe)" = "cpe:2.3:a:hyphen-upstream-deb:hyphen-upstream-deb:1.2-rc1:*:*:*:*:*:*:*" ] \
+    && pass "deb: only the segment after the last hyphen is stripped (1.2-rc1-3 -> 1.2-rc1)" \
+    || fail "hyphen-upstream-deb cpe='$(dc_get hyphen-upstream-deb cpe)'"
+[ "$(dc_get hyphen-upstream-rpm cpe)" = "cpe:2.3:a:somevendor:hyphen-upstream-rpm:1.2-rc1:*:*:*:*:*:*:*" ] \
+    && pass "rpm: only the segment after the last hyphen is stripped (1.2-rc1-3.el9 -> 1.2-rc1)" \
+    || fail "hyphen-upstream-rpm cpe='$(dc_get hyphen-upstream-rpm cpe)'"
+# (g) component.version and purl are NEVER touched by this step: Trivy matches
+# by purl + OS context, and the distro revision has to stay there verbatim.
+[ "$(dc_get bsdutils version)" = "1:2.38.1-5+deb12u3" ] \
+    && pass "bsdutils component.version unchanged (still the real installed version)" \
+    || fail "bsdutils version changed to '$(dc_get bsdutils version)'"
+[ "$(dc_get bsdutils purl)" = "pkg:deb/debian/bsdutils@1%3A2.38.1-5%2Bdeb12u3?arch=arm64" ] \
+    && pass "bsdutils purl unchanged" \
+    || fail "bsdutils purl changed to '$(dc_get bsdutils purl)'"
+[ "$(dc_get audit-libs version)" = "3.0.7-104.el9" ] \
+    && pass "audit-libs component.version unchanged" \
+    || fail "audit-libs version changed to '$(dc_get audit-libs version)'"
+# (h) idempotent: a second pass changes nothing further.
+cp "$WORK/distro-cpe.json" "$WORK/distro-cpe2.json"
+bash "$LIB/enrich-cpe.sh" "$WORK/distro-cpe2.json" >/dev/null 2>&1
+diff -q "$WORK/distro-cpe.json" "$WORK/distro-cpe2.json" >/dev/null 2>&1 \
+    && pass "distro cpe version cleanup is idempotent" \
+    || fail "a second pass changed the SBOM further"
+
 echo "== F-1b: OS-context enrichment — synthesize/normalize operating-system for distro matching =="
 OSCTX="$LIB/enrich-os-context.py"
 # (a) rpm/centos SBOM with NO operating-system component: one is synthesized from
@@ -1412,6 +1521,117 @@ for _p in bomlens:os-context-ambiguous bomlens:os-context-unmatched; do
   _v=$(osc_prop "$_p" "$WORK/osc-centos.json")
   [ "$_v" = "NONE" ] && pass "single-distro SBOM carries no $_p" || fail "$_p present on a single-distro SBOM: '$_v'"
 done
+echo "== F-1b2: distro supplier enrichment (fill supplier from the os-context distro) =="
+DSUP="$LIB/enrich-distro-supplier.py"
+# (a) debian: os-context already resolved to a single, unambiguous distro.
+# Only the deb component gets a supplier; the maven component next to it does
+# not, and an rpm component from a DIFFERENT distro's own reactor is not
+# touched either (this fixture never lets them mix into one ambiguous SBOM --
+# that path is exercised separately in (d)).
+cat > "$WORK/dsup-debian.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "components":[
+   {"type":"library","name":"bash","version":"5.2.15-2","purl":"pkg:deb/debian/bash@5.2.15-2?distro=debian-12"},
+   {"type":"library","name":"some-lib","version":"1.0","purl":"pkg:maven/org.example/some-lib@1.0"},
+   {"type":"operating-system","name":"debian","version":"12","bom-ref":"bomlens-os-context"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-debian.json" >/dev/null 2>&1
+dsup_get() { jq -r --arg n "$1" '[.components[]|select(.name==$n)][0].supplier.name // "NONE"' "$WORK/dsup-debian.json"; }
+[ "$(dsup_get bash)" = "Debian" ] && pass "deb component gets supplier=Debian from the os-context distro" \
+    || fail "bash supplier='$(dsup_get bash)'"
+[ "$(dsup_get some-lib)" = "NONE" ] && pass "a non-distro (maven) component next to it is not touched" \
+    || fail "some-lib supplier='$(dsup_get some-lib)', expected untouched"
+
+# (b) rocky rpm: publisher already carries the distro name (a real scan's own
+# syft output does this), but that must NOT excuse leaving supplier empty --
+# the two fields mean different things and supplier is still unset.
+cat > "$WORK/dsup-rocky.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "components":[
+   {"type":"library","name":"alternatives","version":"1.24-1.el9",
+    "purl":"pkg:rpm/rocky/alternatives@1.24-1.el9?distro=rocky-9.3",
+    "publisher":"Rocky Enterprise Software Foundation"},
+   {"type":"operating-system","name":"rocky","version":"9","bom-ref":"bomlens-os-context"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-rocky.json" >/dev/null 2>&1
+rocky_sup=$(jq -r '[.components[]|select(.name=="alternatives")][0].supplier.name // "NONE"' "$WORK/dsup-rocky.json")
+[ "$rocky_sup" = "Rocky Enterprise Software Foundation" ] \
+    && pass "rpm component still gets supplier filled despite publisher already holding the distro name" \
+    || fail "rocky rpm supplier='$rocky_sup', expected filled (no rpm exception)"
+
+# (c) apk / alpine, and: a component that already carries a supplier is left
+# exactly as it was, not replaced.
+cat > "$WORK/dsup-alpine.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "components":[
+   {"type":"library","name":"apk-tools","version":"2.14.0-r5",
+    "purl":"pkg:apk/alpine/apk-tools@2.14.0-r5?distro=alpine-3.19"},
+   {"type":"library","name":"already-set","version":"1.0",
+    "purl":"pkg:apk/alpine/already-set@1.0?distro=alpine-3.19",
+    "supplier":{"name":"Someone Else"}},
+   {"type":"operating-system","name":"alpine","version":"3.19","bom-ref":"bomlens-os-context"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-alpine.json" >/dev/null 2>&1
+alpine_sup=$(jq -r '[.components[]|select(.name=="apk-tools")][0].supplier.name // "NONE"' "$WORK/dsup-alpine.json")
+[ "$alpine_sup" = "Alpine" ] && pass "apk component gets supplier=Alpine" || fail "apk-tools supplier='$alpine_sup'"
+kept_sup=$(jq -r '[.components[]|select(.name=="already-set")][0].supplier.name // "NONE"' "$WORK/dsup-alpine.json")
+[ "$kept_sup" = "Someone Else" ] && pass "an existing non-empty supplier is not replaced" \
+    || fail "already-set supplier='$kept_sup', expected 'Someone Else' preserved"
+# Idempotent: a second run changes nothing further.
+cp "$WORK/dsup-alpine.json" "$WORK/dsup-alpine2.json"
+python3 "$DSUP" "$WORK/dsup-alpine2.json" >/dev/null 2>&1
+if diff -q "$WORK/dsup-alpine.json" "$WORK/dsup-alpine2.json" >/dev/null 2>&1; then
+    pass "enrich-distro-supplier is idempotent"
+else
+    fail "a second run changed an SBOM where every target already has a supplier"
+fi
+
+# (d) ambiguous distro (os-context voted a majority over a minority) -> stand
+# down entirely, since the single OS component name is not trustworthy for
+# every package in a mixed SBOM.
+cat > "$WORK/dsup-ambiguous.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"properties":[{"name":"bomlens:os-context-ambiguous","value":"debian:12(5), alpine:3.19(2)"}]},
+ "components":[
+   {"type":"library","name":"bash","version":"5.2.15-2","purl":"pkg:deb/debian/bash@5.2.15-2?distro=debian-12"},
+   {"type":"operating-system","name":"debian","version":"12","bom-ref":"bomlens-os-context"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-ambiguous.json" >/dev/null 2>&1
+amb_sup=$(jq -r '[.components[]|select(.name=="bash")][0].supplier // "NONE"' "$WORK/dsup-ambiguous.json")
+[ "$amb_sup" = "NONE" ] && pass "an ambiguous (mixed-distro) SBOM is left untouched" \
+    || fail "ambiguous SBOM's bash got a supplier anyway: $amb_sup"
+
+# (e) no operating-system component at all (a source scan, or os-context-
+# unmatched) -> stand down.
+cat > "$WORK/dsup-no-os.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "components":[
+   {"type":"library","name":"bash","version":"5.2.15-2","purl":"pkg:deb/debian/bash@5.2.15-2"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-no-os.json" >/dev/null 2>&1
+noos_sup=$(jq -r '[.components[]|select(.name=="bash")][0].supplier // "NONE"' "$WORK/dsup-no-os.json")
+[ "$noos_sup" = "NONE" ] && pass "no operating-system component -> left untouched" \
+    || fail "SBOM with no OS component got a supplier anyway: $noos_sup"
+
+# (f) a distro os-context resolves to (ubuntu, ...) but the table has no
+# confirmed supplier name for it -> stand down rather than guess.
+cat > "$WORK/dsup-ubuntu.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "components":[
+   {"type":"library","name":"bash","version":"5.2.15-1ubuntu1","purl":"pkg:deb/ubuntu/bash@5.2.15-1ubuntu1?distro=ubuntu-24.04"},
+   {"type":"operating-system","name":"ubuntu","version":"24.04","bom-ref":"bomlens-os-context"}
+ ]}
+JSON
+python3 "$DSUP" "$WORK/dsup-ubuntu.json" >/dev/null 2>&1
+ubu_sup=$(jq -r '[.components[]|select(.name=="bash")][0].supplier // "NONE"' "$WORK/dsup-ubuntu.json")
+[ "$ubu_sup" = "NONE" ] && pass "a distro with no confirmed supplier name (ubuntu) is left untouched, not guessed" \
+    || fail "ubuntu SBOM's bash got a supplier anyway: $ubu_sup"
+
 echo "== F-1c: maven CPE enrichment — groupId-derived NVD cpe:2.3 =="
 MVNCPE="$LIB/enrich-maven-cpe.py"
 cat > "$WORK/mvn.json" <<'JSON'
@@ -2625,6 +2845,91 @@ jq -e '.checks[] | select(.id=="purl-syntax") | .missing | index("commons-lang3:
 pb_cov=$(jq -r '.checks[] | select(.id=="purl") | .status' "$WORK/pbad_conformance.json")
 [ "$pb_cov" = "pass" ] && pass "PURL coverage stays green (syntax is a separate check)" || fail "purl coverage='$pb_cov', expected pass"
 
+echo "== conformance: os-purl-namespace fails an OS purl whose distro is only a qualifier =="
+# The guide's submission checklist rejects an rpm/deb/apk purl whose
+# distribution appears only as a `?distro=` qualifier and not as the purl
+# namespace (pkg:rpm/<distro>/name) — the same as a namespace missing outright.
+# CycloneDX JSON, SPDX JSON, and SPDX Tag-Value each run their own copy of this
+# check, so each is exercised here.
+jq '.components += [
+  {"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/openssl@3.0.7?distro=rhel-9"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/distro-qual-cdx.json"
+bash "$LIB/validate-sbom.sh" "$WORK/distro-qual-cdx.json" "$WORK/dqc" "supplier" >/dev/null 2>&1
+dqc_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | .status' "$WORK/dqc_conformance.json")
+[ "$dqc_stat" = "fail" ] && pass "CycloneDX JSON: distro-only-qualifier purl fails os-purl-namespace" \
+    || fail "CycloneDX JSON: os-purl-namespace status='$dqc_stat', expected fail"
+jq -e '.checks[] | select(.id=="os-purl-namespace") | .missing | index("pkg:rpm/openssl@3.0.7?distro=rhel-9")' \
+    "$WORK/dqc_conformance.json" >/dev/null \
+    && pass "CycloneDX JSON: missing list names the offending purl" \
+    || fail "CycloneDX JSON: missing list lacks the distro-only-qualifier purl"
+
+jq '.packages += [{
+  "name":"openssl","SPDXID":"SPDXRef-Package-openssl","versionInfo":"3.0.7",
+  "downloadLocation":"NOASSERTION",
+  "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                    "referenceLocator":"pkg:rpm/openssl@3.0.7?distro=rhel-9"}]
+}]' "$FIX/good-spdx.json" > "$WORK/distro-qual-spdx.json"
+bash "$LIB/validate-sbom.sh" "$WORK/distro-qual-spdx.json" "$WORK/dqs" "supplier" >/dev/null 2>&1
+dqs_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | .status' "$WORK/dqs_conformance.json")
+[ "$dqs_stat" = "fail" ] && pass "SPDX JSON: distro-only-qualifier purl fails os-purl-namespace" \
+    || fail "SPDX JSON: os-purl-namespace status='$dqs_stat', expected fail"
+
+cp "$FIX/supplier-clean-tagvalue.spdx" "$WORK/distro-qual.spdx"
+cat >> "$WORK/distro-qual.spdx" <<'EOF'
+
+PackageName: openssl
+SPDXID: SPDXRef-Package-openssl
+PackageVersion: 3.0.7
+PackageDownloadLocation: NOASSERTION
+ExternalRef: PACKAGE-MANAGER purl pkg:rpm/openssl@3.0.7?distro=rhel-9
+PackageLicenseConcluded: NOASSERTION
+PackageChecksum: SHA1: 1111111111111111111111111111111111111
+Relationship: SPDXRef-DOCUMENT DEPENDS_ON SPDXRef-Package-openssl
+EOF
+bash "$LIB/validate-sbom.sh" "$WORK/distro-qual.spdx" "$WORK/dqtv" "supplier" >/dev/null 2>&1
+dqtv_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | "\(.status) \(.detail)"' "$WORK/dqtv_conformance.json")
+[ "$dqtv_stat" = "fail 1 without distribution" ] && pass "SPDX Tag-Value: distro-only-qualifier purl fails os-purl-namespace" \
+    || fail "SPDX Tag-Value: os-purl-namespace = '$dqtv_stat', expected 'fail 1 without distribution'"
+
+# A real syft-style purl carries the distro as BOTH the namespace and a
+# `?distro=` qualifier (e.g. pkg:rpm/rocky/openssl@3.0.7?distro=rocky-9.3).
+# That must still pass — the qualifier alone is not what makes it fail.
+jq '.components += [
+  {"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/rocky/openssl@3.0.7?distro=rocky-9.3"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/distro-ns-cdx.json"
+bash "$LIB/validate-sbom.sh" "$WORK/distro-ns-cdx.json" "$WORK/dnc" "supplier" >/dev/null 2>&1
+dnc_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | .status' "$WORK/dnc_conformance.json")
+[ "$dnc_stat" = "pass" ] && pass "CycloneDX JSON: namespace + distro= qualifier together still pass" \
+    || fail "CycloneDX JSON: os-purl-namespace status='$dnc_stat', expected pass"
+
+jq '.packages += [{
+  "name":"openssl","SPDXID":"SPDXRef-Package-openssl","versionInfo":"3.0.7",
+  "downloadLocation":"NOASSERTION",
+  "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                    "referenceLocator":"pkg:rpm/rocky/openssl@3.0.7?distro=rocky-9.3"}]
+}]' "$FIX/good-spdx.json" > "$WORK/distro-ns-spdx.json"
+bash "$LIB/validate-sbom.sh" "$WORK/distro-ns-spdx.json" "$WORK/dns" "supplier" >/dev/null 2>&1
+dns_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | .status' "$WORK/dns_conformance.json")
+[ "$dns_stat" = "pass" ] && pass "SPDX JSON: namespace + distro= qualifier together still pass" \
+    || fail "SPDX JSON: os-purl-namespace status='$dns_stat', expected pass"
+
+cp "$FIX/supplier-clean-tagvalue.spdx" "$WORK/distro-ns.spdx"
+cat >> "$WORK/distro-ns.spdx" <<'EOF'
+
+PackageName: openssl
+SPDXID: SPDXRef-Package-openssl
+PackageVersion: 3.0.7
+PackageDownloadLocation: NOASSERTION
+ExternalRef: PACKAGE-MANAGER purl pkg:rpm/rocky/openssl@3.0.7?distro=rocky-9.3
+PackageLicenseConcluded: NOASSERTION
+PackageChecksum: SHA1: 2222222222222222222222222222222222222
+Relationship: SPDXRef-DOCUMENT DEPENDS_ON SPDXRef-Package-openssl
+EOF
+bash "$LIB/validate-sbom.sh" "$WORK/distro-ns.spdx" "$WORK/dnstv" "supplier" >/dev/null 2>&1
+dnstv_stat=$(jq -r '.checks[] | select(.id=="os-purl-namespace") | .status' "$WORK/dnstv_conformance.json")
+[ "$dnstv_stat" = "pass" ] && pass "SPDX Tag-Value: namespace + distro= qualifier together still pass" \
+    || fail "SPDX Tag-Value: os-purl-namespace status='$dnstv_stat', expected pass"
+
 echo "== CONFORMANCE_PROFILE: skt-submission tightens PURL/no-generic; default stays as before =="
 
 # A pkg:generic component under the default profile: no-generic warns, does
@@ -2732,6 +3037,84 @@ sed 's/^SPDXVersion: SPDX-2.3$/SPDXVersion: SPDX-2.1/' "$FIX/supplier-clean-tagv
 bash "$LIB/validate-sbom.sh" "$WORK/tv-old.spdx" "$WORK/tvo" "supplier" >/dev/null 2>&1
 tvo=$(jq -r '"\(.checks[] | select(.id=="spec-version") | .status)/\(.result)"' "$WORK/tvo_conformance.json")
 [ "$tvo" = "fail/fail" ] && pass "Tag-Value SPDX-2.1 fails the spec-version check" || fail "Tag-Value spec-version: '$tvo', expected fail/fail"
+
+echo "== conformance: pipelineStepsFailed surfaces a supplier document's own failed-step markers =="
+# docker/lib/pipeline-step.sh's mark_pipeline_warning stamps a
+# bomlens:pipeline-step-failed metadata property on the SBOM itself for every
+# best-effort post-process step that failed. validate-sbom.sh reads it
+# straight off $SBOM (the document under test), so a re-analyzed document
+# still carries it under --analyze too -- no exception for ANALYZE by design.
+# Deduped, order preserved, mirrors server.py's pipeline_steps_seen (#87).
+jq '.metadata.properties = [
+  {"name":"bomlens:pipeline-step-failed","value":"normalize"},
+  {"name":"bomlens:pipeline-step-failed","value":"enrich-cpe"},
+  {"name":"bomlens:pipeline-step-failed","value":"normalize"},
+  {"name":"other-property","value":"ignored"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/psf-dedupe.json"
+bash "$LIB/validate-sbom.sh" "$WORK/psf-dedupe.json" "$WORK/psfd" "supplier" >/dev/null 2>&1
+psfd=$(jq -c '.pipelineStepsFailed' "$WORK/psfd_conformance.json")
+[ "$psfd" = '["normalize","enrich-cpe"]' ] \
+    && pass "duplicate step ids are deduped, order preserved" \
+    || fail "pipelineStepsFailed after dedupe: $psfd, expected [\"normalize\",\"enrich-cpe\"]"
+psfd_result=$(jq -r '.result' "$WORK/psfd_conformance.json")
+psfd_fails=$(jq '[.checks[] | select(.status=="fail")] | length' "$WORK/psfd_conformance.json")
+[ "$psfd_result" = "pass" ] && [ "$psfd_fails" = "0" ] \
+    && pass "a failed pipeline step does not affect the result or any check's status" \
+    || fail "pipelineStepsFailed changed the verdict: result=$psfd_result fails=$psfd_fails"
+
+# ANALYZE input is an untrusted supplier document, so a step id can be any
+# string: html gets it HTML-escaped inside <code>, md has backticks stripped
+# and newlines flattened so the value cannot break out of its code span.
+jq '.metadata.properties = [
+  {"name":"bomlens:pipeline-step-failed","value":"<script>alert(1)</script>"},
+  {"name":"bomlens:pipeline-step-failed","value":"back`tick`s\nnewline"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/psf-hostile.json"
+bash "$LIB/validate-sbom.sh" "$WORK/psf-hostile.json" "$WORK/psfh" "supplier" >/dev/null 2>&1
+[ "$(grep -c '<script>alert' "$WORK/psfh_conformance.html")" = "0" ] \
+    && pass "html report never carries an unescaped <script> from a pipeline-step id" \
+    || fail "html report leaked an unescaped <script> tag"
+grep -q '&lt;script&gt;alert(1)&lt;/script&gt;' "$WORK/psfh_conformance.html" \
+    && pass "html report shows the escaped id inside <code>" \
+    || fail "html report did not show the HTML-escaped step id"
+grep -q '`backticks newline`' "$WORK/psfh_conformance.md" \
+    && pass "md report strips backticks and flattens newlines in a step id" \
+    || fail "md report did not sanitize the hostile step id"
+
+# Caps: length per id and count of ids shown, same numbers as server.py's
+# MAX_PIPELINE_STEP_LEN / MAX_PIPELINE_STEPS (#87), so the two never drift.
+jq --argjson n 25 '.metadata.properties = (
+    [range(0;$n) | {"name":"bomlens:pipeline-step-failed","value":("step-" + (.|tostring))}]
+  )' "$FIX/good-cyclonedx.json" > "$WORK/psf-many.json"
+bash "$LIB/validate-sbom.sh" "$WORK/psf-many.json" "$WORK/psfm" "supplier" >/dev/null 2>&1
+psfm=$(jq -r '"\(.pipelineStepsFailed|length)/\(.pipelineStepsFailedMore)"' "$WORK/psfm_conformance.json")
+[ "$psfm" = "20/5" ] && pass "step ids are capped at 20 shown, the rest counted (got $psfm)" \
+    || fail "pipelineStepsFailed cap: $psfm, expected 20/5"
+grep -q '(and 5 more)' "$WORK/psfm_conformance.md" \
+    && pass "md report states the overflow count" \
+    || fail "md report did not state '(and 5 more)'"
+long_val=$(python3 -c 'print("y"*150)' 2>/dev/null || perl -e 'print "y" x 150')
+jq --arg v "$long_val" '.metadata.properties = [{"name":"bomlens:pipeline-step-failed","value":$v}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/psf-long.json"
+bash "$LIB/validate-sbom.sh" "$WORK/psf-long.json" "$WORK/psfl" "supplier" >/dev/null 2>&1
+psfl_len=$(jq '.pipelineStepsFailed[0] | length' "$WORK/psfl_conformance.json")
+[ "$psfl_len" = "100" ] && pass "a single step id is truncated to 100 chars" \
+    || fail "step id length: $psfl_len, expected 100"
+
+# Normal case: no such property at all, or a format (SPDX JSON / SPDX
+# Tag-Value) that never carries CycloneDX-style metadata.properties -- all
+# fall through to the same empty result, not an error.
+bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/psfnone" "supplier" >/dev/null 2>&1
+psfnone=$(jq -c '.pipelineStepsFailed' "$WORK/psfnone_conformance.json")
+[ "$psfnone" = "[]" ] && pass "no failed-step markers -> pipelineStepsFailed: []" \
+    || fail "pipelineStepsFailed with no markers: $psfnone, expected []"
+bash "$LIB/validate-sbom.sh" "$FIX/good-spdx.json" "$WORK/psfspdxj" "supplier" >/dev/null 2>&1
+psfspdxj=$(jq -c '.pipelineStepsFailed' "$WORK/psfspdxj_conformance.json")
+[ "$psfspdxj" = "[]" ] && pass "SPDX JSON input -> pipelineStepsFailed: []" \
+    || fail "SPDX JSON pipelineStepsFailed: $psfspdxj, expected []"
+bash "$LIB/validate-sbom.sh" "$FIX/supplier-clean-tagvalue.spdx" "$WORK/psfspdxtv" "supplier" >/dev/null 2>&1
+psfspdxtv=$(jq -c '.pipelineStepsFailed' "$WORK/psfspdxtv_conformance.json")
+[ "$psfspdxtv" = "[]" ] && pass "SPDX Tag-Value input -> pipelineStepsFailed: []" \
+    || fail "SPDX Tag-Value pipelineStepsFailed: $psfspdxtv, expected []"
 
 echo "== conformance: SPDX transitive check counts DEPENDENCY_OF (Syft's reverse-direction edge) =="
 # Syft writes OS-package dependency edges in SPDX as the reverse relationship
@@ -3383,6 +3766,260 @@ fi
 # apply a 1000-byte cap (instead of the real 100 MB default) to any later
 # entrypoint.sh fragment this file goes on to source.
 unset OUTPUT_FILE SBOM_SIZE_CAP_BYTES
+
+echo "== stale-artifact cleanup: a re-scan of the same project/version does not mix in a previous run's leftovers =="
+# Extracted verbatim from docker/entrypoint.sh (between its literal anchor
+# comments), so this test tracks the shipped logic rather than a hand-copied
+# duplicate that could silently drift from it.
+sed -n '/^# Stale-artifact cleanup\./,/^# Report language for the human-facing conformance/p' "$ROOT_DIR/docker/entrypoint.sh" \
+    | sed '$d' > "$WORK/cleanup-snippet.sh"
+CLEANUP_SNIPPET_LINES="$(wc -l < "$WORK/cleanup-snippet.sh" | tr -d '[:space:]')"
+if [ ! -s "$WORK/cleanup-snippet.sh" ]; then
+    fail "could not extract the stale-artifact cleanup snippet from entrypoint.sh (did its anchor comments move?)"
+elif [ -z "$CLEANUP_SNIPPET_LINES" ] || [ "$CLEANUP_SNIPPET_LINES" -gt 100 ]; then
+    fail "cleanup snippet is $CLEANUP_SNIPPET_LINES lines (expected well under 100) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
+        "did the REPORT_LANG comment in docker/entrypoint.sh change?"
+elif grep -q '^[[:space:]]*exit\b' "$WORK/cleanup-snippet.sh"; then
+    fail "cleanup snippet contains an exit statement -- refusing to source it into this test process" \
+        "$(cat "$WORK/cleanup-snippet.sh")"
+else
+    CLEANDIR="$WORK/cleanup-dir"; mkdir -p "$CLEANDIR"
+    # A previous run's opt-in artifacts (vendored ID, SPDX export) and the
+    # 2-B result sidecar -- exactly the kind of leftover an earlier run with
+    # different options would leave behind (sync_artifacts only ever copies).
+    for f in _bom.json _NOTICE.txt _security.json _conformance.json \
+             _conformance.result _vendored.cdx.json _bom.spdx.json; do
+        echo "stale" > "$CLEANDIR/proj_1.0${f}"
+    done
+    # A file the user placed in the folder themselves -- must survive.
+    echo "keep me" > "$CLEANDIR/README.md"
+    echo "keep me too" > "$CLEANDIR/proj_1.0_notes.txt"
+    # A supplier's own recorded CVE judgements (POST /vex-verdict) -- must
+    # survive too, even though it is a known suffix (scripts/check-artifact-
+    # registry-sync.sh's CLEANUP_EXEMPT). Every other known suffix here is
+    # scan output regenerated fresh each run, which is why the cleanup sweeps
+    # it; this one is hand-entered and would otherwise be silently destroyed
+    # by re-scanning the same project and version.
+    echo "supplier's recorded judgements" > "$CLEANDIR/proj_1.0_vex.json"
+    # A DIFFERENT version's artifact sharing this run's prefix as a string
+    # prefix ("proj_1.0" is a string-prefix of "proj_1.0.1") -- must survive.
+    # The cleanup matches "${OUT_PREFIX}${suffix}" as one exact filename, never
+    # a "${OUT_PREFIX}*" glob, so this is a different exact name and is never
+    # a candidate.
+    echo "different version, keep me" > "$CLEANDIR/proj_1.0.1_bom.json"
+
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    HOST_OUTPUT_DIR="$CLEANDIR"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUT_PREFIX="proj_1.0"
+    # A current caller (scan-sbom.sh's single-container path, server.py) sends
+    # this; see the BOMLENS_RUN_INPUT-gated cases below for the CLI SOURCE
+    # 2-stage path's own signal.
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    BOMLENS_ARTIFACT_CLEANUP="1"
+    CLEANUP_LOG="$(. "$WORK/cleanup-snippet.sh" 2>&1)"
+
+    remaining="$(ls "$CLEANDIR")"
+    ok=1
+    for f in _bom.json _NOTICE.txt _security.json _conformance.json \
+             _conformance.result _vendored.cdx.json _bom.spdx.json; do
+        printf '%s\n' "$remaining" | grep -qFx "proj_1.0${f}" && ok=0
+    done
+    if [ "$ok" = 1 ]; then
+        pass "every known-suffix artifact from the previous run is removed"
+    else
+        fail "a known-suffix leftover survived the cleanup" "$remaining"
+    fi
+    if printf '%s\n' "$remaining" | grep -qFx "README.md" \
+        && printf '%s\n' "$remaining" | grep -qFx "proj_1.0_notes.txt"; then
+        pass "a file the user placed in the folder (no known suffix) is left alone"
+    else
+        fail "cleanup removed a file it should not have" "$remaining"
+    fi
+    if printf '%s\n' "$remaining" | grep -qFx "proj_1.0_vex.json"; then
+        pass "a re-scan does not destroy a supplier's previously recorded VEX judgements"
+    else
+        fail "cleanup swept the VEX verdict sidecar -- a re-scan would silently lose recorded judgements" "$remaining"
+    fi
+    if printf '%s\n' "$remaining" | grep -qFx "proj_1.0.1_bom.json"; then
+        pass "a different version's artifact sharing this run's prefix as a string prefix is left alone"
+    else
+        fail "cleanup matched by string prefix instead of an exact filename" "$remaining"
+    fi
+    if printf '%s' "$CLEANUP_LOG" | grep -q '\[INFO\] cleaned 7 stale artifact(s)'; then
+        pass "cleanup logs what it removed"
+    else
+        fail "cleanup did not log what it removed" "$CLEANUP_LOG"
+    fi
+
+    # A run with nothing stale in the folder (first scan of a project/version,
+    # or a folder --timestamp already made unique) must stay silent -- the
+    # log line is for something that actually happened, not routine noise.
+    CLEANDIR2="$WORK/cleanup-dir-empty"; mkdir -p "$CLEANDIR2"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    HOST_OUTPUT_DIR="$CLEANDIR2"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUT_PREFIX="fresh_1.0"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    BOMLENS_ARTIFACT_CLEANUP="1"
+    CLEANUP_LOG2="$(. "$WORK/cleanup-snippet.sh" 2>&1)"
+    if [ -z "$CLEANUP_LOG2" ]; then
+        pass "a clean folder (nothing stale) produces no cleanup log line"
+    else
+        fail "a clean folder logged a cleanup that did not happen" "$CLEANUP_LOG2"
+    fi
+    unset BOMLENS_ARTIFACT_CLEANUP
+
+    # BOMLENS_RUN_INPUT (scan-sbom.sh's stage 1 -> stage 2 handoff): stage 1
+    # already wrote this run's own _bom.json before this
+    # container started, so it must survive even though it matches a known
+    # suffix -- unlike an actually-stale leftover of a different suffix,
+    # which is still removed in the same pass.
+    CLEANDIR3="$WORK/cleanup-dir-runinput"; mkdir -p "$CLEANDIR3"
+    echo "this run's own stage-1 output" > "$CLEANDIR3/proj_1.0_bom.json"
+    echo "stale" > "$CLEANDIR3/proj_1.0_NOTICE.txt"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    HOST_OUTPUT_DIR="$CLEANDIR3"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUT_PREFIX="proj_1.0"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    BOMLENS_RUN_INPUT="proj_1.0_bom.json"
+    CLEANUP_LOG3="$(. "$WORK/cleanup-snippet.sh" 2>&1)"
+    remaining3="$(ls "$CLEANDIR3")"
+    if printf '%s\n' "$remaining3" | grep -qFx "proj_1.0_bom.json" \
+        && ! printf '%s\n' "$remaining3" | grep -qFx "proj_1.0_NOTICE.txt"; then
+        pass "BOMLENS_RUN_INPUT protects this run's own stage-1 SBOM while other stale suffixes are still cleaned"
+    else
+        fail "BOMLENS_RUN_INPUT did not protect the named file correctly" "$remaining3"
+    fi
+    if printf '%s' "$CLEANUP_LOG3" | grep -q '\[INFO\] cleaned 1 stale artifact(s)'; then
+        pass "the protected file is not counted in the cleanup log"
+    else
+        fail "cleanup log did not reflect the one non-protected file removed" "$CLEANUP_LOG3"
+    fi
+
+    # A malformed BOMLENS_RUN_INPUT (path separator, attempting to name
+    # something outside this exact-filename check) must be ignored, not
+    # trusted -- it degrades to protecting nothing, never to a path escape.
+    CLEANDIR4="$WORK/cleanup-dir-runinput-bad"; mkdir -p "$CLEANDIR4"
+    echo "stale" > "$CLEANDIR4/proj_1.0_bom.json"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    HOST_OUTPUT_DIR="$CLEANDIR4"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUT_PREFIX="proj_1.0"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    BOMLENS_RUN_INPUT="../proj_1.0_bom.json"
+    . "$WORK/cleanup-snippet.sh" >/dev/null 2>&1
+    if [ -f "$CLEANDIR4/proj_1.0_bom.json" ]; then
+        fail "a malformed BOMLENS_RUN_INPUT still protected a file from cleanup"
+    else
+        pass "a malformed BOMLENS_RUN_INPUT (path separator) is ignored, not honored"
+    fi
+    unset BOMLENS_RUN_INPUT
+
+    # Compatibility: an old scan-sbom.sh (built before this cleanup existed)
+    # sends neither BOMLENS_RUN_INPUT nor BOMLENS_ARTIFACT_CLEANUP. Against a
+    # new image, cleanup must not run at all -- the whole point being that
+    # stage 1's just-written _bom.json (an old caller's own 2-stage SOURCE
+    # handoff) is never mistaken for stale output, since an old caller has no
+    # way to protect it by name. Simulates v1.11.11's docker run for stage 2:
+    # PROJECT_NAME/PROJECT_VERSION/MODE=POSTPROCESS and nothing else new.
+    CLEANDIR5="$WORK/cleanup-dir-oldcaller"; mkdir -p "$CLEANDIR5"
+    echo "an old caller's stage-1 output, must survive" > "$CLEANDIR5/proj_1.0_bom.json"
+    echo "an old caller's own earlier NOTICE, also untouched (old behavior: nothing swept)" \
+        > "$CLEANDIR5/proj_1.0_NOTICE.txt"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    HOST_OUTPUT_DIR="$CLEANDIR5"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUT_PREFIX="proj_1.0"
+    CLEANUP_LOG5="$(. "$WORK/cleanup-snippet.sh" 2>&1)"
+    remaining5="$(ls "$CLEANDIR5")"
+    if printf '%s\n' "$remaining5" | grep -qFx "proj_1.0_bom.json" \
+        && printf '%s\n' "$remaining5" | grep -qFx "proj_1.0_NOTICE.txt"; then
+        pass "an old caller sending neither signal: cleanup does not run, stage-1 output survives"
+    else
+        fail "cleanup ran for a caller that never opted in" "$remaining5"
+    fi
+    if [ -z "$CLEANUP_LOG5" ]; then
+        pass "an old caller sending neither signal: no cleanup log line either"
+    else
+        fail "cleanup logged something despite no caller opting in" "$CLEANUP_LOG5"
+    fi
+fi
+unset HOST_OUTPUT_DIR OUT_PREFIX BOMLENS_ARTIFACT_CLEANUP
+
+echo "== 0-components diagnostic names a nested rootfs candidate =="
+# Extracted verbatim from docker/entrypoint.sh, so this tracks the shipped
+# logic rather than a hand-copied duplicate that could silently drift from it.
+sed -n "/^# Warn (don't fail) when the SBOM has no components\./,/^# ========================================================/p" \
+    "$ROOT_DIR/docker/entrypoint.sh" | sed '$d' > "$WORK/nested-rootfs-warn.sh"
+NRH_SNIPPET_LINES="$(wc -l < "$WORK/nested-rootfs-warn.sh" | tr -d '[:space:]')"
+if [ ! -s "$WORK/nested-rootfs-warn.sh" ]; then
+    fail "could not extract the 0-components diagnostic from entrypoint.sh (did its anchor comments move?)"
+elif [ -z "$NRH_SNIPPET_LINES" ] || [ "$NRH_SNIPPET_LINES" -gt 40 ]; then
+    fail "0-components diagnostic snippet is $NRH_SNIPPET_LINES lines (expected well under 40) -- the end anchor likely did not match" \
+        "did the section-divider comment after it move?"
+elif grep -q '^[[:space:]]*exit\b' "$WORK/nested-rootfs-warn.sh"; then
+    fail "0-components diagnostic snippet contains an exit statement -- refusing to source it into this test process" \
+        "$(cat "$WORK/nested-rootfs-warn.sh")"
+else
+    printf '{"components":[]}' > "$WORK/empty.json"
+    printf '{"components":[{"type":"library","name":"x","version":"1"}]}' > "$WORK/nonempty.json"
+
+    # Empty SBOM + a well-formed hint: both the generic warning and the
+    # rootfs-specific note appear.
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/empty.json"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    NESTED_ROOTFS_HINT="release-20260919/rootfs"
+    NRH_LOG1="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG1" | grep -qF "release-20260919/rootfs (inside the scanned folder) looks like a root filesystem."; then
+        pass "an empty SBOM with a nested-rootfs hint names the candidate folder"
+    else
+        fail "the nested-rootfs candidate was not named" "$NRH_LOG1"
+    fi
+
+    # Empty SBOM, no hint at all: only the generic warning, no rootfs note --
+    # the ordinary case (missing lockfile, empty source) reads the same as always.
+    unset NESTED_ROOTFS_HINT
+    NRH_LOG2="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG2" | grep -q "SBOM has 0 components" \
+        && ! printf '%s' "$NRH_LOG2" | grep -q "looks like a root filesystem"; then
+        pass "no hint set -> only the generic 0-components warning, no rootfs note invented"
+    else
+        fail "output did not match the no-hint case" "$NRH_LOG2"
+    fi
+
+    # A malformed hint (path separator escaping upward) must be ignored, not
+    # trusted -- it degrades to the generic warning, never to an unsafe value
+    # echoed verbatim.
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    NESTED_ROOTFS_HINT="../../etc/passwd"
+    NRH_LOG3="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG3" | grep -q "SBOM has 0 components" \
+        && ! printf '%s' "$NRH_LOG3" | grep -q "looks like a root filesystem"; then
+        pass "a malformed hint (.. segment) is ignored, not echoed"
+    else
+        fail "a malformed hint was echoed instead of ignored" "$NRH_LOG3"
+    fi
+
+    # The whole diagnostic block, hint included, is gated on 0 components: a
+    # source repo that happens to hold a rootfs-shaped fixture folder but still
+    # resolves real components must never see this note (the false-positive
+    # risk the auto-switch design was rejected over -- here it can't recur,
+    # because the note only ever fires once the scan is already empty).
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/nonempty.json"
+    NRH_LOG4="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if [ -z "$NRH_LOG4" ]; then
+        pass "a non-empty SBOM prints nothing, even with a nested-rootfs hint set"
+    else
+        fail "a non-empty SBOM still printed the 0-components diagnostic" "$NRH_LOG4"
+    fi
+    unset NESTED_ROOTFS_HINT
+fi
+unset OUTPUT_FILE
+
 echo "== node-scope: production filter drops the devDependencies tree =="
 # Guards docker/lib/build-prep.sh's node production-scope filter: cdxgen pulls a
 # deployed app's devDependencies (jest/eslint/@babel/...) into the SBOM, and the
@@ -3435,6 +4072,122 @@ JSON
     fi
 else
     echo "  SKIP: node unavailable — skipping node production-filter test"
+fi
+
+echo "== php-scope: composer scope filter drops require-dev, keeps require (shared with maven) =="
+# Guards docker/lib/build-prep.sh's run_scope_filter(): cdxgen already tags each
+# composer component with its resolved scope (require -> required, require-dev
+# -> optional), confirmed against the pinned cdxgen PHP image, so this reuses
+# the same JS the Maven scope filter runs (only the purl prefix differs).
+# Extract the real inlined filter JS from build-prep.sh (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    SFLT="$WORK/scope-filter.js"
+    sed -n "/<<'SFILTER_JS'/,/^SFILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" \
+        | sed '1d;$d' > "$SFLT"
+    if [ -s "$SFLT" ]; then
+        cat > "$WORK/php-mixed-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"monolog","version":"3.5.0","purl":"pkg:composer/monolog/monolog@3.5.0","bom-ref":"monolog@3.5.0","scope":"required"},
+   {"name":"phpunit","version":"10.5.0","purl":"pkg:composer/phpunit/phpunit@10.5.0","bom-ref":"phpunit@10.5.0","scope":"optional"},
+   {"name":"somelib","version":"1.0","purl":"pkg:pypi/somelib@1.0","bom-ref":"pylib"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["monolog@3.5.0","phpunit@10.5.0"]},
+   {"ref":"monolog@3.5.0","dependsOn":[]},
+   {"ref":"phpunit@10.5.0","dependsOn":[]}
+ ]}
+JSON
+        node "$SFLT" "$WORK/php-mixed-bom.json" "pkg:composer/" 2>/dev/null
+        names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/php-mixed-bom.json")
+        [ "$names" = "monolog,somelib" ] \
+            && pass "require-dev dropped; require composer + non-composer kept (got: $names)" \
+            || fail "unexpected components after php scope filter" "$names"
+        if jq -e '[.dependencies[].ref] | index("phpunit@10.5.0")' "$WORK/php-mixed-bom.json" >/dev/null 2>&1; then
+            fail "dropped phpunit still has a dependency entry"
+        else
+            pass "dropped require-dev component removed from the dependency graph"
+        fi
+        jq -e '.dependencies[] | select(.ref=="root") | .dependsOn | index("monolog@3.5.0")' "$WORK/php-mixed-bom.json" >/dev/null 2>&1 \
+            && pass "kept require edge (root -> monolog) preserved" \
+            || fail "require edge wrongly dropped"
+
+        # No scope field at all (e.g. a syft fallback BOM): the guard must see
+        # zero components with scope === "required" and leave everything as-is,
+        # the same protection the Maven filter already relies on.
+        cat > "$WORK/php-noscope-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"monolog","version":"3.5.0","purl":"pkg:composer/monolog/monolog@3.5.0","bom-ref":"monolog@3.5.0"},
+   {"name":"phpunit","version":"10.5.0","purl":"pkg:composer/phpunit/phpunit@10.5.0","bom-ref":"phpunit@10.5.0"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["monolog@3.5.0","phpunit@10.5.0"]}
+ ]}
+JSON
+        node "$SFLT" "$WORK/php-noscope-bom.json" "pkg:composer/" 2>/dev/null
+        names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/php-noscope-bom.json")
+        [ "$names" = "monolog,phpunit" ] \
+            && pass "no scope field on any component: filter leaves the BOM untouched" \
+            || fail "filter changed a BOM with no scope field" "$names"
+
+        # require-dev only (no required component at all): the same guard that
+        # protects a scope-less BOM cannot tell this apart from "scopes were
+        # never populated", so it also leaves this one untouched. Inherited
+        # from the Maven filter (a maven-only reactor has the identical gap);
+        # documented here as known behavior, not fixed by this change.
+        cat > "$WORK/php-devonly-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"phpunit","version":"10.5.0","purl":"pkg:composer/phpunit/phpunit@10.5.0","bom-ref":"phpunit@10.5.0","scope":"optional"}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["phpunit@10.5.0"]}
+ ]}
+JSON
+        node "$SFLT" "$WORK/php-devonly-bom.json" "pkg:composer/" 2>/dev/null
+        names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/php-devonly-bom.json")
+        [ "$names" = "phpunit" ] \
+            && pass "require-dev-only project (no required component): filter leaves the BOM untouched (known gap, shared with maven)" \
+            || fail "filter unexpectedly changed a require-dev-only BOM" "$names"
+    else
+        fail "could not extract SFILTER_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping php scope-filter test"
+fi
+
+echo "== php-scope: BOMLENS_PHP_FULL_GRAPH opts out, composer.json gates the trigger =="
+# Guards the shell-side trigger in build-prep.sh (not the JS filter above):
+# PHP_SCOPE_FILTER is only set when composer.json exists and the opt-out is
+# not on. Extract the real trigger block (no logic duplication) and drive it
+# under each combination.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_opt_fn=$(sed -n '/^opted_out() /p' "$PREP")
+_trigger=$(sed -n '/^# PHP\/Composer scope over-scan/,/^fi$/p' "$PREP")
+if [ -z "$_trigger" ]; then
+    fail "could not extract the PHP_SCOPE_FILTER trigger block from build-prep.sh"
+else
+    _t_on=$(mkdir -p "$WORK/php-trigger-on" && cd "$WORK/php-trigger-on" && touch composer.json \
+        && bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+    [ "$_t_on" = "1" ] \
+        && pass "composer.json present, BOMLENS_PHP_FULL_GRAPH unset: filter turns on" \
+        || fail "filter did not turn on for a plain composer.json project" "got [$_t_on]"
+
+    _t_off=$(mkdir -p "$WORK/php-trigger-off" && cd "$WORK/php-trigger-off" && touch composer.json \
+        && BOMLENS_PHP_FULL_GRAPH=1 bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+    [ -z "$_t_off" ] \
+        && pass "BOMLENS_PHP_FULL_GRAPH=1: filter opts out (full require+require-dev graph kept)" \
+        || fail "BOMLENS_PHP_FULL_GRAPH=1 did not opt out" "got [$_t_off]"
+
+    _t_nocomposer=$(mkdir -p "$WORK/php-trigger-none" && cd "$WORK/php-trigger-none" \
+        && bash -c "$_opt_fn; $_trigger; printf '%s' \"\$PHP_SCOPE_FILTER\"")
+    [ -z "$_t_nocomposer" ] \
+        && pass "no composer.json: filter never turns on" \
+        || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
 fi
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
@@ -4349,6 +5102,430 @@ BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
     && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
     || fail "the opt-out did not keep the resolved tree"
 
+echo "== source-tree guard: an interrupt stops the resolver instead of waiting it out =="
+# Regression: a plain foreground `cdxgen "$@"` deferred INT/TERM
+# handling until cdxgen finished on its own (measured: a 5-minute `docker stop`
+# grace never let cleanup run). build-prep.sh now runs cdxgen backgrounded and
+# waits on it explicitly (run_supervised), so a signal is handled the moment it
+# arrives instead of after the resolver's foreground command returns. Driven
+# with a stub `cdxgen` that spawns a real, killable grandchild and blocks a
+# long time itself, so a slow interrupt handler shows up as this test taking
+# tens of seconds instead of a few.
+INT_ROOT="$WORK/interrupt"
+mkdir -p "$INT_ROOT/bin" "$INT_ROOT/src"
+CDXGEN_MARKER="$INT_ROOT/marker"
+cat > "$INT_ROOT/bin/cdxgen" <<STUB
+#!/bin/sh
+( i=0; while [ "\$i" -lt 60 ]; do echo "\$i" > "$CDXGEN_MARKER.tick"; sleep 1; i=\$((i + 1)); done ) &
+echo "\$!" > "$CDXGEN_MARKER.childpid"
+mkdir -p build
+sleep 60
+STUB
+chmod +x "$INT_ROOT/bin/cdxgen"
+printf 'keep me\n' > "$INT_ROOT/src/README"
+
+PATH="$INT_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$INT_ROOT/src" "$INT_ROOT/out/bom.json" >"$INT_ROOT/log" 2>&1 &
+BP_PID=$!
+
+# 30s, not 5s: on a host running several of these suites at once, the stub's
+# own background subshell can take a while just to get scheduled, and a still
+# reasonable wait shouldn't be read as build-prep.sh being broken.
+_n=0
+while [ ! -s "$CDXGEN_MARKER.childpid" ] && [ "$_n" -lt 300 ]; do sleep 0.1; _n=$((_n + 1)); done
+GRANDCHILD_PID="$(cat "$CDXGEN_MARKER.childpid" 2>/dev/null || echo "")"
+
+if [ -z "$GRANDCHILD_PID" ]; then
+    echo "  (skip: stub cdxgen's grandchild never started within 30s -- test-setup/scheduling issue under load, not a build-prep.sh failure)"
+    kill -TERM "$BP_PID" 2>/dev/null
+    wait "$BP_PID" 2>/dev/null
+else
+    T0=$(date +%s)
+    kill -TERM "$BP_PID" 2>/dev/null
+    _n=0
+    while kill -0 "$BP_PID" 2>/dev/null && [ "$_n" -lt 150 ]; do sleep 0.1; _n=$((_n + 1)); done
+    T1=$(date +%s)
+    ELAPSED=$((T1 - T0))
+    if kill -0 "$BP_PID" 2>/dev/null; then
+        fail "build-prep.sh did not exit within 15s of SIGTERM" "still running as pid $BP_PID"
+        kill -KILL "$BP_PID" 2>/dev/null
+    elif [ "$ELAPSED" -lt 20 ]; then
+        pass "build-prep.sh exited on SIGTERM in ${ELAPSED}s, not after the resolver's own 60s"
+    else
+        fail "build-prep.sh took ${ELAPSED}s to exit after SIGTERM (expected well under the resolver's 60s)"
+    fi
+
+    # Whether the grandchild also died depends on setsid/process-group support:
+    # present on Linux (including the cdxgen images this runs in for real),
+    # absent on macOS (no setsid, no /proc). Report which path this run took
+    # instead of silently skipping.
+    sleep 0.3
+    if command -v setsid >/dev/null 2>&1 || [ -d /proc ]; then
+        if kill -0 "$GRANDCHILD_PID" 2>/dev/null; then
+            fail "the resolver's grandchild process is still running after build-prep.sh exited" "pid $GRANDCHILD_PID"
+            kill -KILL "$GRANDCHILD_PID" 2>/dev/null
+        else
+            pass "the resolver's grandchild process was stopped along with it"
+        fi
+    else
+        echo "  (skip: no setsid and no /proc here, so there is no mechanism on this platform to reach the grandchild -- reflects local macOS dev, not the Linux cdxgen containers this actually runs in)"
+    fi
+fi
+
+[ ! -e "$INT_ROOT/src/build" ] \
+    && pass "guard_restore ran before exit: the build dir the stub created is gone" \
+    || fail "build dir left behind after an interrupted scan" "$(cd "$INT_ROOT/src" && find . | sort | tr '\n' ' ')"
+
+echo "== prep_step: a failed preprocessing step is logged with its stderr and recorded on the SBOM =="
+# Regression: cargo/go/bundle/gradle/android/swift/npm/pip all ran
+# with their stderr discarded and no time limit, so a failure or a stuck
+# network call left no trace anywhere. Every one of those steps now goes
+# through prep_step, which logs the failure (with the command's own stderr)
+# and stamps bomlens:pipeline-step-failed on the SBOM. Driven with stub
+# cargo/cdxgen on PATH so the real prep_step and run_supervised_timeout run,
+# not a reimplementation of either.
+PREP_FAIL_ROOT="$WORK/prep-fail"
+mkdir -p "$PREP_FAIL_ROOT/bin" "$PREP_FAIL_ROOT/src" "$PREP_FAIL_ROOT/out"
+printf '[package]\nname = "x"\nversion = "0.1.0"\n' > "$PREP_FAIL_ROOT/src/Cargo.toml"
+cat > "$PREP_FAIL_ROOT/bin/cargo" <<'STUB'
+#!/bin/sh
+echo "boom: registry unreachable" >&2
+exit 1
+STUB
+chmod +x "$PREP_FAIL_ROOT/bin/cargo"
+# Minimal cdxgen stub: find the -o argument, write a valid empty CycloneDX doc.
+cat > "$PREP_FAIL_ROOT/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}\n' > "$out"
+STUB
+chmod +x "$PREP_FAIL_ROOT/bin/cdxgen"
+
+PATH="$PREP_FAIL_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PREP_FAIL_ROOT/src" "$PREP_FAIL_ROOT/out/bom.json" \
+    > "$PREP_FAIL_ROOT/log" 2>&1
+
+grep -q '\[build-prep\] cargo-lockfile: failed (rc=1)' "$PREP_FAIL_ROOT/log" \
+    && pass "prep_step logs the label and exit code of a failed step" \
+    || fail "the failure was not logged" "$(cat "$PREP_FAIL_ROOT/log")"
+grep -q 'boom: registry unreachable' "$PREP_FAIL_ROOT/log" \
+    && pass "the failed step's own stderr reaches the scan log" \
+    || fail "the command's stderr was not surfaced" "$(cat "$PREP_FAIL_ROOT/log")"
+if command -v jq >/dev/null 2>&1 && [ -f "$PREP_FAIL_ROOT/out/bom.json" ]; then
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed" and .value=="cargo-lockfile")] | length == 1' \
+        "$PREP_FAIL_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "the failed step is recorded on the SBOM as bomlens:pipeline-step-failed" \
+        || fail "the SBOM does not carry the failure" "$(jq -c '.metadata.properties' "$PREP_FAIL_ROOT/out/bom.json" 2>&1)"
+fi
+
+echo "== prep_step: a step that outlives its budget is stopped and reported as a timeout, not waited out =="
+PREP_TO_ROOT="$WORK/prep-timeout"
+mkdir -p "$PREP_TO_ROOT/bin" "$PREP_TO_ROOT/src" "$PREP_TO_ROOT/out"
+printf '[package]\nname = "x"\nversion = "0.1.0"\n' > "$PREP_TO_ROOT/src/Cargo.toml"
+cp "$PREP_FAIL_ROOT/bin/cdxgen" "$PREP_TO_ROOT/bin/cdxgen"
+cat > "$PREP_TO_ROOT/bin/cargo" <<'STUB'
+#!/bin/sh
+sleep 30
+STUB
+chmod +x "$PREP_TO_ROOT/bin/cargo"
+
+T0=$(date +%s)
+PATH="$PREP_TO_ROOT/bin:$PATH" BOMLENS_PREP_TIMEOUT=1 \
+    sh "$LIB/build-prep.sh" "$PREP_TO_ROOT/src" "$PREP_TO_ROOT/out/bom.json" \
+    > "$PREP_TO_ROOT/log" 2>&1
+T1=$(date +%s)
+ELAPSED=$((T1 - T0))
+
+grep -q '\[build-prep\] cargo-lockfile: timed out after 1s' "$PREP_TO_ROOT/log" \
+    && pass "prep_step reports a timeout distinctly from an ordinary failure" \
+    || fail "the timeout was not logged" "$(cat "$PREP_TO_ROOT/log")"
+if [ "$ELAPSED" -lt 15 ]; then
+    pass "build-prep.sh moved on in ${ELAPSED}s, not after the stub's own 30s sleep"
+else
+    fail "build-prep.sh took ${ELAPSED}s (expected well under the stub's 30s sleep)"
+fi
+[ -f "$PREP_TO_ROOT/out/bom.json" ] \
+    && pass "a timed-out step does not abort the scan; cdxgen still ran and wrote the SBOM" \
+    || fail "no SBOM was written after the timeout"
+if command -v jq >/dev/null 2>&1 && [ -f "$PREP_TO_ROOT/out/bom.json" ]; then
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed" and .value=="cargo-lockfile")] | length == 1' \
+        "$PREP_TO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "the timeout is recorded on the SBOM the same way a failure is" \
+        || fail "the SBOM does not carry the timeout" "$(jq -c '.metadata.properties' "$PREP_TO_ROOT/out/bom.json" 2>&1)"
+fi
+
+echo "== prep_step: a successful step leaves no trace of failure =="
+PREP_OK_ROOT="$WORK/prep-ok"
+mkdir -p "$PREP_OK_ROOT/bin" "$PREP_OK_ROOT/src" "$PREP_OK_ROOT/out"
+printf '[package]\nname = "x"\nversion = "0.1.0"\n' > "$PREP_OK_ROOT/src/Cargo.toml"
+cp "$PREP_FAIL_ROOT/bin/cdxgen" "$PREP_OK_ROOT/bin/cdxgen"
+cat > "$PREP_OK_ROOT/bin/cargo" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+chmod +x "$PREP_OK_ROOT/bin/cargo"
+PATH="$PREP_OK_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PREP_OK_ROOT/src" "$PREP_OK_ROOT/out/bom.json" \
+    > "$PREP_OK_ROOT/log" 2>&1
+if grep -q 'cargo-lockfile: failed\|cargo-lockfile: timed out' "$PREP_OK_ROOT/log"; then
+    fail "a successful step was reported as failed" "$(cat "$PREP_OK_ROOT/log")"
+else
+    pass "a successful step is silent (no failed/timed-out line)"
+fi
+if command -v jq >/dev/null 2>&1 && [ -f "$PREP_OK_ROOT/out/bom.json" ]; then
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed")] | length == 0' \
+        "$PREP_OK_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "a successful scan carries no bomlens:pipeline-step-failed property" \
+        || fail "an unexpected pipeline-step-failed property was recorded" "$(jq -c '.metadata.properties' "$PREP_OK_ROOT/out/bom.json" 2>&1)"
+    # A step that ran and succeeded is still positive lock evidence, so it
+    # must be recorded on its own track (bomlens:prep-step-applied), separate
+    # from the failure track checked just above.
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="cargo-lockfile")] | length == 1' \
+        "$PREP_OK_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "a successful step is recorded on the SBOM as bomlens:prep-step-applied" \
+        || fail "the successful step was not recorded as applied lock evidence" "$(jq -c '.metadata.properties' "$PREP_OK_ROOT/out/bom.json" 2>&1)"
+fi
+
+echo "== prep_step: the same label failing more than once is recorded only once =="
+# Isolated unit test of the dedup logic in prep_step itself (real function,
+# lifted from build-prep.sh), with run_supervised_timeout stubbed to a plain
+# passthrough so the test is about PREP_FAILED bookkeeping, not process
+# supervision (already covered above).
+_body="$(awk '
+    /^prep_step\(\) \{/ { inside = 1 }
+    inside { print }
+    inside && $0 == "}" { exit }
+' "$LIB/build-prep.sh")"
+if [ -z "$_body" ]; then
+    fail "could not lift prep_step out of build-prep.sh (was it renamed?)"
+else
+    run_supervised_timeout() { shift; "$@"; }
+    eval "$_body"
+    PREP_FAILED=""
+    PREP_APPLIED=""
+    prep_step dup-label 5 false
+    prep_step dup-label 5 false
+    prep_step other-label 5 false
+    [ "$PREP_FAILED" = "dup-label other-label" ] \
+        && pass "a label that fails repeatedly is recorded once, distinct labels each appear" \
+        || fail "PREP_FAILED dedup is wrong" "got [$PREP_FAILED]"
+    # PREP_APPLIED tracks every label prep_step is called with, success or
+    # failure, so a reader can tell "this step ran here" apart from "it never
+    # applied" -- deduped the same way PREP_FAILED is, above.
+    [ "$PREP_APPLIED" = "dup-label other-label" ] \
+        && pass "PREP_APPLIED records every label called, once each, regardless of outcome" \
+        || fail "PREP_APPLIED dedup is wrong" "got [$PREP_APPLIED]"
+fi
+
+echo "== committed lockfiles: a lockfile already in the tree is itself positive lock evidence, without a network resolve =="
+# Ruby, Swift, PHP and .NET have no separate prep_step to point to as evidence
+# a resolve happened (Ruby/Swift only resolve when NO lockfile is already
+# committed; PHP/.NET have no pre-resolve step at all). A committed lockfile
+# is checked once, unconditionally, and recorded straight onto
+# bomlens:prep-step-applied.
+CA2_ROOT="$WORK/prep-applied-committed"
+mkdir -p "$CA2_ROOT/bin"
+cat > "$CA2_ROOT/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}\n' > "$out"
+STUB
+chmod +x "$CA2_ROOT/bin/cdxgen"
+# A stub that fails loudly if it is ever actually invoked -- the committed-
+# lockfile branches must never shell out to bundle/swift at all.
+cat > "$CA2_ROOT/bin/must-not-run" <<'STUB'
+#!/bin/sh
+echo "must-not-run: this should never execute" >&2
+exit 1
+STUB
+chmod +x "$CA2_ROOT/bin/must-not-run"
+ln -sf must-not-run "$CA2_ROOT/bin/swift"
+
+# Ruby: Gemfile.lock already committed. No `bundle` on PATH at all -- the
+# outer guard for this branch is a plain file test, unlike Swift's below.
+mkdir -p "$CA2_ROOT/ruby/src" "$CA2_ROOT/ruby/out"
+printf 'source "https://rubygems.org"\n' > "$CA2_ROOT/ruby/src/Gemfile"
+printf 'GEM\n  remote: https://rubygems.org/\n' > "$CA2_ROOT/ruby/src/Gemfile.lock"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/ruby/src" "$CA2_ROOT/ruby/out/bom.json" \
+    > "$CA2_ROOT/ruby/log" 2>&1
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="bundle-lock")] | length == 1' \
+    "$CA2_ROOT/ruby/out/bom.json" >/dev/null 2>&1; then
+    pass "a committed Gemfile.lock is recorded as bundle-lock applied, without running bundle"
+else
+    fail "committed Gemfile.lock was not recorded as applied lock evidence" "$(jq -c '.metadata.properties' "$CA2_ROOT/ruby/out/bom.json" 2>&1)"
+fi
+
+# Swift: Package.resolved already committed. `swift` on PATH is a stub that
+# fails if invoked, proving the resolve is skipped, not just fast.
+mkdir -p "$CA2_ROOT/swift/src" "$CA2_ROOT/swift/out"
+printf '// swift-tools-version:5.9\n' > "$CA2_ROOT/swift/src/Package.swift"
+printf '{"pins":[]}\n' > "$CA2_ROOT/swift/src/Package.resolved"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/swift/src" "$CA2_ROOT/swift/out/bom.json" \
+    > "$CA2_ROOT/swift/log" 2>&1
+if grep -q 'must-not-run: this should never execute' "$CA2_ROOT/swift/log"; then
+    fail "a committed Package.resolved still triggered a network resolve" "$(cat "$CA2_ROOT/swift/log")"
+elif jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="swift-package-resolve")] | length == 1' \
+    "$CA2_ROOT/swift/out/bom.json" >/dev/null 2>&1; then
+    pass "a committed Package.resolved is recorded as swift-package-resolve applied, without resolving"
+else
+    fail "committed Package.resolved was not recorded as applied lock evidence" "$(jq -c '.metadata.properties' "$CA2_ROOT/swift/out/bom.json" 2>&1)"
+fi
+
+# Swift: a Package.resolved that exists ONLY under a non-shipped fixture tree
+# (the same test/fixture/example trees NON_SHIPPED_DIRS already leaves out of
+# the SBOM) must NOT count as committed lock evidence, and must
+# NOT skip the real resolve either -- `swift` here is the same fail-if-invoked
+# stub as above, so the real resolve step running (and failing on that stub)
+# is itself the proof the fixture-only file was correctly ignored.
+mkdir -p "$CA2_ROOT/swift-fixture-only/src/tests/fixtures/sample" "$CA2_ROOT/swift-fixture-only/out"
+printf '// swift-tools-version:5.9\n' > "$CA2_ROOT/swift-fixture-only/src/Package.swift"
+printf '{"pins":[]}\n' > "$CA2_ROOT/swift-fixture-only/src/tests/fixtures/sample/Package.resolved"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/swift-fixture-only/src" "$CA2_ROOT/swift-fixture-only/out/bom.json" \
+    > "$CA2_ROOT/swift-fixture-only/log" 2>&1
+if grep -q 'must-not-run: this should never execute' "$CA2_ROOT/swift-fixture-only/log"; then
+    pass "a Package.resolved found only under a non-shipped fixture tree does not count as committed (the real resolve still ran)"
+else
+    fail "a fixture-only Package.resolved was wrongly treated as committed lock evidence" "$(cat "$CA2_ROOT/swift-fixture-only/log")"
+fi
+
+# PHP: composer.lock present vs. absent -- a plain existence check, no tool
+# invoked either way (cdxgen resolves Composer directly).
+mkdir -p "$CA2_ROOT/php-with/src" "$CA2_ROOT/php-with/out" "$CA2_ROOT/php-without/src" "$CA2_ROOT/php-without/out"
+printf '{"require":{}}\n' > "$CA2_ROOT/php-with/src/composer.json"
+printf '{"packages":[]}\n' > "$CA2_ROOT/php-with/src/composer.lock"
+printf '{"require":{}}\n' > "$CA2_ROOT/php-without/src/composer.json"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/php-with/src" "$CA2_ROOT/php-with/out/bom.json" >/dev/null 2>&1
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/php-without/src" "$CA2_ROOT/php-without/out/bom.json" >/dev/null 2>&1
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="composer-lock-committed")] | length == 1' \
+    "$CA2_ROOT/php-with/out/bom.json" >/dev/null 2>&1; then
+    pass "a committed composer.lock is recorded as composer-lock-committed"
+else
+    fail "committed composer.lock was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/php-with/out/bom.json" 2>&1)"
+fi
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="composer-lock-committed")] | length == 0' \
+    "$CA2_ROOT/php-without/out/bom.json" >/dev/null 2>&1; then
+    pass "no composer.lock means no composer-lock-committed evidence"
+else
+    fail "composer-lock-committed was recorded despite no composer.lock" "$(jq -c '.metadata.properties' "$CA2_ROOT/php-without/out/bom.json" 2>&1)"
+fi
+
+# PHP monorepo: no lock at the root, but one per component underneath (a real
+# shape -- a Symfony-style monorepo has no root composer.lock but a lock per
+# src/*/Component, and cdxgen's -r scan resolves everything from those). The
+# check must be recursive, not root-only, or a fully-resolved monorepo like
+# this reads as unknown for no reason (measured: root-only missed it).
+mkdir -p "$CA2_ROOT/php-monorepo/src/components/a" "$CA2_ROOT/php-monorepo/out"
+printf '{"require":{}}\n' > "$CA2_ROOT/php-monorepo/src/composer.json"
+printf '{"packages":[]}\n' > "$CA2_ROOT/php-monorepo/src/components/a/composer.lock"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/php-monorepo/src" "$CA2_ROOT/php-monorepo/out/bom.json" >/dev/null 2>&1
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="composer-lock-committed")] | length == 1' \
+    "$CA2_ROOT/php-monorepo/out/bom.json" >/dev/null 2>&1; then
+    pass "a composer.lock nested under a component (no root lock) is still recorded as composer-lock-committed"
+else
+    fail "a nested composer.lock in a monorepo layout was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/php-monorepo/out/bom.json" 2>&1)"
+fi
+
+# .NET: packages.lock.json present vs. absent, same shape as PHP above.
+mkdir -p "$CA2_ROOT/dotnet-with/src" "$CA2_ROOT/dotnet-with/out" "$CA2_ROOT/dotnet-without/src" "$CA2_ROOT/dotnet-without/out"
+printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "$CA2_ROOT/dotnet-with/src/app.csproj"
+printf '{"version":1,"dependencies":{}}\n' > "$CA2_ROOT/dotnet-with/src/packages.lock.json"
+printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "$CA2_ROOT/dotnet-without/src/app.csproj"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/dotnet-with/src" "$CA2_ROOT/dotnet-with/out/bom.json" >/dev/null 2>&1
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/dotnet-without/src" "$CA2_ROOT/dotnet-without/out/bom.json" >/dev/null 2>&1
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="dotnet-lock-committed")] | length == 1' \
+    "$CA2_ROOT/dotnet-with/out/bom.json" >/dev/null 2>&1; then
+    pass "a committed packages.lock.json is recorded as dotnet-lock-committed"
+else
+    fail "committed packages.lock.json was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/dotnet-with/out/bom.json" 2>&1)"
+fi
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="dotnet-lock-committed")] | length == 0' \
+    "$CA2_ROOT/dotnet-without/out/bom.json" >/dev/null 2>&1; then
+    pass "no packages.lock.json means no dotnet-lock-committed evidence"
+else
+    fail "dotnet-lock-committed was recorded despite no packages.lock.json" "$(jq -c '.metadata.properties' "$CA2_ROOT/dotnet-without/out/bom.json" 2>&1)"
+fi
+
+# .NET solution: packages.lock.json commonly sits next to each project, not
+# at the solution root -- same recursive-vs-root-only concern as PHP above.
+mkdir -p "$CA2_ROOT/dotnet-monorepo/src/projects/a" "$CA2_ROOT/dotnet-monorepo/out"
+printf '<Solution></Solution>\n' > "$CA2_ROOT/dotnet-monorepo/src/app.sln"
+printf '{"version":1,"dependencies":{}}\n' > "$CA2_ROOT/dotnet-monorepo/src/projects/a/packages.lock.json"
+PATH="$CA2_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CA2_ROOT/dotnet-monorepo/src" "$CA2_ROOT/dotnet-monorepo/out/bom.json" >/dev/null 2>&1
+if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="dotnet-lock-committed")] | length == 1' \
+    "$CA2_ROOT/dotnet-monorepo/out/bom.json" >/dev/null 2>&1; then
+    pass "a packages.lock.json nested under a project (no root lock) is still recorded as dotnet-lock-committed"
+else
+    fail "a nested packages.lock.json was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/dotnet-monorepo/out/bom.json" 2>&1)"
+fi
+
+echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
+# The pre-prep_step patterns (silently discarded stderr, no time limit) must
+# not reappear alongside prep_step for the same command.
+for pattern in \
+    'cargo generate-lockfile 2>/dev/null' \
+    'go mod tidy 2>/dev/null' \
+    'bundle lock 2>/dev/null' \
+    'swift package resolve >/dev/null 2>&1 || true' \
+    'GRADLEW" --no-daemon dependencies >/dev/null 2>&1 || true'; do
+    if grep -qF "$pattern" "$LIB/build-prep.sh"; then
+        fail "the old unwrapped pattern is still present" "$pattern"
+    fi
+done
+pass "none of the old silently-discarded preprocessing invocations remain"
+
+echo "== prep_step/run_supervised: no step's command is a shell function defined in this file =="
+# Regression: pip-install passed _pip_install_requirements (a shell function)
+# as prep_step's command. prep_step backgrounds a step through setsid, which
+# execs a real process and cannot see a function defined in build-prep.sh's
+# own interpreter -- it failed every time (rc=127), silently, because the
+# failure still landed in PREP_FAILED and read like an ordinary failure.
+# Functions defined inside the pip heredoc are a separate script's text, not
+# part of build-prep.sh's own function table, so that block is skipped here.
+BP_FUNCS=$(sed '/<<.PIPSCRIPT/,/^PIPSCRIPT$/d' "$LIB/build-prep.sh" \
+    | grep -oE '^[A-Za-z_][A-Za-z0-9_]*\(\)' | sed 's/()//')
+BP_BAD=""
+for f in $BP_FUNCS; do
+    if grep -qE "prep_step[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+$f([[:space:]]|\$)" "$LIB/build-prep.sh" \
+        || grep -qE "run_supervised[[:space:]]+$f([[:space:]]|\$)" "$LIB/build-prep.sh" \
+        || grep -qE "run_supervised_timeout[[:space:]]+[^[:space:]]+[[:space:]]+$f([[:space:]]|\$)" "$LIB/build-prep.sh"; then
+        BP_BAD="$BP_BAD $f"
+    fi
+done
+[ -z "$BP_BAD" ] \
+    && pass "no prep_step/run_supervised call passes a locally-defined function as its command" \
+    || fail "a step's command is a shell function, not an external command (setsid cannot exec it)" "$BP_BAD"
+
+echo "== prep_step: pip-install actually runs pip3, not a function setsid cannot exec =="
+# Same stub-PATH harness as the failed/success cases above, but exercising the
+# pip step specifically -- the one step this regression broke. PIP_MARKER
+# proves the stub pip3 actually ran; before the fix it never did ("setsid:
+# failed to execute ...: No such file or directory"), silently, on any host
+# that has setsid (every cdxgen container, and CI's Ubuntu runners).
+PREP_PIP_ROOT="$WORK/prep-pip"
+mkdir -p "$PREP_PIP_ROOT/bin" "$PREP_PIP_ROOT/src" "$PREP_PIP_ROOT/out"
+printf 'flask==3.0.0\n' > "$PREP_PIP_ROOT/src/requirements.txt"
+cp "$PREP_FAIL_ROOT/bin/cdxgen" "$PREP_PIP_ROOT/bin/cdxgen"
+PIP_MARKER="$PREP_PIP_ROOT/pip-ran"
+cat > "$PREP_PIP_ROOT/bin/pip3" <<'STUB'
+#!/bin/sh
+echo "$@" >> ../pip-ran
+exit 0
+STUB
+chmod +x "$PREP_PIP_ROOT/bin/pip3"
+PATH="$PREP_PIP_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PREP_PIP_ROOT/src" "$PREP_PIP_ROOT/out/bom.json" \
+    > "$PREP_PIP_ROOT/log" 2>&1
+if command -v setsid >/dev/null 2>&1; then
+    [ -s "$PIP_MARKER" ] \
+        && pass "pip-install ran the real pip3 under setsid (CI has it; this host does too)" \
+        || fail "pip3 never ran under setsid" "$(cat "$PREP_PIP_ROOT/log")"
+else
+    [ -s "$PIP_MARKER" ] \
+        && pass "pip-install ran pip3 (no setsid on this host, so this run does not exercise the regression -- CI's does)" \
+        || fail "pip3 never ran even without setsid" "$(cat "$PREP_PIP_ROOT/log")"
+fi
+grep -q 'pip-install: failed\|pip-install: timed out' "$PREP_PIP_ROOT/log" \
+    && fail "pip-install was reported as failed" "$(cat "$PREP_PIP_ROOT/log")" \
+    || pass "pip-install left no failure trace"
+
 echo "== lic-mapping: 0BSD stops claiming the generic BSD names =="
 # build-prep.sh corrects cdxgen's two license-name tables before cdxgen runs,
 # because "BSD License" (the only BSD classifier PyPI has) resolved to 0BSD — a
@@ -4715,6 +5892,116 @@ else
     fail "multiline uses() was not parsed" "$(jq -c '.components' "$MODIR/multiline/out.json" 2>/dev/null)"
 fi
 
+echo "== conda: environment.yml is read structurally, standard 2-space indent only =="
+CONDADIR="$WORK/conda"
+rm -rf "$CONDADIR"
+mkdir -p "$CONDADIR"/{normal,pip3space,dep4space,flowstyle,nested3,mixedtab,stablediff,none}
+
+conda_n() { jq '.components | length' "$1/out.json" 2>/dev/null; }
+conda_get() { jq -r --arg n "$2" --arg f "$3" '[.components[]|select(.name==$n)][0][$f] // "NONE"' "$1/out.json" 2>/dev/null; }
+
+cat > "$CONDADIR/normal/environment.yml" <<'YMLEOF'
+name: myproject
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy=1.26.4
+  - pip:
+    - requests==2.31.0
+YMLEOF
+python3 "$LIB/identify-conda.py" "$CONDADIR/normal" "$CONDADIR/normal/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/normal")" = "3" ] \
+    && pass "conda: standard environment.yml parses to 3 components" \
+    || fail "conda: normal case component count" "$(conda_n "$CONDADIR/normal")"
+[ "$(conda_get "$CONDADIR/normal" numpy purl)" = "pkg:conda/numpy@1.26.4?channel=conda-forge" ] \
+    && pass "conda: single declared channel becomes a purl qualifier" \
+    || fail "conda: numpy purl" "$(conda_get "$CONDADIR/normal" numpy purl)"
+[ "$(conda_get "$CONDADIR/normal" requests purl)" = "pkg:pypi/requests@2.31.0" ] \
+    && pass "conda: pip: sub-list becomes pkg:pypi/ purls" \
+    || fail "conda: requests purl" "$(conda_get "$CONDADIR/normal" requests purl)"
+
+# Non-standard indentation: pip: sub-items at 3 spaces (standard is 4).
+printf 'name: x\ndependencies:\n  - python=3.11\n  - pip:\n   - requests==2.31.0\n' \
+    > "$CONDADIR/pip3space/environment.yml"
+python3 "$LIB/identify-conda.py" "$CONDADIR/pip3space" "$CONDADIR/pip3space/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/pip3space")" = "0" ] \
+    && pass "conda: pip: sub-list at 3 spaces (not 4) leaves the file unread" \
+    || fail "conda: pip3space component count" "$(conda_n "$CONDADIR/pip3space")"
+
+# Non-standard indentation: dependencies: items at 4 spaces (standard is 2).
+printf 'name: x\ndependencies:\n    - python=3.11\n    - numpy=1.26.4\n' \
+    > "$CONDADIR/dep4space/environment.yml"
+python3 "$LIB/identify-conda.py" "$CONDADIR/dep4space" "$CONDADIR/dep4space/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/dep4space")" = "0" ] \
+    && pass "conda: dependencies: items at 4 spaces (not 2) leaves the file unread" \
+    || fail "conda: dep4space component count" "$(conda_n "$CONDADIR/dep4space")"
+
+# Flow-style dependencies list.
+printf 'name: x\ndependencies: [numpy, pandas]\n' > "$CONDADIR/flowstyle/environment.yml"
+python3 "$LIB/identify-conda.py" "$CONDADIR/flowstyle" "$CONDADIR/flowstyle/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/flowstyle")" = "0" ] \
+    && pass "conda: flow-style dependencies: [...] leaves the file unread" \
+    || fail "conda: flowstyle component count" "$(conda_n "$CONDADIR/flowstyle")"
+
+# A third level of nesting under pip:.
+printf 'name: x\ndependencies:\n  - python=3.11\n  - pip:\n    - extras:\n      - requests==2.31.0\n' \
+    > "$CONDADIR/nested3/environment.yml"
+python3 "$LIB/identify-conda.py" "$CONDADIR/nested3" "$CONDADIR/nested3/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/nested3")" = "0" ] \
+    && pass "conda: a third level of nesting under pip: leaves the file unread" \
+    || fail "conda: nested3 component count" "$(conda_n "$CONDADIR/nested3")"
+
+# A file that starts out standard, then a tab-indented line -- the whole file
+# must be discarded, not just the offending line (no partial parsing).
+printf 'name: x\ndependencies:\n  - python=3.11\n  - numpy=1.26.4\n\t- tqdm\n' \
+    > "$CONDADIR/mixedtab/environment.yml"
+python3 "$LIB/identify-conda.py" "$CONDADIR/mixedtab" "$CONDADIR/mixedtab/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/mixedtab")" = "0" ] \
+    && pass "conda: a tab-indented line after a standard start discards the whole file" \
+    || fail "conda: mixedtab component count (partial parse leaked through)" "$(conda_n "$CONDADIR/mixedtab")"
+
+# No environment.yml at all: empty result, not a failure.
+python3 "$LIB/identify-conda.py" "$CONDADIR/none" "$CONDADIR/none/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/none")" = "0" ] \
+    && pass "conda: no environment.yml present is a plain empty result" \
+    || fail "conda: none-case component count" "$(conda_n "$CONDADIR/none")"
+
+# A representative excerpt matching a real ML project's shape (conda
+# packages, a pip: sub-list with both exact and range pins, and editable git
+# installs) -- the case that motivated this script: a plain "torch" with no
+# version in setup.py resolved, in cdxgen's actual output on the real
+# project, to that day's PyPI latest instead of the pytorch=1.11.0 this file
+# pins. Confirms the range operator (">=") and editable-install lines do not
+# fail the whole file, and that the real declared name/version is read.
+cat > "$CONDADIR/stablediff/environment.yaml" <<'YMLEOF'
+name: ldm
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.8.5
+  - pytorch=1.11.0
+  - numpy=1.19.2
+  - pip:
+    - transformers==4.19.2
+    - streamlit>=0.73.1
+    - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
+YMLEOF
+python3 "$LIB/identify-conda.py" "$CONDADIR/stablediff" "$CONDADIR/stablediff/out.json" "1.0" >/dev/null 2>&1
+[ "$(conda_n "$CONDADIR/stablediff")" = "5" ] \
+    && pass "conda: multiple channels (no qualifier) + range pin + editable install = 5 real components" \
+    || fail "conda: stable-diffusion-shaped component count" "$(conda_n "$CONDADIR/stablediff")"
+[ "$(conda_get "$CONDADIR/stablediff" pytorch purl)" = "pkg:conda/pytorch@1.11.0" ] \
+    && pass "conda: pytorch is read as declared (1.11.0), not cdxgen's setup.py substitute" \
+    || fail "conda: pytorch purl" "$(conda_get "$CONDADIR/stablediff" pytorch purl)"
+[ "$(conda_get "$CONDADIR/stablediff" streamlit version)" = "NONE" ] \
+    && pass "conda: a range-pinned pip entry (streamlit>=0.73.1) has no fixed version" \
+    || fail "conda: streamlit version" "$(conda_get "$CONDADIR/stablediff" streamlit version)"
+[ "$(conda_get "$CONDADIR/stablediff" torch purl)" = "NONE" ] \
+    && pass "conda: no 'torch' component (that name only exists in setup.py, not environment.yaml)" \
+    || fail "conda: unexpected torch component" "$(conda_get "$CONDADIR/stablediff" torch purl)"
+
 echo "== \$PROJECT is escaped in generated HTML reports, not injected =="
 # Regression: generate-notice.sh, scan-security.sh, generate-risk-report.sh and
 # validate-sbom.sh all interpolate the project name into an HTML <title>/meta
@@ -4844,8 +6131,15 @@ echo "== build-prep options: every BOMLENS_* switch it reads is passed on by eac
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # The list in source-detect.sh must name exactly the switches build-prep.sh reads,
-# or a new switch silently never reaches the cdxgen container.
-_read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u | tr '\n' ' ')
+# or a new switch silently never reaches the cdxgen container. BOMLENS_GUARD_ID
+# and BOMLENS_GUARD_RESTORE_ONLY are excluded: unlike the switches below (a host
+# shell's own opt-in, forwarded by name only), they carry a value the launcher
+# computes fresh per invocation (the guard-state key), set explicitly with
+# `-e VAR=value` at each of its own call sites -- adding them here would make
+# build_prep_env_args ALSO forward name-only from the launcher's own shell,
+# clobbering nothing today but wiring a second, wrong path for the same name.
+_read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
+    | grep -vE '^BOMLENS_GUARD_(ID|RESTORE_ONLY)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
@@ -4869,6 +6163,1481 @@ _on=""; for v in 1 true 0 false ""; do bash -c "$_opt; opted_out \"\$1\"" _ "$v"
 [ "$_on" = "[1][true]" ] \
     && pass "an opt-out switch counts as set only for 1 or true" \
     || fail "opt-out switch values treated as set: $_on"
+
+echo "== non-shipped trees: test/example/benchmark manifests and workflows are left out and recorded =="
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
+NSM="$ROOT_DIR/tests/fixtures/non-shipped-manifests"
+# build-prep.sh keeps copies of both lists; a drift would make the cdxgen and
+# syft paths leave out different things.
+_bp=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPED_DIRS=' "$DETECT")
+[ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
+    && pass "NON_SHIPPED_DIRS is the same in build-prep.sh and source-detect.sh" \
+    || fail "NON_SHIPPED_DIRS differs" "build-prep [$_bp] source-detect [$_sd]"
+_bp=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$DETECT")
+[ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
+    && pass "NON_SHIPPED_MANIFEST_RE is the same in build-prep.sh and source-detect.sh" \
+    || fail "NON_SHIPPED_MANIFEST_RE differs"
+_list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$NSM" | tr '\n' ' ')
+[ "$_list" = ".github/workflows/ci.yml examples/demo/requirements.txt tests/fixtures/requirements.txt " ] \
+    && pass "non_shipped_manifests lists the fixture's workflow, example and test manifests only" \
+    || fail "non_shipped_manifests output unexpected" "got [$_list]"
+_sargs=$(bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
+case "$_sargs" in
+    *"--exclude ./**/[tT][eE][sS][tT][sS]/**"*"--exclude ./**/.github/workflows/**") pass "non_shipped_syft_args builds syft --exclude flags" ;;
+    *) fail "non_shipped_syft_args output unexpected" "got [$_sargs]" ;;
+esac
+_off=$(BOMLENS_INCLUDE_NON_SHIPPED=true bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
+[ -z "$_off" ] && pass "BOMLENS_INCLUDE_NON_SHIPPED=true turns the syft excludes off" \
+    || fail "syft excludes still set with BOMLENS_INCLUDE_NON_SHIPPED=true" "got [$_off]"
+# Folder names match in any letter case, as cdxgen's glob does (Tests/, Benchmarks/).
+mkdir -p "$WORK/nscase/Tests" "$WORK/nscase/Benchmarks/bench" "$WORK/nscase/src"
+: > "$WORK/nscase/Tests/requirements.txt"
+: > "$WORK/nscase/Benchmarks/bench/Package.swift"
+: > "$WORK/nscase/src/requirements.txt"
+_list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$WORK/nscase" | tr '\n' ' ')
+[ "$_list" = "Benchmarks/bench/Package.swift Tests/requirements.txt " ] \
+    && pass "non_shipped_manifests matches Tests/ and Benchmarks/ in any letter case" \
+    || fail "non_shipped_manifests missed an upper-case folder" "got [$_list]"
+case "$_sargs" in
+    *"--exclude ./**/__[tT][eE][sS][tT][sS]__/**"*"--exclude ./**/[bB][eE][nN][cC][hH][mM][aA][rR][kK][sS]/**"*)
+        pass "syft excludes spell folder names as any-case character classes" ;;
+    *) fail "syft excludes are not case-insensitive" "got [$_sargs]" ;;
+esac
+# The syft path's recorder, on a small SBOM whose root is the fixture.
+printf '%s\n' '{"bomFormat":"CycloneDX","metadata":{"properties":[{"name":"keep","value":"1"}]},"components":[]}' > "$WORK/excl-syft.json"
+bash -c '. "$1"; mark_sbom_excluded "$2" "$3"' _ "$DETECT" "$WORK/excl-syft.json" "$NSM"
+if jq -e '(.metadata.properties | map(select(.name=="keep")) | length == 1)
+          and ([.metadata.properties[] | select(.name=="bomlens:excluded-paths") | .value][0] | contains("**/tests/**"))
+          and ([.metadata.properties[] | select(.name=="bomlens:excluded-manifests") | .value][0]
+               == ".github/workflows/ci.yml, examples/demo/requirements.txt, tests/fixtures/requirements.txt")' \
+       "$WORK/excl-syft.json" >/dev/null 2>&1; then
+    pass "mark_sbom_excluded records the patterns and the files left out"
+else
+    fail "mark_sbom_excluded did not record the expected properties" "$(jq -c '.metadata.properties' "$WORK/excl-syft.json" 2>&1)"
+fi
+# The cdxgen path's recorder in build-prep.sh, with a list over the 50-file cap.
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'EXCL_JS'/,/^EXCL_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/excl.js"
+    printf '%s\n' '{"bomFormat":"CycloneDX","metadata":{"properties":[{"name":"keep","value":"1"}]},"components":[]}' > "$WORK/excl-cdx.json"
+    : > "$WORK/excl-list.txt"
+    for i in $(seq 1 55); do echo "tests/f$i/package.json" >> "$WORK/excl-list.txt"; done
+    node "$WORK/excl.js" "$WORK/excl-cdx.json" "$WORK/excl-list.txt" "**/tests/**" 2>/dev/null
+    if jq -e '(.metadata.properties | map(select(.name=="keep")) | length == 1)
+              and ([.metadata.properties[] | select(.name=="bomlens:excluded-paths") | .value][0] == "**/tests/**")
+              and ([.metadata.properties[] | select(.name=="bomlens:excluded-manifests") | .value][0]
+                   | contains("tests/f50/package.json") and (contains("tests/f51/package.json") | not) and endswith("(+5 more)"))' \
+           "$WORK/excl-cdx.json" >/dev/null 2>&1; then
+        pass "build-prep.sh records the excluded manifests, capped at 50"
+    else
+        fail "build-prep.sh recorder output unexpected" "$(jq -c '.metadata.properties' "$WORK/excl-cdx.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; build-prep.sh recorder not exercised"
+fi
+
+echo "== maven non-deployed-module filter: skip resolution and dependency-graph reachability =="
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'MNDF_JS'/,/^MNDF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/mndf.js"
+
+    # A deployed module, a module whose deploy skip comes from a custom
+    # property inherited two levels down, a module whose skip lives only in
+    # <profiles> (uncertain -- must NOT be excluded), and a diamond dependency
+    # both an excluded and a deployed module reach (must survive: something
+    # deployed still needs it).
+    MR="$WORK/mvn-reactor"
+    mkdir -p "$MR/deployed" "$MR/notdeployed/nested" "$MR/profile-guarded"
+    cat > "$MR/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>reactor-root</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <modules>
+    <module>deployed</module>
+    <module>notdeployed</module>
+    <module>profile-guarded</module>
+  </modules>
+  <properties>
+    <skip_maven_deploy>false</skip_maven_deploy>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <configuration><skip>${skip_maven_deploy}</skip></configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+POM
+    cat > "$MR/deployed/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>reactor-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>deployed-module</artifactId>
+  <dependencies>
+    <dependency><groupId>org.example</groupId><artifactId>kept-lib</artifactId></dependency>
+    <dependency><groupId>org.example</groupId><artifactId>shared-lib</artifactId></dependency>
+  </dependencies>
+</project>
+POM
+    cat > "$MR/notdeployed/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>reactor-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>notdeployed-module</artifactId>
+  <packaging>pom</packaging>
+  <modules><module>nested</module></modules>
+  <properties>
+    <skip_maven_deploy>true</skip_maven_deploy>
+  </properties>
+</project>
+POM
+    cat > "$MR/notdeployed/nested/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>notdeployed-module</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>nested-module</artifactId>
+  <dependencies>
+    <dependency><groupId>org.example</groupId><artifactId>orphan-lib</artifactId></dependency>
+    <dependency><groupId>org.example</groupId><artifactId>shared-lib</artifactId></dependency>
+  </dependencies>
+</project>
+POM
+    cat > "$MR/profile-guarded/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>reactor-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>profile-guarded-module</artifactId>
+  <profiles>
+    <profile>
+      <id>release</id>
+      <properties><skip_maven_deploy>true</skip_maven_deploy></properties>
+    </profile>
+  </profiles>
+</project>
+POM
+    cat > "$WORK/mndf-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:maven/org.example/reactor-root@1.0.0" } },
+  "components": [
+    { "bom-ref": "dep", "purl": "pkg:maven/org.example/deployed-module@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "notdep", "purl": "pkg:maven/org.example/notdeployed-module@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "nested", "purl": "pkg:maven/org.example/nested-module@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "pg", "purl": "pkg:maven/org.example/profile-guarded-module@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "kept", "purl": "pkg:maven/org.example/kept-lib@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "shared", "purl": "pkg:maven/org.example/shared-lib@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "orphan", "purl": "pkg:maven/org.example/orphan-lib@1.0.0", "type": "library", "scope": "required" }
+  ],
+  "dependencies": [
+    { "ref": "root", "dependsOn": ["dep", "notdep", "pg"] },
+    { "ref": "dep", "dependsOn": ["kept", "shared"] },
+    { "ref": "notdep", "dependsOn": ["nested"] },
+    { "ref": "nested", "dependsOn": ["orphan", "shared"] },
+    { "ref": "pg", "dependsOn": [] },
+    { "ref": "kept", "dependsOn": [] },
+    { "ref": "shared", "dependsOn": [] },
+    { "ref": "orphan", "dependsOn": [] }
+  ]
+}
+JSON
+    ( cd "$MR" && node "$WORK/mndf.js" "$WORK/mndf-bom.json" ) >/dev/null 2>&1
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:maven/org.example/orphan-lib@1.0.0") | not)
+        and ($kept | index("pkg:maven/org.example/notdeployed-module@1.0.0") | not)
+        and ($kept | index("pkg:maven/org.example/nested-module@1.0.0") | not)
+        and ($kept | index("pkg:maven/org.example/shared-lib@1.0.0"))
+        and ($kept | index("pkg:maven/org.example/kept-lib@1.0.0"))
+        and ($kept | index("pkg:maven/org.example/profile-guarded-module@1.0.0"))
+        and ($kept | index("pkg:maven/org.example/deployed-module@1.0.0"))
+    ' "$WORK/mndf-bom.json" >/dev/null 2>&1; then
+        pass "diamond dep (shared-lib) survives, orphan-only dep drops, profile-only skip is not excluded"
+    else
+        fail "non-deployed-module filter result unexpected" "$(jq -c '.components[].purl' "$WORK/mndf-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-modules") | .value][0]
+          == "org.example:nested-module, org.example:notdeployed-module")
+        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]
+          | contains("notdeployed-module") and contains("nested-module") and contains("orphan-lib")
+            and (contains("shared-lib") | not) and (contains("kept-lib") | not))
+    ' "$WORK/mndf-bom.json" >/dev/null 2>&1; then
+        pass "excluded modules and components are recorded, without the survivors"
+    else
+        fail "bomlens:excluded-modules/-components recording unexpected" "$(jq -c '.metadata.properties' "$WORK/mndf-bom.json" 2>&1)"
+    fi
+
+    # Form 1: the standard maven.deploy.skip property alone, no plugin config
+    # anywhere in the chain (isolated from the reactor above on purpose -- an
+    # inherited explicit <skip> config would shadow this property entirely).
+    SD="$WORK/mvn-std-skip"
+    mkdir -p "$SD"
+    cat > "$SD/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>standalone-std-skip</artifactId>
+  <version>1.0.0</version>
+  <properties><maven.deploy.skip>true</maven.deploy.skip></properties>
+</project>
+POM
+    cat > "$WORK/std-skip-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:maven/org.example/standalone-std-skip@1.0.0" } },
+  "components": [
+    { "bom-ref": "self", "purl": "pkg:maven/org.example/standalone-std-skip@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "dep", "purl": "pkg:maven/org.example/std-skip-dep@1.0.0", "type": "library", "scope": "required" }
+  ],
+  "dependencies": [
+    { "ref": "root", "dependsOn": ["self"] },
+    { "ref": "self", "dependsOn": ["dep"] },
+    { "ref": "dep", "dependsOn": [] }
+  ]
+}
+JSON
+    ( cd "$SD" && node "$WORK/mndf.js" "$WORK/std-skip-bom.json" ) >/dev/null 2>&1
+    # A single-module "reactor" has no OTHER module to keep, so the filter's own
+    # keepRoots-empty guard stands down and leaves the BOM untouched -- this
+    # confirms resolveSkip reads maven.deploy.skip correctly without asserting
+    # on a drop that the guard deliberately prevents here.
+    if jq -e '[.components[].purl] | length == 2' "$WORK/std-skip-bom.json" >/dev/null 2>&1; then
+        pass "standard maven.deploy.skip property resolves without error (single-module guard stands down)"
+    else
+        fail "standard maven.deploy.skip case errored" "$(jq -c . "$WORK/std-skip-bom.json" 2>&1)"
+    fi
+
+    # Form 3: pluginManagement-only, inherited by a child with no <plugins>
+    # entry of its own -- must still apply (deploy is bound to the default
+    # lifecycle regardless of an explicit <plugins> declaration). A sibling
+    # overriding the inherited default with its own explicit <plugins> entry
+    # both gives the graph filter a deployed module to anchor on and confirms
+    # a direct declaration still wins over an inherited pluginManagement one.
+    PM="$WORK/mvn-pm-skip"
+    mkdir -p "$PM/child" "$PM/deployed-sibling"
+    cat > "$PM/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>pm-skip-root</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <modules><module>child</module><module>deployed-sibling</module></modules>
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <configuration><skip>true</skip></configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
+POM
+    cat > "$PM/child/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>pm-skip-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>pm-skip-child</artifactId>
+</project>
+POM
+    cat > "$PM/deployed-sibling/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>pm-skip-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>pm-deployed-sibling</artifactId>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <configuration><skip>false</skip></configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+POM
+    cat > "$WORK/pm-skip-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:maven/org.example/pm-skip-root@1.0.0" } },
+  "components": [
+    { "bom-ref": "child", "purl": "pkg:maven/org.example/pm-skip-child@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "sibling", "purl": "pkg:maven/org.example/pm-deployed-sibling@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "other", "purl": "pkg:maven/org.example/pm-only-dep@1.0.0", "type": "library", "scope": "required" }
+  ],
+  "dependencies": [
+    { "ref": "root", "dependsOn": ["child", "sibling"] },
+    { "ref": "child", "dependsOn": ["other"] },
+    { "ref": "sibling", "dependsOn": [] },
+    { "ref": "other", "dependsOn": [] }
+  ]
+}
+JSON
+    ( cd "$PM" && node "$WORK/mndf.js" "$WORK/pm-skip-bom.json" ) >/dev/null 2>&1
+    # pm-skip-root itself also resolves skip=true (pluginManagement applies to
+    # the declaring pom's own auto-bound deploy execution too, not just to
+    # children), so it is listed alongside pm-skip-child -- it is never a drop
+    # candidate itself since it is this scan's metadata.component root.
+    if jq -e '
+        (([.metadata.properties[]? | select(.name=="bomlens:excluded-modules") | .value][0] // "")
+          == "org.example:pm-skip-child, org.example:pm-skip-root")
+        and ([.components[].purl] | index("pkg:maven/org.example/pm-only-dep@1.0.0") | not)
+        and ([.components[].purl] | index("pkg:maven/org.example/pm-deployed-sibling@1.0.0"))
+    ' "$WORK/pm-skip-bom.json" >/dev/null 2>&1; then
+        pass "pluginManagement-only skip applies, and an explicit sibling override still wins over it"
+    else
+        fail "pluginManagement-only skip was not recognized" "$(jq -c . "$WORK/pm-skip-bom.json" 2>&1)"
+    fi
+
+    # The parser must never hang, regardless of the cause: a pom with a CDATA
+    # section inside plugin configuration (a real, if uncommon, way a pom.xml
+    # holds source text with its own < and >) and, as a stand-in for whatever
+    # other construct might trip it up next, a pom with an unclosed tag. Both
+    # must finish well inside the parser's own budget, not just inside the
+    # test's outer timeout.
+    HT="$WORK/hang-test"
+    mkdir -p "$HT/cdata-mod" "$HT/other-mod"
+    cat > "$HT/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>hang-test-root</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <modules>
+    <module>cdata-mod</module>
+    <module>other-mod</module>
+  </modules>
+</project>
+POM
+    cat > "$HT/cdata-mod/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>hang-test-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>cdata-module</artifactId>
+  <properties>
+    <maven.deploy.skip>true</maven.deploy.skip>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <configuration>
+              <target>
+                <replace file="x">
+                  <replacevalue><![CDATA[import a.b.C;
+public class X { void f() { if (1 < 2 && 3 > 2) {} } }]]></replacevalue>
+                </replace>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+POM
+    cat > "$HT/other-mod/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>hang-test-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>other-module</artifactId>
+</project>
+POM
+    mkdir -p "$HT/unclosed-mod"
+    cat > "$HT/unclosed-mod/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>unclosed-module</artifactId>
+  <version>1.0.0</version>
+  <properties>
+    <skip_maven_deploy>true</skip_maven_deploy>
+  <build>
+POM
+    cat > "$WORK/hang-cdata-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:maven/org.example/hang-test-root@1.0.0" } },
+  "components": [
+    { "bom-ref": "self", "purl": "pkg:maven/org.example/cdata-module@1.0.0", "type": "library", "scope": "required" },
+    { "bom-ref": "other", "purl": "pkg:maven/org.example/other-module@1.0.0", "type": "library", "scope": "required" }
+  ],
+  "dependencies": [
+    { "ref": "root", "dependsOn": ["self", "other"] },
+    { "ref": "other", "dependsOn": ["self"] },
+    { "ref": "self", "dependsOn": [] }
+  ]
+}
+JSON
+    if ( cd "$HT" && timeout 5 node "$WORK/mndf.js" "$WORK/hang-cdata-bom.json" ) >/dev/null 2>&1; then
+        if jq -e '[.components[].purl] | index("pkg:maven/org.example/cdata-module@1.0.0") | not' \
+               "$WORK/hang-cdata-bom.json" >/dev/null 2>&1; then
+            pass "a pom.xml with a CDATA section resolves correctly and does not hang"
+        else
+            fail "CDATA pom was not excluded" "$(jq -c '.components[].purl' "$WORK/hang-cdata-bom.json" 2>&1)"
+        fi
+    else
+        fail "a pom.xml with a CDATA section timed out or errored (should never hang)"
+    fi
+    # The unclosed-tag pom only needs to prove it cannot hang the run that
+    # reads it -- run the filter with it as the scan target's OWN pom (a
+    # malformed pom.xml at the target itself is the direct, realistic case;
+    # a malformed ancestor is the same code path, loadChain, one level up).
+    cat > "$WORK/hang-unclosed-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "self", "purl": "pkg:maven/org.example/unclosed-module@1.0.0" } },
+  "components": [
+    { "bom-ref": "dep", "purl": "pkg:maven/org.example/unclosed-dep@1.0.0", "type": "library", "scope": "required" }
+  ],
+  "dependencies": [
+    { "ref": "self", "dependsOn": ["dep"] },
+    { "ref": "dep", "dependsOn": [] }
+  ]
+}
+JSON
+    if ( cd "$HT/unclosed-mod" && timeout 5 node "$WORK/mndf.js" "$WORK/hang-unclosed-bom.json" ) >/dev/null 2>&1; then
+        pass "a pom.xml with an unclosed tag does not hang (resolves to not-skipped, safely)"
+    else
+        fail "a pom.xml with an unclosed tag timed out or errored (should never hang)"
+    fi
+else
+    echo "  SKIP: node not installed; non-deployed-module filter not exercised"
+fi
+
+echo "== cargo workspace-member filter: lock-file reachability =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'CWMF_JS'/,/^CWMF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/cwmf.js"
+    NON_SHIPPED_DIRS=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP" | sed 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/')
+
+    # A workspace with a kept root (app), a kept root diamond dependency
+    # (lib-shared, reached from both app and the excluded member), and an
+    # excluded member (demo, under examples/) that alone reaches: a plain
+    # external crate (helper 2.0.0, dropped), a git dependency (gitdep,
+    # dropped -- only to prove a `source = "git+..."` line parses like any
+    # other, not treated as a path member), and a second "helper 1.0.0" that
+    # exists under two different sources -- one reached only from demo, the
+    # other only from app. purl matching carries no source, so the two
+    # collapse onto the same pkg:cargo/helper@1.0.0 component, and it must
+    # survive: from that component alone there is no way to tell which
+    # source's copy a consumer would get, so the conservative side is to keep
+    # it (the same principle as an uncertain module in the Maven filter).
+    CR="$WORK/cargo-reactor"
+    mkdir -p "$CR/app" "$CR/lib-shared" "$CR/examples/demo"
+    cat > "$WORK/cwmf-meta.json" <<META
+{
+  "workspace_members": [
+    "path+file://$CR/app#0.1.0",
+    "path+file://$CR/lib-shared#0.1.0",
+    "path+file://$CR/examples/demo#0.1.0"
+  ],
+  "packages": [
+    { "id": "path+file://$CR/app#0.1.0", "name": "app", "manifest_path": "$CR/app/Cargo.toml" },
+    { "id": "path+file://$CR/lib-shared#0.1.0", "name": "lib-shared", "manifest_path": "$CR/lib-shared/Cargo.toml" },
+    { "id": "path+file://$CR/examples/demo#0.1.0", "name": "demo", "manifest_path": "$CR/examples/demo/Cargo.toml" }
+  ]
+}
+META
+    cat > "$WORK/cwmf.lock" <<'LOCK'
+# This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 4
+
+[[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "lib-shared",
+ "serde",
+ "helper 1.0.0 (registry+https://example.com/crates-index)",
+]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+ "lib-shared",
+ "helper 1.0.0 (registry+https://example.com/private-index)",
+ "helper 2.0.0",
+ "gitdep",
+]
+
+[[package]]
+name = "gitdep"
+version = "0.5.0"
+source = "git+https://example.com/gitdep.git?rev=abc123#abc123abc123abc123abc123abc123abc123ab"
+
+[[package]]
+name = "helper"
+version = "1.0.0"
+source = "registry+https://example.com/crates-index"
+checksum = "aaa"
+
+[[package]]
+name = "helper"
+version = "1.0.0"
+source = "registry+https://example.com/private-index"
+checksum = "bbb"
+
+[[package]]
+name = "helper"
+version = "2.0.0"
+source = "registry+https://example.com/crates-index"
+checksum = "ccc"
+
+[[package]]
+name = "lib-shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde"
+version = "1.0.0"
+source = "registry+https://example.com/crates-index"
+checksum = "ddd"
+LOCK
+    cat > "$WORK/cwmf-bom-orig.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:cargo/app@0.1.0" } },
+  "components": [
+    { "bom-ref": "app", "purl": "pkg:cargo/app@0.1.0", "type": "library" },
+    { "bom-ref": "libshared", "purl": "pkg:cargo/lib-shared@0.1.0", "type": "library" },
+    { "bom-ref": "demo", "purl": "pkg:cargo/demo@0.1.0", "type": "library" },
+    { "bom-ref": "serde", "purl": "pkg:cargo/serde@1.0.0", "type": "library" },
+    { "bom-ref": "helper1", "purl": "pkg:cargo/helper@1.0.0", "type": "library" },
+    { "bom-ref": "helper2", "purl": "pkg:cargo/helper@2.0.0", "type": "library" },
+    { "bom-ref": "gitdep", "purl": "pkg:cargo/gitdep@0.5.0", "type": "library" }
+  ],
+  "dependencies": []
+}
+JSON
+    cp "$WORK/cwmf-bom-orig.json" "$WORK/cwmf-bom.json"
+    ( cd "$CR" && node "$WORK/cwmf.js" "$WORK/cwmf-bom.json" "$WORK/cwmf-meta.json" "$WORK/cwmf.lock" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:cargo/demo@0.1.0") | not)
+        and ($kept | index("pkg:cargo/helper@2.0.0") | not)
+        and ($kept | index("pkg:cargo/gitdep@0.5.0") | not)
+        and ($kept | index("pkg:cargo/lib-shared@0.1.0"))
+        and ($kept | index("pkg:cargo/serde@1.0.0"))
+        and ($kept | index("pkg:cargo/helper@1.0.0"))
+        and ($kept | index("pkg:cargo/app@0.1.0"))
+    ' "$WORK/cwmf-bom.json" >/dev/null 2>&1; then
+        pass "diamond dep (lib-shared) survives, member-only deps drop, an ambiguous same-version dep is kept"
+    else
+        fail "cargo workspace-member filter result unexpected" "$(jq -c '.components[].purl' "$WORK/cwmf-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
+          == "cargo:examples/demo (demo)")
+        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]
+          | contains("demo") and contains("helper@2.0.0") and contains("gitdep")
+            and (contains("lib-shared") | not) and (contains("serde") | not))
+    ' "$WORK/cwmf-bom.json" >/dev/null 2>&1; then
+        pass "excluded workspace members and components are recorded, without the survivors"
+    else
+        fail "bomlens:excluded-members/-components recording unexpected" "$(jq -c '.metadata.properties' "$WORK/cwmf-bom.json" 2>&1)"
+    fi
+
+    # A dependencies array left open (no closing "]") must resolve to "cannot
+    # determine" -- the SBOM is left untouched -- inside the same wall-clock
+    # budget the parser enforces on itself, never hang.
+    cat > "$WORK/cwmf-unclosed.lock" <<'LOCK'
+# This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 4
+
+[[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "lib-shared",
+
+[[package]]
+name = "lib-shared"
+version = "0.1.0"
+LOCK
+    cp "$WORK/cwmf-bom-orig.json" "$WORK/cwmf-unclosed-bom.json"
+    if ( cd "$CR" && timeout 5 node "$WORK/cwmf.js" "$WORK/cwmf-unclosed-bom.json" "$WORK/cwmf-meta.json" "$WORK/cwmf-unclosed.lock" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1; then
+        if jq -e '[.components[].purl] | length == 7' "$WORK/cwmf-unclosed-bom.json" >/dev/null 2>&1; then
+            pass "an unterminated dependencies array resolves to cannot-determine, safely"
+        else
+            fail "unterminated dependencies array was not left untouched" "$(jq -c '.components[].purl' "$WORK/cwmf-unclosed-bom.json" 2>&1)"
+        fi
+    else
+        fail "an unterminated dependencies array timed out or errored (should never hang)"
+    fi
+
+    # An unrecognized lock format version is the same "cannot determine" case.
+    cat > "$WORK/cwmf-badversion.lock" <<'LOCK'
+# This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 99
+
+[[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "lib-shared",
+]
+
+[[package]]
+name = "lib-shared"
+version = "0.1.0"
+LOCK
+    cp "$WORK/cwmf-bom-orig.json" "$WORK/cwmf-badversion-bom.json"
+    if ( cd "$CR" && timeout 5 node "$WORK/cwmf.js" "$WORK/cwmf-badversion-bom.json" "$WORK/cwmf-meta.json" "$WORK/cwmf-badversion.lock" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1; then
+        if jq -e '[.components[].purl] | length == 7' "$WORK/cwmf-badversion-bom.json" >/dev/null 2>&1; then
+            pass "an unrecognized Cargo.lock version resolves to cannot-determine, safely"
+        else
+            fail "unrecognized lock version was not left untouched" "$(jq -c '.components[].purl' "$WORK/cwmf-badversion-bom.json" 2>&1)"
+        fi
+    else
+        fail "an unrecognized Cargo.lock version timed out or errored (should never hang)"
+    fi
+else
+    echo "  SKIP: node not installed; cargo workspace-member filter not exercised"
+fi
+
+echo "== npm workspace-member filter: package-lock.json reachability =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'NWMF_JS'/,/^NWMF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/nwmf.js"
+    NON_SHIPPED_DIRS=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP" | sed 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/')
+
+    # A workspace with two kept members (core, and util which depends on
+    # core -- both survive) and an excluded member (demo, under examples/)
+    # that alone reaches an external dependency (chalk, and its own
+    # transitive dependency ansi-styles, both dropped). core's own
+    # node_modules/@ex/core entry is a workspace "link" -- resolving through
+    # it, not treating it as its own graph node, is exactly what real npm
+    # workspace installs produce and what this filter must follow.
+    cat > "$WORK/nwmf-lock.json" <<'JSON'
+{
+  "name": "root",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": { "name": "root", "workspaces": ["packages/*", "examples/*"] },
+    "packages/core": { "name": "@ex/core", "version": "1.0.0" },
+    "packages/util": {
+      "name": "@ex/util",
+      "version": "1.0.0",
+      "dependencies": { "@ex/core": "*" }
+    },
+    "examples/demo": {
+      "name": "@ex/demo",
+      "version": "1.0.0",
+      "dependencies": { "@ex/core": "*", "chalk": "^5.3.0" }
+    },
+    "node_modules/@ex/core": { "resolved": "packages/core", "link": true },
+    "node_modules/@ex/util": { "resolved": "packages/util", "link": true },
+    "node_modules/chalk": {
+      "name": "chalk",
+      "version": "5.3.0",
+      "resolved": "https://registry.npmjs.org/chalk/-/chalk-5.3.0.tgz",
+      "dependencies": { "ansi-styles": "^6.0.0" }
+    },
+    "node_modules/ansi-styles": {
+      "name": "ansi-styles",
+      "version": "6.2.1",
+      "resolved": "https://registry.npmjs.org/ansi-styles/-/ansi-styles-6.2.1.tgz"
+    }
+  }
+}
+JSON
+    cat > "$WORK/nwmf-bom-orig.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:npm/root@1.0.0" } },
+  "components": [
+    { "bom-ref": "core", "purl": "pkg:npm/%40ex%2Fcore@1.0.0", "type": "library" },
+    { "bom-ref": "util", "purl": "pkg:npm/%40ex%2Futil@1.0.0", "type": "library" },
+    { "bom-ref": "demo", "purl": "pkg:npm/%40ex%2Fdemo@1.0.0", "type": "library" },
+    { "bom-ref": "chalk", "purl": "pkg:npm/chalk@5.3.0", "type": "library" },
+    { "bom-ref": "ansi", "purl": "pkg:npm/ansi-styles@6.2.1", "type": "library" }
+  ],
+  "dependencies": []
+}
+JSON
+    cp "$WORK/nwmf-bom-orig.json" "$WORK/nwmf-bom.json"
+    node "$WORK/nwmf.js" "$WORK/nwmf-bom.json" "$WORK/nwmf-lock.json" "$NON_SHIPPED_DIRS" >/dev/null 2>&1
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:npm/%40ex%2Fdemo@1.0.0") | not)
+        and ($kept | index("pkg:npm/chalk@5.3.0") | not)
+        and ($kept | index("pkg:npm/ansi-styles@6.2.1") | not)
+        and ($kept | index("pkg:npm/%40ex%2Fcore@1.0.0"))
+        and ($kept | index("pkg:npm/%40ex%2Futil@1.0.0"))
+    ' "$WORK/nwmf-bom.json" >/dev/null 2>&1; then
+        pass "excluded member and its own-only transitive dependency drop, a shared member survives"
+    else
+        fail "npm workspace-member filter result unexpected" "$(jq -c '.components[].purl' "$WORK/nwmf-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
+          == "npm:examples/demo (@ex/demo)")
+        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]
+          | contains("demo") and contains("chalk") and contains("ansi-styles")
+            and (contains("core") | not) and (contains("util") | not))
+    ' "$WORK/nwmf-bom.json" >/dev/null 2>&1; then
+        pass "excluded npm workspace members and components are recorded, without the survivors"
+    else
+        fail "bomlens:excluded-members/-components recording unexpected" "$(jq -c '.metadata.properties' "$WORK/nwmf-bom.json" 2>&1)"
+    fi
+
+    # A kept member (util) declares a dependency (widget) this pass cannot
+    # resolve from util's own position in the tree -- nothing at or above
+    # util's own node_modules holds it. The excluded member (demo) declares
+    # the same name and DOES resolve it, nested under its own node_modules.
+    # Naive reachability would call widget excluded-only and drop it, but
+    # something in the kept tree asked for a package by that name, so it
+    # must survive: dropping it risks cutting a component a kept member
+    # genuinely uses. util's own optionalDependencies entry (maybe-thing,
+    # installed nowhere in this lockfile) is the control case -- an
+    # unresolved optional dependency with no installation trace anywhere is
+    # simply not installed, not a gap, and must not by itself force widget
+    # or anything else to be kept.
+    cat > "$WORK/nwmf-protect-lock.json" <<'JSON'
+{
+  "name": "root",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": { "name": "root", "workspaces": ["packages/*", "examples/*"] },
+    "packages/core": { "name": "@ex/core", "version": "1.0.0" },
+    "packages/util": {
+      "name": "@ex/util",
+      "version": "1.0.0",
+      "dependencies": { "@ex/core": "*", "widget": "^1.0.0" },
+      "optionalDependencies": { "maybe-thing": "^1.0.0" }
+    },
+    "examples/demo": {
+      "name": "@ex/demo",
+      "version": "1.0.0",
+      "dependencies": { "@ex/core": "*", "widget": "^1.0.0" }
+    },
+    "node_modules/@ex/core": { "resolved": "packages/core", "link": true },
+    "node_modules/@ex/util": { "resolved": "packages/util", "link": true },
+    "examples/demo/node_modules/widget": {
+      "name": "widget",
+      "version": "1.2.3",
+      "resolved": "https://registry.npmjs.org/widget/-/widget-1.2.3.tgz"
+    }
+  }
+}
+JSON
+    cat > "$WORK/nwmf-protect-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:npm/root@1.0.0" } },
+  "components": [
+    { "bom-ref": "core", "purl": "pkg:npm/%40ex%2Fcore@1.0.0", "type": "library" },
+    { "bom-ref": "util", "purl": "pkg:npm/%40ex%2Futil@1.0.0", "type": "library" },
+    { "bom-ref": "demo", "purl": "pkg:npm/%40ex%2Fdemo@1.0.0", "type": "library" },
+    { "bom-ref": "widget", "purl": "pkg:npm/widget@1.2.3", "type": "library" }
+  ],
+  "dependencies": []
+}
+JSON
+    node "$WORK/nwmf.js" "$WORK/nwmf-protect-bom.json" "$WORK/nwmf-protect-lock.json" "$NON_SHIPPED_DIRS" >/dev/null 2>&1
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:npm/%40ex%2Fdemo@1.0.0") | not)
+        and ($kept | index("pkg:npm/widget@1.2.3"))
+        and ($kept | index("pkg:npm/%40ex%2Fcore@1.0.0"))
+        and ($kept | index("pkg:npm/%40ex%2Futil@1.0.0"))
+    ' "$WORK/nwmf-protect-bom.json" >/dev/null 2>&1; then
+        pass "a kept member's own unresolved dependency name is never dropped, even where an excluded member resolves it"
+    else
+        fail "unresolved-dependency protection result unexpected" "$(jq -c '.components[].purl' "$WORK/nwmf-protect-bom.json" 2>&1)"
+    fi
+
+    # An unrecognized lockfileVersion is the filter's own "cannot determine"
+    # case -- the SBOM is left untouched.
+    cat > "$WORK/nwmf-badversion-lock.json" <<'JSON'
+{
+  "lockfileVersion": 1,
+  "packages": {
+    "": { "name": "root" },
+    "packages/core": { "name": "@ex/core", "version": "1.0.0" }
+  }
+}
+JSON
+    cp "$WORK/nwmf-bom-orig.json" "$WORK/nwmf-badversion-bom.json"
+    if ( timeout 5 node "$WORK/nwmf.js" "$WORK/nwmf-badversion-bom.json" "$WORK/nwmf-badversion-lock.json" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1; then
+        if jq -e '[.components[].purl] | length == 5' "$WORK/nwmf-badversion-bom.json" >/dev/null 2>&1; then
+            pass "an unrecognized package-lock.json lockfileVersion resolves to cannot-determine, safely"
+        else
+            fail "unrecognized lockfileVersion was not left untouched" "$(jq -c '.components[].purl' "$WORK/nwmf-badversion-bom.json" 2>&1)"
+        fi
+    else
+        fail "an unrecognized lockfileVersion timed out or errored (should never hang)"
+    fi
+else
+    echo "  SKIP: node not installed; npm workspace-member filter not exercised"
+fi
+
+echo "== cargo + npm workspace-member filters: bomlens:excluded-members/-components merge, not overwrite =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'CWMF_JS'/,/^CWMF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/both-cwmf.js"
+    sed -n "/<<'NWMF_JS'/,/^NWMF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/both-nwmf.js"
+    NON_SHIPPED_DIRS=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP" | sed 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/')
+
+    # A single (hypothetical polyglot) scan where both the Cargo and the npm
+    # workspace-member filter find something to exclude on the SAME SBOM. The
+    # Cargo filter runs first (it comes first in build-prep.sh) and writes
+    # bomlens:excluded-members/-components; the npm filter must add to those
+    # properties, not replace them.
+    BR="$WORK/both-cargo-reactor"
+    mkdir -p "$BR/capp" "$BR/examples/cdemo"
+    cat > "$WORK/both-cwmf-meta.json" <<META
+{
+  "workspace_members": [
+    "path+file://$BR/capp#0.1.0",
+    "path+file://$BR/examples/cdemo#0.1.0"
+  ],
+  "packages": [
+    { "id": "path+file://$BR/capp#0.1.0", "name": "capp", "manifest_path": "$BR/capp/Cargo.toml" },
+    { "id": "path+file://$BR/examples/cdemo#0.1.0", "name": "cdemo", "manifest_path": "$BR/examples/cdemo/Cargo.toml" }
+  ]
+}
+META
+    cat > "$WORK/both-cwmf.lock" <<'LOCK'
+# This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 4
+
+[[package]]
+name = "capp"
+version = "0.1.0"
+
+[[package]]
+name = "cdemo"
+version = "0.1.0"
+dependencies = [
+ "cdemo_dep",
+]
+
+[[package]]
+name = "cdemo_dep"
+version = "1.0.0"
+source = "registry+https://example.com/crates-index"
+LOCK
+    cat > "$WORK/both-bom.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:cargo/capp@0.1.0" } },
+  "components": [
+    { "bom-ref": "capp", "purl": "pkg:cargo/capp@0.1.0", "type": "library" },
+    { "bom-ref": "cdemo", "purl": "pkg:cargo/cdemo@0.1.0", "type": "library" },
+    { "bom-ref": "cdemodep", "purl": "pkg:cargo/cdemo_dep@1.0.0", "type": "library" },
+    { "bom-ref": "score", "purl": "pkg:npm/score@1.0.0", "type": "library" },
+    { "bom-ref": "sdemo", "purl": "pkg:npm/sdemo@1.0.0", "type": "library" },
+    { "bom-ref": "sdemodep", "purl": "pkg:npm/sdemo_dep@1.0.0", "type": "library" }
+  ],
+  "dependencies": []
+}
+JSON
+    ( cd "$BR" && node "$WORK/both-cwmf.js" "$WORK/both-bom.json" "$WORK/both-cwmf-meta.json" "$WORK/both-cwmf.lock" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+
+    cat > "$WORK/both-nwmf-lock.json" <<'JSON'
+{
+  "name": "root",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": { "name": "root", "workspaces": ["packages/*", "examples/*"] },
+    "packages/score": { "name": "score", "version": "1.0.0" },
+    "examples/sdemo": {
+      "name": "sdemo",
+      "version": "1.0.0",
+      "dependencies": { "sdemo_dep": "^1.0.0" }
+    },
+    "node_modules/sdemo_dep": {
+      "name": "sdemo_dep",
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/sdemo_dep/-/sdemo_dep-1.0.0.tgz"
+    }
+  }
+}
+JSON
+    node "$WORK/both-nwmf.js" "$WORK/both-bom.json" "$WORK/both-nwmf-lock.json" "$NON_SHIPPED_DIRS" >/dev/null 2>&1
+
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:cargo/cdemo@0.1.0") | not)
+        and ($kept | index("pkg:cargo/cdemo_dep@1.0.0") | not)
+        and ($kept | index("pkg:npm/sdemo@1.0.0") | not)
+        and ($kept | index("pkg:npm/sdemo_dep@1.0.0") | not)
+        and ($kept | index("pkg:cargo/capp@0.1.0"))
+        and ($kept | index("pkg:npm/score@1.0.0"))
+    ' "$WORK/both-bom.json" >/dev/null 2>&1; then
+        pass "both filters' drops apply to the same SBOM"
+    else
+        fail "combined cargo+npm filter result unexpected" "$(jq -c '.components[].purl' "$WORK/both-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]) as $m
+        | ($m | contains("cargo:examples/cdemo (cdemo)")) and ($m | contains("npm:examples/sdemo (sdemo)"))
+    ' "$WORK/both-bom.json" >/dev/null 2>&1; then
+        pass "bomlens:excluded-members carries both filters' entries (npm did not overwrite cargo's)"
+    else
+        fail "bomlens:excluded-members did not merge" "$(jq -c '.metadata.properties[] | select(.name=="bomlens:excluded-members")' "$WORK/both-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
+        | ($c | contains("cdemo")) and ($c | contains("sdemo"))
+    ' "$WORK/both-bom.json" >/dev/null 2>&1; then
+        pass "bomlens:excluded-components carries both filters' entries (npm did not overwrite cargo's)"
+    else
+        fail "bomlens:excluded-components did not merge" "$(jq -c '.metadata.properties[] | select(.name=="bomlens:excluded-components")' "$WORK/both-bom.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; cargo+npm merge not exercised"
+fi
+
+echo "== pnpm workspace-member filter: dependency-tree reachability =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'PWMF_JS'/,/^PWMF_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/pwmf.js"
+    NON_SHIPPED_DIRS=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP" | sed 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/')
+
+    # A workspace with a kept root (app), a kept diamond dependency
+    # (lib-shared, reached from both app and the excluded member), and an
+    # excluded member (playground/demo) that alone reaches: a plain external
+    # package (left-pad, dropped) and two packages that are "deduped": true
+    # everywhere they occur in this fixture, so this pass never once sees
+    # their own dependencies -- an overrides-style alias (obug, mirroring a
+    # real workspace's `debug -> npm:obug@^1.0.2` override) and pnpm's own
+    # ESM/CJS-compat "-cjs" key aliasing (string-width-cjs, whose "from" is
+    # the real package name "string-width"). Both must survive (protected),
+    # even though the only member that reaches either one is excluded.
+    PW="$WORK/pnpm-reactor"
+    mkdir -p "$PW/app" "$PW/lib-shared" "$PW/playground/demo"
+    cat > "$WORK/pwmf-tree.json" <<TREE
+[
+  { "name": "app", "version": "1.0.0", "path": "$PW/app", "private": true,
+    "dependencies": {
+      "lib-shared": { "from": "lib-shared", "version": "link:../lib-shared", "path": "$PW/lib-shared" },
+      "is-odd": { "from": "is-odd", "version": "3.0.1",
+        "resolved": "https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz",
+        "dependencies": { "is-number": { "from": "is-number", "version": "6.0.0",
+          "resolved": "https://registry.npmjs.org/is-number/-/is-number-6.0.0.tgz" } } }
+    } },
+  { "name": "lib-shared", "version": "1.0.0", "path": "$PW/lib-shared", "private": true,
+    "dependencies": {
+      "is-number": { "from": "is-number", "version": "6.0.0",
+        "resolved": "https://registry.npmjs.org/is-number/-/is-number-6.0.0.tgz" }
+    } },
+  { "name": "@ex/demo", "version": "1.0.0", "path": "$PW/playground/demo", "private": true,
+    "dependencies": {
+      "lib-shared": { "from": "lib-shared", "version": "link:../../lib-shared", "path": "$PW/lib-shared" },
+      "left-pad": { "from": "left-pad", "version": "1.3.0",
+        "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz" },
+      "obug": { "from": "obug", "version": "1.0.2",
+        "resolved": "https://registry.npmjs.org/obug/-/obug-1.0.2.tgz",
+        "deduped": true, "dedupedDependenciesCount": 1 },
+      "string-width-cjs": { "from": "string-width", "version": "4.2.3",
+        "resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
+        "deduped": true, "dedupedDependenciesCount": 1 }
+    } }
+]
+TREE
+    cat > "$WORK/pwmf-bom-orig.json" <<'JSON'
+{
+  "metadata": { "component": { "bom-ref": "root", "purl": "pkg:npm/root-ws@0.0.0" } },
+  "components": [
+    { "bom-ref": "app", "purl": "pkg:npm/app@1.0.0", "type": "library" },
+    { "bom-ref": "libshared", "purl": "pkg:npm/lib-shared@1.0.0", "type": "library" },
+    { "bom-ref": "demo", "purl": "pkg:npm/%40ex%2Fdemo@1.0.0", "type": "library" },
+    { "bom-ref": "isodd", "purl": "pkg:npm/is-odd@3.0.1", "type": "library" },
+    { "bom-ref": "isnumber", "purl": "pkg:npm/is-number@6.0.0", "type": "library" },
+    { "bom-ref": "leftpad", "purl": "pkg:npm/left-pad@1.3.0", "type": "library" },
+    { "bom-ref": "obug", "purl": "pkg:npm/obug@1.0.2", "type": "library" },
+    { "bom-ref": "stringwidth", "purl": "pkg:npm/string-width@4.2.3", "type": "library" }
+  ],
+  "dependencies": []
+}
+JSON
+    cp "$WORK/pwmf-bom-orig.json" "$WORK/pwmf-bom.json"
+    ( cd "$PW" && node "$WORK/pwmf.js" "$WORK/pwmf-bom.json" "$WORK/pwmf-tree.json" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+    if jq -e '
+        ([.components[].purl]) as $kept
+        | ($kept | index("pkg:npm/%40ex%2Fdemo@1.0.0") | not)
+        and ($kept | index("pkg:npm/left-pad@1.3.0") | not)
+        and ($kept | index("pkg:npm/lib-shared@1.0.0"))
+        and ($kept | index("pkg:npm/is-number@6.0.0"))
+        and ($kept | index("pkg:npm/app@1.0.0"))
+        and ($kept | index("pkg:npm/obug@1.0.2"))
+        and ($kept | index("pkg:npm/string-width@4.2.3"))
+    ' "$WORK/pwmf-bom.json" >/dev/null 2>&1; then
+        pass "diamond dep (lib-shared) survives, member-only dep drops, always-deduped packages are protected"
+    else
+        fail "pnpm workspace-member filter result unexpected" "$(jq -c '.components[].purl' "$WORK/pwmf-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
+          == "pnpm:playground/demo (@ex/demo)")
+        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
+        | ($c | contains("%40ex%2Fdemo@1.0.0")) and ($c | contains("left-pad@1.3.0"))
+          and ($c | contains("obug") | not) and ($c | contains("string-width") | not)
+    ' "$WORK/pwmf-bom.json" >/dev/null 2>&1; then
+        pass "excluded workspace member and dropped component (including the scoped member itself) are recorded, protected packages excluded from the list"
+    else
+        fail "bomlens:excluded-members/-components recording unexpected" "$(jq -c '.metadata.properties' "$WORK/pwmf-bom.json" 2>&1)"
+    fi
+
+    # A tree that is not a JSON array, and one whose entries lack "path",
+    # both leave the SBOM untouched rather than guess.
+    printf '{"not":"an array"}' > "$WORK/pwmf-tree-bad1.json"
+    cp "$WORK/pwmf-bom-orig.json" "$WORK/pwmf-bom-bad1.json"
+    ( cd "$PW" && node "$WORK/pwmf.js" "$WORK/pwmf-bom-bad1.json" "$WORK/pwmf-tree-bad1.json" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+    printf '[{"name":"x"}]' > "$WORK/pwmf-tree-bad2.json"
+    cp "$WORK/pwmf-bom-orig.json" "$WORK/pwmf-bom-bad2.json"
+    ( cd "$PW" && node "$WORK/pwmf.js" "$WORK/pwmf-bom-bad2.json" "$WORK/pwmf-tree-bad2.json" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+    if diff -q "$WORK/pwmf-bom-bad1.json" "$WORK/pwmf-bom-orig.json" >/dev/null 2>&1 \
+       && diff -q "$WORK/pwmf-bom-bad2.json" "$WORK/pwmf-bom-orig.json" >/dev/null 2>&1; then
+        pass "a non-array tree and an entry missing \"path\" both leave the SBOM untouched"
+    else
+        fail "malformed pnpm tree should leave the SBOM untouched" "diffs above"
+    fi
+
+    # A link dependency whose target path matches no known workspace member
+    # (a stale or out-of-tree reference) drops that one edge rather than
+    # failing the whole pass.
+    node -e '
+      const fs = require("fs");
+      const tree = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      const demo = tree.find(p => p.name === "@ex/demo");
+      demo.dependencies.ghost = { from: "ghost", version: "link:../../nonexistent", path: process.argv[2] };
+      fs.writeFileSync(process.argv[3], JSON.stringify(tree));
+    ' "$WORK/pwmf-tree.json" "$PW/nonexistent" "$WORK/pwmf-tree-ghost.json"
+    cp "$WORK/pwmf-bom-orig.json" "$WORK/pwmf-bom-ghost.json"
+    ( cd "$PW" && node "$WORK/pwmf.js" "$WORK/pwmf-bom-ghost.json" "$WORK/pwmf-tree-ghost.json" "$NON_SHIPPED_DIRS" ) >/dev/null 2>&1
+    if jq -e '([.components[].purl]) as $kept | ($kept | index("pkg:npm/left-pad@1.3.0") | not) and ($kept | index("pkg:npm/lib-shared@1.0.0"))' \
+        "$WORK/pwmf-bom-ghost.json" >/dev/null 2>&1; then
+        pass "an unresolvable link target drops that one edge, not the whole pass"
+    else
+        fail "unresolvable link target should not affect the rest of the filter" "$(jq -c '.components[].purl' "$WORK/pwmf-bom-ghost.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; pnpm workspace-member filter not exercised"
+fi
+
+echo "== Node/npm fallback quality gate: a syft fallback covering none of the declared deps is discarded =="
+# syft's pnpm-lock.yaml parsing can miss every real dependency and return only
+# its own platform tooling -- a "successful" scan that in fact describes
+# nothing about the project.
+if command -v jq >/dev/null 2>&1; then
+    NQ="$WORK/node-quality"
+    mkdir -p "$NQ/root/packages/foo"
+    printf '%s\n' '{"name":"root","devDependencies":{"build-tool":"^5.0.0"}}' > "$NQ/root/package.json"
+    printf 'packages:\n  - "packages/*"\n' > "$NQ/root/pnpm-workspace.yaml"
+    printf '%s\n' '{"name":"foo","dependencies":{"axios":"^1.0.0"}}' > "$NQ/root/packages/foo/package.json"
+
+    printf '%s\n' '{"components":[{"name":"@pnpm/exe.linux-x64"},{"name":"pnpm"}]}' > "$NQ/sbom-no-match.json"
+    printf '%s\n' '{"components":[{"name":"axios"},{"name":"pnpm"}]}' > "$NQ/sbom-match.json"
+    mkdir -p "$NQ/no-decl"
+    printf '%s\n' '{"name":"empty"}' > "$NQ/no-decl/package.json"
+
+    _decl=$(bash -c '. "$1"; _node_declared_dep_names "$2"' _ "$DETECT" "$NQ/root" | tr '\n' ' ')
+    [ "$_decl" = "axios build-tool " ] \
+        && pass "declared dependency names combine the root and every pnpm workspace member" \
+        || fail "_node_declared_dep_names output unexpected" "got [$_decl]"
+
+    bash -c '. "$1"; node_fallback_covers_declared_deps "$2" "$3"' _ "$DETECT" "$NQ/root" "$NQ/sbom-no-match.json"
+    [ "$?" -eq 1 ] && pass "a fallback covering none of the declared names is rejected" \
+        || fail "node_fallback_covers_declared_deps did not reject a 0-coverage fallback"
+
+    bash -c '. "$1"; node_fallback_covers_declared_deps "$2" "$3"' _ "$DETECT" "$NQ/root" "$NQ/sbom-match.json"
+    [ "$?" -eq 0 ] && pass "a fallback covering at least one declared name is accepted" \
+        || fail "node_fallback_covers_declared_deps rejected a fallback that did cover a declared name"
+
+    bash -c '. "$1"; node_fallback_covers_declared_deps "$2" "$3"' _ "$DETECT" "$NQ/no-decl" "$NQ/sbom-no-match.json"
+    [ "$?" -eq 2 ] && pass "a project with no declared dependencies skips the gate (nothing to cover)" \
+        || fail "node_fallback_covers_declared_deps did not skip a project with no declared deps"
+
+    cp "$NQ/sbom-no-match.json" "$NQ/applied.json"
+    _out=$(bash -c '. "$1"; apply_node_fallback_quality_gate "$2" "$3" 1' _ "$DETECT" "$NQ/applied.json" "$NQ/root")
+    if [ ! -f "$NQ/applied.json" ] && printf '%s' "$_out" | grep -q "lockfile"; then
+        pass "apply_node_fallback_quality_gate discards the file and prints lockfile guidance"
+    else
+        fail "apply_node_fallback_quality_gate did not discard/guide as expected" "file present=$([ -f "$NQ/applied.json" ] && echo yes || echo no), output=[$_out]"
+    fi
+
+    cp "$NQ/sbom-match.json" "$NQ/kept.json"
+    bash -c '. "$1"; apply_node_fallback_quality_gate "$2" "$3" 1' _ "$DETECT" "$NQ/kept.json" "$NQ/root" >/dev/null
+    [ -f "$NQ/kept.json" ] \
+        && pass "apply_node_fallback_quality_gate leaves a covering fallback in place" \
+        || fail "apply_node_fallback_quality_gate removed a fallback that did cover a declared name"
+else
+    echo "  SKIP: jq not installed; Node fallback quality gate not exercised"
+fi
+
+echo "== maven parent-POM license inheritance: only when the child declares none of its own =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'MLIC_JS'/,/^MLIC_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/mlic.js"
+
+    MP="$WORK/mvn-lic-reactor"
+    mkdir -p "$MP/inherits" "$MP/own-license" "$MP/already-set"
+    cat > "$MP/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>lic-root</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <licenses>
+    <license><name>Apache License, Version 2.0</name></license>
+  </licenses>
+  <modules>
+    <module>inherits</module>
+    <module>own-license</module>
+    <module>already-set</module>
+  </modules>
+</project>
+POM
+    cat > "$MP/inherits/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>lic-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>inherits-module</artifactId>
+</project>
+POM
+    # Declares its own license in the pom, but the SBOM component (as cdxgen
+    # might hand it, missing the license) shows none -- a cdxgen gap, not a
+    # case this fills over with a possibly different parent license.
+    cat > "$MP/own-license/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>lic-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>own-license-module</artifactId>
+  <licenses>
+    <license><name>MIT License</name></license>
+  </licenses>
+</project>
+POM
+    cat > "$MP/already-set/pom.xml" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>lic-root</artifactId><version>1.0.0</version><relativePath>../pom.xml</relativePath></parent>
+  <artifactId>already-set-module</artifactId>
+</project>
+POM
+    cat > "$WORK/mlic-bom.json" <<'JSON'
+{
+  "components": [
+    { "purl": "pkg:maven/org.example/lic-root@1.0.0" },
+    { "purl": "pkg:maven/org.example/inherits-module@1.0.0" },
+    { "purl": "pkg:maven/org.example/own-license-module@1.0.0" },
+    { "purl": "pkg:maven/org.example/already-set-module@1.0.0",
+      "licenses": [{"license": {"name": "BSD-3-Clause"}}] }
+  ]
+}
+JSON
+    # A dependency resolved from the local repository, not a module of this
+    # project's own reactor: its own pom declares no <licenses>, and its
+    # <parent> names a coordinate with no relativePath at all (the ordinary
+    # shape a remote dependency's pom takes) that only the local repository
+    # -- not this reactor's checkout -- can resolve.
+    M2="$WORK/mlic-m2"
+    mkdir -p "$M2/org/example/ext-dep/2.0" "$M2/org/example/ext-parent/1.0.0"
+    cat > "$M2/org/example/ext-dep/2.0/ext-dep-2.0.pom" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>ext-parent</artifactId><version>1.0.0</version></parent>
+  <artifactId>ext-dep</artifactId>
+</project>
+POM
+    cat > "$M2/org/example/ext-parent/1.0.0/ext-parent-1.0.0.pom" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>ext-parent</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <licenses>
+    <license><name>Eclipse Public License 2.0</name></license>
+  </licenses>
+</project>
+POM
+
+    # A parent chain that cycles back on itself (ext-parent's own coordinate,
+    # misdeclared as its own parent) must still terminate -- the depth cap
+    # backstops the visited set here, since a two-node cycle both fits well
+    # under it and would still be caught by the set alone; MAX_PARENT_DEPTH
+    # exists for a long non-cyclic chain the set never revisits.
+    mkdir -p "$M2/org/example/cyclic/1.0"
+    cat > "$M2/org/example/cyclic/1.0/cyclic-1.0.pom" <<'POM'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.example</groupId><artifactId>cyclic</artifactId><version>1.0</version></parent>
+  <artifactId>cyclic</artifactId>
+</project>
+POM
+
+    jq '.components += [
+      {"purl":"pkg:maven/org.example/ext-dep@2.0"},
+      {"purl":"pkg:maven/org.example/cyclic@1.0"}
+    ]' "$WORK/mlic-bom.json" > "$WORK/mlic-bom.json.tmp" && mv "$WORK/mlic-bom.json.tmp" "$WORK/mlic-bom.json"
+
+    ( cd "$MP" && timeout 5 node "$WORK/mlic.js" "$WORK/mlic-bom.json" "$M2" ) >/dev/null 2>&1
+    _mlic_rc=$?
+    if [ "$_mlic_rc" -ne 0 ]; then
+        fail "parent-POM license inheritance timed out or errored (should never hang)"
+    fi
+    if jq -e '(.components[0] | has("licenses")) | not' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "the module declaring its own license (the reactor root) is left untouched"
+    else
+        fail "the root module's own license was rewritten" "$(jq -c '.components[0]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        .components[1].licenses == [{"license": {"name": "Apache License, Version 2.0"}}]
+        and (.components[1].properties | any(.name=="bomlens:licenseSource" and .value=="parent POM"))
+    ' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "a module with no license of its own inherits the parent's, with the source recorded"
+    else
+        fail "parent-POM license inheritance did not fill the expected value" "$(jq -c '.components[1]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+    if jq -e '(.components[2] | has("licenses")) | not' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "a module whose own pom declares a license is left alone even though the SBOM component omits one"
+    else
+        fail "a module's own pom.xml license was overwritten by the parent's" "$(jq -c '.components[2]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+    if jq -e '.components[3].licenses == [{"license": {"name": "BSD-3-Clause"}}]' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "a module whose SBOM component already carries a license is left untouched"
+    else
+        fail "a component with an existing license was overwritten" "$(jq -c '.components[3]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+    if jq -e '
+        .components[4].licenses == [{"license": {"name": "Eclipse Public License 2.0"}}]
+        and (.components[4].properties | any(.name=="bomlens:licenseSource" and .value=="parent POM"))
+    ' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "a dependency outside the reactor inherits its parent's license from the local repository"
+    else
+        fail "local-repository parent-POM inheritance did not fill the expected value" "$(jq -c '.components[4]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+    if jq -e '(.components[5] | has("licenses")) | not' "$WORK/mlic-bom.json" >/dev/null 2>&1; then
+        pass "a parent chain that cycles back on itself resolves to not-found, safely"
+    else
+        fail "a cyclic parent chain was not left untouched" "$(jq -c '.components[5]' "$WORK/mlic-bom.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; maven parent-POM license inheritance not exercised"
+fi
+
+echo "== compositions.aggregate: mark_compositions_aggregate declares graph completeness per signal =="
+# mark_compositions_aggregate is extracted verbatim from docker/entrypoint.sh
+# (between its literal anchor comments), so this test tracks the shipped logic
+# rather than a hand-copied duplicate that could silently drift from it.
+# mark_sbom_degraded lives in docker/lib/source-detect.sh (a shared, side-effect-
+# free library already sourced directly elsewhere in this file) and is sourced
+# from there, so the syft-fallback case below composes the two real functions
+# instead of hand-setting the property mark_sbom_degraded is responsible for.
+sed -n "/^# Declare how complete this SBOM's dependency graph is,/,/^# Observability helpers for best-effort post-process steps/p" "$ROOT_DIR/docker/entrypoint.sh" \
+    | sed '$d' > "$WORK/mca-snippet.sh"
+MCA_SNIPPET_LINES="$(wc -l < "$WORK/mca-snippet.sh" | tr -d '[:space:]')"
+if [ ! -s "$WORK/mca-snippet.sh" ]; then
+    fail "could not extract mark_compositions_aggregate from entrypoint.sh (did its anchor comments move?)"
+elif [ -z "$MCA_SNIPPET_LINES" ] || [ "$MCA_SNIPPET_LINES" -gt 100 ]; then
+    fail "mark_compositions_aggregate snippet is $MCA_SNIPPET_LINES lines (expected well under 100) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
+        "did the '# Observability helpers for best-effort post-process steps' comment in docker/entrypoint.sh change?"
+elif grep -q '^[[:space:]]*exit\b' "$WORK/mca-snippet.sh"; then
+    fail "mark_compositions_aggregate snippet contains an exit statement -- refusing to source it into this test process" \
+        "$(cat "$WORK/mca-snippet.sh")"
+else
+    . "$ROOT_DIR/docker/lib/source-detect.sh"
+    . "$WORK/mca-snippet.sh"
+
+    mca_agg() { jq -r '.compositions[0].aggregate // "(none)"' "$1"; }
+
+    # SOURCE, positive lock evidence (an ecosystem step applied and did not
+    # fail) plus 2+ components and a real edge: the only path to `complete`.
+    cat > "$WORK/mca-source-complete.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"go-mod-tidy"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-complete.json"
+    [ "$(mca_agg "$WORK/mca-source-complete.json")" = "complete" ] \
+        && pass "SOURCE with applied lock evidence + components + an edge declares complete" \
+        || fail "expected complete" "$(mca_agg "$WORK/mca-source-complete.json")"
+
+    # SOURCE, no matching prep-step-applied label at all -- Maven's shape: no
+    # signal distinguishes a resolved graph from a degraded one for it
+    # (measured), so it can never satisfy the lock-evidence condition above.
+    cat > "$WORK/mca-source-maven.json" <<'JSON'
+{"metadata":{"properties":[{"name":"cdx:bom:componentTypes","value":"maven"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-maven.json"
+    [ "$(mca_agg "$WORK/mca-source-maven.json")" = "unknown" ] \
+        && pass "SOURCE with no lock-evidence label (Maven's shape) declares unknown, never complete" \
+        || fail "expected unknown" "$(mca_agg "$WORK/mca-source-maven.json")"
+
+    # SOURCE, lock evidence present but no edges -- the graph itself is too
+    # thin regardless of the lock signal (the positive-evidence rule applies
+    # to both conditions together, not either alone).
+    cat > "$WORK/mca-source-noedges.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"pip-install"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-noedges.json"
+    [ "$(mca_agg "$WORK/mca-source-noedges.json")" = "unknown" ] \
+        && pass "SOURCE with lock evidence but zero edges still declares unknown" \
+        || fail "expected unknown" "$(mca_agg "$WORK/mca-source-noedges.json")"
+
+    # SOURCE, syft fallback (bomlens:sbom-tool-degraded): incomplete outranks
+    # a lock-evidence label that happens to also be present.
+    cat > "$WORK/mca-source-degraded.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen-unavailable"},
+                            {"name":"bomlens:prep-step-applied","value":"npm-production-set"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-degraded.json"
+    [ "$(mca_agg "$WORK/mca-source-degraded.json")" = "incomplete" ] \
+        && pass "SOURCE with the syft-fallback signal declares incomplete, even with edges present" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-source-degraded.json")"
+
+    # Same case, composed from the real syft-fallback function instead of a
+    # hand-set property: mark_sbom_degraded stamps bomlens:sbom-tool-degraded
+    # the same way entrypoint.sh's own SOURCE fallback calls it, and
+    # mark_compositions_aggregate must read that real stamp as incomplete.
+    cat > "$WORK/mca-source-degraded-real.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    mark_sbom_degraded "$WORK/mca-source-degraded-real.json" cdxgen-unavailable
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-degraded-real.json"
+    [ "$(mca_agg "$WORK/mca-source-degraded-real.json")" = "incomplete" ] \
+        && pass "the real mark_sbom_degraded stamp composes correctly with mark_compositions_aggregate" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-source-degraded-real.json")"
+
+    # The CLI's two-stage flow reads MODE=POSTPROCESS, not SOURCE: when stage 1
+    # (the cdxgen sibling container) crashes, scan-sbom.sh's own syft-fallback
+    # helper calls this same mark_sbom_degraded (with a "cdxgen-crash" reason,
+    # one of several STAGE1_FAIL_REASON values) on the file POSTPROCESS then
+    # reads -- mark_compositions_aggregate must declare that incomplete too.
+    cat > "$WORK/mca-postprocess-degraded.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"pip-install"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    mark_sbom_degraded "$WORK/mca-postprocess-degraded.json" cdxgen-crash
+    SCAN_MODE=POSTPROCESS mark_compositions_aggregate "$WORK/mca-postprocess-degraded.json"
+    [ "$(mca_agg "$WORK/mca-postprocess-degraded.json")" = "incomplete" ] \
+        && pass "the CLI two-stage POSTPROCESS path declares incomplete on the same real syft-fallback stamp" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-postprocess-degraded.json")"
+
+    # FIRMWARE, package cataloging failed: incomplete.
+    cat > "$WORK/mca-firmware-failed.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]},
+ "components":[],"dependencies":[]}
+JSON
+    SCAN_MODE=FIRMWARE mark_compositions_aggregate "$WORK/mca-firmware-failed.json"
+    [ "$(mca_agg "$WORK/mca-firmware-failed.json")" = "incomplete" ] \
+        && pass "FIRMWARE with a firmware-packages failure declares incomplete" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-firmware-failed.json")"
+
+    # FIRMWARE, clean: syft success alone is never positive evidence of a
+    # complete graph (it only reads a package database).
+    cat > "$WORK/mca-firmware-ok.json" <<'JSON'
+{"metadata":{"properties":[]},"components":[{"name":"a"}],"dependencies":[]}
+JSON
+    SCAN_MODE=FIRMWARE mark_compositions_aggregate "$WORK/mca-firmware-ok.json"
+    [ "$(mca_agg "$WORK/mca-firmware-ok.json")" = "unknown" ] \
+        && pass "FIRMWARE with no failure signal still declares unknown, not complete" \
+        || fail "expected unknown" "$(mca_agg "$WORK/mca-firmware-ok.json")"
+
+    # AIBOM / MERGE: fixed unknown, no signal this design gives a value to.
+    for mode in AIBOM MERGE MODELFILE DATASET; do
+        cat > "$WORK/mca-$mode.json" <<'JSON'
+{"metadata":{"properties":[]},"components":[],"dependencies":[]}
+JSON
+        SCAN_MODE="$mode" mark_compositions_aggregate "$WORK/mca-$mode.json"
+        [ "$(mca_agg "$WORK/mca-$mode.json")" = "unknown" ] \
+            && pass "$mode declares a fixed unknown" \
+            || fail "$mode: expected unknown" "$(mca_agg "$WORK/mca-$mode.json")"
+    done
+
+    # ANALYZE, a supplier's own compositions already present: never overwritten.
+    cat > "$WORK/mca-analyze-supplied.json" <<'JSON'
+{"metadata":{"properties":[]},"components":[],"dependencies":[],
+ "compositions":[{"aggregate":"complete","assemblies":["urn:example"]}]}
+JSON
+    SCAN_MODE=ANALYZE mark_compositions_aggregate "$WORK/mca-analyze-supplied.json"
+    if jq -e '.compositions == [{"aggregate":"complete","assemblies":["urn:example"]}]' \
+        "$WORK/mca-analyze-supplied.json" >/dev/null 2>&1; then
+        pass "ANALYZE never overwrites a supplier's own compositions declaration"
+    else
+        fail "a supplier's compositions was overwritten" "$(jq -c '.compositions' "$WORK/mca-analyze-supplied.json")"
+    fi
+
+    # ANALYZE, no compositions in the converted document: unknown, same as
+    # AIBOM/MERGE above -- there is no basis to judge the supplier's graph.
+    cat > "$WORK/mca-analyze-none.json" <<'JSON'
+{"metadata":{"properties":[]},"components":[],"dependencies":[]}
+JSON
+    SCAN_MODE=ANALYZE mark_compositions_aggregate "$WORK/mca-analyze-none.json"
+    [ "$(mca_agg "$WORK/mca-analyze-none.json")" = "unknown" ] \
+        && pass "ANALYZE with no compositions of its own declares unknown" \
+        || fail "expected unknown" "$(mca_agg "$WORK/mca-analyze-none.json")"
+
+    # --byte-stable determinism: compositions is written AFTER normalize --stable
+    # in the real pipeline (entrypoint.sh), so two identical scans must still
+    # land on byte-identical output once both steps have run in that order.
+    cat > "$WORK/mca-bs1.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"go-mod-tidy"}]},
+ "components":[{"type":"library","name":"a","version":"1.0"},{"type":"library","name":"b","version":"1.0"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    cp "$WORK/mca-bs1.json" "$WORK/mca-bs2.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/mca-bs1.json" --stable >/dev/null 2>&1
+    bash "$LIB/normalize-sbom.sh" "$WORK/mca-bs2.json" --stable >/dev/null 2>&1
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-bs1.json"
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-bs2.json"
+    if diff -q "$WORK/mca-bs1.json" "$WORK/mca-bs2.json" >/dev/null 2>&1; then
+        pass "compositions written after --stable normalize is still byte-identical across two scans"
+    else
+        fail "compositions broke --byte-stable determinism" "$(diff "$WORK/mca-bs1.json" "$WORK/mca-bs2.json" | head)"
+    fi
+fi
+
+echo "== validate-sbom.sh folds compositions.aggregate into the transitive-dependencies detail =="
+# CycloneDX-only (compositions is a CycloneDX field; the SPDX check functions
+# never reference it). Advisory text only -- asserted against status too, to
+# guard against a future edit that lets it affect the verdict.
+jq '.compositions = [{"aggregate":"complete"}]' "$FIX/good-cyclonedx.json" > "$WORK/comp-complete.json"
+bash "$LIB/validate-sbom.sh" "$WORK/comp-complete.json" "$WORK/compc" "supplier" >/dev/null 2>&1
+cc=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)\t\(.detail)"' "$WORK/compc_conformance.json")
+case "$cc" in
+    pass*"declared complete") pass "a declared-complete graph is noted in the transitive check's detail, status unaffected" ;;
+    *) fail "transitive check detail/status wrong for a complete declaration" "$cc" ;;
+esac
+
+jq '.compositions = [{"aggregate":"unknown"}]' "$FIX/good-cyclonedx.json" > "$WORK/comp-unknown.json"
+bash "$LIB/validate-sbom.sh" "$WORK/comp-unknown.json" "$WORK/compu" "supplier" >/dev/null 2>&1
+cu=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)\t\(.detail)"' "$WORK/compu_conformance.json")
+case "$cu" in
+    pass*"not a defect"*) pass "an unknown declaration gets a not-a-defect note, status unaffected" ;;
+    *) fail "transitive check detail/status wrong for an unknown declaration" "$cu" ;;
+esac
+
+bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/compnone" "supplier" >/dev/null 2>&1
+cn=$(jq -r '.checks[] | select(.id=="transitive") | .detail' "$WORK/compnone_conformance.json")
+[ "$cn" = "1 edge(s)" ] \
+    && pass "no compositions declared leaves the transitive detail exactly as before" \
+    || fail "transitive detail changed with no compositions present" "$cn"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

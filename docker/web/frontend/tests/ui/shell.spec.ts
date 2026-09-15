@@ -516,6 +516,95 @@ test("Sidebar's New scan recovers a stranded failure result", async ({ page }) =
   await expect(page.locator("#project")).toHaveValue("");
 });
 
+// server.py sets errorMessage on the done event (not a separate error event)
+// when a scan fails with no other classification: its own [ERROR] block from
+// the log. A `done` event -- ok or not -- always moves the app off ScanRunning
+// and onto the section screen (the small badge next to the heading is the
+// only other place a failure shows there), so this is Overview's own banner,
+// not ScanRunning's.
+test("a scan that fails with the scanner's own [ERROR] text shows it on the Overview failure banner", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  const errorMessage =
+    "[ERROR] The dependency resolver failed and the fallback scan found none of the project's declared dependencies.";
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({
+      contentType: "text/event-stream",
+      body: `event: done\ndata: ${JSON.stringify({ ...DONE, ok: false, id: undefined, errorMessage })}\n\n`,
+    }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  await expect(page.getByRole("status")).toHaveText("Scan failed");
+  await expect(page.getByRole("alert").getByText(errorMessage, { exact: false })).toBeVisible();
+  // The generic fallback body must not show alongside the specific text.
+  await expect(page.getByText("Something went wrong before the scan could complete")).toHaveCount(0);
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
+// Same as above, in dark mode: the "Scan failed" badge's text-risk-critical-fg
+// is a different (lighter) value there (see index.css's .dark block), so this
+// checks it is not only the light-mode value that clears AA.
+test("the Overview failure banner and Scan failed badge pass contrast in dark mode too", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("sbom.theme", "dark"));
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  const errorMessage = "[ERROR] The dependency resolver failed.";
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({
+      contentType: "text/event-stream",
+      body: `event: done\ndata: ${JSON.stringify({ ...DONE, ok: false, id: undefined, errorMessage })}\n\n`,
+    }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  await expect(page.getByRole("status")).toHaveText("Scan failed");
+  await expect(page.getByRole("alert").getByText(errorMessage, { exact: false })).toBeVisible();
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
+// The same failure, but with no errorMessage at all (the server had nothing
+// [ERROR]-shaped to show, e.g. the scanner just exited 1 with no such line):
+// the generic fallback body shows instead, same copy as ScanRunning's own.
+test("a scan that fails with no [ERROR] text falls back to the generic banner body", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({
+      contentType: "text/event-stream",
+      body: `event: done\ndata: ${JSON.stringify({ ...DONE, ok: false, id: undefined, errorMessage: null })}\n\n`,
+    }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  await expect(
+    page.getByRole("alert").getByText("Something went wrong before the scan could complete"),
+  ).toBeVisible();
+});
+
 // The subtitle under the result heading names what was scanned. It lives inside
 // the screenshot baselines, but pixels are the wrong guard for wording: a short
 // phrase edit stays under the diff tolerance, so the baselines kept an outdated
@@ -1024,6 +1113,59 @@ test("Overview shows what changed since the previous scan of the same project", 
   await expect(page.getByTestId("vuln-diff-all-link")).toBeVisible();
 });
 
+test("Overview comparison card's names jump into the filtered section", async ({ page }) => {
+  await stubAndRunWithPreviousScan(page);
+  await expect(page.locator("main h1")).toBeVisible();
+  await page.getByTestId("comp-change-summary").click();
+
+  const openssl = page.getByRole("link", { name: "openssl@3.0.0" });
+  await expect(openssl).toHaveAttribute("href", /#\/scan\/.*\/components\?q=openssl$/);
+
+  // Keyboard focus lands on the link and stays visible (focus-visible ring,
+  // not outline: none with nothing to replace it): a reader tabbing through
+  // this list needs to see where they are.
+  await openssl.focus();
+  await expect(openssl).toBeFocused();
+  // Scoped to the new list, not the whole page: this fixture's severity-trend
+  // text has its own axe coverage below.
+  const axe = await new AxeBuilder({ page })
+    .include('[data-testid="comp-change-details"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+
+  await openssl.click();
+  await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("openssl", { exact: true })).toBeVisible();
+  await expect(page.getByText("readline", { exact: true })).toHaveCount(0);
+
+  await page.goto("/?ui=next#/new");
+  await stubAndRunWithPreviousScan(page);
+  await page.getByTestId("vuln-change-summary").click();
+  const cve = page.getByRole("link", { name: "CVE-2024-0001 (openssl)" });
+  await expect(cve).toHaveAttribute("href", /#\/scan\/.*\/vulnerabilities\?q=CVE-2024-0001$/);
+  await cve.click();
+  await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
+  await expect(page.getByText("CVE-2024-0002")).toHaveCount(0);
+});
+
+test("Overview comparison card's severity trend text has no axe violations", async ({ page }) => {
+  // Regression guard: this card's "more severe than before" text used the
+  // graphical text-risk-high token instead of text-risk-high-fg and failed
+  // WCAG AA contrast in light mode (3.56:1, needs 4.5:1); severityDir "up" on
+  // this fixture is what put that text on the page at all. Full-page, not
+  // scoped: this also covers the comparison card's diff-name links (their own
+  // contrast/underline fix is tested separately, above).
+  await stubAndRunWithPreviousScan(page);
+  await expect(page.locator("main h1")).toBeVisible();
+  await expect(page.getByText("more severe than before")).toBeVisible();
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
 test("Overview warns when the SBOM degraded to syft (disk space)", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
@@ -1041,6 +1183,31 @@ test("Overview warns when the SBOM degraded to syft (disk space)", async ({ page
   // The degraded banner explains the thin graph and how to fix it.
   await expect(page.getByText("Direct dependencies only", { exact: false })).toBeVisible();
   await expect(page.getByText(/docker system prune/)).toBeVisible();
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
+test("Overview warns when the SBOM degraded to syft (scan tool crash)", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  const degraded = { ...DONE, sbom: { ...DONE.sbom, sbomToolDegraded: "cdxgen-crash" } };
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(degraded)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // The crash-specific banner, not the generic fallback body, and no tool
+  // name or raw error text in it.
+  await expect(page.getByText(/crashed while resolving/)).toBeVisible();
+  await expect(page.getByText("cdxgen", { exact: false })).toHaveCount(0);
 
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
@@ -1067,6 +1234,161 @@ for (const { theme, lang } of COMBOS) {
     await vulnSummary.click();
     await expect(page.getByTestId("comp-diff-all-link")).toBeVisible();
     await captureMain(page, "overview-comparison", theme, lang);
+  });
+}
+
+// One mapped step id (renders translated) and one not yet in pipelineSteps.ts
+// (renders as-is): the fallback is the point, a step id shipped before its
+// label lands here must still show something instead of nothing or breaking.
+const PIPELINE_FAILED_DONE = {
+  ...DONE,
+  sbom: { ...DONE.sbom, pipelineStepsFailed: ["enrich-cpe", "some-future-step"] },
+};
+
+async function stubAndRunPipelineFailed(page: Page, theme: Theme = "light", lang: Lang = "en") {
+  await seedThemeLang(page, theme, lang);
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({
+      contentType: "text/event-stream",
+      body: `event: done\ndata: ${JSON.stringify(PIPELINE_FAILED_DONE)}\n\n`,
+    }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("Overview shows which post-process steps failed, unmapped ids included", async ({ page }) => {
+  await stubAndRunPipelineFailed(page);
+  await expect(page.locator("main h1")).toBeVisible();
+  const banner = page.getByTestId("pipeline-steps-failed");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("CPE identifier enrichment");
+  await expect(banner).toContainText("some-future-step");
+});
+
+// pipelineStepsFailed comes straight from the SBOM's own metadata, which on
+// an --analyze run is a document a supplier submitted, untrusted input. The
+// banner must render it as text, not markup: a step id built to look like a
+// tag must show up as the literal string, not run or get parsed as HTML.
+test("Overview renders an SBOM-supplied step id as literal text, not markup", async ({ page }) => {
+  const XSS_DONE = {
+    ...DONE,
+    sbom: { ...DONE.sbom, pipelineStepsFailed: ["<script>window.__xss = true</script>"] },
+  };
+  await seedThemeLang(page, "light", "en");
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(XSS_DONE)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  const banner = page.getByTestId("pipeline-steps-failed");
+  await expect(banner).toContainText("<script>window.__xss = true</script>");
+  expect(await page.evaluate(() => (window as unknown as { __xss?: boolean }).__xss)).toBeUndefined();
+});
+
+// Same failed-pipeline-step fact, shown in two places (Overview and the
+// conformance panel) and two document origins (a scan the reader ran, an
+// ANALYZE run against a document someone else supplied, the `_input.json`
+// result entry is what a real ANALYZE run always writes, see inputSbomFileName).
+// A supplied document can't be re-scanned, so its hint must not say so.
+const SELF_SCAN_PIPELINE_DONE = {
+  ...DONE,
+  sbom: { ...DONE.sbom, pipelineStepsFailed: ["enrich-cpe"], pipelineStepsFailedMore: 2 },
+  conformance: {
+    result: "pass",
+    format: "CycloneDX",
+    checks: [{ id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" }],
+    pipelineStepsFailed: ["enrich-cpe"],
+    pipelineStepsFailedMore: 2,
+  },
+};
+const SUPPLIED_PIPELINE_DONE = {
+  ...SELF_SCAN_PIPELINE_DONE,
+  mode: "ANALYZE",
+  results: [...DONE.results, { name: "demo_1.0_input.json", size: 100 }],
+};
+
+async function stubAndRunWithDone(page: Page, done: unknown) {
+  await seedThemeLang(page, "light", "en");
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
+  );
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(done)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+}
+
+test("pipeline-steps-failed note suggests re-scanning for a scan the reader ran, in Overview and Conformance", async ({ page }) => {
+  await stubAndRunWithDone(page, SELF_SCAN_PIPELINE_DONE);
+  await expect(page.locator("main h1")).toBeVisible();
+  const overviewBanner = page.getByTestId("pipeline-steps-failed");
+  await expect(overviewBanner).toContainText("Re-scan to retry");
+  await expect(overviewBanner).not.toContainText("Ask the supplier");
+
+  await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
+  const confBanner = page.getByTestId("conformance-pipeline-steps-failed");
+  await expect(confBanner).toBeVisible();
+  await expect(confBanner).toContainText("analysis step(s) failed while this SBOM was generated");
+  await expect(confBanner).not.toContainText("Ask the supplier");
+});
+
+test("pipeline-steps-failed note suggests asking the supplier for a supplied SBOM, in Overview and Conformance", async ({ page }) => {
+  await stubAndRunWithDone(page, SUPPLIED_PIPELINE_DONE);
+  await expect(page.locator("main h1")).toBeVisible();
+  const overviewBanner = page.getByTestId("pipeline-steps-failed");
+  await expect(overviewBanner).toContainText("Ask the supplier to regenerate");
+  await expect(overviewBanner).not.toContainText("Re-scan to retry");
+
+  await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
+  const confBanner = page.getByTestId("conformance-pipeline-steps-failed");
+  await expect(confBanner).toBeVisible();
+  await expect(confBanner).toContainText("analysis step(s) failed while this SBOM was generated");
+  await expect(confBanner).toContainText("Ask the supplier to regenerate");
+});
+
+// A report from before pipelineStepsFailed existed on the conformance JSON
+// reads as an absent key (server.py defaults it to [] / 0), so the note must
+// not render at all, not render empty.
+test("the conformance panel shows no pipeline-steps-failed note when the report predates the field", async ({ page }) => {
+  await stubAiAndRun(page);
+  await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
+  await expect(page.getByText("CycloneDX", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("conformance-pipeline-steps-failed")).toHaveCount(0);
+});
+
+for (const { theme, lang } of COMBOS) {
+  test(`overview pipeline-failed banner matches baseline: ${theme}/${lang} @visual`, async ({ page }) => {
+    await stubAndRunPipelineFailed(page, theme, lang);
+    await expect(page.locator("main h1")).toBeVisible();
+    await expect(page.getByTestId("pipeline-steps-failed")).toBeVisible();
+    await captureMain(page, "overview-pipeline-failed", theme, lang);
   });
 }
 
@@ -1872,6 +2194,53 @@ test("Vulnerabilities table shows the disposition status and NVD severity, when 
   await page.getByText("CVE-2024-1111").click();
   await expect(page.getByText("Published", { exact: true })).toBeVisible();
   await expect(page.getByText("Jan 15, 2024")).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).include("main").analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("a supplier can record their own judgement, separate from the vendor status", async ({ page }) => {
+  await stubVexAndRun(page);
+  let savedBody: Record<string, unknown> | null = null;
+  await page.route("**/vex-verdict**", (r) => {
+    savedBody = r.request().postDataJSON();
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        verdict: {
+          ...savedBody,
+          source: "user",
+          firstRecordedAt: "2026-09-15T00:00:00Z",
+          updatedAt: "2026-09-15T00:00:00Z",
+        },
+      }),
+    });
+  });
+  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
+
+  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
+  await page.getByText("CVE-2024-1111").click();
+  await page.getByLabel("Judgement").selectOption("affected");
+  await page.getByLabel("Notes (optional)").fill("used behind an internal-only endpoint");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("Judgement saved")).toBeVisible();
+  // The request carried pkg+installed (this fixture's finding has no purl),
+  // not a purl the client never had.
+  expect(savedBody).toMatchObject({
+    cve: "CVE-2024-1111",
+    state: "affected",
+    detail: "used behind an internal-only endpoint",
+    pkg: "openssl",
+    installed: "3.0.0",
+  });
+  expect(savedBody).not.toHaveProperty("purl");
+
+  // The new badge sits beside the pre-existing vendor Status badge ("Fixed")
+  // rather than replacing it -- the two are different axes.
+  await expect(row1.getByText("Fixed", { exact: true })).toBeVisible();
+  await expect(row1.getByText("Judgement: Affected")).toBeVisible();
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);

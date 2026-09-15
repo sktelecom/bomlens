@@ -10,6 +10,8 @@
 #   produces <out_prefix>_conformance.json   (machine-readable result)
 #            <out_prefix>_conformance.md      (human summary)
 #            <out_prefix>_conformance.html    (visual summary)
+#            <out_prefix>_conformance.result  (bare "pass"/"fail", for --fail-on-conformance
+#                                              to read without a host jq dependency)
 #
 # Validation runs against the ORIGINAL submission (before any CycloneDX
 # conversion), so SPDX-specific metadata is judged accurately. It NEVER aborts
@@ -215,6 +217,11 @@ cdx_checks() {
     | ((\$c | map(select((.licenses // []) | length > 0)) | length)) as \$lic_ok
     | ((\$c | map(select((.hashes // []) | length > 0)) | length)) as \$hash_ok
     | ([ .dependencies[]? | .dependsOn[]? ] | length) as \$dep_edges
+    # The graph-completeness self-declaration BomLens writes to
+    # compositions[0].aggregate (complete/incomplete/unknown), when present.
+    # Advisory only, folded into the transitive-dependencies detail text below
+    # -- never changes this check's status/required, so it cannot move RESULT.
+    | ((.compositions[0].aggregate // \"\")) as \$agg
     | (.metadata.timestamp // \"\") as \$ts
     | (.metadata.component // {}) as \$top
     | (\$ptot - (\$miss_purl|length)) as \$purl_ok
@@ -300,8 +307,11 @@ cdx_checks() {
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
         status:(if \$dep_edges>0 then \"pass\" elif \$tot==0 then \"warn\" else \"fail\" end),
-        detail:(if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
-                else \"\(\$dep_edges) edge(s)\" end), missing:[]},
+        detail:((if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
+                 else \"\(\$dep_edges) edge(s)\" end)
+                + (if \$agg==\"\" then \"\"
+                   elif \$agg==\"unknown\" then \", graph completeness unknown (no positive evidence found, not a defect)\"
+                   else \", declared \(\$agg)\" end)), missing:[]},
        {id:\"license\", label:\"License coverage (>= \(\$licmin)%, recommended)\", required:false,
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
@@ -873,6 +883,44 @@ N_NA=$(echo "$CHECKS" | jq '[.[] | select((.naKind // "") == "not-applicable")] 
 N_UNTRACEABLE=$(echo "$CHECKS" | jq -r '([.[] | select(.id=="no-generic")][0].detail // "0") | split(" ")[0] | (tonumber? // 0)')
 
 # --------------------------------------------------------
+# pipelineStepsFailed: best-effort post-process steps (normalize,
+# CPE/EOL/malicious enrichment, notice generation, and the like) that failed
+# during generation are recorded on the SBOM itself by
+# docker/lib/pipeline-step.sh's mark_pipeline_warning, one metadata.properties
+# entry per failed step (bomlens:pipeline-step-failed). A conformance PASS
+# computed over an SBOM whose upstream steps did not all succeed may be
+# judging incomplete data, so the report says so as a document-level note --
+# never a lowered check status (an artificially lowered, correctly
+# computed check reads as an unjust rejection).
+#
+# Read straight from $SBOM (the document under test itself), not
+# OUTPUT_FILE, so an --analyze run sees whatever the submitted document
+# already carries. $SBOM is untrusted supplier input there, so the same caps
+# used everywhere else in this file apply: MAX_PIPELINE_STEP_LEN chars per
+# id, MAX_PIPELINE_STEPS ids kept (the rest counted, not shown). Deduped with
+# order preserved -- mirrors server.py's pipeline_steps_seen, kept in sync
+# (see #87). A non-JSON document (SPDX Tag-Value), one with no `metadata`, or
+# one with no such property all fall through to the same {steps:[],more:0}
+# rather than an error.
+MAX_PIPELINE_STEP_LEN=100
+MAX_PIPELINE_STEPS=20
+PIPELINE_STEPS_RESULT=$(jq -c --argjson maxlen "$MAX_PIPELINE_STEP_LEN" --argjson maxn "$MAX_PIPELINE_STEPS" '
+  ([ (((.metadata // {}).properties) // [])[]?
+     | select(type=="object" and .name=="bomlens:pipeline-step-failed")
+     | .value
+     | select(type=="string" and length>0)
+   ] | .[0:2000]) as $raw
+  | (reduce $raw[] as $v ({seen:{}, out:[]};
+       if .seen[$v] then . else {seen: (.seen + {($v): true}), out: (.out + [$v])} end)
+    ).out as $deduped
+  | ($deduped | map(if (length > $maxlen) then .[0:$maxlen] else . end)) as $trimmed
+  | {steps: ($trimmed[0:$maxn]), more: ([(($trimmed|length) - $maxn), 0] | max)}
+' "$SBOM" 2>/dev/null) || true
+[ -n "$PIPELINE_STEPS_RESULT" ] || PIPELINE_STEPS_RESULT='{"steps":[],"more":0}'
+PIPELINE_STEPS_FAILED=$(printf '%s' "$PIPELINE_STEPS_RESULT" | jq -c '.steps // []')
+PIPELINE_STEPS_FAILED_MORE=$(printf '%s' "$PIPELINE_STEPS_RESULT" | jq -r '.more // 0')
+
+# --------------------------------------------------------
 # Regulatory crosswalk summary (informational). Groups the checks that carry
 # crosswalk mappings by regulation framework and, per framework, counts how many
 # mapped requirements are present / a gap / review-only and lists them. Never
@@ -951,11 +999,17 @@ fi
 jq -n \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
    --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
-   --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" '
+   --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" \
+   --argjson pipelineStepsFailed "$PIPELINE_STEPS_FAILED" --argjson pipelineStepsFailedMore "$PIPELINE_STEPS_FAILED_MORE" '
 { project: $project, format: $format, result: $result, generatedAt: $ts,
-  profile: $profile, untraceableComponents: $untraceable, checks: $checks }
+  profile: $profile, untraceableComponents: $untraceable, checks: $checks,
+  pipelineStepsFailed: $pipelineStepsFailed, pipelineStepsFailedMore: $pipelineStepsFailedMore }
 + (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
+
+# Bare pass/fail sidecar for --fail-on-conformance (scripts/scan-sbom.sh): a
+# single word, so the CLI can gate on it without requiring jq on the host.
+printf '%s' "$RESULT" > "${OUT_PREFIX}_conformance.result"
 
 # --------------------------------------------------------
 # Localization (REPORT_LANG=ko). The JSON above is NEVER localized — it is an
@@ -1096,6 +1150,39 @@ else
     C_PILL_UNTRACE="Untraceable (pkg:generic):"
 fi
 
+# Pipeline-steps-failed line for md/html. Built once here, in whichever
+# language was chosen above, then just emitted where empty. The step ids come
+# straight off $SBOM -- untrusted supplier input under --analyze -- so each is
+# escaped/stripped for its target format (never interpolated raw): html gets
+# the same &/</> escaping as PROJECT_ESC, wrapped in <code>; md has any
+# backtick removed (a literal backtick could otherwise break out of the code
+# span) and newlines flattened to spaces. No id-to-check mapping here by
+# design -- the finding it names is document-wide, not a specific check.
+C_PIPELINE_STEPS_MD=""
+C_PIPELINE_STEPS_HTML=""
+if [ "$(printf '%s' "$PIPELINE_STEPS_FAILED" | jq 'length')" -gt 0 ]; then
+    if [ "$REPORT_LANG" = "ko" ]; then
+        _pl_intro=$(kstr conformance.pipeline_steps_intro)
+    else
+        _pl_intro="Pipeline steps that failed during generation (this SBOM may be incomplete)"
+    fi
+    _pl_ids_md=$(printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r '
+        map(gsub("`";"") | gsub("[\r\n]";" ")) | map("`" + . + "`") | join(", ")')
+    _pl_ids_html=$(printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r '
+        map(gsub("&";"&amp;") | gsub("<";"&lt;") | gsub(">";"&gt;") | gsub("[\r\n]";" "))
+        | map("<code>" + . + "</code>") | join(", ")')
+    _pl_more=""
+    if [ "${PIPELINE_STEPS_FAILED_MORE:-0}" -gt 0 ]; then
+        if [ "$REPORT_LANG" = "ko" ]; then
+            _pl_more=" $(tfmt conformance.pipeline_steps_more "$PIPELINE_STEPS_FAILED_MORE")"
+        else
+            _pl_more=" (and ${PIPELINE_STEPS_FAILED_MORE} more)"
+        fi
+    fi
+    C_PIPELINE_STEPS_MD="- ${_pl_intro}: ${_pl_ids_md}${_pl_more}"
+    C_PIPELINE_STEPS_HTML="<p class=\"meta pipeline-steps-failed\">${_pl_intro}: ${_pl_ids_html}${_pl_more}</p>"
+fi
+
 # --------------------------------------------------------
 # Markdown report
 # --------------------------------------------------------
@@ -1107,6 +1194,7 @@ fi
     echo "${C_MD_PROFILE}"
     echo "${C_MD_RESULT}"
     [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo "${C_MD_UNTRACE}"
+    [ -n "$C_PIPELINE_STEPS_MD" ] && echo "$C_PIPELINE_STEPS_MD"
     echo ""
     # Same split as the HTML: verdict-bearing submission requirements first, the
     # advisory G7 elements after, each under its own heading and reason.
@@ -1294,6 +1382,7 @@ fi
 $( [ "${N_NA:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_NA} <span class=\"count\">${N_NA}</span></span>" )
 $( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
 </div>
+$( [ -n "$C_PIPELINE_STEPS_HTML" ] && printf '%s\n' "$C_PIPELINE_STEPS_HTML" )
 HTMLHEAD
     # Two tables, not one. The submission requirements decide the verdict; the G7
     # elements are advisory and never do. Mixed into a single 60-row table the

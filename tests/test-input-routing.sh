@@ -32,7 +32,7 @@ extract_fn() {
     ' "$SCRIPT"
 }
 
-for fn in _is_rootfs_dir find_rootfs_dir has_package_db is_container_archive is_archive; do
+for fn in _is_rootfs_dir find_rootfs_dir nested_rootfs_hint has_package_db is_container_archive is_archive; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then
         echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1
@@ -77,6 +77,42 @@ if find_rootfs_dir "$WORK/nodeps" >/dev/null; then
     fail "a plain source tree was routed to ROOTFS"
 else
     pass "a tree without etc/ stays source"
+fi
+
+echo "== nested_rootfs_hint: naming a nested rootfs without changing routing =="
+
+# A directory --target that is itself a rootfs already routes to ROOTFS on its
+# own (_is_rootfs_dir), so the hint -- meant only for the SOURCE branch's
+# 0-components diagnostic -- has nothing to add there.
+if nested_rootfs_hint "$WORK/flat" >/dev/null; then
+    fail "nested_rootfs_hint returned something for a directory that is itself a rootfs"
+else
+    pass "a directory that is itself a rootfs gets no hint (nothing to add)"
+fi
+
+# The common wrapped-delivery shape, relative to the folder the user pointed
+# --target at -- what a re-run's --target would need appended.
+mkdir -p "$WORK/delivery/release-20260919/rootfs"/{etc,bin,usr}
+if [ "$(nested_rootfs_hint "$WORK/delivery")" = "release-20260919/rootfs" ]; then
+    pass "a rootfs one release-folder down is named, relative to --target"
+else
+    fail "nested_rootfs_hint did not find the wrapped rootfs" \
+        "got: $(nested_rootfs_hint "$WORK/delivery" || echo none)"
+fi
+
+mkdir -p "$WORK/onelevel/rootfs"/{etc,bin,var}
+if [ "$(nested_rootfs_hint "$WORK/onelevel")" = "rootfs" ]; then
+    pass "a rootfs one level down is named"
+else
+    fail "nested_rootfs_hint did not find a one-level-down rootfs" \
+        "got: $(nested_rootfs_hint "$WORK/onelevel" || echo none)"
+fi
+
+# No nested rootfs anywhere -- no hint, same as an ordinary source tree.
+if nested_rootfs_hint "$WORK/nodeps" >/dev/null; then
+    fail "nested_rootfs_hint invented a candidate where none exists"
+else
+    pass "an ordinary source tree with nothing nested gets no hint"
 fi
 
 echo "== the package database decides which scanner can say anything =="
@@ -309,6 +345,43 @@ rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj"
 got="$(detect_lang "$LANGDIR/proj")"
 [ "$got" = "mixed" ] && pass "setup.py beside another language reads as mixed" \
     || fail "a mixed tree detects as '$got'"
+
+echo "== language detection: Android and .NET projects laid out below the root =="
+# Android was recognized by the Groovy DSL, by the plugin id in a build script,
+# or by a manifest at most three levels down, so a Kotlin DSL project, one that
+# declares the plugin in a version catalog, and the standard
+# app/src/main/AndroidManifest.xml all read as java. .NET looked at the root
+# only, so a solution with its projects under src/ read as whatever the root held.
+FX="$ROOT_DIR/tests/fixtures"
+for fx in android-scope android-kotlin-dsl android-version-catalog; do
+    got="$(detect_lang "$FX/$fx")"
+    [ "$got" = "android" ] && pass "$fx detects as android" \
+        || fail "$fx detects as '$got'" "an Android app would be scanned without the Android SDK image"
+done
+
+rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj/app/src/main"
+printf 'plugins {\n}\n' > "$LANGDIR/proj/build.gradle.kts"
+: > "$LANGDIR/proj/app/src/main/AndroidManifest.xml"
+got="$(detect_lang "$LANGDIR/proj")"
+[ "$got" = "android" ] && pass "a Gradle project with app/src/main/AndroidManifest.xml detects as android" \
+    || fail "app/src/main/AndroidManifest.xml under a Gradle root detects as '$got'"
+
+got="$(detect_lang "$FX/dotnet-subfolder")"
+[ "$got" = "dotnet" ] && pass "a .slnx solution with projects in src/ and an e2e-only package.json detects as dotnet" \
+    || fail "dotnet-subfolder detects as '$got'" "neither the MAUI AndroidManifest.xml nor the e2e package.json may decide the language"
+
+rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj/src/App"
+printf '{\n  "name": "web",\n  "dependencies": {\n    "express": "^4"\n  }\n}\n' > "$LANGDIR/proj/package.json"
+: > "$LANGDIR/proj/src/App/App.csproj"
+got="$(detect_lang "$LANGDIR/proj")"
+[ "$got" = "mixed" ] && pass "a package.json with dependencies beside a .csproj in a subfolder reads as mixed" \
+    || fail "a node app with a .csproj in a subfolder detects as '$got'"
+
+rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj"
+: > "$LANGDIR/proj/App.slnx"
+got="$(detect_lang "$LANGDIR/proj")"
+[ "$got" = "dotnet" ] && pass "a root .slnx detects as dotnet" \
+    || fail "a root .slnx detects as '$got'"
 
 echo "== --model routes a Figshare item to the dataset path =="
 # One option takes both AI inputs a person is handed a link to, so the reference

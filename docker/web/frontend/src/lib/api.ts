@@ -130,9 +130,21 @@ export interface SbomSummary {
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
   /** Set when cdxgen couldn't run and the scan fell back to syft (direct deps
-   *  only): "oom" | "disk-space" | "network" | "cdxgen-unavailable". Drives a
-   *  result banner. */
+   *  only): "oom" | "disk-space" | "network" | "cdxgen-crash" (cdxgen ran and
+   *  failed on its own) | "cdxgen-unavailable" (cdxgen never ran at all).
+   *  Drives a result banner. */
   sbomToolDegraded?: string | null;
+  /** Best-effort post-process steps that failed during this scan (docker/lib/
+   *  pipeline-step.sh's bomlens:pipeline-step-failed property), by step id: a
+   *  valid SBOM was still produced, but that step's output may be missing or
+   *  incomplete. Stamped on the document itself, so it survives a re-open, a
+   *  re-`--analyze`, or the SBOM being shared without its scan log. Empty when
+   *  nothing failed. This property comes from the SBOM itself, untrusted
+   *  supplier input on an --analyze run, so server.py dedupes it, caps each
+   *  id at 100 chars and the list at 20; the rest are counted below. */
+  pipelineStepsFailed?: string[];
+  /** How many more failed steps exist past the 20 in pipelineStepsFailed. */
+  pipelineStepsFailedMore?: number;
   /** CycloneDX root component type (application/firmware/container/…) — drives
    *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
   componentType?: string | null;
@@ -208,6 +220,38 @@ export interface VulnItem {
   nvdSeverity?: Severity;
   /** When the advisory was first published (ISO 8601), when known. */
   publishedDate?: string;
+  /** Normalized purl of the affected component, when Trivy resolved one.
+   *  Disambiguates `pkg`+`installed` collisions across unrelated components
+   *  that happen to share both. */
+  purl?: string;
+  /** The supplier's own triage of this CVE (POST /vex-verdict), separate from
+   *  `status` above (the vendor/advisory's own disposition). Absent until one
+   *  is saved for this component + CVE. */
+  vexState?: VexState;
+  /** Optional note recorded alongside vexState. */
+  vexDetail?: string;
+  /** ISO 8601 timestamp of when vexState was last saved. */
+  vexUpdatedAt?: string;
+}
+
+/** A supplier's own judgement of one CVE against one component, in the same
+ *  four terms CycloneDX VEX analysis.state uses (affected/not_affected/
+ *  resolved/in_triage), spelled the way this UI already spells `fixed`
+ *  elsewhere rather than introducing a second vocabulary for the same idea. */
+export const VEX_STATES = ["affected", "not_affected", "fixed", "under_investigation"] as const;
+export type VexState = (typeof VEX_STATES)[number];
+
+/** The stored record POST /vex-verdict returns after a save. */
+export interface VexVerdict {
+  purl: string;
+  pkg: string;
+  installed: string;
+  cve: string;
+  state: VexState;
+  detail: string;
+  source: string;
+  firstRecordedAt: string;
+  updatedAt: string;
 }
 
 /** Severity counts (CRITICAL…UNKNOWN + TOTAL) plus the per-CVE detail rows. */
@@ -370,6 +414,13 @@ export interface ConformanceSummary {
    *  Present only on AI SBOMs; the key is omitted for non-AI SBOMs. Drives the
    *  "Regulatory crosswalk" sub-block inside the conformance panel. */
   regulatoryCrosswalk?: RegulatoryCrosswalk;
+  /** Best-effort post-process step ids validate-sbom.sh saw failed while this
+   *  SBOM was generated (bomlens:pipeline-step-failed), same shape as the
+   *  top-level SBOM summary's field of the same name. Empty/0 on a report
+   *  from before this field existed. */
+  pipelineStepsFailed?: string[];
+  /** How many more failed steps exist past the cap in pipelineStepsFailed. */
+  pipelineStepsFailedMore?: number;
 }
 
 /** One G7 cluster's coverage counts in the aiProfile card. */
@@ -500,6 +551,9 @@ export interface ScanConfig {
   /** The outbound license declared for this scan (SPDX id), which switches the
    *  license-conflict check on. Empty or absent means it stayed off. */
   license?: string;
+  /** The SBOM author declared for this scan (CycloneDX metadata.authors).
+   *  Empty or absent means none was declared. */
+  sbomAuthor?: string;
   /** Match components against NVD-only (CPE) advisories too, catching
    *  vulnerabilities other matching paths miss. Offered for any scan that
    *  produces or reads a package SBOM (not firmware or an AI model — see
@@ -538,6 +592,12 @@ export interface DoneEvent {
   /** Warning lines the scan emitted, deduplicated and capped. These decide how
    *  far a reader should trust the numbers, and used to vanish with the log. */
   scanWarnings?: string[];
+  /** Set only when `ok` is false and the server had not already sent a
+   *  classified `error` event for this run: the scanner's own [ERROR] block(s)
+   *  from the log, deduplicated, joined in order, capped at 500 chars (cut
+   *  from the front, with a leading "..." when it is). Shown verbatim on the
+   *  failed-scan card in place of the generic fallback body. */
+  errorMessage?: string | null;
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */
@@ -644,6 +704,19 @@ export interface ScanParams {
   /** Outbound license (SPDX id) the project ships under. Read server-side as the
    *  exact `license` parameter; empty leaves the license-conflict check off. */
   license?: string;
+  /** The organisation or person running this scan (CycloneDX metadata.authors),
+   *  not the tool and not whoever wrote the software. Read server-side as the
+   *  exact `sbom_author` parameter; empty leaves the SBOM without one. Hidden
+   *  for ANALYZE (see showSbomAuthor): that mode converts a document someone
+   *  else authored. */
+  sbomAuthor?: string;
+  /** Which language the pipeline's own generated prose (notice, conformance,
+   *  security, AI-profile reports; the model/dataset risk assessment's reason
+   *  sentences) renders in. Read server-side as the exact `lang` parameter;
+   *  anything other than "en"/"ko", or omitted, falls back to "en". Not seeded
+   *  from a re-scan's saved config on purpose: it should track whichever
+   *  language the shell is showing right now, not a stale scan-time choice. */
+  lang?: string;
   /** AI-model scans only: the intended usage the assessment should grade
    *  against. Read server-side as the exact `usage` query parameter; omitted
    *  (sent empty) when unspecified or for any other source. */
@@ -1032,6 +1105,52 @@ export async function deleteScan(id: string): Promise<boolean> {
   }
 }
 
+/** Record a supplier's own judgement of one CVE against one component. Prefer
+ *  the vuln's purl when it has one; pkg+installed is only a fallback for a
+ *  finding Trivy resolved no purl for, and the server keys on purl whenever
+ *  one is given, so send it alone rather than "just in case" alongside a
+ *  pkg/installed that might not describe the same component. Throws
+ *  ApiError with the server's message on a rejected or failed save. */
+export async function saveVexVerdict(
+  scanId: string,
+  input: {
+    cve: string;
+    state: VexState;
+    detail?: string;
+    purl?: string;
+    pkg?: string;
+    installed?: string;
+  },
+): Promise<VexVerdict> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
+  const body = input.purl
+    ? { cve: input.cve, state: input.state, detail: input.detail, purl: input.purl }
+    : {
+        cve: input.cve,
+        state: input.state,
+        detail: input.detail,
+        pkg: input.pkg,
+        installed: input.installed,
+      };
+  const res = await fetch(`/vex-verdict?id=${encodeURIComponent(scanId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = `could not save (${res.status})`;
+    try {
+      const j = await res.json();
+      if (j && j.error) msg = j.error;
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(msg, res.status);
+  }
+  const j = (await res.json()) as { ok: boolean; verdict: VexVerdict };
+  return j.verdict;
+}
+
 /** Re-open a past scan by run_id; null if it is gone or invalid. */
 export async function loadScan(id: string): Promise<DoneEvent | null> {
   try {
@@ -1092,6 +1211,8 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     byte_stable: String(params.byteStable),
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
+    sbom_author: params.sbomAuthor ?? "",
+    lang: params.lang ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
     upload_target: params.uploadTarget ?? "",

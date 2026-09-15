@@ -60,7 +60,8 @@ export function BarList({
   const interactive = Boolean(onSelect);
   // Shared button chrome for both interactive modes.
   const rowButton =
-    "block w-full rounded-md text-left transition duration-fast ease-out-soft " +
+    "block w-full rounded-md border border-transparent text-left " +
+    "transition-colors duration-fast ease-out-soft " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
   return (
@@ -96,7 +97,7 @@ export function BarList({
                 type="button"
                 title={activateHint}
                 onClick={() => onActivate(it.key)}
-                className={cn(rowButton, "hover:opacity-90")}
+                className={cn(rowButton, "hover:border-border hover:shadow-sm")}
               >
                 {inner}
               </button>
@@ -114,7 +115,9 @@ export function BarList({
               onClick={() => onSelect?.(it.key)}
               className={cn(
                 rowButton,
-                sel ? "ring-2 ring-foreground ring-offset-1" : "hover:opacity-90",
+                sel
+                  ? "ring-2 ring-foreground ring-offset-1"
+                  : "hover:border-border hover:shadow-sm",
               )}
             >
               {inner}

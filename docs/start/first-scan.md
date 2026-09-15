@@ -134,7 +134,7 @@ BomLens needs only a Docker *engine* — not a specific product.
 | OS | Linux, macOS, Windows |
 | Arch | AMD64, ARM64 |
 
-The base scanner image supports both architectures. The opt-in `--firmware` and `--deep-cve` images are published for AMD64 only, so pulling them on an ARM64 host (an Apple Silicon Mac, an Arm server) fails without an amd64 emulation layer; see the [Docker image reference](../reference/docker-image.md) for the full list.
+Every published image, including the opt-in `--firmware` and `--deep-cve` ones, supports both architectures, so pulling any of them on an ARM64 host (an Apple Silicon Mac, an Arm server) works natively; see the [Docker image reference](../reference/docker-image.md) for the full list.
 
 The memory figure is for the engine itself (the VM behind Docker Desktop, Rancher Desktop, or Colima on macOS), not the host machine. Tools like Colima default to 2 GB, which is enough for a manifest-only scan but too tight for languages where BomLens has to run an actual build to resolve transitive dependencies (Java/Gradle, Java/Maven). Under 4 GB, that build step can be killed for running out of memory, and the scan silently falls back to a shallower, direct-dependencies-only result — check the scan's warnings for a note about this before trusting a thin dependency graph.
 

@@ -13,7 +13,7 @@
 # Usage: generate-ai-profile.sh <out_prefix> <project_name>
 #   reads  <out_prefix>_conformance.json   (validate-sbom.sh; must carry G7 checks)
 #          <out_prefix>_bom.json            (the finished CycloneDX SBOM)
-#   writes <out_prefix>_ai-profile.json  and  _ai-profile.md  and  _ai-profile.html
+#   writes <out_prefix>_ai-profile.json  and  _ai-profile.md
 #
 # AI-only and best-effort: if the conformance report carries no G7 checks (i.e.
 # this is not an AI SBOM), it exits 0 without writing anything. It never runs a

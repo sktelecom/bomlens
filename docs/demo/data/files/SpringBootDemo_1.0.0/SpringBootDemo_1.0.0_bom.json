@@ -21,8 +21,8 @@
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Sunday, September 13, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-09-13T11:15:43Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, September 14, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-09-14T00:44:03Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -132,6 +132,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "logback-classic-1.4.11.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -252,6 +256,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "logback-core-1.4.11.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -340,6 +348,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jackson-annotations-2.16.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -432,6 +444,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jackson-core-2.16.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -519,6 +535,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jackson-databind-2.16.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -610,6 +630,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jackson-datatype-jdk8-2.15.3.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -697,6 +721,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jackson-datatype-jsr310-2.15.3.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -788,6 +816,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jackson-module-parameter-names-2.15.3.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -875,6 +907,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "classmate-1.5.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -995,6 +1031,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "h2-2.2.224.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -1062,6 +1102,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "istack-commons-runtime-4.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1145,6 +1189,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "HikariCP-5.0.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1234,6 +1282,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "micrometer-commons-1.12.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -1315,6 +1367,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "micrometer-observation-1.12.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1405,6 +1461,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jandex-3.1.2.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -1474,6 +1534,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jakarta.activation-api-2.1.2.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -1533,6 +1597,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "The dependency's license was not recognised."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jakarta.annotation-api-2.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1623,6 +1691,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jakarta.inject-api-2.0.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1720,6 +1792,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jakarta.persistence-api-3.1.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -1779,6 +1855,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "The dependency's license was not recognised."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jakarta.transaction-api-2.0.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1846,6 +1926,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jakarta.xml.bind-api-4.0.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -1932,6 +2016,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "byte-buddy-1.14.7.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -2021,6 +2109,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "antlr4-runtime-4.10.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -2113,6 +2205,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "commons-lang3-3.14.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2199,6 +2295,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "log4j-api-2.21.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2283,6 +2383,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "log4j-to-slf4j-2.21.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -2373,6 +2477,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "tomcat-embed-core-10.1.16.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2460,6 +2568,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "tomcat-embed-el-10.1.16.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2545,6 +2657,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "tomcat-embed-websocket-10.1.16.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -2640,6 +2756,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "aspectjweaver-1.9.20.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2706,6 +2826,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "angus-activation-2.0.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2770,6 +2894,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jaxb-core-4.0.2.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -2855,6 +2983,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jaxb-runtime-4.0.2.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -2938,6 +3070,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "txw2-4.0.2.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -3001,6 +3137,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "hibernate-commons-annotations-6.0.6.Final.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3067,6 +3207,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "hibernate-core-6.3.1.Final.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3163,6 +3307,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "jboss-logging-3.5.0.Final.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -3215,6 +3363,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "The component declares no license."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "jul-to-slf4j-2.0.9.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3311,6 +3463,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "slf4j-api-2.0.2.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         }
@@ -3403,6 +3559,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-autoconfigure-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3524,6 +3684,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-aop-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3648,6 +3812,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-data-jpa-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -3767,6 +3935,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-jdbc-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -3891,6 +4063,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-json-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -4010,6 +4186,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-logging-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -4134,6 +4314,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-tomcat-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -4254,6 +4438,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-web-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -4379,6 +4567,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-starter-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -4499,6 +4691,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-boot-3.2.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -4622,6 +4818,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-data-commons-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -4719,6 +4919,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-data-jpa-3.2.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -4813,6 +5017,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-aop-6.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -4940,6 +5148,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-aspects-6.1.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -5063,6 +5275,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-beans-6.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -5190,6 +5406,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-context-6.1.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -5313,6 +5533,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-core-6.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -5440,6 +5664,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-expression-6.1.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -5563,6 +5791,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-jcl-6.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -5691,6 +5923,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-jdbc-6.1.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -5814,6 +6050,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-orm-6.1.0.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -5941,6 +6181,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-tx-6.1.0.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -6064,6 +6308,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "spring-web-6.1.1.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -6191,6 +6439,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bsi:component:filename",
+          "value": "spring-webmvc-6.1.1.jar"
+        },
+        {
           "name": "bomlens:cpeSource",
           "value": "maven-groupid"
         },
@@ -6315,6 +6567,10 @@
         {
           "name": "bomlens:licenseConflict:why",
           "value": "Both are permissive; keep the notices."
+        },
+        {
+          "name": "bsi:component:filename",
+          "value": "snakeyaml-2.2.jar"
         },
         {
           "name": "bomlens:cpeSource",
@@ -6717,7 +6973,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-13T11:15:43Z",
+    "timestamp": "2026-09-14T00:44:03Z",
     "tools": {
       "components": [
         {
@@ -6738,12 +6994,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.10"
+          "version": "1.11.11"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:7867a9c8-b9f3-431d-a4af-56e5437c5963",
+  "serialNumber": "urn:uuid:85a5350c-0353-4636-9b0b-920b58125815",
   "services": [],
   "specVersion": "1.6",
   "version": 1

@@ -163,7 +163,7 @@ export function NewScan({
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Left: pick what to scan, then its source-specific input. */}
         <div className="space-y-4">
-          <div role="group" aria-label={t("newscan.source")} className="space-y-4">
+          <div role="group" aria-label={t("newscan.source")} className="space-y-6">
             {SOURCE_GROUPS.map((group) => {
               // Lock reason for this group (firmware/AI need the Docker sibling
               // image). Shown as visible text so keyboard/touch users — who can't
@@ -206,7 +206,7 @@ export function NewScan({
                             locked
                               ? "cursor-not-allowed border-dashed text-muted-foreground"
                               : active
-                                ? "border-brand/40 bg-brand/10 font-medium text-foreground"
+                                ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
                                 : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
                           )}
                         >

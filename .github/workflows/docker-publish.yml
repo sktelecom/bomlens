@@ -351,12 +351,12 @@ jobs:
     # multi-hour stalls from cloud IPs — that constraint no longer applies,
     # so being back on self-hosted here is incidental, not required.)
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    # Measured on a real successful run: build ~11 min. This job also re-pulls
-    # the pushed image twice (syft attest, then Trivy scan) and downloads a
-    # Trivy DB, all against a small (~0.4 GB) image, so the pre-existing 45
-    # min headroom for the NVD-feed clone + distill still covers the newer
-    # steps too rather than needing its own separate accounting.
-    timeout-minutes: 45
+    # Measured multi-arch build time varied 23-37 min across runs (GHA cache
+    # hit rate for the NVD-feed clone + distill and the arm64 QEMU-emulated
+    # layers), plus ~3 min for the arm64 tool/scan smoke test below and the
+    # re-pulls (syft attest, Trivy scan) against a small (~0.8 GB) image.
+    # 90 min is roughly double the observed worst case.
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -396,13 +396,15 @@ jobs:
           v="${{ steps.meta.outputs.version }}"
           [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
           echo "value=$v" >> "$GITHUB_OUTPUT"
-      # Firmware tools (unblob/cve-bin-tool/ubi_reader) target amd64; build amd64 only.
+      # unblob has an arm64 PyPI wheel, cve-bin-tool and ubi_reader are
+      # pure-Python (any arch), and sasquatch/dpkg install already resolve
+      # arch via `dpkg --print-architecture`, so this builds both platforms.
       - name: Build and push
         id: build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./docker
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_FIRMWARE=true
@@ -413,6 +415,66 @@ jobs:
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=firmware
           cache-to: type=gha,mode=max,scope=firmware
+      # The build above only proves the arm64 layers build (buildx's own
+      # bundled QEMU runs the RUN steps during the build). Running the built
+      # image afterward is a separate mechanism: a plain `docker run` of an
+      # arm64 image on this x86_64 runner needs binfmt_misc registered at the
+      # kernel level, which setup-qemu-action does for the step below.
+      - name: Set up QEMU (for running the built arm64 image, not for the build)
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        with:
+          platforms: arm64
+      # Proves the finished image also RUNS its tools under emulation and
+      # produces a real result, not just that it builds: --load a single-arch
+      # arm64 image from the same cache, check each firmware tool's real
+      # entrypoint, then run an actual firmware scan through
+      # scripts/scan-sbom.sh against a minimal fixture (mirrors the fixture
+      # tests/test-e2e.sh packs for this same job).
+      - name: Smoke test arm64 image (emulated tool execution + a real scan)
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/arm64 --load \
+            --build-arg SBOM_FIRMWARE=true \
+            --build-arg BOMLENS_VERSION=${{ steps.version.outputs.value }} \
+            --cache-from type=gha,scope=firmware \
+            -t bomlens-firmware-arm64-smoke \
+            ./docker
+
+          echo "::group::tool versions (arm64, emulated)"
+          docker run --rm --entrypoint sh bomlens-firmware-arm64-smoke -c '
+            set -e
+            unblob --version
+            sasquatch -version 2>&1 | head -1 || true
+            cve-bin-tool --version
+            ubireader_extract_files --help >/dev/null
+            echo "ubireader_extract_files OK"
+          '
+          echo "::endgroup::"
+
+          echo "::group::real firmware scan (arm64, emulated)"
+          w="$(mktemp -d)"
+          mkdir -p "$w/rootfs/var/lib/dpkg" "$w/rootfs/bin" "$w/rootfs/etc"
+          printf '%s\n' \
+            'Package: zlib1g' \
+            'Status: install ok installed' \
+            'Architecture: amd64' \
+            'Version: 1:1.2.13.dfsg-1' \
+            'Description: compression library - runtime' \
+            > "$w/rootfs/var/lib/dpkg/status"
+          echo "fixture" > "$w/rootfs/bin/busybox"
+          echo "NAME=Fixture" > "$w/rootfs/etc/os-release"
+          docker run --rm -v "$w":/w --entrypoint mksquashfs bomlens-firmware-arm64-smoke \
+            /w/rootfs /w/fw.squashfs -noappend -no-progress
+          ( cd "$w" && SBOM_FIRMWARE_IMAGE=bomlens-firmware-arm64-smoke \
+              bash "${{ github.workspace }}/scripts/scan-sbom.sh" \
+              --project smoke --version 1.0 --target fw.squashfs --generate-only )
+          bom="$w/smoke_1.0/smoke_1.0_bom.json"
+          jq -e '.bomFormat=="CycloneDX" and .metadata.component.type=="firmware"' "$bom" >/dev/null
+          ncomp=$(jq '[.components[]?]|length' "$bom")
+          echo "components detected: $ncomp"
+          [ "$ncomp" -gt 0 ]
+          echo "::endgroup::"
       - name: Install cosign
         if: steps.flags.outputs.push == 'true'
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
@@ -634,13 +696,12 @@ jobs:
   build-deep-cve:
     name: Build deep-cve image
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    # `grype db update` downloads a ~1.8 GB DB at build time; give it headroom.
-    # Measured on a real successful run: build ~9 min. This job also re-pulls
-    # the pushed image twice (syft attest, then Trivy scan) and downloads a
-    # separate, smaller Trivy DB, against a ~0.7 GB compressed image (the 1.8
-    # GB grype DB is already baked in, not re-fetched here) -- the existing 45
-    # min headroom still covers the newer steps too.
-    timeout-minutes: 45
+    # `grype db update` downloads a ~1.8 GB DB at build time, once per
+    # platform. Measured multi-arch build time: ~23 min. Plus ~2 min for the
+    # arm64 tool/scan smoke test below and the re-pulls (syft attest, Trivy
+    # scan) against a ~0.7 GB compressed image. 60 min is roughly double the
+    # observed worst case.
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -679,13 +740,14 @@ jobs:
           v="${{ steps.meta.outputs.version }}"
           [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
           echo "value=$v" >> "$GITHUB_OUTPUT"
-      # grype targets amd64; build amd64 only (the DB download dominates anyway).
+      # grype ships an arm64 release tarball and the Dockerfile already
+      # branches on `uname -m` for it, so this builds both platforms.
       - name: Build and push
         id: build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./docker
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: ${{ steps.flags.outputs.push == 'true' }}
           build-args: |
             SBOM_DEEP_CVE=true
@@ -696,6 +758,42 @@ jobs:
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=deep-cve
           cache-to: type=gha,mode=max,scope=deep-cve
+      # See the firmware job's own comment above: buildx's bundled QEMU built
+      # the arm64 layers; running the loaded image afterward needs
+      # binfmt_misc registered separately.
+      - name: Set up QEMU (for running the built arm64 image, not for the build)
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        with:
+          platforms: arm64
+      # --load a single-arch arm64 image from the same cache and run grype
+      # (this image's own postprocess swap-in) against a real Maven example,
+      # so the check is grype actually matching under emulation, not just its
+      # --version banner.
+      - name: Smoke test arm64 image (emulated grype match)
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/arm64 --load \
+            --build-arg SBOM_DEEP_CVE=true \
+            --build-arg BOMLENS_VERSION=${{ steps.version.outputs.value }} \
+            --cache-from type=gha,scope=deep-cve \
+            -t bomlens-deep-cve-arm64-smoke \
+            ./docker
+
+          echo "::group::grype version (arm64, emulated)"
+          docker run --rm --entrypoint sh bomlens-deep-cve-arm64-smoke -c 'grype version'
+          echo "::endgroup::"
+
+          echo "::group::real deep-cve scan against examples/java-maven (arm64, emulated)"
+          w="$(mktemp -d)"
+          SBOM_DEEP_CVE_IMAGE=bomlens-deep-cve-arm64-smoke \
+            bash scripts/scan-sbom.sh --project smoke --version 1.0 \
+              --target examples/java-maven --deep-cve --generate-only \
+              --output-dir "$w"
+          sec="$w/smoke_1.0/smoke_1.0_security.json"
+          jq -e '.' "$sec" >/dev/null
+          echo "security report produced: $sec"
+          echo "::endgroup::"
       - name: Install cosign
         if: steps.flags.outputs.push == 'true'
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1

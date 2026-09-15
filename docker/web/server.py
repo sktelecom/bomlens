@@ -39,7 +39,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -77,6 +77,12 @@ LIB_DIR = os.environ.get("SBOM_LIB_DIR") or next(
     (d for d in ("/usr/local/lib/sbom", os.path.join(os.path.dirname(WEB_DIR), "lib"))
      if os.path.isdir(d)), "/usr/local/lib/sbom"
 )
+# How long a cancel gives a scan a chance to stop gracefully before this
+# server escalates to a hard kill. Shared by every cancel path (the local
+# run-scan subprocess below, and the firmware/AI sibling container in
+# _stream_cmd) and passed to run-scan as BOMLENS_CANCEL_GRACE so entrypoint.sh
+# uses the same number for its own sibling container's `docker stop`.
+CANCEL_GRACE_SECONDS = int(os.environ.get("BOMLENS_CANCEL_GRACE", "30"))
 
 # Per-kind upload size caps (bytes).
 #
@@ -194,6 +200,10 @@ ARTIFACT_SUFFIXES = (
     # page that re-aggregates the G7 status, regulatory crosswalk and flagged
     # licenses. User-facing report in three formats, so list/download it.
     "_ai-profile.json", "_ai-profile.md",
+    # Supplier-recorded VEX verdicts (POST /vex-verdict): the only artifact
+    # this server writes itself rather than the scan pipeline. User-facing
+    # judgement data, so list/download/delete it like any other result.
+    "_vex.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -320,6 +330,43 @@ def run_artifact_path(run_id, name):
     return safe_output_path(base)
 
 
+def vex_sidecar_write_path(run_id):
+    """Resolve where this run's VEX-verdict sidecar (`<prefix>_vex.json`) should
+    be written, matching the `{prefix}` its other artifacts already use.
+
+    Unlike run_file (which only finds an artifact that already exists), a
+    verdict save may be the first one for this run, so the target has to be
+    derived rather than globbed for. The prefix comes from the run's own
+    _bom.json name (entrypoint.sh may name artifacts differently from the run
+    folder on a timestamped run) -- requiring that file to exist means a
+    verdict can never be filed against a run_id that is not a real, completed
+    scan. Returns None when the run has no bom (nothing to attach a verdict
+    to) or run_id fails the same traversal checks run_dir/safe_prefix_path
+    already enforce elsewhere."""
+    bom = run_file(run_id, "_bom.json")
+    # run_file's legacy-layout fallback (safe_prefix_path) returns a computed
+    # path whether or not the file is actually there -- unlike its new-layout
+    # glob branch, which only ever returns a hit. isfile is the real gate.
+    if not bom or not os.path.isfile(bom):
+        return None
+    base = os.path.basename(bom)
+    if not base.endswith("_bom.json"):
+        return None
+    prefix = base[: -len("_bom.json")]
+    d = run_dir(run_id)
+    if d and os.path.isdir(d):
+        droot = os.path.realpath(d)
+        target = os.path.realpath(os.path.join(d, prefix + "_vex.json"))
+        if target.startswith(droot + os.sep):
+            return target
+        return None
+    # Legacy flat layout: run_id IS the prefix (list_scans constructs it that
+    # way), so this also covers the case where prefix happens to differ from
+    # run_id for some other reason -- safe_prefix_path re-validates it either
+    # way.
+    return safe_prefix_path(prefix, "_vex.json")
+
+
 # Extra read-only scan-target mounts from `scan-sbom.sh --ui --mount <dir>`
 # (or the Windows launcher's SBOM_UI_MOUNT_DIR). One "<container>|<host>" pair
 # per line: the container path joins the rootfs-dir allow-list below, the host
@@ -410,6 +457,110 @@ def _classify_git_failure(text):
             or "network is unreachable" in text.lower():
         return "run.errorGitNetwork"
     return None
+
+
+# Scrubbing for _ScanErrorTracker below: masks credential/token-shaped text
+# that could appear in a scanner [ERROR] line before it ever reaches the SSE
+# stream shown to the browser. Independent of the "Response:" line drop in
+# _ScanErrorTracker (that drop is unconditional regardless of indentation;
+# these patterns are a second, explicit layer in case such a line were ever
+# folded into a block some other way).
+_URL_USERINFO_RE = re.compile(r"://[^/\s@]+:[^/\s@]+@")
+_AUTH_HEADER_RE = re.compile(r"(?i)\bauthorization:\s*.+$")
+_BEARER_TOKEN_RE = re.compile(r"(?i)\bbearer\s+\S+")
+_TOKEN_PARAM_RE = re.compile(r"(?i)\btoken=[^&\s\"']+")
+_HEX_BLOB_RE = re.compile(r"\b[0-9a-fA-F]{20,}\b")
+_BASE64_BLOB_RE = re.compile(r"\b[A-Za-z0-9+/]{24,}={0,2}\b")
+
+
+def _scrub_error_text(text):
+    """Mask credential/token-shaped substrings in one scanner log line before
+    it can reach the browser as part of a failed-scan card's error message.
+
+    Order matters: the structural patterns (a URL's embedded userinfo, an
+    Authorization header, a Bearer token, a `token=` query param) are masked
+    first so their replacement text ("***") does not then get re-matched and
+    mangled by the broader hex/base64-blob patterns that run last."""
+    text = _URL_USERINFO_RE.sub("://***@", text)
+    text = _AUTH_HEADER_RE.sub("Authorization: ***", text)
+    text = _BEARER_TOKEN_RE.sub("Bearer ***", text)
+    text = _TOKEN_PARAM_RE.sub("token=***", text)
+    text = _HEX_BLOB_RE.sub("***", text)
+    text = _BASE64_BLOB_RE.sub("***", text)
+    return text
+
+
+# Cap on the joined [ERROR] block text shown on a failed-scan card (see
+# _ScanErrorTracker). Matches the cap server.py already uses for a git clone
+# failure's raw stderr (_classify_git_failure's caller, run_sibling_scan's
+# 500-char tail): this is the same kind of short human-readable diagnostic,
+# so it gets the same length.
+_SCAN_ERROR_MAX_CHARS = 500
+
+_ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
+_RESPONSE_LINE_RE = re.compile(r"(?i)^response:")
+
+
+class _ScanErrorTracker:
+    """Collects the [ERROR] block(s) a scan's own log emits, for a failed-scan
+    card's errorMessage when the server has no other classification for the
+    failure (see the `error_sent` flag at each done-event call site).
+
+    entrypoint.sh's own convention (matched by hand across its ~20 multi-line
+    [ERROR] blocks) is: the marker line starts with "[ERROR]", and any lines
+    that continue its explanation are indented. A line that is blank, is not
+    indented, or is itself a new marker line, ends the current block. This
+    tracker keeps every DISTINCT block seen during the run (not just the
+    last): a discard-then-exit sequence like #109's Node fallback quality gate
+    prints one block explaining what happened, followed later by a separate
+    one-line block ("fallback SBOM discarded (see above)") right before the
+    process exits: showing only the last of those would show just the
+    "(see above)" line and lose the actual explanation.
+
+    A line starting with "Response:" (a raw upstream HTTP response body, on
+    the TRUSCA/Dependency-Track upload failure paths) never continues a block
+    and is never itself treated as a marker, regardless of indentation. This
+    check runs before the indentation check, so it holds even if a future
+    change indents that line to line up with the block above it.
+    """
+
+    def __init__(self):
+        self._blocks = []      # distinct block texts, in first-seen order
+        self._current = []     # lines of the block being built, or []
+
+    def _flush(self):
+        if self._current:
+            text = "\n".join(self._current)
+            if text not in self._blocks:
+                self._blocks.append(text)
+            self._current = []
+
+    def feed(self, line):
+        if not isinstance(line, str):
+            self._flush()
+            return
+        stripped = line.strip()
+        if not stripped or _RESPONSE_LINE_RE.match(stripped):
+            self._flush()
+            return
+        if _ERROR_LINE_RE.match(stripped):
+            self._flush()
+            self._current.append(_scrub_error_text(stripped))
+            return
+        if self._current and line[:1] in (" ", "\t"):
+            self._current.append(_scrub_error_text(stripped))
+            return
+        self._flush()
+
+    def result(self):
+        """The joined, capped error message, or None if no block was seen."""
+        self._flush()
+        if not self._blocks:
+            return None
+        joined = "\n".join(self._blocks)
+        if len(joined) > _SCAN_ERROR_MAX_CHARS:
+            joined = "..." + joined[-(_SCAN_ERROR_MAX_CHARS - 3):]
+        return joined
 
 
 def safe_scan_dir(rel):
@@ -538,6 +689,37 @@ def scan_root_dir(d):
             return None
         resolved = step
     return resolved if os.path.isdir(resolved) else None
+
+
+def _is_rootfs_dir(d):
+    """Mirrors scripts/scan-sbom.sh's _is_rootfs_dir: etc/ plus at least two
+    of bin/sbin/usr/lib/var. Two, not one, so a source repo that happens to
+    carry etc/ and lib/ (not unusual) is not mistaken for a root filesystem."""
+    if not os.path.isdir(os.path.join(d, "etc")):
+        return False
+    hits = sum(1 for sub in ("bin", "sbin", "usr", "lib", "var") if os.path.isdir(os.path.join(d, sub)))
+    return hits >= 2
+
+
+def nested_rootfs_hint(d):
+    """Mirrors scripts/scan-sbom.sh's nested_rootfs_hint: a
+    deep-source-scan folder that is not itself a root filesystem may still
+    have one a level or two below it (a delivery folder wrapping the actual
+    rootfs), which is why a scan of it can come back with 0 components.
+    Returns a path relative to `d`, or None. Never used to change routing --
+    MODE stays SOURCE either way, the same as the CLI side -- only to name a
+    candidate in the 0-components diagnostic once a scan is already confirmed
+    empty. Kept in sync with the CLI's version deliberately: same shape
+    check, same fixtures in tests/test-input-routing.sh and
+    tests/test-web-ui.sh."""
+    if _is_rootfs_dir(d):
+        return None
+    esc = glob.escape(d)
+    for pattern in ("*", "*/*"):
+        for cand in sorted(glob.glob(os.path.join(esc, pattern))):
+            if os.path.isdir(cand) and _is_rootfs_dir(cand):
+                return os.path.relpath(cand, d)
+    return None
 
 
 def is_yocto_build_dir(d):
@@ -862,6 +1044,12 @@ MAX_ASSESS_MODELS = 50  # assessed model entries in the AI profile card
 MAX_ASSESS_REASONS = 20  # reason strings per assessed model
 MAX_ASSESS_CONDITIONS = 20  # license conditions listed per assessed model
 MAX_ASSESS_URLS = 8  # license source links per assessed model
+# bomlens:pipeline-step-failed values come from the SBOM itself, which for an
+# --analyze run is a document a supplier submitted, so untrusted input. Cap
+# both the length of one step id and how many are shown, same as every other
+# supplier-controlled list surfaced in this file.
+MAX_PIPELINE_STEP_LEN = 100  # chars per step id
+MAX_PIPELINE_STEPS = 20  # step ids listed; the rest are counted, not shown
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -957,6 +1145,7 @@ def security_summary(run_id):
     except (OSError, json.JSONDecodeError):
         return None
     priority = _epss_kev_map(run_id)
+    vex_by_purl, vex_by_nv = _vex_verdict_index(run_id)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
     kernel = 0
@@ -995,6 +1184,17 @@ def security_summary(run_id):
                     "url": v.get("PrimaryURL") or "",
                     "refs": (v.get("References") or [])[:MAX_VULN_REFS],
                 }
+                # Same normalized join key as _component_risk_index. PkgName +
+                # InstalledVersion alone collide across different components that
+                # happen to share both (a vendored copy in one ecosystem, an
+                # unrelated package of the same name in another): without the
+                # purl, an "upgrade fixes N CVEs" bundle can merge findings that
+                # belong to two different components. Omitted when Trivy did not
+                # resolve a PkgIdentifier for this finding.
+                ident = v.get("PkgIdentifier")
+                purl = ident.get("PURL") if isinstance(ident, dict) else None
+                if purl:
+                    row["purl"] = _norm_purl(purl)
                 # EPSS (exploit probability, 0..1) + CISA KEV (actively exploited).
                 epss = pr.get("epss")
                 if isinstance(epss, (int, float)):
@@ -1017,6 +1217,22 @@ def security_summary(run_id):
                 published = v.get("PublishedDate")
                 if isinstance(published, str) and published:
                     row["publishedDate"] = published
+                # The supplier's own triage of this CVE against this component,
+                # if one was saved (POST /vex-verdict). Same purl-then-(name,
+                # installed) lookup as the risk index, so a verdict recorded
+                # against a specific purl is never surfaced on an unrelated
+                # component that merely shares a name and version.
+                verdict = row.get("purl") and vex_by_purl.get((row["purl"], cid))
+                if not verdict:
+                    verdict = vex_by_nv.get(
+                        ((v.get("PkgName") or "").lower(), v.get("InstalledVersion") or "", cid)
+                    )
+                if verdict:
+                    row["vexState"] = verdict.get("state")
+                    if verdict.get("detail"):
+                        row["vexDetail"] = verdict["detail"]
+                    if verdict.get("updatedAt"):
+                        row["vexUpdatedAt"] = verdict["updatedAt"]
                 vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
@@ -1076,6 +1292,55 @@ def _component_risk_index(run_id):
             name = (v.get("PkgName") or "").lower()
             if name:
                 bump(by_nv, (name, v.get("InstalledVersion") or ""), sev)
+    return by_purl, by_nv
+
+
+# A supplier's own triage of one CVE against one component, distinct from the
+# vendor/advisory `Status` Trivy reports (VulnerabilitiesTable.tsx keeps the two
+# in separate badges). Named after CycloneDX's VEX analysis.state, minus the
+# pedigree/false-positive states this UI has no use for.
+VEX_STATES = ("affected", "not_affected", "fixed", "under_investigation")
+MAX_VEX_DETAIL = 2000  # chars; a short justification, not a report
+
+# Serializes read-modify-write on one run's *_vex.json. A single global lock
+# is fine: saves are rare, human-paced actions, never a hot path.
+_vex_write_lock = threading.Lock()
+
+
+def _load_vex_verdicts(run_id):
+    """Saved verdict records for a run, as a raw list. [] when there is no
+    sidecar yet or it fails to parse -- never raises, matching every other
+    sidecar reader here."""
+    p = run_file(run_id, "_vex.json")
+    if not p or not os.path.isfile(p):
+        return []
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    verdicts = data.get("verdicts") if isinstance(data, dict) else None
+    return [v for v in verdicts if isinstance(v, dict)] if isinstance(verdicts, list) else []
+
+
+def _vex_verdict_index(run_id):
+    """Saved verdicts keyed the same two ways _component_risk_index joins
+    Trivy findings to components: by normalized purl when the verdict was
+    recorded against one, else by (name, installed version) -- never both, so
+    a verdict recorded with a purl is never matched by name alone. Returns
+    (by_purl, by_nv); both empty with no sidecar."""
+    by_purl, by_nv = {}, {}
+    for v in _load_vex_verdicts(run_id):
+        cve = v.get("cve")
+        if not cve:
+            continue
+        purl = v.get("purl")
+        if purl:
+            by_purl[(_norm_purl(purl), cve)] = v
+        else:
+            name = (v.get("pkg") or "").lower()
+            if name:
+                by_nv[(name, v.get("installed") or "", cve)] = v
     return by_purl, by_nv
 
 
@@ -1412,9 +1677,11 @@ def sbom_summary(run_id):
         for p in meta_props
     )
     # sbom-tool-degraded: set by entrypoint.sh when cdxgen couldn't run and the
-    # scan fell back to syft (direct deps only) — "oom", "disk-space", "network"
-    # or the generic "cdxgen-unavailable". Drives a result banner so the thin
-    # dependency graph has a visible reason.
+    # scan fell back to syft (direct deps only): "oom", "disk-space", "network",
+    # "cdxgen-crash" (cdxgen ran and failed on its own: an internal exception,
+    # or its own document validation rejecting the result) or the generic
+    # "cdxgen-unavailable" (cdxgen never ran at all). Drives a result banner
+    # so the thin dependency graph has a visible reason.
     degraded = next(
         (
             p.get("value")
@@ -1423,6 +1690,25 @@ def sbom_summary(run_id):
         ),
         None,
     )
+    # pipeline-step-failed: set by docker/lib/pipeline-step.sh's
+    # mark_pipeline_warning for every best-effort post-process step that
+    # failed (normalize, CPE/EOL/malicious enrichment, conformance, notice
+    # generation and the like). A valid SBOM was still produced, but that
+    # step's output may be missing. Unlike sbom-tool-degraded, this property
+    # can appear more than once (one entry per failed step), so it is
+    # collected, not looked up with next(). mark_pipeline_warning can also
+    # record the same step twice (e.g. a re-analyzed document), so duplicates
+    # are dropped, order preserved. Drives a result banner.
+    pipeline_steps_seen = []
+    for p in meta_props:
+        if p.get("name") != "bomlens:pipeline-step-failed":
+            continue
+        value = p.get("value")
+        if not value or value in pipeline_steps_seen:
+            continue
+        pipeline_steps_seen.append(value[:MAX_PIPELINE_STEP_LEN])
+    pipeline_steps_failed_more = max(0, len(pipeline_steps_seen) - MAX_PIPELINE_STEPS)
+    pipeline_steps_failed = pipeline_steps_seen[:MAX_PIPELINE_STEPS]
     # sbom-oversized: set by entrypoint.sh when the finished document is over
     # the same 100 MB budget this server's own upload path enforces (MAX_BYTES
     # above) — a scan run against --target never goes through that upload
@@ -1500,6 +1786,8 @@ def sbom_summary(run_id):
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
         "sbomToolDegraded": degraded,
+        "pipelineStepsFailed": pipeline_steps_failed,
+        "pipelineStepsFailedMore": pipeline_steps_failed_more,
         "sbomOversizedBytes": oversized_bytes,
         # CycloneDX root component type — drives the honest scan-kind subtitle and
         # works on re-open too, where the scan MODE isn't stored.
@@ -1735,10 +2023,25 @@ def conformance_summary(run_id):
             if how or how_ko:
                 row["reviewGuide"] = {"how": how, "howKo": how_ko, "docUrl": rg_url}
         checks.append(row)
+    # pipelineStepsFailed/pipelineStepsFailedMore: validate-sbom.sh already
+    # dedupes, orders, and caps these at MAX_PIPELINE_STEPS ids of
+    # MAX_PIPELINE_STEP_LEN chars each, the same numbers this file uses for
+    # pipeline_steps_seen above (kept in sync deliberately). Re-applied here
+    # anyway, same as every other field in this function -- the report is ours,
+    # but an older one predates this field entirely and reads as an absent key,
+    # which must default to [] / 0 rather than surfacing as null.
+    pipeline_steps_failed = [
+        s[:MAX_PIPELINE_STEP_LEN] for s in _as_list(data.get("pipelineStepsFailed")) if isinstance(s, str)
+    ][:MAX_PIPELINE_STEPS]
+    pipeline_steps_failed_more = data.get("pipelineStepsFailedMore")
+    if not isinstance(pipeline_steps_failed_more, int) or pipeline_steps_failed_more < 0:
+        pipeline_steps_failed_more = 0
     out = {
         "result": data.get("result", "unknown"),
         "format": data.get("format", ""),
         "checks": checks,
+        "pipelineStepsFailed": pipeline_steps_failed,
+        "pipelineStepsFailedMore": pipeline_steps_failed_more,
     }
     # Top-level regulatory crosswalk rollup (AI SBOMs only; validate-sbom.sh omits
     # the key entirely for non-AI SBOMs or when the crosswalk registry is absent).
@@ -2445,6 +2748,8 @@ _SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE", "SOURCE", "IMAGE", "ROOTFS", "
 # environment or a docker-run argv.
 _USAGE_CONTEXTS = ("internal", "product", "redistribute", "outputs-only")
 _CONFORMANCE_PROFILES = ("default", "skt-submission")
+_REPORT_LANGS = ("en", "ko")
+_PCT_ENV_NAMES = ("PURL_MIN_PCT", "LICENSE_MIN_PCT", "HASH_MIN_PCT", "FIELD_MIN_PCT")
 
 
 def _valid_image_ref(ref):
@@ -2467,14 +2772,44 @@ def _valid_model_id(mid):
 
 
 def _env_flag_value(value):
-    """Sanitize a free-text value (project name/version) for a docker-run
-    `-e KEY=<value>` argument.
+    """Sanitize a free-text value (project name/version, SBOM author) for a
+    docker-run `-e KEY=<value>` argument.
 
     It is already a single argv element (subprocess is invoked with a list and
     shell=False, so it can never split into a new flag), but we additionally
     strip control characters and the few shell-significant bytes so the value
-    that reaches the command line is a plain, bounded token."""
-    return re.sub(r"[^\w.+:/ @=-]", "", (value or ""))[:256]
+    that reaches the command line is a plain, bounded token. `,'()&` are kept
+    despite being shell-significant elsewhere: a legal entity name commonly
+    carries them ("SK Telecom Co., Ltd.", "(주)..."), none of them can split
+    or extend the argv (still one list element, shell=False), and none of the
+    downstream consumers re-parses this value as shell syntax (docker-run argv
+    here; jq --arg in stamp-document-metadata.sh; scan-sbom.sh's own --sbom-author
+    is verified end-to-end through its `eval "$DOCKER_MSYS"docker run ...
+    $(printf ... %q ...)` path, which is exactly what %q exists to make safe)."""
+    return re.sub(r"[^\w.+:/ @=&(),'-]", "", (value or ""))[:256]
+
+
+def _pct_env(name):
+    """Read a conformance-threshold percentage (PURL/LICENSE/HASH/FIELD_MIN_PCT)
+    from this process's own environment, validated to an int 0-100, or None if
+    unset/not a plain integer/out of range.
+
+    validate-sbom.sh reads these with `--argjson`, which crashes the whole
+    conformance step on a non-numeric value (jq: "invalid JSON text passed to
+    --argjson") and silently accepts a numeric-but-nonsensical one (150%,
+    -5%) as a coverage floor no scan could ever clear or always clears. Both
+    scan paths call this and only ever see None (key omitted, validate-sbom.sh
+    falls back to its own default) or a value already known to be sane -- the
+    bad-input case never reaches either path, rather than reaching one and not
+    the other."""
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None
+    return n if 0 <= n <= 100 else None
 
 
 def _self_container_id():
@@ -2642,17 +2977,59 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "--volumes-from", self_cid,
         "-v", "/var/run/docker.sock:/var/run/docker.sock",
         "-e", "MODE=%s" % mode,  # mode ∈ _SIBLING_MODES (checked above)
+        # Tells this run's entrypoint.sh it may sweep known-suffix leftovers of
+        # an earlier scan of the same project/version before writing its own
+        # artifacts: this caller (a current server.py) always finishes its own
+        # run in one container, so nothing here is a stage-1 handoff the
+        # cleanup could mistake for stale output. An old server.py never sends
+        # this, and an entrypoint.sh built before it existed ignores it.
+        "-e", "BOMLENS_ARTIFACT_CLEANUP=1",
         "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
         "-e", "PROJECT_VERSION=%s" % _env_flag_value(env.get("PROJECT_VERSION", "")),
         # Outbound license (SPDX id) for the license-conflict check. Sanitized the
         # same way as the project name; empty means the check stays off.
         "-e", "PROJECT_LICENSE=%s" % _env_flag_value(env.get("PROJECT_LICENSE", "")),
+        # SBOM author (metadata.authors). Sanitized the same way; empty means
+        # docmeta leaves the SBOM without one. ANALYZE is one of _SIBLING_MODES,
+        # but harmless to forward regardless: the frontend never sends it for
+        # ANALYZE (showSbomAuthor), and entrypoint.sh's own docmeta dispatch
+        # already excludes ANALYZE (it converts a document we did not author).
+        "-e", "SBOM_AUTHOR=%s" % _env_flag_value(env.get("SBOM_AUTHOR", "")),
         "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
         # No GENERATE_SPDX: SPDX is exported on demand after the scan
         # (convert_bom_to_spdx), so the sibling never produces it.
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
+        # Deep license (ScanCode) and reproducible output are plain form
+        # toggles (see server's own env dict above), not gated to one sibling
+        # mode here: entrypoint.sh already scopes DEEP_LICENSE to a present
+        # /src tree and skips it with a WARN when scancode isn't in the image
+        # (it currently is not, in the published deep-cve image -- see
+        # SBOM_DEEP_LICENSE in docker/Dockerfile), and BYTE_STABLE's
+        # normalize-sbom.sh --stable runs unconditionally for every mode.
+        # Leaving either unforwarded would silently drop a checkbox the reader
+        # just turned on, the same bug class as CONFORMANCE_PROFILE above.
+        # Not _bool_env: both are opt-in (off by default), and _bool_env
+        # defaults a missing key to "true" -- the wrong direction here, same
+        # reason UPLOAD_ENABLED below reads env.get(...) == "true" directly.
+        "-e", "DEEP_LICENSE=%s" % ("true" if env.get("DEEP_LICENSE") == "true" else "false"),
+        "-e", "BYTE_STABLE=%s" % ("true" if env.get("BYTE_STABLE") == "true" else "false"),
+        # Security-report enrichment: an operator's own container environment,
+        # not a request field (no web form checkbox for either). Both default
+        # on and run unconditionally regardless of mode, same as
+        # GENERATE_SECURITY above, so _bool_env's missing-key default of
+        # "true" is the right one here (unlike DEEP_LICENSE/BYTE_STABLE above).
+        # Leaving either unforwarded would silently re-enable it in the
+        # sibling for an operator who turned it off (air-gapped network, no
+        # EPSS/KEV or malicious-package lookup), the opposite direction from
+        # the other toggles here but the same bug class.
+        "-e", "SECURITY_ENRICH=%s" % _bool_env("SECURITY_ENRICH"),
+        "-e", "ENRICH_MALICIOUS=%s" % _bool_env("ENRICH_MALICIOUS"),
+        # deps.dev version-currency check: opt-in (off by default, needs
+        # network), so an explicit env.get check like DEEP_LICENSE/BYTE_STABLE
+        # above, not _bool_env.
+        "-e", "STALENESS_ENRICH=%s" % ("true" if env.get("STALENESS_ENRICH") == "true" else "false"),
     ]
     # The profile the caller resolved (see the main handler's per-mode default),
     # re-derived from a closed allowlist like AI_USAGE_CONTEXT below, never the
@@ -2663,6 +3040,21 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # with.
     if env.get("CONFORMANCE_PROFILE") in _CONFORMANCE_PROFILES:
         args += ["-e", "CONFORMANCE_PROFILE=%s" % env["CONFORMANCE_PROFILE"]]
+    # Same closed-allowlist re-derive as CONFORMANCE_PROFILE above, not the raw
+    # env string: this decides which language the sibling's own generated
+    # reports (notice, conformance, security, AI profile) render in.
+    args += ["-e", "REPORT_LANG=%s" % (env.get("REPORT_LANG") if env.get("REPORT_LANG") in _REPORT_LANGS else "en")]
+    # Conformance-threshold overrides: an operator's environment variable, not a
+    # request field (no web form sets these), so read fresh from os.environ via
+    # _pct_env the same way the in-process path does -- not the merged `env`
+    # above, which may still carry extra_env's raw, unvalidated copy for a key
+    # _pct_env rejected there. Omitted (not None) forwards nothing, same as an
+    # unset var: validate-sbom.sh's own default (profile-driven for PURL_MIN_PCT,
+    # fixed for the other three) applies identically on both paths.
+    for _pct_name in _PCT_ENV_NAMES:
+        _pct_val = _pct_env(_pct_name)
+        if _pct_val is not None:
+            args += ["-e", "%s=%d" % (_pct_name, _pct_val)]
     # Opt-in OSV advisories for firmware: forward only the two fixed control
     # values the UI may have set on the firmware path. We re-derive each from a
     # closed allowlist (never the env string itself) so no user-influenced text
@@ -2718,6 +3110,17 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # image swap itself is the caller's (sibling["image"] == DEEP_CVE_IMAGE).
     if env.get("DEEP_CVE") == "true" and mode not in ("FIRMWARE", "AIBOM"):
         args += ["-e", "DEEP_CVE=true"]
+        # NVD version-range verification for grype's nvd:cpe matches: opt-in,
+        # meaningful only alongside DEEP_CVE (scan-security.sh only invokes
+        # scan-nvd-cpe.py when grype ran under this same condition), so gate
+        # it the same way. The key is a secret, forwarded by NAME ONLY like
+        # SCANOSS_API_KEY/HF_TOKEN below so its value never reaches argv/`ps`
+        # -- the verify script still runs without it, just against the
+        # unauthenticated (lower rate limit) NVD API.
+        if env.get("SECURITY_NVD_VERIFY") == "true":
+            args += ["-e", "SECURITY_NVD_VERIFY=true"]
+            if env.get("NVD_API_KEY"):
+                args += ["-e", "NVD_API_KEY"]
     # Vendored-OSS identification (SCANOSS) can be enabled alongside deep-cve on
     # a source scan; forward the flag and, when set, the credential by NAME ONLY
     # (mirrors API_KEY/HF_TOKEN below — the value stays out of the argv/`ps`).
@@ -3023,6 +3426,44 @@ def _pull_image(image, on_log, on_progress=None, cancel=None):
     return code, classify_pull_failure("\n".join(tail), "exit")
 
 
+# The architecture this daemon reports, normalized to the spelling manifest
+# platform entries use (arm64/amd64, not uname's aarch64/x86_64), so
+# _image_download_bytes() can pick the size for what would actually be pulled.
+# Only a value actually read from `docker version` is cached: the daemon does
+# not change architecture mid-process, but the daemon itself (Docker Desktop,
+# Colima) may not be up yet on the first call, e.g. right after the web UI or
+# the desktop app starts. Caching that failure's "amd64" fallback would show
+# the wrong size for the rest of the process on an arm64 host; instead each
+# failed call returns "amd64" for that one call only and tries again next time.
+_host_arch_cache = None
+
+_ARCH_ALIASES = {
+    "x86_64": "amd64",
+    "x86-64": "amd64",
+    "aarch64": "arm64",
+}
+
+
+def _host_docker_architecture():
+    global _host_arch_cache
+    if _host_arch_cache is not None:
+        return _host_arch_cache
+    if shutil.which("docker"):
+        try:
+            r = subprocess.run(["docker", "version", "--format", "{{.Server.Arch}}"],
+                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               timeout=10)
+            if r.returncode == 0:
+                out = r.stdout.decode("utf-8", "replace").strip()
+                if out:
+                    arch = _ARCH_ALIASES.get(out, out)
+                    _host_arch_cache = arch
+                    return arch
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return "amd64"
+
+
 # Compressed download size for an image, read from the registry manifest, or None.
 #
 # This is the number of bytes the user waits for, which is what they need before
@@ -3034,7 +3475,11 @@ def _pull_image(image, on_log, on_progress=None, cancel=None):
 #
 # Cached because it is a network round trip; the value for a tag changes only when
 # the tag is republished, and a stale value costs a wrong size estimate, not a
-# wrong action.
+# wrong action. Not cached, however, when the size was picked using an amd64
+# guess because the host architecture itself could not be read (see
+# _host_docker_architecture): that guess is not a fact about the manifest, and
+# caching it would show the wrong size for the rest of the process on an arm64
+# host that just started before its own Docker daemon was up.
 _download_size_cache = {}
 
 
@@ -3042,6 +3487,7 @@ def _image_download_bytes(image):
     if image in _download_size_cache:
         return _download_size_cache[image]
     size = None
+    cache_result = True
     if _valid_image_ref(image) and shutil.which("docker"):
         try:
             r = subprocess.run(["docker", "manifest", "inspect", "--verbose", image],
@@ -3050,22 +3496,32 @@ def _image_download_bytes(image):
             if r.returncode == 0:
                 data = json.loads(r.stdout.decode("utf-8", "replace"))
                 entries = data if isinstance(data, list) else [data]
+                by_arch = {}
                 for e in entries:
                     desc = (e.get("Descriptor") or {})
                     plat = (desc.get("platform") or {})
-                    # A multi-arch tag lists every platform; the one that matters is
-                    # the one this daemon would pull. amd64/linux is the published
-                    # platform (the registry publishes amd64 only).
-                    if plat and plat.get("architecture") not in (None, "amd64"):
-                        continue
                     layers = ((e.get("SchemaV2Manifest") or {}).get("layers") or [])
                     total = sum(int(l.get("size") or 0) for l in layers)
-                    if total > 0:
-                        size = total
-                        break
+                    if total <= 0:
+                        continue
+                    arch = plat.get("architecture") if plat else None
+                    by_arch.setdefault(arch or "amd64", total)
+                # A multi-arch tag lists every platform; the one that matters is
+                # the one this daemon would actually pull. A manifest that has
+                # not published that architecture yet (firmware/deep-cve before
+                # their arm64 rollout) falls back to the amd64 size, the same
+                # estimate this returned before host architecture matching.
+                # _host_arch_cache is set only when the architecture was
+                # actually read, so it also tells us whether that fallback (if
+                # any) is a confirmed fact about the manifest or a guess made
+                # because the read itself failed just now.
+                host_arch = _host_docker_architecture()
+                cache_result = _host_arch_cache is not None
+                size = by_arch.get(host_arch) or by_arch.get("amd64")
         except (OSError, ValueError, subprocess.SubprocessError):
             size = None
-    _download_size_cache[image] = size
+    if cache_result:
+        _download_size_cache[image] = size
     return size
 
 
@@ -3196,8 +3652,11 @@ def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env
     each non-empty piece through _emit_or_log so progress markers are caught.
 
     When `cancel()` turns true mid-stream (the client closed the SSE), stop the
-    named sibling container with `docker kill` and terminate the local docker-run
-    process, so a cancelled firmware/AI scan doesn't keep running detached."""
+    named sibling container with `docker stop` (giving its own cleanup a
+    CANCEL_GRACE_SECONDS grace period, same as every other cancel path) and
+    terminate the local docker-run process, escalating to a hard kill if
+    either one is still around once that grace period elapses, so a
+    cancelled firmware/AI scan doesn't keep running detached."""
     try:
         proc = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -3213,11 +3672,15 @@ def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env
         if cancel and cancel():
             if container:
                 try:
-                    subprocess.run(["docker", "kill", container],
+                    subprocess.run(["docker", "stop", "-t", str(CANCEL_GRACE_SECONDS), container],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 except OSError:
                     pass
             proc.terminate()
+            try:
+                proc.wait(timeout=CANCEL_GRACE_SECONDS)
+            except subprocess.TimeoutExpired:
+                proc.kill()
             break
     proc.wait()
     return proc.returncode
@@ -3617,6 +4080,8 @@ class Handler(BaseHTTPRequestHandler):
             self._git_cred()
         elif parsed.path == "/scan-delete":
             self._scan_delete(urllib.parse.parse_qs(parsed.query))
+        elif parsed.path == "/vex-verdict":
+            self._vex_verdict_save(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
@@ -3658,6 +4123,122 @@ class Handler(BaseHTTPRequestHandler):
             for slot in [k for k in _scans_cache if k[0] == sid]:
                 del _scans_cache[slot]
         self._send(200, json.dumps({"deleted": sid, "removed": removed}))
+
+    def _vex_verdict_save(self, qs):
+        """Record a supplier's own triage of one CVE against one component
+        (POST /vex-verdict?id=<scan id>): affected / not_affected / fixed /
+        under_investigation, with an optional note. Stored separately from the
+        vendor/advisory `Status` Trivy reports (security_summary keeps both,
+        VulnerabilitiesTable.tsx shows both) and never rewrites the SBOM or the
+        Trivy report.
+
+        The first write endpoint whose body can change something on disk, so
+        every check below runs before the write it guards, in order: scan id,
+        then body size, then JSON shape, then each field, and only then the
+        sidecar path is resolved and the file replaced atomically. A rejection
+        at any step touches nothing that was already on disk."""
+        sid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(sid):
+            self._send(400, json.dumps({"error": "bad scan id"}))
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > 8192:
+            self._send(400, json.dumps({"error": "bad request"}))
+            return
+        try:
+            data = json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, OSError):
+            self._send(400, json.dumps({"error": "invalid JSON"}))
+            return
+        if not isinstance(data, dict):
+            self._send(400, json.dumps({"error": "invalid JSON"}))
+            return
+
+        def field(key):
+            v = data.get(key)
+            return v.strip() if isinstance(v, str) else ""
+
+        # The CVE id shares its shape with GET /advisory's: same namespace
+        # prefixes, same charset, same length cap. Reusing the check keeps the
+        # two endpoints from drifting on what an "id" is allowed to look like.
+        cve = data.get("cve")
+        if not _advisory_id_ok(cve):
+            self._send(400, json.dumps({"error": "bad cve id"}))
+            return
+        state = data.get("state")
+        if state not in VEX_STATES:
+            self._send(400, json.dumps({"error": "bad state"}))
+            return
+        purl, pkg, installed = field("purl"), field("pkg"), field("installed")
+        if len(purl) > 512 or len(pkg) > 512 or len(installed) > 128:
+            self._send(400, json.dumps({"error": "bad request"}))
+            return
+        if not purl and not (pkg and installed):
+            self._send(400, json.dumps({"error": "purl or pkg+installed required"}))
+            return
+        detail = data.get("detail", "")
+        if not isinstance(detail, str) or len(detail) > MAX_VEX_DETAIL:
+            self._send(400, json.dumps({"error": "bad detail"}))
+            return
+
+        target = vex_sidecar_write_path(sid)
+        if not target:
+            self._send(404, json.dumps({"error": "scan not found"}))
+            return
+
+        norm = _norm_purl(purl) if purl else ""
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with _vex_write_lock:
+            verdicts = _load_vex_verdicts(sid)
+            match = None
+            for existing in verdicts:
+                if existing.get("cve") != cve:
+                    continue
+                if norm:
+                    if _norm_purl(existing.get("purl") or "") == norm:
+                        match = existing
+                        break
+                elif (
+                    not existing.get("purl")
+                    and (existing.get("pkg") or "").lower() == pkg.lower()
+                    and (existing.get("installed") or "") == installed
+                ):
+                    match = existing
+                    break
+            record = {
+                "purl": purl,
+                "pkg": pkg,
+                "installed": installed,
+                "cve": cve,
+                "state": state,
+                "detail": detail,
+                "source": "user",
+                # Preserved across an edit to the same verdict; only updatedAt
+                # moves, so a supplier can tell "recorded" from "last touched".
+                "firstRecordedAt": (match or {}).get("firstRecordedAt") or now,
+                "updatedAt": now,
+            }
+            if match is not None:
+                verdicts[verdicts.index(match)] = record
+            else:
+                verdicts.append(record)
+            tmp_path = target + ".tmp"
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as fh:
+                    json.dump({"verdicts": verdicts}, fh, indent=2)
+                    fh.write("\n")
+                os.replace(tmp_path, target)
+            except OSError:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                self._send(500, json.dumps({"error": "could not save"}))
+                return
+        self._send(200, json.dumps({"ok": True, "verdict": record}))
 
     def _git_cred(self):
         """Stash a private-repo token; return a single-use credId."""
@@ -4084,6 +4665,15 @@ class Handler(BaseHTTPRequestHandler):
         # value simply leaves the check off.
         outbound_license = g("license").strip()[:64]
 
+        # Optional SBOM author (--sbom-author on the CLI): the organisation or
+        # person running this scan, recorded on metadata.authors. Free text (a
+        # legal entity name), bounded here and sanitized again at the docker-run
+        # boundary; an empty value leaves the SBOM without one. The frontend
+        # hides this field for ANALYZE, but a direct API call could still send
+        # it, so it stays here rather than in a per-mode branch: entrypoint.sh's
+        # own docmeta dispatch is what actually excludes ANALYZE.
+        sbom_author = g("sbom_author").strip()[:128]
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -4106,6 +4696,17 @@ class Handler(BaseHTTPRequestHandler):
             print(f"[WARN] conformance_profile '{conformance_profile}' not "
                   f"recognized; using the per-mode default.", file=sys.stderr)
             conformance_profile = ""
+
+        # Report language (--lang on the CLI): which language the pipeline's own
+        # generated prose renders in (notice, conformance, security, AI-profile
+        # reports; the model/dataset risk assessment's reason sentences). The
+        # request decides it, not this server's own locale -- the web UI sends
+        # whatever language its shell is currently showing. Anything outside the
+        # closed allowlist, or absent, is English; a typo in a query param is
+        # not a reason to fail a scan.
+        report_lang = g("lang").strip()
+        if report_lang not in _REPORT_LANGS:
+            report_lang = "en"
 
         # Per-run output folder OUTPUT_DIR/<run_id>/ (matches scan-sbom.sh). The
         # default run_id is the {prefix}; with ?timestamp=true the folder name
@@ -4191,6 +4792,7 @@ class Handler(BaseHTTPRequestHandler):
                 "includeOsv": g("includeOsv") == "true",
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
+                "sbomAuthor": sbom_author,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -4249,11 +4851,23 @@ class Handler(BaseHTTPRequestHandler):
         # Build the run-scan environment + working dir for the chosen source.
         env = os.environ.copy()
         env.update({
+            # Tells this run's entrypoint.sh it may sweep known-suffix
+            # leftovers of an earlier scan of the same project/version before
+            # writing its own artifacts (same reasoning as the sibling-
+            # container -e flag of the same name above).
+            "BOMLENS_ARTIFACT_CLEANUP": "1",
             "PROJECT_NAME": project,
             "PROJECT_VERSION": version,
             "PROJECT_LICENSE": outbound_license,
+            "SBOM_AUTHOR": sbom_author,
+            "REPORT_LANG": report_lang,
             "UPLOAD_ENABLED": "false",
             "HOST_OUTPUT_DIR": run_out,
+            # entrypoint.sh's own cdxgen-sibling cancel handler uses the same
+            # grace as this server's cancel paths below, so a cancel behaves
+            # consistently whether the SSE stream reads it out of run-scan's
+            # child (this branch) or a firmware/AI sibling container.
+            "BOMLENS_CANCEL_GRACE": str(CANCEL_GRACE_SECONDS),
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
             "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
             # No GENERATE_SPDX: the UI exports SPDX on demand from the results
@@ -4269,6 +4883,20 @@ class Handler(BaseHTTPRequestHandler):
             # literal, no user text. SECURITY_NVD_VERIFY stays off (network/NVD key).
             "DEEP_CVE": "true" if g("deep_cve") == "true" else "false",
         })
+        # Conformance-threshold overrides (PURL/LICENSE/HASH/FIELD_MIN_PCT): no
+        # web form sets these, an operator does, as plain environment variables
+        # on this server's own container (see docs/reference/docker-image.md).
+        # env.copy() above already carries whatever was set, but unvalidated --
+        # re-set each from _pct_env's validated read, and drop it when invalid,
+        # so this path and the sibling one (run_sibling_scan) see identically
+        # sane input rather than one crashing validate-sbom.sh's jq and the
+        # other quietly falling back to a default.
+        for _pct_name in _PCT_ENV_NAMES:
+            _pct_val = _pct_env(_pct_name)
+            if _pct_val is None:
+                env.pop(_pct_name, None)
+            else:
+                env[_pct_name] = str(_pct_val)
         # Allowlisted above (and rebound to the _USAGE_CONTEXTS literal). Set
         # only when given: assess-ai-risk.sh treats the absent var as "no
         # scenario" and reports every binding condition instead.
@@ -4498,6 +5126,15 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
                 env["SOURCE_ROOT"] = scan_root_of(cleanup_dir)
+                # Same reasoning as the copy above: a deep scan always builds
+                # the whole picked folder, so the hint is looked for there too
+                # (not the request-derived scan_dir) -- both for the same
+                # server's-own-record-over-request-input reason, and because
+                # that is the folder the scan (and so the empty-SBOM outcome)
+                # actually covers.
+                hint = nested_rootfs_hint(picked["path"])
+                if hint:
+                    env["NESTED_ROOTFS_HINT"] = hint
 
             elif source == "git-url":
                 if not target:
@@ -4792,12 +5429,18 @@ class Handler(BaseHTTPRequestHandler):
             # notice for C/C++ or Swift). Deduplicated and capped: a repeated
             # line says nothing more the second time.
             scan_warnings = []
+            # Tracks this run's [ERROR] block(s), for errorMessage on the done
+            # event below when the run fails with no other classification
+            # (error_sent stays False): see _ScanErrorTracker.
+            error_tracker = _ScanErrorTracker()
+            error_sent = False
 
             def note_log(ln):
                 if isinstance(ln, str) and ln.lstrip().startswith("[WARN]"):
                     text = ln.strip()
                     if text not in scan_warnings and len(scan_warnings) < MAX_SCAN_WARNINGS:
                         scan_warnings.append(text)
+                error_tracker.feed(ln)
                 sse("log", json.dumps(ln))
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
@@ -4822,6 +5465,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 ok = rc == 0
                 if rc == -1:
+                    error_sent = True
                     sse("error", json.dumps({
                         "detail": "Failed to launch the %s sibling container." % mode.lower(),
                         "key": None,
@@ -4844,12 +5488,21 @@ class Handler(BaseHTTPRequestHandler):
                                 )
                         # Client cancelled (the SSE write broke): stop the scan
                         # instead of running it to completion on a dead stream.
+                        # entrypoint.sh's own trap stops its cdxgen sibling on
+                        # this SIGTERM; escalate to a hard kill if run-scan is
+                        # still around once that has had CANCEL_GRACE_SECONDS
+                        # to happen, rather than waiting on it indefinitely.
                         if disconnected[0]:
                             proc.terminate()
+                            try:
+                                proc.wait(timeout=CANCEL_GRACE_SECONDS)
+                            except subprocess.TimeoutExpired:
+                                proc.kill()
                             break
                     proc.wait()
                     ok = proc.returncode == 0
                 except Exception as exc:  # noqa: BLE001
+                    error_sent = True
                     sse("error", json.dumps({"detail": "Failed to launch scan: %s" % exc, "key": None}))
 
             # Artifacts landed in run_out (the run folder named run_id); the
@@ -4874,6 +5527,11 @@ class Handler(BaseHTTPRequestHandler):
                 # as the run-folder sidecar so a re-opened scan carries it too.
                 "scanConfig": scan_config,
                 "scanWarnings": scan_warnings,
+                # Only when this run's own failure was never already classified
+                # via a dedicated `error` event above (error_sent); see
+                # _ScanErrorTracker. None when the run succeeded or nothing
+                # matched the [ERROR] convention.
+                "errorMessage": None if (ok or error_sent) else error_tracker.result(),
             }
             if scan_warnings:
                 scan_config["warnings"] = scan_warnings

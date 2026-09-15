@@ -50,6 +50,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--verify-weights` | false | With `--model`: download the repo's pickle-format weight files (`.bin`/`.pt`/`.pth`/`.ckpt` — the ones that execute code on load) and run the same local picklescan verification `--model-file` runs, instead of only trusting HuggingFace's own scan (`bomlens:hf:scan:*`). safetensors/GGUF/ONNX weights are never downloaded — they cannot execute code on load, so there is nothing for picklescan to check. Real network and disk cost (bounded by `AIBOM_VERIFY_MAX_FILES`/`AIBOM_VERIFY_MAX_BYTES`, default 5 files / 2 GiB each), unlike the metadata-only `ENRICH_HF_SECURITY` lookup, which is why this is opt-in. AI-model scans only |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
+| `--fail-on-conformance` | false | Exit 2 if this scan's own conformance report says "fail" (exit 3 if no conformance report was produced for this scan). Not offered with `--ui`. See [Exit codes](#exit-codes) |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
 | `--output-dir <dir>` | current directory | Base directory for outputs (alias `-o`). Each scan lands in a `{Project}_{Version}/` subfolder under it, keeping the bundle together and out of the source tree |
 | `--timestamp` | false | Append `_YYYYMMDD-HHMMSS` to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged |
@@ -129,6 +130,17 @@ To restore the previous flat layout, where every file is written directly in the
 
 `--diff` has no project or version of its own, so it writes its report directly into the base directory (current directory, or `--output-dir`) rather than a per-run subfolder.
 
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Scan succeeded |
+| 1 | Scan failed (bad arguments, Docker unavailable, a required input missing, and similar) |
+| 2 | `--fail-on-conformance`: the scan succeeded, but its own conformance report says "fail" |
+| 3 | `--fail-on-conformance`: the scan succeeded, but produced no conformance report to judge |
+
+2 and 3 are used only when `--fail-on-conformance` is given; every scan that does not use it exits 0 or 1.
+
 ## Pin the scanner image version
 
 Override the scanner image with `SBOM_SCANNER_IMAGE`.
@@ -170,6 +182,14 @@ docker system prune -f
 ```
 
 With Rancher Desktop or Docker Desktop, the same cleanup is also available from the app's own Preferences screen.
+
+### Interrupted build artifacts in the source tree
+
+A source scan (`--target <dir>`, the web UI's folder scan, or the desktop app) runs build steps (`cargo generate-lockfile`, `go mod tidy`, `npm install`, and the like) against the scanned tree, then restores it: every file a build step changed or added is put back or removed. If that scan ends by SIGKILL, an out-of-memory kill, or a host crash, the restore never runs and the changes stay. The next scan of that same source tree restores them first, before doing anything else, once it has confirmed the earlier scan's container is no longer running.
+
+### Leftover output-folder artifacts on re-scan
+
+Re-scanning the same `--project`/`--version` reuses its output folder, however the earlier scan there ended. Before writing its own artifacts, the new scan removes any of BomLens's own files under that project/version that today's mode or options will not produce, so nothing from an earlier run with different options survives to be mistaken for this run's output. A file you placed in the folder yourself, or a different version's artifacts, is left alone.
 
 ### Anything else
 

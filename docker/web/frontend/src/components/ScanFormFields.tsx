@@ -386,6 +386,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     isAnalyze,
     outboundLicense,
     setOutboundLicense,
+    sbomAuthor,
+    setSbomAuthor,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -394,6 +396,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showDeepCve,
     showByteStable,
     showOutboundLicense,
+    showSbomAuthor,
     showConformanceProfile,
     capabilities,
     busy,
@@ -515,6 +518,27 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           />
           <p id="outbound-license-hint" className="text-xs text-muted-foreground">
             {t("options.outboundLicenseHint")}
+          </p>
+        </div>
+      )}
+      {showSbomAuthor && (
+        <div className="space-y-1.5">
+          <label htmlFor="sbom-author" className="text-sm font-medium text-foreground">
+            {t("options.sbomAuthor")}
+          </label>
+          <input
+            id="sbom-author"
+            type="text"
+            value={sbomAuthor}
+            onChange={(e) => setSbomAuthor(e.target.value)}
+            disabled={busy}
+            placeholder="SK Telecom Co., Ltd."
+            spellCheck={false}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
+            aria-describedby="sbom-author-hint"
+          />
+          <p id="sbom-author-hint" className="text-xs text-muted-foreground">
+            {t("options.sbomAuthorHint")}
           </p>
         </div>
       )}

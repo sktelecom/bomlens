@@ -104,12 +104,24 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
                   aria-pressed={isSel}
                   onClick={() => onSelect?.(s)}
                   className={cn(
-                    "rounded-full transition duration-fast ease-out-soft",
+                    "rounded-full border border-transparent transition-colors duration-fast ease-out-soft",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                     security[s] === 0
                       ? "cursor-not-allowed opacity-40"
                       : "cursor-pointer hover:opacity-80",
-                    isSel && "ring-2 ring-foreground ring-offset-1",
+                    // A rest-state border, not just on hover/select: this badge
+                    // sits in a filter row next to identical-looking but inert
+                    // badges elsewhere on the page (e.g. a table's own severity
+                    // cell), so it needs to read as pressable before the reader
+                    // hovers it. A real `border` here, not `ring`: a low-contrast
+                    // ring color (border-border, near the page background) on a
+                    // fully rounded pill renders with zero visible difference in
+                    // the pinned Playwright container (measured: byte-identical
+                    // screenshots before/after adding it), while the same colour
+                    // as an actual border always paints.
+                    isSel
+                      ? "ring-2 ring-foreground ring-offset-1"
+                      : "border-border",
                     Boolean(selected) && !isSel && "opacity-60",
                   )}
                 >

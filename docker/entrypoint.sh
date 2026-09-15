@@ -67,6 +67,88 @@ SAFE_VERSION=$(echo "${PROJECT_VERSION}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/_
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
 
+# Stale-artifact cleanup. A re-scan of the same project/version reuses this
+# folder (mkdir -p, never recreated: scan-sbom.sh and server.py's
+# claim_run_id both do this) and sync_artifacts below only ever copies, never
+# deletes, so a suffix this run's own mode/options do not produce would
+# otherwise survive from an earlier run here and be mistaken for this run's
+# own output: a CLI re-scan's folder listing, and the web UI's results list
+# and download-all (both just read whatever is on disk right now) would all
+# still show it. Every image (base, firmware, aibom, deep-cve) runs this same
+# entrypoint, and the web UI's sibling-container paths and --analyze both
+# reach here too, so this one place covers all of them.
+#
+# Only a file matching THIS run's prefix and a suffix this pipeline is known
+# to produce is removed; anything else the user placed in the folder (a
+# README, an unrelated file) is left alone. --timestamp / ?timestamp=true
+# give each run its own folder, so there is nothing to clean there. Run
+# before anything below writes a new artifact, so if this run itself fails
+# partway through, what is left in the folder is only what THIS run produced
+# so far, never a stale mix with the previous run's leftovers.
+#
+# The suffix list mirrors scripts/check-artifact-registry-sync.sh's REGISTRY
+# exactly (that script cross-checks this array against it); update both when
+# a producer script starts writing a new one.
+KNOWN_ARTIFACT_SUFFIXES=(
+    _bom.json _bom.json.sig _bom.spdx.json _bom.spdx.json.sig
+    _NOTICE.txt _NOTICE.html _NOTICE.pdf
+    _security.json _security.md _security.html
+    _conformance.json _conformance.md _conformance.html _conformance.result
+    _risk-report.md _risk-report.html
+    _scancode.json _files.json _source.json _input.json
+    _yocto_vex.json _security_epss.json _vendored.cdx.json
+    _ai-profile.json _ai-profile.md
+    _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
+    _security_cvebintool.json _security_grype.json _security_yocto.json
+)
+# Only a caller that knows about this cleanup runs it at all. An old
+# scan-sbom.sh or server.py (built before this existed) sends neither signal
+# below, so its calls fall through to the pre-cleanup behavior (nothing
+# removed) instead of this new sweep mistaking ITS stage 1's just-written
+# $OUTPUT_FILE for a previous run's leftover -- that mistake is exactly what
+# broke a 2-stage CLI SOURCE scan started by an old scan-sbom.sh against a new
+# image: BOMLENS_RUN_INPUT (below) only protects one filename, it does not
+# gate whether the sweep runs at all, so a caller that never sends it still
+# had everything else it just produced swept away.
+#
+# BOMLENS_RUN_INPUT itself is the signal for the 2-stage CLI SOURCE path (a
+# current scan-sbom.sh always sets it there, see below); every other path
+# (single-container CLI modes, the web UI in-process and sibling-container
+# paths) has no stage-1 filename to name, so a current caller sends
+# BOMLENS_ARTIFACT_CLEANUP=1 instead.
+if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ]; then
+    # A CLI SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen,
+    # on the host) first, this one (POSTPROCESS) second. scan-sbom.sh removes any
+    # leftover from an earlier run at this filename before stage 1 starts, so by
+    # the time this runs, that same filename is either absent or is stage 1's own
+    # fresh output for THIS run -- never a stale one. Deleting it here anyway
+    # would be exactly the bug that pre-deletion exists to prevent, so
+    # scan-sbom.sh names it (BOMLENS_RUN_INPUT) and it is skipped below. Only a
+    # plain filename (no path separator, no leading dot) is honored; anything
+    # else is ignored rather than trusted, since a malformed value here should
+    # degrade to "skip nothing", not to a path escape.
+    _run_input=""
+    if [ -n "${BOMLENS_RUN_INPUT:-}" ] && printf '%s' "$BOMLENS_RUN_INPUT" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+        _run_input="$BOMLENS_RUN_INPUT"
+    fi
+    if [ -n "$HOST_OUTPUT_DIR" ] && [ -d "$HOST_OUTPUT_DIR" ]; then
+        _cleaned=()
+        for _suf in "${KNOWN_ARTIFACT_SUFFIXES[@]}"; do
+            _f="$HOST_OUTPUT_DIR/${OUT_PREFIX}${_suf}"
+            [ -n "$_run_input" ] && [ "$(basename "$_f")" = "$_run_input" ] && continue
+            if [ -f "$_f" ]; then
+                rm -f "$_f"
+                _cleaned+=("$(basename "$_f")")
+            fi
+        done
+        if [ "${#_cleaned[@]}" -gt 0 ]; then
+            echo "[INFO] cleaned ${#_cleaned[@]} stale artifact(s) from a previous scan of the same project/version: ${_cleaned[*]}"
+        fi
+        unset _cleaned _suf _f
+    fi
+    unset _run_input
+fi
+
 # Report language for the human-facing conformance + AI-profile reports. Only
 # en (default) or ko; the report generators read REPORT_LANG directly, so export
 # a normalized value here for both of them. Anything else falls back to English
@@ -87,6 +169,102 @@ self_container_id() {
     id=$(sed -n 's|.*/containers/\([0-9a-f]\{64\}\)/.*|\1|p' /proc/self/mountinfo 2>/dev/null | head -1)
     [ -n "$id" ] || id="${HOSTNAME:-}"
     echo "$id"
+}
+
+# How long a cancel gives the cdxgen sibling (below) to stop gracefully before
+# the docker engine's own SIGKILL fallback takes over. server.py sets the same
+# value as the env var when it launches this script, so both sides of a cancel
+# (this trap, and server.py's own escalation from proc.terminate() to a hard
+# kill) share one number.
+BOMLENS_CANCEL_GRACE="${BOMLENS_CANCEL_GRACE:-30}"
+
+# SIBLING_CID: the cdxgen sibling container id while generate_sbom_cdxgen is
+# waiting on it, empty otherwise. Read by stop_sibling (below), called from
+# the INT/TERM trap generate_sbom_cdxgen sets while it runs.
+SIBLING_CID=""
+stop_sibling() {
+    [ -n "$SIBLING_CID" ] || return 0
+    docker stop -t "$BOMLENS_CANCEL_GRACE" "$SIBLING_CID" >/dev/null 2>&1 || true
+}
+
+# Host-persistent guard state: mirrors scripts/scan-sbom.sh's
+# setup_guard_state for the web UI's SOURCE scans. Whoever launched this
+# container (scan-sbom.sh --ui, the desktop app) mounts a host directory at
+# GUARD_STATE_DIR; --volumes-from "$self" below already carries that mount
+# into the cdxgen sibling, so only the env var needs adding there.
+#
+# Scope: only a stable, repeatedly-scanned host path. SOURCE_ROOT_HOST is
+# empty for a ZIP upload or git clone (a fresh temp dir every scan, so there
+# is no "next scan of the same tree" to hand a stale record to) — the same
+# scope scan-sbom.sh's CLI path uses.
+guard_hash() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum 2>/dev/null | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 2>/dev/null | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+#   $1 = this container's id (for --volumes-from, sees the same mounts the
+#        real sibling would)
+#   $2 = build-prep.sh's own content (already read once by the caller)
+#   $3 = scanned tree, this container's path
+#   $4 = the name the caller is about to give the real sibling container
+#   $5 = the cdxgen image the caller is about to run (recorded for cleanup)
+GUARD_STATE_DIR="/bomlens-state"
+GUARD_ID=""
+setup_guard_state() {
+    local self="$1" prep="$2" src="$3" next_owner="$4" next_image="$5"
+    [ -n "${SOURCE_ROOT_HOST:-}" ] || return 0
+    [ -d "$GUARD_STATE_DIR" ] || return 0
+    local key owner_file owner ps_out ps_rc recorded_path recorded_image cleanup_image self_image
+    key=$(printf '%s' "$SOURCE_ROOT_HOST" | guard_hash) || return 0
+    [ -n "$key" ] || return 0
+    owner_file="$GUARD_STATE_DIR/$key/owner"
+    if [ -f "$owner_file" ]; then
+        owner=$(cat "$owner_file" 2>/dev/null)
+        recorded_path=$(cat "$GUARD_STATE_DIR/$key/path" 2>/dev/null)
+        if [ -z "$owner" ] || [ "$recorded_path" != "$SOURCE_ROOT_HOST" ] || ! command -v docker >/dev/null 2>&1; then
+            echo "[WARN] found a leftover-cleanup record for this folder that does not match it (or cannot be confirmed); leaving it in place."
+            return 0
+        fi
+        ps_out=$(docker ps --filter "name=^${owner}\$" --format '{{.Names}}' 2>/dev/null)
+        ps_rc=$?
+        if [ "$ps_rc" -ne 0 ]; then
+            echo "[WARN] could not confirm whether a previous scan of this folder ($owner) is still running; leaving its leftovers in place this time."
+            return 0
+        fi
+        if [ -n "$ps_out" ]; then
+            echo "[WARN] a previous scan of this folder ($owner) appears to still be running; not touching its leftovers."
+            return 0
+        fi
+        recorded_image=$(cat "$GUARD_STATE_DIR/$key/image" 2>/dev/null)
+        cleanup_image=""
+        if [ -n "$recorded_image" ] && docker image inspect "$recorded_image" >/dev/null 2>&1; then
+            cleanup_image="$recorded_image"
+        else
+            self_image=$(docker inspect -f '{{.Config.Image}}' "$self" 2>/dev/null)
+            if [ -n "$self_image" ] && docker image inspect "$self_image" >/dev/null 2>&1; then
+                cleanup_image="$self_image"
+            fi
+        fi
+        if [ -z "$cleanup_image" ]; then
+            echo "[WARN] no locally available image to clean up a previous interrupted scan's leftovers with; leaving them in place."
+            return 0
+        fi
+        echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
+        docker run --rm -u 0:0 \
+            --volumes-from "$self" \
+            -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+            --entrypoint sh "$cleanup_image" \
+            -c "$prep" _ "$src" >/dev/null 2>&1 || true
+    fi
+    mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
+    printf '%s\n' "$next_owner" > "$GUARD_STATE_DIR/$key/owner" 2>/dev/null || return 0
+    printf '%s\n' "$SOURCE_ROOT_HOST" > "$GUARD_STATE_DIR/$key/path" 2>/dev/null || return 0
+    printf '%s\n' "$next_image" > "$GUARD_STATE_DIR/$key/image" 2>/dev/null || return 0
+    GUARD_ID="$key"
 }
 
 # generate_sbom_cdxgen: run a cdxgen language image as a SIBLING container (via the
@@ -155,9 +333,22 @@ generate_sbom_cdxgen() {
     # cleanup would remove before we could read it — guessing from rc=137 alone
     # would misreport a plain `kill -9` or an OOM on a different process in the
     # same container as memory exhaustion.
-    local logf cidf; logf=$(mktemp); cidf=$(mktemp); rm -f "$cidf"
+    #
+    # Run in the background and wait explicitly, instead of foreground, so a
+    # cancel (server.py's proc.terminate()) is handled the moment it arrives:
+    # a shell only acts on a trap once it regains control, and while blocked on
+    # a foreground command that does not happen until the command finishes on
+    # its own (measured). `wait` returns as soon as the signal
+    # arrives, so the trap below can stop the sibling right away instead of
+    # leaving it to run to completion unsupervised.
+    local logf cidf rcf; logf=$(mktemp); cidf=$(mktemp); rcf=$(mktemp); rm -f "$cidf"
     local prep_env; read -ra prep_env <<< "$(build_prep_env_args)"
-    docker run -u 0:0 \
+    local sibling_name="bomlens-sib-$$"
+    setup_guard_state "$self" "$prep" "$src" "$sibling_name" "$img"
+    local guard_env=()
+    [ -n "$GUARD_ID" ] && guard_env=(-e "BOMLENS_GUARD_ID=$GUARD_ID")
+    ( docker run -u 0:0 \
+        --name "$sibling_name" \
         --cidfile "$cidf" \
         --volumes-from "$self" \
         -e HOME=/tmp/sbomhome \
@@ -167,11 +358,26 @@ generate_sbom_cdxgen() {
         -e PROJECT_VERSION="$PROJECT_VERSION" \
         -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
         "${prep_env[@]}" \
+        "${guard_env[@]}" \
         --entrypoint sh "$img" \
-        -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION" 2>&1 | tee "$logf"
-    rc=${PIPESTATUS[0]}
-    local cid=""
-    [ -s "$cidf" ] && cid=$(cat "$cidf")
+        -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
+    local pipe_pid=$!
+    # The cidfile appears as soon as the container is created, well before it
+    # finishes, so a cancel arriving during the run still has a container id
+    # to stop.
+    local cid="" _n=0
+    while [ -z "$cid" ] && [ "$_n" -lt 50 ] && kill -0 "$pipe_pid" 2>/dev/null; do
+        [ -s "$cidf" ] && cid=$(cat "$cidf")
+        [ -n "$cid" ] || { sleep 0.1; _n=$((_n + 1)); }
+    done
+    SIBLING_CID="$cid"
+    trap 'stop_sibling; exit 130' INT
+    trap 'stop_sibling; exit 143' TERM
+    wait "$pipe_pid" || true
+    trap - INT TERM
+    rc=$(cat "$rcf" 2>/dev/null || echo 1)
+    rm -f "$rcf"
+    SIBLING_CID=""
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
@@ -187,8 +393,12 @@ generate_sbom_cdxgen() {
             CDXGEN_FAIL_REASON="network"
             echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
         else
-            CDXGEN_FAIL_REASON="cdxgen-unavailable"
-            echo "[WARN] cdxgen sibling container failed (rc=$rc)."
+            # Not a resource/network failure this container could see: cdxgen
+            # ran and exited non-zero on its own, most often an internal
+            # exception or its own schema validator rejecting the document
+            # (raw Node stack trace or validation errors, both in $logf only).
+            CDXGEN_FAIL_REASON="cdxgen-crash"
+            echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
         rm -f "$logf" "$cidf"
@@ -206,18 +416,78 @@ generate_sbom_cdxgen() {
     return 0
 }
 
-# Record that the SBOM came from the shallow syft fallback (direct deps only),
-# with the reason, so the web UI can explain why the dependency graph is thin.
-# Mirrors the other bomlens:* metadata signals the server reads (survives
-# stamp/normalize like bomlens:suggest-identify-vendored does).
-mark_sbom_degraded() {
-    local file="$1" reason="$2" tmp
+# Declare how complete this SBOM's dependency graph is, in CycloneDX's own
+# compositions.aggregate field (one document-level entry; assemblies/dependencies
+# refs stay empty). `complete` is used only when there is POSITIVE evidence
+# the graph is whole, never merely because nothing failed: an unresolved leaf
+# (e.g. one Maven coordinate cdxgen could not fetch) leaves no trace in the
+# SBOM or in any log, so "no failure seen" cannot mean "complete" (measured).
+#
+# SOURCE/POSTPROCESS: build-prep.sh already stamped bomlens:prep-step-applied
+# (a label per ecosystem lock step it ran or found already committed, success
+# or failure) and bomlens:pipeline-step-failed (labels that failed) onto this
+# same file -- read those instead of re-deriving anything here, since the
+# source tree itself is not mounted in POSTPROCESS. Maven has no such label at
+# all (no pre-resolve step, and its own cdxgen success signals do not tell
+# resolved apart from degraded, measured), so it can never satisfy the
+# lock-evidence condition below and stays `unknown`.
+#
+# IMAGE/ROOTFS/FIRMWARE/BINARY: syft only reads a package database, so success
+# alone is never positive evidence of a complete graph (it does not see
+# inter-package or static-linked dependencies) -- these stay `unknown` unless a
+# failure signal is present, then `incomplete`.
+#
+# AIBOM/MODELFILE/DATASET/MERGE: no signal this design defines a value for --
+# fixed `unknown`. ANALYZE with no compositions of its own is the same
+# (`unknown`); ANALYZE that already carries a supplier's own compositions is
+# never reached here at all (the early return below).
+mark_compositions_aggregate() {
+    local file="$1" aggregate="" info degraded lock_ok components edges tmp
     [ -f "$file" ] || return 0
     command -v jq >/dev/null 2>&1 || return 0
-    tmp="${file}.degraded.tmp"
-    if jq --arg r "$reason" \
-        '(.metadata.properties) = ((.metadata.properties // []) + [{name:"bomlens:sbom-tool-degraded", value:$r}])' \
-        "$file" > "$tmp" 2>/dev/null; then
+    # A supplier's own declaration (ANALYZE) is never overwritten.
+    if jq -e '(.compositions // []) | length > 0' "$file" >/dev/null 2>&1; then
+        return 0
+    fi
+    case "$SCAN_MODE" in
+        SOURCE|POSTPROCESS)
+            info=$(jq -r --arg labels "npm-production-set pip-install go-mod-tidy cargo-lockfile bundle-lock swift-package-resolve gradle-dependencies android-release-classpath composer-lock-committed dotnet-lock-committed" '
+                ($labels | split(" ")) as $known
+                | (.metadata.properties // []) as $props
+                | ([$props[] | select(.name=="bomlens:prep-step-applied") | .value]) as $applied
+                | ([$props[] | select(.name=="bomlens:pipeline-step-failed") | .value]) as $failed
+                | (($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0) as $degraded
+                | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
+                | ((.components // []) | length) as $components
+                | ([(.dependencies // [])[]?.dependsOn[]?] | length) as $edges
+                | "\($degraded) \($lock_ok) \($components) \($edges)"
+            ' "$file" 2>/dev/null)
+            read -r degraded lock_ok components edges <<< "$info"
+            if [ "$degraded" = "true" ]; then
+                aggregate="incomplete"
+            elif [ "$lock_ok" = "true" ] && [ "${components:-0}" -ge 2 ] && [ "${edges:-0}" -ge 1 ]; then
+                aggregate="complete"
+            else
+                aggregate="unknown"
+            fi
+            ;;
+        IMAGE|ROOTFS|FIRMWARE|BINARY)
+            if jq -e '(.metadata.properties // []) | any(.name=="bomlens:pipeline-step-failed" and (.value=="firmware-packages" or .value=="firmware-extra-roots"))' "$file" >/dev/null 2>&1; then
+                aggregate="incomplete"
+            else
+                aggregate="unknown"
+            fi
+            ;;
+        AIBOM|MODELFILE|DATASET|MERGE|ANALYZE)
+            aggregate="unknown"
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+    [ -n "$aggregate" ] || return 0
+    tmp="${file}.compositions.tmp"
+    if jq --arg agg "$aggregate" '.compositions = [{aggregate: $agg}]' "$file" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$file"
     else
         rm -f "$tmp"
@@ -273,6 +543,9 @@ case "$SCAN_MODE" in
         SRC_ROOT="${SOURCE_ROOT:-/src}"
         if [ ! -d "$SRC_ROOT" ]; then echo "[ERROR] source dir not found: $SRC_ROOT"; exit 1; fi
         if [ -z "$(ls -A "$SRC_ROOT" 2>/dev/null)" ]; then echo "[ERROR] source dir is empty: $SRC_ROOT"; exit 1; fi
+        # The syft fallback leaves out the same non-shipped trees as the cdxgen
+        # path (see NON_SHIPPED_DIRS in source-detect.sh).
+        read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
         if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
             # Best-effort low-disk warning: cdxgen pulls/extracts a language image
             # via the host Docker, which fails if space is tight. We only see this
@@ -286,15 +559,19 @@ case "$SCAN_MODE" in
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
             if ! generate_sbom_cdxgen "$SRC_ROOT" "$OUTPUT_FILE"; then
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
-                syft "dir:$SRC_ROOT" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+                syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
+                apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
                 mark_sbom_degraded "$OUTPUT_FILE" "${CDXGEN_FAIL_REASON:-cdxgen-unavailable}"
+                mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
             fi
         else
             echo "[1/2] syft: source dir $SRC_ROOT (manifest-only; docker.sock/CLI/host-path unavailable)"
-            syft "dir:$SRC_ROOT" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+            syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
                 || { echo "[ERROR] syft source scan failed."; exit 1; }
+            apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
             mark_sbom_degraded "$OUTPUT_FILE" "cdxgen-unavailable"
+            mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
         fi
         # Normalize the root component type for a source scan. cdxgen sets
         # application/library/framework, but a syft `dir:` (fallback / no-Docker)
@@ -571,6 +848,22 @@ if command -v jq >/dev/null 2>&1; then
     COMP_COUNT=$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${COMP_COUNT:-0}" -eq 0 ]; then
         echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)."
+        # A directory --target that is not itself a root filesystem but
+        # has one a level or two below it (a delivery folder wrapping the
+        # actual rootfs) is a common way this ends up empty -- cdxgen has
+        # nothing to read there. scan-sbom.sh already found this on the host
+        # (nested_rootfs_hint) and names it here only now that the scan is
+        # confirmed empty, not on sight of the folder alone: a source repo
+        # that happens to hold a rootfs-shaped fixture, but still resolves
+        # real components, must never see this note. Validated the same way
+        # as BOMLENS_RUN_INPUT: an unexpected character degrades to no note,
+        # never to an unsafe value echoed verbatim.
+        if [ -n "${NESTED_ROOTFS_HINT:-}" ] \
+           && printf '%s' "$NESTED_ROOTFS_HINT" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._/ -]*$' \
+           && ! printf '%s' "$NESTED_ROOTFS_HINT" | grep -q '\.\.'; then
+            echo "       $NESTED_ROOTFS_HINT (inside the scanned folder) looks like a root filesystem."
+            echo "       If that folder is the actual delivery, re-run with --target pointed at it directly."
+        fi
     fi
 fi
 
@@ -653,6 +946,35 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
                     echo "[WARN] merge of CocoaPods components failed; keeping the original SBOM." >&2
                     rm -f "${OUTPUT_FILE}.merged"
                 fi
+            fi
+        fi
+    fi
+fi
+
+# ========================================================
+# conda environment.yml dependencies. identify-conda.py already ran in
+# build-prep.sh (stage 1, before cdxgen), not here: whether cdxgen's python
+# cataloger gets excluded has to be decided before cdxgen runs, and only when
+# the parse actually produced something (see identify-conda.py's own header
+# and build-prep.sh's own conda block for why). This step reads that already-
+# written sidecar and merges it in -- the same /out directory both stages
+# mount, so it is still here to read. Re-parsing environment.yml a second
+# time would only ever reproduce the same result, since nothing about the
+# source tree changes between the two stages. No-op when the main scan
+# already carries a pkg:layer=conda component, so this never double-counts.
+# ========================================================
+CONDA_SBOM="${OUT_PREFIX}_conda.cdx.json"
+if [ -f "$CONDA_SBOM" ]; then
+    HAS_CONDA=$(jq '[.components[]? | select(.properties[]? | select(.name=="bomlens:layer" and .value=="conda"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
+    if [ "${HAS_CONDA:-0}" -eq 0 ]; then
+        CONDA_N=$(jq '[.components[]?] | length' "$CONDA_SBOM" 2>/dev/null || echo 0)
+        if [ "${CONDA_N:-0}" -gt 0 ]; then
+            echo "[INFO] conda environment.yml dependencies identified: $CONDA_N, merging into SBOM."
+            if bash "$LIBDIR/merge-sbom.sh" "${OUTPUT_FILE}.merged" "$PROJECT_NAME" "$PROJECT_VERSION" "$OUTPUT_FILE" "$CONDA_SBOM"; then
+                mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
+            else
+                echo "[WARN] merge of conda components failed; keeping the original SBOM." >&2
+                rm -f "${OUTPUT_FILE}.merged"
             fi
         fi
     fi
@@ -795,6 +1117,11 @@ else
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE"
 fi
 
+# The component/dependency graph is final as of the normalize pass above; every
+# step below this point only enriches metadata (CPE, EOL, risk, ...) and must
+# not change compositions.aggregate's answer, so this runs once, here.
+mark_compositions_aggregate "$OUTPUT_FILE"
+
 # CPE enrichment: firmware/image/rootfs components often arrive with name+version
 # but no purl/cpe. enrich-cpe.sh attaches (or version-normalizes) a cpe:2.3 for
 # WHITELISTED component names only (closed list, no guessing) and fills confirmed
@@ -819,6 +1146,22 @@ fi
 # distro= version). Runs before the security scan; best-effort, never aborts.
 if [ "${ENRICH_OS_CONTEXT:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-os-context python3 "$LIBDIR/enrich-os-context.py" "$OUTPUT_FILE"
+fi
+
+# Distro supplier enrichment: an rpm/deb/apk component carries `publisher` but
+# never `supplier` (verified: deb/apk hold an individual maintainer there,
+# different per package; rpm already holds the distro project, but that is a
+# different CycloneDX field with a different meaning, so it does not excuse
+# leaving `supplier` empty). enrich-distro-supplier.py reads the
+# operating-system component enrich-os-context.py just synthesized (or left
+# in place) and fills `supplier` with that distro's project name, for the
+# distros this file has a confirmed name for. Runs right after OS-context
+# enrichment, since it depends on that component. Skipped for AI SBOMs and
+# with ENRICH_DISTRO_SUPPLIER=false; a no-op when there is no single
+# unambiguous operating-system component, or its distro has no confirmed
+# supplier name yet. Best-effort, never aborts.
+if [ "${ENRICH_DISTRO_SUPPLIER:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
+    run_optional_step enrich-distro-supplier python3 "$LIBDIR/enrich-distro-supplier.py" "$OUTPUT_FILE"
 fi
 
 # Maven CPE enrichment: maven libraries carry a PURL but no CPE, so a CPE-aware
@@ -1075,7 +1418,10 @@ fi
 # invalidate that signature (the .sig would no longer verify against the
 # now-different file).
 if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; then
-    for ext in json md html; do
+    # "result" is the bare pass/fail sidecar --fail-on-conformance reads; it
+    # never appears in server.py's ARTIFACT_SUFFIXES (not human-facing), only
+    # in ARTIFACTS here so it actually reaches HOST_OUTPUT_DIR.
+    for ext in json md html result; do
         [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
     done
     run_optional_step generate-risk-report bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME" "$SCAN_MODE"
@@ -1194,7 +1540,7 @@ fi
 # it only for the modes that can carry a machine-learning-model component.
 if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
     if bash "$LIBDIR/generate-ai-profile.sh" "$OUT_PREFIX" "$PROJECT_NAME"; then
-        for ext in json md html; do
+        for ext in json md; do
             [ -f "${OUT_PREFIX}_ai-profile.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_ai-profile.${ext}")
         done
     fi

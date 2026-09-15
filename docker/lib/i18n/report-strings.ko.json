@@ -11,6 +11,8 @@
   "conformance.md_result": "- 결과: **%s** (필수 실패: %s개, 경고: %s개, 검토 필요: %s개, 해당 없음: %s개)",
   "conformance.md_profile": "- 검사 기준: %s",
   "conformance.md_untraceable": "- 추적 불가 구성요소 (pkg:generic / 사용자 지정 PURL): %s개 — 권고이며 결과에 영향을 주지 않음",
+  "conformance.pipeline_steps_intro": "생성 중 실패한 파이프라인 단계 (이 SBOM이 불완전할 수 있음)",
+  "conformance.pipeline_steps_more": "외 %s개",
   "conformance.meta_project": "프로젝트",
   "conformance.meta_generated": "생성 시각",
   "conformance.meta_format": "형식",

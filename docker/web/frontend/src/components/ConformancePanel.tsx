@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
+import { PipelineStepsFailedNote } from "@/components/PipelineStepsFailedNote";
 import {
   fileUrl,
   type ConformanceCheck,
@@ -37,10 +38,12 @@ import {
 import { Disclosure } from "@/components/ui/disclosure";
 import { cn } from "@/lib/utils";
 
+// `color` is applied to an aria-hidden Icon at each usage site, not read
+// directly as body text.
 const STATUS = {
-  pass: { Icon: CircleCheck, color: "text-risk-low", key: "g7.sPass" },
-  fail: { Icon: CircleX, color: "text-risk-critical", key: "g7.sFail" },
-  warn: { Icon: CircleAlert, color: "text-risk-medium", key: "g7.sWarn" },
+  pass: { Icon: CircleCheck, color: "text-risk-low", key: "g7.sPass" }, // token-lint-ignore
+  fail: { Icon: CircleX, color: "text-risk-critical", key: "g7.sFail" }, // token-lint-ignore
+  warn: { Icon: CircleAlert, color: "text-risk-medium", key: "g7.sWarn" }, // token-lint-ignore
   // Nothing in this document to judge. Muted on purpose: it is neither a gap the
   // reader can close nor something met, so it must not read as either.
   na: { Icon: CircleMinus, color: "text-muted-foreground", key: "g7.sNa" },
@@ -355,10 +358,13 @@ function KindChip({
       aria-pressed={isSel}
       onClick={() => onSelect(kind)}
       className={cn(
-        "rounded-full transition duration-fast ease-out-soft",
+        "rounded-full border border-transparent transition-colors duration-fast ease-out-soft",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         count === 0 ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:opacity-80",
-        isSel && "ring-2 ring-foreground ring-offset-1",
+        // Rest-state border so this reads as pressable next to identical-looking
+        // but inert badges elsewhere (see SeverityBar's own for why this is a
+        // real `border`, not a low-contrast `ring`).
+        isSel ? "ring-2 ring-foreground ring-offset-1" : "border-border",
         Boolean(selected) && !isSel && "opacity-60",
       )}
     >
@@ -421,12 +427,17 @@ export function ConformancePanel({
   conformance,
   scanId,
   results = [],
+  isSuppliedDocument = false,
 }: {
   conformance: ConformanceSummary;
   /** Scoping for the report download links; omit to hide them. */
   scanId?: string | null;
   /** This scan's artifacts, to offer the same report as a file. */
   results?: ResultFile[];
+  /** An ANALYZE run against an uploaded SBOM the reader did not generate
+   *  (`Boolean(inputSbomFileName(result))`), so a failed-pipeline-step note
+   *  suggests asking the supplier to regenerate it instead of re-scanning. */
+  isSuppliedDocument?: boolean;
 }) {
   const { t } = useTranslation();
   const checks = conformance.checks ?? [];
@@ -448,7 +459,18 @@ export function ConformancePanel({
   );
 
   if (checks.length === 0) {
-    return <EmptyState>{t("g7.empty")}</EmptyState>;
+    return (
+      <div className="space-y-6">
+        <PipelineStepsFailedNote
+          steps={conformance.pipelineStepsFailed ?? []}
+          more={conformance.pipelineStepsFailedMore ?? 0}
+          context="conformance"
+          isSuppliedDocument={isSuppliedDocument}
+          testId="conformance-pipeline-steps-failed"
+        />
+        <EmptyState>{t("g7.empty")}</EmptyState>
+      </div>
+    );
   }
 
   const keep = (c: ConformanceCheck) =>
@@ -479,6 +501,13 @@ export function ConformancePanel({
 
   return (
     <div className="space-y-6">
+      <PipelineStepsFailedNote
+        steps={conformance.pipelineStepsFailed ?? []}
+        more={conformance.pipelineStepsFailedMore ?? 0}
+        context="conformance"
+        isSuppliedDocument={isSuppliedDocument}
+        testId="conformance-pipeline-steps-failed"
+      />
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           {conformance.format ? (

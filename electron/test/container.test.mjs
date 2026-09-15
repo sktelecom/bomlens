@@ -4,6 +4,7 @@
 // container.mjs의 순수 로직 단위 테스트(electron 비의존). 실제 Docker 기동/E2E는
 // Windows에서 tests/windows-e2e-checklist.md와 desktop 워크플로우로 검증한다.
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -18,6 +19,7 @@ import {
   ContainerError,
   CONTAINER_ERR,
   currentDockerBin,
+  defaultGuardStateDir,
   defaultOutputDir,
   detectWsl2Docker,
   dockerStatus,
@@ -25,6 +27,7 @@ import {
   imageRef,
   resetDockerBin,
   resolveDockerBin,
+  resolveHostDir,
   scanMountArgs,
 } from "../lib/container.mjs";
 
@@ -69,6 +72,60 @@ test("defaultOutputDir honours SBOM_OUTPUT_DIR when set", () => {
     if (prev === undefined) delete process.env.SBOM_OUTPUT_DIR;
     else process.env.SBOM_OUTPUT_DIR = prev;
   }
+});
+
+test("defaultGuardStateDir follows scan-sbom.sh's XDG_STATE_HOME rule on macOS/Linux", () => {
+  const home = "/Users/example";
+  assert.equal(
+    defaultGuardStateDir({ platform: "darwin", env: {}, home }),
+    path.join(home, ".local", "state", "bomlens", "guard"),
+  );
+  assert.equal(
+    defaultGuardStateDir({ platform: "linux", env: { XDG_STATE_HOME: "/custom/state" }, home }),
+    path.join("/custom/state", "bomlens", "guard"),
+  );
+});
+
+test("defaultGuardStateDir follows scan-sbom.sh's LOCALAPPDATA rule on Windows", () => {
+  const home = "C:\\Users\\example";
+  assert.equal(
+    defaultGuardStateDir({ platform: "win32", env: { LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local" }, home }),
+    path.join("C:\\Users\\example\\AppData\\Local", "bomlens", "guard"),
+  );
+  assert.equal(
+    defaultGuardStateDir({ platform: "win32", env: {}, home }),
+    path.join(home, "AppData", "Local", "bomlens", "guard"),
+  );
+});
+
+// scan-sbom.sh's GUARD_STATE_DIR (the CLI) and this function must land on the
+// exact same host directory for a given platform+env, or a scan interrupted
+// from one launcher is never found by a rescan from the other -- the reason
+// this function exists at all. Mirrors scan-sbom.sh's own branch (both end in
+// .../bomlens/guard now; an earlier version of this file put Windows under an
+// extra .../bomlens/state/guard, which never matched the CLI's .../bomlens/guard).
+test("defaultGuardStateDir lands on the same host directory as scan-sbom.sh's CLI, per platform", () => {
+  const cliGuardStateDir = ({ platform, env, home }) =>
+    platform === "win32"
+      ? path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "bomlens", "guard")
+      : path.join(env.XDG_STATE_HOME ?? path.join(home, ".local", "state"), "bomlens", "guard");
+
+  for (const { platform, env, home } of [
+    { platform: "darwin", env: {}, home: "/Users/example" },
+    { platform: "linux", env: { XDG_STATE_HOME: "/custom/state" }, home: "/home/example" },
+    { platform: "win32", env: { LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local" }, home: "C:\\Users\\example" },
+    { platform: "win32", env: {}, home: "C:\\Users\\example" },
+  ]) {
+    assert.equal(defaultGuardStateDir({ platform, env, home }), cliGuardStateDir({ platform, env, home }));
+  }
+});
+
+test("defaultGuardStateDir honours SBOM_GUARD_STATE_DIR when set", () => {
+  const custom = path.join(os.tmpdir(), "custom-guard-state");
+  assert.equal(
+    defaultGuardStateDir({ platform: "darwin", env: { SBOM_GUARD_STATE_DIR: custom }, home: "/Users/example" }),
+    custom,
+  );
 });
 
 test("DEFAULT_IMAGE pins the app's own version, not :latest", () => {
@@ -246,6 +303,51 @@ test("scanMountArgs keeps a Windows folder path intact in mount and env", () => 
     args[3],
     "SBOM_UI_SCAN_ROOTS=/scan-targets/extracted-rootfs|C:\\Users\\me\\extracted-rootfs\n",
   );
+});
+
+test("scanMountArgs resolves a symlinked picked folder to its real path", () => {
+  // scan-sbom.sh --ui가 SBOM_UI_HOST_DIR을 pwd -P로 resolve하는 것과 같은 이유:
+  // CLI로 같은(심볼릭 링크 너머의) 폴더를 스캔했을 때와 같은 가드 상태 키가 나오려면
+  // 여기서도 실제 경로를 써야 한다. 컨테이너 경로 쪽 이름은 사용자가 고른 원래
+  // 표기(링크 이름)를 그대로 쓴다 — 바뀌는 건 host 쪽 경로뿐이다.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bomlens-scanmount-"));
+  const real = path.join(tmp, "real-target");
+  fs.mkdirSync(real);
+  const link = path.join(tmp, "picked-link");
+  fs.symlinkSync(real, link, "dir");
+  try {
+    const args = scanMountArgs([link]);
+    const hostReal = fs.realpathSync.native(real);
+    assert.equal(args[1], `${hostReal}:/scan-targets/picked-link:ro`);
+    assert.equal(args[3], `SBOM_UI_SCAN_ROOTS=/scan-targets/picked-link|${hostReal}\n`);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("resolveHostDir resolves a symlinked directory and creates a missing one", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bomlens-hostdir-"));
+  try {
+    const real = path.join(tmp, "real-out");
+    fs.mkdirSync(real);
+    const link = path.join(tmp, "out-link");
+    fs.symlinkSync(real, link, "dir");
+    assert.equal(resolveHostDir(link), fs.realpathSync.native(real));
+
+    const missing = path.join(tmp, "not-yet-created", "sbom-output");
+    const resolved = resolveHostDir(missing);
+    assert.ok(fs.statSync(missing).isDirectory());
+    assert.equal(resolved, fs.realpathSync.native(missing));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("resolveHostDir falls back to the original string when mkdir/realpath both fail", () => {
+  const boom = () => {
+    throw new Error("nope");
+  };
+  assert.equal(resolveHostDir("/some/unresolvable/path", { mkdir: boom, realpath: boom }), "/some/unresolvable/path");
 });
 
 // dockerStatus의 -1(spawn 실패, 진짜 못 찾음) vs 그 밖의 0이 아닌 코드(바이너리는 찾아서

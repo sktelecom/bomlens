@@ -155,7 +155,7 @@ SBOM(`..._bom.json`)과 위험분석 보고서(`..._risk-report.html`)도 같은
 전체를 ZIP 하나로 한 번에 받을 수도 있습니다. 내려받은 파일은 결과 폴더에도 저장됩니다.
 각 파일이 무엇이고 언제 생기는지는 [산출물 레퍼런스](../reference/artifacts.ko.md)를 참고하세요.
 
-![결과 화면에서 고지문을 포맷별로 내려받거나 전체를 ZIP으로 받는다](../images/app-results.png)
+![결과 화면에서 고지문을 포맷별로 내려받거나 전체를 ZIP으로 받는다](../images/app-results-ko.png)
 
 ## 막혔을 때
 

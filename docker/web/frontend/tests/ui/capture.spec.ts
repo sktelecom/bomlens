@@ -426,6 +426,13 @@ for (const lang of ["en", "ko"] as Lang[]) {
   const s = STR[lang];
 
   test(`@capture advanced toggle - ${lang}`, async ({ page }) => {
+    // The expanded disclosure below can run taller than the default 720px
+    // viewport (it already does in English). An element screenshot taller
+    // than the viewport makes Playwright scroll and stitch the capture, and
+    // that stitching has come out with a blank band at the bottom for this
+    // element before, so a plain height bump avoids needing more than one
+    // scroll position in the first place.
+    await page.setViewportSize({ width: 1280, height: 1400 });
     await seedLang(page, lang);
     await stub(page, { firmware: false, scanoss: true, docker: true });
     await page.goto("/#/new");
@@ -515,9 +522,12 @@ const CONFORMANCE_DONE = {
   },
 };
 
-// The G7 label/detail text this section renders (label/detail vs. labelKo/
-// detailKo, per ConformancePanel.tsx) so each locale's capture waits for the
-// text that will actually be on screen instead of an English-only string.
+// docs/reference/ui.md's "SBOM Validation" paragraph describes this screen as
+// showing the verdict, the base CycloneDX checks, and the G7 sub-block
+// "grouped by the seven G7 clusters" as one whole, not a subset filtered
+// down to what still needs fixing. The panel itself opens filtered to
+// "actionable" whenever any check qualifies (ConformancePanel.tsx), so the
+// capture has to reset that filter to match what the doc describes.
 const G7_WAIT: Record<Lang, string> = { en: "SBOM author", ko: "SBOM 작성자" };
 
 for (const lang of ["en", "ko"] as Lang[]) {
@@ -527,6 +537,27 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await stub(page, { firmware: false, scanoss: false, docker: true }, { done: CONFORMANCE_DONE });
     await runScan(page, "model", "1.0");
     await NAV(page, "conformance").click();
+    // Reset the default "actionable" filter to "all" (the chip toggles off
+    // when clicked a second time). Scoped to main: the top bar's EN/KO
+    // toggle is also a pressed button. The chip only exists once the
+    // conformance data has rendered, so wait for it before deciding whether
+    // to click it (count() alone does not wait).
+    const activeKindChip = page.locator("main").getByRole("button", { pressed: true }).first();
+    try {
+      await activeKindChip.waitFor({ state: "visible", timeout: 5000 });
+      await activeKindChip.click();
+    } catch {
+      // No kind filter defaulted on (no actionable check in this stub); nothing to toggle.
+    }
+    // A cluster with no actionable check of its own (metadata, holding "SBOM
+    // author") stays collapsed even under the "all" filter, since each
+    // CheckGroup only auto-opens when the filter is non-null or it contains
+    // an actionable check. Force every disclosure open directly so the
+    // screenshot shows every cluster, matching what the doc describes.
+    await page.getByText(G7_WAIT[lang]).first().waitFor({ state: "attached" });
+    await page.locator("main details").evaluateAll((els) => {
+      for (const el of els) (el as HTMLDetailsElement).open = true;
+    });
     await page.getByText(G7_WAIT[lang]).first().waitFor({ state: "visible" });
     await killAnim(page);
     await settleMain(page);

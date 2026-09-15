@@ -12,7 +12,7 @@ C/C++ 임베디드 소스를 스캔했는데 BomLens가 거의 아무것도 못 
 
 이 상황이 되면 BomLens가 이 옵션을 권하는 한 줄 안내를 출력하고, 웹 UI도 스캔 후 같은 안내를 보여줍니다. 사용자가 직접 상황을 알아챌 필요는 없습니다.
 
-![희소한 C/C++ 스캔에서 identify-vendored를 권하는 결과 배너](../images/web-ui-vendored-banner-en.png)
+![희소한 C/C++ 스캔에서 identify-vendored를 권하는 결과 배너](../images/web-ui-vendored-banner-ko.png)
 
 `--identify-vendored`는 소스 파일의 지문을 공개 OSSKB 지식 베이스와 대조해, 일치한 항목을 이름·버전·PURL을 갖춘 컴포넌트로 기록합니다. 그러면 복사돼 들어간 오픈소스가 SBOM에 드러나고, 알려진 CVE가 있는 라이브러리는 보안 보고서에도 나타납니다.
 
@@ -45,7 +45,7 @@ docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker
 
 명령어가 낯선 Windows 사용자는 [비개발자 빠른 시작](../start/no-cli.ko.md)의 데스크톱 앱 안내를 먼저 따라 하세요.
 
-![고급 섹션의 파일 단위 식별 (SCANOSS) 토글](../images/web-ui-identify-vendored-en.png)
+![고급 섹션의 파일 단위 식별 (SCANOSS) 토글](../images/web-ui-identify-vendored-ko.png)
 
 ## 결과
 
@@ -55,7 +55,7 @@ docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker
 
 파일 단위 전체 일치만 컴포넌트가 됩니다. 부분(스니펫) 일치는 노이즈가 커서 제외하므로 보고서가 깔끔하게 유지됩니다.
 
-![vendored 표시와 일치도가 달린 컴포넌트 표](../images/web-ui-vendored-badge-en.png)
+![vendored 표시와 일치도가 달린 컴포넌트 표](../images/web-ui-vendored-badge-ko.png)
 
 ## 엔드포인트와 제한
 

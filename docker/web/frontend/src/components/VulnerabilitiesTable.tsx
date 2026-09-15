@@ -15,14 +15,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { EmptyState, ErrorState } from "@/components/ui/state";
-import { type SecuritySummary, type Severity, type VulnItem } from "@/lib/api";
+import {
+  ApiError,
+  saveVexVerdict,
+  VEX_STATES,
+  type SecuritySummary,
+  type Severity,
+  type VexState,
+  type VulnItem,
+} from "@/lib/api";
 import { csvFilename, downloadCsv, toCsv, vulnCsvRows } from "@/lib/csv";
 import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
 import { severityTone } from "@/lib/severity";
+import { useToast } from "@/lib/toast";
 import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
+import { IS_STATIC_DEMO } from "@/lib/demo";
 
 import { SeverityBar } from "./SeverityBar";
 
@@ -56,6 +67,23 @@ const STATUS_HINT_KEY: Record<string, string> = {
   end_of_life: "result.statusEndOfLifeHint",
   fix_deferred: "result.statusFixDeferredHint",
   under_investigation: "result.statusUnderInvestigationHint",
+};
+
+// The supplier's own judgement (POST /vex-verdict), badged separately from
+// STATUS_TONE above (the vendor/advisory's own disposition) with its own
+// "Judgement: …" wording so the two are never mistaken for one axis.
+const VEX_TONE: Record<VexState, "success" | "medium" | "info"> = {
+  fixed: "success",
+  not_affected: "success",
+  affected: "medium",
+  under_investigation: "info",
+};
+
+const VEX_LABEL_KEY: Record<VexState, string> = {
+  affected: "result.vexStateAffected",
+  not_affected: "result.vexStateNotAffected",
+  fixed: "result.vexStateFixed",
+  under_investigation: "result.vexStateUnderInvestigation",
 };
 
 interface Props {
@@ -137,29 +165,34 @@ function formatPublishedDate(iso: string, locale: string): string {
   return d.toLocaleDateString(locale, { dateStyle: "medium" });
 }
 
-/** Expanded detail for one CVE — CVSS, description and reference links. */
+/** Expanded detail for one CVE: CVSS, description, reference links, and the
+ *  supplier's own judgement (VexJudgement below). */
 function VulnDetail({
   vuln,
   links,
   onPickComponent,
   onPickDependency,
+  scanId,
+  vex,
+  onVexSaved,
 }: {
   vuln: VulnItem;
   links: string[];
   onPickComponent?: (name: string) => void;
   onPickDependency?: (name: string, version?: string) => void;
+  scanId?: string | null;
+  vex: VexFields;
+  onVexSaved: (saved: VexFields) => void;
 }) {
   const { t, i18n } = useTranslation();
-  if (
-    vuln.cvss == null &&
-    !vuln.description &&
-    links.length === 0 &&
-    !vuln.publishedDate
-  ) {
+  const noOriginalDetail =
+    vuln.cvss == null && !vuln.description && links.length === 0 && !vuln.publishedDate;
+  if (noOriginalDetail && !scanId && !vex.state) {
     return <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>;
   }
   return (
     <div className="space-y-3">
+      {noOriginalDetail && <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>}
       {vuln.cvss != null && (
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="font-medium">{t("result.vulnCvss")}</span>
@@ -234,8 +267,135 @@ function VulnDetail({
           {t("result.viewInDependencies", { name: vuln.pkg })}
         </button>
       ) : null}
+      <VexJudgement scanId={scanId} vuln={vuln} vex={vex} onSaved={onVexSaved} />
     </div>
   );
+}
+
+/** Judgement input for one CVE against one component: state select, an
+ *  optional note, and Save. Read-only (state only, no editing) in the static
+ *  demo build, which has no server to save to. */
+function VexJudgement({
+  scanId,
+  vuln,
+  vex,
+  onSaved,
+}: {
+  scanId?: string | null;
+  vuln: VulnItem;
+  vex: VexFields;
+  onSaved: (saved: VexFields) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { toast } = useToast();
+  const [pendingState, setPendingState] = useState<VexState | "">(vex.state ?? "");
+  const [pendingDetail, setPendingDetail] = useState(vex.detail ?? "");
+  const [saving, setSaving] = useState(false);
+
+  // The same component instance is reused across rows as the open panel
+  // switches (React diffs by the surrounding Fragment's key, not this one's
+  // props), so the form has to resync when the row underneath it changes.
+  useEffect(() => {
+    setPendingState(vex.state ?? "");
+    setPendingDetail(vex.detail ?? "");
+  }, [vuln.id, vuln.purl, vuln.pkg, vex.state, vex.detail]);
+
+  if (IS_STATIC_DEMO) {
+    if (!vex.state) return null;
+    return (
+      <div className="space-y-1 border-t pt-3">
+        <div className="font-medium">{t("result.vexSectionTitle")}</div>
+        <Badge tone={VEX_TONE[vex.state]}>{t(VEX_LABEL_KEY[vex.state])}</Badge>
+        {vex.detail && <p className="text-muted-foreground">{vex.detail}</p>}
+      </div>
+    );
+  }
+  if (!scanId) return null;
+
+  const save = async () => {
+    if (!pendingState) return;
+    setSaving(true);
+    try {
+      const verdict = await saveVexVerdict(scanId, {
+        cve: vuln.id,
+        state: pendingState,
+        detail: pendingDetail || undefined,
+        purl: vuln.purl,
+        pkg: vuln.purl ? undefined : vuln.pkg,
+        installed: vuln.purl ? undefined : vuln.installed,
+      });
+      onSaved({ state: verdict.state, detail: verdict.detail, updatedAt: verdict.updatedAt });
+      toast(t("result.vexSaved"));
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : t("result.vexSaveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="font-medium">{t("result.vexSectionTitle")}</div>
+      <p className="text-xs text-muted-foreground">{t("result.vexSectionHint")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          aria-label={t("result.vexStateLabel")}
+          value={pendingState}
+          onChange={(e) => setPendingState(e.target.value as VexState | "")}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">{t("result.vexStatePlaceholder")}</option>
+          {VEX_STATES.map((s) => (
+            <option key={s} value={s}>
+              {t(VEX_LABEL_KEY[s])}
+            </option>
+          ))}
+        </Select>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={!pendingState || saving}
+          onClick={(e) => {
+            e.stopPropagation();
+            void save();
+          }}
+        >
+          {saving ? t("result.vexSaving") : t("result.vexSaveButton")}
+        </Button>
+      </div>
+      <textarea
+        value={pendingDetail}
+        onChange={(e) => setPendingDetail(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        placeholder={t("result.vexDetailPlaceholder")}
+        aria-label={t("result.vexDetailLabel")}
+        rows={2}
+        maxLength={2000}
+        className="w-full max-w-lg rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      />
+      {vex.updatedAt && (
+        <p className="text-xs text-muted-foreground">
+          {t("result.vexUpdatedAt", { date: formatPublishedDate(vex.updatedAt, i18n.language) })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A row's own saved fields, or a not-yet-persisted local edit overriding
+ *  them (set right after a successful save, before the next full reload). */
+interface VexFields {
+  state?: VexState;
+  detail?: string;
+  updatedAt?: string;
+}
+
+/** Same identity a saved verdict is keyed by: purl when the row has one,
+ *  otherwise pkg+installed (matching the server's own purl-then-fallback
+ *  join in security_summary/_vex_verdict_index). */
+function vexKey(v: VulnItem): string {
+  return `${v.purl || `${v.pkg}@${v.installed}`}::${v.id}`;
 }
 
 /**
@@ -254,6 +414,13 @@ export function VulnerabilitiesTable({
   const { t } = useTranslation();
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // Local overrides for a verdict just saved this session, so the badge and
+  // panel reflect it immediately without waiting on a re-fetch of the whole
+  // scan. Reset on scanId change so switching scans can't carry one over.
+  const [vexOverrides, setVexOverrides] = useState<Record<string, VexFields>>({});
+  useEffect(() => {
+    setVexOverrides({});
+  }, [scanId]);
   const initial = vulnsFromQuery(urlState);
   const [severityFilter, setSeverityFilter] = useState(initial.severity);
   const [query, setQuery] = useState(initial.term);
@@ -460,14 +627,26 @@ export function VulnerabilitiesTable({
         </thead>
         <tbody>
           {visible.map((v, i) => {
-            const key = `${v.id}-${v.pkg}-${i}`;
+            // `i` alone already makes this unique for React; purl (falling back
+            // to pkg name) is used instead of pkg so the key identifies the same
+            // component as the grouping/join keys elsewhere in this file.
+            const key = `${v.id}-${v.purl || v.pkg}-${i}`;
             const isOpen = openKey === key;
             const links = vulnLinks(v);
+            const vex: VexFields = vexOverrides[vexKey(v)] ?? {
+              state: v.vexState,
+              detail: v.vexDetail,
+              updatedAt: v.vexUpdatedAt,
+            };
             const hasDetail =
               v.cvss != null ||
               !!v.description ||
               links.length > 0 ||
-              !!v.publishedDate;
+              !!v.publishedDate ||
+              // The judgement panel is reachable even for a CVE with no other
+              // detail: a component's own scan is the one place to set it.
+              Boolean(scanId) ||
+              Boolean(vex.state);
             const toggle = () => setOpenKey(isOpen ? null : key);
             return (
               <Fragment key={key}>
@@ -518,6 +697,11 @@ export function VulnerabilitiesTable({
                           }
                         >
                           {STATUS_LABEL_KEY[v.status] ? t(STATUS_LABEL_KEY[v.status]) : v.status}
+                        </Badge>
+                      )}
+                      {vex.state && (
+                        <Badge tone={VEX_TONE[vex.state]} title={t("result.vexSectionHint")}>
+                          {t("result.vexBadge", { state: t(VEX_LABEL_KEY[vex.state]) })}
                         </Badge>
                       )}
                       {v.kev && (
@@ -586,6 +770,11 @@ export function VulnerabilitiesTable({
                         links={links}
                         onPickComponent={onPickComponent}
                         onPickDependency={onPickDependency}
+                        scanId={scanId}
+                        vex={vex}
+                        onVexSaved={(saved) =>
+                          setVexOverrides((prev) => ({ ...prev, [vexKey(v)]: saved }))
+                        }
                       />
                     </td>
                   </tr>

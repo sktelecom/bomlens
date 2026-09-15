@@ -7,6 +7,8 @@
   "commitMessagePrefix": "chore(deps):",
   "prConcurrentLimit": 5,
   "separateMajorMinor": true,
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
   "packageRules": [
     {
       "description": "Surface tool major bumps (e.g. cdxgen v12 -> v13) as their own PR for a deliberate, snapshot-reviewed upgrade.",

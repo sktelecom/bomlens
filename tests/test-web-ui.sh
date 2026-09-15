@@ -501,6 +501,165 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("CONFORMANCE_PROFILE") for a in captured["args"]), captured["args"]
 
+# PURL/LICENSE/HASH/FIELD_MIN_PCT: an operator's environment variable on this
+# server's own container (docs/reference/docker-image.md), not a request field
+# -- so _pct_env reads os.environ directly, and the test sets it there too
+# (not via extra_env, which run_sibling_scan merges in as if it were a request
+# field). A missed forward would silently re-grade a scan against the default
+# thresholds instead of the operator's own, the same class of bug as
+# CONFORMANCE_PROFILE above.
+_PCT_VARS = ("PURL_MIN_PCT", "LICENSE_MIN_PCT", "HASH_MIN_PCT", "FIELD_MIN_PCT")
+for _v in _PCT_VARS:
+    os.environ[_v] = "77"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+)
+assert rc == 0, rc
+for _v in _PCT_VARS:
+    assert ("%s=77" % _v) in captured["args"], (_v, captured["args"])
+for _v in _PCT_VARS:
+    del os.environ[_v]
+
+# Unset -> not forwarded at all (validate-sbom.sh's own default applies).
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+)
+assert rc == 0, rc
+assert not any(a.startswith(_PCT_VARS) for a in captured["args"]), captured["args"]
+
+# A bad value (non-numeric, or numeric but out of 0-100) is dropped, not
+# forwarded as-is -- validate-sbom.sh's `--argjson` would crash the whole
+# conformance step on the non-numeric one.
+for _bad in ("abc", "150", "-5", "12.5", ""):
+    os.environ["PURL_MIN_PCT"] = _bad
+    captured.clear()
+    rc = server.run_sibling_scan(
+        "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+        lambda ln: None, upload_file=up_file,
+    )
+    assert rc == 0, rc
+    assert not any(a.startswith("PURL_MIN_PCT") for a in captured["args"]), (_bad, captured["args"])
+    del os.environ["PURL_MIN_PCT"]
+
+# DEEP_LICENSE and BYTE_STABLE: plain New scan checkboxes the request already
+# sets on the in-process env dict (server's own env.update above), not an
+# operator environment variable like the four PCT vars -- so the test drives
+# them via extra_env, the same way CONFORMANCE_PROFILE above does. A missed
+# forward would silently drop a checkbox the reader just turned on.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_LICENSE": "true", "BYTE_STABLE": "true"},
+)
+assert rc == 0, rc
+assert "DEEP_LICENSE=true" in captured["args"], captured["args"]
+assert "BYTE_STABLE=true" in captured["args"], captured["args"]
+
+# Off (or simply not set) forwards the explicit "false", not silence -- a
+# missing key must not fall back to _bool_env's default-true.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+)
+assert rc == 0, rc
+assert "DEEP_LICENSE=false" in captured["args"], captured["args"]
+assert "BYTE_STABLE=false" in captured["args"], captured["args"]
+
+# SECURITY_ENRICH/ENRICH_MALICIOUS: an operator's own container environment
+# (docs/reference/cli.md, docs/reference/docker-image.md), not a request
+# field -- same as the PCT vars, forwarded via extra_env the way
+# run_sibling_scan's caller passes its own os.environ.copy()-based env
+# through. Both default on and must reach the sibling explicitly off when the
+# operator turned them off (e.g. air-gapped, no EPSS/KEV/malicious lookup);
+# a missed forward would silently re-enable them only in the sibling.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"SECURITY_ENRICH": "false", "ENRICH_MALICIOUS": "false"},
+)
+assert rc == 0, rc
+assert "SECURITY_ENRICH=false" in captured["args"], captured["args"]
+assert "ENRICH_MALICIOUS=false" in captured["args"], captured["args"]
+
+# Unset (or any other value) forwards the explicit default "true" -- the
+# missing-key case _bool_env is meant for, unlike DEEP_LICENSE/BYTE_STABLE.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+)
+assert rc == 0, rc
+assert "SECURITY_ENRICH=true" in captured["args"], captured["args"]
+assert "ENRICH_MALICIOUS=true" in captured["args"], captured["args"]
+
+# STALENESS_ENRICH: same operator-environment story, but opt-in (default off)
+# like DEEP_LICENSE/BYTE_STABLE -- on must be explicit, and unset must forward
+# the explicit "false", not silence.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"STALENESS_ENRICH": "true"},
+)
+assert rc == 0, rc
+assert "STALENESS_ENRICH=true" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+)
+assert rc == 0, rc
+assert "STALENESS_ENRICH=false" in captured["args"], captured["args"]
+
+# SECURITY_NVD_VERIFY + NVD_API_KEY: opt-in, meaningful only alongside
+# DEEP_CVE (gated the same way scan-security.sh gates scan-nvd-cpe.py). The
+# key is a secret, forwarded by NAME ONLY like SCANOSS_API_KEY above -- never
+# inlined as NVD_API_KEY=value.
+NVD_SENTINEL = "nvd_sentinel_do_not_leak_7c2e"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "SECURITY_NVD_VERIFY": "true", "NVD_API_KEY": NVD_SENTINEL},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "SECURITY_NVD_VERIFY=true" in _a, _a
+assert "NVD_API_KEY" in _a and not any(x.startswith("NVD_API_KEY=") for x in _a), _a
+assert not any(NVD_SENTINEL in a for a in _a), "NVD_API_KEY value leaked into argv"
+assert (captured["env"] or {}).get("NVD_API_KEY") == NVD_SENTINEL, "subprocess env must carry the key for name-only -e"
+
+# SECURITY_NVD_VERIFY without DEEP_CVE -> not forwarded (the version filter it
+# controls never runs outside a deep-cve scan).
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"SECURITY_NVD_VERIFY": "true", "NVD_API_KEY": NVD_SENTINEL},
+)
+assert rc == 0, rc
+assert not any(x.startswith("SECURITY_NVD_VERIFY") for x in captured["args"]), captured["args"]
+assert not any(x == "NVD_API_KEY" for x in captured["args"]), captured["args"]
+
+# SECURITY_NVD_VERIFY off (default) with DEEP_CVE on -> stays out of the argv,
+# and no key is forwarded without it.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "NVD_API_KEY": NVD_SENTINEL},
+)
+assert rc == 0, rc
+assert not any(x.startswith("SECURITY_NVD_VERIFY") for x in captured["args"]), captured["args"]
+assert not any(x == "NVD_API_KEY" for x in captured["args"]), captured["args"]
+
 # HF_TOKEN: inherited from THIS container's environment (never posted to the UI)
 # and forwarded by name only, so the secret stays out of the docker-run argv.
 HF_SENTINEL = "hf_sentinel_do_not_leak_9f3a"
@@ -1032,6 +1191,74 @@ else
     fail "Yocto detection parity failed (see assertion above)"
 fi
 
+echo "== nested_rootfs_hint: mirrors scan-sbom.sh's shape check for the web UI's deep source scan =="
+if python3 - "$ROOT_DIR" <<'PY'
+import os, sys, tempfile
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+with tempfile.TemporaryDirectory() as root:
+    def mk(*parts):
+        p = os.path.join(root, *parts)
+        os.makedirs(p, exist_ok=True)
+        return p
+
+    # Same four fixtures, same names and shapes, as
+    # tests/test-input-routing.sh's "nested_rootfs_hint" section,
+    # kept in sync deliberately (see the comment on nested_rootfs_hint in
+    # scripts/scan-sbom.sh and in this file's own nested_rootfs_hint).
+
+    # A directory that is itself a rootfs (etc/ + 2 of bin/sbin/usr/lib/var)
+    # gets no hint -- it has nothing to add there, this check exists only for
+    # the SOURCE-branch diagnostic.
+    flat = mk("flat")
+    for sub in ("etc", "bin", "sbin", "usr", "lib"):
+        mk("flat", sub)
+    assert server.nested_rootfs_hint(flat) is None, "a rootfs itself should get no hint"
+
+    # The common wrapped-delivery shape, named relative to the picked folder --
+    # what the web UI's own diagnostic will show the user.
+    delivery = mk("delivery")
+    mk("delivery", "release-20260919", "rootfs", "etc")
+    mk("delivery", "release-20260919", "rootfs", "bin")
+    mk("delivery", "release-20260919", "rootfs", "usr")
+    assert server.nested_rootfs_hint(delivery) == os.path.join("release-20260919", "rootfs"), \
+        server.nested_rootfs_hint(delivery)
+
+    onelevel = mk("onelevel")
+    mk("onelevel", "rootfs", "etc")
+    mk("onelevel", "rootfs", "bin")
+    mk("onelevel", "rootfs", "var")
+    assert server.nested_rootfs_hint(onelevel) == "rootfs", server.nested_rootfs_hint(onelevel)
+
+    # No nested rootfs anywhere -- no hint, same as an ordinary source tree.
+    nodeps = mk("nodeps")
+    mk("nodeps", "src")
+    assert server.nested_rootfs_hint(nodeps) is None
+PY
+then
+    pass "nested_rootfs_hint matches the CLI's shape check (self/wrapped/one-level/none)"
+else
+    fail "nested_rootfs_hint parity with scan-sbom.sh failed (see assertion above)"
+fi
+
+# A deep source scan always copies and builds the whole picked scan root
+# (picked["path"]), never the request-derived scan_dir a caller may have
+# pointed at a subfolder of it -- copy_scan_target_tree already makes this
+# choice explicitly (its own comment: request input must not reach the
+# copytree sink). nested_rootfs_hint must look in the same place the scan
+# actually covers, for the same reason and so the CLI/web-UI diagnostics
+# agree on what "one or two levels below the scanned folder" means. A CodeQL
+# alert on the earlier scan_dir-based call is closed by this source fix, not
+# by dismissal -- this guards the fix by source text rather than re-running
+# the request handler (no scan-target-src integration harness exists yet to
+# drive it end to end).
+if grep -qF 'hint = nested_rootfs_hint(picked["path"])' "$ROOT_DIR/docker/web/server.py"; then
+    pass "the deep-scan nested-rootfs hint is looked up from the picked scan root, not the request path"
+else
+    fail "the deep-scan nested-rootfs hint call no longer uses picked[\"path\"] -- did it regress to the request-derived scan_dir?"
+fi
+
 echo "== upload round-trip (the regression that shows as 'Failed to fetch') =="
 echo "hello" > "$WORK/payload.txt"
 ( cd "$WORK" && zip -q sample.zip payload.txt )
@@ -1536,6 +1763,37 @@ else
 fi
 rm -f "$OUT"/serr_1.0_* "$OUT"/sok_1.0_*
 
+echo "== purl attached to vulnerability rows (security_summary) =="
+# Two different components (different ecosystems) can share a name and
+# installed version by coincidence. Without the purl on each row, a consumer
+# joining/grouping by pkg+installed alone (groupByUpgrade on the frontend)
+# would merge findings that belong to two unrelated components.
+cat > "$OUT/purl_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-1","Severity":"HIGH","PkgName":"foo","InstalledVersion":"1.0",
+   "PkgIdentifier":{"PURL":"pkg:npm/foo@1.0"}},
+  {"VulnerabilityID":"CVE-2","Severity":"LOW","PkgName":"foo","InstalledVersion":"1.0",
+   "PkgIdentifier":{"PURL":"pkg:golang/foo@1.0"}},
+  {"VulnerabilityID":"CVE-3","Severity":"LOW","PkgName":"libfoo","InstalledVersion":"1.0"}
+]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+vulns = {x["id"]: x for x in server.security_summary("purl_1.0")["vulnerabilities"]}
+assert vulns["CVE-1"]["purl"] == "pkg:npm/foo@1.0", vulns["CVE-1"]
+assert vulns["CVE-2"]["purl"] == "pkg:golang/foo@1.0", vulns["CVE-2"]
+assert vulns["CVE-1"]["purl"] != vulns["CVE-2"]["purl"], "different components must not share a purl"
+assert "purl" not in vulns["CVE-3"], vulns["CVE-3"]  # no PkgIdentifier -> omitted, not guessed
+PY
+then
+    pass "purl attached to each vulnerability row when Trivy resolved one"
+else
+    fail "purl attachment is wrong"
+fi
+rm -f "$OUT"/purl_1.0_*
+
 echo "== untrusted SBOM shapes must not crash the summaries (ANALYZE mode) =="
 # ANALYZE copies an uploaded SBOM verbatim; CycloneDX does not force components[]
 # to be objects or properties/licenses/externalReferences to be arrays. A crafted
@@ -1750,6 +2008,62 @@ else
     echo "  SKIP: jq not available for conformance generation"
 fi
 
+echo "== conformance_summary passes through pipelineStepsFailed =="
+# validate-sbom.sh already dedupes/orders/caps this off the SBOM's own
+# bomlens:pipeline-step-failed properties; conformance_summary must pass it
+# through, and default to []/0 for a report generated before this field
+# existed (an old _conformance.json on disk, or one hand-crafted without it),
+# rather than surfacing a missing key as null and breaking the frontend type.
+if command -v jq >/dev/null 2>&1; then
+    jq '.metadata.properties = [
+      {"name":"bomlens:pipeline-step-failed","value":"normalize"},
+      {"name":"bomlens:pipeline-step-failed","value":"enrich-cpe"},
+      {"name":"bomlens:pipeline-step-failed","value":"normalize"}
+    ]' "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" > "$OUT/psfweb_1.0_bom.json"
+    PROJECT=psfweb GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
+        "$OUT/psfweb_1.0_bom.json" "$OUT/psfweb_1.0" >/dev/null 2>&1
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+c = server.conformance_summary("psfweb_1.0")
+assert c is not None, "no conformance summary"
+assert c.get("pipelineStepsFailed") == ["normalize", "enrich-cpe"], (
+    "pipelineStepsFailed not passed through / not deduped", c.get("pipelineStepsFailed"))
+assert c.get("pipelineStepsFailedMore") == 0, c.get("pipelineStepsFailedMore")
+PY
+    then
+        pass "conformance_summary passes through pipelineStepsFailed, deduped"
+    else
+        fail "conformance_summary did not pass through pipelineStepsFailed"
+    fi
+    rm -f "$OUT"/psfweb_1.0_*
+
+    # An old report predates the field entirely -- absence, not null or a crash.
+    PROJECT=psfold GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
+        "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$OUT/psfold_1.0" >/dev/null 2>&1
+    jq 'del(.pipelineStepsFailed, .pipelineStepsFailedMore)' \
+        "$OUT/psfold_1.0_conformance.json" > "$OUT/psfold_1.0_conformance.json.tmp" \
+        && mv "$OUT/psfold_1.0_conformance.json.tmp" "$OUT/psfold_1.0_conformance.json"
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+c = server.conformance_summary("psfold_1.0")
+assert c is not None, "no conformance summary"
+assert c.get("pipelineStepsFailed") == [], ("an old report must default to []", c.get("pipelineStepsFailed"))
+assert c.get("pipelineStepsFailedMore") == 0, ("an old report must default to 0", c.get("pipelineStepsFailedMore"))
+PY
+    then
+        pass "an old report with no pipelineStepsFailed key defaults to [] and 0"
+    else
+        fail "an old report without pipelineStepsFailed was not defaulted safely"
+    fi
+    rm -f "$OUT"/psfold_1.0_*
+else
+    echo "  SKIP: jq not available for conformance generation"
+fi
+
 echo "== ai profile summary (ai_profile_summary) =="
 # generate-ai-profile.sh re-aggregates the conformance + SBOM artifacts into a
 # governance card. ai_profile_summary must return the light rollup for an AI SBOM
@@ -1928,6 +2242,76 @@ else
     fail "sbomToolDegraded not surfaced correctly"
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
+
+echo "== pipeline-step-failed property (sbom_summary) =="
+# mark_pipeline_warning (docker/lib/pipeline-step.sh) appends one
+# bomlens:pipeline-step-failed property per failed best-effort step, so the
+# same name can repeat; sbom_summary must collect all of them, not just the
+# first. A document with none must surface an empty list, not a missing key.
+cat > "$OUT/pipefail_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"pipefail","version":"1.0"},"properties":[{"name":"bomlens:pipeline-step-failed","value":"enrich-cpe"},{"name":"bomlens:pipeline-step-failed","value":"generate-notice"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/pipeok_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"pipeok","version":"1.0"}},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server.sbom_summary("pipefail_1.0")["pipelineStepsFailed"] == ["enrich-cpe", "generate-notice"]
+assert server.sbom_summary("pipeok_1.0")["pipelineStepsFailed"] == []
+PY
+then
+    pass "pipelineStepsFailed collects every occurrence (empty list when none)"
+else
+    fail "pipelineStepsFailed not surfaced correctly"
+fi
+rm -f "$OUT"/pipefail_1.0_* "$OUT"/pipeok_1.0_*
+
+echo "== pipeline-step-failed: dedup, per-id cap, and list cap (untrusted input) =="
+# On an --analyze run this property comes from a supplier's document, so it is
+# untrusted: mark_pipeline_warning can record the same step twice (a
+# re-analyzed document), a step id could be arbitrarily long, and there is no
+# limit on how many distinct ids a document could carry. sbom_summary must
+# dedupe (order preserved), cap one id's length, and cap the list length while
+# counting the rest.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+out_dir = os.environ["SBOM_OUTPUT_DIR"]
+long_value = "x" * 300
+props = (
+    [{"name": "bomlens:pipeline-step-failed", "value": "enrich-cpe"}] * 2
+    + [{"name": "bomlens:pipeline-step-failed", "value": long_value}]
+    + [{"name": "bomlens:pipeline-step-failed", "value": f"step-{i}"} for i in range(25)]
+)
+with open(os.path.join(out_dir, "pipebig_1.0_bom.json"), "w") as f:
+    json.dump(
+        {
+            "bomFormat": "CycloneDX",
+            "metadata": {"component": {"name": "pipebig", "version": "1.0"}, "properties": props},
+            "components": [{"name": "flask", "version": "2.0", "type": "library", "purl": "pkg:pypi/flask@2.0"}],
+        },
+        f,
+    )
+
+summary = server.sbom_summary("pipebig_1.0")
+steps = summary["pipelineStepsFailed"]
+# 27 distinct values in (enrich-cpe once deduped + the long one + 25 step-N),
+# capped to 20; the other 7 are counted, not shown.
+assert steps.count("enrich-cpe") == 1, steps
+assert len(steps) == 20, steps
+assert summary["pipelineStepsFailedMore"] == 7, summary["pipelineStepsFailedMore"]
+assert len(steps[1]) == 100, len(steps[1])
+PY
+then
+    pass "pipelineStepsFailed dedupes, caps id length at 100 and the list at 20"
+else
+    fail "pipelineStepsFailed untrusted-input handling is wrong (see assertion above)"
+fi
+rm -f "$OUT"/pipebig_1.0_*
 
 echo "== sbom-oversized property (sbom_summary) =="
 # When entrypoint.sh's size-cap check stamps bomlens:sbom-oversized, the
@@ -2770,6 +3154,8 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "AI_USAGE_CONTEXT=${AI_USAGE_CONTEXT:-}"
   echo "CONFORMANCE_PROFILE=${CONFORMANCE_PROFILE:-}"
   echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"
+  echo "SBOM_AUTHOR=${SBOM_AUTHOR:-}"
+  echo "REPORT_LANG=${REPORT_LANG:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
   echo "TARGET_DIR=${TARGET_DIR:-}"
@@ -2787,6 +3173,31 @@ case "$mode" in
     progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
     deepcve-progress) echo "[deep-cve-progress] 55%"; write_bom ;;
     fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
+    # Mirrors #109's Node fallback quality gate: an [ERROR] block explaining
+    # what happened, then a separate one-line [ERROR] right before exit. Both
+    # must reach the failed-scan card, not just the last ("see above") line.
+    error-block)
+        echo "[ERROR] The dependency resolver failed and the fallback scan found none of the project's declared dependencies."
+        echo "        Commit a lockfile that matches package.json, or run 'npm install' once so a resolvable lockfile is present, then re-scan."
+        echo "[ERROR] fallback SBOM discarded (see above)."
+        exit 1
+        ;;
+    # The real merged text of #109's apply_node_fallback_quality_gate
+    # (docker/lib/source-detect.sh), verbatim -- this is what actually reaches
+    # a web UI scan's log today, not a stand-in.
+    error-block-real)
+        echo "[ERROR] The dependency resolver failed and the fallback scan found none of the project's declared dependencies (direct-deps-only manifest reading), so the result would misrepresent the scan as covering the dependency tree when it covers none of it."
+        echo "        Commit a lockfile (package-lock.json, npm-shrinkwrap.json, yarn.lock or pnpm-lock.yaml) that matches package.json if one is missing, or run 'npm install'/'pnpm install' once so a resolvable lockfile is present, then re-scan."
+        echo "        Or scan from an environment where cdxgen itself can run (Docker access for the web UI's source scan; a working docker.sock for the CLI's transitive resolution) instead of relying on this direct-deps-only fallback."
+        exit 1
+        ;;
+    # A raw upstream HTTP response body (as the TRUSCA/Dependency-Track upload
+    # failure paths print) must never reach the card, indented or not.
+    error-response-leak)
+        echo "[ERROR] TRUSCA ingest failed (HTTP 500)"
+        echo "Response: {\"secret\": \"do-not-leak-me\"}"
+        exit 1
+        ;;
     hang)
         i=0
         while [ "$i" -lt 100 ]; do
@@ -2925,10 +3336,159 @@ import sys, json
 evs = json.load(sys.stdin)
 dones = [e for e in evs if e['event'] == 'done']
 assert len(dones) == 1 and dones[0]['data']['ok'] is False, evs
+# No [ERROR]-marked line at all: nothing to show beyond the generic fallback
+# the frontend already falls back to (run.failedBody) when this is null.
+assert dones[0]['data'].get('errorMessage') is None, evs
 "; then
     pass "scanner exit 1 ends the stream with done ok:false"
 else
     fail "failed scan did not report done ok:false" "$events"
+fi
+
+# Mirrors #109's Node fallback quality gate: an explanation block, then a
+# separate one-line block right before exit. Both must reach errorMessage in
+# order, not just the last ("see above") line.
+echo error-block > "$STUB_MODE_FILE"
+events=$(sse_events "project=errblock&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+dones = [e for e in evs if e['event'] == 'done']
+assert len(dones) == 1 and dones[0]['data']['ok'] is False, evs
+msg = dones[0]['data'].get('errorMessage')
+assert msg is not None, evs
+assert 'dependency resolver failed' in msg, msg
+assert 'Commit a lockfile' in msg, msg
+assert msg.endswith('fallback SBOM discarded (see above).'), msg
+# No sse('error') was sent for this run (a plain exit 1, no rc==-1/exception
+# path), so errorMessage is the only place this reached the client.
+assert not [e for e in evs if e['event'] == 'error'], evs
+"; then
+    pass "a multi-block scanner failure reaches errorMessage in order, not just the last block"
+else
+    fail "multi-block [ERROR] capture did not reach errorMessage as expected" "$events"
+fi
+
+# The real merged wording (#109, docker/lib/source-detect.sh's
+# apply_node_fallback_quality_gate), not a stand-in: guards against the stub
+# above drifting stale if that file's message ever changes without this test
+# changing too.
+if grep -qF "The dependency resolver failed and the fallback scan found none of the project's declared dependencies (direct-deps-only manifest reading)" \
+    "$ROOT_DIR/docker/lib/source-detect.sh" \
+    && grep -qF "Commit a lockfile (package-lock.json, npm-shrinkwrap.json, yarn.lock or pnpm-lock.yaml)" \
+        "$ROOT_DIR/docker/lib/source-detect.sh"; then
+    pass "the stub's real-wording case still matches docker/lib/source-detect.sh verbatim"
+else
+    fail "docker/lib/source-detect.sh's Node fallback quality gate wording changed; update the error-block-real stub and this test to match"
+fi
+echo error-block-real > "$STUB_MODE_FILE"
+events=$(sse_events "project=errblockreal&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+dones = [e for e in evs if e['event'] == 'done']
+assert len(dones) == 1 and dones[0]['data']['ok'] is False, evs
+msg = dones[0]['data'].get('errorMessage')
+assert msg is not None, evs
+assert len(msg) == 500, len(msg)
+assert msg.startswith('...'), msg
+# The real block is 687 chars raw, so the cap cuts into the first (diagnostic)
+# sentence -- both actionable guidance sentences, at the tail, must survive
+# in full: that's what a reader actually needs to act on.
+assert msg.endswith(
+    \"or run 'npm install'/'pnpm install' once so a resolvable lockfile is present, then re-scan.\n\"
+    \"Or scan from an environment where cdxgen itself can run (Docker access for the web UI's source scan; \"
+    \"a working docker.sock for the CLI's transitive resolution) instead of relying on this direct-deps-only fallback.\"
+), msg
+"; then
+    pass "the real #109 Node-fallback message is captured and the 500-char cap keeps both guidance sentences intact"
+else
+    fail "the real #109 Node-fallback message was not captured as expected" "$events"
+fi
+
+# A raw upstream HTTP response body (as printed on the TRUSCA/Dependency-Track
+# upload failure paths) must never reach the client, regardless of indentation.
+echo error-response-leak > "$STUB_MODE_FILE"
+events=$(sse_events "project=respleak&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+dones = [e for e in evs if e['event'] == 'done']
+assert len(dones) == 1 and dones[0]['data']['ok'] is False, evs
+msg = dones[0]['data'].get('errorMessage')
+# The raw line still streams to the live log as always (unchanged, pre-existing
+# behavior); only errorMessage -- the new field a card would show prominently
+# -- must never carry the response body.
+assert msg == '[ERROR] TRUSCA ingest failed (HTTP 500)', msg
+assert 'do-not-leak-me' not in msg, msg
+assert any('do-not-leak-me' in str(e['data']) for e in evs if e['event'] == 'log'), \
+    'expected the raw Response: line to still be in the live log, unaffected'
+"; then
+    pass "a raw Response: body line never reaches errorMessage, only the [ERROR] line above it"
+else
+    fail "a Response: line leaked into errorMessage" "$events"
+fi
+
+echo "== _scrub_error_text: credential/token-shaped text is masked before display =="
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+scrub = server._scrub_error_text
+assert "hunter2" not in scrub("Upload to https://user:hunter2@example.com/api failed")
+assert "***@example.com" in scrub("Upload to https://user:hunter2@example.com/api failed")
+assert "abcdef1234567890abcdef1234567890" not in scrub(
+    "Authorization: Bearer abcdef1234567890abcdef1234567890")
+assert "dXNlcjpwYXNz" not in scrub("curl: Authorization: Basic dXNlcjpwYXNz")
+assert "deadbeefdeadbeefdeadbeef" not in scrub("curl failed: token=deadbeefdeadbeefdeadbeef1234")
+assert "0123456789abcdef0123456789abcdef01234567" not in scrub(
+    "hash mismatch: 0123456789abcdef0123456789abcdef01234567")
+assert "QWxhZGRpbjpvcGVuIHNlc2FtZQ==QWxhZGRpbjpvcGVuIHNlc2FtZQ==" not in scrub(
+    "blob: QWxhZGRpbjpvcGVuIHNlc2FtZQ==QWxhZGRpbjpvcGVuIHNlc2FtZQ==")
+# Ordinary text with no credential-shaped substring survives untouched.
+assert scrub("[ERROR] TARGET_FILE not found: /src/demo.zip") == "[ERROR] TARGET_FILE not found: /src/demo.zip"
+print("ok")
+PY
+then
+    pass "URL userinfo, Authorization/Bearer, token=, hex and base64 blobs are all masked"
+else
+    fail "_scrub_error_text let a credential/token-shaped substring through"
+fi
+
+echo "== _ScanErrorTracker: block grouping, dedup and the 500-char cap =="
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# A repeated identical block (e.g. a retried step logging the same [ERROR]
+# twice) is kept only once, not duplicated.
+t = server._ScanErrorTracker()
+t.feed("[ERROR] source dir not found: /src")
+t.feed("[ERROR] source dir not found: /src")
+assert t.result() == "[ERROR] source dir not found: /src", t.result()
+
+# An [ERROR] block still open at end-of-stream (no trailing blank/marker line)
+# is still captured.
+t2 = server._ScanErrorTracker()
+t2.feed("[ERROR] top")
+t2.feed("        continues here")
+assert t2.result() == "[ERROR] top\ncontinues here", t2.result()
+
+# Over the 500-char cap: the front is cut, not the end, with a leading "...".
+t3 = server._ScanErrorTracker()
+t3.feed("[ERROR] " + ("lorem ipsum dolor sit amet " * 30))
+res = t3.result()
+assert len(res) == 500, len(res)
+assert res.startswith("..."), res
+assert res.endswith("lorem ipsum dolor sit amet"), res
+print("ok")
+PY
+then
+    pass "the tracker dedupes identical blocks, flushes an unterminated block, and caps at 500 chars from the front"
+else
+    fail "_ScanErrorTracker grouping/dedup/cap behavior regressed"
 fi
 
 echo ok > "$STUB_MODE_FILE"
@@ -3220,6 +3780,110 @@ if [ -z "$(sed -n 's/^PROJECT_LICENSE=//p' "$WORK/stub-env")" ]; then
     pass "no license param -> PROJECT_LICENSE stays empty (conflict check off)"
 else
     fail "PROJECT_LICENSE was set without a license param" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== sbom_author: the SBOM author reaches the scan env verbatim, and only when given =="
+# URL-encode via Python (comma/space/parens/ampersand/Korean all need it; the
+# ampersand especially, or it would be read as a second query parameter).
+urlenc() { python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"; }
+rm -f "$WORK/stub-env"
+sse_events "project=auth1&version=1.0&source=current-dir&sbom_author=$(urlenc "ACME Corp")" >/dev/null
+if [ "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" = "ACME Corp" ]; then
+    pass "sbom_author=ACME Corp -> SBOM_AUTHOR in the run-scan env"
+else
+    fail "SBOM author did not reach the scan env" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=auth2&version=1.0&source=current-dir" >/dev/null
+if [ -z "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" ]; then
+    pass "no sbom_author param -> SBOM_AUTHOR stays empty (left out of the SBOM)"
+else
+    fail "SBOM_AUTHOR was set without a sbom_author param" "$(cat "$WORK/stub-env")"
+fi
+# This path (the in-process scan) is a subprocess env var, not a docker-run
+# argv or a shell command line, so a legal entity name reaches it byte for
+# byte -- no comma/parens/ampersand stripping, matching --sbom-author on the
+# CLI (see stamp-document-metadata.sh's jq --arg, and scan-sbom.sh's own
+# printf %q path, both verified end to end for the same two values below).
+rm -f "$WORK/stub-env"
+sse_events "project=auth3&version=1.0&source=current-dir&sbom_author=$(urlenc 'SK Telecom Co., Ltd.')" >/dev/null
+if [ "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" = "SK Telecom Co., Ltd." ]; then
+    pass "a legal-entity name with a comma reaches SBOM_AUTHOR unchanged"
+else
+    fail "SK Telecom Co., Ltd. was mangled" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=auth4&version=1.0&source=current-dir&sbom_author=$(urlenc '(주)에스케이 & 파트너스')" >/dev/null
+if [ "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" = "(주)에스케이 & 파트너스" ]; then
+    pass "a Korean legal-entity name with parens/ampersand reaches SBOM_AUTHOR unchanged"
+else
+    fail "(주)에스케이 & 파트너스 was mangled" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== lang: the request's language decides REPORT_LANG, not this server's own locale =="
+rm -f "$WORK/stub-env"
+sse_events "project=lang1&version=1.0&source=current-dir&lang=ko" >/dev/null
+if [ "$(sed -n 's/^REPORT_LANG=//p' "$WORK/stub-env")" = "ko" ]; then
+    pass "lang=ko -> REPORT_LANG=ko in the run-scan env"
+else
+    fail "lang=ko did not reach the scan env as REPORT_LANG" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=lang2&version=1.0&source=current-dir&lang=en" >/dev/null
+if [ "$(sed -n 's/^REPORT_LANG=//p' "$WORK/stub-env")" = "en" ]; then
+    pass "lang=en -> REPORT_LANG=en in the run-scan env"
+else
+    fail "lang=en did not reach the scan env as REPORT_LANG" "$(cat "$WORK/stub-env")"
+fi
+# Omitted and out-of-allowlist both fall back to en -- a typo in the query
+# param is not a reason to fail a scan, same rule as conformance_profile.
+rm -f "$WORK/stub-env"
+sse_events "project=lang3&version=1.0&source=current-dir" >/dev/null
+if [ "$(sed -n 's/^REPORT_LANG=//p' "$WORK/stub-env")" = "en" ]; then
+    pass "no lang param -> REPORT_LANG defaults to en"
+else
+    fail "REPORT_LANG did not default to en with no lang param" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=lang4&version=1.0&source=current-dir&lang=fr" >/dev/null
+if [ "$(sed -n 's/^REPORT_LANG=//p' "$WORK/stub-env")" = "en" ]; then
+    pass "lang=fr (not en/ko) falls back to REPORT_LANG=en"
+else
+    fail "an out-of-allowlist lang value did not fall back to en" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== _env_flag_value: sanitizer for the sibling docker-run -e argument =="
+if python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+# A legal entity name keeps the punctuation it actually needs -- this is the
+# same sanitizer PROJECT_NAME goes through, so widening it here also fixes a
+# name like "SK Telecom Co., Ltd." losing its comma there.
+assert server._env_flag_value("SK Telecom Co., Ltd.") == "SK Telecom Co., Ltd.", server._env_flag_value("SK Telecom Co., Ltd.")
+assert server._env_flag_value("(주)에스케이 & 파트너스") == "(주)에스케이 & 파트너스", server._env_flag_value("(주)에스케이 & 파트너스")
+assert server._env_flag_value("O'Reilly Media") == "O'Reilly Media", server._env_flag_value("O'Reilly Media")
+
+# $ and backticks are still stripped -- the two bytes that actually start a
+# command substitution -- even though the now-wider charset keeps the
+# parentheses around them (a legal entity name may need those too, e.g. a
+# "(주)" prefix); the result is inert literal text, not two bytes short of a
+# shell command. This value is not a shell string anywhere it goes (see the
+# SBOM_AUTHOR forwarding tests above and scan-sbom.sh's own printf %q path),
+# but the sanitizer keeps stripping $ and ` anyway as its own docstring's
+# defense-in-depth describes.
+mangled = server._env_flag_value("Evil $(touch /tmp/PWNED) `touch /tmp/PWNED2`")
+assert "$" not in mangled and "`" not in mangled, mangled
+assert mangled == "Evil (touch /tmp/PWNED) touch /tmp/PWNED2", mangled
+
+# Still bounded.
+assert len(server._env_flag_value("x" * 300)) == 256
+PY
+then
+    pass "_env_flag_value keeps legal-entity punctuation and still strips shell metacharacters"
+else
+    fail "_env_flag_value sanitizer check failed (see assertion above)"
 fi
 
 echo "== upload: web upload params map to the run-scan env (token via single-use cred) =="
@@ -3781,6 +4445,359 @@ then
 else
     fail "SPDX sibling refresh case failed (see assertion above)"
 fi
+
+echo "== firmware/AI sibling cancel: docker-stop-style, not raw docker kill =="
+# Regression: _stream_cmd used to send a signal-less `docker
+# kill` (immediate SIGKILL, zero grace) when a firmware/AI scan's client
+# disconnected, giving the sibling's own cleanup no chance to run. It now
+# sends `docker stop -t CANCEL_GRACE_SECONDS`, the same grace every other
+# cancel path uses, driven against the real _stream_cmd (not a fake) with a
+# fake docker on PATH so the actual argv it constructs is what gets checked.
+: > "$FAKE_DOCKER_LOG"
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER:$PATH" FAKE_DOCKER_LOG="$FAKE_DOCKER_LOG" \
+   python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+logs = []
+rc = server._stream_cmd(
+    ["sh", "-c", "echo hi; sleep 30"],
+    logs.append,
+    cancel=lambda: True,
+    container="fake-container-123",
+)
+with open(os.environ["FAKE_DOCKER_LOG"]) as fh:
+    calls = fh.read()
+assert "docker kill" not in calls, calls
+assert "docker stop -t %d fake-container-123" % server.CANCEL_GRACE_SECONDS in calls, calls
+PY
+then
+    pass "cancelling a firmware/AI sibling scan emits docker stop, not docker kill"
+else
+    fail "firmware/AI sibling cancel did not use docker-stop-style argv"
+fi
+
+echo "== image download size estimate matches the host docker architecture =="
+# _image_download_bytes() used to always read the amd64 entry off a multi-arch
+# manifest, regardless of the daemon that would actually pull the image. A
+# fake `docker` on PATH stands in both for `docker version` (the daemon's
+# reported architecture) and `docker manifest inspect --verbose` (the
+# per-platform layer sizes), so this checks host-architecture matching,
+# aarch64/x86_64 alias normalization, and the amd64 fallback (a manifest that
+# has not published the host's architecture yet, or a daemon that cannot be
+# asked) without a real docker or registry.
+FAKEDOCKER2="$WORK/fakedockerbin2"; mkdir -p "$FAKEDOCKER2"
+MANIFEST_MULTI="$WORK/manifest-multi.json"
+cat > "$MANIFEST_MULTI" <<'JSON'
+[
+  {"Descriptor": {"platform": {"architecture": "amd64", "os": "linux"}},
+   "SchemaV2Manifest": {"layers": [{"size": 100000000}]}},
+  {"Descriptor": {"platform": {"architecture": "arm64", "os": "linux"}},
+   "SchemaV2Manifest": {"layers": [{"size": 222000000}]}}
+]
+JSON
+MANIFEST_SINGLE_AMD64="$WORK/manifest-single-amd64.json"
+cat > "$MANIFEST_SINGLE_AMD64" <<'JSON'
+{"Descriptor": {"platform": {"architecture": "amd64", "os": "linux"}},
+ "SchemaV2Manifest": {"layers": [{"size": 50000000}]}}
+JSON
+cat > "$FAKEDOCKER2/docker" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+  version)
+    if [ "${DOCKER_STUB_VERSION_FAIL:-0}" = "1" ]; then
+      echo "Error: cannot connect to the Docker daemon" >&2
+      exit 1
+    fi
+    if [ -n "${VERSION_FAIL_ONCE_MARKER:-}" ] && [ ! -f "$VERSION_FAIL_ONCE_MARKER" ]; then
+      : > "$VERSION_FAIL_ONCE_MARKER"
+      echo "Error: cannot connect to the Docker daemon (not up yet)" >&2
+      exit 1
+    fi
+    echo "${DOCKER_STUB_ARCH:-amd64}"
+    exit 0
+    ;;
+  manifest)
+    case "${4:-}" in
+      *multi-arch-image*) cat "$MANIFEST_MULTI_FILE" ;;
+      *single-arch-image*) cat "$MANIFEST_SINGLE_FILE" ;;
+      *) echo '{}' ;;
+    esac
+    exit 0
+    ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$FAKEDOCKER2/docker"
+
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   DOCKER_STUB_ARCH=arm64 python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+multi = server._image_download_bytes("ghcr.io/sktelecom/multi-arch-image:latest")
+assert multi == 222000000, multi
+single = server._image_download_bytes("ghcr.io/sktelecom/single-arch-image:latest")
+assert single == 50000000, single
+PY
+then
+    pass "an arm64 daemon gets the arm64 entry, and falls back to the amd64 entry when arm64 was never published"
+else
+    fail "arm64-daemon size selection did not match expectations"
+fi
+
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   DOCKER_STUB_ARCH=aarch64 python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+size = server._image_download_bytes("ghcr.io/sktelecom/multi-arch-image:latest")
+assert size == 222000000, size
+PY
+then
+    pass "a daemon reporting uname-style aarch64 is normalized to the arm64 manifest entry"
+else
+    fail "aarch64-to-arm64 normalization did not select the arm64 entry"
+fi
+
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   DOCKER_STUB_ARCH=x86_64 python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+size = server._image_download_bytes("ghcr.io/sktelecom/multi-arch-image:latest")
+assert size == 100000000, size
+PY
+then
+    pass "a daemon reporting uname-style x86_64 is normalized to the amd64 manifest entry"
+else
+    fail "x86_64-to-amd64 normalization did not select the amd64 entry"
+fi
+
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   DOCKER_STUB_VERSION_FAIL=1 python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+size = server._image_download_bytes("ghcr.io/sktelecom/multi-arch-image:latest")
+assert size == 100000000, size
+PY
+then
+    pass "a daemon that cannot report its architecture falls back to the amd64 entry"
+else
+    fail "a failed docker version call did not fall back to the amd64 entry"
+fi
+
+# The failure above must not be cached: the web UI or desktop app can start
+# before Docker Desktop/Colima itself is up, so the first `docker version`
+# call can fail transiently. Only a value actually read gets cached; a failed
+# call falls back to amd64 for that one call and tries again next time.
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   VERSION_FAIL_ONCE_MARKER="$WORK/version-fail-once-marker" DOCKER_STUB_ARCH=arm64 \
+   python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+first = server._host_docker_architecture()
+assert first == "amd64", first
+assert server._host_arch_cache is None, server._host_arch_cache
+
+second = server._host_docker_architecture()
+assert second == "arm64", second
+assert server._host_arch_cache == "arm64", server._host_arch_cache
+PY
+then
+    pass "a docker version call that fails once (daemon not up yet) is not cached, so the next call reads the real architecture"
+else
+    fail "a transient docker-version failure poisoned the architecture cache with amd64"
+fi
+
+# The same failure, one level up: _image_download_bytes() must not cache the
+# amd64-guess size it computes while the architecture read is still failing,
+# or the process would show that wrong size for this image forever even once
+# the daemon comes up.
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER2:$PATH" \
+   MANIFEST_MULTI_FILE="$MANIFEST_MULTI" MANIFEST_SINGLE_FILE="$MANIFEST_SINGLE_AMD64" \
+   VERSION_FAIL_ONCE_MARKER="$WORK/version-fail-once-marker-2" DOCKER_STUB_ARCH=arm64 \
+   python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+image = "ghcr.io/sktelecom/multi-arch-image:latest"
+first = server._image_download_bytes(image)
+assert first == 100000000, first  # amd64 guess: the daemon was not up yet
+assert image not in server._download_size_cache, server._download_size_cache
+
+second = server._image_download_bytes(image)
+assert second == 222000000, second  # daemon is up now: the real arm64 size
+assert server._download_size_cache[image] == 222000000, server._download_size_cache
+PY
+then
+    pass "a download-size estimate made while the daemon was not up yet is not cached, and is recomputed correctly once it is"
+else
+    fail "an amd64 guess from a not-yet-ready daemon was cached as the image's download size"
+fi
+
+echo "== supplier VEX verdicts (POST /vex-verdict) =="
+# vex_1.0: one finding with a purl (foo), one Trivy resolved no PkgIdentifier
+# for (bar) -- exercises both join keys _vex_verdict_index uses.
+cat > "$OUT/vex_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vex","version":"1.0"}},
+ "components":[{"name":"foo","version":"1.0","type":"library","purl":"pkg:npm/foo@1.0"},
+               {"name":"bar","version":"2.0","type":"library"}]}
+JSON
+cat > "$OUT/vex_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-2024-10001","Severity":"HIGH","PkgName":"foo","InstalledVersion":"1.0",
+   "PkgIdentifier":{"PURL":"pkg:npm/foo@1.0"}},
+  {"VulnerabilityID":"CVE-2024-10002","Severity":"LOW","PkgName":"bar","InstalledVersion":"2.0"}
+]}]}
+JSON
+
+# -- adversarial cases: none of these may write vex_1.0_vex.json --
+bad_id=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"fixed","purl":"pkg:npm/foo@1.0"}' \
+    "$BASE/vex-verdict?id=../../etc/passwd")
+[ "$bad_id" = "400" ] && pass "/vex-verdict blocks a traversal scan id (400)" || fail "traversal id returned $bad_id (expected 400)"
+
+missing_scan=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"fixed","purl":"pkg:npm/foo@1.0"}' \
+    "$BASE/vex-verdict?id=vex_nosuchscan_1.0")
+[ "$missing_scan" = "404" ] && pass "/vex-verdict 404s for a scan with no _bom.json" || fail "nonexistent scan returned $missing_scan (expected 404)"
+
+bad_json=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{not json' "$BASE/vex-verdict?id=vex_1.0")
+[ "$bad_json" = "400" ] && pass "/vex-verdict rejects malformed JSON (400)" || fail "malformed JSON returned $bad_json (expected 400)"
+
+bad_state=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"definitely_affected","purl":"pkg:npm/foo@1.0"}' \
+    "$BASE/vex-verdict?id=vex_1.0")
+[ "$bad_state" = "400" ] && pass "/vex-verdict rejects an unrecognized state (400)" || fail "bad state returned $bad_state (expected 400)"
+
+bad_cve=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"not-an-advisory-id","state":"fixed","purl":"pkg:npm/foo@1.0"}' \
+    "$BASE/vex-verdict?id=vex_1.0")
+[ "$bad_cve" = "400" ] && pass "/vex-verdict rejects a CVE id outside the known advisory namespaces (400)" || fail "bad cve id returned $bad_cve (expected 400)"
+
+no_identity=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"fixed"}' "$BASE/vex-verdict?id=vex_1.0")
+[ "$no_identity" = "400" ] && pass "/vex-verdict rejects a verdict with neither purl nor pkg+installed (400)" || fail "no component identity returned $no_identity (expected 400)"
+
+big_detail=$(python3 -c "import json; print(json.dumps({'cve':'CVE-2024-10001','state':'fixed','purl':'pkg:npm/foo@1.0','detail':'x'*3000}))")
+oversized=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -d "$big_detail" "$BASE/vex-verdict?id=vex_1.0")
+[ "$oversized" = "400" ] && pass "/vex-verdict rejects a detail note over the length cap (400)" || fail "oversized detail returned $oversized (expected 400)"
+
+cross_origin=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+    -H "Origin: http://evil.example" \
+    -d '{"cve":"CVE-2024-10001","state":"fixed","purl":"pkg:npm/foo@1.0"}' \
+    "$BASE/vex-verdict?id=vex_1.0")
+[ "$cross_origin" = "403" ] && pass "a cross-site Origin on /vex-verdict is rejected (403)" || fail "cross-site Origin returned $cross_origin (expected 403)"
+
+[ -f "$OUT/vex_1.0_vex.json" ] && fail "an adversarial /vex-verdict request wrote a sidecar anyway" "$(cat "$OUT/vex_1.0_vex.json")" \
+    || pass "no _vex.json sidecar was written by any of the rejected requests above"
+
+# -- a real save, then read it back through the same summary the UI consumes --
+save_resp=$(curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"not_affected","purl":"pkg:npm/foo@1.0","detail":"not reachable from our code"}' \
+    "$BASE/vex-verdict?id=vex_1.0")
+echo "$save_resp" | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+assert r['ok'] is True, r
+v = r['verdict']
+assert v['state'] == 'not_affected', v
+assert v['detail'] == 'not reachable from our code', v
+assert v['source'] == 'user', v
+assert v['firstRecordedAt'] == v['updatedAt'], v  # first save: identical
+" && pass "a valid /vex-verdict save returns the stored record" || fail "save response is wrong" "$save_resp"
+
+# The fallback-keyed CVE (no purl in the Trivy finding) saved by pkg+installed.
+curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10002","state":"under_investigation","pkg":"bar","installed":"2.0"}' \
+    "$BASE/vex-verdict?id=vex_1.0" >/dev/null
+
+if curl -fsS "$BASE/scan?id=vex_1.0" 2>/dev/null | python3 -c "
+import sys, json
+vulns = {v['id']: v for v in json.load(sys.stdin)['security']['vulnerabilities']}
+assert vulns['CVE-2024-10001']['vexState'] == 'not_affected', vulns['CVE-2024-10001']
+assert vulns['CVE-2024-10001']['vexDetail'] == 'not reachable from our code', vulns['CVE-2024-10001']
+assert vulns['CVE-2024-10002']['vexState'] == 'under_investigation', vulns['CVE-2024-10002']
+# the vendor Status axis (absent here) and the supplier's own vexState are
+# separate fields -- saving one must not invent or touch the other.
+assert 'status' not in vulns['CVE-2024-10001'], vulns['CVE-2024-10001']
+"; then
+    pass "saved verdicts are joined onto the matching vulnerability rows (purl and pkg+installed both)"
+else
+    fail "verdicts did not join back onto /scan?id= as expected"
+fi
+
+# Editing the same (purl, cve) verdict updates in place -- one record, not two
+# -- and keeps the original firstRecordedAt.
+first_recorded=$(python3 -c "import json; print(json.load(open('$OUT/vex_1.0_vex.json'))['verdicts'][0]['firstRecordedAt'])")
+curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"affected","purl":"pkg:npm/foo@1.0","detail":"reassessed"}' \
+    "$BASE/vex-verdict?id=vex_1.0" >/dev/null
+if python3 -c "
+import json
+d = json.load(open('$OUT/vex_1.0_vex.json'))
+matching = [v for v in d['verdicts'] if v['cve'] == 'CVE-2024-10001']
+assert len(matching) == 1, matching  # updated in place, not appended
+v = matching[0]
+assert v['state'] == 'affected', v
+assert v['detail'] == 'reassessed', v
+assert v['firstRecordedAt'] == '$first_recorded', v
+assert v['updatedAt'] >= v['firstRecordedAt'], v
+"; then
+    pass "re-saving the same verdict updates it in place and keeps firstRecordedAt"
+else
+    fail "re-saving the same verdict duplicated it or lost firstRecordedAt"
+fi
+
+# When a request carries both purl and pkg+installed, purl decides the key on
+# write, exactly as it does on read (a row is looked up by its own purl first,
+# falling back to name+installed only when the row has none). A mismatched
+# pkg/installed sent alongside the real purl must not fork off a second record
+# or move the join off the purl-keyed one.
+curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"fixed","purl":"pkg:npm/foo@1.0","pkg":"someone-elses-name","installed":"9.9.9"}' \
+    "$BASE/vex-verdict?id=vex_1.0" >/dev/null
+if python3 -c "
+import json
+d = json.load(open('$OUT/vex_1.0_vex.json'))
+matching = [v for v in d['verdicts'] if v['cve'] == 'CVE-2024-10001']
+assert len(matching) == 1, matching  # still one record, updated not forked
+assert matching[0]['state'] == 'fixed', matching[0]
+"; then
+    pass "purl and pkg+installed sent together key on purl alone, on write"
+else
+    fail "sending purl alongside a mismatched pkg+installed forked the record"
+fi
+if curl -fsS "$BASE/scan?id=vex_1.0" 2>/dev/null | python3 -c "
+import sys, json
+vulns = {v['id']: v for v in json.load(sys.stdin)['security']['vulnerabilities']}
+assert vulns['CVE-2024-10001']['vexState'] == 'fixed', vulns['CVE-2024-10001']
+"; then
+    pass "the purl-keyed write above still joins back through the purl-keyed read"
+else
+    fail "the purl-preferring write did not join back on read"
+fi
+
+curl -fsS -X POST "$BASE/scan-delete?id=vex_1.0" >/dev/null 2>&1
+[ -f "$OUT/vex_1.0_vex.json" ] && fail "/scan-delete left the VEX sidecar behind" \
+    || pass "/scan-delete removes the VEX verdict sidecar along with the rest of the scan"
 
 echo "== external vulnerability lookup (GET /advisory, GET /package-advisories) =="
 # Three dedicated server instances so these tests never touch the real

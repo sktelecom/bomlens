@@ -1,5 +1,4 @@
 node_modules/
 dist-electron/
-package-lock.json
 test-results/
 playwright-report/

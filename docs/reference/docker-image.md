@@ -16,7 +16,7 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 | `ghcr.io/sktelecom/bomlens-deep-cve` | Bundles grype for deep CVE matching (opt-in). Used by the CLI's `--deep-cve` and by the web UI's Deep CVE matching toggle, both of which pull it automatically as a sibling container when it is not already the running image |
 | `ghcr.io/sktelecom/bomlens-aibom` | Generates an AI-model ML-BOM (opt-in, legacy alias: sbom-scanner-aibom). Used by `--model`/`--model-file` and the web UI's AI model tile, pulled automatically as a sibling container |
 
-`latest` and version tags are available. `ghcr.io/sktelecom/bomlens` and `bomlens-aibom` (and their aliases) support both `linux/amd64` and `linux/arm64`; `bomlens-firmware` and `bomlens-deep-cve` are published for `linux/amd64` only, so pulling them on an `arm64` host (an Apple Silicon Mac, an Arm server) fails without an amd64 emulation layer. Images are signed with cosign before publishing.
+`latest` and version tags are available. All published images (`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-aibom`, and their aliases) support both `linux/amd64` and `linux/arm64`, so pulling any of them on an `arm64` host (an Apple Silicon Mac, an Arm server) works natively. Images are signed with cosign before publishing.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -146,6 +146,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
 | `ENRICH_MALICIOUS` | — | `true` | Flag components that are known-malicious packages (typosquats, hijacked accounts) from a bundled offline OSV snapshot. A separate signal from vulnerabilities: the response is removal and credential rotation, not an upgrade |
 | `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro package PURLs (rpm, deb, and apk). Trivy selects the distro vulnerability feed from that component, so without it the OS packages in a supplier SBOM or rootfs scan would get no OS CVE matches at all. No-op when the SBOM has no recognizable distro packages — including a distro Trivy carries no feed for, such as OpenWRT (skipped for AI SBOMs) |
+| `ENRICH_DISTRO_SUPPLIER` | — | `true` | Fill `supplier` on an rpm, deb, or apk component with the distro project's name, read from the `operating-system` component `ENRICH_OS_CONTEXT` synthesizes. Left blank for a distro with no confirmed supplier name, an ambiguous (mixed-distro) SBOM, or a component that already carries a supplier (skipped for AI SBOMs) |
 | `STALENESS_ENRICH` | — | `false` | Add deps.dev version currency (how many releases behind latest); needs network access |
 | `ENRICH_HF_SECURITY` | — | `true` | AIBOM mode: read HuggingFace's per-file security scan results (ClamAV + picklescan) into the ML-BOM; metadata only, no file download |
 | `API_KEY`, `API_URL` | For uploads | — | Upload credential and server URL. DT uses `X-Api-Key`; TRUSCA uses a Bearer token |
@@ -156,14 +157,18 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven source scans: set `1` to keep the full resolved graph instead of filtering to compile/runtime scope |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js source scans: set `1` to keep the full dev-plus-production graph instead of the production-only set |
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android source scans (Android SDK image): set `1` to keep the full graph, build and test tooling included, instead of filtering to the release runtime classpath |
+| `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP (Composer) source scans: set `1` to keep the full require-plus-require-dev graph instead of filtering to the required set |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | Source scans: set `1` to leave the resolved tree in place. By default the scan restores the files its resolvers rewrote (`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`) and removes the build directories they created, so the scanned project is handed back as it was |
+| `BOMLENS_PREP_TIMEOUT` | - | `900` (`1800` for Gradle/Android steps) | Seconds a single dependency-resolution step (Cargo, Go, Bundler, pip, npm, Swift, Gradle/Android) is allowed to run before it is stopped and the scan moves on without it. Set to override both defaults for every step. A step that fails or times out is logged with its own output and recorded on the SBOM as `bomlens:pipeline-step-failed`; the scan itself still completes |
+| `BOMLENS_CANCEL_GRACE` | — | `30` | Seconds a cancelled scan (CLI Ctrl+C, or the web UI's cancel button) gets to stop cleanly before it is force-stopped. Applies to the CLI and `--ui`; the desktop app always uses the default |
+| `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | Source scans: set `1` to keep the manifests under test, example, benchmark and demo folders and the GitHub Actions workflows in `.github/workflows`, which are left out by default |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM), which additionally allow 1.7 |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | Accepted SPDX spec versions for the conformance check |
-| `PURL_MIN_PCT` | — | `90` | Conformance check: minimum percentage of components with a PURL (mandatory check) |
-| `LICENSE_MIN_PCT` | — | `80` | Conformance check: minimum percentage of components with a license (recommended, warn only) |
-| `HASH_MIN_PCT` | — | `50` | Conformance check: minimum percentage of components with a hash (recommended, warn only) |
-| `FIELD_MIN_PCT` | — | `80` | Conformance check: minimum percentage coverage for advisory per-component regulatory fields |
+| `PURL_MIN_PCT` | — | `90` | Conformance check: minimum percentage of components with a PURL (mandatory check). Applies to a `--deep-cve` scan too, CLI or web UI |
+| `LICENSE_MIN_PCT` | — | `80` | Conformance check: minimum percentage of components with a license (recommended, warn only). Applies to a `--deep-cve` scan too, CLI or web UI |
+| `HASH_MIN_PCT` | — | `50` | Conformance check: minimum percentage of components with a hash (recommended, warn only). Applies to a `--deep-cve` scan too, CLI or web UI |
+| `FIELD_MIN_PCT` | — | `80` | Conformance check: minimum percentage coverage for advisory per-component regulatory fields. Applies to a `--deep-cve` scan too, CLI or web UI |
 
 > TRUSCA's (formerly TrustedOSS Portal) native ingest endpoint (`POST /v1/projects/{id}/sbom-ingest`, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep `UPLOAD_TARGET=dependency-track` (the default).
 

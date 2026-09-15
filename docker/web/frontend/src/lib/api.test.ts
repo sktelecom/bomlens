@@ -15,6 +15,7 @@ import {
   getCapabilities,
   listScans,
   loadScan,
+  saveVexVerdict,
   stashGitCred,
   startScan,
   uploadFile,
@@ -218,6 +219,58 @@ describe("network functions", () => {
     expect(init.method).toBe("POST");
     expect(init.headers["Content-Type"]).toBe("application/json");
     expect(JSON.parse(init.body)).toEqual({ token: "ghp_secret" });
+  });
+
+  it("saveVexVerdict sends purl alone, dropping pkg/installed, when the vuln has one", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        ok: true,
+        verdict: { cve: "CVE-1", state: "fixed", purl: "pkg:npm/foo@1.0" },
+      }),
+    );
+    await saveVexVerdict("scan_1.0", {
+      cve: "CVE-1",
+      state: "fixed",
+      purl: "pkg:npm/foo@1.0",
+      // A caller that still passes these (e.g. forwarding the whole VulnItem)
+      // must not have them leak into the request once a purl is present.
+      pkg: "unrelated",
+      installed: "9.9.9",
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/vex-verdict?id=scan_1.0");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      cve: "CVE-1",
+      state: "fixed",
+      detail: undefined,
+      purl: "pkg:npm/foo@1.0",
+    });
+  });
+
+  it("saveVexVerdict falls back to pkg+installed when there is no purl", async () => {
+    fetchMock.mockResolvedValue(ok({ ok: true, verdict: { cve: "CVE-2", state: "affected" } }));
+    await saveVexVerdict("scan_1.0", {
+      cve: "CVE-2",
+      state: "affected",
+      pkg: "bar",
+      installed: "2.0",
+    });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      cve: "CVE-2",
+      state: "affected",
+      detail: undefined,
+      pkg: "bar",
+      installed: "2.0",
+    });
+  });
+
+  it("saveVexVerdict throws an ApiError carrying the server's message on rejection", async () => {
+    fetchMock.mockResolvedValue(fail(400, { error: "bad state" }));
+    await expect(
+      saveVexVerdict("scan_1.0", { cve: "CVE-1", state: "affected", pkg: "bar", installed: "1.0" }),
+    ).rejects.toMatchObject({ message: "bad state", status: 400 });
   });
 
   it("getCapabilities returns the payload, or a safe default on failure", async () => {

@@ -2,7 +2,8 @@
   "project": "SpringBootDemo",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-09-13T11:15:46Z",
+  "generatedAt": "2026-09-14T00:44:06Z",
+  "profile": "default",
   "untraceableComponents": 0,
   "checks": [
     {
@@ -29,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-09-13T11:15:43Z",
+      "detail": "2026-09-14T00:44:03Z",
       "missing": [],
       "regulations": [
         {
@@ -41,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-09-13T11:15:43Z"
+      "detail_ko": "2026-09-14T00:44:03Z"
     },
     {
       "id": "tools",
@@ -282,8 +283,8 @@
       "required": false,
       "source": "auto",
       "naKind": "",
-      "status": "warn",
-      "detail": "0% (0/64)",
+      "status": "pass",
+      "detail": "100% (64/64)",
       "missing": [],
       "regulations": [
         {
@@ -295,7 +296,7 @@
         }
       ],
       "label_ko": "구성요소 파일명 포함률 (80% 이상, 권장)",
-      "detail_ko": "0% (0/64)"
+      "detail_ko": "100% (64/64)"
     },
     {
       "id": "artifact-uri",
@@ -379,8 +380,8 @@
       "source": "declared",
       "role": "",
       "reviewGuide": {
-        "how": "A signature delivered beside the SBOM rather than inside it does not appear here, because this report reads one file. If the SBOM arrived with a detached signature, verify it against the sender's key before treating the contents as theirs, and record that you did. A signature carried inside the document is read automatically and this row will say so.",
-        "how_ko": "SBOM 안이 아니라 파일 옆에 따로 온 서명은 이 보고서에 나타나지 않습니다. 보고서가 파일 하나만 읽기 때문입니다. 분리 서명과 함께 받았다면 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다. 문서 안에 담긴 서명은 자동으로 읽히며 그 경우 이 행에 표시됩니다.",
+        "how": "A signature carried inside the document, or a detached one sitting next to the SBOM as <sbom-filename>.sig (cosign's own convention, e.g. from --sign), is detected automatically and this row will say so. A detached signature under a different name or location is not visible here, because this report only looks for that one convention. Verify it against the sender's key before treating the contents as theirs, and record that you did.",
+        "how_ko": "문서 안에 담긴 서명이나, cosign(예: --sign)이 SBOM 옆에 <SBOM 파일명>.sig로 남기는 분리 서명은 자동으로 인식되며 그 경우 이 행에 표시됩니다. 다른 이름이나 위치의 분리 서명은 이 보고서가 그 한 가지 관례만 찾기 때문에 나타나지 않습니다. 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다.",
         "docUrl": "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"
       },
       "regulations": [
@@ -1059,8 +1060,8 @@
         "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
         "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
         "total": 14,
-        "present": 9,
-        "gap": 4,
+        "present": 10,
+        "gap": 3,
         "review": 1,
         "failed": 0,
         "elements": [
@@ -1079,7 +1080,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-09-13T11:15:43Z",
+            "detail": "2026-09-14T00:44:03Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1177,9 +1178,9 @@
           {
             "id": "component-filename",
             "label": "Component filename coverage (>= 80%, recommended)",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "0% (0/64)",
+            "detail": "100% (64/64)",
             "refs": [
               "Section 5.2.2"
             ]

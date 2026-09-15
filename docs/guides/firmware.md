@@ -79,6 +79,8 @@ Pass the firmware file you received to `--target` and add `--firmware`:
 
 The output is the same NOTICE, SBOM and risk report as any other scan (see [What the reports mean](../concepts/reports-explained.md) and the [artifacts reference](../reference/artifacts.md) for the general shape), but a firmware SBOM has one thing worth knowing before you read it: some components carry no version at all. When a binary's version string did not survive the build, BomLens still records that the library is linked in — read from the ELF's SONAME and NEEDED entries, structure rather than a string match — and tags that component `bomlens:evidenceGrade = presence-only`. A missing version there is not a gap in the scan; it means the binary itself carries no version to read, and the component is real regardless. For a license obligation this is enough (the library is present whether or not anything says which release), but it means version-based CVE matching has nothing to key on for that component.
 
+If the syft package-identification pass fails, the scan does not stop: syft's own error goes into the scan log, and the SBOM records which pass failed as `bomlens:pipeline-step-failed` (`firmware-packages` for the main rootfs; `firmware-extra-roots` for a secondary package source unpacking finds alongside it, such as a nested container image store or a filesystem with its own package database). A component count lower than expected is worth checking the scan log for this before assuming the firmware genuinely holds that few packages.
+
 ## CVE matching, online and offline
 
 CVE matching for static binaries uses cve-bin-tool with its own vulnerability database. The firmware image ships in a hybrid arrangement, so the same image works both air-gapped and online.

@@ -82,6 +82,38 @@ export function defaultOutputDir() {
   return override && override.trim() ? override : path.join(os.homedir(), "sbom-output");
 }
 
+// 호스트에 영구히 남는 가드 상태 폴더. "디렉터리 경로" 스캔이 너무 거칠게 죽어
+// (강제 종료, OOM, 호스트 재부팅) entrypoint.sh의 정상 정리조차 돌지 못했을 때, 같은 폴더의
+// 다음 스캔이 이 폴더에 남은 기록으로 소스 트리에 남은 산출물을 마저 치운다. scan-sbom.sh의
+// GUARD_STATE_DIR과 같은 규칙(XDG_STATE_HOME 우선, 없으면 홈 아래 .local/state; Windows는
+// LOCALAPPDATA 아래)을 순수 Node로 재현한다.
+export function defaultGuardStateDir({ platform = process.platform, env = process.env, home = os.homedir() } = {}) {
+  const override = env.SBOM_GUARD_STATE_DIR;
+  if (override && override.trim()) return override;
+  if (platform === "win32") {
+    return path.join(env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), "bomlens", "guard");
+  }
+  return path.join(env.XDG_STATE_HOME ?? path.join(home, ".local", "state"), "bomlens", "guard");
+}
+
+// outputDir을 pwd -P와 같은 뜻으로 resolve한다: scan-sbom.sh --ui가 SBOM_UI_HOST_DIR을
+// resolve하는 것과 맞춰, 심볼릭 링크가 낀 폴더를 골라도 CLI로 같은 폴더를 스캔했을 때와
+// 같은 가드 상태 키가 나오게 한다. 아직 없는 폴더는 만들고(도커가 마운트 시 자동 생성하던
+// 것과 같은 효과), 만들거나 resolve하지 못하면 원래 문자열 그대로 최선 노력으로 진행한다
+// (컨테이너 기동을 막을 이유는 아니다).
+export function resolveHostDir(dir, { mkdir = fs.mkdirSync, realpath = fs.realpathSync.native } = {}) {
+  try {
+    mkdir(dir, { recursive: true });
+  } catch {
+    /* best-effort */
+  }
+  try {
+    return realpath(dir);
+  } catch {
+    return dir;
+  }
+}
+
 // 추가 스캔 대상 폴더(--ui --mount의 데스크톱판)를 docker run 인자로 변환한다(순수 —
 // 단위 테스트 가능). scan-sbom.sh와 같은 규칙: 폴더 이름을 안전한 문자로 정리해
 // /scan-targets/<이름>에 읽기 전용으로 붙이고, 겹치면 -2, -3을 덧붙인다. 서버에는
@@ -94,15 +126,26 @@ export function scanMountArgs(dirs = []) {
     const trimmed = String(dir ?? "").trim();
     if (!trimmed) continue;
     // 끝의 구분자를 떼고 마지막 경로 조각을 이름으로 쓴다(윈도우 드라이브 루트
-    // "C:\" 는 조각이 없어 아래 루트 폴백을 탄다).
+    // "C:\" 는 조각이 없어 아래 루트 폴백을 탄다). 이름은 사용자가 고른 원래
+    // 표기 그대로 쓴다 — resolve로 바뀌는 것은 아래 host 쪽 경로뿐이다.
     const segments = trimmed.split(/[/\\]+/).filter((s) => s && !/^[A-Za-z]:$/.test(s));
     let name = (segments[segments.length - 1] ?? "").replace(/[^A-Za-z0-9._-]/g, "-");
     if (!name || name === "-" || name === "." || name === "..") name = "root";
     let unique = name;
     for (let n = 2; seen.has(unique); n += 1) unique = `${name}-${n}`;
     seen.add(unique);
-    args.push("-v", `${trimmed}:/scan-targets/${unique}:ro`);
-    scanRoots += `/scan-targets/${unique}|${trimmed}\n`;
+    // pwd -P와 같은 목적: scan-sbom.sh --ui가 SBOM_UI_HOST_DIR을 resolve하는 것과
+    // 맞춰, 심볼릭 링크로 고른 폴더도 실제 경로로 가드 상태 키를 만든다. 존재하지
+    // 않거나(테스트 픽스처) 권한 문제로 resolve가 안 되면 원래 표기를 그대로 쓴다
+    // (최선 노력 — 마운트 자체는 여전히 되므로 스캔을 막을 이유가 아니다).
+    let host = trimmed;
+    try {
+      host = fs.realpathSync.native(trimmed);
+    } catch {
+      /* best-effort */
+    }
+    args.push("-v", `${host}:/scan-targets/${unique}:ro`);
+    scanRoots += `/scan-targets/${unique}|${host}\n`;
   }
   if (scanRoots) args.push("-e", `SBOM_UI_SCAN_ROOTS=${scanRoots}`);
   return args;
@@ -383,6 +426,7 @@ export class UiContainer {
     image = DEFAULT_IMAGE,
     hostPort,
     outputDir = defaultOutputDir(),
+    guardStateDir = defaultGuardStateDir(),
     firmwareImage = FIRMWARE_IMAGE,
     aibomImage = AIBOM_IMAGE,
     scanMounts = [],
@@ -390,6 +434,7 @@ export class UiContainer {
     this.image = image;
     this.hostPort = hostPort;
     this.outputDir = outputDir;
+    this.guardStateDir = guardStateDir;
     this.firmwareImage = firmwareImage;
     this.aibomImage = aibomImage;
     this.scanMounts = scanMounts;
@@ -399,6 +444,7 @@ export class UiContainer {
   // 컨테이너를 detached로 띄우고 /capabilities가 200이 될 때까지 기다린다.
   async start({ timeoutMs = 60000 } = {}) {
     const name = `sbom-ui-${this.hostPort}`;
+    const hostDir = resolveHostDir(this.outputDir);
     const args = [
       "run",
       "-d",
@@ -412,19 +458,22 @@ export class UiContainer {
       // 있으므로 루프백에만 게시해 같은 네트워크의 다른 기기에서 닿지 않게 한다.
       `127.0.0.1:${this.hostPort}:8080`,
       "-v",
-      `${this.outputDir}:/src`,
+      `${hostDir}:/src`,
       "-v",
-      `${this.outputDir}:/host-output`,
+      `${hostDir}:/host-output`,
       // 추가 스캔 대상 폴더(읽기 전용) — 웹 UI의 "디렉터리 경로" 입력 선택지가 된다.
       ...scanMountArgs(this.scanMounts),
       "-v",
       engineMount(),
+      // 5-P PR 2: entrypoint.sh가 이 경로에서 이전 실행의 가드 기록을 찾는다.
+      "-v",
+      `${this.guardStateDir}:/bomlens-state`,
       "-e",
       "MODE=UI",
       "-e",
       "UI_PORT=8080",
       "-e",
-      `SBOM_UI_HOST_DIR=${this.outputDir}`,
+      `SBOM_UI_HOST_DIR=${hostDir}`,
       // Sibling-image refs for firmware / AI-model scans (server.py launches
       // these via the host socket when the input type needs them).
       "-e",

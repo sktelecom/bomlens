@@ -50,8 +50,47 @@ cat > "$BIN/docker" <<'STUB'
 #!/usr/bin/env bash
 log="${DOCKER_STUB_LOG:-/dev/null}"
 echo "docker $*" >> "$log"
+# DOCKER_STUB_ARGV_DUMP=1 additionally logs each argv element on its own
+# bracketed line, so a test can tell "one element containing a space" apart
+# from "word-split into several" -- something a substring grep on the `$*`
+# line above cannot, since that line always has spaces between elements
+# either way.
+if [ "${DOCKER_STUB_ARGV_DUMP:-0}" = "1" ]; then
+  for a in "$@"; do
+    printf '<%s>\n' "$a" >> "$log"
+  done
+fi
 case "${1:-}" in
-  version|info|pull|image|inspect|stop|rm) exit 0 ;;
+  version|info|pull|image|stop|rm) exit 0 ;;
+  ps)
+    # `docker ps -aq --filter label=bomlens.scan=cli --filter status=exited`:
+    # the startup sweep for a scan container an earlier, killed run left
+    # behind. DOCKER_STUB_EXITED_CLI_CONTAINERS models what that query finds;
+    # unset/empty means the ordinary no-leftover case, same as this stub's
+    # own silence for any other `docker ps` call (the name-lookup one
+    # elsewhere in scan-sbom.sh falls through here too, and must stay empty).
+    has_label=0; has_exited=0
+    for a in "$@"; do
+      case "$a" in
+        label=bomlens.scan=cli) has_label=1 ;;
+        status=exited) has_exited=1 ;;
+      esac
+    done
+    if [ "$has_label" = 1 ] && [ "$has_exited" = 1 ] && [ -n "${DOCKER_STUB_EXITED_CLI_CONTAINERS:-}" ]; then
+      printf '%s\n' $DOCKER_STUB_EXITED_CLI_CONTAINERS
+    fi
+    exit 0 ;;
+  inspect)
+    # -f '{{.State.OOMKilled}}' (stage 1's fallback classification): the stub
+    # container never OOMs, so this is always "false", matching real docker's
+    # own output shape (the templated field's value, not a JSON blob).
+    echo "false"; exit 0 ;;
+  wait)
+    # Stage 1 reads the container's exit code from `docker wait`, not the
+    # `docker run | tee` pipeline's own status (that would be tee's).
+    # DOCKER_STUB_RUN_RC models a container that ran and reported this rc
+    # instead of 0; unset/empty means the ordinary successful-run case below.
+    echo "${DOCKER_STUB_RUN_RC:-0}"; exit 0 ;;
   run)
     # Drop the SBOM where the real container would: the host dir bind-mounted to
     # /host-output (post-process / single-shot) or /out (source stage 1) — i.e.
@@ -81,6 +120,12 @@ case "${1:-}" in
       dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
       printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"}},"components":[]}\n' \
         "$pn" "$pv" > "$dest/${pn}_${pv}_bom.json"
+      # DOCKER_STUB_CONFORMANCE_RESULT models validate-sbom.sh's bare pass/fail
+      # sidecar (--fail-on-conformance reads it). Unset means this run produced
+      # no conformance report, same as a mode/step that never generates one.
+      if [ -n "${DOCKER_STUB_CONFORMANCE_RESULT:-}" ]; then
+        printf '%s' "$DOCKER_STUB_CONFORMANCE_RESULT" > "$dest/${pn}_${pv}_conformance.result"
+      fi
     fi
     # MODE=DIFF carries no PROJECT_NAME/VERSION at all — it names its own
     # output file (DIFF_OUT_NAME) instead, so it needs its own stub write.
@@ -129,7 +174,7 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
-            --conformance-profile; do
+            --conformance-profile --fail-on-conformance; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -190,15 +235,163 @@ GOTOOLCHAIN='go1.26.0;touch x' scan_in "$d" --project Pgotcbad --version 1.0.0 -
 
 # Source-scan options for build-prep.sh reach the cdxgen container by name only.
 d="$(new_proj prepenv)"; printf '{"name":"a"}' > "$d/package.json"
-BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_MAVEN_FULL_GRAPH=1 BOMLENS_ANDROID_FULL_GRAPH=1 BOMLENS_NODE_FULL_GRAPH=1 \
+BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_MAVEN_FULL_GRAPH=1 BOMLENS_ANDROID_FULL_GRAPH=1 BOMLENS_NODE_FULL_GRAPH=1 BOMLENS_PHP_FULL_GRAPH=1 \
   scan_in "$d" --project Pprepenv --version 1.0.0 --generate-only
 ok=1
-for n in BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH; do
+for n in BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH; do
   in_log "-e $n" || ok=0
   in_log "$n=" && ok=0
 done
 [ "$ok" = 1 ] && pass "BOMLENS_* source-scan options passed to the cdxgen container by name" \
   || { fail "BOMLENS_* source-scan options passed to the cdxgen container by name" "rc=$RC"; show; }
+
+# A host override of the scan-cancel grace period reaches the web UI
+# container: server.py (which runs inside it) reads BOMLENS_CANCEL_GRACE
+# itself, so a value set only on the host would otherwise never be seen
+# there. --ui execs docker run in place of this process, so scan_in's own
+# subshell IS that docker run (stubbed) — nothing further to await.
+d="$(new_proj uicancelgrace)"
+BOMLENS_CANCEL_GRACE=45 scan_in "$d" --ui --output-dir "$d"
+in_log "-e BOMLENS_CANCEL_GRACE" \
+  && pass "BOMLENS_CANCEL_GRACE passed to the web UI container" \
+  || { fail "BOMLENS_CANCEL_GRACE passed to the web UI container" "rc=$RC"; show; }
+
+# --------------------------------------------------------
+section "Startup sweep for a killed scan's leftover container"
+# --------------------------------------------------------
+# Every scan container carries a bomlens.scan=cli label; each run's startup
+# sweeps up only its own label's EXITED containers (a process killed before
+# its own cleanup could run leaves one behind for good otherwise), never a
+# still-running one -- the daemon's own --filter status=exited already keeps
+# this query from ever naming a running container in the first place.
+d="$(new_proj sweepleftover)"; printf '{"name":"a"}' > "$d/package.json"
+DOCKER_STUB_EXITED_CLI_CONTAINERS="bomlens-scan-11111-1 bomlens-scan-22222-2" \
+  scan_in "$d" --project Psweep --version 1.0.0 --generate-only
+{ in_log "ps -aq --filter label=bomlens.scan=cli --filter status=exited" \
+    && in_log "rm bomlens-scan-11111-1 bomlens-scan-22222-2"; } \
+  && pass "an exited leftover from an earlier run is swept up at startup" \
+  || { fail "an exited leftover from an earlier run is swept up at startup" "rc=$RC"; show; }
+
+d="$(new_proj sweepnone)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project Psweepnone --version 1.0.0 --generate-only
+# The sweep's own removal is a plain "rm <id...>", distinct from the per-run
+# container's "rm -f <name>" cleanup elsewhere in the same log -- an empty
+# leftover query must produce none of the former, some of the latter still
+# expected as usual.
+! grep -qE '^docker rm bomlens-scan-' "$LOG" \
+  && pass "no leftover found means nothing named by the sweep query is removed" \
+  || { fail "no leftover found means nothing named by the sweep query is removed" "rc=$RC"; show; }
+
+# --------------------------------------------------------
+section "Host-persistent guard state"
+# --------------------------------------------------------
+# The web UI container needs /bomlens-state mounted so entrypoint.sh (running
+# inside it) can find the same host-persistent record the CLI path writes.
+d="$(new_proj uiguardmount)"
+scan_in "$d" --ui --output-dir "$d"
+in_log ":/bomlens-state" \
+  && pass "web UI container mounts /bomlens-state" \
+  || { fail "web UI container mounts /bomlens-state" "rc=$RC"; show; }
+
+# scan-sbom.sh's own GUARD_STATE_DIR branch (mirrored here so a test can both
+# override it, portably, and know where to look/plant a record): Windows/MSYS
+# keys off LOCALAPPDATA, everywhere else it is XDG_STATE_HOME (or
+# $HOME/.local/state) -- both end in .../bomlens/guard, but a different env
+# var, so a test cannot just set XDG_STATE_HOME and assume it took effect.
+is_windows_bash() {
+    case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac
+}
+# $1 = the POSIX dir a test wants scan-sbom.sh to use as its guard-state root.
+# Exports the right override var for this platform in the CALLING shell (no
+# $(...) here -- a subshell's export never reaches scan_in afterward) and sets
+# GUARD_OVERRIDE_DIR to the on-disk path (…/bomlens/guard) to plant a record
+# under.
+guard_state_dir_override() {
+    if is_windows_bash; then
+        LOCALAPPDATA="$(cygpath -w "$1" 2>/dev/null || printf '%s' "$1")"
+        export LOCALAPPDATA
+    else
+        XDG_STATE_HOME="$1"
+        export XDG_STATE_HOME
+    fi
+    GUARD_OVERRIDE_DIR="$1/bomlens/guard"
+}
+
+# --output-dir reaches the container resolved (pwd -P), not as the symlink the
+# user passed: a "current-dir" scan of a symlinked path must hash to the same
+# guard-state key a CLI scan of the resolved path would (both use pwd -P), so
+# a scan interrupted from one side is still found by a rescan from the other.
+# Skipped where `ln -s` cannot make a real symlink (e.g. Git Bash on a Windows
+# runner without symlink privilege falls back to a plain-file stand-in) --
+# nothing this test exercises would be true of a copy.
+d="$(new_proj uisymlinktarget)"
+d_real="$(cd "$d" && pwd -P)"
+LINK="$WORK/ui-symlink-in.$N"
+ln -s "$d" "$LINK" 2>/dev/null
+if [ -L "$LINK" ]; then
+    # hostpath() in scan-sbom.sh runs the resolved path through `cygpath -m`
+    # before it reaches -v (Windows drive form, e.g. C:/Users/...), not the
+    # POSIX form (/c/Users/...) pwd -P itself returns on Git Bash.
+    if command -v cygpath >/dev/null 2>&1; then
+        d_real_host="$(cygpath -m -- "$d_real" 2>/dev/null || printf '%s' "$d_real")"
+    else
+        d_real_host="$d_real"
+    fi
+    scan_in "$d" --ui --output-dir "$LINK"
+    if in_log "$d_real_host:/src"; then
+        pass "--ui --output-dir resolves a symlinked path before mounting it"
+    else
+        fail "--ui --output-dir resolves a symlinked path before mounting it" \
+            "expected '$d_real_host:/src'; docker invocation was: $(cat "$LOG" 2>/dev/null)"
+        show
+    fi
+else
+    skip "--ui --output-dir resolves a symlinked path before mounting it (ln -s did not make a real symlink here)"
+fi
+
+# A leftover guard-state record only names a folder's own leftovers as safe to
+# clean up when the recorded absolute path matches this scan's target exactly
+# (defense against a hash collision or a stale/tampered record naming the
+# wrong folder). A mismatch must be left untouched, not treated as clearable.
+guard_hash_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s' "$1" | sha256sum | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+if command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1; then
+    _prev_xdg="${XDG_STATE_HOME-__unset__}"; _prev_lad="${LOCALAPPDATA-__unset__}"
+    d="$(new_proj guardmismatch)"; printf '{"name":"a"}' > "$d/package.json"
+    d_real="$(cd "$d" && pwd -P)"
+    key="$(guard_hash_of "$d_real")"
+    guard_home="$WORK/guard-state-home"
+    guard_state_dir_override "$guard_home"
+    guard_dir="$GUARD_OVERRIDE_DIR"
+    mkdir -p "$guard_dir/$key"
+    printf 'stale-owner-container\n' > "$guard_dir/$key/owner"
+    printf '/some/unrelated/other/path\n' > "$guard_dir/$key/path"
+    printf 'ghcr.io/sktelecom/bomlens:cdxgen-node20\n' > "$guard_dir/$key/image"
+
+    scan_in "$d" --project Pguardmismatch --version 1.0.0 --generate-only
+    ok=1
+    [ "$RC" -eq 0 ] || ok=0
+    in_out "does not match" || ok=0
+    [ "$(cat "$guard_dir/$key/path" 2>/dev/null)" = "/some/unrelated/other/path" ] || ok=0
+    [ "$(cat "$guard_dir/$key/owner" 2>/dev/null)" = "stale-owner-container" ] || ok=0
+    if [ "$ok" = 1 ]; then
+        pass "a guard-state record naming a different path is left untouched"
+    else
+        fail "a guard-state record naming a different path is left untouched" \
+            "rc=$RC guard_dir=$guard_dir key=$key; scan output: $(cat "$OUT" 2>/dev/null)"
+    fi
+    [ "$_prev_xdg" = "__unset__" ] && unset XDG_STATE_HOME || export XDG_STATE_HOME="$_prev_xdg"
+    [ "$_prev_lad" = "__unset__" ] && unset LOCALAPPDATA || export LOCALAPPDATA="$_prev_lad"
+else
+    skip "a guard-state record naming a different path is left untouched (no sha256sum/shasum)"
+fi
 
 # .NET needs a *.csproj glob, swift needs Package.swift — handled specially.
 d="$(new_proj dotnet)"; printf '<Project></Project>' > "$d/app.csproj"
@@ -210,6 +403,26 @@ d="$(new_proj swift)"; printf '// swift-tools-version:5.9\n' > "$d/Package.swift
 scan_in "$d" --project Pswift --version 1.0.0 --generate-only
 { in_out "Language: swift" && in_log "cdxgen-debian-swift"; } \
   && pass "swift (Package.swift) → swift image" || { fail "swift (Package.swift) → swift image" "rc=$RC"; show; }
+
+# Layouts found below the root: a Kotlin DSL Android app goes to the Android SDK
+# image, and a .NET solution with its projects under src/ goes to the .NET image
+# despite the e2e-only package.json at its root.
+d="$(new_proj androidkts)"; mkdir -p "$d/app"
+printf 'rootProject.name = "k"\n' > "$d/settings.gradle.kts"
+printf 'android {\n    namespace = "com.example.k"\n    compileSdk = 34\n}\n' > "$d/app/build.gradle.kts"
+scan_in "$d" --project Pandroidkts --version 1.0.0 --generate-only
+{ in_out "Android source detected" && in_log "bomlens-android-sdk34"; } \
+  && pass "Kotlin DSL Android app → Android SDK image" \
+  || { fail "Kotlin DSL Android app → Android SDK image" "rc=$RC"; show; }
+
+d="$(new_proj dotnetsub)"; mkdir -p "$d/src/App"
+printf '<Solution />\n' > "$d/App.slnx"
+printf '{"name":"e2e","devDependencies":{"@playwright/test":"^1"}}' > "$d/package.json"
+printf '<Project Sdk="Microsoft.NET.Sdk"></Project>' > "$d/src/App/App.csproj"
+scan_in "$d" --project Pdotnetsub --version 1.0.0 --generate-only
+{ in_out "Language: dotnet" && in_log "cdxgen-debian-dotnet9"; } \
+  && pass ".NET solution with projects in src/ → dotnet image" \
+  || { fail ".NET solution with projects in src/ → dotnet image" "rc=$RC"; show; }
 
 # Unknown (no manifest) and mixed (two manifests) both fall back to all-in-one.
 d="$(new_proj unknown)"; printf 'hello\n' > "$d/README"
@@ -230,6 +443,13 @@ scan_in "$d" --project Done --version 2.0.0 --generate-only
     && [ -f "$d/Done_2.0.0/Done_2.0.0_bom.json" ] && [ ! -f "$d/Done_2.0.0_bom.json" ]; } \
   && pass "source scan completes and writes <proj>_<ver>/<proj>_<ver>_bom.json" \
   || { fail "source scan completes and writes SBOM" "rc=$RC"; show; }
+
+# Stage 2 (POSTPROCESS) must be told stage 1's output filename, so
+# entrypoint.sh's stale-artifact cleanup can tell this run's own fresh SBOM
+# apart from a leftover of an earlier run at the same --project/--version.
+in_log "-e BOMLENS_RUN_INPUT=Done_2.0.0_bom.json" \
+  && pass "POSTPROCESS is told this run's own SBOM filename (BOMLENS_RUN_INPUT)" \
+  || { fail "BOMLENS_RUN_INPUT missing from the POSTPROCESS docker run"; show; }
 
 # Fail-closed on an empty host mount, in the DEFAULT (non --generate-only) path.
 # Regression: the "did the artifact reach the host?" guard used to run ONLY under
@@ -275,6 +495,9 @@ d="$(new_proj img)"
 scan_in "$d" --project Img --version 1 --target nginx:latest --generate-only
 { in_out "Mode: IMAGE" && in_log "TARGET_IMAGE=nginx:latest"; } \
   && pass "--target nginx:latest → IMAGE mode" || { fail "--target image → IMAGE mode" "rc=$RC"; show; }
+in_log "-e BOMLENS_ARTIFACT_CLEANUP=1" \
+  && pass "the single-container docker run opts into stale-artifact cleanup (BOMLENS_ARTIFACT_CLEANUP)" \
+  || { fail "BOMLENS_ARTIFACT_CLEANUP missing from the single-container docker run"; show; }
 
 d="$(new_proj bin)"; printf 'ELFish\n' > "$d/app.out"
 scan_in "$d" --project Bin --version 1 --target app.out --generate-only
@@ -512,6 +735,49 @@ scan_in "$d" --project PT --version 1 --target app.out --generate-only \
   && pass "--license/--sbom-author/--identify-vendored/--trusca/--deep-cve reach the container" \
   || { fail "pass-through flags reach the container"; show; }
 
+# --------------------------------------------------------
+section "--sbom-author reaches the container verbatim (legal-entity names, shell metacharacters)"
+# --------------------------------------------------------
+# The web UI's server.py path checked ("SK Telecom Co., Ltd.", parens/ampersand)
+# is a subprocess env var, never shell syntax. The CLI path is different: it
+# goes through printf %q into an `eval "$DOCKER_MSYS"docker run ...
+# $(pp_env)...` command line (scripts/scan-sbom.sh), which only round-trips a
+# value correctly if %q's escaping actually gets re-parsed by that eval. Argv
+# dumped one bracketed element per line (DOCKER_STUB_ARGV_DUMP), not just
+# grepped as a substring of the joined `docker $*` line, so a value split
+# across multiple `-e` tokens (silently narrower than intended) would be
+# caught too: `<SBOM_AUTHOR=one` and `two>` on separate lines would not match
+# the single-line assertion below.
+d="$(new_proj sbom-author-verbatim)"; printf 'ELFish\n' > "$d/app.out"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project SA1 --version 1 --target app.out --generate-only \
+  --sbom-author 'SK Telecom Co., Ltd.'
+in_log "<SBOM_AUTHOR=SK Telecom Co., Ltd.>" \
+  && pass "a legal-entity name with a comma reaches the container as one unbroken argv element" \
+  || { fail "SK Telecom Co., Ltd. was split or mangled crossing the eval boundary"; show; cat "$LOG"; }
+
+d="$(new_proj sbom-author-korean)"; printf 'ELFish\n' > "$d/app.out"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project SA2 --version 1 --target app.out --generate-only \
+  --sbom-author '(주)에스케이 & 파트너스'
+in_log "<SBOM_AUTHOR=(주)에스케이 & 파트너스>" \
+  && pass "a Korean legal-entity name with parens/ampersand reaches the container as one unbroken argv element" \
+  || { fail "(주)에스케이 & 파트너스 was split or mangled crossing the eval boundary"; show; cat "$LOG"; }
+
+# Command substitution stays literal text -- eval re-parses the %q-escaped
+# value as one shell word, so $(...) and `...` inside it are data, not syntax.
+rm -f /tmp/bomlens-test-pwned-eval /tmp/bomlens-test-pwned-backtick
+d="$(new_proj sbom-author-injection)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project SA3 --version 1 --target app.out --generate-only \
+  --sbom-author 'Evil $(touch /tmp/bomlens-test-pwned-eval) `touch /tmp/bomlens-test-pwned-backtick`'
+if [ ! -e /tmp/bomlens-test-pwned-eval ] && [ ! -e /tmp/bomlens-test-pwned-backtick ] \
+   && in_log 'SBOM_AUTHOR=Evil $(touch /tmp/bomlens-test-pwned-eval) `touch /tmp/bomlens-test-pwned-backtick`'; then
+    pass "command substitution in --sbom-author is not executed and reaches the container as literal text"
+else
+    fail "--sbom-author let a shell command run"; show
+    rm -f /tmp/bomlens-test-pwned-eval /tmp/bomlens-test-pwned-backtick
+fi
+
 # No flag -> the container sees the default profile.
 d="$(new_proj profdefault)"; printf 'ELFish\n' > "$d/app.out"
 scan_in "$d" --project PD --version 1 --target app.out --generate-only
@@ -533,6 +799,57 @@ scan_in "$d" --project PB --version 1 --target app.out --generate-only \
 { in_out "not supported" && in_log "CONFORMANCE_PROFILE=default"; } \
   && pass "an unknown --conformance-profile warns and falls back to default" \
   || { fail "unknown --conformance-profile handling"; show; }
+
+# --------------------------------------------------------
+section "--fail-on-conformance exit codes"
+# --------------------------------------------------------
+# Host-only logic (scan-sbom.sh reads validate-sbom.sh's bare pass/fail
+# sidecar itself), so the stub models it via DOCKER_STUB_CONFORMANCE_RESULT
+# rather than anything on the docker-run argv.
+d="$(new_proj foc_pass)"; printf 'ELFish\n' > "$d/app.out"
+export DOCKER_STUB_CONFORMANCE_RESULT=pass
+scan_in "$d" --project FP --version 1 --target app.out --generate-only --fail-on-conformance
+rc_pass=$RC
+unset DOCKER_STUB_CONFORMANCE_RESULT
+[ "$rc_pass" -eq 0 ] && pass "--fail-on-conformance: a pass report exits 0" \
+  || { fail "--fail-on-conformance pass case" "rc=$rc_pass"; show; }
+
+d="$(new_proj foc_fail)"; printf 'ELFish\n' > "$d/app.out"
+export DOCKER_STUB_CONFORMANCE_RESULT=fail
+scan_in "$d" --project FF --version 1 --target app.out --generate-only --fail-on-conformance
+rc_fail=$RC
+unset DOCKER_STUB_CONFORMANCE_RESULT
+{ [ "$rc_fail" -eq 2 ] && in_out "Conformance check failed"; } \
+  && pass "--fail-on-conformance: a fail report exits 2" \
+  || { fail "--fail-on-conformance fail case" "rc=$rc_fail"; show; }
+
+d="$(new_proj foc_none)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project FN --version 1 --target app.out --generate-only --fail-on-conformance
+rc_none=$RC
+{ [ "$rc_none" -eq 3 ] && in_out "no conformance report to judge"; } \
+  && pass "--fail-on-conformance: no report exits 3" \
+  || { fail "--fail-on-conformance no-report case" "rc=$rc_none"; show; }
+
+# A stale .result from an earlier run at the same project/version (this run's
+# folder is reused, not recreated) must not be read as this run's verdict:
+# this run produces no report, so the gate must still see "no report" (3),
+# not the leftover "pass".
+d="$(new_proj foc_stale)"; printf 'ELFish\n' > "$d/app.out"
+export DOCKER_STUB_CONFORMANCE_RESULT=pass
+scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on-conformance
+[ "$RC" -eq 0 ] || { fail "--fail-on-conformance stale-result setup" "rc=$RC"; show; }
+unset DOCKER_STUB_CONFORMANCE_RESULT
+scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on-conformance
+rc_stale=$RC
+{ [ "$rc_stale" -eq 3 ] && in_out "no conformance report to judge"; } \
+  && pass "--fail-on-conformance: a stale pass file from an earlier run is not mistaken for this run's verdict" \
+  || { fail "--fail-on-conformance stale-result case" "rc=$rc_stale"; show; }
+
+d="$(new_proj foc_ui)"
+err="$(bash "$SCAN" --ui --fail-on-conformance 2>&1)"; rc=$?
+{ [ "$rc" -ne 0 ] && printf '%s' "$err" | grep -q "not offered with --ui"; } \
+  && pass "--fail-on-conformance is rejected with --ui" \
+  || fail "--fail-on-conformance + --ui rejection" "rc=$rc: $err"
 
 # --------------------------------------------------------
 section "Windows path & filesystem adversarial matrix"
@@ -715,6 +1032,13 @@ fi
 if [ -f "$SCAN_BAT" ]; then
   grep -q "scan-sbom.sh" "$SCAN_BAT"     && pass "scan-sbom.bat delegates to scan-sbom.sh" || fail "scan-sbom.bat delegates to scan-sbom.sh"
   grep -qi "where bash" "$SCAN_BAT"      && pass "scan-sbom.bat checks for Git Bash"        || fail "scan-sbom.bat checks for Git Bash"
+  # --fail-on-conformance's exit codes (2/3) are only useful to a CI author if
+  # scan-sbom.bat actually forwards scan-sbom.sh's real exit code instead of
+  # cmd's own (e.g. an "endlocal" alone always reports 0). No Windows/Wine here
+  # to run it, so this is a static check for the two lines that make it work.
+  { grep -qi "%ERRORLEVEL%" "$SCAN_BAT" && grep -qi "exit /b" "$SCAN_BAT"; } \
+    && pass "scan-sbom.bat forwards scan-sbom.sh's real exit code (ERRORLEVEL)" \
+    || fail "scan-sbom.bat exit code forwarding"
 fi
 # check-setup helper exists on both platforms and inspects the same prerequisites.
 [ -f "$CHECK_BAT" ] && pass "scripts/check-setup.bat present" || fail "scripts/check-setup.bat present"

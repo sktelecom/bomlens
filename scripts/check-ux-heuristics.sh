@@ -41,6 +41,17 @@ check_silent_exits() {
   [ -f "$file" ] || { note_fail "missing $file"; return; }
   local n bad=0
   while IFS= read -r n; do
+    # A comment-only line matching $exit_re (a hand-written explanation, e.g.
+    # "exit 1 elsewhere in this script") is not a real exit call, so skip it
+    # before checking for a preceding message -- otherwise prose that happens
+    # to mention an exit code reads as a silent exit. Only the line's own
+    # leading marker counts: "exit 1  # why" still starts with real code, so
+    # it stays checked, matching sh's "#" and .bat's "REM " / "::" comments.
+    local this_line
+    this_line="$(sed -n "${n}p" "$file")"
+    if printf '%s' "$this_line" | grep -qE '^[[:space:]]*(#|REM[[:space:]]|::)'; then
+      continue
+    fi
     # Look at the offending line plus the 3 lines above it for a user message.
     local ctx
     ctx="$(sed -n "$((n>3 ? n-3 : 1)),${n}p" "$file")"

@@ -163,7 +163,7 @@ export function ScanRunning({
                     <Icon
                       className={cn(
                         "h-4 w-4 shrink-0",
-                        st === "done" && "text-risk-low",
+                        st === "done" && "text-risk-low", // token-lint-ignore: aria-hidden below
                         st === "active" && "animate-spin text-brand",
                         st === "pending" && "text-muted-foreground/50",
                       )}

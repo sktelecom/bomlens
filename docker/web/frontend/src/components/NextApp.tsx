@@ -1,6 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -601,9 +602,17 @@ export function NextApp() {
                 className={
                   result.ok
                     ? "rounded-full bg-success-solid/10 px-2 py-0.5 text-xs font-medium text-success"
-                    : "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+                    : "inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-risk-critical-fg"
                 }
               >
+                {/* text-risk-critical-fg (not text-destructive): --destructive
+                    is the same value in both themes, so text-destructive on
+                    this badge's own tinted background fails WCAG AA in light
+                    mode (axe: 3.95:1, needs 4.5:1) -- risk-critical-fg is
+                    already the AA-passing dark/light cut of the same red the
+                    destructive token aligns with (see index.css). The icon
+                    means the failure reads without relying on color alone. */}
+                {!result.ok && <TriangleAlert className="h-3 w-3" aria-hidden />}
                 {result.ok ? t("result.succeeded") : t("result.failed")}
               </span>
             </div>

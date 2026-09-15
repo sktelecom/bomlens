@@ -29,6 +29,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=docker/lib/cdx-version.sh
 . "$SCRIPT_DIR/cdx-version.sh"
+# shellcheck source=docker/lib/pipeline-step.sh
+. "$SCRIPT_DIR/pipeline-step.sh"
 
 FW="$1"
 OUTPUT="$2"
@@ -411,11 +413,35 @@ fi
 # --------------------------------------------------------
 # ③ Package components (syft) + binary components (cve-bin-tool).
 # --------------------------------------------------------
+# syft over one tree, writing its CycloneDX JSON to $2. stderr goes to a temp
+# file, not /dev/null, so a failure leaves its cause in the scan log. A failure
+# writes an empty component list, so the scan goes on with the binary passes,
+# and queues $3 in SYFT_FAILED for the SBOM signal written with the SBOM below.
+SYFT_FAILED=""
+catalog_packages() {
+    local dir="$1" out="$2" label="$3" err
+    err=$(mktemp)
+    if syft "dir:$dir" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$out" 2>"$err"; then
+        rm -f "$err"
+        return 0
+    fi
+    if [ -s "$err" ]; then
+        echo "[firmware] syft said (last 20 lines):" >&2
+        tail -20 "$err" | sed 's/^/[firmware]   /' >&2
+    fi
+    rm -f "$err"
+    echo '{"components":[]}' > "$out"
+    case " $SYFT_FAILED " in
+        *" $label "*) ;;
+        *) SYFT_FAILED="${SYFT_FAILED:+$SYFT_FAILED }$label" ;;
+    esac
+    return 1
+}
+
 PKG_SBOM="$WORK/pkg.cdx.json"
 echo "[firmware] syft: cataloging packages under rootfs..."
-if ! syft "dir:$ROOTFS" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$PKG_SBOM" 2>/dev/null; then
+if ! catalog_packages "$ROOTFS" "$PKG_SBOM" firmware-packages; then
     echo "[firmware] WARN: syft directory scan failed; continuing without package components." >&2
-    echo '{"components":[]}' > "$PKG_SBOM"
 fi
 
 # ③.1 The same cataloger over the filesystems found beside the rootfs.
@@ -463,11 +489,9 @@ if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
         esac
         echo "[firmware] syft: cataloging $extra_what beside the rootfs:" \
              "${extra_root#"$EXTRACT"/}"
-        if ! syft "dir:$extra_root" -o "cyclonedx-json@$CDX_SPEC_VERSION" \
-                > "$WORK/extra/$extra_scanned.cdx.json" 2>/dev/null; then
+        if ! catalog_packages "$extra_root" "$WORK/extra/$extra_scanned.cdx.json" firmware-extra-roots; then
             echo "[firmware] WARN: syft failed on ${extra_root#"$EXTRACT"/};" \
                  "its contents are not in the SBOM." >&2
-            echo '{"components":[]}' > "$WORK/extra/$extra_scanned.cdx.json"
         fi
         # Say which container each of those components belongs to, and list the
         # images themselves. On a switch OS that membership is most of what a
@@ -937,6 +961,11 @@ jq -n \
   components: $comps[0]
 }
 + (if ($deps[0] | length) > 0 then {dependencies: $deps[0]} else {} end)' > "$OUTPUT"
+
+# Record each syft pass that failed, now that the SBOM exists.
+for _failed in $SYFT_FAILED; do
+    mark_pipeline_warning "$OUTPUT" "$_failed"
+done
 
 echo "[firmware] SBOM written: $OUTPUT (components=${NTOTAL}: packages=${NPKG}, binaries=${NBIN})"
 # Reported separately from `packages`, and before dedupe, because the two numbers

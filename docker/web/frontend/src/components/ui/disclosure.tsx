@@ -41,6 +41,7 @@ export function Disclosure({
       <summary
         className={cn(
           "flex cursor-pointer list-none items-center rounded-sm",
+          "transition-colors duration-fast ease-out-soft hover:bg-muted/50",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           "[&::-webkit-details-marker]:hidden",
           size === "md" ? "gap-2" : "gap-1.5",

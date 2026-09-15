@@ -34,3 +34,23 @@ for (const { lang, file } of SHOTS) {
     }
   });
 }
+
+// Regenerates the Docker-missing guidance screenshot (docs/images/
+// desktop-docker-missing.png), used unchanged by both the en and ko docs.
+// SBOM_SMOKE_SCREEN=docker-missing (main.mjs) seeds the screen directly
+// instead of waiting on a real Docker check, so this is deterministic like
+// the start-screen shots above.
+test("capture the Docker-missing screen", async () => {
+  test.skip(process.env.SBOM_CAPTURE !== "1", "opt-in via SBOM_CAPTURE=1");
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_SMOKE_SCREEN: "docker-missing", SBOM_LANG: "ko" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await win.locator("#version").waitFor();
+    await win.screenshot({ path: path.join(imagesDir, "desktop-docker-missing.png") });
+  } finally {
+    await app.close();
+  }
+});

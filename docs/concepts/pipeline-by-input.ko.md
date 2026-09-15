@@ -14,7 +14,7 @@ BomLens는 여러 입력을 받습니다. 소스코드, 펌웨어, 받은 SBOM, 
 
 ## 소스코드
 
-소스 폴더, GitHub URL, ZIP 아카이브입니다. 언어 감지로 알맞은 공식 [cdxgen](https://github.com/CycloneDX/cdxgen) 언어 이미지를 골라, 의존성을 준비(`build-prep.sh`)한 뒤 SBOM을 생성합니다. 형제 컨테이너를 실행할 수 없을 때(예: 웹 UI의 소스 스캔)는 디렉터리를 [syft](https://github.com/anchore/syft)로 스캔하는 방식으로 폴백하며, 이때는 락 파일에서 직접 의존성을 잡습니다.
+소스 폴더, GitHub URL, ZIP 아카이브입니다. 언어 감지로 알맞은 공식 [cdxgen](https://github.com/CycloneDX/cdxgen) 언어 이미지를 골라, 의존성을 준비(`build-prep.sh`)한 뒤 SBOM을 생성합니다. 형제 컨테이너를 실행할 수 없을 때(예: 웹 UI의 소스 스캔)나 cdxgen 자체가 처리 도중 실패했을 때(내부 예외, 또는 자체 문서 검증이 결과를 거부한 경우)는 디렉터리를 [syft](https://github.com/anchore/syft)로 스캔하는 방식으로 폴백하며, 이때는 락 파일에서 직접 의존성을 잡습니다. 어느 경우든 SBOM에는 사유와 함께 `bomlens:sbom-tool-degraded`가 남습니다. Node/npm에서는 폴백 결과가 프로젝트의 선언된 의존성을 하나도 포함하지 않으면 그 결과를 버리고 안내와 함께 스캔을 실패로 끝내며, 실제로는 아무것도 못 잡았는데 완전한 것처럼 보이는 결과를 보고하지 않습니다.
 
 소스 스캔에만 적용되는 옵션이 두 가지 있고, 둘 다 기본은 꺼짐입니다.
 

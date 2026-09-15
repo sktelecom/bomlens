@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a09a7b-5962-707e-9085-b61c95663dc8",
-  "CreatedAt": "2026-09-13T11:16:10.210033941Z",
+  "ReportID": "01a09d5f-6055-7a4f-b7c2-c463058d26f1",
+  "CreatedAt": "2026-09-14T00:44:28.629677722Z",
   "ArtifactName": "NginxRuntimeImage_1.24-alpine_bom.json",
   "ArtifactType": "cyclonedx",
   "Metadata": {

@@ -14,7 +14,7 @@ Every external tool below is open source; the table in [Open-source tools used](
 
 ## Source code
 
-A source folder, a GitHub URL, or a ZIP archive. Language detection picks the matching official [cdxgen](https://github.com/CycloneDX/cdxgen) language image, which prepares dependencies (`build-prep.sh`) and generates the SBOM. When BomLens cannot run a sibling container (for example the web UI's source scan), it falls back to [syft](https://github.com/anchore/syft) over the directory, which captures direct dependencies from lock files.
+A source folder, a GitHub URL, or a ZIP archive. Language detection picks the matching official [cdxgen](https://github.com/CycloneDX/cdxgen) language image, which prepares dependencies (`build-prep.sh`) and generates the SBOM. BomLens falls back to [syft](https://github.com/anchore/syft) over the directory, which captures direct dependencies from lock files, when it cannot run a sibling container (for example the web UI's source scan) or when cdxgen itself fails partway through (an internal exception, or its own document validation rejecting the result). Either way the SBOM carries `bomlens:sbom-tool-degraded` with the reason. For Node/npm, a fallback that covers none of the project's own declared dependencies is discarded and the scan fails with guidance, rather than reporting a misleadingly complete-looking result.
 
 Two options apply to source scans only, and both are off by default.
 

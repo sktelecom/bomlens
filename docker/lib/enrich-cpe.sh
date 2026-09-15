@@ -29,11 +29,13 @@
 #
 #   (b) A cpe whose VERSION carries a distro package-revision suffix. syft labels
 #       OpenWRT/Buildroot/Alpine packages with versions like `1.30.1-5`, `2.80-15`
-#       or `1.36.1-r2` (upstream version + a distro rebuild count). NVD's CPE
-#       version is the bare upstream `1.30.1` / `2.80` / `1.36.1`. For whitelisted
-#       names we rewrite the cpe's version to the upstream prefix (revision suffix
-#       stripped) AND, when vendor/product disagree with our curated map, correct
-#       them — so the recorded CPE is the NVD-canonical identifier.
+#       or `1.36.1-r2` (upstream version + a distro rebuild count), and deb/rpm
+#       packages carry their own package-manager revision the same way (see (d)
+#       below for exactly how each format is parsed). NVD's CPE version is the
+#       bare upstream version. For whitelisted names we rewrite the cpe's version
+#       to the upstream prefix (revision suffix stripped) AND, when vendor/product
+#       disagree with our curated map, correct them, so the recorded CPE is the
+#       NVD-canonical identifier.
 #
 #   (c) No license. syft reads name+version from opkg/dpkg entries but not the
 #       license metadata, so famous OSS (busybox, dropbear, dnsmasq, ...) arrive
@@ -42,11 +44,49 @@
 #       licenses[] from the curated SPDX id/expression. A pre-existing license
 #       (e.g. one syft did populate) is NEVER overwritten — syft is trusted.
 #
+#   (d) A deb/rpm/apk library's cpe VERSION still carries the distro revision even
+#       when the NAME is not in the whitelist. syft's deb/apk catalogers build the
+#       whole cpe as vendor=product=<package name> (self-referential -- not a real
+#       vendor, left alone by this script; see below), and its rpm cataloger reads
+#       the package's own Vendor header, which is a real vendor string but the
+#       version is still the raw distro one either way. Stripping only the version,
+#       for EVERY deb/rpm/apk library component (not just whitelisted names), is
+#       safe in a way a vendor/product guess is not: it only removes characters
+#       from an existing, already-correct name, so the worst outcome is still no
+#       match, never a match against the wrong project. Format-specific, narrow
+#       rules only (unmatched versions are left exactly as syft produced them):
+#         deb: a leading "<digits>:" epoch is dropped, then a trailing
+#              "-<revision>" is dropped where <revision> starts with a digit
+#              (Debian policy: the debian revision is everything after the LAST
+#              "-", and always starts with an upstream-supplied digit) --
+#              5.2.15-2+b13 -> 5.2.15, 1:2.38.1-5+deb12u3 -> 2.38.1. A version
+#              with no "-" at all (e.g. base-files' 13ubuntu10.4) has no revision
+#              to remove under this rule and is left untouched.
+#         rpm: the same "epoch:" and trailing "-<revision>" shape, since RPM
+#              release tags (.el9, .fc41, .el9_1) sit inside that same trailing
+#              segment: 3.0.7-104.el9 -> 3.0.7, 1.5.0-8.fc41 -> 1.5.0.
+#         apk: the existing "-r<digits>" rule (unchanged), e.g. 1.36.1-r31 ->
+#              1.36.1.
+#       The vendor/product syft already set (self-referential or, for rpm, the
+#       real Vendor header) are NEVER changed by this step -- only cpe-name-map.json
+#       corrects those, and only for names a person has verified. A component this
+#       step touches gets `bomlens:cpeSource=distro-version-strip`, distinct from
+#       `name-map`, so a reader can tell "version cleaned up, identity as syft/RPM
+#       gave it" apart from "identity corrected against a verified project".
+#
 # Accuracy first: a name->CPE guess (or a version rewrite, or a license) for an
 # UNKNOWN component invents false-positives (a wrong vuln or a wrong license is
-# worse than an empty result), so ONLY whitelisted names are touched, and only
-# licenses confirmed against the upstream project are listed in the map. Versions
-# that are not CPE-safe are left as-is.
+# worse than an empty result), so vendor/product are ONLY touched for whitelisted
+# names, and only licenses confirmed against the upstream project are listed in
+# the map. Versions that are not CPE-safe (after stripping, for (d); before, for
+# the whitelist path) are left as-is, and the version field is always re-escaped
+# per CPE 2.3 formatted-string binding (syft itself escapes special characters
+# there -- e.g. a debian epoch colon comes out as `1\:2.38.1...` -- so a
+# stripped/rebuilt version has to be re-escaped the same way, not concatenated
+# raw). This step never touches `.version` or `.purl`: those are the scanner's
+# own record of what was actually installed, including the distro revision, and
+# Trivy's purl+OS-context matching (see the top of this file) depends on that
+# revision being present verbatim.
 #
 # Generic by design: applies to any CycloneDX SBOM (FIRMWARE, IMAGE, ROOTFS, ...).
 set -e
@@ -92,6 +132,32 @@ TMP="$(mktemp)"
 if jq --argjson cmap "$CMAP" '
   def safe_ver(v): (v // "") | test("^[A-Za-z0-9][A-Za-z0-9_.+-]*$");
   def upstream_ver(v): (v // "") | sub("-r?[0-9]+$"; "");
+
+  # CPE 2.3 formatted-string escaping for the narrow set of characters real
+  # package versions actually use (epoch colon, deb "+build" markers, the "~"
+  # Debian uses for pre-release ordering) plus a literal backslash. unescape is
+  # generic (drop the backslash before any escaped character) so it round-trips
+  # whatever escape() produced, or whatever syft produced, without needing to
+  # enumerate every WFN special character the syft escaper might use.
+  def cpe_unescape: gsub("\\\\(?<c>.)"; "\(.c)");
+  def cpe_escape: gsub("(?<c>[\\\\:+~])"; "\\\(.c)");
+
+  # The purl scheme names the package format directly (pkg:deb/..., pkg:rpm/...,
+  # pkg:apk/...); "" for no purl or an unrecognized scheme.
+  def purl_ecosystem: (.purl // "") | (capture("^pkg:(?<t>[a-z]+)/")? // {}) | (.t // "");
+
+  # See (d) above for the exact per-format rule and why it is safe to apply
+  # beyond the whitelist. $v unchanged (and callers must then leave the cpe
+  # alone) when it does not match the revision shape for that format.
+  def strip_distro_revision($eco; $v):
+    if $eco == "deb" then
+      ($v | sub("^[0-9]+:"; "") | sub("-[0-9][A-Za-z0-9.+~]*$"; ""))
+    elif $eco == "rpm" then
+      ($v | sub("^[0-9]+:"; "") | sub("-[0-9][A-Za-z0-9._]*$"; ""))
+    elif $eco == "apk" then
+      ($v | sub("-r[0-9]+$"; ""))
+    else $v end;
+
   def has_license: ((.licenses // []) | type=="array")
     and ((.licenses // []) | any(
       ((.license.id // "") != "") or
@@ -138,17 +204,45 @@ if jq --argjson cmap "$CMAP" '
      else . end)
     | (((.name // "") | ascii_downcase)) as $n
     | ($cmap[$n]) as $m
-    # (a)+(b) CPE enrichment for whitelisted names with a CPE-safe version.
-    | (if ($m != null) and (safe_ver(.version)) and (cpe_withheld | not)
+    | (purl_ecosystem) as $eco
+    # (a)+(b) CPE enrichment for whitelisted names. deb/rpm/apk names use the
+    # same format-specific revision strip as (d) below; anything else (firmware
+    # names with no purl, e.g. OpenWRT/Buildroot) keeps the original generic
+    # rule. safe_ver is checked on the STRIPPED result, not the raw version --
+    # checking it before stripping would reject e.g. a debian epoch ("1:...")
+    # that the strip step is about to remove anyway.
+    | (if ($eco == "deb" or $eco == "rpm" or $eco == "apk")
+       then strip_distro_revision($eco; .version)
+       else upstream_ver(.version) end) as $uv
+    | (if ($m != null) and (safe_ver($uv)) and (cpe_withheld | not)
       then
-        (upstream_ver(.version)) as $uv
-        | ("cpe:2.3:a:" + $m.cpe_vendor + ":" + $m.cpe_product + ":" + $uv + ":*:*:*:*:*:*:*") as $cpe
+        ("cpe:2.3:a:" + $m.cpe_vendor + ":" + $m.cpe_product + ":" + ($uv | cpe_escape) + ":*:*:*:*:*:*:*") as $cpe
         | (if (.cpe == $cpe) then .   # idempotent: already our cpe
            else
              . + { cpe: $cpe }
              | .properties = (((.properties // []) | map(select(.name != "bomlens:cpeSource")))
                  + [{name:"bomlens:cpeSource", value:"name-map"}])
            end)
+      else . end)
+    # (d) Version-only cleanup for deb/rpm/apk library components NOT in the
+    # name map: vendor/product (self-referential, or the real rpm Vendor header)
+    # are left exactly as syft set them. Only fires when the stripped version
+    # actually differs (so a version with no matching revision shape leaves the
+    # cpe untouched) and the result is still CPE-safe.
+    | (if (.type == "library") and ((.cpe // "") != "") and (cpe_withheld | not)
+          and (($eco == "deb") or ($eco == "rpm") or ($eco == "apk"))
+          and (((.properties // []) | any(.name == "bomlens:cpeSource" and .value == "name-map")) | not)
+      then
+        (.cpe | [splits("(?<!\\\\):")]) as $fields
+        | ($fields[5] // "" | cpe_unescape) as $rawver
+        | (strip_distro_revision($eco; $rawver)) as $newver
+        | (if ($newver != $rawver) and safe_ver($newver)
+           then
+             ($fields[0:5] + [($newver | cpe_escape)] + $fields[6:] | join(":")) as $newcpe
+             | . + { cpe: $newcpe }
+             | .properties = (((.properties // []) | map(select(.name != "bomlens:cpeSource")))
+                 + [{name:"bomlens:cpeSource", value:"distro-version-strip"}])
+           else . end)
       else . end)
     # (c) License enrichment: only a whitelisted name with a confirmed spdx_license
     # AND no existing license. Idempotent via bomlens:licenseSource=name-map.
@@ -161,12 +255,17 @@ if jq --argjson cmap "$CMAP" '
   ) else . end)
 ' "$SBOM" > "$TMP" 2>/dev/null; then
     N=$(jq '[.components[]? | select((.properties // []) | any(
-             .name=="bomlens:cpeSource" and .value != "withheld-kernel-module"))] | length' "$TMP" 2>/dev/null || echo 0)
+             .name=="bomlens:cpeSource" and .value=="name-map"))] | length' "$TMP" 2>/dev/null || echo 0)
+    D=$(jq '[.components[]? | select((.properties // []) | any(
+             .name=="bomlens:cpeSource" and .value=="distro-version-strip"))] | length' "$TMP" 2>/dev/null || echo 0)
     L=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:licenseSource"))] | length' "$TMP" 2>/dev/null || echo 0)
     K=$(jq '[.components[]? | select((.properties // []) | any(
              .name=="bomlens:cpeSource" and .value=="withheld-kernel-module"))] | length' "$TMP" 2>/dev/null || echo 0)
     mv "$TMP" "$SBOM"
     echo "[cpe] set/normalized a whitelisted cpe:2.3 on ${N} component(s) for CVE matching."
+    if [ "${D:-0}" -gt 0 ]; then
+        echo "[cpe] stripped the distro revision from ${D} more deb/rpm/apk cpe(s) (vendor/product left as-is)."
+    fi
     echo "[cpe] filled a confirmed SPDX license on ${L} previously license-null whitelisted component(s)."
     if [ "${K:-0}" -gt 0 ]; then
         echo "[cpe] withheld a name-derived cpe from ${K} Linux kernel module(s); the module name is not a product and the kernel is reported separately."

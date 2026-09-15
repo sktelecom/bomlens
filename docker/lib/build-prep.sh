@@ -75,7 +75,17 @@ guard_paths() {
 
 guard_snapshot() {
     opted_out "${BOMLENS_KEEP_BUILD_OUTPUT:-}" && { log "source-tree guard off (BOMLENS_KEEP_BUILD_OUTPUT)"; return 0; }
-    GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
+    # Host-persistent guard state (BOMLENS_GUARD_ID, /bomlens-state -- see the
+    # restore-only branch near the bottom of this file): when the caller wired
+    # both up, this snapshot survives a SIGKILL that never lets guard_restore
+    # run, so a later invocation can finish the restore. Falls back to the
+    # normal ephemeral dir when either is absent (unset key, older caller,
+    # no /bomlens-state mount) -- unchanged from before this existed.
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d /bomlens-state ]; then
+        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
+        mkdir -p "$GUARD_DIR" 2>/dev/null || GUARD_DIR=""
+    fi
+    [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
     while IFS= read -r _f; do
@@ -130,15 +140,252 @@ guard_restore() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Supervised execution — run a resolver command so an interrupt can actually
+# stop it, instead of the interrupt being deferred until the command finishes
+# on its own.
+#
+# A shell only runs a trap once it regains control; while it is blocked
+# waiting on a foreground command, a caught signal does not preempt that wait
+# (confirmed by measurement: `docker stop` with a 5-minute grace never let
+# INT/TERM-based cleanup run against a plain foreground cdxgen invocation).
+# Backgrounding the command and waiting on it explicitly changes that: the
+# `wait` returns as soon as the signal arrives, so the trap can act right
+# away — it just has to stop the command itself first.
+#
+# setsid gives the command its own process group (pgid == its own pid), so
+# stopping it reaches the whole subtree it spawns (language tool -> package
+# manager -> git clone, etc.) with one signal instead of depending on each
+# level to forward it to the next. Confirmed present in every cdxgen image
+# build-prep.sh runs in (debian-rust/golang124/ruby34/php84/dotnet9/swift,
+# temurin-java21, python312, node20, the all-in-one image). Where it is
+# missing, falls back to a /proc-based tree walk.
+#
+# _cg_pid / _cg_pgid track whatever is currently supervised, so stop_supervised
+# and a trap can act on it without either needing to be passed the details.
+_cg_pid=""
+_cg_pgid=""
+_have_setsid=0
+command -v setsid >/dev/null 2>&1 && _have_setsid=1
+
+_proc_kill_tree() {
+    _pkt_root="$1"; _pkt_sig="$2"
+    for _pkt_p in /proc/[0-9]*; do
+        _pkt_pid=${_pkt_p#/proc/}
+        [ -r "$_pkt_p/stat" ] || continue
+        _pkt_ppid=$(awk '{print $4}' "$_pkt_p/stat" 2>/dev/null)
+        [ "$_pkt_ppid" = "$_pkt_root" ] && _proc_kill_tree "$_pkt_pid" "$_pkt_sig"
+    done
+    kill "-$_pkt_sig" "$_pkt_root" 2>/dev/null
+}
+
+_supervised_alive() {
+    if [ -n "$_cg_pgid" ]; then
+        kill -0 "-$_cg_pgid" 2>/dev/null
+    else
+        kill -0 "$_cg_pid" 2>/dev/null
+    fi
+}
+
+# Run CMD... in the background (its own process group via setsid when
+# available) and block until it finishes, returning its exit code. Sets
+# _cg_pid/_cg_pgid so stop_supervised (from a trap, or a caller's own
+# deadline) can stop it.
+run_supervised() {
+    if [ "$_have_setsid" = 1 ]; then
+        setsid "$@" &
+        _cg_pid=$!
+        _cg_pgid="$_cg_pid"
+    else
+        "$@" &
+        _cg_pid=$!
+        _cg_pgid=""
+    fi
+    wait "$_cg_pid"
+    return $?
+}
+
+# Same as run_supervised, but returns 124 (matching the `timeout` command's
+# convention) and stops the command itself if it is still running after
+# TIMEOUT_SECONDS, instead of waiting for it indefinitely. Does not exit the
+# script and does not touch GUARD_DIR — a caller times out one step and keeps
+# going, distinct from the whole-script abort the INT/TERM traps below do.
+run_supervised_timeout() {
+    _rst_timeout="$1"; shift
+    if [ "$_have_setsid" = 1 ]; then
+        setsid "$@" &
+        _cg_pid=$!
+        _cg_pgid="$_cg_pid"
+    else
+        "$@" &
+        _cg_pid=$!
+        _cg_pgid=""
+    fi
+    _rst_n=0
+    while kill -0 "$_cg_pid" 2>/dev/null; do
+        if [ "$_rst_n" -ge "$_rst_timeout" ]; then
+            stop_supervised
+            return 124
+        fi
+        sleep 1
+        _rst_n=$((_rst_n + 1))
+    done
+    wait "$_cg_pid"
+    return $?
+}
+
+# Stop whatever run_supervised/run_supervised_timeout is currently tracking:
+# TERM, wait for it to actually exit (not just accept that we asked), then
+# KILL if it hasn't. Blocks (bounded) until the whole tree is confirmed gone,
+# so a caller running guard_restore right after is not racing a resolver
+# process still writing files. Idempotent; a no-op when nothing is tracked.
+stop_supervised() {
+    [ -n "$_cg_pid" ] || return 0
+    if [ -n "$_cg_pgid" ]; then
+        kill -TERM "-$_cg_pgid" 2>/dev/null
+    else
+        _proc_kill_tree "$_cg_pid" TERM
+    fi
+    _ss_n=0
+    while [ "$_ss_n" -lt 50 ] && _supervised_alive; do
+        sleep 0.2
+        _ss_n=$((_ss_n + 1))
+    done
+    if _supervised_alive; then
+        if [ -n "$_cg_pgid" ]; then
+            kill -KILL "-$_cg_pgid" 2>/dev/null
+        else
+            _proc_kill_tree "$_cg_pid" KILL
+        fi
+        _ss_n=0
+        while [ "$_ss_n" -lt 25 ] && _supervised_alive; do
+            sleep 0.2
+            _ss_n=$((_ss_n + 1))
+        done
+    fi
+    _cg_pid=""; _cg_pgid=""
+}
+
+# Time limits for the resolution steps below, run through prep_step. A first
+# Gradle resolve (empty cache) can legitimately take well over 15 minutes, and
+# losing dependencies to a timeout is worse than a slow scan, so Gradle steps
+# get a longer budget than the rest. BOMLENS_PREP_TIMEOUT overrides both.
+PREP_TIMEOUT_DEFAULT="${BOMLENS_PREP_TIMEOUT:-900}"
+PREP_TIMEOUT_GRADLE="${BOMLENS_PREP_TIMEOUT:-1800}"
+
+# Run one resolution step (LABEL, a timeout in seconds, then the command and
+# its args) under run_supervised_timeout, so it is stopped like the rest if the
+# scan is interrupted. Failure or a timeout (rc 124) is logged with the
+# command's own stderr (last 20 lines) and recorded in PREP_FAILED, a
+# space-separated list of labels a caller stamps onto the SBOM once cdxgen has
+# run. Every label this scan actually calls, success or failure, also lands in
+# PREP_APPLIED regardless of outcome: a manifest this project does not have
+# (e.g. no go.mod) never calls prep_step at all, so PREP_APPLIED is what tells
+# a reader "this ecosystem's step ran here" apart from "it never applied" --
+# PREP_FAILED alone cannot, since both look the same (absent) to it. Never
+# aborts the script; returns the command's exit code.
+PREP_FAILED=""
+PREP_APPLIED=""
+prep_step() {
+    _ps_label="$1"; _ps_timeout="$2"; shift 2
+    case " $PREP_APPLIED " in
+        *" $_ps_label "*) ;;
+        *) PREP_APPLIED="${PREP_APPLIED:+$PREP_APPLIED }$_ps_label" ;;
+    esac
+    _ps_err=$(mktemp)
+    run_supervised_timeout "$_ps_timeout" "$@" 2>"$_ps_err"
+    _ps_rc=$?
+    if [ "$_ps_rc" -ne 0 ]; then
+        if [ "$_ps_rc" -eq 124 ]; then
+            echo "[build-prep] $_ps_label: timed out after ${_ps_timeout}s" >&2
+        else
+            echo "[build-prep] $_ps_label: failed (rc=$_ps_rc)" >&2
+        fi
+        if [ -s "$_ps_err" ]; then
+            echo "[build-prep] $_ps_label said (last 20 lines):" >&2
+            tail -20 "$_ps_err" | sed 's/^/[build-prep]   /' >&2
+        fi
+        case " $PREP_FAILED " in
+            *" $_ps_label "*) ;;
+            *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$_ps_label" ;;
+        esac
+    fi
+    rm -f "$_ps_err"
+    return "$_ps_rc"
+}
+
+# Record LABEL into PREP_APPLIED directly, with no command to run: for a
+# manifest whose lock evidence is a file we only check for (a committed
+# Gemfile.lock/Package.resolved/composer.lock/packages.lock.json), not a
+# command whose failure prep_step would capture. Never touches PREP_FAILED --
+# there is nothing here that can fail.
+mark_prep_applied() {
+    case " $PREP_APPLIED " in
+        *" $1 "*) ;;
+        *) PREP_APPLIED="${PREP_APPLIED:+$PREP_APPLIED }$1" ;;
+    esac
+}
+
+# Cleanup-only invocation (BOMLENS_GUARD_RESTORE_ONLY=1): a prior run recorded
+# its snapshot at /bomlens-state/$BOMLENS_GUARD_ID and never got to restore
+# it -- SIGKILL, OOM, a host crash, anything that skips the traps below. The
+# caller (scan-sbom.sh / entrypoint.sh) already confirmed that run's container
+# is gone before asking us to finish what it started; this reuses
+# guard_restore's own diff logic instead of reimplementing it host-side. No
+# resolvers, no cdxgen -- filesystem cleanup only, and fast.
+if opted_out "${BOMLENS_GUARD_RESTORE_ONLY:-}"; then
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "/bomlens-state/$BOMLENS_GUARD_ID" ]; then
+        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
+        guard_restore
+    fi
+    exit 0
+fi
+
 guard_snapshot
-trap 'guard_restore' EXIT
-trap 'guard_restore; exit 130' INT
-trap 'guard_restore; exit 143' TERM
+trap 'stop_supervised; guard_restore' EXIT
+trap 'stop_supervised; guard_restore; exit 130' INT
+trap 'stop_supervised; guard_restore; exit 143' TERM
+
+# Non-shipped trees: manifests under test, fixture, example, benchmark and demo
+# folders, and the GitHub Actions workflows, are left out of the SBOM because
+# none of it ships with the product. The two lists below are copies of the ones
+# in source-detect.sh (this file runs alone in the cdxgen container);
+# tests/test-postprocess.sh checks they stay equal.
+# BOMLENS_INCLUDE_NON_SHIPPED=1 (or true) keeps everything. Defined here,
+# ahead of every ecosystem block below, because the lock-evidence check each
+# one may run (mark_prep_applied / _lock_evidence_found) needs it too, not
+# just the cdxgen --exclude flags built from it further down.
+NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples benches benchmarks playground samples"
+NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
+EXCLUDE_NON_SHIPPED=1
+if opted_out "${BOMLENS_INCLUDE_NON_SHIPPED:-}"; then
+    EXCLUDE_NON_SHIPPED=""
+    log "non-shipped trees kept (BOMLENS_INCLUDE_NON_SHIPPED)"
+fi
+
+# True when a lockfile named $1 exists anywhere under the scan root, outside
+# .git/node_modules/vendor (a dependency's OWN lockfile is not evidence about
+# THIS project) and the non-shipped test/fixture/example trees above (a
+# lockfile bundled as a fixture for testing unrelated tooling is not evidence
+# either -- and unpruned, this walks vendor/node_modules in full on every
+# call, which is slow on a real monorepo). Used by the Swift/PHP/.NET lock-
+# evidence checks below. Uses its own positional parameters, not "$@" (which
+# for most of this script's later ecosystem blocks is cdxgen's own argument
+# list being built) -- a function's `set --` only reassigns its own scope in
+# POSIX sh, so this never leaks into the caller's "$@".
+_lock_evidence_found() {
+    _lef_name="$1"
+    set -- -name .git -o -name node_modules -o -name vendor
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _lef_d in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_lef_d"; done
+    fi
+    find . \( "$@" \) -prune -o -type f -name "$_lef_name" -print 2>/dev/null | grep -q .
+}
 
 # Rust — cdxgen does NOT auto-run cargo; lockfile is essential for transitive deps
 if [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1; then
     log "cargo generate-lockfile"
-    cargo generate-lockfile 2>/dev/null
+    prep_step cargo-lockfile "$PREP_TIMEOUT_DEFAULT" cargo generate-lockfile
 fi
 
 # Go — complete go.sum so cdxgen's default-readonly `go list -deps` resolves the
@@ -162,14 +409,20 @@ if [ -f go.mod ] && command -v go >/dev/null 2>&1; then
         echo "[build-prep] go: allow access to proxy.golang.org (or your GOPROXY) from the Docker engine and re-scan." >&2
     fi
     log "go mod tidy"
-    GOFLAGS="-mod=mod" go mod tidy 2>/dev/null || GOFLAGS="-mod=mod" go mod download 2>/dev/null
+    prep_step go-mod-tidy "$PREP_TIMEOUT_DEFAULT" sh -c 'GOFLAGS="-mod=mod" go mod tidy || GOFLAGS="-mod=mod" go mod download'
 fi
 
 # Ruby — ensure a lockfile exists (cdxgen ruby images usually auto-resolve,
-# but a Gemfile.lock makes it deterministic)
-if [ -f Gemfile ] && [ ! -f Gemfile.lock ] && command -v bundle >/dev/null 2>&1; then
-    log "bundle lock"
-    bundle lock 2>/dev/null || bundle install 2>/dev/null
+# but a Gemfile.lock makes it deterministic). A Gemfile.lock already committed
+# is itself positive lock evidence -- record it the same as a step we ran
+# ourselves succeeding, without re-resolving over the network.
+if [ -f Gemfile ]; then
+    if [ -f Gemfile.lock ]; then
+        mark_prep_applied bundle-lock
+    elif command -v bundle >/dev/null 2>&1; then
+        log "bundle lock"
+        prep_step bundle-lock "$PREP_TIMEOUT_DEFAULT" sh -c 'bundle lock || bundle install'
+    fi
 fi
 
 # Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
@@ -194,6 +447,17 @@ fi
 MAVEN_SCOPE_FILTER=""
 if [ -f pom.xml ] && ! opted_out "${BOMLENS_MAVEN_FULL_GRAPH:-}"; then
     MAVEN_SCOPE_FILTER=1
+fi
+
+# PHP/Composer scope over-scan: the same mechanism as the Maven filter above.
+# cdxgen already tags each composer component's resolved scope (require ->
+# required, require-dev -> optional), so no composer run or second resolve is
+# needed here either, confirmed against the pinned cdxgen PHP image and not
+# just assumed from cdxgen's own upstream behavior. BOMLENS_PHP_FULL_GRAPH=1
+# opts out (keep the require+require-dev superset).
+PHP_SCOPE_FILTER=""
+if [ -f composer.json ] && ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
+    PHP_SCOPE_FILTER=1
 fi
 
 # Gradle (java-gradle / Android) — resolve so cdxgen sees the full graph.
@@ -224,11 +488,14 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     if [ -n "${ANDROID_HOME:-}" ] && ! opted_out "${BOMLENS_ANDROID_FULL_GRAPH:-}"; then
         log "android: resolving deployable release runtime classpath"
         _relset=$(mktemp)
-        _subs=$("$GRADLEW" --no-daemon -q --console=plain projects 2>/dev/null \
+        # Both Gradle calls below share one label: to a reader they are one
+        # logical step (the release classpath resolve), whether it timed out
+        # listing subprojects or resolving one module's dependencies.
+        _subs=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain projects \
                 | sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p")
         # Include the root ("") as a fallback for single-module projects.
         for _s in $_subs ""; do
-            _dep=$("$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" 2>/dev/null)
+            _dep=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies")
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
             # plain releaseRuntimeClasspath, else the first flavored release variant
@@ -275,7 +542,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     else
         # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
         log "gradle dependencies"
-        "$GRADLEW" --no-daemon dependencies >/dev/null 2>&1 || true
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon dependencies >/dev/null
     fi
 fi
 
@@ -292,65 +559,80 @@ fi
 # without the bad pin). So: keep the bulk install as the fast path, surface pip's
 # own error when it fails, then retry requirement by requirement so one
 # unbuildable pin costs only its own evidence.
+# Written to a temp file and run as its own script, not a shell function:
+# prep_step backgrounds a step through setsid, which execs a real process and
+# cannot see a function defined in build-prep.sh's own interpreter (setsid:
+# failed to execute ...: No such file or directory, pip never ran, silently,
+# because the failure still landed in PREP_FAILED). Same reason go-mod-tidy,
+# bundle-lock and npm-production-set below run through sh rather than a
+# function. A file rather than `sh -c "$(cat <<'EOF' ...)"`: some /bin/sh
+# builds mis-parse a `case ... ;; esac` heredoc body nested inside a command
+# substitution.
+#
+# Everything the script writes to stderr (pip's own output included, no longer
+# routed through a side file) lands in prep_step's capture and its
+# last-20-lines report on failure. The per-requirement "$_pf of $_pn failed"
+# summary stays, since prep_step's generic message has no way to know that
+# count.
+_pip_script=$(mktemp 2>/dev/null) || _pip_script="${TMPDIR:-/tmp}/bomlens-pip-install.sh"
+cat > "$_pip_script" <<'PIPSCRIPT'
+PIP_BSP=""                       # PEP 668 needs --break-system-packages here
+
+# One best-effort install attempt. A PEP 668 "externally managed" image
+# refuses the plain call and needs --break-system-packages; that is the only
+# failure worth retrying, and once seen it is remembered, so a requirement
+# that simply cannot be built is attempted once rather than twice.
+pip_try() {
+    if [ -n "$PIP_BSP" ]; then
+        pip3 install -q --break-system-packages "$@"
+        return $?
+    fi
+    _ptry=$(mktemp 2>/dev/null) || _ptry="${TMPDIR:-/tmp}/bomlens-pip-try.err"
+    pip3 install -q "$@" 2>"$_ptry"
+    _prc=$?
+    if [ "$_prc" -ne 0 ] && grep -q "externally-managed-environment" "$_ptry" 2>/dev/null; then
+        rm -f "$_ptry"
+        pip3 install -q --break-system-packages "$@" || return 1
+        PIP_BSP=1
+        return 0
+    fi
+    cat "$_ptry" >&2
+    rm -f "$_ptry"
+    return "$_prc"
+}
+
+if ! pip_try -r requirements.txt; then
+    echo "[build-prep] pip: bulk install failed; retrying one requirement at a time" >&2
+    _reqs=$(mktemp 2>/dev/null) || _reqs="${TMPDIR:-/tmp}/bomlens-reqs.txt"
+    # Strip comments the way pip does: a whole-line '#', or a '#' that
+    # follows whitespace. A bare '#' inside a token is left alone so a VCS
+    # URL fragment (git+https://...#egg=name) survives.
+    sed -e 's/^[[:space:]]*#.*$//' -e 's/[[:space:]][[:space:]]*#.*$//' \
+        -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' requirements.txt > "$_reqs"
+    _pn=0; _pf=0
+    while IFS= read -r _req; do
+        [ -n "$_req" ] || continue
+        # Option lines (-r/-c/-e/--index-url/--hash/...) are not requirement
+        # specifiers; installing them one by one is meaningless.
+        case "$_req" in -*) continue ;; esac
+        _pn=$((_pn + 1))
+        pip_try "$_req" \
+            || { _pf=$((_pf + 1)); echo "[build-prep] pip: could not install '$_req'" >&2; }
+    done < "$_reqs"
+    rm -f "$_reqs"
+    if [ "$_pf" -gt 0 ]; then
+        echo "[build-prep] pip: $_pf of $_pn requirement(s) failed to install" >&2
+        exit 1
+    fi
+fi
+exit 0
+PIPSCRIPT
+
 if [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
     log "pip install requirements"
-    PIP_BSP=""                       # PEP 668 needs --break-system-packages here
-    _piperr=$(mktemp 2>/dev/null) || _piperr="${TMPDIR:-/tmp}/bomlens-pip.err"
-
-    # One best-effort install attempt. A PEP 668 "externally managed" image
-    # refuses the plain call and needs --break-system-packages; that is the only
-    # failure worth retrying, and once seen it is remembered, so a requirement
-    # that simply cannot be built is attempted once rather than twice.
-    pip_try() {
-        if [ -n "$PIP_BSP" ]; then
-            pip3 install -q --break-system-packages "$@" 2>>"$_piperr"
-            return $?
-        fi
-        _ptry=$(mktemp 2>/dev/null) || _ptry="${TMPDIR:-/tmp}/bomlens-pip-try.err"
-        pip3 install -q "$@" 2>"$_ptry"
-        _prc=$?
-        if [ "$_prc" -ne 0 ] && grep -q "externally-managed-environment" "$_ptry" 2>/dev/null; then
-            rm -f "$_ptry"
-            pip3 install -q --break-system-packages "$@" 2>>"$_piperr" || return 1
-            PIP_BSP=1
-            return 0
-        fi
-        cat "$_ptry" >> "$_piperr" 2>/dev/null
-        rm -f "$_ptry"
-        return "$_prc"
-    }
-
-    if ! pip_try -r requirements.txt; then
-        log "pip: bulk install failed; retrying one requirement at a time"
-        _reqs=$(mktemp 2>/dev/null) || _reqs="${TMPDIR:-/tmp}/bomlens-reqs.txt"
-        # Strip comments the way pip does: a whole-line '#', or a '#' that
-        # follows whitespace. A bare '#' inside a token is left alone so a VCS
-        # URL fragment (git+https://...#egg=name) survives.
-        sed -e 's/^[[:space:]]*#.*$//' -e 's/[[:space:]][[:space:]]*#.*$//' \
-            -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' requirements.txt > "$_reqs"
-        _pn=0; _pf=0
-        while IFS= read -r _req; do
-            [ -n "$_req" ] || continue
-            # Option lines (-r/-c/-e/--index-url/--hash/...) are not requirement
-            # specifiers; installing them one by one is meaningless.
-            case "$_req" in -*) continue ;; esac
-            _pn=$((_pn + 1))
-            pip_try "$_req" \
-                || { _pf=$((_pf + 1)); echo "[build-prep] pip: could not install '$_req'" >&2; }
-        done < "$_reqs"
-        rm -f "$_reqs"
-        # This report goes to stderr, next to pip's own output, so the two stay
-        # together in a combined log. What pip said is the point: the cause of a
-        # partial install belongs in the scan log, not in /dev/null. Tail only,
-        # because a resolver failure can print hundreds of candidate lines.
-        [ "$_pf" -gt 0 ] && echo "[build-prep] pip: $_pf of $_pn requirement(s) failed to install" >&2
-        if [ -s "$_piperr" ]; then
-            echo "[build-prep] pip: last lines of pip output:" >&2
-            tail -20 "$_piperr" >&2
-        fi
-    fi
-    rm -f "$_piperr"
+    prep_step pip-install "$PREP_TIMEOUT_DEFAULT" sh "$_pip_script"
 fi
+rm -f "$_pip_script"
 
 # Swift / SPM — cdxgen reads Package.resolved for the resolved graph, and parses it
 # offline (verified: both the v1 `object.pins` and v2 top-level `pins` formats). Only run
@@ -360,11 +642,14 @@ fi
 # needs no prep here — it is filled from the lockfile by syft in post-processing. NOTE:
 # UIKit/Xcode-driven resolution needs macOS; on Linux only non-platform Swift deps resolve.
 if [ -f Package.swift ] && command -v swift >/dev/null 2>&1; then
-    if find . -name Package.resolved -type f 2>/dev/null | grep -q .; then
+    if _lock_evidence_found Package.resolved; then
         log "swift: committed Package.resolved present; skipping network resolve"
+        # A committed Package.resolved is itself positive lock evidence, the
+        # same as running the resolve ourselves and it succeeding.
+        mark_prep_applied swift-package-resolve
     else
         log "swift package resolve (no committed Package.resolved)"
-        swift package resolve >/dev/null 2>&1 || true
+        prep_step swift-package-resolve "$PREP_TIMEOUT_DEFAULT" swift package resolve >/dev/null
     fi
 fi
 
@@ -386,7 +671,7 @@ if [ -f package.json ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
     # Copy a committed lockfile too so the prod resolve pins the same versions cdxgen sees.
     [ -f package-lock.json ] && cp package-lock.json "$_npmtmp/" 2>/dev/null
     _nodeset=$(mktemp)
-    if ( cd "$_npmtmp" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts >/dev/null 2>&1 ) \
+    if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
        && [ -f "$_npmtmp/package-lock.json" ]; then
         # Emit name@version for every non-dev node_modules entry in the resolved lockfile.
         node -e '
@@ -430,7 +715,63 @@ set -- -r --spec-version "$SPEC" -o "$OUT"
 if find . -name Podfile -type f 2>/dev/null | grep -q .; then
     set -- "$@" --exclude-type cocoapods
 fi
+# conda: cdxgen has no conda cataloger and does not know environment.yml at
+# all (confirmed: neither `--type conda` against the file nor against a
+# synthesized conda-meta/ install directory produces anything -- this image
+# has no conda/mamba binary for it to shell out to). Left alone, cdxgen's
+# python auto-detection reads whatever OTHER python manifest happens to sit
+# in the same tree (setup.py, requirements.txt, ...) instead, which can be
+# actively wrong rather than merely incomplete: measured on a real project,
+# an unpinned setup.py install_requires resolved to that day's PyPI latest,
+# with zero overlap against what environment.yml actually pins (see
+# identify-conda.py's own header for the full account). Parse environment.yml
+# here, before cdxgen runs, and only silence cdxgen's python cataloger when
+# our own parse actually produced something to use instead -- a parse that
+# comes back empty (no environment.yml, or one that does not match the shape
+# identify-conda.py knows) leaves cdxgen's python step running exactly as
+# before, since an inaccurate python-derived SBOM still beats an empty one.
+CONDA_ENV_FILE=""
+[ -f "environment.yml" ] && CONDA_ENV_FILE="environment.yml"
+[ -z "$CONDA_ENV_FILE" ] && [ -f "environment.yaml" ] && CONDA_ENV_FILE="environment.yaml"
+if [ -n "$CONDA_ENV_FILE" ] && command -v python3 >/dev/null 2>&1; then
+    CONDA_SBOM="${OUT%_bom.json}_conda.cdx.json"
+    if python3 /tmp/identify-conda.py "$SRC" "$CONDA_SBOM" "${PROJECT_VERSION:-unknown}"; then
+        CONDA_N=$(node -e '
+            try { const d = require(process.argv[1]); process.stdout.write(String((d.components||[]).length)); }
+            catch (e) { process.stdout.write("0"); }
+        ' "$CONDA_SBOM" 2>/dev/null || echo 0)
+        if [ "${CONDA_N:-0}" -gt 0 ]; then
+            log "conda: $CONDA_ENV_FILE parsed ($CONDA_N components); excluding cdxgen's python cataloger"
+            set -- "$@" --exclude-type python
+        else
+            log "conda: $CONDA_ENV_FILE present but not parsed; leaving cdxgen's python cataloger as-is"
+        fi
+    fi
+fi
+# Non-shipped trees: leave out manifests under test, fixture, example,
+# benchmark and demo folders, and the GitHub Actions workflows -- none of it
+# ships with the product. NON_SHIPPED_DIRS/EXCLUDE_NON_SHIPPED are defined
+# near the top of this file (ahead of every ecosystem block, including the
+# lock-evidence checks that also read them); this is just where they get
+# turned into cdxgen's own --exclude flags.
+if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+    for _d in $NON_SHIPPED_DIRS; do set -- "$@" --exclude "**/$_d/**"; done
+    set -- "$@" --exclude "**/.github/workflows/**"
+fi
 set -- "$@" "$SRC"
+
+# PHP (Composer) / .NET - cdxgen resolves both directly with no pre-resolve step,
+# and neither leaves any signal telling a real resolve apart from a degraded
+# one. The only positive lock evidence available for them is a committed
+# lockfile, checked the same way as Swift's Package.resolved check above (both
+# use _lock_evidence_found, defined near the top of this file): a recursive,
+# pruned existence check, not a command that can fail. Recursive, not
+# root-only: a PHP monorepo (e.g. one lockfile per component under src/, no
+# lockfile at the root) still has cdxgen's `-r` scan resolving everything from
+# those nested lockfiles (measured), so a root-only check would call a
+# fully-resolved monorepo unknown for no reason.
+_lock_evidence_found composer.lock && mark_prep_applied composer-lock-committed
+_lock_evidence_found packages.lock.json && mark_prep_applied dotnet-lock-committed
 
 # --- correct the BSD license-name aliases cdxgen resolves against ---
 # cdxgen turns a license NAME into an SPDX id through two data files, and up to
@@ -544,19 +885,72 @@ fix_lic_mapping
 # --- locate cdxgen (path differs per image) and generate the SBOM ---
 if command -v cdxgen >/dev/null 2>&1; then
     log "cdxgen (PATH)"
-    cdxgen "$@"
+    run_supervised cdxgen "$@"
     rc=$?
 elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
     log "cdxgen (/opt/cdxgen/bin/cdxgen.js)"
-    node /opt/cdxgen/bin/cdxgen.js "$@"
+    run_supervised node /opt/cdxgen/bin/cdxgen.js "$@"
     rc=$?
 elif [ -f /opt/bin/cdxgen ]; then
     log "cdxgen (/opt/bin/cdxgen)"
-    /opt/bin/cdxgen "$@"
+    run_supervised /opt/bin/cdxgen "$@"
     rc=$?
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
+fi
+
+# Record each prep_step that failed or timed out (PREP_FAILED, space-separated
+# labels) on the SBOM, one bomlens:pipeline-step-failed property per label,
+# the same shape docker/lib/pipeline-step.sh's mark_pipeline_warning writes.
+# This file is bind-mounted alone (see the header comment), so the property is
+# appended inline with node rather than sourcing that script.
+if [ "${rc:-1}" -eq 0 ] && [ -n "$PREP_FAILED" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _pf=$(mktemp).js
+    cat > "$_pf" <<'PREPFAIL_JS'
+const fs = require('fs');
+const [bomPath, labels] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = bom.metadata.properties || [];
+const list = labels.split(' ').filter(Boolean);
+for (const label of list) {
+  props.push({ name: 'bomlens:pipeline-step-failed', value: label });
+}
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] recorded ' + list.length + ' failed preprocessing step(s) on the SBOM: ' + list.join(', ') + '\n');
+PREPFAIL_JS
+    node "$_pf" "$OUT" "$PREP_FAILED" || log "prep-failed: recording skipped (non-fatal)"
+    rm -f "$_pf"
+fi
+
+# Record every prep_step this scan actually called (PREP_APPLIED, space-separated
+# labels, success or failure) on the SBOM, one bomlens:prep-step-applied property
+# per label -- the "this ecosystem's lock step ran here" signal a reader combines
+# with the absence of the matching bomlens:pipeline-step-failed label above to
+# tell "resolved" apart from "never applicable" when compositions.aggregate is
+# later decided from this SBOM's properties.
+if [ "${rc:-1}" -eq 0 ] && [ -n "$PREP_APPLIED" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _pa=$(mktemp).js
+    cat > "$_pa" <<'PREPAPPLIED_JS'
+const fs = require('fs');
+const [bomPath, labels] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = bom.metadata.properties || [];
+const list = labels.split(' ').filter(Boolean);
+for (const label of list) {
+  props.push({ name: 'bomlens:prep-step-applied', value: label });
+}
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] recorded ' + list.length + ' applied preprocessing step(s) on the SBOM: ' + list.join(', ') + '\n');
+PREPAPPLIED_JS
+    node "$_pa" "$OUT" "$PREP_APPLIED" || log "prep-applied: recording skipped (non-fatal)"
+    rm -f "$_pa"
 fi
 
 # Android release-scope filter: keep only components in the deployable release
@@ -648,27 +1042,286 @@ NFILTER_JS
     rm -f "$_nflt" "$NODE_PROD_SET"
 fi
 
-# Maven scope filter: cdxgen tags each maven component with its resolved scope
-# (compile/runtime -> required, test -> optional, provided/system -> excluded).
-# Drop the non-deployable ones, keeping non-maven components, the app root, and
-# anything cdxgen left unscoped. Prune the dependency graph to the kept refs.
-# Guard: only act when cdxgen actually populated scopes (at least one maven node
-# marked "required") — the syft fallback path emits no scope, and dropping there
-# would gut the BOM, so we leave it untouched and recall never regresses.
-if [ "${rc:-1}" -eq 0 ] && [ -n "${MAVEN_SCOPE_FILTER:-}" ] \
+# npm workspace-member filter: the file-level exclusion above (the --exclude
+# globs built from NON_SHIPPED_DIRS) does not reach an npm workspace member
+# registered in package-lock.json, since cdxgen reads that file directly. A
+# member whose own directory sits under an excluded tree is dropped, along
+# with a dependency only that member reaches (any way at all -- dependencies,
+# devDependencies and optionalDependencies alike), unless a kept member
+# reaches it too. BOMLENS_INCLUDE_NON_SHIPPED=1 (the same switch the
+# file-level exclusion above uses) opts out.
+#
+# Reads package-lock.json's own "packages" map directly: a workspace member
+# is any key that is not the root ("") and does not contain "node_modules/"
+# -- the same distinction Cargo.lock draws between a path member (no
+# `source`) and a registry crate (`source` present), just expressed in
+# npm's own lockfile shape. Resolving one package's dependency name to the
+# entry it actually gets replays npm's own directory-nesting resolution
+# (walk up from the requiring package's own key, node_modules at a time,
+# same as Node's own runtime `require` resolution) rather than trusting a
+# declared semver range, and follows a workspace member's own `"link":
+# true` node_modules entry through to its real packages/... key. A name
+# that resolves nowhere is common and expected here (an optional or
+# platform-specific dependency simply not installed) and is just not
+# traversed further, unlike Cargo.lock, where every declared dependency
+# item is a byte someone else's tooling wrote and MUST resolve, so a miss
+# there means the parse itself is wrong.
+if [ "${rc:-1}" -eq 0 ] && [ -f package.json ] && [ -f package-lock.json ] \
+   && [ -n "$EXCLUDE_NON_SHIPPED" ] \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
-    log "maven: filtering SBOM to deployable scope"
-    _mflt=$(mktemp).js
-    cat > "$_mflt" <<'MFILTER_JS'
+    _nwmf=$(mktemp).js
+    cat > "$_nwmf" <<'NWMF_JS'
 const fs = require('fs');
-const [bomPath] = process.argv.slice(2);
+const path = require('path');
+const [bomPath, lockPath, dirsStr] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
+
+const LOCK_MAX_BYTES = 16 * 1024 * 1024;
+const BUDGET_MS = 3000;
+let lockText;
+try {
+  const st = fs.statSync(lockPath);
+  if (st.size > LOCK_MAX_BYTES) process.exit(0);
+  lockText = fs.readFileSync(lockPath, 'utf8');
+} catch (e) { process.exit(0); }
+let lock;
+try { lock = JSON.parse(lockText); } catch (e) { process.exit(0); }
+if (lock.lockfileVersion !== 2 && lock.lockfileVersion !== 3) process.exit(0);
+const packages = lock.packages;
+if (!packages || typeof packages !== 'object') process.exit(0);
+
+const deadline = Date.now() + BUDGET_MS;
+let steps = 0;
+function overBudget() { return (++steps & 0xfff) === 0 && Date.now() > deadline; }
+
+const NON_SHIPPED_DIRS = new Set((dirsStr || '').split(/\s+/).filter(Boolean));
+const keys = Object.keys(packages);
+const isMember = k => k !== '' && !k.includes('node_modules/');
+const memberKeys = keys.filter(isMember);
+if (memberKeys.length === 0) process.exit(0);
+
+function underExcludedTree(key) {
+  return key.split('/').some(seg => NON_SHIPPED_DIRS.has(seg));
+}
+const excludedMembers = memberKeys.filter(underExcludedTree);
+if (excludedMembers.length === 0) process.exit(0);
+const keptMembers = memberKeys.filter(k => !underExcludedTree(k));
+if (keptMembers.length === 0) process.exit(0);
+
+// Resolve a link entry (a workspace member's own node_modules alias) through
+// to the real packages/... key it points at.
+function resolveLink(key) {
+  let cur = key;
+  let hops = 0;
+  while (packages[cur] && packages[cur].link && typeof packages[cur].resolved === 'string') {
+    if (++hops > 20) return null;   // a link cycle: cannot determine
+    cur = packages[cur].resolved;
+  }
+  return packages[cur] ? cur : null;
+}
+
+// Every "node_modules/<name>" suffix anywhere in the lockfile, regardless of
+// which directory it hangs off of -- whether a declared dependency has any
+// installation trace at all, not just one reachable via the walk-up below.
+const installedNames = new Set();
+for (const k of keys) {
+  const i = k.lastIndexOf('node_modules/');
+  if (i !== -1) installedNames.add(k.slice(i + 'node_modules/'.length));
+}
+
+function isOptionalDecl(entry, name) {
+  if (entry.optionalDependencies && Object.prototype.hasOwnProperty.call(entry.optionalDependencies, name)) return true;
+  const pm = entry.peerDependenciesMeta;
+  return !!(pm && pm[name] && pm[name].optional === true);
+}
+
+function depNamesOf(entry) {
+  return Object.keys(Object.assign({},
+    entry.dependencies, entry.devDependencies, entry.optionalDependencies, entry.peerDependencies));
+}
+
+function resolveDep(fromKey, name) {
+  let dir = fromKey;
+  for (;;) {
+    const candidate = dir === '' ? 'node_modules/' + name : dir + '/node_modules/' + name;
+    if (packages[candidate]) return resolveLink(candidate);
+    if (dir === '') return null;
+    const idx = dir.lastIndexOf('/');
+    dir = idx === -1 ? '' : dir.slice(0, idx);
+  }
+}
+
+// adj holds only the edges that resolved. unresolved holds, per key, the
+// declared names that did not -- except an optional (or optional peer) one
+// with no installation trace anywhere, which is simply not installed and
+// carries no risk either way. A name that failed to resolve is not dropped
+// silently: whichever BFS below actually walks through the key that
+// declared it decides what that means for the filter (see the comment on
+// the kept-side walk).
+const adj = new Map();
+const unresolved = new Map();
+for (const k of keys) {
+  if (overBudget()) process.exit(0);
+  const entry = packages[k];
+  if (!entry || (entry.link && typeof entry.resolved === 'string')) continue;   // links carry no deps of their own
+  const targets = [];
+  const missing = [];
+  for (const name of depNamesOf(entry)) {
+    const t = resolveDep(k, name);
+    if (t) { targets.push(t); continue; }
+    if (isOptionalDecl(entry, name) && !installedNames.has(name)) continue;   // never installed anywhere: not a gap
+    missing.push(name);
+  }
+  adj.set(k, targets);
+  if (missing.length) unresolved.set(k, missing);
+}
+
+function bfs(starts) {
+  const seen = new Set(starts);
+  const queue = starts.slice();
+  while (queue.length) {
+    if (overBudget()) return null;
+    const cur = queue.shift();
+    for (const next of (adj.get(cur) || [])) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+  return seen;
+}
+const reachedFromKeep = bfs(keptMembers);
+const reachedFromExclude = bfs(excludedMembers);
+if (!reachedFromKeep || !reachedFromExclude) process.exit(0);
+
+// A name a kept-reachable package declares but this pass could not resolve
+// (something other than an optional dependency never installed at all) is
+// not a "this drops" signal and not a "this stays" signal either -- it is a
+// missing edge in OUR OWN view of a graph that plainly does reach further,
+// since something in the kept tree asked for it. Treat every component
+// under that name, wherever it sits, as reachable from a kept root: dropping
+// it would risk cutting a component a kept member genuinely uses. An
+// unresolved name met walking the excluded side is not given the same
+// treatment -- skipping it there only leaves something in the SBOM that
+// might not have needed to stay, the safe direction. Too many protected
+// names at once means this pass cannot really tell what is going on, so it
+// stands down entirely rather than lean on a growing exception list.
+const PROTECTED_NAME_LIMIT = 50;
+const protectedNames = new Set();
+for (const k of reachedFromKeep) {
+  for (const name of (unresolved.get(k) || [])) protectedNames.add(name);
+}
+if (protectedNames.size > PROTECTED_NAME_LIMIT) process.exit(0);
+
+const dropKeys = new Set(excludedMembers);
+for (const k of reachedFromExclude) if (!reachedFromKeep.has(k)) dropKeys.add(k);
+if (dropKeys.size === 0) process.exit(0);
+
+// purl matching carries name@version, not the installed path, so collapse to
+// name@version pairs the same conservative way the Cargo filter does: a pair
+// reached from a kept root under ANY of its installed locations counts as
+// kept.
+function nvOf(k) {
+  const entry = packages[k];
+  if (!entry) return null;
+  const name = entry.name || k.slice(k.lastIndexOf('node_modules/') + 'node_modules/'.length);
+  return entry.version ? name + '@' + entry.version : null;
+}
+const keptNV = new Set([...reachedFromKeep].map(nvOf).filter(Boolean));
+const dropNV = new Set();
+for (const k of dropKeys) {
+  const entry = packages[k];
+  if (entry && entry.name && protectedNames.has(entry.name)) continue;   // a kept root's own unresolved edge named this
+  const nv = nvOf(k);
+  if (nv && !keptNV.has(nv)) dropNV.add(nv);
+}
+if (dropNV.size === 0) process.exit(0);
+
+const refOf = c => c['bom-ref'] || c.purl;
+const nvOfPurl = purl => {
+  const m = /^pkg:npm\/([^@]+)@([^?]+)/.exec(purl || '');
+  return m ? decodeURIComponent(m[1]) + '@' + decodeURIComponent(m[2]) : null;
+};
+const droppedPurls = [];
+const keep = c => {
+  const nv = nvOfPurl(c.purl);
+  if (!nv || !dropNV.has(nv)) return true;
+  droppedPurls.push(c.purl);
+  return false;
+};
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+if (droppedPurls.length === 0) process.exit(0);
+
+const mc = bom.metadata && bom.metadata.component;
+const keptRefs = new Set(bom.components.map(refOf));
+if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
+bom.dependencies = bom.dependencies
+  .filter(d => keptRefs.has(d.ref))
+  .map(d => Array.isArray(d.dependsOn) ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) }) : d);
+
+function mergeCapped(existing, additions, limit) {
+  let shown = [];
+  let priorTotal = 0;
+  if (existing) {
+    const m = /^(.*?)(?: \(\+(\d+) more\))?$/.exec(existing);
+    shown = m[1] ? m[1].split(', ').filter(Boolean) : [];
+    priorTotal = shown.length + (m[2] ? parseInt(m[2], 10) : 0);
+  }
+  const merged = shown.concat(additions);
+  const total = priorTotal + additions.length;
+  let val = merged.slice(0, limit).join(', ');
+  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  return val;
+}
+const LIMIT = 50;
+bom.metadata = bom.metadata || {};
+const existingProps = bom.metadata.properties || [];
+const priorMembers = (existingProps.find(p => p.name === 'bomlens:excluded-members') || {}).value || null;
+const priorComponents = (existingProps.find(p => p.name === 'bomlens:excluded-components') || {}).value || null;
+const memberList = excludedMembers.map(k => {
+  const entry = packages[k];
+  const name = (entry && entry.name) || k.split('/').pop();
+  return 'npm:' + k + ' (' + name + ')';
+});
+const props = existingProps.filter(p => p.name !== 'bomlens:excluded-members' && p.name !== 'bomlens:excluded-components');
+props.push({ name: 'bomlens:excluded-members', value: mergeCapped(priorMembers, memberList, LIMIT) });
+props.push({ name: 'bomlens:excluded-components', value: mergeCapped(priorComponents, droppedPurls, LIMIT) });
+bom.metadata.properties = props;
+
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] npm: excluded ' + excludedMembers.length + ' workspace member(s), dropped ' + (before - bom.components.length) + ' of ' + before + ' components\n');
+NWMF_JS
+    node "$_nwmf" "$OUT" package-lock.json "$NON_SHIPPED_DIRS" || log "npm: workspace-member filter skipped (non-fatal)"
+    rm -f "$_nwmf"
+fi
+
+# Scope filter (Maven, PHP/Composer): cdxgen tags each component's resolved
+# scope itself (Maven: compile/runtime -> required, test -> optional,
+# provided/system -> excluded; Composer: require -> required, require-dev ->
+# optional). Both ecosystems reduce to the same post-filter: drop the
+# non-deployable nodes under the ecosystem's own purl prefix, keeping every
+# other component, the app root, and anything cdxgen left unscoped, then prune
+# the dependency graph to what remains. Guard: only act when cdxgen actually
+# populated scopes (at least one node of that purl prefix marked "required")
+# -- the syft fallback path emits no scope, and dropping there would gut the
+# BOM, so we leave it untouched and recall never regresses.
+run_scope_filter() {
+    _sf_purl_prefix="$1"
+    _sf_label="$2"
+    [ "${rc:-1}" -eq 0 ] || return 0
+    [ -f "$OUT" ] || return 0
+    command -v node >/dev/null 2>&1 || return 0
+    log "$_sf_label: filtering SBOM to deployable scope"
+    _sflt=$(mktemp).js
+    cat > "$_sflt" <<'SFILTER_JS'
+const fs = require('fs');
+const [bomPath, purlPrefix] = process.argv.slice(2);
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components)) process.exit(0);
-const isMaven = c => (c.purl || '').startsWith('pkg:maven/');
-const hasScopes = bom.components.some(c => isMaven(c) && c.scope === 'required');
+const isTarget = c => (c.purl || '').startsWith(purlPrefix);
+const hasScopes = bom.components.some(c => isTarget(c) && c.scope === 'required');
 if (!hasScopes) process.exit(0);   // scopes not populated (e.g. syft fallback): leave as-is
-const keep = c => !isMaven(c) || (c.scope !== 'optional' && c.scope !== 'excluded');
+const keep = c => !isTarget(c) || (c.scope !== 'optional' && c.scope !== 'excluded');
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
 const mc = bom.metadata && bom.metadata.component;
@@ -683,10 +1336,1141 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] maven: kept ' + bom.components.length + ' of ' + before + ' components\n');
-MFILTER_JS
-    node "$_mflt" "$OUT" || log "maven: filter skipped (non-fatal)"
-    rm -f "$_mflt"
+process.stderr.write('[build-prep] ' + purlPrefix + ': kept ' + bom.components.length + ' of ' + before + ' components\n');
+SFILTER_JS
+    node "$_sflt" "$OUT" "$_sf_purl_prefix" || log "$_sf_label: filter skipped (non-fatal)"
+    rm -f "$_sflt"
+}
+if [ -n "${MAVEN_SCOPE_FILTER:-}" ]; then
+    run_scope_filter "pkg:maven/" "maven"
+fi
+if [ -n "${PHP_SCOPE_FILTER:-}" ]; then
+    run_scope_filter "pkg:composer/" "php"
+fi
+
+# Maven non-deployed-module filter: the scope filter above keeps a component the
+# moment ANY reactor module needs it at compile/runtime scope, but cdxgen tags
+# scope once per component for the whole reactor -- it does not know that the
+# one module reaching a dependency at that scope is itself never deployed (a
+# test-support or demo module some projects keep in the same reactor, distinct
+# from a source-tree TEST FOLDER, which the source-scan exclusion earlier in
+# this file already leaves out of cdxgen's input entirely). Find those modules
+# from the pom tree itself (maven-deploy-plugin's effective `skip`, walking
+# parent/relativePath and resolving `${property}` references with no `mvn`
+# invocation), then drop only what is reachable from one of
+# them and NOT reachable from any module that does deploy. A component no
+# reactor module's dependency graph reaches at all is left alone (cdxgen may
+# simply not have recorded that edge, not that nothing needs it), and a kept
+# module cdxgen gave no dependency-graph entry to at all makes the whole graph
+# untrustworthy for this pass, so the filter stands down rather than guess.
+# BOMLENS_MAVEN_FULL_GRAPH=1 (the same switch as the scope filter above) opts
+# out, since both exist to answer the same "give me the full reactor graph"
+# request.
+#
+# Runs under this same file's own `command -v node` (this file already runs
+# node for the scope filter above and several other passes), inside the
+# cdxgen sibling container -- the CLI's stage-1 container and the web UI's
+# entrypoint.sh-launched sibling both run from a cdxgen image, and cdxgen
+# itself is a Node.js CLI, so node is present at both the places this file
+# runs from by construction, not by a separate check.
+if [ "${rc:-1}" -eq 0 ] && [ -f pom.xml ] && ! opted_out "${BOMLENS_MAVEN_FULL_GRAPH:-}" \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _mndf=$(mktemp).js
+    cat > "$_mndf" <<'MNDF_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
+
+// Minimal recursive-descent XML parser (no deps): elements, nested elements,
+// direct text, comments, <?xml?>, self-closing tags, CDATA (skipped whole --
+// nothing this script reads lives inside one; an antrun plugin's
+// <replacevalue> can legitimately hold Java source with its own < and >, a
+// real construct real pom.xml files use). Does not handle entities beyond the
+// five XML builtins -- pom.xml needs no more for the fields this reads
+// (parent/relativePath, modules, properties, plugin config).
+//
+// The tag matcher uses a sticky regex against a fixed lastIndex rather than
+// `src.slice(i)`: slicing copies everything from i to the end of the file on
+// EVERY tag, which is O(n) per tag and O(n^2) over a whole real pom.xml (a
+// large multi-module reactor's shared parent pom, read once per descendant
+// walking its chain, made this seconds-to-minutes rather than milliseconds).
+// The close-tag check uses `startsWith` at a position for the same reason.
+// A construct this parser does not recognize (as CDATA is handled, this is
+// now only something stranger still, like a stray processing instruction)
+// must never leave `i` unmoved -- that would spin forever rather than just
+// skip one node, so progress is asserted explicitly, at both the recursive
+// and the top level.
+// Belt and suspenders beyond CDATA handling and the progress checks below: a
+// pom.xml this parser has some OTHER, still-unknown way to mishandle must
+// never be able to hang the whole scan or exhaust memory on it. A byte cap
+// (real pom.xml files are a few KB to a couple hundred KB; the reactor's own
+// files here top out under 60KB) and a wall-clock budget checked periodically
+// during parsing (real parses finish in low single-digit milliseconds) turn
+// "unknown parser bug on someone's pom.xml" into "this module's skip status
+// could not be determined", which safely resolves to false -- not a hang.
+const POM_MAX_BYTES = 2 * 1024 * 1024;
+const POM_PARSE_BUDGET_MS = 2000;
+const TAG_RE = /<([A-Za-z_][\w.:-]*)((?:\s+[^>]*?)?)(\/?)>/y;
+function parseXml(src) {
+  if (src.length > POM_MAX_BYTES) return null;
+  src = src.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  let i = 0;
+  const n = src.length;
+  const deadline = Date.now() + POM_PARSE_BUDGET_MS;
+  let steps = 0;
+  function overBudget() { return (++steps & 0xfff) === 0 && Date.now() > deadline; }
+  function skipWs() { while (i < n && /\s/.test(src[i])) i++; }
+  function parseNode() {
+    skipWs();
+    if (src[i] !== '<') return null;
+    TAG_RE.lastIndex = i;
+    const m = TAG_RE.exec(src);
+    if (!m || m.index !== i) return null;
+    i = TAG_RE.lastIndex;
+    const tag = m[1];
+    const node = { tag, children: [], text: '' };
+    if (m[3] === '/') return node;
+    const closeTag = '</' + tag + '>';
+    while (i < n) {
+      if (overBudget()) throw new Error('parse budget exceeded');
+      skipWs();
+      if (src.startsWith(closeTag, i)) { i += closeTag.length; return node; }
+      if (src[i] === '<') {
+        if (src.startsWith('</', i)) { const end = src.indexOf('>', i); i = end < 0 ? n : end + 1; return node; }
+        if (src.startsWith('<![CDATA[', i)) {
+          const end = src.indexOf(']]>', i);
+          i = end < 0 ? n : end + 3;
+          continue;
+        }
+        const beforeChild = i;
+        const child = parseNode();
+        if (child) node.children.push(child);
+        if (i === beforeChild) { const end = src.indexOf('>', i); i = end < 0 ? n : end + 1; }
+      } else {
+        const next = src.indexOf('<', i);
+        node.text += next < 0 ? src.slice(i) : src.slice(i, next);
+        i = next < 0 ? n : next;
+      }
+    }
+    return node;
+  }
+  try {
+    const roots = [];
+    while (i < n) {
+      if (overBudget()) throw new Error('parse budget exceeded');
+      skipWs();
+      if (i >= n) break;
+      const before = i;
+      const node = parseNode();
+      if (node) roots.push(node);
+      if (i === before) break;
+    }
+    return roots.find(r => r.tag === 'project') || null;
+  } catch (e) {
+    return null;
+  }
+}
+const decodeEntities = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+const directChild = (node, tag) => node ? (node.children.find(c => c.tag === tag) || null) : null;
+const directChildren = (node, tag) => node ? node.children.filter(c => c.tag === tag) : [];
+const directText = node => node ? decodeEntities(node.text).trim() : '';
+
+// pom loading + parent-chain walk (nearest first). A missing or unresolvable
+// parent (remote-only relativePath, a cycle) stops the chain there -- the
+// caller then finds no more signal and resolves to "not skipped".
+function loadChain(moduleDir, seen) {
+  seen = seen || new Set();
+  const pomPath = path.join(moduleDir, 'pom.xml');
+  const real = path.resolve(pomPath);
+  if (seen.has(real)) return [];
+  seen.add(real);
+  let text;
+  try { text = fs.readFileSync(pomPath, 'utf8'); } catch (e) { return []; }
+  const project = parseXml(text);
+  if (!project) return [];
+  const chain = [{ dir: moduleDir, project }];
+  const parent = directChild(project, 'parent');
+  if (parent) {
+    const relPathNode = directChild(parent, 'relativePath');
+    const relPath = relPathNode ? directText(relPathNode) : '../pom.xml';
+    if (relPath !== '') chain.push(...loadChain(path.dirname(path.join(moduleDir, relPath)), seen));
+  }
+  return chain;
+}
+function findProperty(project, name) {
+  const props = directChild(project, 'properties');
+  const node = props ? directChild(props, name) : null;
+  return node ? directText(node) : undefined;
+}
+// Never descends into <profiles> -- a profile's activation cannot be known
+// offline, so config that lives only there is invisible here and falls
+// through to "not skipped".
+function findPluginSkip(project, underPluginManagement) {
+  const build = directChild(project, 'build');
+  if (!build) return undefined;
+  const pluginsHolder = underPluginManagement ? directChild(build, 'pluginManagement') : build;
+  const plugins = pluginsHolder ? directChild(pluginsHolder, 'plugins') : null;
+  if (!plugins) return undefined;
+  for (const plugin of directChildren(plugins, 'plugin')) {
+    const artifactId = directChild(plugin, 'artifactId');
+    if (!artifactId || directText(artifactId) !== 'maven-deploy-plugin') continue;
+    const config = directChild(plugin, 'configuration');
+    const skip = config ? directChild(config, 'skip') : null;
+    if (skip) return directText(skip);
+  }
+  return undefined;
+}
+function resolveValue(raw, chain) {
+  raw = (raw || '').trim();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  const m = /^\$\{([^}]+)\}$/.exec(raw);
+  if (!m) return false;
+  for (const { project } of chain) {
+    const v = findProperty(project, m[1]);
+    if (v !== undefined) return v.trim() === 'true';
+  }
+  return false;
+}
+// Effective maven-deploy-plugin skip for one module: direct <plugins> config
+// (nearest pom in the chain wins) first, then <pluginManagement> (still
+// applies -- deploy is bound to the default lifecycle regardless of an
+// explicit <plugins> entry), then the standard maven.deploy.skip property
+// alone. Anything this cannot resolve comes back false: under-excluding is
+// the safe direction, not over-excluding.
+function resolveSkip(moduleDir) {
+  const chain = loadChain(moduleDir);
+  if (chain.length === 0) return false;
+  for (const { project } of chain) { const v = findPluginSkip(project, false); if (v !== undefined) return resolveValue(v, chain); }
+  for (const { project } of chain) { const v = findPluginSkip(project, true); if (v !== undefined) return resolveValue(v, chain); }
+  for (const { project } of chain) { const v = findProperty(project, 'maven.deploy.skip'); if (v !== undefined) return v.trim() === 'true'; }
+  return false;
+}
+function gaOfProject(project) {
+  const artifactId = directChild(project, 'artifactId');
+  let groupId = directChild(project, 'groupId');
+  if (!groupId) { const parent = directChild(project, 'parent'); groupId = parent ? directChild(parent, 'groupId') : null; }
+  return (groupId ? directText(groupId) : '?') + ':' + (artifactId ? directText(artifactId) : '?');
+}
+function enumerateModules(rootDir) {
+  const out = [];
+  function walk(dir) {
+    let text;
+    try { text = fs.readFileSync(path.join(dir, 'pom.xml'), 'utf8'); } catch (e) { return; }
+    const project = parseXml(text);
+    if (!project) return;
+    out.push({ dir, project });
+    const modulesNode = directChild(project, 'modules');
+    if (!modulesNode) return;
+    for (const modNode of directChildren(modulesNode, 'module')) {
+      const rel = directText(modNode);
+      if (rel) walk(path.join(dir, rel));
+    }
+  }
+  walk(rootDir);
+  return out;
+}
+
+// 1. which reactor modules are never deployed
+const modules = enumerateModules('.');
+const excludedGAs = new Set();
+for (const { dir, project } of modules) { if (resolveSkip(dir)) excludedGAs.add(gaOfProject(project)); }
+if (excludedGAs.size === 0) process.exit(0);
+
+// 2. map reactor modules onto the SBOM's own maven components
+const gaOfPurl = purl => { const m = /^pkg:maven\/([^/]+)\/([^@?]+)/.exec(purl || ''); return m ? decodeURIComponent(m[1]) + ':' + decodeURIComponent(m[2]) : null; };
+const refOf = c => c['bom-ref'] || c.purl;
+const allModuleGAs = new Set(modules.map(m => gaOfProject(m.project)));
+const moduleRefByGA = new Map();
+for (const c of bom.components) { const g = gaOfPurl(c.purl); if (g && allModuleGAs.has(g)) moduleRefByGA.set(g, refOf(c)); }
+const mc = bom.metadata && bom.metadata.component;
+const mcRef = mc ? refOf(mc) : null;
+if (mc) { const g = gaOfPurl(mc.purl); if (g && allModuleGAs.has(g)) moduleRefByGA.set(g, mcRef); }
+if (moduleRefByGA.size === 0) process.exit(0);
+
+const adj = new Map();
+for (const d of bom.dependencies) adj.set(d.ref, d.dependsOn || []);
+
+// metadata.component's own dependsOn should name the reactor's modules; if it
+// does not (an aggregate root cdxgen did not wire that way), fall back to
+// every module this pom tree's own <modules> lists found in the SBOM.
+const moduleRefSet = new Set(moduleRefByGA.values());
+const mcModuleDeps = (mcRef ? (adj.get(mcRef) || []) : []).filter(r => moduleRefSet.has(r));
+const reactorRefs = mcModuleDeps.length > 0 ? new Set(mcModuleDeps) : moduleRefSet;
+
+const keepRoots = [];
+const excludeRoots = [];
+for (const [g, ref] of moduleRefByGA) {
+  if (!reactorRefs.has(ref)) continue;
+  (excludedGAs.has(g) ? excludeRoots : keepRoots).push(ref);
+}
+if (keepRoots.length === 0 || excludeRoots.length === 0) process.exit(0);
+
+const incomplete = keepRoots.filter(r => !adj.has(r));
+if (incomplete.length > 0) {
+  process.stderr.write('[build-prep] maven: dependency graph incomplete for a kept module; skipping the non-deployed-module filter\n');
+  process.exit(0);
+}
+
+function bfs(starts) {
+  const seen = new Set(starts);
+  const queue = starts.slice();
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const next of (adj.get(cur) || [])) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+  return seen;
+}
+const reachedFromKeep = bfs(keepRoots);
+const reachedFromExclude = bfs(excludeRoots);
+const dropRefs = new Set(excludeRoots);
+for (const r of reachedFromExclude) if (!reachedFromKeep.has(r)) dropRefs.add(r);
+if (mcRef) dropRefs.delete(mcRef);
+if (dropRefs.size === 0) process.exit(0);
+
+// 3. apply, mirroring the scope filter's own graph-pruning style
+const droppedPurls = bom.components.filter(c => dropRefs.has(refOf(c))).map(c => c.purl || refOf(c));
+const before = bom.components.length;
+bom.components = bom.components.filter(c => !dropRefs.has(refOf(c)));
+const keptRefs = new Set(bom.components.map(refOf));
+if (mcRef) keptRefs.add(mcRef);
+bom.dependencies = bom.dependencies
+  .filter(d => keptRefs.has(d.ref))
+  .map(d => Array.isArray(d.dependsOn) ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) }) : d);
+
+// 4. record what was excluded, same shape as bomlens:excluded-paths/-manifests
+const LIMIT = 50;
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || []).filter(p => p.name !== 'bomlens:excluded-modules' && p.name !== 'bomlens:excluded-components');
+// Every skip=true module actually present in this scan's reactor, not just the
+// ones used to seed the BFS above (a nested excluded module, e.g. one two
+// levels under an already-excluded parent, is reached through its parent and
+// never becomes its own root, but it is still a module this scan excluded).
+const excludedList = [...excludedGAs].filter(g => moduleRefByGA.has(g)).sort();
+let modVal = excludedList.slice(0, LIMIT).join(', ');
+if (excludedList.length > LIMIT) modVal += ` (+${excludedList.length - LIMIT} more)`;
+props.push({ name: 'bomlens:excluded-modules', value: modVal });
+if (droppedPurls.length) {
+  let compVal = droppedPurls.slice(0, LIMIT).join(', ');
+  if (droppedPurls.length > LIMIT) compVal += ` (+${droppedPurls.length - LIMIT} more)`;
+  props.push({ name: 'bomlens:excluded-components', value: compVal });
+}
+bom.metadata.properties = props;
+
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] maven: excluded ' + excludedList.length + ' non-deployed module(s), dropped ' + (before - bom.components.length) + ' of ' + before + ' components\n');
+MNDF_JS
+    node "$_mndf" "$OUT" || log "maven: non-deployed-module filter skipped (non-fatal)"
+    rm -f "$_mndf"
+fi
+
+# Cargo workspace-member filter: the file-level exclusion above (the --exclude
+# globs built from NON_SHIPPED_DIRS) narrows what cdxgen crawls, but cdxgen
+# reads Cargo.lock directly for Rust, independent of that crawl -- a crate
+# registered as a workspace member in Cargo.lock survives even when its own
+# directory sits under an excluded tree (an examples-only crate, say). Drop
+# such a member's own component, and a dependency only that member needs,
+# unless a kept member reaches it too (any way at all -- Cargo.lock's own
+# dependency list carries no normal/dev/build distinction, and there is no
+# principled reason to treat them differently here anyway: reaching it at all
+# is enough to keep it, same as everywhere else in this file).
+# BOMLENS_INCLUDE_NON_SHIPPED=1 (the same switch the file-level exclusion
+# above uses) opts out, since this extends that same exclusion to the lock
+# file.
+#
+# Member/path discovery uses `cargo metadata --no-deps --offline`, confirmed
+# to need no network at all (it reads only the Cargo.toml files already on
+# disk, workspace inheritance and all). The dependency graph itself is NOT
+# read from a full `cargo metadata` resolve -- that needs to download every
+# crate's source even when Cargo.lock already pins exact versions, which is
+# slow and fails outright offline. Instead this reads Cargo.lock's own flat,
+# machine-generated package list directly: a single forward pass over its
+# lines, no recursion, so the stuck-parser bug the pom parser above once had
+# (a child parse that never advances the cursor) cannot recur here by
+# construction. A byte-size cap and a wall-clock budget still bound it, and
+# any dependency-list entry that cannot be traced to exactly one package
+# block (Cargo.lock's three reference forms: bare name, "name version", or
+# "name version (source)") stands the whole pass down rather than guess.
+if [ "${rc:-1}" -eq 0 ] && [ -f Cargo.toml ] && [ -f Cargo.lock ] \
+   && [ -n "$EXCLUDE_NON_SHIPPED" ] \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; then
+    _cwmeta=$(prep_step cargo-workspace-metadata "$PREP_TIMEOUT_DEFAULT" cargo metadata --no-deps --format-version 1 --offline)
+    _cwmeta_rc=$?
+    if [ "$_cwmeta_rc" -eq 0 ] && [ -n "$_cwmeta" ]; then
+        _cwmetaf=$(mktemp)
+        printf '%s' "$_cwmeta" > "$_cwmetaf"
+        _cwmf=$(mktemp).js
+        cat > "$_cwmf" <<'CWMF_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath, metaPath, lockPath, dirsStr] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
+
+let meta;
+try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch (e) { process.exit(0); }
+const members = Array.isArray(meta.workspace_members) ? meta.workspace_members : [];
+if (members.length === 0) process.exit(0);
+const pkgById = new Map();
+for (const p of (meta.packages || [])) pkgById.set(p.id, p);
+
+const NON_SHIPPED_DIRS = new Set((dirsStr || '').split(/\s+/).filter(Boolean));
+// realpath both sides: cargo (and process.cwd()) resolve symlinks, so a raw
+// string comparison can spuriously disagree on any host where the scan root
+// is reached through one (macOS routes its own tmp dir through /private,
+// for one).
+let cwd;
+try { cwd = fs.realpathSync(process.cwd()); } catch (e) { cwd = process.cwd(); }
+function relDir(manifestPath) {
+  let dir = path.dirname(manifestPath);
+  try { dir = fs.realpathSync(dir); } catch (e) { /* use the raw path */ }
+  return path.relative(cwd, dir);
+}
+function underExcludedTree(manifestPath) {
+  const rel = relDir(manifestPath);
+  if (!rel || rel.startsWith('..')) return false;
+  return rel.split(path.sep).some(seg => NON_SHIPPED_DIRS.has(seg));
+}
+
+const memberInfo = [];
+for (const id of members) {
+  const p = pkgById.get(id);
+  if (!p || !p.name || !p.manifest_path) process.exit(0);   // metadata shape unexpected: bail
+  memberInfo.push({ name: p.name, manifestPath: p.manifest_path,
+                    excluded: underExcludedTree(p.manifest_path) });
+}
+const excludedMembers = memberInfo.filter(m => m.excluded);
+if (excludedMembers.length === 0) process.exit(0);
+const keptMembers = memberInfo.filter(m => !m.excluded);
+if (keptMembers.length === 0) process.exit(0);
+
+// --- Cargo.lock: single forward pass over its lines, no recursion ---
+const LOCK_MAX_BYTES = 8 * 1024 * 1024;
+const PARSE_BUDGET_MS = 3000;
+let lockText;
+try { lockText = fs.readFileSync(lockPath, 'utf8'); } catch (e) { process.exit(0); }
+if (lockText.length > LOCK_MAX_BYTES) process.exit(0);
+
+const deadline = Date.now() + PARSE_BUDGET_MS;
+let steps = 0;
+function overBudget() { return (++steps & 0xfff) === 0 && Date.now() > deadline; }
+
+function quoted(s) {
+  const m = /^"((?:[^"\\]|\\.)*)"\s*,?\s*$/.exec(s.trim());
+  return m ? m[1].replace(/\\(.)/g, '$1') : null;
+}
+
+const lines = lockText.split('\n');
+let lockVersion = null;
+const blocks = [];
+let cur = null;
+let inDeps = false;
+let malformed = false;
+for (let i = 0; i < lines.length && !malformed; i++) {
+  if (overBudget()) { malformed = true; break; }
+  const trimmed = lines[i].trim();
+  if (lockVersion === null && !cur) {
+    const m = /^version\s*=\s*(\d+)\s*$/.exec(trimmed);
+    if (m) lockVersion = m[1];
+  }
+  if (trimmed === '[[package]]') {
+    if (inDeps) { malformed = true; break; }   // unterminated dependencies array
+    if (cur) blocks.push(cur);
+    cur = { name: null, version: null, source: null, deps: [] };
+    continue;
+  }
+  if (!cur) continue;
+  if (inDeps) {
+    if (trimmed === ']' || trimmed === '],') { inDeps = false; continue; }
+    const item = quoted(trimmed);
+    if (item === null) { malformed = true; break; }
+    cur.deps.push(item);
+    continue;
+  }
+  let m;
+  if ((m = /^name\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/.exec(trimmed))) { cur.name = m[1]; continue; }
+  if ((m = /^version\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/.exec(trimmed))) { cur.version = m[1]; continue; }
+  if ((m = /^source\s*=\s*"((?:[^"\\]|\\.)*)"\s*$/.exec(trimmed))) { cur.source = m[1]; continue; }
+  if (/^dependencies\s*=\s*\[\s*\]\s*$/.test(trimmed)) { continue; }
+  if ((m = /^dependencies\s*=\s*\[(.*)\]\s*$/.exec(trimmed))) {
+    const inner = m[1].trim();
+    if (inner) {
+      for (const part of inner.split(',')) {
+        const item = quoted(part);
+        if (item === null) { malformed = true; break; }
+        cur.deps.push(item);
+      }
+    }
+    continue;
+  }
+  if (/^dependencies\s*=\s*\[\s*$/.test(trimmed)) { inDeps = true; continue; }
+  // any other line (checksum, replace, ...) is ignored
+}
+if (!malformed && cur && !inDeps) blocks.push(cur);
+if (malformed || inDeps || lockVersion === null || (lockVersion !== '3' && lockVersion !== '4')) process.exit(0);
+if (blocks.some(b => !b.name || !b.version)) process.exit(0);
+
+// Canonical key per Cargo.lock's own reference precedence: bare name if that
+// name is unique in this lock, else "name version", else "name version
+// (source)". A dependency-list item, resolved the same way, must land on
+// exactly one block or the whole pass stands down.
+const nameCount = new Map();
+const nvCount = new Map();
+for (const b of blocks) {
+  nameCount.set(b.name, (nameCount.get(b.name) || 0) + 1);
+  const nv = b.name + '|' + b.version;
+  nvCount.set(nv, (nvCount.get(nv) || 0) + 1);
+}
+function canonicalKey(b) {
+  if (nameCount.get(b.name) === 1) return b.name;
+  if (nvCount.get(b.name + '|' + b.version) === 1) return b.name + ' ' + b.version;
+  return b.name + ' ' + b.version + ' (' + (b.source || '') + ')';
+}
+const keyOf = new Map();
+const blockByKey = new Map();
+for (const b of blocks) { const k = canonicalKey(b); keyOf.set(b, k); blockByKey.set(k, b); }
+if (blockByKey.size !== blocks.length) process.exit(0);   // two blocks collided on their key
+
+const byName = new Map();
+const byNameVersion = new Map();
+const byNameVersionSource = new Map();
+for (const b of blocks) {
+  (byName.get(b.name) || byName.set(b.name, []).get(b.name)).push(b);
+  const nv = b.name + '|' + b.version;
+  (byNameVersion.get(nv) || byNameVersion.set(nv, []).get(nv)).push(b);
+  const nvs = nv + '|' + (b.source || '');
+  (byNameVersionSource.get(nvs) || byNameVersionSource.set(nvs, []).get(nvs)).push(b);
+}
+function resolveDepItem(item) {
+  let m = /^(\S+) (\S+) \((.+)\)$/.exec(item);
+  if (m) {
+    const c = byNameVersionSource.get(m[1] + '|' + m[2] + '|' + m[3]) || [];
+    return c.length === 1 ? c[0] : null;
+  }
+  m = /^(\S+) (\S+)$/.exec(item);
+  if (m) {
+    const c = byNameVersion.get(m[1] + '|' + m[2]) || [];
+    return c.length === 1 ? c[0] : null;
+  }
+  const c = byName.get(item) || [];
+  return c.length === 1 ? c[0] : null;
+}
+
+const adj = new Map();
+for (const b of blocks) {
+  if (overBudget()) process.exit(0);
+  const targets = [];
+  for (const item of b.deps) {
+    const target = resolveDepItem(item);
+    if (!target) process.exit(0);   // an unresolved reference: stand the whole pass down
+    targets.push(keyOf.get(target));
+  }
+  adj.set(keyOf.get(b), targets);
+}
+
+// Workspace members are local path packages; a real workspace cannot have two
+// members share a name, so this must resolve to exactly one block.
+function memberKey(m) {
+  const c = byName.get(m.name) || [];
+  return c.length === 1 ? keyOf.get(c[0]) : null;
+}
+const keptRoots = [];
+for (const m of keptMembers) { const k = memberKey(m); if (!k) process.exit(0); keptRoots.push(k); }
+const excludeRoots = [];
+for (const m of excludedMembers) { const k = memberKey(m); if (!k) process.exit(0); excludeRoots.push(k); }
+
+function bfs(starts) {
+  const seen = new Set(starts);
+  const queue = starts.slice();
+  while (queue.length) {
+    if (overBudget()) return null;
+    const cur = queue.shift();
+    for (const next of (adj.get(cur) || [])) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+  return seen;
+}
+const reachedFromKeep = bfs(keptRoots);
+const reachedFromExclude = bfs(excludeRoots);
+if (!reachedFromKeep || !reachedFromExclude) process.exit(0);
+
+const dropKeys = new Set(excludeRoots);
+for (const k of reachedFromExclude) if (!reachedFromKeep.has(k)) dropKeys.add(k);
+if (dropKeys.size === 0) process.exit(0);
+
+// purl matching only carries name@version, not source, so collapse drop/keep
+// sets to name@version pairs; a pair reachable from a kept root under ANY of
+// its blocks counts as kept -- conservative when the same name@version
+// exists under two different sources and only one of them is excluded.
+const nvOf = k => { const b = blockByKey.get(k); return b.name + '@' + b.version; };
+const keptNV = new Set([...reachedFromKeep].map(nvOf));
+const dropNV = new Set();
+for (const k of dropKeys) { const nv = nvOf(k); if (!keptNV.has(nv)) dropNV.add(nv); }
+if (dropNV.size === 0) process.exit(0);
+
+// --- apply to the SBOM ---
+const refOf = c => c['bom-ref'] || c.purl;
+const nvOfPurl = purl => {
+  const m = /^pkg:cargo\/([^@]+)@([^?]+)/.exec(purl || '');
+  return m ? decodeURIComponent(m[1]) + '@' + decodeURIComponent(m[2]) : null;
+};
+const droppedPurls = [];
+const keep = c => {
+  const nv = nvOfPurl(c.purl);
+  if (!nv || !dropNV.has(nv)) return true;
+  droppedPurls.push(c.purl);
+  return false;
+};
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+if (droppedPurls.length === 0) process.exit(0);
+
+const mc = bom.metadata && bom.metadata.component;
+const keptRefs = new Set(bom.components.map(refOf));
+if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
+bom.dependencies = bom.dependencies
+  .filter(d => keptRefs.has(d.ref))
+  .map(d => Array.isArray(d.dependsOn) ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) }) : d);
+
+// Record, merging into whatever another exclusion pass in this same scan
+// already wrote to the same shared bomlens:excluded-components property
+// (a polyglot repo could also trip the Maven non-deployed-module filter
+// above). The prior value is itself a capped display string, so the merge
+// is best-effort: it recovers the prior shown items and total count from
+// the "(+N more)" suffix and re-caps over the combined total.
+function mergeCapped(existing, additions, limit) {
+  let shown = [];
+  let priorTotal = 0;
+  if (existing) {
+    const m = /^(.*?)(?: \(\+(\d+) more\))?$/.exec(existing);
+    shown = m[1] ? m[1].split(', ').filter(Boolean) : [];
+    priorTotal = shown.length + (m[2] ? parseInt(m[2], 10) : 0);
+  }
+  const merged = shown.concat(additions);
+  const total = priorTotal + additions.length;
+  let val = merged.slice(0, limit).join(', ');
+  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  return val;
+}
+const LIMIT = 50;
+bom.metadata = bom.metadata || {};
+const existingProps = bom.metadata.properties || [];
+const priorMembers = (existingProps.find(p => p.name === 'bomlens:excluded-members') || {}).value || null;
+const priorComponents = (existingProps.find(p => p.name === 'bomlens:excluded-components') || {}).value || null;
+const memberList = excludedMembers.map(m =>
+  'cargo:' + relDir(m.manifestPath).split(path.sep).join('/') + ' (' + m.name + ')');
+const props = existingProps.filter(p => p.name !== 'bomlens:excluded-members' && p.name !== 'bomlens:excluded-components');
+props.push({ name: 'bomlens:excluded-members', value: mergeCapped(priorMembers, memberList, LIMIT) });
+props.push({ name: 'bomlens:excluded-components', value: mergeCapped(priorComponents, droppedPurls, LIMIT) });
+bom.metadata.properties = props;
+
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] cargo: excluded ' + excludedMembers.length + ' workspace member(s), dropped ' + (before - bom.components.length) + ' of ' + before + ' components\n');
+CWMF_JS
+        node "$_cwmf" "$OUT" "$_cwmetaf" Cargo.lock "$NON_SHIPPED_DIRS" || log "cargo: workspace-member filter skipped (non-fatal)"
+        rm -f "$_cwmf" "$_cwmetaf"
+    else
+        log "cargo: could not resolve workspace members offline; skipping workspace-member filter"
+    fi
+fi
+
+# pnpm workspace-member filter: the same problem as the Cargo/npm filters
+# above -- cdxgen reads pnpm-lock.yaml directly, so a member whose own
+# directory sits under an excluded tree (a playground or __tests__ package,
+# say) survives the file-level --exclude globs. Drop such a member's own
+# component, and a dependency only that member reaches (any way at all),
+# unless a kept member reaches it too. BOMLENS_INCLUDE_NON_SHIPPED=1 opts
+# out, same switch as the file-level exclusion above.
+#
+# Member discovery and the dependency graph both come from `pnpm ls`, never
+# from hand-parsing pnpm-lock.yaml's YAML. A single `pnpm ls -r --depth
+# Infinity --json --lockfile-only` call needs no node_modules and no
+# network, and returns every workspace project's own full recursive
+# dependency tree in one process (confirmed against a real 283-project
+# workspace: 1.1MB of JSON, ~3.5s -- far cheaper than one `pnpm ls --filter`
+# call per member).
+#
+# A workspace-member dependency carries pnpm's `link:`/`file:` version
+# prefix and always repeats the target's own absolute path in its `path`
+# field, so a member-to-member edge resolves by matching that path against
+# the top-level project list -- never by name, and never by trusting a link
+# node's own inline expansion (pnpm fills that in for some occurrences of a
+# link and leaves it empty for others; the top-level project entry is the
+# one place every member's own direct dependencies are always complete).
+#
+# An external registry package's edges collapse onto its own name@version:
+# pnpm expands a name@version's dependencies at most once per `pnpm ls`
+# call and marks every later occurrence "deduped": true with no
+# "dependencies" key, so the adjacency for that name@version has to be
+# collected from whichever occurrence(s), anywhere in the whole document,
+# actually carry it -- not from any one node's local subtree. A name@version
+# that is deduped everywhere it appears does happen in real workspaces (an
+# `overrides`-aliased package, and pnpm's own internal ESM/CJS-compat
+# "-cjs" aliases both do this) -- `dedupedDependenciesCount` says it has
+# children, but none of its occurrences ever show them. Such a package is
+# never dropped (protected), the same conservative fallback the npm filter
+# above gives an unresolved dependency name.
+if [ "${rc:-1}" -eq 0 ] && [ -f pnpm-workspace.yaml ] && [ -f pnpm-lock.yaml ] \
+   && [ -n "$EXCLUDE_NON_SHIPPED" ] \
+   && [ -f "$OUT" ] && command -v node >/dev/null 2>&1 && command -v pnpm >/dev/null 2>&1; then
+    _pwtree=$(prep_step pnpm-workspace-tree "$PREP_TIMEOUT_DEFAULT" pnpm ls -r --depth Infinity --json --lockfile-only)
+    _pwtree_rc=$?
+    if [ "$_pwtree_rc" -eq 0 ] && [ -n "$_pwtree" ]; then
+        _pwtreef=$(mktemp)
+        printf '%s' "$_pwtree" > "$_pwtreef"
+        _pwmf=$(mktemp).js
+        cat > "$_pwmf" <<'PWMF_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath, treePath, dirsStr] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
+
+const MAX_TREE_BYTES = 64 * 1024 * 1024;
+let treeText;
+try {
+  const st = fs.statSync(treePath);
+  if (st.size > MAX_TREE_BYTES) process.exit(0);
+  treeText = fs.readFileSync(treePath, 'utf8');
+} catch (e) { process.exit(0); }
+let tree;
+try { tree = JSON.parse(treeText); } catch (e) { process.exit(0); }
+if (!Array.isArray(tree) || tree.length === 0) process.exit(0);
+if (tree.some(p => !p || typeof p.path !== 'string')) process.exit(0);   // shape unexpected: bail
+
+const NON_SHIPPED_DIRS = new Set((dirsStr || '').split(/\s+/).filter(Boolean));
+let cwd;
+try { cwd = fs.realpathSync(process.cwd()); } catch (e) { cwd = process.cwd(); }
+function canon(p) { try { return fs.realpathSync(p); } catch (e) { return p; } }
+function relOf(absPath) { return path.relative(cwd, canon(absPath)); }
+function underExcludedTree(rel) {
+  if (!rel || rel.startsWith('..')) return false;
+  return rel.split(path.sep).some(seg => NON_SHIPPED_DIRS.has(seg));
+}
+
+// pathToMember keys on the realpath'd absolute path, the same identity a
+// link/file dependency's own "path" field carries, so a member-to-member
+// edge matches by exact key lookup, never by name.
+const pathToMember = new Map();
+for (const p of tree) {
+  const key = canon(p.path);
+  pathToMember.set(key, {
+    name: typeof p.name === 'string' ? p.name : null,
+    version: typeof p.version === 'string' ? p.version : null,
+    relPath: relOf(p.path),
+    excluded: underExcludedTree(relOf(p.path)),
+  });
+}
+const excludedMembers = [...pathToMember.values()].filter(m => m.excluded);
+if (excludedMembers.length === 0) process.exit(0);
+const keptMembers = [...pathToMember.values()].filter(m => !m.excluded);
+if (keptMembers.length === 0) process.exit(0);
+
+const BUDGET_MS = 5000;
+const deadline = Date.now() + BUDGET_MS;
+let steps = 0;
+let budgetExceeded = false;
+function overBudget() {
+  if (budgetExceeded) return true;
+  if ((++steps & 0xfff) === 0 && Date.now() > deadline) budgetExceeded = true;
+  return budgetExceeded;
+}
+
+function mergedDeps(node) {
+  return Object.assign({}, node.dependencies, node.devDependencies, node.optionalDependencies);
+}
+
+// extAdj: "name@version" -> child tokens, built from whichever occurrence(s)
+// in the WHOLE tree carry that name@version's real "dependencies" (the
+// first one visited; later "deduped": true occurrences of the same
+// name@version are skipped via the extAdj.has(nv) guard, since pnpm
+// guarantees they resolve to the identical subtree). hiddenChildren
+// collects a name@version pnpm says has children (dedupedDependenciesCount
+// > 0) that this pass never once saw expanded -- protected below.
+const extAdj = new Map();
+const hiddenChildren = new Set();
+
+function tokenFor(name, node) {
+  if (overBudget() || !node || typeof node.version !== 'string') return null;
+  if ((node.version.startsWith('link:') || node.version.startsWith('file:')) && typeof node.path === 'string') {
+    const key = canon(node.path);
+    return pathToMember.has(key) ? 'm:' + key : null;   // unresolvable link target: drop the edge
+  }
+  const from = typeof node.from === 'string' ? node.from : name;
+  const nv = from + '@' + node.version;
+  const hasDeps = Object.prototype.hasOwnProperty.call(node, 'dependencies')
+    || Object.prototype.hasOwnProperty.call(node, 'devDependencies')
+    || Object.prototype.hasOwnProperty.call(node, 'optionalDependencies');
+  if (hasDeps) {
+    if (!extAdj.has(nv)) extAdj.set(nv, collectTokens(mergedDeps(node)));
+  } else if (typeof node.dedupedDependenciesCount === 'number' && node.dedupedDependenciesCount > 0) {
+    hiddenChildren.add(nv);
+  }
+  return 'e:' + nv;
+}
+function collectTokens(depsObj) {
+  const out = [];
+  for (const name of Object.keys(depsObj)) {
+    if (overBudget()) return out;
+    const t = tokenFor(name, depsObj[name]);
+    if (t) out.push(t);
+  }
+  return out;
+}
+
+// memberChildren: each member's own direct (dependencies + devDependencies
+// + optionalDependencies) tokens, from its own top-level project entry --
+// never from a link node's inline (sometimes-partial) copy of the same
+// list. Walking every project here also fully populates extAdj above,
+// regardless of which project happens to visit a given external package
+// first.
+const memberChildren = new Map();
+for (const p of tree) {
+  if (overBudget()) process.exit(0);
+  memberChildren.set(canon(p.path), collectTokens(mergedDeps(p)));
+}
+if (budgetExceeded) process.exit(0);
+
+const protectedNV = new Set([...hiddenChildren].filter(nv => !extAdj.has(nv)));
+
+function childrenOf(token) {
+  if (token.charCodeAt(0) === 109 /* 'm' */) return memberChildren.get(token.slice(2)) || [];
+  return extAdj.get(token.slice(2)) || [];
+}
+function bfs(starts) {
+  const seen = new Set(starts);
+  const queue = starts.slice();
+  while (queue.length) {
+    if (overBudget()) return null;
+    const cur = queue.shift();
+    for (const next of childrenOf(cur)) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+  return seen;
+}
+const keptRoots = [...pathToMember.entries()].filter(([, m]) => !m.excluded).map(([k]) => 'm:' + k);
+const excludeRoots = [...pathToMember.entries()].filter(([, m]) => m.excluded).map(([k]) => 'm:' + k);
+const reachedFromKeep = bfs(keptRoots);
+const reachedFromExclude = bfs(excludeRoots);
+if (!reachedFromKeep || !reachedFromExclude) process.exit(0);
+
+// Drop set: reached from an excluded root, not reached from any kept root
+// (any way at all), and -- for an external package -- not protected. A
+// dropped member's own name@version joins the very same pool an external
+// package purl is matched against below: its component carries an ordinary
+// pkg:npm purl too, so one drop set and one filter pass cover both.
+const dropNV = new Set();
+for (const token of reachedFromExclude) {
+  if (reachedFromKeep.has(token)) continue;
+  if (token.charCodeAt(0) === 109 /* 'm' */) {
+    const m = pathToMember.get(token.slice(2));
+    if (m.name && m.version) dropNV.add(m.name + '@' + m.version);
+  } else {
+    const nv = token.slice(2);
+    if (!protectedNV.has(nv)) dropNV.add(nv);
+  }
+}
+if (dropNV.size === 0) process.exit(0);
+
+const refOf = c => c['bom-ref'] || c.purl;
+const nvOfPurl = purl => {
+  const m = /^pkg:npm\/([^@]+)@([^?]+)/.exec(purl || '');
+  return m ? decodeURIComponent(m[1]) + '@' + decodeURIComponent(m[2]) : null;
+};
+const droppedPurls = [];
+const keep = c => {
+  const nv = nvOfPurl(c.purl);
+  if (!nv || !dropNV.has(nv)) return true;
+  droppedPurls.push(c.purl);
+  return false;
+};
+const before = bom.components.length;
+bom.components = bom.components.filter(keep);
+if (droppedPurls.length === 0) process.exit(0);
+
+const mc = bom.metadata && bom.metadata.component;
+const keptRefs = new Set(bom.components.map(refOf));
+if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
+bom.dependencies = bom.dependencies
+  .filter(d => keptRefs.has(d.ref))
+  .map(d => Array.isArray(d.dependsOn) ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => keptRefs.has(r)) }) : d);
+
+function mergeCapped(existing, additions, limit) {
+  let shown = [];
+  let priorTotal = 0;
+  if (existing) {
+    const m = /^(.*?)(?: \(\+(\d+) more\))?$/.exec(existing);
+    shown = m[1] ? m[1].split(', ').filter(Boolean) : [];
+    priorTotal = shown.length + (m[2] ? parseInt(m[2], 10) : 0);
+  }
+  const merged = shown.concat(additions);
+  const total = priorTotal + additions.length;
+  let val = merged.slice(0, limit).join(', ');
+  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  return val;
+}
+const LIMIT = 50;
+bom.metadata = bom.metadata || {};
+const existingProps = bom.metadata.properties || [];
+const priorMembers = (existingProps.find(p => p.name === 'bomlens:excluded-members') || {}).value || null;
+const priorComponents = (existingProps.find(p => p.name === 'bomlens:excluded-components') || {}).value || null;
+const memberList = excludedMembers.map(m => 'pnpm:' + m.relPath + ' (' + (m.name || '(unnamed)') + ')');
+const props = existingProps.filter(p => p.name !== 'bomlens:excluded-members' && p.name !== 'bomlens:excluded-components');
+props.push({ name: 'bomlens:excluded-members', value: mergeCapped(priorMembers, memberList, LIMIT) });
+props.push({ name: 'bomlens:excluded-components', value: mergeCapped(priorComponents, droppedPurls, LIMIT) });
+bom.metadata.properties = props;
+
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] pnpm: excluded ' + excludedMembers.length + ' workspace member(s), dropped ' + (before - bom.components.length) + ' of ' + before + ' components\n');
+PWMF_JS
+        node "$_pwmf" "$OUT" "$_pwtreef" "$NON_SHIPPED_DIRS" || log "pnpm: workspace-member filter skipped (non-fatal)"
+        rm -f "$_pwmf" "$_pwtreef"
+    else
+        log "pnpm: could not resolve workspace tree; skipping workspace-member filter"
+    fi
+fi
+
+# Maven parent-POM license inheritance: a project commonly declares
+# <licenses> once, on a parent pom, and leaves the child silent about it,
+# relying on Maven's own effective-POM inheritance. cdxgen reads each
+# component's own pom.xml, not the effective one, so a component this reads
+# as having no license at all -- correct for that one file, wrong for what it
+# actually ships under. Applies to any Maven component in the SBOM, not only
+# the scanned project's own reactor modules: a dependency resolved from the
+# local repository (spring-boot-starter-web's own transitive jul-to-slf4j,
+# say) has this exact shape just as often, its <parent> naming a coordinate
+# (spring-boot-starter-parent) with no reactor directory to walk to at all.
+#
+# Walks the parent chain like the non-deployed-module filter above, but a
+# link can point two different places: a <relativePath> that resolves to an
+# actual pom.xml on disk (a reactor module's parent, most often), or --
+# whenever that does not resolve, including when relativePath is absent
+# entirely -- the parent's own group/artifact/version looked up in this run's
+# own local repository, populated as a side effect of cdxgen's own Maven
+# resolve above. Maven itself needs every ancestor's pom to compute an
+# effective POM, so the chain is there to read, offline, no `mvn` invocation
+# needed either way.
+#
+# Runs independently of BOMLENS_MAVEN_FULL_GRAPH -- that switch is about
+# whether non-deployed modules get dropped from the graph, an unrelated
+# question from whether a license gets filled in. A depth cap backstops the
+# visited set: a long but non-cyclic chain, which a visited set alone would
+# never catch, still terminates. Only fills a component whose OWN pom.xml
+# declares no <licenses> at all (checked on the parsed pom.xml itself, not
+# merely the SBOM component -- one that does declare one but that cdxgen
+# failed to carry through is a cdxgen gap, not a case this fills over with a
+# possibly different parent value) and only when an ancestor's pom.xml does
+# declare one.
+if [ "${rc:-1}" -eq 0 ] && [ -f pom.xml ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    log "maven: inheriting missing licenses from a parent POM"
+    _mlic=$(mktemp).js
+    cat > "$_mlic" <<'MLIC_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath, m2Root] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+
+const POM_MAX_BYTES = 2 * 1024 * 1024;
+const POM_PARSE_BUDGET_MS = 2000;
+const TAG_RE = /<([A-Za-z_][\w.:-]*)((?:\s+[^>]*?)?)(\/?)>/y;
+function parseXml(src) {
+  if (src.length > POM_MAX_BYTES) return null;
+  src = src.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  let i = 0;
+  const n = src.length;
+  const deadline = Date.now() + POM_PARSE_BUDGET_MS;
+  let steps = 0;
+  function overBudget() { return (++steps & 0xfff) === 0 && Date.now() > deadline; }
+  function skipWs() { while (i < n && /\s/.test(src[i])) i++; }
+  function parseNode() {
+    skipWs();
+    if (src[i] !== '<') return null;
+    TAG_RE.lastIndex = i;
+    const m = TAG_RE.exec(src);
+    if (!m || m.index !== i) return null;
+    i = TAG_RE.lastIndex;
+    const tag = m[1];
+    const node = { tag, children: [], text: '' };
+    if (m[3] === '/') return node;
+    const closeTag = '</' + tag + '>';
+    while (i < n) {
+      if (overBudget()) throw new Error('parse budget exceeded');
+      skipWs();
+      if (src.startsWith(closeTag, i)) { i += closeTag.length; return node; }
+      if (src[i] === '<') {
+        if (src.startsWith('</', i)) { const end = src.indexOf('>', i); i = end < 0 ? n : end + 1; return node; }
+        if (src.startsWith('<![CDATA[', i)) {
+          const end = src.indexOf(']]>', i);
+          i = end < 0 ? n : end + 3;
+          continue;
+        }
+        const beforeChild = i;
+        const child = parseNode();
+        if (child) node.children.push(child);
+        if (i === beforeChild) { const end = src.indexOf('>', i); i = end < 0 ? n : end + 1; }
+      } else {
+        const next = src.indexOf('<', i);
+        node.text += next < 0 ? src.slice(i) : src.slice(i, next);
+        i = next < 0 ? n : next;
+      }
+    }
+    return node;
+  }
+  try {
+    const roots = [];
+    while (i < n) {
+      if (overBudget()) throw new Error('parse budget exceeded');
+      skipWs();
+      if (i >= n) break;
+      const before = i;
+      const node = parseNode();
+      if (node) roots.push(node);
+      if (i === before) break;
+    }
+    return roots.find(r => r.tag === 'project') || null;
+  } catch (e) {
+    return null;
+  }
+}
+const decodeEntities = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+const directChild = (node, tag) => node ? (node.children.find(c => c.tag === tag) || null) : null;
+const directChildren = (node, tag) => node ? node.children.filter(c => c.tag === tag) : [];
+const directText = node => node ? decodeEntities(node.text).trim() : '';
+
+const MAX_PARENT_DEPTH = 10;
+
+// A location is either a reactor directory ({dir}) or a local-repository
+// coordinate ({gav}) -- the two places a pom.xml can actually be read from
+// offline. The local repository layout names a group/artifact/version's pom
+// deterministically: group with dots turned to path segments, then
+// artifact/version/artifact-version.pom, no classifier.
+function m2PomPath(gav) {
+  return path.join(m2Root, ...gav.group.split('.'), gav.artifact, gav.version,
+    gav.artifact + '-' + gav.version + '.pom');
+}
+function locationKey(loc) {
+  return loc.dir ? 'dir:' + path.resolve(loc.dir)
+                 : 'gav:' + loc.gav.group + ':' + loc.gav.artifact + ':' + loc.gav.version;
+}
+function loadPom(loc) {
+  const pomPath = loc.dir ? path.join(loc.dir, 'pom.xml') : m2PomPath(loc.gav);
+  let text;
+  try { text = fs.readFileSync(pomPath, 'utf8'); } catch (e) { return null; }
+  const project = parseXml(text);
+  return project ? { dir: loc.dir || null, project } : null;
+}
+// Where a <parent> points next: relativePath if it names an actual pom.xml
+// on disk (only possible from a reactor directory), else the parent
+// coordinate's own pom in the local repository.
+function parentLocation(project, currentDir) {
+  const parent = directChild(project, 'parent');
+  if (!parent) return null;
+  if (currentDir !== null) {
+    const relPathNode = directChild(parent, 'relativePath');
+    const relPath = relPathNode ? directText(relPathNode) : '../pom.xml';
+    if (relPath !== '') {
+      const candidateDir = path.dirname(path.join(currentDir, relPath));
+      if (fs.existsSync(path.join(candidateDir, 'pom.xml'))) return { dir: candidateDir };
+    }
+  }
+  const g = directText(directChild(parent, 'groupId'));
+  const a = directText(directChild(parent, 'artifactId'));
+  const v = directText(directChild(parent, 'version'));
+  return (g && a && v) ? { gav: { group: g, artifact: a, version: v } } : null;
+}
+function loadChain(startLoc, seen, depth) {
+  seen = seen || new Set();
+  depth = depth || 0;
+  if (depth >= MAX_PARENT_DEPTH) return [];
+  const key = locationKey(startLoc);
+  if (seen.has(key)) return [];
+  seen.add(key);
+  const loaded = loadPom(startLoc);
+  if (!loaded) return [];
+  const chain = [loaded];
+  const next = parentLocation(loaded.project, loaded.dir);
+  if (next) chain.push(...loadChain(next, seen, depth + 1));
+  return chain;
+}
+function enumerateModules(rootDir) {
+  const out = [];
+  function walk(dir) {
+    let text;
+    try { text = fs.readFileSync(path.join(dir, 'pom.xml'), 'utf8'); } catch (e) { return; }
+    const project = parseXml(text);
+    if (!project) return;
+    out.push({ dir, project });
+    const modulesNode = directChild(project, 'modules');
+    if (!modulesNode) return;
+    for (const modNode of directChildren(modulesNode, 'module')) {
+      const rel = directText(modNode);
+      if (rel) walk(path.join(dir, rel));
+    }
+  }
+  walk(rootDir);
+  return out;
+}
+function gaOfProject(project) {
+  const artifactId = directChild(project, 'artifactId');
+  let groupId = directChild(project, 'groupId');
+  if (!groupId) { const parent = directChild(project, 'parent'); groupId = parent ? directChild(parent, 'groupId') : null; }
+  return (groupId ? directText(groupId) : '?') + ':' + (artifactId ? directText(artifactId) : '?');
+}
+function licensesOf(project) {
+  const lics = directChild(project, 'licenses');
+  if (!lics) return [];
+  const out = [];
+  for (const lic of directChildren(lics, 'license')) {
+    const name = directText(directChild(lic, 'name'));
+    if (name) out.push(name);
+  }
+  return out;
+}
+
+// A reactor module's own directory, keyed by group:artifact so a component
+// resolved from the local build (version always matches what was just
+// built) starts its chain on the actual checkout rather than a redundant
+// .m2 copy; anything else starts straight from its own .m2 coordinate.
+const reactorDirByGA = new Map();
+for (const { dir, project } of enumerateModules('.')) reactorDirByGA.set(gaOfProject(project), dir);
+
+const MAVEN_PURL_RE = /^pkg:maven\/([^/]+)\/([^@]+)@([^?]+)/;
+function gavOfPurl(purl) {
+  const m = MAVEN_PURL_RE.exec(purl || '');
+  return m ? { group: decodeURIComponent(m[1]), artifact: decodeURIComponent(m[2]), version: decodeURIComponent(m[3]) } : null;
+}
+
+let filled = 0;
+for (const c of bom.components) {
+  if (Array.isArray(c.licenses) && c.licenses.length > 0) continue;
+  const gav = gavOfPurl(c.purl);
+  if (!gav) continue;
+  const reactorDir = reactorDirByGA.get(gav.group + ':' + gav.artifact);
+  const chain = loadChain(reactorDir ? { dir: reactorDir } : { gav });
+  if (chain.length === 0 || licensesOf(chain[0].project).length > 0) continue;
+  let names = [];
+  for (let i = 1; i < chain.length; i++) {
+    names = licensesOf(chain[i].project);
+    if (names.length) break;
+  }
+  if (!names.length) continue;
+  c.licenses = names.map(name => ({ license: { name } }));
+  c.properties = (c.properties || []).filter(p => p.name !== 'bomlens:licenseSource')
+    .concat([{ name: 'bomlens:licenseSource', value: 'parent POM' }]);
+  filled++;
+}
+if (filled) {
+  fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+  process.stderr.write('[build-prep] maven: inherited a parent POM license for ' + filled + ' component(s)\n');
+}
+MLIC_JS
+    node "$_mlic" "$OUT" "/tmp/sbomhome/.m2" || log "maven: parent-POM license inheritance skipped (non-fatal)"
+    rm -f "$_mlic"
 fi
 
 # Python license evidence: settle each PyPI component's license on what the
@@ -1094,6 +2878,46 @@ if missing:
 PY_LIC
     python3 "$_pylic" "$OUT" || log "python: license evidence pass skipped (non-fatal)"
     rm -f "$_pylic"
+fi
+
+# Record what the non-shipped exclusion left out: the patterns in
+# bomlens:excluded-paths and the manifest files, capped at 50, in
+# bomlens:excluded-manifests.
+if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _globs=""
+    _re=""
+    for _d in $NON_SHIPPED_DIRS; do _globs="$_globs, **/$_d/**"; _re="$_re|$_d"; done
+    _globs="${_globs#, }, **/.github/workflows/**"
+    _re="(^|/)(${_re#|})/"
+    _excl=$(mktemp)
+    find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null \
+        | sed 's#^\./##' \
+        | { grep -Ei "^\.github/workflows/[^/]+\.ya?ml$|$_re" || true; } \
+        | { grep -Ei "^\.github/workflows/|$NON_SHIPPED_MANIFEST_RE" || true; } \
+        | LC_ALL=C sort > "$_excl"
+    _js=$(mktemp).js
+    cat > "$_js" <<'EXCL_JS'
+const fs = require('fs');
+const [bomPath, listPath, globs] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+const files = fs.readFileSync(listPath, 'utf8').split('\n').filter(Boolean);
+const LIMIT = 50;
+bom.metadata = bom.metadata || {};
+const props = (bom.metadata.properties || []).filter(
+  p => p.name !== 'bomlens:excluded-paths' && p.name !== 'bomlens:excluded-manifests');
+props.push({ name: 'bomlens:excluded-paths', value: globs });
+if (files.length) {
+  let v = files.slice(0, LIMIT).join(', ');
+  if (files.length > LIMIT) v += ` (+${files.length - LIMIT} more)`;
+  props.push({ name: 'bomlens:excluded-manifests', value: v });
+}
+bom.metadata.properties = props;
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] non-shipped: left out ' + files.length + ' manifest file(s)\n');
+EXCL_JS
+    node "$_js" "$OUT" "$_excl" "$_globs" || log "non-shipped: recording skipped (non-fatal)"
+    rm -f "$_js" "$_excl"
 fi
 
 # Put the scanned tree back before the ownership fix below, so anything we

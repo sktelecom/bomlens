@@ -16,7 +16,7 @@ description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호�
 | `ghcr.io/sktelecom/bomlens-deep-cve` | 심층 CVE 매칭용 grype 포함 (opt-in). CLI의 `--deep-cve`와 웹 UI의 심층 CVE 매칭 토글이 쓰며, 둘 다 지금 실행 중인 이미지가 이 이미지가 아니면 곁들임 컨테이너로 자동으로 내려받습니다 |
 | `ghcr.io/sktelecom/bomlens-aibom` | AI 모델 ML-BOM 생성용 (opt-in, legacy alias: sbom-scanner-aibom). `--model`/`--model-file`과 웹 UI의 AI 모델 타일이 쓰며, 곁들임 컨테이너로 자동으로 내려받습니다 |
 
-`latest`와 버전 태그를 제공합니다. `ghcr.io/sktelecom/bomlens`와 `bomlens-aibom`(및 별칭)은 `linux/amd64`와 `linux/arm64`를 모두 지원하고, `bomlens-firmware`와 `bomlens-deep-cve`는 `linux/amd64`만 발행돼 `arm64` 호스트(Apple Silicon 맥, Arm 서버)에서는 amd64 에뮬레이션 계층 없이 pull이 실패합니다. 이미지는 cosign으로 서명되어 발행됩니다.
+`latest`와 버전 태그를 제공합니다. 발행되는 모든 이미지(`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-aibom` 및 별칭)가 `linux/amd64`와 `linux/arm64`를 모두 지원하므로, `arm64` 호스트(Apple Silicon 맥, Arm 서버)에서도 그대로 pull해 쓸 수 있습니다. 이미지는 cosign으로 서명되어 발행됩니다.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -146,6 +146,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
 | `ENRICH_MALICIOUS` | — | `true` | 번들된 오프라인 OSV 스냅샷으로 악성 패키지(오타 도용, 계정 탈취 배포본)를 표시. 취약점과 별개 신호이며, 대응도 업그레이드가 아니라 제거와 자격 증명 교체다 |
 | `ENRICH_OS_CONTEXT` | — | `true` | 배포판 패키지 PURL(rpm·deb·apk)에서 `operating-system` 컴포넌트를 합성. Trivy가 이 컴포넌트를 보고 배포판 취약점 피드를 고르므로, 없으면 공급사 SBOM이나 rootfs 스캔의 OS 패키지는 OS CVE 매칭이 전혀 안 됨. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음. Trivy가 피드를 제공하지 않는 배포판(예: OpenWRT)도 대상에서 제외 (AI SBOM은 건너뜀) |
+| `ENRICH_DISTRO_SUPPLIER` | — | `true` | rpm·deb·apk 컴포넌트의 `supplier`를 배포판 프로젝트 이름으로 채움. `ENRICH_OS_CONTEXT`가 합성한 `operating-system` 컴포넌트에서 배포판을 읽는다. 확인된 공급자 이름이 없는 배포판, 배포판이 섞인 SBOM, 이미 supplier가 있는 컴포넌트는 그대로 둠 (AI SBOM은 건너뜀) |
 | `STALENESS_ENRICH` | — | `false` | deps.dev 버전 최신성(최신 대비 몇 릴리스 뒤처졌는지) 추가. 네트워크 접근 필요 |
 | `ENRICH_HF_SECURITY` | — | `true` | AIBOM 모드에서 HuggingFace의 파일별 보안 스캔 결과(ClamAV·picklescan)를 ML-BOM에 기록. 메타데이터만 읽고 파일은 내려받지 않음 |
 | `API_KEY`, `API_URL` | 업로드 시 | — | 업로드 자격과 서버 주소. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰입니다 |
@@ -156,14 +157,18 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
+| `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP(Composer) 소스 스캔: `1`로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지 |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | 소스 스캔: `1`로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌 |
+| `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |
+| `BOMLENS_CANCEL_GRACE` | — | `30` | 스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 `--ui`에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다 |
+| `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | 소스 스캔: `1`로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트와 `.github/workflows`의 GitHub Actions 워크플로를 포함 |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. 1.7을 추가로 허용 |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | 적합성 검사가 허용하는 SPDX spec 버전 |
-| `PURL_MIN_PCT` | — | `90` | 적합성 검사: PURL을 가진 컴포넌트 비율의 최소 기준(필수 검사) |
-| `LICENSE_MIN_PCT` | — | `80` | 적합성 검사: 라이선스를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시) |
-| `HASH_MIN_PCT` | — | `50` | 적합성 검사: 해시를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시) |
-| `FIELD_MIN_PCT` | — | `80` | 적합성 검사: 규제 대응용 컴포넌트별 필드의 참고 기준 커버리지 |
+| `PURL_MIN_PCT` | — | `90` | 적합성 검사: PURL을 가진 컴포넌트 비율의 최소 기준(필수 검사). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
+| `LICENSE_MIN_PCT` | — | `80` | 적합성 검사: 라이선스를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
+| `HASH_MIN_PCT` | — | `50` | 적합성 검사: 해시를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
+| `FIELD_MIN_PCT` | — | `80` | 적합성 검사: 규제 대응용 컴포넌트별 필드의 참고 기준 커버리지. CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
 
 > TRUSCA(구 TrustedOSS Portal)의 네이티브 ingest 엔드포인트(`POST /v1/projects/{id}/sbom-ingest`, Bearer 인증)는 Dependency-Track와 호환되지 않습니다. 일반 Dependency-Track 서버로 올릴 때는 `UPLOAD_TARGET=dependency-track`(기본값)을 그대로 두세요.
 

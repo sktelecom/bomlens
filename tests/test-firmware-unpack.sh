@@ -2182,6 +2182,78 @@ else
     fail "CPE matching does not read the merged set"
 fi
 
+echo "== a failed syft pass leaves its cause in the log and a signal for the SBOM =="
+# syft's stderr used to go to /dev/null and a failure became an empty component
+# list with a one-line warning, so the reason never reached the log and the
+# SBOM carried no trace of the missing packages. Lift the helper both syft
+# passes now go through and drive it with a stub syft.
+body="$(awk '
+    /^catalog_packages\(\) \{/ { inside = 1 }
+    inside { print }
+    inside && $0 == "}" { exit }
+' "$SCRIPT")"
+if [ -z "$body" ]; then
+    fail "could not lift catalog_packages out of scan-firmware.sh" "was it renamed?"
+else
+    eval "$body"
+    export CDX_SPEC_VERSION=1.6
+    SYFT_FAILED=""
+    stub="$(mktemp -d)"
+    cat > "$stub/syft" <<'STUB'
+#!/bin/sh
+if [ "${SYFT_STUB_FAIL:-0}" = 1 ]; then
+    echo "boom: cannot read layer" >&2
+    exit 1
+fi
+echo '{"components":[{"name":"busybox"}]}'
+STUB
+    chmod +x "$stub/syft"
+    out="$(mktemp)"; errlog="$(mktemp)"
+
+    PATH="$stub:$PATH" SYFT_STUB_FAIL=1 catalog_packages /tree "$out" firmware-packages 2>"$errlog"; rc=$?
+    case "$(cat "$errlog")" in
+        *"boom: cannot read layer"*) pass "syft's stderr reaches the scan log" ;;
+        *) fail "syft's stderr was dropped" "$(cat "$errlog")" ;;
+    esac
+    if [ "$rc" -ne 0 ] && [ "$(jq -c . "$out" 2>/dev/null)" = '{"components":[]}' ]; then
+        pass "a failed pass returns non-zero and writes an empty component list"
+    else
+        fail "a failed pass did not leave an empty component list" "rc=$rc out=$(cat "$out")"
+    fi
+    [ "$SYFT_FAILED" = "firmware-packages" ] \
+        && pass "the failed pass is queued for the SBOM signal" \
+        || fail "the failed pass was not queued" "SYFT_FAILED=[$SYFT_FAILED]"
+
+    PATH="$stub:$PATH" SYFT_STUB_FAIL=1 catalog_packages /a "$out" firmware-extra-roots 2>/dev/null
+    PATH="$stub:$PATH" SYFT_STUB_FAIL=1 catalog_packages /b "$out" firmware-extra-roots 2>/dev/null
+    [ "$SYFT_FAILED" = "firmware-packages firmware-extra-roots" ] \
+        && pass "each kind of failed pass is queued once" \
+        || fail "failed passes queued wrongly" "SYFT_FAILED=[$SYFT_FAILED]"
+
+    SYFT_FAILED=""
+    PATH="$stub:$PATH" catalog_packages /c "$out" firmware-packages 2>"$errlog"; rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$SYFT_FAILED" ] && jq -e '.components[0].name == "busybox"' "$out" >/dev/null 2>&1; then
+        pass "a successful pass keeps syft's output and queues nothing"
+    else
+        fail "a successful pass was mishandled" "rc=$rc SYFT_FAILED=[$SYFT_FAILED] out=$(cat "$out")"
+    fi
+    rm -rf "$stub" "$out" "$errlog"
+fi
+
+# Both syft passes go through the helper, and the signal is written only after
+# the final SBOM exists, so it cannot be overwritten.
+n_direct=$(grep -c 'syft "dir:' "$SCRIPT")
+[ "$n_direct" -eq 1 ] \
+    && pass "the only direct syft call is the one inside catalog_packages" \
+    || fail "a syft call bypasses catalog_packages" "found $n_direct direct calls"
+write_line=$(grep -n '> "\$OUTPUT"$' "$SCRIPT" | tail -1 | cut -d: -f1)
+mark_line=$(grep -n 'mark_pipeline_warning "\$OUTPUT"' "$SCRIPT" | head -1 | cut -d: -f1)
+if [ -n "$write_line" ] && [ -n "$mark_line" ] && [ "$mark_line" -gt "$write_line" ]; then
+    pass "failed passes are recorded after the SBOM is written"
+else
+    fail "the SBOM signal is not written after the SBOM" "write=$write_line mark=$mark_line"
+fi
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

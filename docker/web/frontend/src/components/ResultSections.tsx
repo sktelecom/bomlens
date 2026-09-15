@@ -215,6 +215,7 @@ export function ResultSection({
           conformance={result.conformance}
           scanId={scanId}
           results={result.results}
+          isSuppliedDocument={Boolean(inputSbomFileName(result))}
         />
       ) : null;
 

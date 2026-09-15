@@ -47,8 +47,8 @@ const EMPTY_SOURCE = {
 };
 
 /** A source scan that found nothing AND whose dependency analyzer also
- *  couldn't run: the shape that made the two banners contradict each other
- *  (G-1). "Direct dependencies only" implies there ARE direct dependencies,
+ *  couldn't run: the shape that made the two banners contradict each other.
+ *  "Direct dependencies only" implies there ARE direct dependencies,
  *  which isn't true when components is 0. */
 const EMPTY_SOURCE_DEGRADED = {
   ...base,
@@ -117,7 +117,7 @@ test("a scan with no components warns instead of reading as clean", async ({ pag
   await expect(banner).toContainText(/requirements\.txt/);
 });
 
-test("G-1: a zero-component scan does not also claim direct dependencies were found", async ({ page }) => {
+test("a zero-component scan does not also claim direct dependencies were found", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true }, EMPTY_SOURCE_DEGRADED);
   await page.goto("/#/new");
   await fillAndRun(page);

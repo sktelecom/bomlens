@@ -19,12 +19,14 @@ bom.json
 *_conformance.json
 *_conformance.md
 *_conformance.html
+*_conformance.result
 *_scancode.json
 *_NOTICE.pdf
 *_security_epss.json
 *_vendored.cdx.json
 *_modelica.cdx.json
 *_cocoapods.cdx.json
+*_conda.cdx.json
 *_files.json
 *_source.json
 *_input.json
@@ -32,7 +34,7 @@ bom.json
 *_security_yocto.json
 *_ai-profile.json
 *_ai-profile.md
-*_ai-profile.html
+*_vex.json
 *_security_cvebintool.json
 *_security_grype.json
 *.wfp

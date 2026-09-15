@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Docker required — BomLens</title>
+    <title>BomLens</title>
     <style>
       /* 색은 커스텀 프로퍼티로 모으고, OS가 라이트 모드면 아래 미디어 쿼리가 덮어쓴다. */
       :root {
@@ -248,8 +248,8 @@
             url: "https://docs.docker.com/engine/install/",
             name: "WSL2 + docker-ce",
             desc: {
-              ko: "완전 무료 — CLI 전용, 이 데스크톱 앱에서는 안 됨",
-              en: "completely free — CLI only, does not work with this desktop app",
+              ko: "완전 무료, CLI 전용이라 이 데스크톱 앱에서는 안 됨",
+              en: "completely free, CLI only, does not work with this desktop app",
             },
           },
           {
@@ -274,8 +274,13 @@
             url: "https://github.com/abiosoft/colima",
             name: "Colima",
             desc: {
-              ko: "완전 무료 — brew install colima docker 후 colima start",
-              en: "completely free — brew install colima docker, then colima start",
+              ko: ["완전 무료. 설치: ", { code: "brew install colima docker" }, ", 실행: ", { code: "colima start" }],
+              en: [
+                "completely free. Install: ",
+                { code: "brew install colima docker" },
+                ", then run: ",
+                { code: "colima start" },
+              ],
             },
           },
         ],
@@ -332,7 +337,9 @@
         document.getElementById("intro").textContent = s.intro[platform];
         document.getElementById("hint").textContent = s.hint;
 
-        // 옵션 목록 렌더: 링크가 있으면 <a>, 명령어면 <code>, 설명은 " — "로 잇는다.
+        // 옵션 목록 렌더: 링크가 있으면 <a>, 명령어면 <code>, 설명은 ": "로 잇는다. desc는
+        // 보통 문자열이지만, 문장 중간에 <code>로 감싸야 할 명령이 있으면 문자열과
+        // {code: "..."} 조각을 섞은 배열이다(Colima의 설치/실행 명령 참고).
         const list = document.getElementById("options");
         for (const opt of OPTIONS[platform]) {
           const li = document.createElement("li");
@@ -346,7 +353,17 @@
             label.textContent = opt.name;
           }
           li.appendChild(label);
-          li.appendChild(document.createTextNode(` — ${opt.desc[lang]}`));
+          li.appendChild(document.createTextNode(": "));
+          const descParts = Array.isArray(opt.desc[lang]) ? opt.desc[lang] : [opt.desc[lang]];
+          for (const part of descParts) {
+            if (typeof part === "object" && part.code) {
+              const code = document.createElement("code");
+              code.textContent = part.code;
+              li.appendChild(code);
+            } else {
+              li.appendChild(document.createTextNode(part));
+            }
+          }
           list.appendChild(li);
         }
       }

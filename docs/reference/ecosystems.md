@@ -37,6 +37,8 @@ Every source-code example runs the same way from the repository root: point `--t
 jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 ```
 
+By default a source scan leaves out the manifests under test, fixture, example, benchmark and demo folders (`test`, `tests`, `spec`, `fixtures`, `testdata`, `__tests__`, `e2e`, `example`, `examples`, `benches`, `benchmarks`, `playground`, `samples`) and the GitHub Actions workflows in `.github/workflows`, because none of them ship with the product. The SBOM records the patterns in the `bomlens:excluded-paths` property and the manifest files it left out in `bomlens:excluded-manifests`. To include them, set `BOMLENS_INCLUDE_NON_SHIPPED=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+
 The sections below give the ready-to-paste command for each language.
 
 ---
@@ -62,6 +64,9 @@ Detected file: `pom.xml`
 
 > Note: cdxgen resolves the whole build graph, so BomLens filters the SBOM to the deployable set — compile and runtime scope — and drops the test and provided toolchain (JUnit, Lombok, and the like) so the result reflects what ships rather than the full build. To keep the complete resolved graph instead, set `BOMLENS_MAVEN_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
 > A runtime dependency declared with `<optional>true</optional>` is dropped as well, because cdxgen gives it the same tag as a test-scope one.
+> A multi-module reactor can carry modules that never get deployed alongside the ones that do: a demo, or a module the project itself excludes from `mvn deploy` (`maven-deploy-plugin`'s `skip` resolving to `true`, however it is set). Such a module's own component is left out. A dependency only that module needs is left out too, but only when no deployed module in the same reactor declares it at any scope (a deployed module's own `provided` or `test` declaration of it, not just a `compile`/`runtime` one, is enough to keep it, since the SBOM's dependency graph does not record which scope each edge represents). `BOMLENS_MAVEN_FULL_GRAPH=1` keeps everything this leaves out. The excluded modules and the components dropped because of them are recorded on the SBOM as `bomlens:excluded-modules` and `bomlens:excluded-components`.
+
+> Note: cdxgen reads a Maven component's license from its own `pom.xml` only, so one that declares no `<licenses>` and relies on Maven's own inheritance from a parent POM comes through with none. BomLens now walks that parent chain itself (the reactor's own modules, then the local repository for a parent outside it) and fills the license from the first ancestor that declares one, leaving the component untouched if none do or if it already carries a license. The filled component is recorded with a `bomlens:licenseSource` property set to `parent POM`.
 
 ---
 
@@ -72,6 +77,22 @@ Detected file: `pom.xml`
 ```
 
 Detected file: `build.gradle` or `build.gradle.kts`
+
+---
+
+## Android
+
+Detected when the project has a Gradle root (`settings.gradle[.kts]` or `build.gradle[.kts]` at the root) and shows a sign of the Android Gradle plugin: the plugin id in the version catalog (`gradle/libs.versions.toml`), the plugin id or a catalog alias in a build script (root or `app/`), a Kotlin DSL `namespace` declaration, or an `AndroidManifest.xml` a few levels down. A manifest with no Gradle root does not count on its own, which also keeps a .NET MAUI app's `Platforms/Android/AndroidManifest.xml` from being misread as an Android project.
+
+Android needs an SDK platform image BomLens does not publish: the Android SDK it contains is not open source, and Google's terms do not allow redistributing it, so the image is built locally instead. The project's `compileSdk`/`compileSdkVersion` picks the API level (34 if none is found); the scan then looks for `bomlens-android-sdk<API>:latest`, and if it is missing, prints the build command instead of failing on a missing image:
+
+```bash
+docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/android
+```
+
+Building it means accepting Google's SDK terms yourself. Set `ANDROID_IMAGE_PREFIX` to use an image built elsewhere.
+
+> Note: images published under `ghcr.io/sktelecom/bomlens-android-sdk<API>` up to v1.9.0 still work for scans on that release line, but nothing new is pushed to them; a current scan needs a locally built image.
 
 ---
 
@@ -86,6 +107,8 @@ Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.
 > Note: a lock file pins the exact installed versions. Dependencies are still captured from `package.json` without one, but committing a lock file makes the result reproducible.
 
 > Note: the SBOM is filtered to the production dependency set, so devDependencies are dropped and the result reflects what ships. To keep the full dev-plus-production graph instead, set `BOMLENS_NODE_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+
+> Note: an npm workspace member registered in `package-lock.json` survives the file-level exclusion above even when its own directory sits under an excluded tree, because cdxgen reads `package-lock.json` directly. Such a member's own component is left out too, along with a dependency only that member needs, unless a kept member reaches it as well. `BOMLENS_INCLUDE_NON_SHIPPED=1` (the same switch as the file-level exclusion above) keeps everything this leaves out. The excluded members and the components dropped because of them are recorded on the SBOM as `bomlens:excluded-members` and `bomlens:excluded-components`. A yarn workspace member is not caught the same way yet.
 
 ---
 
@@ -129,6 +152,8 @@ Detected file: `Gemfile.lock`
 
 Detected file: `composer.lock`
 
+> Note: cdxgen already tags each composer component with its resolved scope (`require` becomes required, `require-dev` becomes optional), so BomLens filters the SBOM to the required set, the same way it does for Maven. To keep the full require-plus-require-dev graph instead, set `BOMLENS_PHP_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+
 ---
 
 ## Rust
@@ -139,6 +164,8 @@ Detected file: `composer.lock`
 
 Detected file: `Cargo.lock`
 
+> Note: a Cargo workspace member registered in `Cargo.lock` survives the file-level exclusion above even when its own directory sits under an excluded tree, because cdxgen reads `Cargo.lock` directly. Such a member's own component is left out too, along with a dependency only that member needs, unless a kept member reaches it as well (any way at all). `BOMLENS_INCLUDE_NON_SHIPPED=1` (the same switch as the file-level exclusion above) keeps everything this leaves out. The excluded members and the components dropped because of them are recorded on the SBOM as `bomlens:excluded-members` and `bomlens:excluded-components`.
+
 ---
 
 ## .NET
@@ -147,7 +174,7 @@ Detected file: `Cargo.lock`
 ./scripts/scan-sbom.sh --project "DotNetExample" --version "1.0.0" --target examples/dotnet --generate-only
 ```
 
-Detected file: `*.csproj` + `packages.lock.json`
+Detected files: `*.csproj`, `*.fsproj`, `*.sln` or `*.slnx`, at the root or in folders up to three levels below it, plus `packages.lock.json`
 
 ---
 
@@ -222,7 +249,7 @@ If source analysis finds no dependencies, check for the lock file below.
 | Rust | `Cargo.lock` |
 | Ruby | `Gemfile.lock` |
 | PHP | `composer.lock` |
-| .NET | `*.csproj` + `packages.lock.json` |
+| .NET | `*.csproj`, `*.fsproj`, `*.sln` or `*.slnx` (root or up to three folders down) + `packages.lock.json` |
 
 ## Comparing results
 

@@ -449,7 +449,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
                   title={on ? t("models.documented") : t("models.notDocumented")}
                 >
                   <Icon
-                    className={cn("h-3.5 w-3.5", on ? "text-risk-low" : "text-muted-foreground/60")}
+                    className={cn("h-3.5 w-3.5", on ? "text-risk-low" : "text-muted-foreground/60")} /* token-lint-ignore: aria-hidden is one line down */
                     aria-hidden
                   />
                   {label}
