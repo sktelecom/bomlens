@@ -1,0 +1,21 @@
+{
+ "firmware": true,
+ "scanoss": true,
+ "deepLicense": false,
+ "docker": true,
+ "aibom": true,
+ "deepCve": true,
+ "firmwareSibling": false,
+ "aibomSibling": false,
+ "deepCveSibling": false,
+ "spdxExport": false,
+ "spdxSibling": false,
+ "hfAuth": false,
+ "externalLookup": true,
+ "firmwareImage": "ghcr.io/sktelecom/bomlens-firmware:1.12.1",
+ "aibomImage": "ghcr.io/sktelecom/bomlens-aibom:1.12.1",
+ "deepCveImage": "ghcr.io/sktelecom/bomlens-deep-cve:latest",
+ "version": "1.12.1",
+ "hostDir": "",
+ "scanRoots": []
+}
