@@ -48,9 +48,13 @@ opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 #
 # So we snapshot the resolver-owned files before the run and put the tree back
 # afterwards: snapshotted files are restored byte for byte, and files or build
-# directories that were NOT there before are removed. Nothing outside these
-# names is considered, and nothing that already existed is deleted, so a
-# committed lockfile or a pre-existing build/ is never lost.
+# directories that were NOT there before are removed (composer's vendor/ and
+# dotnet's obj/ and bin/ included). Nothing outside these names is considered,
+# and nothing that already existed is deleted, so a committed lockfile or a
+# pre-existing build/ is never lost. The names in play are versioned and recorded
+# with the snapshot (names.version): a snapshot written by an older script never
+# listed vendor/obj/bin or composer.json, so finishing it must not treat the
+# user's own ones as new.
 # BOMLENS_KEEP_BUILD_OUTPUT=1 opts out (leave the resolved tree in place, e.g.
 # to inspect what a resolution produced).
 # ---------------------------------------------------------------------------
@@ -59,16 +63,33 @@ GUARD_DIR=""
 # Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
 # (app/build, services/api/go.mod) without walking a whole monorepo; .git and
 # node_modules are pruned because nothing we run resolves inside them.
-guard_paths() {
+# The name set grows over time: 1 = original, 2 adds vendor/obj/bin directories,
+# 3 adds composer.json (rewritten during the PHP resolve), 4 adds *.egg-info
+# directories (left by a Python source install). guard_paths takes the
+# version to list, so a snapshot is always compared with the names it was written
+# under.
+GUARD_NAMES_VERSION=4
+guard_paths() {  # guard_paths f|d [version]
+    _gv="${2:-$GUARD_NAMES_VERSION}"
     if [ "$1" = "f" ]; then
-        find . -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -type f \
-            \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
-               -o -name Package.resolved -o -name package-lock.json \
-               -o -name composer.lock \) -print 2>/dev/null | LC_ALL=C sort
+        if [ "$_gv" -ge 3 ]; then
+            find . -maxdepth 4 \( -name .git -o -name node_modules -o -name vendor \) -prune -o -type f \
+                \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
+                   -o -name Package.resolved -o -name package-lock.json \
+                   -o -name composer.lock -o -name composer.json \) -print 2>/dev/null | LC_ALL=C sort
+        else
+            find . -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -type f \
+                \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
+                   -o -name Package.resolved -o -name package-lock.json \
+                   -o -name composer.lock \) -print 2>/dev/null | LC_ALL=C sort
+        fi
     else
-        find . -maxdepth 4 -name .git -prune -o -type d \
-            \( -name .gradle -o -name .build -o -name build -o -name target \
-               -o -name node_modules -o -name __pycache__ -o -name .venv \) \
+        # Directory names accumulate by version; "$@" carries them into one find.
+        set -- -name .gradle -o -name .build -o -name build -o -name target \
+               -o -name node_modules -o -name __pycache__ -o -name .venv
+        [ "$_gv" -lt 2 ] || set -- "$@" -o -name vendor -o -name obj -o -name bin
+        [ "$_gv" -lt 4 ] || set -- "$@" -o -name '*.egg-info'
+        find . -maxdepth 4 -name .git -prune -o -type d \( "$@" \) \
             -print -prune 2>/dev/null | LC_ALL=C sort
     fi
 }
@@ -88,6 +109,7 @@ guard_snapshot() {
     [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
+    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
         mkdir -p "$GUARD_DIR/tree/$(dirname "$_f")" 2>/dev/null
@@ -112,7 +134,11 @@ guard_restore() {
         fi
         cp -p "$_g/tree/$_f" "$_f" 2>/dev/null && _rst=$((_rst + 1))
     done < "$_g/files.before"
-    guard_paths f > "$_g/files.after" 2>/dev/null
+    # A snapshot written by an older script has no version file (1) and is
+    # finished with the names it was written under.
+    _gnv=$(cat "$_g/names.version" 2>/dev/null)
+    case "$_gnv" in ''|*[!0-9]*) _gnv=1 ;; esac
+    guard_paths f "$_gnv" > "$_g/files.after" 2>/dev/null
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
         # Never the SBOM itself: the web-UI path asks cdxgen to write it inside
@@ -121,7 +147,7 @@ guard_restore() {
         grep -qxF "$_f" "$_g/files.before" 2>/dev/null && continue
         rm -f "$_f" 2>/dev/null && _del=$((_del + 1))
     done < "$_g/files.after"
-    guard_paths d > "$_g/dirs.after" 2>/dev/null
+    guard_paths d "$_gnv" > "$_g/dirs.after" 2>/dev/null
     while IFS= read -r _d; do
         [ -n "$_d" ] || continue
         [ -d "$_d" ] || continue
@@ -423,6 +449,55 @@ if [ -f Gemfile ]; then
         log "bundle lock"
         prep_step bundle-lock "$PREP_TIMEOUT_DEFAULT" sh -c 'bundle lock || bundle install'
     fi
+fi
+
+# PHP (Composer): resolve a lockfile when the root manifest has none.
+# Unlike Ruby/Cargo/Go/Python above, cdxgen never resolves composer.json on
+# its own: a root manifest with no committed composer.lock (a library-shaped
+# package that does not commit one at all, confirmed against Symfony's
+# HttpFoundation component) has nothing for cdxgen to read and the scan
+# comes back with zero components, no different from a project that
+# genuinely has no dependencies. --no-dev keeps the resolve at deployable
+# scope, the same principle PHP_SCOPE_FILTER below applies when a lock is
+# already there. composer.lock already committed at the root, or found
+# nested under a monorepo component with none at the root, is unaffected --
+# that positive lock evidence is recorded further down this file
+# (composer-lock-committed), unchanged by this step.
+if [ -f composer.json ] && [ ! -f composer.lock ] && command -v composer >/dev/null 2>&1; then
+    log "composer update"
+    # `--no-dev` only skips installing require-dev; composer still resolves it,
+    # and a library whose dev tools require the library itself or PHP extensions
+    # the image lacks fails to resolve at all, leaving no lock and an empty SBOM.
+    # A library may also set config.lock=false, so composer writes no lock even
+    # when it resolves. The deployable scope needs none of that, so resolve a
+    # manifest without require-dev and config.lock, and ignore platform
+    # requirements (nothing runs here; a project pinned to an older PHP than the
+    # image still resolves, though a dependency version needing a newer PHP can
+    # then be picked). BOMLENS_PHP_FULL_GRAPH keeps the full manifest. The
+    # original is copied outside the tree, written back in place (so a symlinked
+    # composer.json stays a link) right after the resolve, and is also covered
+    # by the source-tree guard if the run is killed in between. php is always
+    # there where composer is; jq covers a stub or an unusual image.
+    _cj_orig=""; _cj_new=""
+    if ! opted_out "${BOMLENS_PHP_FULL_GRAPH:-}"; then
+        _cj_orig=$(mktemp 2>/dev/null) && _cj_new=$(mktemp 2>/dev/null) || { rm -f "$_cj_orig" "$_cj_new"; _cj_orig=""; }
+    fi
+    if [ -n "$_cj_orig" ] && cp -p composer.json "$_cj_orig" 2>/dev/null; then
+        _cj_ok=""
+        if command -v php >/dev/null 2>&1; then
+            php -r '$j = json_decode(file_get_contents("composer.json")); if (!is_object($j)) exit(1); unset($j->{"require-dev"}); if (isset($j->config) && is_object($j->config)) unset($j->config->lock); echo json_encode($j, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);' > "$_cj_new" 2>/dev/null && _cj_ok=1
+        elif command -v jq >/dev/null 2>&1; then
+            jq 'del(."require-dev") | del(.config.lock)' composer.json > "$_cj_new" 2>/dev/null && _cj_ok=1
+        fi
+        if [ -n "$_cj_ok" ] && [ -s "$_cj_new" ] && cat "$_cj_new" > composer.json 2>/dev/null; then
+            _cj_rewritten=1
+        else
+            _cj_rewritten=""
+        fi
+    fi
+    prep_step composer-install "$PREP_TIMEOUT_DEFAULT" composer update --no-dev --no-scripts --no-interaction --ignore-platform-reqs
+    [ -z "${_cj_rewritten:-}" ] || cat "$_cj_orig" > composer.json 2>/dev/null
+    rm -f "${_cj_orig:-}" "${_cj_new:-}"
 fi
 
 # Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
@@ -808,6 +883,7 @@ fix_lic_mapping() {
     command -v node >/dev/null 2>&1 || return 0
     _lic_dir=""
     for _c in /opt/cdxgen/data /opt/bin/data \
+              /usr/local/lib/node_modules/@cdxgen/cdxgen/data \
               /usr/local/lib/node_modules/@cyclonedx/cdxgen/data; do
         [ -f "$_c/lic-mapping.json" ] && { _lic_dir="$_c"; break; }
     done
@@ -898,6 +974,124 @@ elif [ -f /opt/bin/cdxgen ]; then
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
+fi
+
+# Rust licenses. cdxgen reads only Cargo.lock for a Rust project, and a lock file
+# carries no license, so nearly every crate came through without one. `cargo
+# metadata` downloads the crates and reports each one's declared license, so the
+# gap is filled from that: a component with no license takes the license its crate
+# declares in its own Cargo.toml (a workspace member or path crate included, whose
+# manifest is local). A license the SBOM already has is never replaced, a crate
+# that declares none stays empty, and every value set is stamped
+# bomlens:licenseSource. Cargo's older "MIT/Apache-2.0" spelling is written as an
+# SPDX expression, and a value that is not one (or names an id that is not on the
+# SPDX list) is kept as a plain license name. With no route to the registry `cargo
+# metadata` fails: the step is recorded as failed on the SBOM below, and the
+# licenses stay as cdxgen left them. It runs before that recording so a failure
+# reaches the SBOM. FETCH_LICENSE=false (the switch that turns off network license
+# lookups, also set by --byte-stable) skips it; so does BOMLENS_NO_CARGO_LICENSE=1
+# (or true). Unlike the workspace-member filter further down, which uses
+# --no-deps --offline to avoid it, this needs the crates' sources, so it costs a
+# download (about 8 seconds for 150 crates).
+if opted_out "${BOMLENS_NO_CARGO_LICENSE:-}"; then
+    log "cargo: license pass off (BOMLENS_NO_CARGO_LICENSE)"
+elif [ "${FETCH_LICENSE:-true}" = "false" ]; then
+    log "cargo: license pass off (FETCH_LICENSE=false)"
+elif [ "${rc:-1}" -eq 0 ] && [ -f Cargo.toml ] && [ -f "$OUT" ] \
+     && command -v node >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1 \
+     && grep -q '"pkg:cargo/' "$OUT" 2>/dev/null; then
+    log "cargo: reading the licenses crates declare (cargo metadata)"
+    _clmeta=$(mktemp)
+    if prep_step cargo-license-metadata "$PREP_TIMEOUT_DEFAULT" sh -c 'cargo metadata --format-version 1 > "$1"' _ "$_clmeta" \
+       && [ -s "$_clmeta" ]; then
+        _clspdx=""
+        for _c in /opt/cdxgen/data /opt/bin/data \
+                  /usr/local/lib/node_modules/@cdxgen/cdxgen/data \
+                  /usr/local/lib/node_modules/@cyclonedx/cdxgen/data; do
+            [ -f "$_c/spdx-licenses.json" ] && { _clspdx="$_c/spdx-licenses.json"; break; }
+        done
+        _cljs=$(mktemp)
+        cat > "$_cljs" <<'CARGO_LIC'
+const fs = require('fs');
+const [bomPath, metaPath] = process.argv.slice(2);
+let bom, meta;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(meta.packages)) process.exit(0);
+
+// The SPDX ids (and exceptions) cdxgen ships. Without the list nothing can be
+// vouched for as an id, so every value is kept as a plain license name.
+let known = new Set();
+try {
+  const list = JSON.parse(fs.readFileSync(process.env.BOMLENS_SPDX_LIST || '', 'utf8'));
+  if (Array.isArray(list)) known = new Set(list);
+} catch (e) { /* no list */ }
+
+// name@version -> the license the crate declares (path and workspace crates too).
+const declared = new Map();
+for (const p of meta.packages) {
+  if (p.name && p.version && typeof p.license === 'string' && p.license.trim()) {
+    declared.set(p.name + '@' + p.version, p.license.trim());
+  }
+}
+
+// Cargo's older spelling separates alternatives with a slash: "MIT/Apache-2.0".
+// Free text that merely contains a slash (a URL) is left alone.
+const ID = '[A-Za-z0-9.+-]+';
+function spdx(text) {
+  const t = text.replace(/\s+/g, ' ');
+  return new RegExp('^' + ID + '( ?/ ?' + ID + ')+$').test(t) ? t.replace(/ ?\/ ?/g, ' OR ') : t;
+}
+// An SPDX expression alternates ids and OR/AND/WITH, every id on the SPDX list.
+function tokens(t) {
+  const tok = t.replace(/[()]/g, ' ').trim().split(/\s+/);
+  const ok = tok.length % 2 === 1 && tok.every((w, i) => i % 2 === 1
+    ? /^(OR|AND|WITH)$/.test(w) : known.has(w.replace(/\+$/, '')));
+  return ok ? tok : null;
+}
+// A flat OR (or AND) list is written in a fixed order, so the same pair of
+// licenses is one entry in the NOTICE whichever way a crate spells it.
+function ordered(t, tok) {
+  if (/[()]/.test(t)) return t;
+  const ops = new Set(tok.filter((w, i) => i % 2 === 1));
+  if (ops.size !== 1 || ops.has('WITH')) return t;
+  const words = tok.filter((w, i) => i % 2 === 0).sort();
+  return words.join(' ' + [...ops][0] + ' ');
+}
+function licenseEntry(text) {
+  const t = spdx(text);
+  const tok = tokens(t);
+  if (!tok) return { license: { name: t } };
+  if (tok.length === 1) return known.has(tok[0]) ? { license: { id: tok[0] } } : { expression: tok[0] };
+  return { expression: ordered(t, tok) };
+}
+// Any evidence at all (an id, name, expression, url or text) means the component
+// already has a license and is left alone; a malformed field is left alone too.
+const hasLicense = c => c.licenses !== undefined && (!Array.isArray(c.licenses)
+  || c.licenses.some(e => e && (e.expression
+    || (e.license && (e.license.id || e.license.name || e.license.url || e.license.text)))));
+
+let changed = 0;
+for (const c of bom.components) {
+  if (!String(c.purl || '').startsWith('pkg:cargo/') || hasLicense(c)) continue;
+  const text = declared.get(c.name + '@' + c.version);
+  if (!text) continue;
+  c.licenses = [licenseEntry(text)];
+  c.properties = (c.properties || []).filter(p => p.name !== 'bomlens:licenseSource')
+    .concat([{ name: 'bomlens:licenseSource', value: 'cargo metadata' }]);
+  changed++;
+}
+if (changed) {
+  fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+  process.stderr.write('[build-prep] cargo: filled ' + changed + ' component license(s) from the crates\' own manifests\n');
+}
+CARGO_LIC
+        BOMLENS_SPDX_LIST="$_clspdx" node "$_cljs" "$OUT" "$_clmeta" || log "cargo: license pass skipped (non-fatal)"
+        rm -f "$_cljs"
+    else
+        log "cargo: could not read crate licenses (cargo metadata failed, is the registry reachable?); licenses left as the generator resolved them"
+    fi
+    rm -f "$_clmeta"
 fi
 
 # Record each prep_step that failed or timed out (PREP_FAILED, space-separated
@@ -2878,6 +3072,479 @@ if missing:
 PY_LIC
     python3 "$_pylic" "$OUT" || log "python: license evidence pass skipped (non-fatal)"
     rm -f "$_pylic"
+fi
+
+# Copyright statements from the license files each installed package ships.
+# cdxgen leaves component.copyright empty, so the NOTICE has no attribution line
+# to print. The installed packages exist only until guard_restore below, and only
+# in this container, so the statements have to be read here.
+#
+# Only the package's own license files are read (LICENSE, LICENCE, COPYING,
+# NOTICE, COPYRIGHT), and only a line that opens with "Copyright", "(c)" or the
+# copyright sign and then gives a year, another (c), or "by". A component that
+# already has a copyright is left alone, a statement that cannot be tied to a
+# package is dropped, and every value set is stamped bomlens:copyrightSource.
+# BOMLENS_NO_COPYRIGHT=1 (or true) turns the pass off.
+#
+# Go and Rust read the same way, through the shared node script below: Go from the
+# folders `go list -m` reports (the module cache, a replacement's folder) and from
+# vendor/, Rust from the folders `cargo metadata --offline` reports (the registry, git
+# checkouts, path dependencies). The scanned project's own module or crates are
+# skipped. Maven is not covered: it downloads jars, not source trees.
+if opted_out "${BOMLENS_NO_COPYRIGHT:-}"; then
+    log "copyright: pass off (BOMLENS_NO_COPYRIGHT)"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ]; then
+    if command -v python3 >/dev/null 2>&1 && grep -q '"pkg:pypi/' "$OUT" 2>/dev/null; then
+        log "copyright: reading license files of installed python packages"
+        _pycpr=$(mktemp)
+        cat > "$_pycpr" <<'PY_CPR'
+import json, os, re, stat, sys
+from importlib.metadata import distributions
+
+bom_path = sys.argv[1]
+try:
+    with open(bom_path, encoding="utf-8") as fh:
+        bom = json.load(fh)
+except Exception:
+    sys.exit(0)
+components = bom.get("components")
+if not isinstance(components, list):
+    sys.exit(0)
+
+FILE_RE = re.compile(r"^(licen[sc]e|copying|notice|copyright)([-_.].*)?$", re.I)
+NEEDS_RE = re.compile(r"^[\s#*/;>|-]*(?:copyright\s*(?:\(c\)|\u00a9|&copy;|\d{4}|by\b)"
+                      r"|(?:\(c\)|\u00a9|&copy;)\s*\d{4})", re.I)
+# What is left of a statement once the marker, years and punctuation are removed must
+# still name someone.
+FILLER_RE = re.compile(r"copyright|\(c\)|\u00a9|&copy;|all rights reserved|\bby\b|[\d\s,.:;-]", re.I)
+# A template the package never filled in: <year>, [fullname], {{author}}, "year name of
+# author", "YEAR by AUTHOR EMAIL".
+WORDS = r"(?:year|yyyy|names?|owners?|holders?|authors?|fullname|full|email|organi[sz]ation|company|copyright|of|and|your|the)"
+PLACEHOLDER_RE = re.compile(r"[<\[{]{1,2}\s*" + WORDS + r"(?:[\s,]+" + WORDS + r")*\s*[>\]}]{1,2}"
+                            r"|\byear\s+name\s+of\s+author\b", re.I)
+UPPER_RE = re.compile(r"\b(?:YEAR|AUTHOR|OWNER|EMAIL)\b")
+# Text that belongs to a license, not to the package that ships it.
+BOILERPLATE_RE = re.compile(r"free software foundation|stichting mathematisch|"
+                            r"corporation for national research|internet (?:systems|software) consortium", re.I)
+PROSE_RE = re.compile(r"\b(?:notice|permission|shall|consisting|hereby|herein|conditions|provided|following)\b", re.I)
+HEAD_BYTES, MAX_FILES, MAX_LINES, MAX_STATEMENTS, MAX_LEN = 65536, 6, 400, 5, 200
+
+
+def canon(name):
+    return re.sub(r"[-_.]+", "-", (name or "").strip()).lower()
+
+
+def clean(line):
+    text = re.sub(r"^[\s#*/;>|-]+|[\s#*/;|-]+$", "", line)
+    return re.sub(r"\s+", " ", text).replace("&copy;", "(c)")
+
+
+def read_head(path, root):
+    """First HEAD_BYTES of a regular file that really lives under root."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return ""
+        real = os.path.realpath(path)
+        if not real.startswith(root + os.sep):
+            return ""
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read(HEAD_BYTES)
+    except Exception:
+        return ""
+
+
+def statements_in(path, root):
+    found = []
+    lines = [ln.rstrip("\r") for ln in read_head(path, root).split("\n")[:MAX_LINES]]
+    for n, line in enumerate(lines):
+        if len(line) > MAX_LEN * 2 or not NEEDS_RE.match(line):
+            continue
+        text = clean(line)
+        # A holder that runs onto the next line ("..., Stichting X," then "The Netherlands").
+        if text.endswith(",") and n + 1 < len(lines):
+            nxt = lines[n + 1]
+            if nxt.strip() and not NEEDS_RE.match(nxt):
+                text = clean(text + " " + nxt.strip())
+        text = text.rstrip(",")
+        if (not text or len(text) > MAX_LEN or PLACEHOLDER_RE.search(text) or UPPER_RE.search(text)
+                or BOILERPLATE_RE.search(text) or PROSE_RE.search(text)
+                or not re.search(r"[^\W\d_]", FILLER_RE.sub("", text))):
+            continue
+        found.append(text)
+    return found
+
+
+def key_of(text):
+    text = re.sub(r"<[^>]*>", "", text.lower()).replace("\u00a9", "").replace("(c)", "")
+    return re.sub(r"\s+", " ", text).strip().rstrip(".,;")
+
+
+def collapse(found):
+    """Drop repeats and any statement that only abbreviates a longer one."""
+    kept = []
+    for text in found:
+        key = key_of(text)
+        for i, (k, t) in enumerate(kept):
+            if k.startswith(key) or key.startswith(k):
+                if len(text) > len(t):
+                    kept[i] = (key, text)
+                break
+        else:
+            kept.append((key, text))
+    return [t for _, t in kept][:MAX_STATEMENTS]
+
+
+def dist_files(dist):
+    """(path, root) pairs: the license files an installed distribution ships, and the
+    directory each must stay under."""
+    found, seen = [], set()
+
+    def add(path, root):
+        if path not in seen and os.path.isfile(path):
+            seen.add(path)
+            found.append((path, root))
+
+    try:
+        base = str(getattr(dist, "_path", "") or "")
+        if base and os.path.isdir(base):
+            root = os.path.realpath(base)
+            for rel in (dist.metadata.get_all("License-File") or []):
+                for sub in (os.path.join(base, "licenses"), base):
+                    cand = os.path.join(sub, rel)
+                    if os.path.isfile(cand):
+                        add(cand, root)
+                        break
+            for cur, _dirs, names in os.walk(base):
+                for fn in sorted(names):
+                    if FILE_RE.match(fn):
+                        add(os.path.join(cur, fn), root)
+        # An egg-info install records no license file of its own; a wheel whose
+        # metadata directory we could not locate still lists its files.
+        if not found:
+            root = os.path.realpath(str(dist.locate_file("")))
+            for entry in (dist.files or []):
+                if FILE_RE.match(os.path.basename(str(entry))):
+                    add(str(dist.locate_file(entry)), root)
+    except Exception:
+        pass
+    return found[:MAX_FILES]
+
+index = {}
+for dist in distributions():
+    try:
+        name, version = dist.metadata.get("Name"), dist.metadata.get("Version")
+    except Exception:
+        continue
+    if name and version:
+        index.setdefault((canon(name), version), dist)
+
+if not index:
+    sys.stderr.write("[build-prep] copyright: no installed python distribution metadata found; "
+                     "python components left as they were\n")
+    sys.exit(0)
+
+changed = 0
+for comp in components:
+    if not str(comp.get("purl") or "").startswith("pkg:pypi/") or comp.get("copyright"):
+        continue
+    dist = index.get((canon(comp.get("name")), comp.get("version")))
+    if not dist:
+        continue
+    found = []
+    for path, root in dist_files(dist):
+        found.extend(statements_in(path, root))
+    found = collapse(found)
+    if not found:
+        continue
+    comp["copyright"] = "; ".join(found)
+    props = [p for p in comp.get("properties") or []
+             if p.get("name") != "bomlens:copyrightSource"]
+    props.append({"name": "bomlens:copyrightSource", "value": "installed license file"})
+    comp["properties"] = props
+    changed += 1
+
+if changed:
+    with open(bom_path, "w", encoding="utf-8") as fh:
+        json.dump(bom, fh, indent=2)
+    sys.stderr.write("[build-prep] copyright: filled %d python component(s) from installed license files\n" % changed)
+PY_CPR
+        python3 "$_pycpr" "$OUT" || log "copyright: python pass skipped (non-fatal)"
+        rm -f "$_pycpr"
+    fi
+    # Same depth as guard_paths: a node_modules nested deeper than four levels in a
+    # monorepo is not searched, and its components keep no copyright.
+    _nmdirs=""
+    if command -v node >/dev/null 2>&1 && grep -q '"pkg:npm/' "$OUT" 2>/dev/null; then
+        _nmdirs=$(find . -maxdepth 4 -name .git -prune -o -type d -name node_modules -print -prune 2>/dev/null)
+    fi
+    _cprgo=""
+    _cprcargo=""
+    if command -v node >/dev/null 2>&1; then
+        [ -f go.mod ] && command -v go >/dev/null 2>&1 && grep -q '"pkg:golang/' "$OUT" 2>/dev/null && _cprgo=1
+        [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1 && grep -q '"pkg:cargo/' "$OUT" 2>/dev/null && _cprcargo=1
+    fi
+    if [ -n "$_nmdirs" ] || [ -n "$_cprgo" ] || [ -n "$_cprcargo" ]; then
+        _jscpr=$(mktemp)
+        cat > "$_jscpr" <<'NODE_CPR'
+const fs = require('fs');
+const path = require('path');
+const bomPath = process.argv[2];
+const roots = (process.env.BOMLENS_NM_DIRS || '').split('\n').filter(Boolean);
+// Go and Rust hand over a name@version -> directory index instead of a node_modules tree.
+const indexFile = process.env.BOMLENS_CPR_INDEX || '';
+const purlPrefix = process.env.BOMLENS_CPR_PURL_PREFIX || 'pkg:npm/';
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+// Only to say that an ecosystem's license files could not be listed at all.
+if (process.env.BOMLENS_CPR_UNREAD) {
+  bom.metadata = bom.metadata || {};
+  const props = bom.metadata.properties = bom.metadata.properties || [];
+  const held = props.find(p => p.name === 'bomlens:copyrightUnread');
+  if (held) held.value = held.value.split(',').concat(process.env.BOMLENS_CPR_UNREAD).filter((v, i, a) => a.indexOf(v) === i).join(',');
+  else props.push({ name: 'bomlens:copyrightUnread', value: process.env.BOMLENS_CPR_UNREAD });
+  fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+  process.exit(0);
+}
+if (!Array.isArray(bom.components)) process.exit(0);
+
+const FILE_RE = /^(licen[sc]e|copying|notice|copyright)([-_.].*)?$/i;
+const NEEDS_RE = /^[\s#*/;>|-]*(?:copyright\s*(?:\(c\)|\u00a9|&copy;|\d{4}|by\b)|(?:\(c\)|\u00a9|&copy;)\s*\d{4})/i;
+// What is left of a statement once the marker, years and punctuation are removed must
+// still name someone.
+const FILLER_RE = /copyright|\(c\)|\u00a9|&copy;|all rights reserved|\bby\b|[\d\s,.:;-]/gi;
+// A template the package never filled in: <year>, [fullname], {{author}}, "year name of
+// author", "YEAR by AUTHOR EMAIL".
+const WORDS = '(?:year|yyyy|names?|owners?|holders?|authors?|fullname|full|email|organi[sz]ation|company|copyright|of|and|your|the)';
+const PLACEHOLDER_RE = new RegExp('[<\\[{]{1,2}\\s*' + WORDS + '(?:[\\s,]+' + WORDS + ')*\\s*[>\\]}]{1,2}'
+  + '|\\byear\\s+name\\s+of\\s+author\\b', 'i');
+const UPPER_RE = /\b(?:YEAR|AUTHOR|OWNER|EMAIL)\b/;
+// Text that belongs to a license, not to the package that ships it.
+const BOILERPLATE_RE = /free software foundation|stichting mathematisch|corporation for national research|internet (?:systems|software) consortium/i;
+const PROSE_RE = /\b(?:notice|permission|shall|consisting|hereby|herein|conditions|provided|following)\b/i;
+const HEAD_BYTES = 65536, MAX_FILES = 6, MAX_LINES = 400, MAX_STATEMENTS = 5, MAX_LEN = 200;
+
+function clean(line) {
+  return line.replace(/^[\s#*/;>|-]+|[\s#*/;|-]+$/g, '').replace(/\s+/g, ' ').replace(/&copy;/g, '(c)');
+}
+
+// First HEAD_BYTES of a regular file that really lives under root.
+function readHead(file, root) {
+  let fd;
+  try {
+    if (!fs.lstatSync(file).isFile()) return '';
+    if (!fs.realpathSync(file).startsWith(root + path.sep)) return '';
+    fd = fs.openSync(file, 'r');
+    const buf = Buffer.alloc(HEAD_BYTES);
+    const n = fs.readSync(fd, buf, 0, HEAD_BYTES, 0);
+    return buf.toString('utf8', 0, n);
+  } catch (e) {
+    return '';
+  } finally {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch (e) { /* closed */ }
+  }
+}
+
+function statementsIn(file, root) {
+  const found = [];
+  const lines = readHead(file, root).split(/\r?\n/).slice(0, MAX_LINES);
+  lines.forEach((line, n) => {
+    if (line.length > MAX_LEN * 2 || !NEEDS_RE.test(line)) return;
+    let t = clean(line);
+    // A holder that runs onto the next line ("..., Stichting X," then "The Netherlands").
+    if (t.endsWith(',') && n + 1 < lines.length) {
+      const nxt = lines[n + 1];
+      if (nxt.trim() && !NEEDS_RE.test(nxt)) t = clean(t + ' ' + nxt.trim());
+    }
+    t = t.replace(/,+$/, '');
+    if (!t || t.length > MAX_LEN || PLACEHOLDER_RE.test(t) || UPPER_RE.test(t)
+        || BOILERPLATE_RE.test(t) || PROSE_RE.test(t)
+        || !/[\p{L}]/u.test(t.replace(FILLER_RE, ''))) return;
+    found.push(t);
+  });
+  return found;
+}
+
+function keyOf(t) {
+  return t.toLowerCase().replace(/<[^>]*>/g, '').replace(/\u00a9|\(c\)/g, '')
+    .replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
+}
+
+// Drop repeats and any statement that only abbreviates a longer one.
+function collapse(found) {
+  const kept = [];
+  for (const t of found) {
+    const key = keyOf(t);
+    const i = kept.findIndex(k => k[0].startsWith(key) || key.startsWith(k[0]));
+    if (i === -1) kept.push([key, t]);
+    else if (t.length > kept[i][1].length) kept[i] = [key, t];
+  }
+  return kept.map(k => k[1]).slice(0, MAX_STATEMENTS);
+}
+
+// name@version -> the package directory that holds its license files
+const index = new Map();
+const seen = new Set();
+function walk(nm) {
+  let real;
+  try { real = fs.realpathSync(nm); } catch (e) { return; }
+  if (seen.has(real)) return;
+  seen.add(real);
+  let entries;
+  try { entries = fs.readdirSync(nm, { withFileTypes: true }); } catch (e) { return; }
+  for (const e of entries) {
+    if (e.name === '.bin' || (e.name.startsWith('.') && e.name !== '.pnpm')) continue;
+    const dir = path.join(nm, e.name);
+    if (e.name === '.pnpm') {
+      try { fs.readdirSync(dir).forEach(v => walk(path.join(dir, v, 'node_modules'))); } catch (x) { /* none */ }
+      continue;
+    }
+    if (e.name.startsWith('@')) {
+      try { fs.readdirSync(dir).forEach(s => pkg(path.join(dir, s))); } catch (x) { /* none */ }
+    } else {
+      pkg(dir);
+    }
+  }
+}
+function pkg(dir) {
+  let meta;
+  try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch (e) { return; }
+  // A package.json states its own name; only trust it where the folder agrees.
+  if (meta && meta.name && meta.version && path.basename(dir) === String(meta.name).split('/').pop()) {
+    const key = meta.name + '@' + meta.version;
+    if (!index.has(key)) index.set(key, dir);
+  }
+  walk(path.join(dir, 'node_modules'));
+}
+if (indexFile) {
+  try {
+    const given = JSON.parse(fs.readFileSync(indexFile, 'utf8'));
+    for (const k of Object.keys(given)) index.set(k, given[k]);
+  } catch (e) { process.exit(0); }
+} else {
+  roots.forEach(walk);
+}
+
+let changed = 0;
+for (const c of bom.components) {
+  if (!String(c.purl || '').startsWith(purlPrefix) || c.copyright || !c.name || !c.version) continue;
+  const dir = index.get((c.group ? c.group + '/' : '') + c.name + '@' + c.version);
+  if (!dir) continue;
+  let root;
+  let files = [];
+  try {
+    root = fs.realpathSync(dir);
+    files = fs.readdirSync(dir).filter(f => FILE_RE.test(f)).sort().slice(0, MAX_FILES);
+  } catch (e) { continue; }
+  let found = [];
+  for (const f of files) found = found.concat(statementsIn(path.join(dir, f), root));
+  found = collapse(found);
+  if (!found.length) continue;
+  c.copyright = found.join('; ');
+  c.properties = (c.properties || []).filter(p => p.name !== 'bomlens:copyrightSource')
+    .concat([{ name: 'bomlens:copyrightSource', value: 'installed license file' }]);
+  changed++;
+}
+if (changed) {
+  fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+  process.stderr.write('[build-prep] copyright: filled ' + changed + ' ' + purlPrefix.replace(/^pkg:|\/$/g, '') + ' component(s) from installed license files\n');
+}
+NODE_CPR
+        # Says on the SBOM that a whole ecosystem's license files could not be listed, so
+        # "no copyright" and "not read" can be told apart.
+        _cpr_unread() {
+            log "copyright: $2"
+            BOMLENS_CPR_UNREAD="$1" node "$_jscpr" "$OUT" || log "copyright: could not record the gap (non-fatal)"
+        }
+        if [ -n "$_nmdirs" ]; then
+            log "copyright: reading license files under node_modules"
+            BOMLENS_CPR_INDEX="" BOMLENS_CPR_PURL_PREFIX="pkg:npm/" BOMLENS_NM_DIRS="$_nmdirs" node "$_jscpr" "$OUT" \
+                || log "copyright: npm pass skipped (non-fatal)"
+        fi
+        if [ -n "$_cprgo" ]; then
+            log "copyright: reading license files in the Go module cache and vendor/"
+            _cprix=$(mktemp)
+            _cprjs=$(mktemp)
+            cat > "$_cprjs" <<'GO_CPR_INDEX'
+const fs = require('fs');
+const path = require('path');
+const out = {};
+let text = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', d => { text += d; }).on('end', () => {
+  // path@version <TAB> folder, one per line, from `go list -m`. A module that is not on
+  // disk has no folder and is left out.
+  for (const line of text.split('\n')) {
+    const i = line.indexOf('\t');
+    if (i > 0 && line.slice(i + 1)) out[line.slice(0, i)] = line.slice(i + 1);
+  }
+  // A vendored project keeps the modules under vendor/ and may have no module cache.
+  try {
+    const root = fs.realpathSync('vendor');
+    for (const line of fs.readFileSync(path.join('vendor', 'modules.txt'), 'utf8').split('\n')) {
+      const m = /^# (\S+) (\S+)(?: => .*)?$/.exec(line);
+      if (!m || (m[1] + '@' + m[2]) in out) continue;
+      let dir;
+      try { dir = fs.realpathSync(path.join('vendor', m[1])); } catch (e) { continue; }
+      if (dir.startsWith(root + path.sep)) out[m[1] + '@' + m[2]] = dir;
+    }
+  } catch (e) { /* no vendor directory */ }
+  process.stdout.write(JSON.stringify(out));
+});
+GO_CPR_INDEX
+            # -e keeps a module that fails to resolve in the listing instead of stopping the
+            # whole command. A replaced module reads from its replacement's folder; when the
+            # replacement has a version, that version is a second key, because cdxgen names a
+            # component after the replacement when it falls back to reading go.mod.
+            _cprgotmpl='{{if not .Main}}{{.Path}}@{{.Version}}{{"\t"}}{{if .Replace}}{{.Replace.Dir}}{{else}}{{.Dir}}{{end}}{{if .Replace}}{{if .Replace.Version}}{{"\n"}}{{.Replace.Path}}@{{.Replace.Version}}{{"\t"}}{{.Replace.Dir}}{{end}}{{end}}{{end}}'
+            run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c 'GOFLAGS="-mod=mod" go list -m -e -f "$1" all 2>/dev/null | node "$2" > "$3"' _ "$_cprgotmpl" "$_cprjs" "$_cprix"
+            _cprrc=$?
+            if [ "$_cprrc" -eq 0 ] && [ "$(wc -c < "$_cprix" | tr -d ' ')" -gt 2 ]; then
+                BOMLENS_CPR_INDEX="$_cprix" BOMLENS_CPR_PURL_PREFIX="pkg:golang/" node "$_jscpr" "$OUT" \
+                    || log "copyright: go pass skipped (non-fatal)"
+            elif [ "$_cprrc" -eq 124 ]; then
+                _cpr_unread golang "go module listing timed out after ${PREP_TIMEOUT_DEFAULT}s; go components left as they were"
+            else
+                _cpr_unread golang "no Go module folder found (modules not downloaded and no vendor/); go components left as they were"
+            fi
+            rm -f "$_cprix" "$_cprjs"
+        fi
+        if [ -n "$_cprcargo" ]; then
+            log "copyright: reading license files in the cargo registry"
+            _cprix=$(mktemp)
+            _cprmeta=$(mktemp)
+            _cprjs=$(mktemp)
+            cat > "$_cprjs" <<'CARGO_CPR_INDEX'
+const fs = require('fs');
+const path = require('path');
+const meta = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+// The scanned project's own crates are not third-party components.
+const own = new Set(meta.workspace_members || []);
+const out = {};
+for (const k of meta.packages || []) {
+  if (!k.name || !k.version || !k.manifest_path || own.has(k.id)) continue;
+  out[k.name + '@' + k.version] = path.dirname(k.manifest_path);
+}
+process.stdout.write(JSON.stringify(out));
+CARGO_CPR_INDEX
+            # Offline on purpose: the crates are on disk only when the license pass above
+            # (or an earlier build step) downloaded them. Reaching the network here would
+            # make the result depend on the registry, which FETCH_LICENSE=false and
+            # --byte-stable rule out.
+            run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c 'cargo metadata --format-version 1 --offline > "$1" 2>/dev/null' _ "$_cprmeta"
+            _cprrc=$?
+            if [ "$_cprrc" -eq 0 ] && [ -s "$_cprmeta" ] \
+               && node "$_cprjs" "$_cprmeta" > "$_cprix" 2>/dev/null && [ -s "$_cprix" ]; then
+                BOMLENS_CPR_INDEX="$_cprix" BOMLENS_CPR_PURL_PREFIX="pkg:cargo/" node "$_jscpr" "$OUT" \
+                    || log "copyright: cargo pass skipped (non-fatal)"
+            elif [ "$_cprrc" -eq 124 ]; then
+                _cpr_unread cargo "cargo metadata timed out after ${PREP_TIMEOUT_DEFAULT}s; cargo components left as they were"
+            else
+                _cpr_unread cargo "crate sources are not on disk (cargo metadata --offline failed); cargo components left as they were"
+            fi
+            rm -f "$_cprix" "$_cprmeta" "$_cprjs"
+        fi
+        rm -f "$_jscpr"
+    fi
 fi
 
 # Record what the non-shipped exclusion left out: the patterns in

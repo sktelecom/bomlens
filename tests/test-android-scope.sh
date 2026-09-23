@@ -56,17 +56,26 @@ TOOLCHAIN='utp|grpc|netty|ddmlib|net[.]java[.]dev[.]jna|com[.]android[.]tools|te
 
 # Run build-prep in the android image exactly as generate_sbom_cdxgen does, and
 # echo the produced BOM path (empty on failure). $1 = extra `docker run` env args.
+#
+# build-prep.sh is run by path (bind-mounted), not dumped into `sh -c`: past
+# the kernel's single-argument limit (MAX_ARG_STRLEN, 128KiB on Linux), a
+# `-c "$(cat build-prep.sh)"` invocation fails with "argument list too long".
+# generate_sbom_cdxgen hits the same limit against a real sibling container
+# and works around it by writing the script into the guard-state mount both
+# sides share; a plain bind mount does the same job here more simply, since
+# this test talks to the image directly instead of through a sibling.
 run_scan() {
     local tag="$1" extra="$2" src="$WORK/src-$1"
     rm -rf "$src"; cp -R "$FIXTURE" "$src"
     # shellcheck disable=SC2086
     docker run --rm -u 0:0 \
         -v "$src":/app -v "$WORK/gcache":/root/.gradle \
+        -v "$PREP":/tmp/build-prep.sh:ro \
         -e HOME=/tmp/sbomhome \
         -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
         $extra \
         --entrypoint sh "$IMG" \
-        -c "$(cat "$PREP")" _ /app "/app/bom.json" 1.6 > "$WORK/$tag.log" 2>&1
+        /tmp/build-prep.sh /app "/app/bom.json" 1.6 > "$WORK/$tag.log" 2>&1
     [ -f "$src/bom.json" ] && echo "$src/bom.json"
 }
 

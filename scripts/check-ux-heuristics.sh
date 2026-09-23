@@ -76,6 +76,7 @@ declare -a CONCEPTS=(
   "Docker install:[Dd]ocker"
   "Docker engine:엔진|engine|running|info"
   "Scanner image:이미지|image"
+  "Engine memory:MemTotal"
   "UI port:포트|port|UI_PORT"
 )
 for f in scripts/check-setup.sh scripts/check-setup.bat; do
@@ -89,6 +90,41 @@ for f in scripts/check-setup.sh scripts/check-setup.bat; do
     fi
   done
 done
+
+# The message keys (M_...) are shared: the same set in both scripts, each defined
+# once per language, so a message added to one platform cannot be forgotten on the
+# other. Only keys that belong to one platform's mechanics are exempt
+# (M_PRESS is the .bat's "press any key" line before its window closes).
+echo "2b) Setup-check messages (same keys, both languages)"
+PLATFORM_ONLY_KEYS=" M_PRESS "
+sh_defs="$(grep -oE '^[[:space:]]+M_[A-Z0-9_]+=' scripts/check-setup.sh | tr -d ' \t=' | sort)"
+bat_defs="$(grep -oE '^[[:space:]]*set "M_[A-Z0-9_]+=' scripts/check-setup.bat | sed -E 's/^[[:space:]]*set "//; s/=$//' | sort)"
+for name in sh bat; do
+  defs_var="${name}_defs"; defs="${!defs_var}"
+  dup_ok=1
+  while IFS= read -r key; do
+    [ -n "$key" ] || continue
+    cnt="$(printf '%s\n' "$defs" | grep -cx "$key")"
+    [ "$cnt" -eq 2 ] || { note_fail "check-setup.$name defines $key $cnt time(s), expected once per language (2)"; dup_ok=0; }
+  done <<EOF2
+$(printf '%s\n' "$defs" | sort -u)
+EOF2
+  [ "$dup_ok" -eq 1 ] && note_ok "check-setup.$name defines every message in both languages"
+done
+sh_keys="$(printf '%s\n' "$sh_defs" | sort -u)"
+bat_keys="$(printf '%s\n' "$bat_defs" | sort -u)"
+only_sh=""; only_bat=""
+for k in $sh_keys; do
+  printf '%s\n' "$bat_keys" | grep -qx "$k" || case "$PLATFORM_ONLY_KEYS" in *" $k "*) ;; *) only_sh="$only_sh $k" ;; esac
+done
+for k in $bat_keys; do
+  printf '%s\n' "$sh_keys" | grep -qx "$k" || case "$PLATFORM_ONLY_KEYS" in *" $k "*) ;; *) only_bat="$only_bat $k" ;; esac
+done
+if [ -z "$only_sh$only_bat" ]; then
+  note_ok "check-setup.sh and check-setup.bat carry the same $(printf '%s\n' "$sh_keys" | grep -c .) messages"
+else
+  note_fail "message keys differ between check-setup scripts: only in .sh:${only_sh:- (none)}; only in .bat:${only_bat:- (none)}"
+fi
 
 # ----------------------------------------------------------------------------
 # 3) Flag docs. Every option the argument parser handles must appear in the

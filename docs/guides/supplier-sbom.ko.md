@@ -9,15 +9,15 @@ description: 외부에서 받은 SBOM(CycloneDX/SPDX)이 요구사항을 충족�
 
 ## 언제 쓰나
 
-협력사나 다른 팀이 소스 대신 SBOM 파일을 전달했고, 그 SBOM이 품질 기준을 갖췄는지 확인한 뒤 라이선스와 취약점을 점검해야 할 때 씁니다. 입력은 CycloneDX와 SPDX(JSON, Tag-Value) 모두 가능하며, 내부에서 CycloneDX로 변환해 분석합니다.
+협력사나 다른 팀이 소스 대신 SBOM 파일을 전달했고, 그 SBOM이 품질 기준을 갖췄는지 확인한 뒤 라이선스와 취약점을 점검해야 할 때 씁니다. 입력은 CycloneDX(JSON, XML)와 SPDX(JSON, Tag-Value) 모두 가능하며, 내부에서 CycloneDX로 변환해 분석합니다. SPDX RDF/XML은 아직 지원하지 않습니다.
 
 검증 기준은 SBOM이 의존성 점검에 쓸 만한 품질을 갖췄는지를 보는 항목들입니다. 조직마다 요구사항이 다를 수 있으니, 참고 사례로 SK텔레콤 [공급망 보안 가이드](https://sktelecom.github.io/guide/supply-chain/for-suppliers/)의 [SBOM 요구사항](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/)을 둘 수 있습니다.
 
 | 구분 | 기준 |
 |------|------|
-| 포맷 | CycloneDX v1.3~1.6 또는 SPDX v2.2~2.3 |
+| 포맷 | CycloneDX v1.3~1.7 또는 SPDX v2.2~2.3 |
 | 필수 메타데이터 | timestamp, 생성 도구 정보, 최상위 컴포넌트 이름과 버전 |
-| 필수 컴포넌트 필드 | name, version, 표준 `pkg:type/name@version` 형식의 PURL(`pkg:generic` 금지) |
+| 필수 컴포넌트 필드 | name, version, 표준 `pkg:type/name@version` 형식의 PURL. 타입이 요구하는 네임스페이스 포함(`pkg:maven/<groupId>/<artifactId>`, `pkg:rpm/<배포판>/<이름>`), purl-spec에 정의된 타입 사용, `pkg:generic` 금지 |
 | 완전성 | 직접 의존성과 추이적(transitive) 의존성 모두 포함 |
 | 권장 | supplier, 라이선스(SPDX ID), hash |
 
@@ -70,14 +70,17 @@ Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 
 
 적합성 보고서는 받은 SBOM이 품질 기준을 갖췄는지 항목별로 점검한 결과입니다. 검증은 변환 전 원본을 기준으로 하므로, SPDX를 넣어도 원본 SPDX의 필드를 그대로 확인합니다.
 
-- 필수 항목이 하나라도 미달이면 `fail`입니다. 필수 항목은 [언제 쓰나](#언제-쓰나)의 기준 표와 같습니다 — 스펙 버전 범위(CycloneDX v1.3~1.6, SPDX v2.2~2.3), timestamp, 도구 정보, 최상위 컴포넌트, name/version 커버리지, PURL 커버리지와 문법(표준 `pkg:type/name@version` 형식, `pkg:generic` 금지), 추이적 의존성. AI SBOM은 AIBOM 도구가 산출하는 CycloneDX 1.7도 허용합니다.
+- 필수 항목이 하나라도 미달이면 `fail`입니다. 필수 항목은 [언제 쓰나](#언제-쓰나)의 기준 표와 같습니다. 스펙 버전 범위(CycloneDX v1.3~1.7, SPDX v2.2~2.3), timestamp, 도구 정보, 최상위 컴포넌트, name/version 커버리지, PURL 커버리지와 문법(표준 `pkg:type/name@version` 형식, `pkg:generic` 금지), 타입이 요구하는 PURL 네임스페이스, 추이적 의존성입니다.
+- 네임스페이스 검사는 OS 패키지뿐 아니라 purl-spec이 네임스페이스를 필수로 규정한 모든 타입을 봅니다. groupId가 빠진 `pkg:maven` 식별자나 배포판을 `?distro=` 한정자로만 적은 `pkg:rpm` 식별자는 형식은 맞지만 어떤 패키지에도 연결되지 않습니다. `pkg:golang`과 `pkg:huggingface`는 네임스페이스가 없어도 올바른 식별자일 수 있어(Go 모듈 경로는 호스트 이름 하나일 수 있고, 조직 없이 공개된 모델에는 소유자 구간이 없습니다) 권고 항목으로 따로 보고합니다.
+- `--resolve-purl`을 붙이면 항목이 하나 더 붙습니다. 적합성 검사에서 네트워크를 쓰는 유일한 부분입니다. 식별자가 실제 있는 패키지를 가리키는지 각 패키지 저장소에 조회하는데, 형식 검사로는 볼 수 없는 것을 잡습니다. `pkg:maven/org.drools/org.drools.drools-core-dynamic@…`은 artifactId 안에 groupId가 한 번 더 들어갔고, `pkg:maven/The%2BApache%2BSoftware%2BFoundation/poi@…`은 groupId 자리에 회사 표시 이름이 들어갔습니다. 둘 다 형식은 맞지만 저장소에는 없습니다. 이 항목은 권고이며 판정을 바꾸지 않습니다. 사내 저장소에만 올린 패키지도 같은 결과가 나오기 때문입니다. 사내 네임스페이스는 `PURL_RESOLVE_IGNORE`로 제외하세요. 버전이 아니라 좌표만 확인합니다. 벤더가 다시 빌드한 버전은 정상이면서도 공개 저장소에 없기 때문입니다.
+- PURL 타입은 purl-spec에 정의된 타입인지 확인합니다. 표시용 이름에서 식별자를 되돌려 만드는 생성 도구는 규격에 없는 타입을 만들어 내기도 하는데(`pkg:applications/java@11.0.25`), 다른 검사 항목으로는 드러나지 않습니다. 기본 기준에서는 경고, `skt-submission`에서는 실패로 다룹니다. 타입 목록은 `docker/lib/purl-types.json`에 있습니다.
 - 권장 항목이 미달이면 `warn`이며, `fail`로 보지는 않습니다. 라이선스와 hash 커버리지 외에, 규제 기준선이 요구하는 컴포넌트별 권고 필드도 여기에 포함됩니다 — SHA-512 체크섬 커버리지, 컴포넌트 작성 주체, 컴포넌트 파일명, 소스·배포 URI, 전달 파일 속성(스캔으로 확인할 수 없으면 검토 필요로 표시), 그리고 아래에서 설명하는 파일 구성요소 식별자 포함률.
 - name/version과 PURL 커버리지는 패키지 구성요소만을 대상으로 잽니다. 바이너리와 펌웨어 SBOM은 전달된 파일도 파일 구성요소로 함께 싣는데, 디스크 위의 파일에는 패키지 버전도 PURL 타입도 없습니다. 이런 파일을 분모에 넣으면 존재할 수 없는 필드를 두고 미달 판정을 내리게 됩니다. 그렇다고 파일을 식별에서 면제하지는 않고, 파일이 실제로 지니는 식별자인 해시를 파일 구성요소 식별자 검사가 확인합니다. 패키지 없이 파일만 실린 SBOM은 `fail`입니다. 취약점 매칭이 패키지 식별자를 키로 삼기 때문에 파일 목록만으로는 아무것도 답할 수 없습니다.
 - 2026년 최소 요소 중에는 필드가 비어 있을 때 그 이유를 밝히라는 항목이 있습니다. 값을 확인하지 못한 것인지, 알면서 공개하지 않은 것인지를 구분하라는 요구입니다. BomLens가 생성한 SBOM은 문서 전체에 대해 그 진술을 담습니다. 스캔은 확인하지 못하는 경우만 만들기 때문입니다. 받은 SBOM이 자기 공백에 대해 아무 말도 하지 않으면 이 항목은 공백으로 보고됩니다.
 - HTML 보고서 상단 카드에 적합/부적합과 누락 목록이 표시됩니다.
 - 규제 기준선과 대응되는 검사에는 행 아래에 참고 규정이 붙고, 크로스워크 절이 프레임워크별 충족 현황을 집계합니다 — BSI TR-03183-2(EU 사이버복원력법을 위한 독일 기술지침)와 미국 SBOM 최소 요소(2026년판)입니다. 크로스워크는 참고 자료이며 준수 판정을 하지 않습니다. 동작 방식은 [AI 모델 SBOM 가이드](ai-model.ko.md#규제-크로스워크)에서 설명합니다.
 
-`fail`이 나오면 SBOM을 보낸 쪽에 어떤 필드가 빠졌는지 알려 보완을 요청합니다. 가장 흔한 미충족 항목은 PURL 누락, `pkg:generic` 사용, 추이적 의존성 누락(직접 의존성만 포함)입니다.
+`fail`이 나오면 SBOM을 보낸 쪽에 어떤 필드가 빠졌는지 알려 보완을 요청합니다. 가장 흔한 미충족 항목은 PURL 누락, `pkg:generic` 사용, 패키지 매니저가 아니라 컴포넌트 표시 이름에서 만들어 네임스페이스가 빠진 PURL, 추이적 의존성 누락(직접 의존성만 포함)입니다.
 
 ## 위험분석보고서 읽기
 
@@ -90,7 +93,7 @@ Java(Maven) 비중이 큰 SBOM이라면 스캔 옵션에서 **심층 CVE 매칭 
 
 ## SPDX 입력
 
-SPDX(JSON, Tag-Value)를 넣으면 내부에서 `syft convert`로 CycloneDX로 바꾼 뒤 동일한 파이프라인으로 분석합니다. 적합성 검증은 변환 전 SPDX 원본을 기준으로 합니다. 변환 과정에서 timestamp나 도구, 추이적 의존성 같은 메타데이터가 정규화되거나 사라질 수 있기 때문입니다. SPDX의 라이선스 표현 일부는 CycloneDX로 옮기면서 단순화될 수 있습니다.
+CycloneDX XML 문서는 검증 전에 CycloneDX JSON으로 다시 쓰며, 컴포넌트 해시와 루트 컴포넌트, 루트에서 이어지는 의존성 연결은 그대로 보존합니다. services, vulnerabilities, pedigree, evidence 절은 옮기지 않으며 건너뛴 절은 스캔 로그에 이름이 남습니다. DTD나 엔티티를 선언한 문서는 거부합니다. SPDX(JSON, Tag-Value)를 넣으면 내부에서 `syft convert`로 CycloneDX로 바꾼 뒤 동일한 파이프라인으로 분석합니다. 적합성 검증은 변환 전 SPDX 원본을 기준으로 합니다. 변환 과정에서 timestamp나 도구, 추이적 의존성 같은 메타데이터가 정규화되거나 사라질 수 있기 때문입니다. SPDX의 라이선스 표현 일부는 CycloneDX로 옮기면서 단순화될 수 있습니다.
 
 ## Yocto 이미지
 

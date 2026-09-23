@@ -1,6 +1,6 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-09-14T00:44:06Z
-Total components: 64 · Distinct licenses: 11
+Generated: 2026-09-15T12:44:32Z
+Total components: 64 · Distinct licenses: 10
 
 This product includes the following open source software.
 Each component lists its source/download location and copyright/attribution.
@@ -226,7 +226,10 @@ Components (2):
       Copyright: holders not captured in SBOM — see source (https://github.com/hibernate/hibernate-orm)
 
 License: MIT
-Components (1):
+Components (2):
+  - jul-to-slf4j@2.0.9
+      Source: https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/
+      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/)
   - slf4j-api@2.0.2
       Source: https://github.com/qos-ch/slf4j
       Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/slf4j)
@@ -236,12 +239,6 @@ Components (1):
   - h2@2.2.224
       Source: https://github.com/h2database/h2database
       Copyright: holders not captured in SBOM — see source (https://github.com/h2database/h2database)
-
-License: NOASSERTION
-Components (1):
-  - jul-to-slf4j@2.0.9
-      Source: https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/)
 
 ================================================================================
 License texts (SPDX standard)

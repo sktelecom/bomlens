@@ -1,0 +1,18 @@
+# name	ecosystem	repository	tag	commit	lockfile
+axios	nodejs	https://github.com/axios/axios.git	v1.20.0	84a9f3b9a4f3244b8c8e818f557d64c7b964fb25	yes
+uuid	nodejs	https://github.com/uuidjs/uuid.git	v14.0.2	fd59f0277549d22cc7ec00a7b3b5c9bccb4d3c1d	yes
+express	nodejs	https://github.com/expressjs/express.git	v5.2.1	dbac741a49a5a64336b70c06e85c2e2706e36336	no
+click	python	https://github.com/pallets/click.git	8.5.0	8b19813f2bfca99f1018a587a8cf54fc959f2e5d	yes
+requests	python	https://github.com/psf/requests.git	v2.34.2	6e83187b8feb273ed4c6cdab5efd8d54901dfab3	no
+cobra	go	https://github.com/spf13/cobra.git	v1.10.2	88b30ab89da2d0d0abb153818746c5a2d30eccec	yes
+logrus	go	https://github.com/sirupsen/logrus.git	v1.10.2	6d6a132bc03324d4ceb78e1b927f995d014cda20	yes
+ripgrep	rust	https://github.com/BurntSushi/ripgrep.git	15.2.0	e89fff89ac9af12e8d4ce9d5fd07beb408ca730f	yes
+fd	rust	https://github.com/sharkdp/fd.git	v10.5.0	4f81778774463bf414a184cbe6d5219ad2229646	yes
+fastlane	ruby	https://github.com/fastlane/fastlane.git	2.240.1	1b9d750f2605380c3928647d97ddcaae77b06531	yes
+jekyll	ruby	https://github.com/jekyll/jekyll.git	v4.4.1	1f319fb273b6cdf876bc6edd38d7477935cdda8c	no
+guzzle	php	https://github.com/guzzle/guzzle.git	8.2.0	93939470950a9b11e2e84204166ef5e048c55fe4	no
+monolog	php	https://github.com/Seldaek/monolog.git	3.12.0	72c534fc0ab181ef52d92a68382318631e301608	no
+morelinq	dotnet	https://github.com/morelinq/MoreLINQ.git	v4.4.0	6d97c3b1d482f98300f4446df14742b0e3fafbec	no
+fluentvalidation	dotnet	https://github.com/FluentValidation/FluentValidation.git	12.1.0	b960f42b6065d1aeecddb0c747e532b1842a96ef	no
+gson	java-maven	https://github.com/google/gson.git	gson-parent-2.14.0	3ff35d6269894901ab8006258395aafc4b9765cd	no
+commons-lang	java-maven	https://github.com/apache/commons-lang.git	rel/commons-lang-3.20.0	598dfc163b8b410fb3bb8794521206ec8dcec82a	no

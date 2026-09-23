@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.74.0"
   },
-  "ReportID": "01a09d5f-1f75-73ab-994f-346dadb8cafb",
-  "CreatedAt": "2026-09-14T00:44:12.021242928Z",
+  "ReportID": "01a0a519-0dce-78d0-adfd-ac3cd2c1cdc5",
+  "CreatedAt": "2026-09-15T12:44:37.710579602Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -539,10 +539,13 @@
           "Name": "org.slf4j:jul-to-slf4j",
           "Identifier": {
             "PURL": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar",
-            "UID": "a756ae4d263ee1d8",
+            "UID": "1ef27ba9857d663",
             "BOMRef": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar"
           },
-          "Version": "2.0.9"
+          "Version": "2.0.9",
+          "Licenses": [
+            "MIT"
+          ]
         },
         {
           "ID": "org.slf4j:slf4j-api:2.0.2",
@@ -1545,6 +1548,7 @@
           },
           "References": [
             "https://access.redhat.com/errata/RHSA-2026:40895",
+            "https://access.redhat.com/errata/RHSA-2026:43400",
             "https://access.redhat.com/security/cve/CVE-2026-54512",
             "https://bugzilla.redhat.com/2492010",
             "https://bugzilla.redhat.com/2492015",
@@ -1553,7 +1557,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
-            "https://errata.almalinux.org/9/ALSA-2026-40895.html",
+            "https://errata.almalinux.org/10/ALSA-2026-43400.html",
             "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/434d6c511de7fdd9872f29157aafb6162d12d8d5",
@@ -1646,7 +1650,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54512",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-54513",
-            "https://errata.almalinux.org/9/ALSA-2026-40895.html",
+            "https://errata.almalinux.org/10/ALSA-2026-43400.html",
             "https://errata.rockylinux.org/RLSA-2026:40895",
             "https://github.com/FasterXML/jackson-databind",
             "https://github.com/FasterXML/jackson-databind/commit/01d1692c8d0ed03e51a0e3c4f8a9e6908e4931e5",
@@ -1662,7 +1666,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-09-11T13:18:15.873Z"
+          "LastModifiedDate": "2026-09-14T13:18:40.63Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54514",
@@ -2783,6 +2787,7 @@
             }
           },
           "References": [
+            "https://access.redhat.com/errata/RHSA-2025:11332",
             "https://access.redhat.com/errata/RHSA-2025:11335",
             "https://access.redhat.com/security/cve/CVE-2024-56337",
             "https://bugzilla.redhat.com/2333521",
@@ -2792,7 +2797,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
-            "https://errata.almalinux.org/9/ALSA-2025-11335.html",
+            "https://errata.almalinux.org/10/ALSA-2025-11332.html",
             "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://linux.oracle.com/cve/CVE-2024-56337.html",
@@ -2869,6 +2874,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/06/16/1",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-48988",
             "https://bugzilla.redhat.com/2373015",
@@ -2893,7 +2899,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2b0ab14fb55d4edc896e5f1817f2ab76f714ae5e",
@@ -2970,6 +2976,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/08/13/2",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-48989",
             "https://bugzilla.redhat.com/2373015",
@@ -2995,7 +3002,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/73c04a10395774bda71a0b37802cf983662ce255",
@@ -3075,6 +3082,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/07/10/12",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-52520",
             "https://bugzilla.redhat.com/2373015",
@@ -3099,7 +3107,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/927d66fbc294cb65242102b817a45fd80834e040",
@@ -3174,6 +3182,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/07/10/13",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-53506",
             "https://bugzilla.redhat.com/2373015",
@@ -3198,7 +3207,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/2aa6261276ebe50b99276953591e3a2be7898bdb",
@@ -3275,6 +3284,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/10/27/4",
             "https://access.redhat.com/errata/RHSA-2025:23049",
+            "https://access.redhat.com/errata/RHSA-2025:23052",
             "https://access.redhat.com/security/cve/CVE-2025-55752",
             "https://bugzilla.redhat.com/2362782",
             "https://bugzilla.redhat.com/2406591",
@@ -3284,7 +3294,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
-            "https://errata.almalinux.org/9/ALSA-2025-23049.html",
+            "https://errata.almalinux.org/10/ALSA-2025-23052.html",
             "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/130d36d8492ef9e4eb22952c17c92423cb35fd06",
@@ -3376,11 +3386,12 @@
             "https://access.redhat.com/errata/RHSA-2026:6569",
             "https://access.redhat.com/errata/RHSA-2026:8334",
             "https://access.redhat.com/security/cve/CVE-2026-24734",
-            "https://bugzilla.redhat.com/2440426",
+            "https://bugzilla.redhat.com/2457020",
+            "https://bugzilla.redhat.com/2457027",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2440426",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2026-24734",
-            "https://errata.almalinux.org/9/ALSA-2026-26323.html",
+            "https://errata.almalinux.org/10/ALSA-2026-36790.html",
             "https://errata.rockylinux.org/RLSA-2026:26323",
             "https://github.com/apache/tomcat",
             "https://linux.oracle.com/cve/CVE-2026-24734.html",
@@ -4054,6 +4065,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/04/28/2",
+            "https://access.redhat.com/errata/RHSA-2025:11332",
             "https://access.redhat.com/errata/RHSA-2025:11335",
             "https://access.redhat.com/security/cve/CVE-2025-31650",
             "https://bugzilla.redhat.com/2333521",
@@ -4063,7 +4075,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-56337",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31650",
-            "https://errata.almalinux.org/9/ALSA-2025-11335.html",
+            "https://errata.almalinux.org/10/ALSA-2025-11332.html",
             "https://errata.rockylinux.org/RLSA-2025:11335",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/1eef1dc459c45f1e421d8bd25ef340fc1cc34edc",
@@ -4204,6 +4216,7 @@
           },
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/06/16/2",
+            "https://access.redhat.com/errata/RHSA-2025:14178",
             "https://access.redhat.com/errata/RHSA-2025:14181",
             "https://access.redhat.com/security/cve/CVE-2025-49125",
             "https://bugzilla.redhat.com/2373015",
@@ -4228,7 +4241,7 @@
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52434",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-52520",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-53506",
-            "https://errata.almalinux.org/9/ALSA-2025-14181.html",
+            "https://errata.almalinux.org/10/ALSA-2025-14178.html",
             "https://errata.rockylinux.org/RLSA-2025:14181",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/7617b9c247bc77ed0444dd69adcd8aa48777886c",
@@ -4603,6 +4616,7 @@
           "References": [
             "http://www.openwall.com/lists/oss-security/2025/04/28/3",
             "https://access.redhat.com/errata/RHSA-2025:23049",
+            "https://access.redhat.com/errata/RHSA-2025:23052",
             "https://access.redhat.com/security/cve/CVE-2025-31651",
             "https://bugzilla.redhat.com/2362782",
             "https://bugzilla.redhat.com/2406591",
@@ -4611,7 +4625,7 @@
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-31651",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2025-55752",
-            "https://errata.almalinux.org/9/ALSA-2025-23049.html",
+            "https://errata.almalinux.org/10/ALSA-2025-23052.html",
             "https://errata.rockylinux.org/RLSA-2025:23049",
             "https://github.com/apache/tomcat",
             "https://github.com/apache/tomcat/commit/066bf6b6a15a4e7e0941d4acf096841165b97098",

@@ -9,15 +9,15 @@ How to validate that an SBOM (JSON) received from a supplier or another team mee
 
 ## When to use it
 
-Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets your quality criteria and then check its licenses and vulnerabilities. The input can be CycloneDX or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis.
+Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets your quality criteria and then check its licenses and vulnerabilities. The input can be CycloneDX (JSON or XML) or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis. SPDX RDF/XML is not supported yet.
 
 The criteria check whether an SBOM is good enough for dependency review. Requirements vary by organization; as one reference, see SK Telecom's [supply chain security guide](https://sktelecom.github.io/guide/supply-chain/for-suppliers/) and its [SBOM requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/).
 
 | Category | Criteria |
 |----------|----------|
-| Format | CycloneDX v1.3–1.6 or SPDX v2.2–2.3 |
+| Format | CycloneDX v1.3–1.7 or SPDX v2.2–2.3 |
 | Required metadata | timestamp, tool info, top-level component name and version |
-| Required component fields | name, version, PURL in standard `pkg:type/name@version` form (`pkg:generic` not allowed) |
+| Required component fields | name, version, PURL in standard `pkg:type/name@version` form, with the namespace the type requires (`pkg:maven/<groupId>/<artifactId>`, `pkg:rpm/<distro>/<name>`); a type purl-spec defines, and not `pkg:generic` |
 | Completeness | both direct and transitive dependencies included |
 | Recommended | supplier, license (SPDX ID), hash |
 
@@ -70,14 +70,17 @@ A self-generated scan produces the same conformance report file by default too (
 
 The conformance report is the per-item check of whether the received SBOM meets the quality criteria. Validation is based on the original input before conversion, so even for SPDX it checks the fields of the original SPDX.
 
-- If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — spec version range (CycloneDX v1.3–1.6, SPDX v2.2–2.3), timestamp, tool info, top-level component, name/version coverage, PURL coverage and syntax (standard `pkg:type/name@version` form, no `pkg:generic`), and transitive dependencies. AI SBOMs are also accepted at CycloneDX 1.7, which the AIBOM toolchain emits.
+- If any required item falls short, it is a `fail`. The required items match the criteria table in [When to use it](#when-to-use-it) — spec version range (CycloneDX v1.3–1.7, SPDX v2.2–2.3), timestamp, tool info, top-level component, name/version coverage, PURL coverage and syntax (standard `pkg:type/name@version` form, no `pkg:generic`), the PURL namespace where the type requires one, and transitive dependencies.
+- The namespace check covers every type whose namespace purl-spec marks required, not only OS packages: a `pkg:maven` identifier without its groupId, or a `pkg:rpm` identifier that carries the distribution only as a `?distro=` qualifier, is well-formed text that resolves to nothing. `pkg:golang` and `pkg:huggingface` are reported on a separate advisory row, because an identifier of either can legitimately have no namespace (a Go module path can be a bare host; a model published outside an organization has no owner segment).
+- `--resolve-purl` adds one more row, and it is the only part of the check that uses the network. It asks each package repository whether the identifiers actually name packages that exist, which catches what no format check can: `pkg:maven/org.drools/org.drools.drools-core-dynamic@…` repeats its groupId inside the artifactId, and `pkg:maven/The%2BApache%2BSoftware%2BFoundation/poi@…` carries a vendor display name where the groupId belongs. Both are well formed and both resolve to nothing. The row is advisory and never fails the SBOM: a package published only to an internal repository answers exactly the same way, so set `PURL_RESOLVE_IGNORE` to the namespaces you know are internal. The coordinate is checked, not the version, because a vendor rebuild version is legitimate and absent from the public repository.
+- The PURL type is checked against the types purl-spec defines. A generator that rebuilds identifiers from a display name can invent one (`pkg:applications/java@11.0.25`), and nothing else in the report sees it. It warns under the default profile and fails under `skt-submission`. The list of types lives in `docker/lib/purl-types.json`.
 - If a recommended item falls short, it is a `warn`, not a `fail`. Besides license and hash coverage, this includes the advisory per-component fields the regulatory baselines call for — SHA-512 checksum coverage, component creator, component filename, source/distribution URI, the delivered-file properties (marked review when no scan can see the artifact), and the file component identifier coverage described below.
 - Name/version and PURL coverage are measured over package components only. A binary or firmware SBOM also lists the delivered files as file components, and a file on disk has no package version and no PURL type to carry, so counting them would mark an SBOM short on a field that cannot exist there. Files are still expected to be identified, by the identifier they do carry: the file identifier check measures how many of them have a hash. An SBOM that lists files and no packages at all is a `fail`, because vulnerability matching keys on package identifiers and a file listing answers none of it.
 - One of the 2026 minimum elements asks the SBOM to say why a field is empty when it is empty — whether the author could not establish the value or is withholding it. An SBOM BomLens generated carries that statement for the whole document, since a scan only ever produces the first case. A received SBOM that says nothing about its absences is reported as a gap on that element.
 - The cards at the top of the HTML report show pass/fail and the list of missing items.
 - Each check that corresponds to a regulatory baseline carries the reference under its row, and a crosswalk section rolls the coverage up per framework — BSI TR-03183-2 (the German technical guideline for the EU Cyber Resilience Act) and the US SBOM minimum elements (2026). The crosswalk is reference material and makes no compliance determination; the [AI model SBOM guide](ai-model.md#regulatory-crosswalk) describes how it works.
 
-When a `fail` appears, tell whoever sent the SBOM which fields are missing and ask them to fix it. The most common unmet items are a missing PURL, use of `pkg:generic`, and missing transitive dependencies (only direct dependencies included).
+When a `fail` appears, tell whoever sent the SBOM which fields are missing and ask them to fix it. The most common unmet items are a missing PURL, use of `pkg:generic`, a PURL built from the component's display name rather than from the package manager (which loses the namespace), and missing transitive dependencies (only direct dependencies included).
 
 ## Reading the risk report
 
@@ -90,7 +93,7 @@ The risk report (`_risk-report`) is a document built by re-aggregating the outpu
 
 ## SPDX input
 
-If you supply SPDX (JSON, Tag-Value), it is converted to CycloneDX internally with `syft convert` and then analyzed through the same pipeline. Conformance validation is based on the original SPDX before conversion, because metadata such as timestamp, tools, or transitive dependencies can be normalized away during conversion. Some SPDX license expressions may be simplified when moved to CycloneDX.
+A CycloneDX XML document is rewritten as CycloneDX JSON before validation, keeping component hashes, the root component and the dependency links from it; services, vulnerabilities, pedigree and evidence sections are not carried over, and the scan log names any it skipped. A document that declares a DTD or an entity is refused. If you supply SPDX (JSON, Tag-Value), it is converted to CycloneDX internally with `syft convert` and then analyzed through the same pipeline. Conformance validation is based on the original SPDX before conversion, because metadata such as timestamp, tools, or transitive dependencies can be normalized away during conversion. Some SPDX license expressions may be simplified when moved to CycloneDX.
 
 ## Yocto images
 

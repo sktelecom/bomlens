@@ -709,9 +709,13 @@ def main():
 
     try:
         doc = load_document(src)
-    except (OSError, ValueError) as exc:
+    except OSError as exc:
         print("[yocto-spdx] cannot read %s: %s" % (src, exc), file=sys.stderr)
         return 1
+    except ValueError:
+        # Not JSON at all (CycloneDX XML, SPDX Tag-Value, UTF-16 text): this is not
+        # a Yocto document, so the generic converter gets it without a warning.
+        return 3
 
     if yocto_spdx2_index(doc):
         # The image document of a 2.2 build lists the image and nothing else; the

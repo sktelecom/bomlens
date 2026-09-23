@@ -12,6 +12,7 @@ import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
 import { ResultSection } from "./ResultSections";
+import { ReportProblem } from "./ReportProblem";
 import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
@@ -644,6 +645,17 @@ export function NextApp() {
             (status === "running" || logs.length > 0) && (
               <ProgressLog logs={logs} status={status} collapsible />
             )}
+
+          {/* A finished scan, succeeded or failed: the summary to attach to an
+              issue, shown in full before anything is copied. */}
+          {activeSection === "overview" && (
+            <ReportProblem
+              key={result.id ?? loadedIdRef.current ?? "none"}
+              scanId={result.id ?? loadedIdRef.current}
+              errorMessage={scanError}
+              defaultOpen={!result.ok}
+            />
+          )}
         </div>
       )}
 

@@ -91,6 +91,7 @@ const PERMISSIVE = new Set([
   "0BSD",
   "BSD-2-CLAUSE",
   "BSD-3-CLAUSE",
+  "BSD-3-CLAUSE-LBNL",
   "APACHE-2.0",
   "APACHE-1.1",
   "ZLIB",

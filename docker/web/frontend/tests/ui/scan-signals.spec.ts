@@ -160,6 +160,74 @@ test("an AI model scan is not warned about its empty component list", async ({ p
   await expect(page.getByTestId("zero-components")).toHaveCount(0);
 });
 
+// Firmware scope: what the unpacker could not open. The vulnerability counts
+// describe only what was opened, so the overview says how much that was.
+const FIRMWARE_PARTIAL = {
+  ...base,
+  mode: "FIRMWARE",
+  sbom: {
+    components: 1,
+    firmwareScope: {
+      unknownPercent: 25,
+      unknownBytes: 250000,
+      failedSteps: 2,
+      encryptedRegions: 1,
+      failedFormats: ["ubi"],
+      missingExtractors: ["sasquatch"],
+      namesMore: 0,
+    },
+    componentList: [
+      { name: "busybox", version: "1.36.1", group: "", purl: "pkg:generic/busybox@1.36.1", type: "library", licenses: ["GPL-2.0-only"] },
+    ],
+  },
+};
+
+const FIRMWARE_OPENED_FULLY = {
+  ...FIRMWARE_PARTIAL,
+  sbom: { ...FIRMWARE_PARTIAL.sbom, firmwareScope: null },
+};
+
+test("a firmware scan that could not open part of the image says how much", async ({ page }) => {
+  await stub(page, { firmware: true, scanoss: false, docker: true }, FIRMWARE_PARTIAL);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  const note = page.getByTestId("firmware-scope");
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("25%");
+  await expect(note).toContainText("ubi");
+  await expect(note).toContainText("sasquatch");
+  // It states scope; it must not read as a failed scan.
+  await expect(note).not.toContainText(/fail(ed|ure)\b/i);
+});
+
+// A submitted SBOM is the supplier's data. Its firmware properties are not this
+// scan's statement about its own coverage, so the note stays away from it: the
+// run keeps the submitted document as _input.json, which is what marks it.
+test("a submitted SBOM never gets the firmware scope note", async ({ page }) => {
+  const submitted = {
+    ...FIRMWARE_PARTIAL,
+    mode: "ANALYZE",
+    results: [
+      ...(FIRMWARE_PARTIAL as { results?: unknown[] }).results ?? [],
+      { name: "supplier_1.0_input.json", size: 100 },
+    ],
+  };
+  await stub(page, { firmware: true, scanoss: false, docker: true }, submitted);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  await expect(page.getByTestId("firmware-scope")).toHaveCount(0);
+});
+
+test("a firmware scan that opened everything shows no scope note", async ({ page }) => {
+  await stub(page, { firmware: true, scanoss: false, docker: true }, FIRMWARE_OPENED_FULLY);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  await expect(page.getByTestId("firmware-scope")).toHaveCount(0);
+});
+
 // 20-b: versions the resolver chose, not versions anyone installed. Measured on
 // a real repository: 113 components all resolved to the newest release, and the
 // 3 vulnerabilities found were measured against those, not against whatever an

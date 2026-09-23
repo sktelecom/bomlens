@@ -110,6 +110,19 @@
         color: var(--feedback);
         visibility: hidden;
       }
+      /* 보조 링크: 메뉴바가 숨겨진 OS에서도 신고 양식에 닿는 길. */
+      #report {
+        position: fixed;
+        left: 0;
+        bottom: 30px;
+        margin: 0;
+        padding: 0 32px;
+        font-size: 11.5px;
+        color: var(--dim);
+      }
+      #report:hover {
+        color: var(--fg);
+      }
       #version {
         position: fixed;
         left: 0;
@@ -157,6 +170,7 @@
       <button id="open-logs" type="button"></button>
       <p id="feedback" role="status"></p>
     </main>
+    <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
     <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
@@ -204,6 +218,7 @@
             darwin: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. macOS에서 쓸 수 있는 옵션:",
             linux: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Linux에서는 Docker Engine을 설치하면 됩니다:",
           },
+          report: "문제 신고",
           hint: "설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
           checkAgain: "다시 확인",
           openLogs: "로그 폴더 열기",
@@ -226,6 +241,7 @@
             darwin: "BomLens runs the scanner as a Docker container. Options on macOS:",
             linux: "BomLens runs the scanner as a Docker container. On Linux, install Docker Engine:",
           },
+          report: "Report a problem",
           hint: "Install it, start the engine, then relaunch this app.",
           checkAgain: "Check again",
           openLogs: "Open log folder",
@@ -310,6 +326,7 @@
       };
 
       const s = STR[lang];
+      document.getElementById("report").textContent = s.report;
 
       document.getElementById("title").textContent =
         reason === "not-running" ? s.titleNotRunning : reason === "wsl2-only" ? s.titleWsl2Only : s.title;

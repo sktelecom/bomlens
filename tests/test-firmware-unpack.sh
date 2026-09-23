@@ -2254,6 +2254,56 @@ else
     fail "the SBOM signal is not written after the SBOM" "write=$write_line mark=$mark_line"
 fi
 
+echo "== analysis scope: totals from the unpacker's own report =="
+# Totals come from unblob --report. Everything called "unrecognized" is measured at
+# the top level against the input file, so one sentence never mixes bases: the
+# fixture has 250000 of 1000000 bytes outside any recognized region (25%), plus
+# one nested unrecognized region that is counted apart. Two steps did not
+# complete (an extractor that ran and failed, and one whose dependency is
+# missing), and one region is encrypted.
+SUMJQ="$ROOT_DIR/docker/lib/summarize-unblob-report.jq"
+sum=$(jq -c -f "$SUMJQ" "$FIX/unblob-report-partial.json" 2>/dev/null)
+chk() { [ "$(printf '%s' "$sum" | jq -c "$1")" = "$2" ] && pass "$3" || fail "$3" "$1 -> $(printf '%s' "$sum" | jq -c "$1")"; }
+chk '.unknown_top_percent' 25 "top-level unrecognized share is measured against the input file"
+chk '.unknown_bytes' 250000 "unrecognized bytes are the top-level bytes outside any recognized region"
+chk '.unknown_chunks' 2 "unrecognized regions are counted at the top level"
+chk '.nested_unknown_chunks' 1 "a nested unrecognized region is counted apart"
+chk '.encrypted_chunks' 1 "encrypted regions are counted"
+chk '.extract_failed' 2 "a failed extractor and a missing dependency each count as a step that did not complete"
+chk '.extract_failed_formats' '["squashfs_v4_le","ubi"]' "the formats whose extraction did not complete are named"
+chk '.missing_extractors' '["sasquatch"]' "a missing extractor dependency is named"
+# The input size must not depend on where the root task sits in the array.
+rev=$(jq -c 'reverse' "$FIX/unblob-report-partial.json" | jq -c -f "$SUMJQ" | jq -c '[.input_bytes,.unknown_top_percent]')
+[ "$rev" = "[1000000,25]" ] && pass "a reordered report gives the same input size and share" || fail "reordered report" "$rev"
+# A sliver of unrecognized bytes rounds up, so it never reads as "0%" beside a
+# nonzero byte count.
+tiny=$(jq -c -f "$SUMJQ" <<'EOF2'
+[{"task":{"path":"/w/a","depth":0},"reports":[{"path":"/w/a","size":16777216,"__typename__":"StatReport"},
+  {"id":"1:1","handler_name":"tar","start_offset":0,"end_offset":16772216,"size":16772216,"is_encrypted":false,"extraction_reports":[],"__typename__":"ChunkReport"}]}]
+EOF2
+)
+[ "$(printf '%s' "$tiny" | jq -c '[.unknown_bytes,.unknown_top_percent]')" = "[5000,0.1]" ] \
+    && pass "a few unrecognized bytes show as 0.1%, not 0%" || fail "tiny unrecognized share" "$tiny"
+# An image no handler recognized has no unrecognized-region record to count, yet
+# all of it is unrecognized: the share comes from what was covered, not from a
+# count of unknown records.
+none=$(jq -c -f "$SUMJQ" <<'EOF2'
+[{"task":{"path":"/w/a","depth":0},"reports":[{"path":"/w/a","size":5000,"__typename__":"StatReport"}]}]
+EOF2
+)
+[ "$(printf '%s' "$none" | jq -c '[.unknown_bytes,.unknown_top_percent,.unknown_chunks]')" = "[5000,100,0]" ] \
+    && pass "an image nothing recognized is 100% unrecognized" || fail "unrecognized-only image" "$none"
+# A report with nothing wrong reports zero, not absence.
+clean=$(jq -c -f "$SUMJQ" <<'EOF2'
+[{"task":{"path":"/w/a","depth":0},"reports":[{"path":"/w/a","size":100,"__typename__":"StatReport"},
+  {"id":"1:1","handler_name":"tar","start_offset":0,"end_offset":100,"size":100,"is_encrypted":false,"extraction_reports":[],"__typename__":"ChunkReport"}]}]
+EOF2
+)
+[ "$(printf '%s' "$clean" | jq -c '[.unknown_chunks,.extract_failed,.unknown_top_percent]')" = "[0,0,0]" ] \
+    && pass "a fully recognized image summarizes to zeros" || fail "clean report summary" "$clean"
+grep -q 'unblob-summary.json' "$SCRIPT" && grep -q -- '--report "\$UNBLOB_REPORT"' "$SCRIPT" \
+    && pass "the scan asks unblob for its report and reads the summary" || fail "scan-firmware.sh does not request --report"
+
 echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]

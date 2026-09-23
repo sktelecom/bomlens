@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-09-14T00:44:39Z",
+  "generatedAt": "2026-09-15T12:45:04Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-09-14T00:44:36+00:00",
+      "detail": "2026-09-15T12:45:01+00:00",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-09-14T00:44:36+00:00"
+      "detail_ko": "2026-09-15T12:45:01+00:00"
     },
     {
       "id": "tools",
@@ -179,7 +179,7 @@
       "source": "auto",
       "naKind": "",
       "status": "pass",
-      "detail": "2 edge(s)",
+      "detail": "2 edge(s), graph completeness unknown (no positive evidence found, not a defect)",
       "missing": [],
       "regulations": [
         {
@@ -191,7 +191,7 @@
         }
       ],
       "label_ko": "전이 의존성 (의존 그래프)",
-      "detail_ko": "의존 관계 2개"
+      "detail_ko": "2 edge(s), graph completeness unknown (no positive evidence found, not a defect)"
     },
     {
       "id": "license",
@@ -2105,6 +2105,8 @@
       "detail_ko": "사람 검토 필요 (자동 확인 불가)"
     }
   ],
+  "pipelineStepsFailed": [],
+  "pipelineStepsFailedMore": 0,
   "regulatoryCrosswalk": {
     "disclaimer": "BomLens does not certify or determine compliance with the EU AI Act, the Korean AI Framework Act, the EU Cyber Resilience Act, or any other regulation. This crosswalk covers only the documentation elements an SBOM can carry; obligations that an SBOM cannot express — bias and fairness assessment, risk management, human oversight — are out of its scope and must be met through separate documents. It makes documentation gaps visible so a person can prepare; interpreting it against a specific product's legal obligations is a person's job.",
     "frameworks": [
@@ -2487,7 +2489,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-09-14T00:44:36+00:00",
+            "detail": "2026-09-15T12:45:01+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -2537,7 +2539,7 @@
             "label": "Transitive dependencies (graph edges)",
             "status": "pass",
             "source": "auto",
-            "detail": "2 edge(s)",
+            "detail": "2 edge(s), graph completeness unknown (no positive evidence found, not a defect)",
             "refs": [
               "Section 5.1; 5.2.2"
             ]

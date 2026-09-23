@@ -160,7 +160,7 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 
 | Tool | Pinned version (ARG) | Purpose | License (SPDX) | Copyleft | Source |
 |------|----------------------|---------|----------------|----------|--------|
-| grype | v0.112.0 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
+| grype | v0.119.0 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
 

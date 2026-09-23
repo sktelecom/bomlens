@@ -18,7 +18,7 @@ Many questions are answered there, including the Windows and web UI flows.
 | Report a security vulnerability | See [SECURITY.md](SECURITY.md) — please do **not** open a public issue |
 | Contribute a change | See [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-When filing a bug, the issue templates ask for your OS, Docker engine, the command you ran, and the output. Including those helps us reproduce and fix it faster.
+When filing a bug, the issue form requires how you ran BomLens, the command, the scan mode, the container engine, the scanner image tag, and your OS. In the web UI and the desktop app, the result screen has a "Report a problem" panel that shows a diagnostics summary to paste into the form; nothing is sent until you paste it yourself.
 
 ## Response expectations
 

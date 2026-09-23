@@ -148,6 +148,17 @@
     "unpinnedTitle": "Versions were resolved at scan time",
     "unpinnedBody": "This project states version ranges and ships no lock file, so the versions listed here are what a fresh install would fetch today — not necessarily what is installed on your machine. The vulnerability result was measured against these versions. To see the risk in your own environment, scan a manifest that pins exact versions.",
     "scanWarningsTitle": "The scan reported these while it ran",
+    "firmwareScopeTitle": "Firmware analysis scope",
+    "firmwareScopeUnknown": "{{percent}}% of the image ({{bytes}} bytes) was not recognized as a known format.",
+    "firmwareScopeFailed_one": "{{count}} extraction step did not complete.",
+    "firmwareScopeFailed_other": "{{count}} extraction steps did not complete.",
+    "firmwareScopeEncrypted_one": "{{count}} region is encrypted.",
+    "firmwareScopeEncrypted_other": "{{count}} regions are encrypted.",
+    "firmwareScopeMissing": "Extraction tools the scanner image does not include: {{tools}}.",
+    "firmwareScopeBody": "Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts describe only what could be opened.",
+    "firmwareScopeFormats": "Formats: {{formats}}.",
+    "firmwareScopeMore_one": "{{count}} more name is not listed.",
+    "firmwareScopeMore_other": "{{count}} more names are not listed.",
     "sbomDegradedTitle": "Direct dependencies only — deep resolution didn't run",
     "sbomDegradedBody": "The transitive-dependency analyzer (cdxgen) couldn't run, so this SBOM lists only direct dependencies. Make sure Docker is available and re-scan for the full dependency graph.",
     "sbomDegradedDisk": "The transitive-dependency analyzer (cdxgen) ran out of Docker disk space, so this SBOM lists only direct dependencies. Free space (e.g. \"docker system prune\") and re-scan for the full dependency graph.",
@@ -203,6 +214,10 @@
       "aiProfile": {
         "title": "AI compliance profile",
         "desc": "The G7 minimum elements, licenses needing review and regulatory crosswalk, gathered for this model."
+      },
+      "vex": {
+        "title": "CVE judgements",
+        "desc": "Your own affected / not affected / fixed / under investigation calls, the CycloneDX VEX file exported from them, and any supplier VEX you imported."
       },
       "security": {
         "title": "Security report",
@@ -299,6 +314,23 @@
     "vexSaving": "Saving…",
     "vexSaved": "Judgement saved",
     "vexSaveFailed": "Could not save the judgement",
+    "vexExport": "Export VEX",
+    "vexExporting": "Building VEX…",
+    "vexExportFailed": "Could not export the judgements as VEX. The components you judged may not be in the SBOM",
+    "vexExportPartial": "{{skipped}} judgement(s) left out of the VEX: their component is not in the SBOM",
+    "vexImport": "Import VEX",
+    "vexImporting": "Reading VEX…",
+    "vexImported": "Imported {{imported}} statement(s); {{unmatched}} did not match a component in the SBOM",
+    "vexImportMismatch": "Not imported: this VEX describes {{vex}}, but the scan is {{scan}}",
+    "vexImportNoMatch": "Not imported: no statement in this VEX applies to a component of this SBOM",
+    "vexImportInvalid": "Not imported: the file is not a CycloneDX VEX document",
+    "vexImportFailed": "Could not import the VEX document",
+    "vexImportTooLarge": "Not imported: the file or its statement list is too large",
+    "vexReceivedBadge": "Supplier VEX: {{state}}",
+    "vexReceivedTitle": "Supplier VEX",
+    "vexReceivedHint": "A statement from a VEX document you imported, separate from your own judgement.",
+    "vexReceivedFrom": "From a VEX document for {{product}}, separate from your own judgement.",
+    "vexReceivedJustification": "Justification: {{value}}",
     "vexUpdatedAt": "Last updated {{date}}",
     "vulnRowToggle": "Show vulnerability details",
     "componentRowToggle": "Show component details",
@@ -478,7 +510,8 @@
     "helpVersion": "Version {{version}}",
     "helpVersionUnknown": "Version not stamped in this build",
     "conformanceSplitTitle": "Mandatory checks passed, out of the mandatory checks measured",
-    "lookupTitle": "External vulnerability lookup"
+    "lookupTitle": "External vulnerability lookup",
+    "helpReport": "Report a problem"
   },
   "shell": {
     "newScan": "New scan",
@@ -612,6 +645,7 @@
     "verifyWeights": "model weight verification",
     "modelSecurity": "model security scanning",
     "conformance": "conformance validation",
+    "resolvePurl": "package repository lookup for the submitted identifiers",
     "describeInput": "input SBOM description generation",
     "suggestVendored": "vendored-source detection",
     "docmeta": "document metadata capture",
@@ -639,7 +673,12 @@
     "androidReleaseClasspath": "Android release classpath resolution",
     "swiftPackageResolve": "Swift package resolution",
     "npmProductionSet": "npm production dependency resolution",
-    "pipInstall": "Python dependency installation"
+    "pipInstall": "Python dependency installation",
+    "cargoWorkspaceMetadata": "Cargo workspace member detection",
+    "cargoLicenseMetadata": "Rust crate license lookup",
+    "composerInstall": "PHP Composer dependency resolution",
+    "pnpmWorkspaceTree": "pnpm workspace dependency tree resolution",
+    "enrichDistroSupplier": "OS package supplier enrichment"
   },
   "pipelineNote": {
     "titleScan": "Some data may be incomplete",
@@ -1197,6 +1236,29 @@
     "showingFiltered": "Showing {{count}} of {{total}} checks.",
     "noMatch": "No check matches this filter.",
     "report": "Report ({{ext}})",
+    "qualityPassWarn": "Pass, see the note below",
+    "qualityEmptyTitle": "No software components were found",
+    "qualityEmptyBody": "A pass here only means no required item could be measured. It does not mean the software was found. If you scanned a folder, check that it has a dependency manifest and that the scan path is right, then scan again.",
+    "qualityEmptyBodySupplied": "A pass here only means no required item could be measured. It does not mean the software is listed. Ask the supplier for an SBOM that lists the software components.",
+    "qualityLicenseTitle": "No component declares a license",
+    "qualityLicenseBody": "Software components with a declared license: {{declared}}/{{total}} ({{pct}}%). Attribution notices built from this SBOM will be nearly empty. Some ecosystems do not record licenses in their dependency files. A per-file license scan can fill part of the gap.",
+    "qualityLicenseFigure": "Declared licenses: {{pct}}% ({{declared}}/{{total}} software components; NOASSERTION and NONE are not counted)",
     "hiddenByFilter": "{{count}} more match this search under another filter."
+  },
+  "report": {
+    "open": "Report a problem",
+    "intro": "This is everything that will be copied. Read it first: nothing is sent anywhere, and you paste it into the issue yourself. Home-directory user names and credential-shaped text are masked, but other paths and names may remain.",
+    "loading": "Preparing the summary…",
+    "loadFailed": "The summary could not be prepared. You can still open the issue form and describe what happened.",
+    "label": "Diagnostics summary",
+    "copy": "Copy summary",
+    "copied": "Summary copied",
+    "copyFailed": "Copying was blocked here. Select the text above and copy it by hand.",
+    "openIssue": "Open the issue form",
+    "copyLog": "Copy log",
+    "logCopied": "Log copied",
+    "logHint": "Copies the log exactly as shown above. Credential-shaped text is already masked, but read it before you paste it: paths and names are not.",
+    "ready": "The diagnostics summary is ready below.",
+    "logCopyFailed": "Copying was blocked here. Select the log above and copy it by hand."
   }
 }

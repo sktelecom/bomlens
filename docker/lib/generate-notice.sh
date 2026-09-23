@@ -16,10 +16,16 @@
 #       * Source / download location — from externalReferences (vcs / distribution
 #         / website), else inferred from the purl's package registry, else the raw
 #         purl. This satisfies a copyleft notice's "where to get the source" duty.
+#         For pypi, a distribution externalReference is not used: it names one
+#         resolved wheel/sdist file (cdxgen fills it from the PyPI JSON API), and a
+#         wheel's filename encodes a platform/ABI tag that need not match what this
+#         scan actually installed. The pypi.org project-page URL is version-scoped
+#         rather than file-scoped, so it can't point at the wrong platform's file.
 #       * Copyright / attribution — component.copyright when present (cdxgen leaves
-#         it empty; scancode --deep-license or other sources fill it). When absent,
-#         an honest minimal attribution (name + license + source) is shown rather
-#         than a blank.
+#         it empty; build-prep.sh fills npm and Python components from the
+#         installed license files, and scancode --deep-license or other sources
+#         can fill others). When absent,
+#         the line is omitted rather than guessed.
 #   - The SPDX standard full text for each used license is appended from the
 #     bundled ./licenses/<spdx-id>.txt set (offline; no network at notice time).
 #   - When a PDF renderer (weasyprint) is present, the HTML is rendered to a PDF.
@@ -110,12 +116,25 @@ def purl_src($purl):
 # Order: externalReferences vcs > distribution > website, else inferred from purl,
 # else the raw purl string, else null. The notice never leaves source blank when a
 # purl is present.
-# shellcheck disable=SC2016  # jq program; $c / $refs are jq variables.
+#
+# pypi is the one exception to "distribution wins": that externalReference is a
+# single resolved wheel/sdist URL, and a wheel's filename bakes in a platform/ABI
+# tag (e.g. "-cp311-cp311-manylinux...whl" or "-macosx_..."). Nothing upstream of
+# this script confirms that tag matches what was actually installed for this scan,
+# so a pypi component skips straight to the version-scoped pypi.org project page
+# instead — always correct, even if less specific.
+# shellcheck disable=SC2016  # jq program; $c / $refs / $ptype are jq variables.
 SRC_DEF="$PURL_SRC_DEF"'
+def purl_type($purl):
+  ($purl // "") as $p
+  | if ($p | startswith("pkg:")) | not then null
+    else ($p | ltrimstr("pkg:") | split("/")[0] | split("@")[0] | ascii_downcase) end;
 def src($c):
-  ([ $c.externalReferences[]? | select(.url != null and .url != "") ]) as $refs
+  (purl_type($c.purl)) as $ptype
+  | ([ $c.externalReferences[]? | select(.url != null and .url != "") ]) as $refs
   | ( [ $refs[] | select((.type // "") == "vcs") | .url ][0]
-      // [ $refs[] | select((.type // "") == "distribution") | .url ][0]
+      // (if $ptype == "pypi" then null
+          else [ $refs[] | select((.type // "") == "distribution") | .url ][0] end)
       // [ $refs[] | select((.type // "") == "website") | .url ][0]
       // purl_src($c.purl)
       // ($c.purl // null) );'
@@ -144,8 +163,8 @@ def src($c):
 # licence notice can speak to: a path is not a project, so there is no name to
 # attribute and no source to point at. Measured across the corpus, 4,649 such
 # entries carry no licence, no purl and no external reference between them, so
-# every one of them landed under NOASSERTION with "holders not captured" beneath
-# it. One access point image alone contributed 423.
+# every one of them landed under NOASSERTION with no source or attribution line
+# beneath it. One access point image alone contributed 423.
 #
 # Everything folded here remains in the SBOM under its own name. What changes is
 # a document written for a person to act on.
@@ -269,17 +288,15 @@ done)
     echo "Each component lists its source/download location and copyright/attribution."
     echo "================================================================================"
     # license -> components, each with source location and copyright/attribution.
-    # Attribution falls back to an honest "not captured" line (never blank) so the
-    # notice always names the holder source even when component.copyright is empty.
+    # The Copyright line is printed only when component.copyright was captured;
+    # when it wasn't, the line is omitted rather than guessed or filled with a
+    # placeholder — Source above still points a reader at the holder.
     echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'.[] |
         "\nLicense: \(.license)\(unverified_note(.license))\nComponents (\(.count // (.components | length))):",
         (.components[] |
             "  - \(.comp)",
             (if .src then "      Source: \(.src)" else empty end),
-            (if .copyright
-                then "      Copyright: \(.copyright)"
-                else "      Copyright: holders not captured in SBOM — see source" + (if .src then " (\(.src))" else "" end)
-             end))'
+            (if .copyright then "      Copyright: \(.copyright)" else empty end))'
     echo ""
     if [ "$REVIEW_N" -gt 0 ]; then
         echo "================================================================================"
@@ -366,7 +383,6 @@ PROJECT_ESC="$(esc "$PROJECT")"
  .src{display:block;color:var(--muted);font-size:.78rem;margin-top:.25rem;}
  .src a{color:var(--brand);text-decoration:none;word-break:break-all;}
  .attr{display:block;color:var(--muted);font-size:.78rem;margin-top:.1rem;}
- .attr.none{font-style:italic;opacity:.75;}
  .lic .unverified{color:var(--brand-2);font-size:.78rem;margin:.1rem 0 0;}
  .texts{margin-top:2.5rem;border-top:1px solid var(--border);padding-top:1.25rem;}
  .texts pre{background:var(--th-bg);border:1px solid var(--border);
@@ -395,7 +411,8 @@ HTMLHEAD
 
     # jq @html escapes license names, component identifiers, source URLs and
     # copyright. An http(s) source is rendered as a link; a raw purl as plain text.
-    # Attribution always renders: component.copyright, or an honest "not captured".
+    # The Copyright line renders only when component.copyright was captured; when
+    # it wasn't, attrhtml prints nothing rather than a placeholder.
     echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'
         def srchtml($s):
           if $s == null then ""
@@ -405,7 +422,7 @@ HTMLHEAD
         def attrhtml($c):
           if $c.copyright
           then "<span class=\"attr\">Copyright: " + ($c.copyright|@html) + "</span>"
-          else "<span class=\"attr none\">Copyright: holders not captured in SBOM — see source</span>" end;
+          else "" end;
         .[] |
         "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
         (if is_spdx_shaped(.license) then ""

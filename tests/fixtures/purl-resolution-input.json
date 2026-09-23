@@ -1,0 +1,28 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "metadata": {
+    "timestamp": "2026-09-22T00:00:00Z",
+    "tools": [ { "name": "supplier-tool", "version": "1.0" } ],
+    "component": { "type": "application", "name": "supplier-app", "version": "9.5" }
+  },
+  "components": [
+    { "type": "library", "name": "poi", "version": "5.4.1",
+      "purl": "pkg:maven/org.apache.poi/poi@5.4.1" },
+    { "type": "library", "name": "poi", "version": "5.4.1",
+      "purl": "pkg:maven/The%2BApache%2BSoftware%2BFoundation/poi@5.4.1" },
+    { "type": "library", "name": "drools-core", "version": "7.67.2.Final",
+      "purl": "pkg:maven/org.drools/drools-core@7.67.2.Final" },
+    { "type": "library", "name": "drools-core-dynamic", "version": "7.67.2.Final-redhat-00054",
+      "purl": "pkg:maven/org.drools/org.drools.drools-core-dynamic@7.67.2.Final-redhat-00054" },
+    { "type": "library", "name": "express", "version": "4.18.2",
+      "purl": "pkg:npm/express@4.18.2" },
+    { "type": "library", "name": "curl", "version": "8.5.0",
+      "purl": "pkg:deb/debian/curl@8.5.0" },
+    { "type": "library", "name": "acme-core", "version": "2.0.0",
+      "purl": "pkg:maven/com.acme.internal/acme-core@2.0.0" }
+  ],
+  "dependencies": [
+    { "ref": "supplier-app", "dependsOn": [ "poi" ] }
+  ]
+}

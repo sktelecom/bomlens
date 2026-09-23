@@ -31,6 +31,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--model-file <path>` | — | Read one AI model file and describe it from its own header: GGUF, safetensors, PyTorch (`.pt`/`.pth`/`.ckpt`), pickle, npz, npy or ONNX. Offline, no HuggingFace account, and it works on a model that was never published. What can be filled depends on the format — GGUF carries a name, a license and an architecture, while safetensors usually carries only tensor shapes, and a field the file does not declare is left empty rather than guessed. A `.gguf`/`.safetensors`/`.pt`/… path passed to `--target` is read this way too. Mutually exclusive with `--target`/`--analyze`/`--git` |
 | `--license <spdx-id>` | — | The outbound license the project is distributed under (e.g. `Apache-2.0`). Recorded on the SBOM's root component and used to flag dependencies whose terms clash with it. A source scan cannot infer this — cdxgen leaves the root license empty for maven and gradle — so without it no conflict verdict is produced. An existing root license (a supplier SBOM's own declaration) is never replaced |
 | `--sbom-author <name>` | — | The entity that generated the SBOM — the organisation or person running the scan, not the tool and not whoever wrote the software. Recorded in `metadata.authors`, using the full name without acronyms. Nothing in a scan can discover it, so the field is left out of the SBOM when it is not given rather than filled with a placeholder |
+| `--vex <file>` | — | A CycloneDX VEX document (JSON) a supplier sent for this product. The statements that apply to a component of the scanned SBOM are kept in `{Project}_{Version}_vex_imported.json`; the SBOM and the security report are not changed. Turns the security report on too (as `--deep-cve` does), because the statements are shown on its findings: open the scan folder in the web UI to see them on the vulnerability rows. A document for a different product or version, or one that is not CycloneDX VEX, is reported and skipped, and the scan still completes; a document with no applicable statement leaves an earlier `_vex_imported.json` as it was. Not offered with `--ui` (use Import VEX on the Vulnerabilities screen) or `--diff` |
 | `--usage <scenario>` | — | Tailor the AI model risk assessment (`--model` and `--model-file`) to how the model will be used: `internal`, `product`, `redistribute` or `outputs-only`. Only the license conditions that bind that scenario decide the verdict, and the report states which scenario it was judged for. Unset judges against every condition |
 | `--merge <a.json> <b.json> …` | — | Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with `--project`/`--version`. Optional — for a server SBOM when an external system needs a single product BOM; otherwise keep the layers separate (see the [server SBOM guide](../guides/server-delivery.md)). Mutually exclusive with `--target`/`--analyze`/`--git` |
 | `--merge-root <file>` | — | With `--merge`: keep this input's `specVersion` and root component (for example an ML-BOM's CycloneDX 1.7 root with its model card) instead of writing a fresh 1.6 root. Must be one of the `--merge` files; the preserved root is renamed to `--project`/`--version` |
@@ -45,12 +46,14 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--no-report` | false | Skip the open-source risk report (see below) |
 | `--lang <en\|ko>` | `en` | Language for the human-facing conformance and AI-profile reports (`.md`/`.html`). The SBOM and the JSON reports stay English regardless |
 | `--conformance-profile <default\|skt-submission>` | `default` | Conformance check strictness. `skt-submission` requires 100% PURL coverage and fails on any `pkg:generic` identifier, matching the SKT supplier submission review. The web UI's submission-review screen defaults to `skt-submission`; the CLI does not, so pair it with `--analyze` explicitly |
+| `--resolve-purl` | off | `--analyze` only: ask each package repository whether the identifiers in the submitted SBOM name packages that exist, and add the answer to the conformance report as an advisory row. The only part of the check that uses the network. An identifier that resolves to nothing is reported, never failed, because a package published only to an internal repository answers the same way; `PURL_RESOLVE_IGNORE` skips namespaces you know are internal |
 | `--deep-license` | false | Precise license detection with scancode (opt-in image) |
 | `--deep-cve` | false | Add a second CVE-matching pass via grype's NVD CPE matcher (opt-in `bomlens-deep-cve` image, pulled automatically). Recovers NVD-only CVEs that Trivy misses, mostly for older Maven libraries, since BomLens attaches an NVD-matchable CPE to Maven components specifically; implies `--security`. Findings not verified against the live NVD version range are flagged version-unverified in the report — see the [deep CVE matching guide](../guides/reports.md) |
 | `--identify-vendored` | false | Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the [identify bundled OSS guide](../guides/identify-vendored.md) |
 | `--verify-weights` | false | With `--model`: download the repo's pickle-format weight files (`.bin`/`.pt`/`.pth`/`.ckpt` — the ones that execute code on load) and run the same local picklescan verification `--model-file` runs, instead of only trusting HuggingFace's own scan (`bomlens:hf:scan:*`). safetensors/GGUF/ONNX weights are never downloaded — they cannot execute code on load, so there is nothing for picklescan to check. Real network and disk cost (bounded by `AIBOM_VERIFY_MAX_FILES`/`AIBOM_VERIFY_MAX_BYTES`, default 5 files / 2 GiB each), unlike the metadata-only `ENRICH_HF_SECURITY` lookup, which is why this is opt-in. AI-model scans only |
 | `--byte-stable` | false | Deterministic (reproducible) SBOM output |
 | `--fail-on-conformance` | false | Exit 2 if this scan's own conformance report says "fail" (exit 3 if no conformance report was produced for this scan). Not offered with `--ui`. See [Exit codes](#exit-codes) |
+| `--fail-on <condition>` | — | Exit 4 when this scan meets the condition, or 5 when it cannot be judged from what the scan produced. Repeat the option for several conditions. The conditions are a closed list: `vulnerability=<critical\|high\|medium\|low>` (a finding at that severity or worse; turns the security report on), `malicious-package` (a component flagged as a known malicious package), `license-conflict` (a component incompatible with the license the product is distributed under; the SBOM's root component has to record it, which `--license` does for source and rootfs scans and a supplier SBOM carries itself, otherwise it cannot be judged), `empty-result` (the scan identified no software: no component is left once operating-system and file entries are set aside, so a rootfs or image scan that names no package counts as empty), `license-coverage=<0-100>` (fewer than that percent of those same components declare a license; a license of NOASSERTION or NONE is not a declaration, and the percentage is rounded down; the value is required, has no default and takes no leading zero). Both read the scan's own conformance report, so a scan that wrote none cannot be judged, nor can one whose SBOM format the report did not measure (an SPDX 3.0 document that could not be converted). `license-coverage=` cannot be judged on a scan with no such component either (use `empty-result` for that). They leave the conformance verdict itself unchanged. Findings are counted as the security report counts them: once per package and id, with the kernel's advisories left out. `--vex` statements are not applied, so a finding the supplier declared not affected still counts. `vulnerability=` is not available for AI model and dataset inputs, which have no dependencies to scan, and neither is `empty-result`. Not offered with `--ui` or `--diff`. See [Exit codes](#exit-codes) |
 | `--sign` | false | cosign signature (`COSIGN_KEY` required) |
 | `--output-dir <dir>` | current directory | Base directory for outputs (alias `-o`). Each scan lands in a `{Project}_{Version}/` subfolder under it, keeping the bundle together and out of the source tree |
 | `--timestamp` | false | Append `_YYYYMMDD-HHMMSS` to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged |
@@ -130,6 +133,23 @@ To restore the previous flat layout, where every file is written directly in the
 
 `--diff` has no project or version of its own, so it writes its report directly into the base directory (current directory, or `--output-dir`) rather than a per-run subfolder.
 
+## What the scan prints at the end
+
+With `--generate-only`, the CLI lists the files it produced after `Analysis Complete!`. For every scan that measured software (not an AI model or dataset scan) it then states what the result holds:
+
+```
+  Components:  176 identified (purl on 100%, license declared on 96% (169 of 176))
+```
+
+The numbers come from the scan's own conformance measurement, so they match the `licenseCoverage` and `softwareComponentCount` fields of the conformance report, and the purl share counts the same packages as its purl check. The purl share is shown for CycloneDX results only. A warning line follows when something is off:
+
+- `No software was identified`: the result has no components. Check that the scanned folder holds a manifest or lock file for a supported ecosystem.
+- `No component declares a license`: no component declares one, so license checks have nothing to work with.
+- `Reduced analysis`: a shallow fallback ran instead of the full analysis and only direct dependencies were identified. The line names the cause: out of disk space, out of memory, a failed download, or the dependency analyzer failing or not running.
+- `Steps that failed`: post-processing steps that did not complete, by name. Details are in the log above.
+
+The last two are not shown for `--analyze`, because they would describe the submitted document rather than this run. The summary does not change the exit code. To fail a run on these conditions, use `--fail-on empty-result` or `--fail-on license-coverage=<0-100>`. A scanner image that predates the summary prints only the file list.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -138,8 +158,10 @@ To restore the previous flat layout, where every file is written directly in the
 | 1 | Scan failed (bad arguments, Docker unavailable, a required input missing, and similar) |
 | 2 | `--fail-on-conformance`: the scan succeeded, but its own conformance report says "fail" |
 | 3 | `--fail-on-conformance`: the scan succeeded, but produced no conformance report to judge |
+| 4 | `--fail-on`: the scan succeeded, but at least one condition is met |
+| 5 | `--fail-on`: the scan succeeded, but a condition could not be judged (for example the vulnerability database could not be downloaded, `license-conflict` without `--license`, or `empty-result` and `license-coverage=` when the scan wrote no conformance report or the report did not measure the SBOM's format), or the scan produced no result to judge |
 
-2 and 3 are used only when `--fail-on-conformance` is given; every scan that does not use it exits 0 or 1.
+2 to 5 are used only when the matching option is given; every scan that uses neither exits 0 or 1. Every `--fail-on` condition is printed with its verdict. When more than one code applies, the lowest wins: 2 and 3 (conformance) before 4, and 4 (a condition is met) before 5 (a condition could not be judged). "Could not be judged" is a failure on purpose: a scan that could not look is not a scan that found nothing, so an air-gapped run with no vulnerability database never passes a `vulnerability=` gate by accident.
 
 ## Pin the scanner image version
 
@@ -193,8 +215,8 @@ Re-scanning the same `--project`/`--version` reuses its output folder, however t
 
 ### Anything else
 
-1. Check verbose logs with `VERBOSE=true ./tests/test-scan.sh`.
+1. Run the same command again and read the terminal output. The `[WARN]` and `[ERROR]` lines say what was skipped or what failed.
 2. Update the Docker image: `docker pull ghcr.io/sktelecom/bomlens:latest`.
-3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/bomlens/issues) with your environment info and logs.
+3. If it still fails, open a [GitHub Issue](https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml) with the command you ran and its terminal output. The issue form lists what it needs.
 
 For how to use each mode, see the [input scenarios guide](../guides/by-input.md); for the kinds of outputs, see the [artifacts reference](artifacts.md); for language detection, see [supported ecosystems](ecosystems.md); to run scans in a pipeline, see [CI/CD integration](../guides/ci-cd.md).

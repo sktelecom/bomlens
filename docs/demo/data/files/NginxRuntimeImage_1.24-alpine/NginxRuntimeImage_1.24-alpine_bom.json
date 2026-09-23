@@ -38310,7 +38310,7 @@
     },
     {
       "bom-ref": "pkg:apk/alpine/alpine-baselayout-data@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f4d364196d3576d8&upstream=alpine-baselayout",
-      "cpe": "cpe:2.3:a:alpine-baselayout-data:alpine-baselayout-data:3.4.0-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:alpine-baselayout-data:alpine-baselayout-data:3.4.0:*:*:*:*:*:*:*",
       "description": "Alpine base dir structure and init scripts",
       "externalReferences": [
         {
@@ -38414,16 +38414,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/alpine-baselayout-data@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=alpine-baselayout",
       "type": "library",
-      "version": "3.4.0-r0"
+      "version": "3.4.0-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/alpine-baselayout@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=6e97ac524b16262e",
-      "cpe": "cpe:2.3:a:alpine-baselayout:alpine-baselayout:3.4.0-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:alpine-baselayout:alpine-baselayout:3.4.0:*:*:*:*:*:*:*",
       "description": "Alpine base dir structure and init scripts",
       "externalReferences": [
         {
@@ -38519,16 +38526,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/alpine-baselayout@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "3.4.0-r0"
+      "version": "3.4.0-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/alpine-keys@2.4-r1?arch=x86_64&distro=alpine-3.17.7&package-id=7b661594e49912dd",
-      "cpe": "cpe:2.3:a:alpine-keys:alpine-keys:2.4-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:alpine-keys:alpine-keys:2.4:*:*:*:*:*:*:*",
       "description": "Public keys for Alpine Linux packages",
       "externalReferences": [
         {
@@ -38616,16 +38630,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/alpine-keys@2.4-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.4-r1"
+      "version": "2.4-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/aom-libs@3.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7bddfa32a11390db&upstream=aom",
-      "cpe": "cpe:2.3:a:aom-libs:aom-libs:3.5.0-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:aom-libs:aom-libs:3.5.0:*:*:*:*:*:*:*",
       "description": "Alliance for Open Media (AOM) AV1 codec SDK (libraries)",
       "externalReferences": [
         {
@@ -38731,16 +38752,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Oleg Titov <oleg.titov@gmail.com>",
       "purl": "pkg:apk/alpine/aom-libs@3.5.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=aom",
       "type": "library",
-      "version": "3.5.0-r0"
+      "version": "3.5.0-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/apk-tools@2.12.10-r1?arch=x86_64&distro=alpine-3.17.7&package-id=16afe072554310ee",
-      "cpe": "cpe:2.3:a:apk-tools:apk-tools:2.12.10-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:apk-tools:apk-tools:2.12.10:*:*:*:*:*:*:*",
       "description": "Alpine Package Keeper - package manager for alpine",
       "externalReferences": [
         {
@@ -38860,16 +38888,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/apk-tools@2.12.10-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.12.10-r1"
+      "version": "2.12.10-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/brotli-libs@1.0.9-r9?arch=x86_64&distro=alpine-3.17.7&package-id=005491e94a33d00b&upstream=brotli",
-      "cpe": "cpe:2.3:a:brotli-libs:brotli-libs:1.0.9-r9:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:brotli-libs:brotli-libs:1.0.9:*:*:*:*:*:*:*",
       "description": "Generic lossless compressor (libraries)",
       "externalReferences": [
         {
@@ -38981,16 +39016,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "prspkt <prspkt@protonmail.com>",
       "purl": "pkg:apk/alpine/brotli-libs@1.0.9-r9?arch=x86_64&distro=alpine-3.17.7&upstream=brotli",
       "type": "library",
-      "version": "1.0.9-r9"
+      "version": "1.0.9-r9",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/busybox-binsh@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=93ba00f9117dea1c&upstream=busybox",
-      "cpe": "cpe:2.3:a:busybox-binsh:busybox-binsh:1.35.0-r29:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:busybox-binsh:busybox-binsh:1.35.0:*:*:*:*:*:*:*",
       "description": "busybox ash /bin/sh",
       "externalReferences": [
         {
@@ -39090,12 +39132,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
       "purl": "pkg:apk/alpine/busybox-binsh@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&upstream=busybox",
       "type": "library",
-      "version": "1.35.0-r29"
+      "version": "1.35.0-r29",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/busybox@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=ca8e18476c9977b9",
@@ -39184,11 +39233,14 @@
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
       "purl": "pkg:apk/alpine/busybox@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.35.0-r29"
+      "version": "1.35.0-r29",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/ca-certificates-bundle@20230506-r0?arch=x86_64&distro=alpine-3.17.7&package-id=a1ad99156141ece3&upstream=ca-certificates",
-      "cpe": "cpe:2.3:a:ca-certificates-bundle:ca-certificates-bundle:20230506-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:ca-certificates-bundle:ca-certificates-bundle:20230506:*:*:*:*:*:*:*",
       "description": "Pre generated bundle of Mozilla certificates",
       "externalReferences": [
         {
@@ -39302,16 +39354,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/ca-certificates-bundle@20230506-r0?arch=x86_64&distro=alpine-3.17.7&upstream=ca-certificates",
       "type": "library",
-      "version": "20230506-r0"
+      "version": "20230506-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/ca-certificates@20230506-r0?arch=x86_64&distro=alpine-3.17.7&package-id=2f9f5fc1478eaf42",
-      "cpe": "cpe:2.3:a:ca-certificates:ca-certificates:20230506-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:ca-certificates:ca-certificates:20230506:*:*:*:*:*:*:*",
       "description": "Common CA certificates PEM files from Mozilla",
       "externalReferences": [
         {
@@ -39425,12 +39484,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/ca-certificates@20230506-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "20230506-r0"
+      "version": "20230506-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/curl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=0b571a3ed57ccc52",
@@ -39535,11 +39601,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/curl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "8.5.0-r0"
+      "version": "8.5.0-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/fontconfig@2.14.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=660c2ab4c7c0a9f5",
-      "cpe": "cpe:2.3:a:fontconfig:fontconfig:2.14.1-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:fontconfig:fontconfig:2.14.1:*:*:*:*:*:*:*",
       "description": "Library for configuring and customizing font access",
       "externalReferences": [
         {
@@ -39663,16 +39732,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/fontconfig@2.14.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.14.1-r0"
+      "version": "2.14.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/freetype@2.12.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=c9946c882a3cff61",
-      "cpe": "cpe:2.3:a:freetype:freetype:2.12.1-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:freetype:freetype:2.12.1:*:*:*:*:*:*:*",
       "description": "TrueType font rendering library",
       "externalReferences": [
         {
@@ -39769,16 +39845,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
       "purl": "pkg:apk/alpine/freetype@2.12.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.12.1-r0"
+      "version": "2.12.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/geoip@1.6.12-r3?arch=x86_64&distro=alpine-3.17.7&package-id=09dceaf46b58b8ee",
-      "cpe": "cpe:2.3:a:geoip:geoip:1.6.12-r3:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:geoip:geoip:1.6.12:*:*:*:*:*:*:*",
       "description": "Lookup countries by IP addresses",
       "externalReferences": [
         {
@@ -39862,16 +39945,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Leonardo Arena <rnalrd@alpinelinux.org>",
       "purl": "pkg:apk/alpine/geoip@1.6.12-r3?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.6.12-r3"
+      "version": "1.6.12-r3",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libavif@0.11.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=d26cde9e5b1b8a93",
-      "cpe": "cpe:2.3:a:aomedia:libavif:0.11.1-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:aomedia:libavif:0.11.1:*:*:*:*:*:*:*",
       "description": "Library for encoding and decoding .avif files",
       "externalReferences": [
         {
@@ -39959,16 +40049,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Bart Ribbers <bribbers@disroot.org>",
       "purl": "pkg:apk/alpine/libavif@0.11.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "0.11.1-r0"
+      "version": "0.11.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libbsd@0.11.7-r0?arch=x86_64&distro=alpine-3.17.7&package-id=b76c4a1effdce309",
-      "cpe": "cpe:2.3:a:libbsd:libbsd:0.11.7-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libbsd:libbsd:0.11.7:*:*:*:*:*:*:*",
       "description": "commonly-used BSD functions not implemented by all libcs",
       "externalReferences": [
         {
@@ -40052,12 +40149,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Drew DeVault <sir@cmpwn.com>",
       "purl": "pkg:apk/alpine/libbsd@0.11.7-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "0.11.7-r0"
+      "version": "0.11.7-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libbz2@1.0.8-r4?arch=x86_64&distro=alpine-3.17.7&package-id=2f0f3e827b7bfd4f&upstream=bzip2",
@@ -40158,11 +40262,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libbz2@1.0.8-r4?arch=x86_64&distro=alpine-3.17.7&upstream=bzip2",
       "type": "library",
-      "version": "1.0.8-r4"
+      "version": "1.0.8-r4",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libc-utils@0.7.2-r3?arch=x86_64&distro=alpine-3.17.7&package-id=b1c2651bdcbb8d9c&upstream=libc-dev",
-      "cpe": "cpe:2.3:a:libc-utils:libc-utils:0.7.2-r3:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libc-utils:libc-utils:0.7.2:*:*:*:*:*:*:*",
       "description": "Meta package to pull in correct libc",
       "externalReferences": [
         {
@@ -40252,16 +40359,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libc-utils@0.7.2-r3?arch=x86_64&distro=alpine-3.17.7&upstream=libc-dev",
       "type": "library",
-      "version": "0.7.2-r3"
+      "version": "0.7.2-r3",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libcrypto3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&package-id=b10e908f307dcdea&upstream=openssl",
-      "cpe": "cpe:2.3:a:libcrypto3:libcrypto3:3.0.12-r4:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:openssl:openssl:3.0.12:*:*:*:*:*:*:*",
       "description": "Crypto library from openssl",
       "externalReferences": [
         {
@@ -40349,12 +40463,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
         }
       ],
       "publisher": "Ariadne Conill <ariadne@dereferenced.org>",
       "purl": "pkg:apk/alpine/libcrypto3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&upstream=openssl",
       "type": "library",
-      "version": "3.0.12-r4"
+      "version": "3.0.12-r4",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libcurl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=8bba5df3475ec4ab&upstream=curl",
@@ -40467,11 +40588,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libcurl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=curl",
       "type": "library",
-      "version": "8.5.0-r0"
+      "version": "8.5.0-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libdav1d@1.0.0-r2?arch=x86_64&distro=alpine-3.17.7&package-id=b82627e9d94a773b&upstream=dav1d",
-      "cpe": "cpe:2.3:a:libdav1d:libdav1d:1.0.0-r2:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libdav1d:libdav1d:1.0.0:*:*:*:*:*:*:*",
       "description": "small and fast AV1 Decoder (libraries)",
       "externalReferences": [
         {
@@ -40547,16 +40671,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Bart Ribbers <bribbers@disroot.org>",
       "purl": "pkg:apk/alpine/libdav1d@1.0.0-r2?arch=x86_64&distro=alpine-3.17.7&upstream=dav1d",
       "type": "library",
-      "version": "1.0.0-r2"
+      "version": "1.0.0-r2",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libedit@20221030.3.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=14b4efd093d0cc73",
-      "cpe": "cpe:2.3:a:libedit:libedit:20221030.3.1-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libedit:libedit:20221030.3.1:*:*:*:*:*:*:*",
       "description": "BSD line editing library",
       "externalReferences": [
         {
@@ -40636,12 +40767,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Drew DeVault <sir@cmpwn.com>",
       "purl": "pkg:apk/alpine/libedit@20221030.3.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "20221030.3.1-r0"
+      "version": "20221030.3.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libexpat@2.6.2-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f843f8e4dd1ce5d5&upstream=expat",
@@ -40730,7 +40868,10 @@
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libexpat@2.6.2-r0?arch=x86_64&distro=alpine-3.17.7&upstream=expat",
       "type": "library",
-      "version": "2.6.2-r0"
+      "version": "2.6.2-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libgcrypt@1.10.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f7f0de7b422d2a79",
@@ -40823,11 +40964,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libgcrypt@1.10.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.10.1-r0"
+      "version": "1.10.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libgd@2.3.3-r3?arch=x86_64&distro=alpine-3.17.7&package-id=a02d7378826239fe&upstream=gd",
-      "cpe": "cpe:2.3:a:libgd:libgd:2.3.3-r3:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libgd:libgd:2.3.3:*:*:*:*:*:*:*",
       "description": "Library for the dynamic creation of images by programmers (libraries)",
       "externalReferences": [
         {
@@ -40935,16 +41079,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libgd@2.3.3-r3?arch=x86_64&distro=alpine-3.17.7&upstream=gd",
       "type": "library",
-      "version": "2.3.3-r3"
+      "version": "2.3.3-r3",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libgpg-error@1.46-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a944500415d5c0d2",
-      "cpe": "cpe:2.3:a:libgpg-error:libgpg-error:1.46-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libgpg-error:libgpg-error:1.46:*:*:*:*:*:*:*",
       "description": "Support library for libgcrypt",
       "externalReferences": [
         {
@@ -41049,16 +41200,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libgpg-error@1.46-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.46-r1"
+      "version": "1.46-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libice@1.0.10-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a2ceccc1179ea7a1",
-      "cpe": "cpe:2.3:a:libice:libice:1.0.10-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libice:libice:1.0.10:*:*:*:*:*:*:*",
       "description": "X11 Inter-Client Exchange library",
       "externalReferences": [
         {
@@ -41134,16 +41292,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libice@1.0.10-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.0.10-r1"
+      "version": "1.0.10-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libintl@0.21.1-r1?arch=x86_64&distro=alpine-3.17.7&package-id=29e6a9b16de12cd9&upstream=gettext",
-      "cpe": "cpe:2.3:a:libintl:libintl:0.21.1-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libintl:libintl:0.21.1:*:*:*:*:*:*:*",
       "description": "GNU gettext runtime library",
       "externalReferences": [
         {
@@ -41223,12 +41388,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libintl@0.21.1-r1?arch=x86_64&distro=alpine-3.17.7&upstream=gettext",
       "type": "library",
-      "version": "0.21.1-r1"
+      "version": "0.21.1-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libjpeg-turbo@2.1.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=a3f400796abb0452",
@@ -41339,11 +41511,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libjpeg-turbo@2.1.4-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.1.4-r0"
+      "version": "2.1.4-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libmd@1.0.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=3b1ada4b7d623a84",
-      "cpe": "cpe:2.3:a:libmd:libmd:1.0.4-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libmd:libmd:1.0.4:*:*:*:*:*:*:*",
       "description": "Message Digest functions from BSD systems",
       "externalReferences": [
         {
@@ -41424,12 +41599,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "omni <omni+alpine@hack.org>",
       "purl": "pkg:apk/alpine/libmd@1.0.4-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.0.4-r0"
+      "version": "1.0.4-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libpng@1.6.39-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7c1ba0840ebd6223",
@@ -41522,11 +41704,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libpng@1.6.39-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.6.39-r0"
+      "version": "1.6.39-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libsm@1.2.3-r1?arch=x86_64&distro=alpine-3.17.7&package-id=803004cbe152d9fe",
-      "cpe": "cpe:2.3:a:libsm:libsm:1.2.3-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libsm:libsm:1.2.3:*:*:*:*:*:*:*",
       "description": "X11 Session Management library",
       "externalReferences": [
         {
@@ -41610,16 +41795,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libsm@1.2.3-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.2.3-r1"
+      "version": "1.2.3-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libssl3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&package-id=ae67f981f2be9e5a&upstream=openssl",
-      "cpe": "cpe:2.3:a:libssl3:libssl3:3.0.12-r4:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:openssl:openssl:3.0.12:*:*:*:*:*:*:*",
       "description": "SSL shared libraries",
       "externalReferences": [
         {
@@ -41711,16 +41903,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "name-map"
         }
       ],
       "publisher": "Ariadne Conill <ariadne@dereferenced.org>",
       "purl": "pkg:apk/alpine/libssl3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&upstream=openssl",
       "type": "library",
-      "version": "3.0.12-r4"
+      "version": "3.0.12-r4",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libuuid@2.38.1-r1?arch=x86_64&distro=alpine-3.17.7&package-id=abb8fc11a74159c0&upstream=util-linux",
-      "cpe": "cpe:2.3:a:libuuid:libuuid:2.38.1-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libuuid:libuuid:2.38.1:*:*:*:*:*:*:*",
       "description": "DCE compatible Universally Unique Identifier library",
       "externalReferences": [
         {
@@ -41796,16 +41995,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libuuid@2.38.1-r1?arch=x86_64&distro=alpine-3.17.7&upstream=util-linux",
       "type": "library",
-      "version": "2.38.1-r1"
+      "version": "2.38.1-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libwebp@1.2.4-r3?arch=x86_64&distro=alpine-3.17.7&package-id=1e0ab57302189d9c",
-      "cpe": "cpe:2.3:a:libwebp:libwebp:1.2.4-r3:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libwebp:libwebp:1.2.4:*:*:*:*:*:*:*",
       "description": "Libraries for working with WebP images",
       "externalReferences": [
         {
@@ -41893,16 +42099,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libwebp@1.2.4-r3?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.2.4-r3"
+      "version": "1.2.4-r3",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libx11@1.8.7-r0?arch=x86_64&distro=alpine-3.17.7&package-id=d4603b28db29ff29",
-      "cpe": "cpe:2.3:a:libx11:libx11:1.8.7-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libx11:libx11:1.8.7:*:*:*:*:*:*:*",
       "description": "X11 client-side library",
       "externalReferences": [
         {
@@ -41998,16 +42211,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libx11@1.8.7-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.8.7-r0"
+      "version": "1.8.7-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxau@1.0.10-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f7facf15deeb76ad",
-      "cpe": "cpe:2.3:a:libxau:libxau:1.0.10-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxau:libxau:1.0.10:*:*:*:*:*:*:*",
       "description": "X11 authorisation library",
       "externalReferences": [
         {
@@ -42083,16 +42303,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxau@1.0.10-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.0.10-r0"
+      "version": "1.0.10-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxcb@1.15-r0?arch=x86_64&distro=alpine-3.17.7&package-id=3a45efceaf770ece",
-      "cpe": "cpe:2.3:a:libxcb:libxcb:1.15-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxcb:libxcb:1.15:*:*:*:*:*:*:*",
       "description": "X11 client-side library",
       "externalReferences": [
         {
@@ -42268,16 +42495,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxcb@1.15-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.15-r0"
+      "version": "1.15-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxdmcp@1.1.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=ff29eb9b850be859",
-      "cpe": "cpe:2.3:a:libxdmcp:libxdmcp:1.1.4-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxdmcp:libxdmcp:1.1.4:*:*:*:*:*:*:*",
       "description": "X11 Display Manager Control Protocol library",
       "externalReferences": [
         {
@@ -42357,16 +42591,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxdmcp@1.1.4-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.1.4-r0"
+      "version": "1.1.4-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxext@1.3.5-r0?arch=x86_64&distro=alpine-3.17.7&package-id=1bb7617caccafb21",
-      "cpe": "cpe:2.3:a:libxext:libxext:1.3.5-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxext:libxext:1.3.5:*:*:*:*:*:*:*",
       "description": "X11 miscellaneous extensions library",
       "externalReferences": [
         {
@@ -42446,12 +42687,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxext@1.3.5-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.3.5-r0"
+      "version": "1.3.5-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxml2@2.10.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f09a8c2ed073953a",
@@ -42560,11 +42808,14 @@
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxml2@2.10.4-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2.10.4-r0"
+      "version": "2.10.4-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxpm@3.5.15-r0?arch=x86_64&distro=alpine-3.17.7&package-id=9a268a7f89debeb5",
-      "cpe": "cpe:2.3:a:libxpm-project:libxpm:3.5.15-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxpm-project:libxpm:3.5.15:*:*:*:*:*:*:*",
       "description": "X11 pixmap library",
       "externalReferences": [
         {
@@ -42668,16 +42919,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxpm@3.5.15-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "3.5.15-r0"
+      "version": "3.5.15-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxslt@1.1.37-r1?arch=x86_64&distro=alpine-3.17.7&package-id=c80b355e26c33f48",
-      "cpe": "cpe:2.3:a:libxslt:libxslt:1.1.37-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxslt:libxslt:1.1.37:*:*:*:*:*:*:*",
       "description": "XML stylesheet transformation library",
       "externalReferences": [
         {
@@ -42769,16 +43027,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxslt@1.1.37-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.1.37-r1"
+      "version": "1.1.37-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/libxt@1.2.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=88e7d7ee3d55e00b",
-      "cpe": "cpe:2.3:a:libxt:libxt:1.2.1-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libxt:libxt:1.2.1:*:*:*:*:*:*:*",
       "description": "X11 toolkit intrinsics library",
       "externalReferences": [
         {
@@ -42866,16 +43131,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/libxt@1.2.1-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.2.1-r0"
+      "version": "1.2.1-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/musl-utils@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7&package-id=bc4a891b3ccf1867&upstream=musl",
-      "cpe": "cpe:2.3:a:musl-utils:musl-utils:1.2.3-r5:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:musl-utils:musl-utils:1.2.3:*:*:*:*:*:*:*",
       "description": "the musl c library (libc) implementation",
       "externalReferences": [
         {
@@ -42997,16 +43269,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Timo Teräs <timo.teras@iki.fi>",
       "purl": "pkg:apk/alpine/musl-utils@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7&upstream=musl",
       "type": "library",
-      "version": "1.2.3-r5"
+      "version": "1.2.3-r5",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7&package-id=b0ab45c7582fa548",
-      "cpe": "cpe:2.3:a:musl-libc:musl:1.2.3-r5:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:musl-libc:musl:1.2.3:*:*:*:*:*:*:*",
       "description": "the musl c library (libc) implementation",
       "externalReferences": [
         {
@@ -43086,16 +43365,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Timo Teräs <timo.teras@iki.fi>",
       "purl": "pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.2.3-r5"
+      "version": "1.2.3-r5",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/ncurses-libs@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a33387e463bcd6a8&upstream=ncurses",
-      "cpe": "cpe:2.3:a:ncurses-libs:ncurses-libs:6.3_p20221119-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:ncurses-libs:ncurses-libs:6.3_p20221119:*:*:*:*:*:*:*",
       "description": "Ncurses libraries",
       "externalReferences": [
         {
@@ -43211,16 +43497,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/ncurses-libs@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&upstream=ncurses",
       "type": "library",
-      "version": "6.3_p20221119-r1"
+      "version": "6.3_p20221119-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/ncurses-terminfo-base@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&package-id=ece9b18df48edde2&upstream=ncurses",
-      "cpe": "cpe:2.3:a:ncurses-terminfo-base:ncurses-terminfo-base:6.3_p20221119-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:ncurses-terminfo-base:ncurses-terminfo-base:6.3_p20221119:*:*:*:*:*:*:*",
       "description": "Descriptions of common terminals",
       "externalReferences": [
         {
@@ -43324,16 +43617,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/ncurses-terminfo-base@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&upstream=ncurses",
       "type": "library",
-      "version": "6.3_p20221119-r1"
+      "version": "6.3_p20221119-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nghttp2-libs@1.51.0-r2?arch=x86_64&distro=alpine-3.17.7&package-id=61c5885b62788e64&upstream=nghttp2",
-      "cpe": "cpe:2.3:a:nghttp2-libs:nghttp2-libs:1.51.0-r2:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:nghttp2-libs:nghttp2-libs:1.51.0:*:*:*:*:*:*:*",
       "description": "Experimental HTTP/2 client, server and proxy (libraries)",
       "externalReferences": [
         {
@@ -43501,16 +43801,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Francesco Colista <fcolista@alpinelinux.org>",
       "purl": "pkg:apk/alpine/nghttp2-libs@1.51.0-r2?arch=x86_64&distro=alpine-3.17.7&upstream=nghttp2",
       "type": "library",
-      "version": "1.51.0-r2"
+      "version": "1.51.0-r2",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nginx-module-geoip@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=e1714bd3992e0b50",
-      "cpe": "cpe:2.3:a:nginx-module-geoip:nginx-module-geoip:1.24.0-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:nginx-module-geoip:nginx-module-geoip:1.24.0:*:*:*:*:*:*:*",
       "description": "nginx GeoIP dynamic modules",
       "externalReferences": [
         {
@@ -43644,16 +43951,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
       "purl": "pkg:apk/alpine/nginx-module-geoip@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.24.0-r1"
+      "version": "1.24.0-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nginx-module-image-filter@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=24c266d25d51870e",
-      "cpe": "cpe:2.3:a:nginx-module-image-filter:nginx-module-image-filter:1.24.0-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:nginx-module-image-filter:nginx-module-image-filter:1.24.0:*:*:*:*:*:*:*",
       "description": "nginx image filter dynamic module",
       "externalReferences": [
         {
@@ -43803,16 +44117,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
       "purl": "pkg:apk/alpine/nginx-module-image-filter@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.24.0-r1"
+      "version": "1.24.0-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nginx-module-njs@1.24.0.0.7.12-r1?arch=x86_64&distro=alpine-3.17.7&package-id=e2216ab0609277b2",
-      "cpe": "cpe:2.3:a:nginx-module-njs:nginx-module-njs:1.24.0.0.7.12-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:nginx-module-njs:nginx-module-njs:1.24.0.0.7.12:*:*:*:*:*:*:*",
       "description": "nginx njs dynamic modules",
       "externalReferences": [
         {
@@ -43966,16 +44287,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
       "purl": "pkg:apk/alpine/nginx-module-njs@1.24.0.0.7.12-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.24.0.0.7.12-r1"
+      "version": "1.24.0.0.7.12-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nginx-module-xslt@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=36612e86b15f0ae1",
-      "cpe": "cpe:2.3:a:nginx-module-xslt:nginx-module-xslt:1.24.0-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:nginx-module-xslt:nginx-module-xslt:1.24.0:*:*:*:*:*:*:*",
       "description": "nginx xslt dynamic module",
       "externalReferences": [
         {
@@ -44117,12 +44445,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
       "purl": "pkg:apk/alpine/nginx-module-xslt@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.24.0-r1"
+      "version": "1.24.0-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/nginx@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=907a1ddaad3cf576",
@@ -44245,7 +44580,10 @@
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
       "purl": "pkg:apk/alpine/nginx@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.24.0-r1"
+      "version": "1.24.0-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/pcre2@10.42-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7a6d329fd83fbe68",
@@ -44350,11 +44688,14 @@
       "publisher": "Jakub Jirutka <jakub@jirutka.cz>",
       "purl": "pkg:apk/alpine/pcre2@10.42-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "10.42-r0"
+      "version": "10.42-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/scanelf@1.3.5-r1?arch=x86_64&distro=alpine-3.17.7&package-id=aa189d4fe94178ae&upstream=pax-utils",
-      "cpe": "cpe:2.3:a:scanelf:scanelf:1.3.5-r1:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:scanelf:scanelf:1.3.5:*:*:*:*:*:*:*",
       "description": "Scan ELF binaries for stuff",
       "externalReferences": [
         {
@@ -44430,16 +44771,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/scanelf@1.3.5-r1?arch=x86_64&distro=alpine-3.17.7&upstream=pax-utils",
       "type": "library",
-      "version": "1.3.5-r1"
+      "version": "1.3.5-r1",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/ssl_client@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=8827bc68b60ba6d0&upstream=busybox",
-      "cpe": "cpe:2.3:a:ssl-client:ssl-client:1.35.0-r29:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:ssl-client:ssl-client:1.35.0:*:*:*:*:*:*:*",
       "description": "EXternal ssl_client for busybox wget",
       "externalReferences": [
         {
@@ -44543,16 +44891,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
       "purl": "pkg:apk/alpine/ssl_client@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&upstream=busybox",
       "type": "library",
-      "version": "1.35.0-r29"
+      "version": "1.35.0-r29",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/tiff@4.4.0-r4?arch=x86_64&distro=alpine-3.17.7&package-id=570e283921452f67",
-      "cpe": "cpe:2.3:a:libtiff:libtiff:4.4.0-r4:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:libtiff:libtiff:4.4.0:*:*:*:*:*:*:*",
       "description": "Provides support for the Tag Image File Format or TIFF",
       "externalReferences": [
         {
@@ -44660,16 +45015,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Michael Mason <ms13sp@gmail.com>",
       "purl": "pkg:apk/alpine/tiff@4.4.0-r4?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "4.4.0-r4"
+      "version": "4.4.0-r4",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/tzdata@2024a-r0?arch=x86_64&distro=alpine-3.17.7&package-id=3a9dbb952e8aa3d5",
-      "cpe": "cpe:2.3:a:tzdata:tzdata:2024a-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:tzdata:tzdata:2024a:*:*:*:*:*:*:*",
       "description": "Timezone data",
       "externalReferences": [
         {
@@ -44737,16 +45099,23 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/tzdata@2024a-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "2024a-r0"
+      "version": "2024a-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/xz-libs@5.2.9-r0?arch=x86_64&distro=alpine-3.17.7&package-id=ef9c11af2472497f&upstream=xz",
-      "cpe": "cpe:2.3:a:xz-libs:xz-libs:5.2.9-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:xz-libs:xz-libs:5.2.9:*:*:*:*:*:*:*",
       "description": "Library and CLI tools for XZ and LZMA compressed files (libraries)",
       "externalReferences": [
         {
@@ -44857,12 +45226,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/xz-libs@5.2.9-r0?arch=x86_64&distro=alpine-3.17.7&upstream=xz",
       "type": "library",
-      "version": "5.2.9-r0"
+      "version": "5.2.9-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/zlib@1.2.13-r0?arch=x86_64&distro=alpine-3.17.7&package-id=0f6f64aa11912270",
@@ -44951,11 +45327,14 @@
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
       "purl": "pkg:apk/alpine/zlib@1.2.13-r0?arch=x86_64&distro=alpine-3.17.7",
       "type": "library",
-      "version": "1.2.13-r0"
+      "version": "1.2.13-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     },
     {
       "bom-ref": "pkg:apk/alpine/zstd-libs@1.5.5-r0?arch=x86_64&distro=alpine-3.17.7&package-id=47bd720affa207ad&upstream=zstd",
-      "cpe": "cpe:2.3:a:zstd-libs:zstd-libs:1.5.5-r0:*:*:*:*:*:*:*",
+      "cpe": "cpe:2.3:a:zstd-libs:zstd-libs:1.5.5:*:*:*:*:*:*:*",
       "description": "Zstandard - Fast real-time compression algorithm (libraries)",
       "externalReferences": [
         {
@@ -45056,12 +45435,19 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:cpeSource",
+          "value": "distro-version-strip"
         }
       ],
       "publisher": "psykose <alice@ayaya.dev>",
       "purl": "pkg:apk/alpine/zstd-libs@1.5.5-r0?arch=x86_64&distro=alpine-3.17.7&upstream=zstd",
       "type": "library",
-      "version": "1.5.5-r0"
+      "version": "1.5.5-r0",
+      "supplier": {
+        "name": "Alpine"
+      }
     }
   ],
   "dependencies": [
@@ -45510,7 +45896,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-14T00:44:20Z",
+    "timestamp": "2026-09-15T12:44:44Z",
     "tools": {
       "components": [
         {
@@ -45523,12 +45909,17 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.11.11"
+          "version": "1.12.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:168e632b-6701-4f0f-a784-d489514dc378",
+  "serialNumber": "urn:uuid:9f36d4c6-85ac-4418-9394-a46bd743fa17",
   "specVersion": "1.6",
-  "version": 1
+  "version": 1,
+  "compositions": [
+    {
+      "aggregate": "unknown"
+    }
+  ]
 }

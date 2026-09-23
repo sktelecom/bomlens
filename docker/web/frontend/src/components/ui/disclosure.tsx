@@ -25,6 +25,7 @@ export function Disclosure({
   size = "sm",
   className,
   summaryClassName,
+  onToggle,
   children,
 }: {
   summary: ReactNode;
@@ -32,12 +33,18 @@ export function Disclosure({
   size?: "sm" | "md";
   className?: string;
   summaryClassName?: string;
+  /** Called with the new open state whenever the user opens or closes it. */
+  onToggle?: (open: boolean) => void;
   children: ReactNode;
 }) {
   // Captured once so React never fights the user's own open/close toggling.
   const [initialOpen] = useState(defaultOpen);
   return (
-    <details className={cn("group", className)} open={initialOpen}>
+    <details
+      className={cn("group", className)}
+      open={initialOpen}
+      onToggle={onToggle ? (e) => onToggle(e.currentTarget.open) : undefined}
+    >
       <summary
         className={cn(
           "flex cursor-pointer list-none items-center rounded-sm",

@@ -1,7 +1,8 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useRef } from "react";
+import { Copy, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -10,10 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { ScanProgress } from "@/lib/api";
+import { copyToClipboard } from "@/lib/diagnostics";
 import { stageProgress } from "@/lib/scanProgress";
 import { Disclosure } from "@/components/ui/disclosure";
+import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 export type RunStatus = "running" | "done" | "error";
@@ -42,7 +46,9 @@ export function ProgressLog({
   progress,
 }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const logBoxRef = useRef<HTMLDivElement>(null);
+  const [copyBlocked, setCopyBlocked] = useState(false);
 
   useEffect(() => {
     // Auto-scroll the log box itself — never scrollIntoView, which would also
@@ -66,6 +72,19 @@ export function ProgressLog({
     : status === "running"
       ? stageProgress(logs)
       : 100;
+
+  // Copies the lines exactly as they are shown in the box, so what lands on the
+  // clipboard is what the user just read.
+  const copyLog = async () => {
+    if (await copyToClipboard(logs.join("\n"))) {
+      setCopyBlocked(false);
+      toast(t("report.logCopied"));
+    } else {
+      // A non-secure page (opened over a network address) has no clipboard API:
+      // say so instead of doing nothing.
+      setCopyBlocked(true);
+    }
+  };
 
   const body = (
     <>
@@ -104,6 +123,23 @@ export function ProgressLog({
           ))
         )}
       </div>
+      {logs.length > 0 && (
+        <div className="space-y-2">
+          <Button type="button" variant="outline" size="sm" onClick={copyLog}>
+            <Copy className="h-4 w-4" aria-hidden />
+            {t("report.copyLog")}
+          </Button>
+          <p className="flex items-start gap-2 text-sm text-foreground/80">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-risk-medium" aria-hidden />
+            {t("report.logHint")}
+          </p>
+          {copyBlocked && (
+            <p role="status" className="text-sm text-foreground/70">
+              {t("report.logCopyFailed")}
+            </p>
+          )}
+        </div>
+      )}
     </>
   );
 

@@ -17,6 +17,7 @@ import {
   matchesQuery,
   missingOverflow,
   profileCard,
+  resultQuality,
   sortByAttention,
   splitChecks,
   verdictTally,
@@ -413,5 +414,52 @@ describe("matchesQuery", () => {
   it("requires all words, and an empty query matches everything", () => {
     expect(matchesQuery(row, "BSI 9.9.9")).toBe(false);
     expect(matchesQuery(row, "   ")).toBe(true);
+  });
+});
+
+describe("resultQuality", () => {
+  const base = { result: "pass", checks: [check("timestamp", "pass", { required: true })] };
+
+  it("flags an empty result", () => {
+    const q = resultQuality({ ...base, emptyResult: true, softwareComponentCount: 0,
+      licenseCoverage: { declared: 0, total: 0, pct: null } });
+    expect(q).toEqual({ empty: true, noLicenses: false, license: null });
+  });
+
+  it("flags a non-empty set where no component declares a license", () => {
+    const q = resultQuality({ ...base, emptyResult: false, softwareComponentCount: 157,
+      licenseCoverage: { declared: 0, total: 157, pct: 0 } });
+    expect(q.noLicenses).toBe(true);
+    expect(q.license).toEqual({ declared: 0, total: 157, pct: 0 });
+  });
+
+  it("does not call 1 of 157 (rounded down to 0%) 'none', but keeps the figure", () => {
+    const q = resultQuality({ ...base, emptyResult: false,
+      licenseCoverage: { declared: 1, total: 157, pct: 0 } });
+    expect(q.noLicenses).toBe(false);
+    expect(q.license).toEqual({ declared: 1, total: 157, pct: 0 });
+  });
+
+  it("does not flag partial coverage but keeps the figure", () => {
+    const q = resultQuality({ ...base, emptyResult: false,
+      licenseCoverage: { declared: 30, total: 100, pct: 30 } });
+    expect(q.noLicenses).toBe(false);
+    expect(q.license?.pct).toBe(30);
+  });
+
+  it("shows no figure when the percentage is unknown", () => {
+    const q = resultQuality({ ...base, emptyResult: false,
+      licenseCoverage: { declared: 0, total: 5, pct: null } });
+    expect(q).toEqual({ empty: false, noLicenses: false, license: null });
+  });
+
+  it("yields nothing for a report without the fields", () => {
+    expect(resultQuality(base)).toEqual({ empty: false, noLicenses: false, license: null });
+  });
+
+  it("skips AI documents, whose G7 checks carry the judgement", () => {
+    const q = resultQuality({ ...base, emptyResult: true,
+      licenseCoverage: { declared: 0, total: 2, pct: 0 } }, true);
+    expect(q).toEqual({ empty: false, noLicenses: false, license: null });
   });
 });

@@ -160,8 +160,25 @@ prep_page() {
             cp "$ROOT/tests/fixtures/good-cyclonedx.json"      "$2/mms-relay-bin_2.0.0/mms-relay-bin_2.0.0_bom.json"
             ;;
         dockerimg)
-            # "Analyze a source directory" mounts $(pwd) as /src.
-            cp -R "$ROOT/examples/nodejs/." "$2/"
+            # "Analyze a source directory" mounts $(pwd) as /src. This runs the
+            # image directly with no docker.sock, so SOURCE mode takes syft's
+            # manifest-only path (entrypoint.sh's "else" branch): a project
+            # with no committed lockfile now fails that path on purpose (see
+            # docker/lib/source-detect.sh and test-e2e.sh's 3h), so the walkthrough
+            # needs a package.json with a matching lockfile, not examples/nodejs
+            # (kept lockfile-less deliberately, to exercise that failure path).
+            cat > "$2/package.json" <<'JSON'
+{"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}
+JSON
+            cat > "$2/package-lock.json" <<'JSON'
+{"name":"demo-app","version":"1.0.0","lockfileVersion":3,"requires":true,
+ "packages":{
+   "":{"name":"demo-app","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}},
+   "node_modules/left-pad":{"version":"1.3.0",
+     "resolved":"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+     "integrity":"sha512-Xs8ynn5gmSFuvHtqQxflWCPa9AbEWZjOI6mSpQXo/PLdTQEA5MPPCf9dSXZ7NsCCz4pWzD/qxb4CJHrahOTgFA=="}
+ }}
+JSON
             ;;
     esac
 }

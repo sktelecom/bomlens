@@ -1,5 +1,5 @@
 {
-  "_comment": "Modelica short library name -> GitHub (owner, repo), for the uses() annotation identify-modelica.py reads. A name here becomes pkg:github/<owner>/<repo>@<version>, which enrich-github-cpe.py can then attach a CPE to if the pair is also curated there. A name NOT here falls back to pkg:generic/<name>@<version> rather than guessing a repository. Extend as needed; only add a pair you have confirmed is the actual upstream of the library.",
-  "Modelica": { "owner": "modelica", "repo": "ModelicaStandardLibrary" },
-  "Buildings": { "owner": "lbl-srg", "repo": "modelica-buildings" }
+  "_comment": "Modelica short library name -> GitHub (owner, repo), for the uses() annotation identify-modelica.py reads. A name here becomes pkg:github/<owner>/<repo>@<version>, which enrich-github-cpe.py can then attach a CPE to if the pair is also curated there. A name NOT here falls back to pkg:generic/<name>@<version> rather than guessing a repository. Extend as needed; only add a pair you have confirmed is the actual upstream of the library. An entry may also carry `license` (an SPDX id) and `licenseFromVersion` (the first version confirmed under it); a version below that floor gets no license. Only record a license read from the upstream license file at that version's tag.",
+  "Modelica": { "owner": "modelica", "repo": "ModelicaStandardLibrary", "license": "BSD-3-Clause", "licenseFromVersion": "3.2.3" },
+  "Buildings": { "owner": "lbl-srg", "repo": "modelica-buildings", "license": "BSD-3-Clause-LBNL", "licenseFromVersion": "13.0.0" }
 }

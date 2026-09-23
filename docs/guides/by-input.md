@@ -121,7 +121,7 @@ $SBOM --project team4-proj --version 2.0.0 \
   --generate-only
 ```
 
-- Both CycloneDX and SPDX (JSON/Tag-Value) are accepted and converted to CycloneDX internally.
+- CycloneDX (JSON or XML) and SPDX (JSON/Tag-Value) are accepted and converted to CycloneDX internally. SPDX RDF/XML is not supported yet.
 - `--analyze` turns on notice and security automatically, so you do not need `--all`.
 - A format conformance report (`_conformance.{json,md,html}`) is also produced, and the first section of the risk report includes the conformance result (whether required fields are present). For what counts as a `fail` vs. a `warn`, see [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report) in the supplier SBOM guide.
 

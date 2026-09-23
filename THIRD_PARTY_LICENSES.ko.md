@@ -154,7 +154,7 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 
 | 도구 | 핀 버전 (ARG) | 용도 | 라이선스 (SPDX) | Copyleft | Source |
 |------|------|------|------------------|----------|--------|
-| grype | v0.112.0 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
+| grype | v0.119.0 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 > 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
 

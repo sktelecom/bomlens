@@ -66,6 +66,7 @@ command -v file >/dev/null 2>&1 && FILE_INFO=$(file -b "$FW" 2>/dev/null || echo
 # Each step is gated on whether real files actually landed (exit codes are
 # unreliable: unblob returns 0 even when an extractor dependency is missing).
 # --------------------------------------------------------
+UNBLOB_REPORT="$WORK/unblob-report.json"
 has_extracted() { [ -n "$(find "$EXTRACT" -type f -size +0c 2>/dev/null | head -1)" ]; }
 unpacked=0
 # Which unpackers were actually available and run. The failure message used to
@@ -85,7 +86,7 @@ _tmo() { if command -v timeout >/dev/null 2>&1; then timeout "$FW_UNPACK_TIMEOUT
 if command -v unblob >/dev/null 2>&1; then
     echo "[firmware] unpacking with unblob..."
     note_tried unblob
-    _tmo unblob --extract-dir "$EXTRACT" "$FW" >/dev/null 2>&1 || true
+    _tmo unblob --extract-dir "$EXTRACT" --report "$UNBLOB_REPORT" "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
 # -no-xattrs, on both call sites below: unsquashfs restores extended attributes
@@ -934,9 +935,36 @@ if command -v python3 >/dev/null 2>&1 \
     fi
 fi
 
+# --------------------------------------------------------
+# ⑤ Analysis coverage: what unblob could and could not open.
+#
+# `unblob --report` lists every region it recognized, every region it could not
+# identify, and every extractor that failed or was missing. A scan that opens
+# only part of an image reads the same as a clean one unless this is said, so
+# the totals go on the root component and into the risk report. The wording is
+# a statement of scope, not a failure. The report itself is large (about 1.4 KB
+# per file, 1.5 MB for a 16 MB image), so only the totals are kept. jq needs
+# roughly ten times the report's size in memory, so a report past
+# FW_REPORT_SUMMARY_MAX_BYTES (32 MiB) is not read at all.
+# --------------------------------------------------------
+FW_REPORT_SUMMARY_MAX_BYTES="${FW_REPORT_SUMMARY_MAX_BYTES:-33554432}"
+if [ -s "$UNBLOB_REPORT" ]; then
+    _rsize=$(wc -c < "$UNBLOB_REPORT" | tr -d ' ')
+    if [ "$_rsize" -le "$FW_REPORT_SUMMARY_MAX_BYTES" ] \
+       && jq -f "$SCRIPT_DIR/summarize-unblob-report.jq" "$UNBLOB_REPORT" > "$WORK/unblob-summary.json" 2>/dev/null; then
+        :
+    else
+        echo '{}' > "$WORK/unblob-summary.json"
+        echo "[firmware] unblob report was too large or unreadable; coverage summary skipped."
+    fi
+else
+    echo '{}' > "$WORK/unblob-summary.json"
+fi
+
 jq -n \
     --slurpfile comps "$WORK/merged.json" \
     --slurpfile deps "$DEPS_JSON" \
+    --slurpfile scope "$WORK/unblob-summary.json" \
     --arg name "$(basename "$FW")" \
     --arg version "$VERSION" \
     --arg desc "$FILE_INFO" \
@@ -956,7 +984,20 @@ jq -n \
       { type: "application", name: "syft", version: $syftv },
       { type: "application", name: "cve-bin-tool", version: $cvebtv }
     ] },
-    component: { type: "firmware", name: $name, version: $version, description: $desc }
+    component: ({ type: "firmware", name: $name, version: $version, description: $desc }
+      + (($scope[0] // {}) as $c
+         | if ($c | length) == 0 then {} else {properties: [
+             {name: "bomlens:firmware:input-bytes", value: ($c.input_bytes | tostring)},
+             {name: "bomlens:firmware:recognized-regions", value: ($c.recognized_chunks | tostring)},
+             {name: "bomlens:firmware:unknown-regions", value: ($c.unknown_chunks | tostring)},
+             {name: "bomlens:firmware:unknown-bytes", value: ($c.unknown_bytes | tostring)},
+             {name: "bomlens:firmware:nested-unknown-regions", value: ($c.nested_unknown_chunks | tostring)},
+             {name: "bomlens:firmware:unknown-top-level-percent", value: ($c.unknown_top_percent | tostring)},
+             {name: "bomlens:firmware:encrypted-regions", value: ($c.encrypted_chunks | tostring)},
+             {name: "bomlens:firmware:extraction-failed", value: ($c.extract_failed | tostring)},
+             {name: "bomlens:firmware:extraction-failed-formats", value: ($c.extract_failed_formats | join(","))},
+             {name: "bomlens:firmware:missing-extractors", value: ($c.missing_extractors | join(","))}
+           ]} end))
   },
   components: $comps[0]
 }

@@ -121,7 +121,7 @@ $SBOM --project team4-proj --version 2.0.0 \
   --generate-only
 ```
 
-- CycloneDX와 SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다.
+- CycloneDX(JSON/XML)와 SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다. SPDX RDF/XML은 아직 지원하지 않습니다.
 - `--analyze`는 고지문과 보안을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다.
 - 추가로 포맷 적합성 보고서(`_conformance.{json,md,html}`)가 생성됩니다. 받은 SBOM이 필수 항목(이름, 버전, 식별자 등)을 갖췄는지 점검한 결과이며, 위험분석보고서 1절에도 요약이 들어갑니다. 받은 SBOM을 검증하고 공급사에 보완을 요청하는 흐름은 [공급사 SBOM 검증](../guides/supplier-sbom.ko.md)을 참고하세요.
 

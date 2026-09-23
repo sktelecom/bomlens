@@ -1280,15 +1280,24 @@ c_kind=$(curl -s -o /dev/null -w '%{http_code}' -F "file=@$WORK/sample.zip" "$BA
 [ "$c_kind" = "400" ] && pass "unknown upload kind rejected (400)" || fail "bogus kind returned $c_kind (expected 400)"
 c_ext=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=zip" -F "file=@$WORK/payload.txt" "$BASE/upload?kind=zip")
 [ "$c_ext" = "415" ] && pass "wrong extension rejected (415)" || fail ".txt as zip returned $c_ext (expected 415)"
-# An XML SBOM is refused here rather than in the container: the pipeline reads
-# JSON only, so accepting the file just spends a scan to fail. The answer has to
-# name the format and the fix, not read as "unsupported file type".
+# CycloneDX XML is accepted: the pipeline converts it to JSON. Any other XML
+# (SPDX RDF/XML in practice) is refused here rather than in the container, since
+# accepting it would only spend a scan to fail, and the answer names the format
+# and the fix instead of reading as "unsupported file type".
 printf '<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.6"/>\n' > "$WORK/supplier.xml"
-xml_body=$(curl -s -o "$WORK/xml-resp.json" -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier.xml" "$BASE/upload?kind=sbom")
-[ "$xml_body" = "415" ] && pass "XML SBOM upload rejected (415)" || fail ".xml as sbom returned $xml_body (expected 415)"
+xml_ok=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier.xml" "$BASE/upload?kind=sbom")
+[ "$xml_ok" = "200" ] && pass "CycloneDX XML SBOM upload accepted (200)" || fail "CycloneDX .xml as sbom returned $xml_ok (expected 200)"
+# UTF-16 (what some Windows tools write) puts a NUL between every character, so
+# a plain byte search for the namespace misses it; the converter reads it fine.
+printf '<?xml version="1.0"?><bom xmlns="http://cyclonedx.org/schema/bom/1.6"/>\n' | iconv -f UTF-8 -t UTF-16 > "$WORK/supplier-u16.xml"
+xml_u16=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier-u16.xml" "$BASE/upload?kind=sbom")
+[ "$xml_u16" = "200" ] && pass "UTF-16 CycloneDX XML upload accepted (200)" || fail "UTF-16 .xml as sbom returned $xml_u16 (expected 200)"
+printf '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>\n' > "$WORK/supplier-rdf.xml"
+xml_body=$(curl -s -o "$WORK/xml-resp.json" -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier-rdf.xml" "$BASE/upload?kind=sbom")
+[ "$xml_body" = "415" ] && pass "non-CycloneDX XML SBOM upload rejected (415)" || fail "RDF .xml as sbom returned $xml_body (expected 415)"
 xml_err=$(python3 -c "import json;print(json.load(open('$WORK/xml-resp.json')).get('error',''))" 2>/dev/null)
 case "$xml_err" in
-    *"not supported yet"*) pass "the 415 names XML and tells the user to convert to JSON" ;;
+    *"Only CycloneDX XML is read"*) pass "the 415 names the accepted XML format and the fix" ;;
     *) fail "XML upload error text unexpected" "got '$xml_err'" ;;
 esac
 # A JSON SBOM upload is unaffected by that guard.
@@ -2008,6 +2017,72 @@ else
     echo "  SKIP: jq not available for conformance generation"
 fi
 
+echo "== sbom_summary reports the firmware scope from the SBOM's own properties =="
+# scan-firmware.sh stamps bomlens:firmware:* on the root component and lists
+# unblob among the tools. The summary exposes them as firmwareScope only for a
+# document that scan produced: a merged SBOM keeps the root component of an
+# earlier firmware scan, and a submitted one is a supplier's data, and neither may
+# present those numbers as its own. Values are accepted only if plainly numbers or
+# names, and it is null when nothing went unopened.
+FWPROPS='[
+  {"name":"bomlens:firmware:input-bytes","value":"1000000"},
+  {"name":"bomlens:firmware:unknown-bytes","value":"250000"},
+  {"name":"bomlens:firmware:unknown-top-level-percent","value":"25"},
+  {"name":"bomlens:firmware:extraction-failed","value":"2"},
+  {"name":"bomlens:firmware:encrypted-regions","value":"1"},
+  {"name":"bomlens:firmware:extraction-failed-formats","value":"ubi,squashfs_v4_le"},
+  {"name":"bomlens:firmware:missing-extractors","value":"sasquatch<img src=x>"}]'
+mkfw() { # name, tools-json, properties-json
+    jq -n --argjson t "$2" --argjson p "$3" \
+        '{bomFormat:"CycloneDX",specVersion:"1.6",metadata:{tools:{components:$t},component:{type:"firmware",name:"fw.bin",properties:$p}},components:[{name:"a",version:"1",type:"library"}]}' \
+        > "$OUT/$1_1.0_bom.json"
+}
+mkfw fwscope '[{"type":"application","name":"unblob"}]' "$FWPROPS"
+mkfw fwmerged '[{"type":"application","name":"bomlens-merge"}]' "$FWPROPS"
+mkfw fwfull '[{"type":"application","name":"unblob"}]' '[
+  {"name":"bomlens:firmware:input-bytes","value":"1000"},
+  {"name":"bomlens:firmware:unknown-bytes","value":"0"},
+  {"name":"bomlens:firmware:extraction-failed","value":"0"},
+  {"name":"bomlens:firmware:encrypted-regions","value":"0"}]'
+mkfw fwbad '[{"type":"application","name":"unblob"}]' '[
+  {"name":"bomlens:firmware:input-bytes","value":"1000"},
+  {"name":"bomlens:firmware:unknown-bytes","value":"-250000"},
+  {"name":"bomlens:firmware:unknown-top-level-percent","value":"1e999"},
+  {"name":"bomlens:firmware:extraction-failed","value":"0"},
+  {"name":"bomlens:firmware:encrypted-regions","value":"0"}]'
+mkfw fwmany '[{"type":"application","name":"unblob"}]' '[
+  {"name":"bomlens:firmware:input-bytes","value":"1000"},
+  {"name":"bomlens:firmware:extraction-failed-formats","value":"a,b,c,d,e,f,g,h,i,j,k,l"},
+  {"name":"bomlens:firmware:missing-extractors","value":"x"}]'
+cat > "$OUT/fwnone_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"a","version":"1","type":"library"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+def scope(i): return server.sbom_summary(i + "_1.0")["firmwareScope"]
+f = scope("fwscope")
+assert f["unknownPercent"] == 25.0 and f["unknownBytes"] == 250000, f
+assert f["failedSteps"] == 2 and f["encryptedRegions"] == 1, f
+assert f["failedFormats"] == ["ubi", "squashfs_v4_le"], f
+assert f["missingExtractors"] == ["sasquatchimgsrcx"], ("markup not reduced", f["missingExtractors"])
+assert scope("fwmerged") is None, "a merged SBOM must not present an earlier scan's coverage as its own"
+assert scope("fwfull") is None, "an image opened in full must give no scope"
+assert scope("fwnone") is None, "a document with no properties must give no scope"
+b = scope("fwbad")
+assert b is None, ("a malformed number must be dropped, not repaired into a plausible one", b)
+m = scope("fwmany")
+assert len(m["failedFormats"]) == 10 and m["namesMore"] == 2, m
+PY
+then
+    pass "sbom_summary gives firmwareScope only for a scan that unpacked the image, and only from plain values"
+else
+    fail "sbom_summary firmwareScope contract"
+fi
+rm -f "$OUT"/fwscope_1.0_bom.json "$OUT"/fwmerged_1.0_bom.json "$OUT"/fwfull_1.0_bom.json \
+      "$OUT"/fwbad_1.0_bom.json "$OUT"/fwmany_1.0_bom.json "$OUT"/fwnone_1.0_bom.json
+
 echo "== conformance_summary passes through pipelineStepsFailed =="
 # validate-sbom.sh already dedupes/orders/caps this off the SBOM's own
 # bomlens:pipeline-step-failed properties; conformance_summary must pass it
@@ -2060,6 +2135,76 @@ PY
         fail "an old report without pipelineStepsFailed was not defaulted safely"
     fi
     rm -f "$OUT"/psfold_1.0_*
+else
+    echo "  SKIP: jq not available for conformance generation"
+fi
+
+echo "== conformance_summary passes through the result-quality signals =="
+# emptyResult / softwareComponentCount / licenseCoverage (validate-sbom.sh) drive
+# the panel's empty-result and zero-license warnings. They must pass through as
+# typed values, drop malformed ones, and stay absent for an older report.
+if command -v jq >/dev/null 2>&1; then
+    PROJECT=rqweb GEN_AT=2026-01-01 bash "$ROOT_DIR/docker/lib/validate-sbom.sh" \
+        "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$OUT/rqweb_1.0" >/dev/null 2>&1
+    if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" "$OUT/rqweb_1.0_conformance.json" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+path = sys.argv[2]
+orig = json.load(open(path))
+c = server.conformance_summary("rqweb_1.0")
+assert c["emptyResult"] is False and c["softwareComponentCount"] > 0, c
+lc = c["licenseCoverage"]
+assert set(lc) == {"declared", "total", "pct"} and lc["total"] == c["softwareComponentCount"], lc
+
+def rewrite(mutate):
+    d = json.loads(json.dumps(orig)); mutate(d)
+    json.dump(d, open(path, "w"))
+    return server.conformance_summary("rqweb_1.0")
+
+def empty(d):
+    d["softwareComponentCount"] = 0; d["emptyResult"] = True
+    d["licenseCoverage"] = {"declared": 0, "total": 0, "pct": None}
+c = rewrite(empty)
+assert c["emptyResult"] is True and c["licenseCoverage"]["pct"] is None, c
+
+def bad(d):
+    d["emptyResult"] = "yes"; d["softwareComponentCount"] = -3
+    d["licenseCoverage"] = {"declared": "x", "total": 5, "pct": 7}
+c = rewrite(bad)
+for k in ("emptyResult", "softwareComponentCount", "licenseCoverage"):
+    assert k not in c, ("malformed value leaked", k, c.get(k))
+
+def pctbad(d):
+    d["licenseCoverage"] = {"declared": 1, "total": 2, "pct": 900}
+assert rewrite(pctbad)["licenseCoverage"] == {"declared": 1, "total": 2, "pct": None}
+def pctfloat(d):
+    d["licenseCoverage"] = {"declared": 1, "total": 2, "pct": 33.3}
+assert rewrite(pctfloat)["licenseCoverage"]["pct"] is None
+def pctbool(d):
+    d["licenseCoverage"] = {"declared": 1, "total": 2, "pct": True}
+assert rewrite(pctbool)["licenseCoverage"]["pct"] is None
+def over(d):
+    d["licenseCoverage"] = {"declared": 9, "total": 2, "pct": 50}
+assert "licenseCoverage" not in rewrite(over)
+def contradict(d):
+    d["emptyResult"] = True; d["softwareComponentCount"] = 157
+c = rewrite(contradict)
+assert "emptyResult" not in c or "softwareComponentCount" not in c, c
+
+def old(d):
+    for k in ("emptyResult", "softwareComponentCount", "licenseCoverage"):
+        d.pop(k, None)
+c = rewrite(old)
+for k in ("emptyResult", "softwareComponentCount", "licenseCoverage"):
+    assert k not in c, ("an old report must not gain", k)
+PY
+    then
+        pass "conformance_summary passes through, validates and defaults the result-quality signals"
+    else
+        fail "conformance_summary result-quality signals wrong"
+    fi
+    rm -f "$OUT"/rqweb_1.0_*
 else
     echo "  SKIP: jq not available for conformance generation"
 fi
@@ -3198,6 +3343,22 @@ case "$mode" in
         echo "Response: {\"secret\": \"do-not-leak-me\"}"
         exit 1
         ;;
+    # Warnings and an error that carry exactly what a diagnostics summary must
+    # not repeat: a home-directory user name, a Bearer token, a URL with
+    # credentials, an Authorization header.
+    diag-leak)
+        echo "[WARN] cannot read /Users/alice/secretproj/pom.xml"
+        echo "[WARN] retry with Authorization: Bearer abcdef1234567890abcdef1234567890"
+        echo "[WARN] fetched https://deploy:pa55w0rd@example.com/x?token=s3cr3ttoken1234"
+        echo "[WARN] cannot open C:\\Users\\bob\\proj\\build.gradle"
+        # A value no other mask would catch, on a line that is not the last one.
+        echo "[WARN] Authorization: custom-scheme opaquevalue-onlyhere"
+        echo "[WARN] pushed with ghp_AbCdEfGhIjKlMnOpQrStUvWxYz012345 and password=hunter2"
+        # Not credentials: an image digest must survive.
+        echo "[WARN] base image ghcr.io/example/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef is old"
+        echo "[ERROR] boom at /home/carol/work with Bearer zzzzzzzzzzzzzzzzzzzzzzzzzz"
+        exit 1
+        ;;
     hang)
         i=0
         while [ "$i" -lt 100 ]; do
@@ -3421,12 +3582,262 @@ msg = dones[0]['data'].get('errorMessage')
 # -- must never carry the response body.
 assert msg == '[ERROR] TRUSCA ingest failed (HTTP 500)', msg
 assert 'do-not-leak-me' not in msg, msg
-assert any('do-not-leak-me' in str(e['data']) for e in evs if e['event'] == 'log'), \
-    'expected the raw Response: line to still be in the live log, unaffected'
+assert any(str(e['data']).startswith('Response:') for e in evs if e['event'] == 'log'), \
+    'expected the Response: line itself to still stream to the live log'
 "; then
     pass "a raw Response: body line never reaches errorMessage, only the [ERROR] line above it"
 else
     fail "a Response: line leaked into errorMessage" "$events"
+fi
+
+echo "== /diagnostics: the Report-a-problem summary carries an allowlist only =="
+# The summary is what a user pastes into a public issue. Whatever the scan
+# logged (paths with a user name, tokens, credentials in a URL, the scanned
+# path itself) must not be in it, on a failed scan and on a successful one.
+echo diag-leak > "$STUB_MODE_FILE"
+events=$(sse_events "project=diagproj&version=9.9&source=rootfs-dir&target=$PLAINROOT&token=")
+diag_id=$(echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False, d
+print(d['id'])")
+diag_fail=$(curl -fsS "$BASE2/diagnostics?id=$diag_id" 2>/dev/null)
+if echo "$diag_fail" | PLAINROOT="$PLAINROOT" python3 -c "
+import sys, json, os
+t = json.load(sys.stdin)['text']
+assert t.startswith('BomLens diagnostics'), t
+for want in ('app version:', 'scanner image:', 'container engine:', 'mode: ROOTFS',
+             'options:', 'outcome: failed', 'stages:', 'warnings: 7', 'error:'):
+    assert want in t, (want, t)
+for banned in ('alice', 'bob', 'carol', 'abcdef1234567890', 'pa55w0rd', 's3cr3ttoken',
+               'zzzzzzzz', 'diagproj', os.environ['PLAINROOT'], 'Bearer a',
+               'opaquevalue', 'ghp_AbCd', 'hunter2', '/host/plainroot'):
+    assert banned not in t, (banned, t)
+assert '/Users/***/secretproj/pom.xml' in t and '/home/***/work' in t, t
+assert 'Users' + chr(92) + '***' in t, t
+assert 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' in t, t
+"; then
+    pass "/diagnostics on a failed scan lists the allowlisted fields and none of the leaked user names, tokens, credentials, scanned path or project name"
+else
+    fail "/diagnostics leaked or omitted fields on a failed scan" "$diag_fail"
+fi
+
+# The live log (and so the copy-log button) is masked the same way, but keeps
+# digests: same stub run, log events.
+if echo "$events" | python3 -c "
+import sys, json
+logs = [str(e['data']) for e in json.load(sys.stdin) if e['event'] == 'log']
+joined = '\n'.join(logs)
+for banned in ('ghp_AbCd', 'hunter2', 'pa55w0rd', 's3cr3ttoken', 'opaquevalue', 'abcdef1234567890abcdef1234567890'):
+    assert banned not in joined, (banned, joined)
+assert 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' in joined, joined
+"; then
+    pass "streamed log lines are credential-masked and keep image digests"
+else
+    fail "streamed log lines leaked a credential or lost a digest" "$events"
+fi
+
+# A failure the server classifies itself (fail(): here an unknown input type)
+# must still land in the summary, with the reason and a bounded, allowlisted
+# input kind, not the request's raw value.
+events=$(sse_events "project=diagfail&version=1.0&source=bogus-kind-that-is-far-too-long-to-echo-back-in-a-summary-line")
+fail_id=$(echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False, d
+print(d['id'])")
+if curl -fsS "$BASE2/diagnostics?id=$fail_id" | python3 -c "
+import sys, json
+t = json.load(sys.stdin)['text']
+assert 'outcome: failed' in t and 'input: other' in t, t
+assert 'error:' in t and 'unknown input type: bogus-kind' in t, t
+assert 'far-too-long-to-echo-back-in-a-summary-line' not in t, t
+"; then
+    pass "a server-classified failure (unknown input type) is in the summary with its reason, and the request's source value is not echoed back"
+else
+    fail "/diagnostics for a fail() path lacks the reason or echoes the source value"
+fi
+
+echo ok > "$STUB_MODE_FILE"
+events=$(sse_events "project=diagok&version=1.0&source=rootfs-dir&target=$PLAINROOT")
+ok_id=$(echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+# scanConfig in the done payload carries settings only, not the recorded outcome.
+assert not ({'mode', 'ok', 'errorMessage'} & set(d['scanConfig'])), d['scanConfig']
+print(d['id'])")
+if curl -fsS "$BASE2/scan?id=$ok_id" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)['scanConfig']
+assert not ({'mode', 'ok', 'errorMessage'} & set(c)), c
+"; then
+    pass "scanConfig (done event and re-opened scan) holds the settings only, not the recorded outcome"
+else
+    fail "scanConfig carries outcome fields"
+fi
+if curl -fsS "$BASE2/diagnostics?id=$ok_id" | PLAINROOT="$PLAINROOT" python3 -c "
+import sys, json, os
+t = json.load(sys.stdin)['text']
+assert 'outcome: succeeded' in t and 'sbom generated: 2 components' in t, t
+assert 'pipeline steps failed: none' in t and 'artifacts: bom.json' in t, t
+assert 'diagok' not in t and os.environ['PLAINROOT'] not in t, t
+"; then
+    pass "/diagnostics on a successful scan reports the outcome, component count and artifact kinds without the project name or scanned path"
+else
+    fail "/diagnostics on a successful scan is wrong"
+fi
+
+# No id, but the failure text the browser already shows: it is added, masked.
+if curl -fsS -G "$BASE2/diagnostics" --data-urlencode "error=Failed to launch scan: /Users/dave/x Bearer topsecretvalue1" | python3 -c "
+import sys, json
+t = json.load(sys.stdin)['text']
+assert 'error:' in t and 'Failed to launch scan' in t, t
+assert 'dave' not in t and 'topsecretvalue1' not in t, t
+"; then
+    pass "/diagnostics without an id adds the on-screen error, masked"
+else
+    fail "/diagnostics did not add or did not mask the on-screen error"
+fi
+
+# No id (a scan that failed before it had a run folder): environment only. A
+# malformed id is refused, like every other id-taking endpoint.
+if curl -fsS "$BASE2/diagnostics" | python3 -c "
+import sys, json
+t = json.load(sys.stdin)['text']
+assert 'app version:' in t and 'outcome' not in t, t
+" && [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/diagnostics?id=../etc")" = "400" ]; then
+    pass "/diagnostics without an id returns the environment section only, and a traversal id is refused (400)"
+else
+    fail "/diagnostics without an id or with a bad id misbehaved"
+fi
+
+echo "== credential masks: one check per pattern, digests preserved =="
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+mask = server._mask_credentials
+red = server._redact_diagnostic_text
+DIGEST = "sha256:" + "0123456789abcdef" * 4
+COMMIT = "0123456789abcdef0123456789abcdef01234567"
+
+# Authorization on a NON-last line, with a value no other mask catches.
+out = red("[WARN] Authorization: custom-scheme opaquevalue\n[WARN] second")
+assert "opaquevalue" not in out and out.endswith("[WARN] second"), out
+# Authorization must not swallow the next line when the value is empty.
+assert red("Authorization:\nnext line").endswith("next line")
+
+secrets = {
+    "github classic": "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+    "github oauth": "gho_AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+    "github user": "ghu_AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+    "github server": "ghs_AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+    "github refresh": "ghr_AbCdEfGhIjKlMnOpQrStUvWxYz012345",
+    "github fine-grained": "github_pat_11ABCDEFG0abcdefghijklmnop_qrstuvwxyz0123456789",
+    "gitlab": "glpat-abcdefghij1234",
+    "huggingface": "hf_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+    "slack": "xoxb-1234567890-abcdefghij",
+    "aws": "AKIA" + "ABCDEFGHIJKLMNOP",
+    "api key": "sk-abcdefghijklmnopqrstuvwxyz0123",
+    "npm": "npm_abcdefghijklmnopqrstuvwxyz0123456789",
+    "jwt": "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.abcdefghijklmnop",
+}
+for name, tok in secrets.items():
+    for form in (tok, "token_" + tok, "using " + tok + " now", "Basic " + tok):
+        got = mask("[WARN] " + form)
+        assert tok not in got, (name, form, got)
+
+for text, hidden in (
+    ("password=hunter2 more", "hunter2"),
+    ("db_password: hunter2", "hunter2"),
+    ('{"api_key": "hunter2"}', "hunter2"),
+    ("secret = hunter2;", "hunter2"),
+    ("access-key=hunter2", "hunter2"),
+    ("https://hunter2token@example.com/x", "hunter2token"),
+    ("https://user:hunter2@example.com/x", "hunter2"),
+    ("curl -H 'Authorization: Bearer hunter2'", "hunter2"),
+    ("fetch ?token=hunter2&x=1", "hunter2"),
+):
+    got = mask(text)
+    assert hidden not in got and "***" in got, (text, got)
+
+# Not credentials: kept.
+assert mask("ssh://git@github.com/o/r.git") == "ssh://git@github.com/o/r.git"
+assert DIGEST in mask("pull ghcr.io/o/app@" + DIGEST)
+assert DIGEST in server._scrub_error_text("pull ghcr.io/o/app@" + DIGEST)
+assert COMMIT in mask("at commit " + COMMIT)
+assert "sk-learn" in mask("install sk-learn")
+assert "a token was refused" == mask("a token was refused")
+
+# The stricter variant still masks bare hex runs (error cards), except digests.
+assert COMMIT not in server._scrub_error_text("hash " + COMMIT)
+
+# Home-directory user names.
+assert red("/Users/alice/p") == "/Users/***/p"
+assert red("/home/bob/p") == "/home/***/p"
+assert red("C:\\Users\\carol\\p") == "C:\\Users\\***\\p"
+print("ok")
+PY
+then
+    pass "each credential pattern is masked; digests, commit ids, ssh git@ and ordinary words are kept"
+else
+    fail "credential mask unit checks failed (see assertion above)"
+fi
+
+echo "== diagnostics: custom registry hidden, sources allowlisted, lines capped =="
+if SBOM_OUTPUT_DIR="$OUT" SBOM_SCANNER_IMAGE="registry.corp.internal:5000/team/bomlens:1.2.3@sha256:$(printf 'ab%.0s' $(seq 32))" \
+    python3 - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+t = server.build_diagnostics(None)
+assert "corp.internal" not in t and "team/bomlens" not in t, t
+assert "scanner image: <custom image>:1.2.3@sha256:" in t, t
+assert "firmware image: ghcr.io/sktelecom/bomlens-firmware:latest" in t, t
+assert server._diag_image("ghcr.io/sktelecom/bomlens:latest", "ghcr.io/sktelecom/bomlens:latest") == "ghcr.io/sktelecom/bomlens:latest"
+assert server._diag_image("host:5000/x/y", "z") == "<custom image>"
+
+# A run whose recorded settings hold hostile values.
+run = "diaghostile_1"
+d = os.path.join(server.OUTPUT_DIR, run); os.makedirs(d, exist_ok=True)
+server.write_scanmeta(d, {"source": "x" * 500, "mode": "not a mode!", "conformanceProfile": "p" * 500,
+                          "ok": False, "errorMessage": "e" * 5000,
+                          "warnings": ["[WARN] " + "w" * 5000]})
+t = server.build_diagnostics(run)
+assert "input: other" in t and "mode: unknown" in t and "conformance profile" not in t, t
+assert max(len(l) for l in t.splitlines()) < 320, max(len(l) for l in t.splitlines())
+print("ok")
+PY
+then
+    pass "a custom registry host is hidden, hostile recorded values are not echoed, and long lines are capped"
+else
+    fail "diagnostics hardening checks failed (see assertion above)"
+fi
+
+echo "== diagnostics: engine probe parses tab-separated output and does not cache a failure =="
+ENGDIR="$WORK/enginebin"; mkdir -p "$ENGDIR"
+cat > "$ENGDIR/docker" <<'STUBDOCKER'
+#!/bin/bash
+if [ -f "$ENGINE_FAIL_FLAG" ]; then exit 1; fi
+printf '27.0.3\tDebian GNU/Linux 12 | (bookworm)\tlinux\taarch64\n'
+STUBDOCKER
+chmod +x "$ENGDIR/docker"; : > "$WORK/engine.sock"; : > "$WORK/engine-fail"
+if PATH="$ENGDIR:$PATH" SBOM_DOCKER_SOCK="$WORK/engine.sock" ENGINE_FAIL_FLAG="$WORK/engine-fail" \
+    SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" "$WORK/engine-fail" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server._diag_engine() == "engine did not answer", server._diag_engine()
+os.remove(sys.argv[2])           # the engine recovers: the failure was not cached
+got = server._diag_engine()
+assert got == "server 27.0.3, Debian GNU/Linux 12 | (bookworm) (linux/aarch64)", got
+print("ok")
+PY
+then
+    pass "the engine probe survives a | in the OS name and a transient failure is not cached"
+else
+    fail "engine probe parsing or caching is wrong (see assertion above)"
 fi
 
 echo "== _scrub_error_text: credential/token-shaped text is masked before display =="
@@ -4656,7 +5067,7 @@ echo "== supplier VEX verdicts (POST /vex-verdict) =="
 cat > "$OUT/vex_1.0_bom.json" <<'JSON'
 {"bomFormat":"CycloneDX","metadata":{"component":{"name":"vex","version":"1.0"}},
  "components":[{"name":"foo","version":"1.0","type":"library","purl":"pkg:npm/foo@1.0"},
-               {"name":"bar","version":"2.0","type":"library"}]}
+               {"name":"bar","version":"2.0","type":"library","bom-ref":"bar-ref"}]}
 JSON
 cat > "$OUT/vex_1.0_security.json" <<'JSON'
 {"Results":[{"Vulnerabilities":[
@@ -4740,6 +5151,11 @@ assert vulns['CVE-2024-10002']['vexState'] == 'under_investigation', vulns['CVE-
 assert 'status' not in vulns['CVE-2024-10001'], vulns['CVE-2024-10001']
 "; then
     pass "saved verdicts are joined onto the matching vulnerability rows (purl and pkg+installed both)"
+curl -fsS "$BASE/scan?id=vex_1.0" 2>/dev/null | python3 -c "
+import sys, json
+s = json.load(sys.stdin)['security']
+assert s['vexCount'] == 2, s
+" && pass "the scan summary carries how many judgements are on file (vexCount)" || fail "vexCount missing from the scan summary"
 else
     fail "verdicts did not join back onto /scan?id= as expected"
 fi
@@ -4795,9 +5211,226 @@ else
     fail "the purl-preferring write did not join back on read"
 fi
 
+# -- export the judgements as a CycloneDX VEX document (GET /vex-export) --
+bad_export_id=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/vex-export?id=../../etc/passwd")
+[ "$bad_export_id" = "400" ] && pass "/vex-export blocks a traversal scan id (400)" || fail "traversal id on /vex-export returned $bad_export_id (expected 400)"
+no_export_scan=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/vex-export?id=vex_nosuchscan_1.0")
+[ "$no_export_scan" = "404" ] && pass "/vex-export 404s for a scan with no _bom.json" || fail "nonexistent scan on /vex-export returned $no_export_scan (expected 404)"
+echo '{"bomFormat":"CycloneDX","components":[]}' > "$OUT/vexnone_1.0_bom.json"
+no_verdicts=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/vex-export?id=vexnone_1.0")
+[ "$no_verdicts" = "404" ] && pass "/vex-export 404s when no judgement was recorded" || fail "scan without judgements on /vex-export returned $no_verdicts (expected 404)"
+rm -f "$OUT/vexnone_1.0_bom.json"
+
+# A judgement recorded against a component the SBOM does not contain cannot be
+# pointed at anything, so the export must leave it out rather than guess.
+curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10009","state":"affected","pkg":"ghost","installed":"1.0"}' \
+    "$BASE/vex-verdict?id=vex_1.0" >/dev/null
+export_resp=$(curl -fsS "$BASE/vex-export?id=vex_1.0")
+echo "$export_resp" | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+assert r['name'] == 'vex_1.0_vex.cdx.json', r
+# the ghost judgement saved above is reported as left out, not silently dropped
+assert r['skipped'] == 1 and r['exported'] >= 2, r
+assert any(x['name'] == r['name'] for x in r['results']), r['results']
+" && pass "/vex-export names the new artifact and lists it in the results" || fail "/vex-export response is wrong" "$export_resp"
+if python3 -c "
+import json
+d = json.load(open('$OUT/vex_1.0_vex.cdx.json'))
+assert d['bomFormat'] == 'CycloneDX' and d['specVersion'] == '1.6', d
+vulns = {v['id']: v for v in d['vulnerabilities']}
+# CVE-2024-10001 was last saved as fixed, CVE-2024-10002 as under_investigation:
+# the exported states are the CycloneDX words, not the UI's.
+assert vulns['CVE-2024-10001']['analysis']['state'] == 'resolved', vulns
+assert vulns['CVE-2024-10002']['analysis']['state'] == 'in_triage', vulns
+assert vulns['CVE-2024-10001']['affects'] == [{'ref': 'pkg:npm/foo@1.0'}], vulns
+# every ref resolves inside the document: the referenced components ride along
+embedded = {c['bom-ref']: c for c in d['components']}
+assert set(embedded) == {'pkg:npm/foo@1.0', 'bar-ref'}, embedded
+assert embedded['pkg:npm/foo@1.0']['purl'] == 'pkg:npm/foo@1.0', embedded
+assert 'justification' not in vulns['CVE-2024-10001']['analysis'], vulns
+assert d['metadata']['component']['name'] == 'vex', d['metadata']
+assert 'CVE-2024-10009' not in vulns, vulns  # its component is not in the SBOM
+assert vulns['CVE-2024-10002']['affects'] == [{'ref': 'bar-ref'}], vulns
+"; then
+    pass "the exported VEX maps states to CycloneDX values and points at the scanned components"
+else
+    fail "the exported VEX document is wrong" "$(cat "$OUT/vex_1.0_vex.cdx.json" 2>/dev/null)"
+fi
+curl -fsS -X POST -H "Content-Type: application/json" \
+    -d '{"cve":"CVE-2024-10001","state":"not_affected","purl":"pkg:npm/foo@1.0","detail":"changed after the first export"}' \
+    "$BASE/vex-verdict?id=vex_1.0" >/dev/null
+curl -fsS "$BASE/vex-export?id=vex_1.0" >/dev/null
+python3 -c "
+import json
+d = json.load(open('$OUT/vex_1.0_vex.cdx.json'))
+v = [x for x in d['vulnerabilities'] if x['id'] == 'CVE-2024-10001'][0]
+assert v['analysis']['state'] == 'not_affected' and v['analysis']['detail'] == 'changed after the first export', v
+" && pass "exporting again rebuilds the VEX from the current judgements" || fail "the second export did not pick up the changed judgement"
+
+# A judgement whose component is not in the SBOM is the only one on file: nothing
+# can be exported, and the caller is told so rather than handed an empty document.
+mkdir -p "$OUT/vexonly_1.0"
+echo '{"bomFormat":"CycloneDX","components":[{"name":"foo","version":"1.0","type":"library","bom-ref":"foo"}]}' > "$OUT/vexonly_1.0/vexonly_1.0_bom.json"
+echo '{"verdicts":[{"cve":"CVE-2024-10009","state":"affected","pkg":"ghost","installed":"1.0"}]}' > "$OUT/vexonly_1.0/vexonly_1.0_vex.json"
+none_matched=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/vex-export?id=vexonly_1.0")
+[ "$none_matched" = "422" ] && pass "/vex-export answers 422 when no judgement matches a component" || fail "unmatched-only export returned $none_matched (expected 422)"
+[ -f "$OUT/vexonly_1.0/vexonly_1.0_vex.cdx.json" ] && fail "a 422 export left a document behind" || pass "a 422 export writes no document"
+
+# The run-folder layout (what real scans produce), with a serialNumber and a
+# Maven-style group:artifact finding name that the SBOM carries as group + name.
+mkdir -p "$OUT/vexrun_1.0"
+cat > "$OUT/vexrun_1.0/vexrun_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","serialNumber":"urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79","version":1,
+ "metadata":{"component":{"name":"vexrun","version":"1.0","type":"application","bom-ref":"root"}},
+ "components":[{"group":"org.apache.logging.log4j","name":"log4j-core","version":"2.14.1","type":"library","bom-ref":"m1"}]}
+JSON
+echo '{"verdicts":[{"cve":"CVE-2021-44228","state":"fixed","pkg":"org.apache.logging.log4j:log4j-core","installed":"2.14.1"}]}' > "$OUT/vexrun_1.0/vexrun_1.0_vex.json"
+run_resp=$(curl -fsS "$BASE/vex-export?id=vexrun_1.0")
+echo "$run_resp" | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+assert r['exported'] == 1 and r['skipped'] == 0, r
+assert any(x['name'] == 'vexrun_1.0_vex.cdx.json' for x in r['results']), r['results']
+d = json.load(open('$OUT/vexrun_1.0/vexrun_1.0_vex.cdx.json'))
+assert d['vulnerabilities'][0]['affects'] == [{'ref': 'm1'}], d
+assert d['components'][0]['group'] == 'org.apache.logging.log4j', d
+" && pass "run-folder export matches a Maven group:artifact finding and stays self-contained" || fail "run-folder export is wrong" "$run_resp"
+rm -rf "$OUT/vexonly_1.0" "$OUT/vexrun_1.0"
+
+cross_export=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE/vex-export?id=vex_1.0")
+[ "$cross_export" = "403" ] && pass "a cross-site Origin on /vex-export is rejected (403)" || fail "cross-site Origin on /vex-export returned $cross_export (expected 403)"
+
+# -- import a supplier's VEX document (POST /vex-import) --
+post_vex() { curl -s -o "${2:-/dev/null}" -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "$1" "$BASE/vex-import?id=${3:-vex_1.0}"; }
+[ "$(post_vex '{}' /dev/null '../../etc/passwd')" = "400" ] && pass "/vex-import blocks a traversal scan id (400)" || fail "traversal id on /vex-import"
+[ "$(post_vex '{}' /dev/null vex_nosuchscan_1.0)" = "404" ] && pass "/vex-import 404s for a scan with no _bom.json" || fail "nonexistent scan on /vex-import"
+[ "$(post_vex '{not json')" = "400" ] && pass "/vex-import rejects malformed JSON (400)" || fail "malformed JSON on /vex-import"
+[ "$(post_vex '{"bomFormat":"SPDX"}')" = "400" ] && pass "/vex-import rejects a document that is not CycloneDX VEX (400)" || fail "non-CycloneDX body on /vex-import"
+head -c 4300000 /dev/zero | tr '\0' 'x' > "$WORK/big-vex.txt"
+big=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/big-vex.txt" "$BASE/vex-import?id=vex_1.0")
+[ "$big" = "413" ] && pass "/vex-import rejects a body over the size cap (413)" || fail "oversized body on /vex-import returned $big (expected 413)"
+cross_import=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: http://evil.example" -H "Content-Type: application/json" -d '{}' "$BASE/vex-import?id=vex_1.0")
+[ "$cross_import" = "403" ] && pass "a cross-site Origin on /vex-import is rejected (403)" || fail "cross-site Origin on /vex-import returned $cross_import (expected 403)"
+
+# A VEX for another product: refused, nothing written.
+other='{"bomFormat":"CycloneDX","metadata":{"component":{"name":"someone-else","version":"1.0"}},"vulnerabilities":[{"id":"CVE-2024-10001","analysis":{"state":"not_affected"},"affects":[{"ref":"pkg:npm/foo@1.0"}]}]}'
+mismatch=$(post_vex "$other" "$WORK/mismatch.json")
+if [ "$mismatch" = "409" ] && python3 -c "
+import json; r = json.load(open('$WORK/mismatch.json'))
+assert r['vexProduct'].startswith('someone-else') and r['scanProduct'].startswith('vex'), r"; then
+    pass "/vex-import refuses a VEX for a different product (409) and names both"
+else
+    fail "different-product VEX returned $mismatch (expected 409)" "$(cat "$WORK/mismatch.json")"
+fi
+[ -f "$OUT/vex_1.0_vex_imported.json" ] && fail "a refused import wrote a file" || pass "a refused import writes nothing"
+
+# Nothing in the document applies to this SBOM: 422, nothing written.
+none='{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vex","version":"1.0"}},"components":[{"bom-ref":"g","name":"ghost","version":"1","purl":"pkg:npm/ghost@1"}],"vulnerabilities":[{"id":"CVE-2024-10001","analysis":{"state":"not_affected"},"affects":[{"ref":"g"}]}]}'
+[ "$(post_vex "$none")" = "422" ] && pass "/vex-import answers 422 when no statement matches a component" || fail "no-match VEX on /vex-import"
+[ -f "$OUT/vex_1.0_vex_imported.json" ] && fail "a 422 import wrote a file" || pass "a 422 import writes nothing"
+
+# A real one: the supplier says CVE-2024-10001 does not affect foo, in CycloneDX words.
+good='{"bomFormat":"CycloneDX","specVersion":"1.6","serialNumber":"urn:uuid:11111111-1111-1111-1111-111111111111","version":1,"metadata":{"component":{"name":"VEX","version":"1.0"}},"components":[{"bom-ref":"a","name":"foo","version":"1.0","purl":"pkg:npm/foo@1.0?arch=x"},{"bom-ref":"g","name":"ghost","version":"1","purl":"pkg:npm/ghost@1"}],"vulnerabilities":[{"id":"CVE-2024-10001","analysis":{"state":"not_affected","justification":"code_not_reachable","detail":"never called"},"affects":[{"ref":"a"},{"ref":"g"}]},{"id":"CVE-2024-10002","analysis":{"state":"weird"},"affects":[{"ref":"a"}]}]}'
+imp=$(post_vex "$good" "$WORK/import.json")
+if [ "$imp" = "200" ] && python3 -c "
+import json; r = json.load(open('$WORK/import.json'))
+assert r['imported'] == 1 and r['unmatched'] == 1 and r['ignored'] == 1, r
+assert r['statements'][0]['state'] == 'not_affected' and r['statements'][0]['purl'] == 'pkg:npm/foo@1.0', r
+assert any(x['name'] == 'vex_1.0_vex_imported.json' for x in r['results']), r['results']"; then
+    pass "/vex-import keeps the statements that match, counts the rest, and lists the file"
+else
+    fail "valid VEX import is wrong ($imp)" "$(cat "$WORK/import.json")"
+fi
+if curl -fsS "$BASE/scan?id=vex_1.0" 2>/dev/null | python3 -c "
+import sys, json
+vulns = {v['id']: v for v in json.load(sys.stdin)['security']['vulnerabilities']}
+row = vulns['CVE-2024-10001']
+# the received statement is its own field: the user's own judgement is untouched
+assert row['vexReceived']['state'] == 'not_affected', row
+assert row['vexReceived']['justification'] == 'code_not_reachable', row
+assert row['vexReceived']['detail'] == 'never called', row
+assert row['vexState'] == 'not_affected', row  # the earlier own judgement (last saved above)
+assert 'vexReceived' not in vulns['CVE-2024-10002'], vulns['CVE-2024-10002']
+"; then
+    pass "a received statement shows on its row beside, not instead of, the user's own judgement"
+else
+    fail "received statement did not join onto /scan?id= as expected"
+fi
+python3 -c "
+import json
+d = json.load(open('$OUT/vex_1.0_vex.json'))
+assert all(v.get('source') == 'user' for v in d['verdicts']), d
+" && pass "importing left the user's own judgements file untouched" || fail "importing changed _vex.json"
+
+# Importing again replaces the received file rather than adding to it.
+again='{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vex","version":"1.0"}},"components":[{"bom-ref":"b","name":"bar","version":"2.0"}],"vulnerabilities":[{"id":"CVE-2024-10002","analysis":{"state":"resolved"},"affects":[{"ref":"b"}]}]}'
+[ "$(post_vex "$again")" = "200" ] && curl -fsS "$BASE/scan?id=vex_1.0" 2>/dev/null | python3 -c "
+import sys, json
+vulns = {v['id']: v for v in json.load(sys.stdin)['security']['vulnerabilities']}
+assert vulns['CVE-2024-10002']['vexReceived']['state'] == 'fixed', vulns['CVE-2024-10002']
+assert 'vexReceived' not in vulns['CVE-2024-10001'], vulns['CVE-2024-10001']
+" && pass "a second import replaces the first, and a name-only component matches by name and version" || fail "second import did not replace the first"
+
+# -- hostile and awkward documents: none may reach a 500 --
+weird='{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vex","version":"1.0"}},"components":[{"name":5,"version":{"a":1},"purl":{"p":1},"bom-ref":["x"]},{"name":"foo","version":"1.0","purl":"pkg:npm/foo@1.0","bom-ref":"a"}],"vulnerabilities":[{"id":"CVE-2024-10001","analysis":{"state":["not_affected"]},"affects":[{"ref":"a"}]},{"id":"CVE-2024-10002","analysis":{"state":"resolved"},"affects":[{"ref":"a"}]},{"id":"CVE-2024-10003","analysis":{"state":"resolved"}}]}'
+weird_code=$(post_vex "$weird" "$WORK/weird.json")
+if [ "$weird_code" = "200" ] && python3 -c "
+import json; r = json.load(open('$WORK/weird.json'))
+assert r['imported'] == 1 and r['ignored'] == 2, r  # wrong-typed state, and a statement with no affects"; then
+    pass "wrong-typed fields and a statement with no affects are counted as ignored, never a 500"
+else
+    fail "awkward VEX document returned $weird_code" "$(cat "$WORK/weird.json")"
+fi
+# Sent from a file: a single 200 KB argument is over Linux's per-argument limit.
+python3 -c "print('['*100000 + ']'*100000)" > "$WORK/deep.json"
+deep=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/deep.json" "$BASE/vex-import?id=vex_1.0")
+[ "$deep" = "400" ] && pass "a deeply nested body is refused as invalid (400), not a 500" || fail "deeply nested body on /vex-import returned $deep (expected 400)"
+
+# Trivy-shaped row without a purl (a CPE match) against an SBOM component that has one:
+# the statement is stored with both keys, so the row still shows it.
+mkdir -p "$OUT/vexasym_1.0"
+echo '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vexasym","version":"1.0","type":"application","bom-ref":"root"}},"components":[{"name":"openssl","version":"3.0.0","type":"library","purl":"pkg:generic/openssl@3.0.0","bom-ref":"o"}]}' > "$OUT/vexasym_1.0/vexasym_1.0_bom.json"
+echo '{"Results":[{"Vulnerabilities":[{"VulnerabilityID":"CVE-2024-3333","Severity":"HIGH","PkgName":"openssl","InstalledVersion":"3.0.0","PkgIdentifier":{}},{"VulnerabilityID":"CVE-2024-4444","Severity":"LOW","PkgName":"zlib","InstalledVersion":"1.0","PkgIdentifier":{"PURL":"pkg:generic/zlib@1.0"}}]}]}' > "$OUT/vexasym_1.0/vexasym_1.0_security.json"
+asym='{"bomFormat":"CycloneDX","metadata":{"component":{"name":"vexasym","version":"1.0","bom-ref":"prod"}},"components":[{"bom-ref":"o","name":"openssl","version":"3.0.0","purl":"pkg:generic/openssl@3.0.0"}],"vulnerabilities":[{"id":"CVE-2024-3333","analysis":{"state":"not_affected"},"affects":[{"ref":"o"}]},{"id":"CVE-2024-4444","analysis":{"state":"not_affected","detail":"product does not ship it"},"affects":[{"ref":"prod"}]}]}'
+[ "$(post_vex "$asym" /dev/null vexasym_1.0)" = "200" ] && curl -fsS "$BASE/scan?id=vexasym_1.0" 2>/dev/null | python3 -c "
+import sys, json
+vulns = {v['id']: v for v in json.load(sys.stdin)['security']['vulnerabilities']}
+assert vulns['CVE-2024-3333']['vexReceived']['state'] == 'not_affected', vulns['CVE-2024-3333']
+# a product-level statement covers a finding that has no statement of its own
+assert vulns['CVE-2024-4444']['vexReceived']['detail'] == 'product does not ship it', vulns['CVE-2024-4444']
+" && pass "a purl-less finding matches its component by name and version, and a product-level statement covers the rest" || fail "purl-less finding or product-level statement did not show on its row"
+rm -rf "$OUT/vexasym_1.0"
+
+# The scanned SBOM is not held to the received document's size cap.
+python3 -c "
+import json
+comps = [{'name': 'p%d' % i, 'version': '1', 'type': 'library', 'purl': 'pkg:npm/p%d@1' % i, 'bom-ref': 'p%d' % i, 'description': 'x' * 200} for i in range(36000)]
+json.dump({'bomFormat': 'CycloneDX', 'metadata': {'component': {'name': 'bigsbom', 'version': '1'}}, 'components': comps}, open('$OUT/bigsbom_1_bom.json', 'w'))
+"
+bigsize=$(wc -c < "$OUT/bigsbom_1_bom.json")
+[ "$bigsize" -gt 8388608 ] || fail "fixture SBOM is not over 8 MiB ($bigsize)"
+[ "$(post_vex '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"bigsbom","version":"1"}},"components":[{"bom-ref":"x","name":"p1","version":"1","purl":"pkg:npm/p1@1"}],"vulnerabilities":[{"id":"CVE-2024-1","analysis":{"state":"resolved"},"affects":[{"ref":"x"}]}]}' /dev/null bigsbom_1)" = "200" ] \
+    && pass "an SBOM over 8 MiB still accepts a VEX import" || fail "a large scanned SBOM broke /vex-import"
+rm -f "$OUT/bigsbom_1_bom.json" "$OUT/bigsbom_1_vex_imported.json"
+
+# A document that would add more statements than the cap is refused.
+python3 -c "
+import json
+vulns = [{'id': 'CVE-2024-%d' % i, 'analysis': {'state': 'resolved'}, 'affects': [{'ref': 'prod'}]} for i in range(20001)]
+json.dump({'bomFormat': 'CycloneDX', 'metadata': {'component': {'name': 'vex', 'version': '1.0', 'bom-ref': 'prod'}}, 'vulnerabilities': vulns}, open('$WORK/many.json', 'w'))
+"
+many=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/many.json" "$BASE/vex-import?id=vex_1.0")
+[ "$many" = "413" ] && pass "a document with too many statements is refused (413)" || fail "over-cap statement count returned $many (expected 413)"
+
 curl -fsS -X POST "$BASE/scan-delete?id=vex_1.0" >/dev/null 2>&1
 [ -f "$OUT/vex_1.0_vex.json" ] && fail "/scan-delete left the VEX sidecar behind" \
     || pass "/scan-delete removes the VEX verdict sidecar along with the rest of the scan"
+[ -f "$OUT/vex_1.0_vex_imported.json" ] && fail "/scan-delete left the received VEX behind" \
+    || pass "/scan-delete removes the received VEX file too"
+[ -f "$OUT/vex_1.0_vex.cdx.json" ] && fail "/scan-delete left the exported VEX behind" \
+    || pass "/scan-delete removes the exported VEX document too"
 
 echo "== external vulnerability lookup (GET /advisory, GET /package-advisories) =="
 # Three dedicated server instances so these tests never touch the real

@@ -17,4 +17,5 @@ entrypoint  text eol=lf
 
 # Fixtures / data are normalized to LF for byte-stable diffs across platforms.
 *.json      text eol=lf
+*.tsv       text eol=lf
 *.md        text eol=lf

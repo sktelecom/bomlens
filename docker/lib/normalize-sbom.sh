@@ -226,6 +226,47 @@ PYRANGE_DEDUP='
 # component name/version are retained); valid namespaced swift purls are untouched.
 PURL_FIX='(.metadata.component) |= (if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) | (.components) |= (if type=="array" then map(if (has("purl") and (.purl|test("^pkg:swift/[^/]+@"))) then with_entries(select(.key!="purl")) else . end) else . end)'
 
+# cdxgen lists a resolved Swift package again from the import statements and
+# from the checked-out copy's own Package.swift: a pkg:generic entry with no
+# version, and a purl-less entry with version "unspecified". Both name a package
+# that Package.resolved already gave a namespaced pkg:swift purl and (usually) a
+# license, so they only inflate the count and lower the license and purl
+# coverage. A component is dropped only when all of these hold: exactly one
+# namespaced pkg:swift component has its name (two packages sharing a name in
+# different namespaces make the match ambiguous, so nothing is dropped), it has
+# no version, it has a bom-ref or purl to identify it, and it carries nothing but
+# the bookkeeping properties cdxgen adds to such copies (no license, evidence,
+# hashes, or other properties, which would mark a first-party target). Dependency
+# edges of a dropped copy are merged into the kept package and every edge that
+# named it points at the kept one. Platform modules (Foundation, XCTest) and the
+# root are left alone.
+SWIFT_DUP_FIX='def swift_ref: (.["bom-ref"] // .purl // "");
+  def swift_ns: ((.purl // "") | test("^pkg:swift/[^/]+/"));
+  ( [ .components[]? | select(swift_ns) ] | group_by(.name // "")
+    | map(select(length == 1 and ((.[0].name // "") != "") and (.[0] | swift_ref) != "") | {((.[0].name)): (.[0] | swift_ref)})
+    | add // {} ) as $keep
+  | ( [ .components[]?
+        | select( (swift_ns | not)
+                  and (swift_ref != "")
+                  and ((.name // "") as $n | $n != "" and $keep[$n] != null)
+                  and (((.version // "") == "") or (.version == "unspecified"))
+                  and (((.purl // "") == "") or (.purl == ("pkg:generic/" + .name)))
+                  and ((.licenses // []) | length == 0)
+                  and (.evidence == null)
+                  and ((.hashes // []) | length == 0)
+                  and ((.properties // []) | all(.name | test("^(cdx:swift:|internal:|cdx:license:|bomlens:licenseClass$)"))) )
+        | {(swift_ref): $keep[.name]} ] | add // {} ) as $drop
+  | if ($drop | length) == 0 then . else
+      .components |= map(select(swift_ref as $r | ($drop | has($r)) | not))
+      | (if (.dependencies|type)=="array" then
+          .dependencies |= ( map(.ref as $r | .ref = ($drop[$r // ""] // $r)
+                                 | .dependsOn = ((.dependsOn // []) | map($drop[.] // .)))
+            | group_by(.ref)
+            | map(.[0] + {dependsOn: (map(.dependsOn) | add | unique) })
+            | map(.ref as $r | .dependsOn |= map(select(. != $r))) )
+         else . end)
+    end'
+
 # Make vendored (SCANOSS-identified) components reachable by the security scan.
 # SCANOSS labels C/C++ matches with pkg:github/<owner>/<repo> PURLs, which Trivy
 # does NOT use for CVE matching — it matches OS/language PURLs and CPEs. Without a
@@ -429,6 +470,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${DROP_EMPTY_FILES}
         | ${NAME_VERSION_DEDUP}
         | ${PYRANGE_DEDUP}
+        | ${SWIFT_DUP_FIX}
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
         | ${OS_SRC_FIX}
@@ -448,7 +490,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

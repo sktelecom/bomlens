@@ -20,6 +20,7 @@ import { SCAN_STAGES, stageStatuses } from "@/lib/scanProgress";
 import { cn } from "@/lib/utils";
 
 import { ProgressLog } from "./ProgressLog";
+import { ReportProblem } from "./ReportProblem";
 
 type Status = "running" | "done" | "error";
 
@@ -181,6 +182,10 @@ export function ScanRunning({
       )}
 
       <ProgressLog logs={logs} status={status} progress={progress} />
+
+      {/* No run id here: the stream ended before a finished scan existed, so the
+          summary is the environment section only. */}
+      {failed && <ReportProblem scanId={null} errorMessage={errorMessage} defaultOpen />}
     </div>
   );
 }

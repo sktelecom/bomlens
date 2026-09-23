@@ -318,7 +318,7 @@ grep -q "G7 registry evaluation failed" <<<"$BRLOG" && pass "broken registry war
 # the point is that a broken G7 registry costs the report its G7 section and
 # nothing else.
 bshape=$(jq -r '"g7=\([.checks[]|select(.id|startswith("g7-"))]|length) cisa=\([.checks[]|select(.id|startswith("cisa-"))]|length) base=\([.checks[]|select((.id|startswith("g7-")|not) and (.id|startswith("cisa-")|not))]|length) result=\(.result)"' "$WORK/conf4_conformance.json")
-[ "$bshape" = "g7=0 cisa=23 base=18 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
+[ "$bshape" = "g7=0 cisa=23 base=21 result=pass" ] && pass "base checks and result survive a broken registry" || fail "report shape '$bshape' after broken registry"
 
 echo "== legacy CycloneDX tools array does not false-negative the tool checks =="
 # metadata.tools as a bare array (pre-1.5 shape) used to hard-error inside the

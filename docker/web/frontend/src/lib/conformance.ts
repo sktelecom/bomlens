@@ -9,7 +9,7 @@
  * Pure and unit tested — every count comes from the check statuses and sources,
  * none is invented.
  */
-import type { AiProfile, ConformanceCheck } from "./api";
+import type { AiProfile, ConformanceCheck, ConformanceSummary } from "./api";
 
 export function isG7(check: ConformanceCheck): boolean {
   return check.id.startsWith("g7-");
@@ -388,5 +388,37 @@ export function profileCard(profile: AiProfile): ProfileCardModel {
     licenseNonCommercial: profile.licenseReview.nonCommercial,
     frameworkCount: profile.regulatoryCrosswalk.frameworks.length,
     crosswalk: crosswalkTotals(profile.regulatoryCrosswalk.frameworks),
+  };
+}
+
+/** What the report says about the result itself, as opposed to the SBOM's fields:
+ *  whether the scan found any software and how many components declare a
+ *  license. A "pass" verdict cannot express either, since an empty document has
+ *  nothing mandatory to fail. */
+export interface ResultQuality {
+  /** No software components at all. */
+  empty: boolean;
+  /** No component declares a license, over a non-empty set. */
+  noLicenses: boolean;
+  /** Present whenever there are components, so the figure can be shown. */
+  license: { declared: number; total: number; pct: number } | null;
+}
+
+/** `isAi` excludes AI documents: the caller passes `isAiScan(result)`, which
+ *  also covers a dataset document. Their G7 checks carry the judgement, and a
+ *  model document legitimately declares no per-package licenses. A report that
+ *  carries no signal (written before the fields existed, or a format the
+ *  scanner could not measure) yields no warning and no figure. */
+export function resultQuality(conformance: ConformanceSummary, isAi = false): ResultQuality {
+  const lc = conformance.licenseCoverage;
+  const license =
+    !isAi && lc && lc.total > 0 && typeof lc.pct === "number"
+      ? { declared: lc.declared, total: lc.total, pct: lc.pct }
+      : null;
+  return {
+    empty: !isAi && conformance.emptyResult === true,
+    // Not `pct === 0`: 1 of 157 rounds down to 0% but is not "none".
+    noLicenses: license !== null && license.declared === 0,
+    license,
   };
 }

@@ -28,13 +28,13 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 
 | Tool | Version | Role |
 |------|------|------|
-| syft | v1.51.0 | Scans images, binaries, and directories |
+| syft | v1.52.0 | Scans images, binaries, and directories |
 | Trivy | v0.74.0 | Vulnerability report |
 | cosign | v3.1.3 | SBOM signing |
 | jq | — | SBOM normalization and notice generation |
 | ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
 | docker CLI | 29.7.2 | Starts a sibling cdxgen container when the web UI runs a source scan |
-| cdxgen | 12.8.4 | Model pedigree enrichment (`bomlens-aibom` image only) |
+| cdxgen | 13.1.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
 
 Tool versions are pinned with `ARG` in `docker/Dockerfile`.
 
@@ -99,7 +99,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
-In direct runs, `SOURCE` mode has syft read the package manifests inside the container, so it may only capture direct dependencies. If you need transitive dependencies, use `scan-sbom.sh`, which routes to the per-language cdxgen images.
+In direct runs, `SOURCE` mode has syft read the package manifests inside the container, so it may only capture direct dependencies. If you need transitive dependencies, use `scan-sbom.sh`, which routes to the per-language cdxgen images. Syft's manifest readers need a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` for Node, and the equivalent for other ecosystems) to resolve any of a project's declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.
 
 ### Notice and reports in one run
 
@@ -159,16 +159,23 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android source scans (Android SDK image): set `1` to keep the full graph, build and test tooling included, instead of filtering to the release runtime classpath |
 | `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP (Composer) source scans: set `1` to keep the full require-plus-require-dev graph instead of filtering to the required set |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | Source scans: set `1` to leave the resolved tree in place. By default the scan restores the files its resolvers rewrote (`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`) and removes the build directories they created, so the scanned project is handed back as it was |
-| `BOMLENS_PREP_TIMEOUT` | - | `900` (`1800` for Gradle/Android steps) | Seconds a single dependency-resolution step (Cargo, Go, Bundler, pip, npm, Swift, Gradle/Android) is allowed to run before it is stopped and the scan moves on without it. Set to override both defaults for every step. A step that fails or times out is logged with its own output and recorded on the SBOM as `bomlens:pipeline-step-failed`; the scan itself still completes |
+| `BOMLENS_PREP_TIMEOUT` | - | `900` (`1800` for Gradle/Android steps) | Seconds a single dependency-resolution step (Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) is allowed to run before it is stopped and the scan moves on without it. Set to override both defaults for every step. A step that fails or times out is logged with its own output and recorded on the SBOM as `bomlens:pipeline-step-failed`; the scan itself still completes |
 | `BOMLENS_CANCEL_GRACE` | — | `30` | Seconds a cancelled scan (CLI Ctrl+C, or the web UI's cancel button) gets to stop cleanly before it is force-stopped. Applies to the CLI and `--ui`; the desktop app always uses the default |
 | `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | Source scans: set `1` to keep the manifests under test, example, benchmark and demo folders and the GitHub Actions workflows in `.github/workflows`, which are left out by default |
-| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
-| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM), which additionally allow 1.7 |
+| `BOMLENS_NO_COPYRIGHT` | - | - | Source scans: set `1` to skip filling npm, Python, Go and Rust component `copyright` from the installed packages' license files |
+| `BOMLENS_NO_CARGO_LICENSE` | - | - | Source scans: set `1` to skip filling Rust component licenses from `cargo metadata` (`FETCH_LICENSE=false` on the command line skips it too) |
+| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
+| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM); always includes 1.7, the version the AIBOM toolchain emits |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | Accepted SPDX spec versions for the conformance check |
 | `PURL_MIN_PCT` | — | `90` | Conformance check: minimum percentage of components with a PURL (mandatory check). Applies to a `--deep-cve` scan too, CLI or web UI |
 | `LICENSE_MIN_PCT` | — | `80` | Conformance check: minimum percentage of components with a license (recommended, warn only). Applies to a `--deep-cve` scan too, CLI or web UI |
 | `HASH_MIN_PCT` | — | `50` | Conformance check: minimum percentage of components with a hash (recommended, warn only). Applies to a `--deep-cve` scan too, CLI or web UI |
 | `FIELD_MIN_PCT` | — | `80` | Conformance check: minimum percentage coverage for advisory per-component regulatory fields. Applies to a `--deep-cve` scan too, CLI or web UI |
+| `PURL_TYPES_FILE` | — | `docker/lib/purl-types.json` | Conformance check: the purl-spec type data that says which types exist and which of them require a namespace |
+| `NS_ADVISORY_TYPES` | — | `golang huggingface` | Conformance check: types whose missing namespace is reported on the advisory row instead of failing the SBOM (space-separated) |
+| `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance report as an advisory row. Uses the network |
+| `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
+| `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |
 
 > TRUSCA's (formerly TrustedOSS Portal) native ingest endpoint (`POST /v1/projects/{id}/sbom-ingest`, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep `UPLOAD_TARGET=dependency-track` (the default).
 

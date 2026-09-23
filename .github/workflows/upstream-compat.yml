@@ -6,7 +6,7 @@
 # opens a tracking issue.
 #
 # Scope: cdxgen (pulled at runtime via CDXGEN_TAG / CDXGEN_ALLINONE, so it can
-# drift even on the moving v12 tag). syft/trivy are baked into the image by ARG;
+# drift even on the moving v13 tag). syft/trivy are baked into the image by ARG;
 # their drift surfaces on the Renovate bump PR, which runs the full CI (example
 # scans + output snapshots).
 name: Upstream compatibility
@@ -32,7 +32,7 @@ jobs:
     env:
       # Preview the newest cdxgen instead of the pinned tag.
       CDXGEN_TAG: latest
-      CDXGEN_ALLINONE: ghcr.io/cyclonedx/cdxgen:latest
+      CDXGEN_ALLINONE: ghcr.io/cdxgen/cdxgen:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

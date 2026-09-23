@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   ShieldCheck,
+  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,19 @@ import { Select } from "@/components/ui/select";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import {
   ApiError,
+  exportVex,
+  fileUrl,
+  importVex,
   saveVexVerdict,
   VEX_STATES,
+  type ResultFile,
+  type VexReceived,
   type SecuritySummary,
   type Severity,
   type VexState,
   type VulnItem,
 } from "@/lib/api";
+import { receivedFor, receivedIndex, type ReceivedIndex } from "@/lib/vexReceived";
 import { csvFilename, downloadCsv, toCsv, vulnCsvRows } from "@/lib/csv";
 import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
@@ -103,6 +110,9 @@ interface Props {
    *  upgrading it actually reach this transitive package?" without hand-
    *  expanding a tree that can run to hundreds of branches. */
   onPickDependency?: (name: string, version?: string) => void;
+  /** The refreshed artifact listing after a VEX export, so the header counts
+   *  and the Artifacts screen agree with the new file. */
+  onResultsChange?: (files: ResultFile[]) => void;
 }
 
 type Sort = { key: VulnSortKey; dir: SortDir };
@@ -174,6 +184,7 @@ function VulnDetail({
   onPickDependency,
   scanId,
   vex,
+  received,
   onVexSaved,
 }: {
   vuln: VulnItem;
@@ -182,12 +193,13 @@ function VulnDetail({
   onPickDependency?: (name: string, version?: string) => void;
   scanId?: string | null;
   vex: VexFields;
+  received?: VexReceived;
   onVexSaved: (saved: VexFields) => void;
 }) {
   const { t, i18n } = useTranslation();
   const noOriginalDetail =
     vuln.cvss == null && !vuln.description && links.length === 0 && !vuln.publishedDate;
-  if (noOriginalDetail && !scanId && !vex.state) {
+  if (noOriginalDetail && !scanId && !vex.state && !received) {
     return <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>;
   }
   return (
@@ -267,6 +279,23 @@ function VulnDetail({
           {t("result.viewInDependencies", { name: vuln.pkg })}
         </button>
       ) : null}
+      {received && (
+        <div className="space-y-1 border-t pt-3">
+          <div className="font-medium">{t("result.vexReceivedTitle")}</div>
+          <p className="text-xs text-muted-foreground">
+            {received.source
+              ? t("result.vexReceivedFrom", { product: received.source })
+              : t("result.vexReceivedHint")}
+          </p>
+          <Badge tone={VEX_TONE[received.state]}>{t(VEX_LABEL_KEY[received.state])}</Badge>
+          {received.justification && (
+            <p className="text-muted-foreground">
+              {t("result.vexReceivedJustification", { value: received.justification })}
+            </p>
+          )}
+          {received.detail && <p className="text-muted-foreground">{received.detail}</p>}
+        </div>
+      )}
       <VexJudgement scanId={scanId} vuln={vuln} vex={vex} onSaved={onVexSaved} />
     </div>
   );
@@ -410,16 +439,26 @@ export function VulnerabilitiesTable({
   onQueryChange,
   onPickComponent,
   onPickDependency,
+  onResultsChange,
 }: Props) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const items = security.vulnerabilities ?? [];
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [exportingVex, setExportingVex] = useState(false);
   // Local overrides for a verdict just saved this session, so the badge and
   // panel reflect it immediately without waiting on a re-fetch of the whole
   // scan. Reset on scanId change so switching scans can't carry one over.
   const [vexOverrides, setVexOverrides] = useState<Record<string, VexFields>>({});
+  // The statements from a VEX document imported this session. Once set they
+  // stand for the whole received file (the server replaces it on every import),
+  // so they win over what the scan payload carried.
+  const [imported, setImported] = useState<ReceivedIndex | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setVexOverrides({});
+    setImported(null);
   }, [scanId]);
   const initial = vulnsFromQuery(urlState);
   const [severityFilter, setSeverityFilter] = useState(initial.severity);
@@ -465,6 +504,69 @@ export function VulnerabilitiesTable({
       csvFilename(scanId ?? "scan", "vulnerabilities", new Date().toISOString().slice(0, 10)),
       toCsv(vulnCsvRows(visible, headers)),
     );
+  };
+
+  // The export button appears only once at least one judgement exists, either
+  // loaded with the scan or saved this session.
+  const hasVex =
+    !IS_STATIC_DEMO &&
+    ((security.vexCount ?? 0) > 0 ||
+      items.some((v) => Boolean(vexOverrides[vexKey(v)]?.state ?? v.vexState)));
+  const runVexExport = async () => {
+    if (!scanId || exportingVex) return;
+    setExportingVex(true);
+    const res = await exportVex(scanId);
+    setExportingVex(false);
+    if (!res) {
+      toast(t("result.vexExportFailed"));
+      return;
+    }
+    onResultsChange?.(res.results);
+    // Hand the file over straight away, as the SPDX export does.
+    const a = document.createElement("a");
+    a.href = fileUrl(scanId, res.name);
+    a.download = res.name;
+    a.click();
+    toast(
+      res.skipped > 0
+        ? t("result.vexExportPartial", { skipped: res.skipped })
+        : t("result.downloadStarted"),
+    );
+  };
+
+  const runVexImport = async (file: File) => {
+    if (!scanId || importing) return;
+    // A VEX document is a few hundred KB at most; the server refuses more than
+    // 4 MB, so say so before sending it.
+    if (file.size > 4 * 1024 * 1024) {
+      toast(t("result.vexImportTooLarge"));
+      return;
+    }
+    setImporting(true);
+    const out = await importVex(scanId, await file.text());
+    setImporting(false);
+    if (!out.ok) {
+      if (out.status === 409) {
+        toast(
+          t("result.vexImportMismatch", {
+            vex: out.vexProduct ?? "?",
+            scan: out.scanProduct ?? "?",
+          }),
+        );
+      } else if (out.status === 413) {
+        toast(t("result.vexImportTooLarge"));
+      } else if (out.status === 422) {
+        toast(t("result.vexImportNoMatch"));
+      } else if (out.status === 400) {
+        toast(t("result.vexImportInvalid"));
+      } else {
+        toast(t("result.vexImportFailed"));
+      }
+      return;
+    }
+    setImported(receivedIndex(out.statements, out.source));
+    onResultsChange?.(out.results);
+    toast(t("result.vexImported", { imported: out.imported, unmatched: out.unmatched }));
   };
 
   const anyEpss = useMemo(() => items.some((v) => typeof v.epss === "number"), [items]);
@@ -590,17 +692,60 @@ export function VulnerabilitiesTable({
             {t("result.vulnShown", { shown: visible.length, total: items.length })}
           </span>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="ml-auto shrink-0"
-          disabled={visible.length === 0}
-          onClick={exportCsv}
-        >
-          <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-          {t("result.exportCsv")}
-        </Button>
+        <div className="ml-auto flex shrink-0 gap-2">
+          {scanId && !IS_STATIC_DEMO && (
+            <>
+              {/* sr-only, not hidden: the native input keeps its label and
+                  keyboard behavior, as in FileDropzone. The button below opens it,
+                  so it is left out of the tab order to avoid a second stop. */}
+              <input
+                ref={importInput}
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label={t("result.vexImport")}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void runVexImport(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={importing}
+                onClick={() => importInput.current?.click()}
+              >
+                <Upload className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                {importing ? t("result.vexImporting") : t("result.vexImport")}
+              </Button>
+            </>
+          )}
+          {scanId && hasVex && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exportingVex}
+              onClick={runVexExport}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+              {exportingVex ? t("result.vexExporting") : t("result.vexExport")}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={visible.length === 0}
+            onClick={exportCsv}
+          >
+            <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+            {t("result.exportCsv")}
+          </Button>
+        </div>
       </div>
       <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
         <table className="w-full text-left text-xs">
@@ -638,6 +783,7 @@ export function VulnerabilitiesTable({
               detail: v.vexDetail,
               updatedAt: v.vexUpdatedAt,
             };
+            const received = imported ? receivedFor(imported, v) : v.vexReceived;
             const hasDetail =
               v.cvss != null ||
               !!v.description ||
@@ -646,7 +792,8 @@ export function VulnerabilitiesTable({
               // The judgement panel is reachable even for a CVE with no other
               // detail: a component's own scan is the one place to set it.
               Boolean(scanId) ||
-              Boolean(vex.state);
+              Boolean(vex.state) ||
+              Boolean(received);
             const toggle = () => setOpenKey(isOpen ? null : key);
             return (
               <Fragment key={key}>
@@ -702,6 +849,11 @@ export function VulnerabilitiesTable({
                       {vex.state && (
                         <Badge tone={VEX_TONE[vex.state]} title={t("result.vexSectionHint")}>
                           {t("result.vexBadge", { state: t(VEX_LABEL_KEY[vex.state]) })}
+                        </Badge>
+                      )}
+                      {received && (
+                        <Badge tone={VEX_TONE[received.state]} title={t("result.vexReceivedHint")}>
+                          {t("result.vexReceivedBadge", { state: t(VEX_LABEL_KEY[received.state]) })}
                         </Badge>
                       )}
                       {v.kev && (
@@ -772,6 +924,7 @@ export function VulnerabilitiesTable({
                         onPickDependency={onPickDependency}
                         scanId={scanId}
                         vex={vex}
+                        received={received}
                         onVexSaved={(saved) =>
                           setVexOverrides((prev) => ({ ...prev, [vexKey(v)]: saved }))
                         }

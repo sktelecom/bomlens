@@ -69,6 +69,8 @@ SBOM_FIRMWARE_IMAGE=<사내 미러>:<태그> ./scripts/scan-sbom.sh --ui
 
 산출물은 다른 스캔과 같은 고지문, SBOM, 위험분석보고서입니다(일반적인 구성은 [보고서 읽는 법](../concepts/reports-explained.ko.md)과 [산출물 레퍼런스](../reference/artifacts.ko.md) 참고). 다만 펌웨어 SBOM을 읽기 전에 알아둘 점이 하나 있습니다. 일부 컴포넌트는 버전이 아예 없습니다. 바이너리의 버전 문자열이 빌드 과정에서 남지 않은 경우에도, BomLens는 그 라이브러리가 링크돼 있다는 사실만은 기록합니다. 문자열 매칭이 아니라 ELF의 SONAME·NEEDED 항목이라는 구조 자체에서 읽은 것이며, 이런 컴포넌트에는 `bomlens:evidenceGrade = presence-only` 속성이 붙습니다. 버전이 없다고 해서 스캔이 놓친 것이 아니라, 바이너리 자체에 읽을 버전이 없다는 뜻이며 컴포넌트 자체는 실재합니다. 라이선스 의무 판단에는 이것으로 충분하지만(어느 릴리스인지와 무관하게 그 라이브러리는 존재하므로), 버전 기반 CVE 매칭은 이 컴포넌트를 판단할 근거가 없습니다.
 
+언패커는 이미지를 어디까지 열 수 있었는지도 함께 보고하며, BomLens는 이를 결과 옆에 기록합니다. 합계는 펌웨어 컴포넌트의 `bomlens:firmware:*` 속성(`input-bytes`, `recognized-regions`, `unknown-regions`, `unknown-bytes`, `unknown-top-level-percent`, `nested-unknown-regions`, `encrypted-regions`, `extraction-failed`, `extraction-failed-formats`, `missing-extractors`)으로 남고, 열지 못한 부분이 있으면 위험분석보고서에 "펌웨어 분석 범위" 절이 추가됩니다. 이 값은 스캔의 범위로 읽습니다. 식별하지 못한 영역, 암호화된 영역, 스캐너 이미지에 없는 추출 도구가 필요한 영역 안의 컴포넌트는 SBOM에 없으므로, 취약점이 0건이어도 그것은 열어 볼 수 있었던 범위에 대한 결과입니다. 식별하지 못한 비율과 바이트 수는 이미지 최상위 기준이고, 추출된 내용 안의 미식별 영역은 따로 셉니다. 이 절은 BomLens가 직접 실행한 스캔에만 쓰며, 검토용으로 제출받은 SBOM에는 쓰지 않습니다. 합계만 남기며, 언패커의 전체 보고서는 산출물 폴더에 쓰지 않습니다.
+
 syft의 패키지 식별 단계가 실패해도 스캔은 멈추지 않습니다. syft 자체의 오류가 스캔 로그에 남고, SBOM에는 어느 단계가 실패했는지 `bomlens:pipeline-step-failed`로 기록됩니다(메인 rootfs는 `firmware-packages`, 압축 해제 중 함께 발견되는 별도 패키지 소스, 예를 들어 내장된 컨테이너 이미지 저장소나 독자적인 패키지 데이터베이스를 가진 파일시스템은 `firmware-extra-roots`). 예상보다 컴포넌트 수가 적으면 펌웨어에 실제로 그만큼만 있다고 단정하기 전에 스캔 로그에서 이 기록부터 확인하는 편이 좋습니다.
 
 ## CVE 매칭, 온라인과 오프라인

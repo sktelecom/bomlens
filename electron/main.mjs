@@ -6,7 +6,7 @@
 //
 // onot의 main.mjs를 본떴으나, 파이썬 사이드카 대신 Docker 컨테이너를 띄운다(lib/container.mjs).
 // 백엔드와 React SPA가 이미 스캐너 이미지 안에 있으므로 BrowserWindow는 localhost를 로드한다.
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, session, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,7 @@ import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
 import { classifyPullFailure, createPullProgress } from "./lib/pullprogress.mjs";
 import { addScanMounts, parseScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
+import { buildMenuTemplate, ISSUE_FORM_URL } from "./lib/helpmenu.mjs";
 import { createStartupLogger } from "./lib/log.mjs";
 import { parseWindowState, sanitizeBounds } from "./lib/winstate.mjs";
 import { mainMessages, resolveLang } from "./lib/i18n.mjs";
@@ -510,6 +511,19 @@ function registerApp() {
     t = mainMessages(lang);
     // 시작 로그 파일: 실행마다 새로 쓴다. UI 전환 후 사라진 진행 내역을 문제 보고에 쓴다.
     startupLogger = createStartupLogger(startupLogPath());
+    // 앱 메뉴에 도움말 > "문제 신고"를 더한다. 기본 메뉴 인스턴스는 고칠 수 없어 같은 구성을
+    // 새로 만든다(lib/helpmenu.mjs). Windows/Linux에서는 메뉴바가 숨겨져(Alt로 표시) 있으므로
+    // 시작 화면에도 같은 링크를 둔다(assets/status.html).
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate(
+        buildMenuTemplate({
+          platform: process.platform,
+          reportLabel: t.reportProblem,
+          helpLabel: t.helpMenu,
+          onReport: () => shell.openExternal(ISSUE_FORM_URL),
+        }),
+      ),
+    );
     // macOS About 패널에 앱 이름과 버전을 표기한다(다른 OS에서는 효과가 없고 무해).
     app.setAboutPanelOptions({ applicationName: "BomLens", applicationVersion: app.getVersion() });
     app.on("web-contents-created", (_e, contents) => hardenWebContents(contents));

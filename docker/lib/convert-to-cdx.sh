@@ -11,7 +11,9 @@
 #   - SPDX (JSON/Tag-Value)  -> `syft convert` to cyclonedx-json
 #   - syft failure on SPDX-JSON -> jq fallback (.packages[] -> .components[],
 #     preserving name/version/purl/license) so license analysis still works.
-#   - XML (CycloneDX / SPDX RDF) -> refused by name: convert to JSON and retry.
+#   - CycloneDX XML          -> rewritten as JSON by sbom-detect.sh (cdx-xml-to-json.py)
+#                               before the format is detected here, so it arrives as CycloneDX.
+#   - SPDX RDF/XML and any XML that could not be read -> refused by name.
 #
 # See docs/supplier-sbom-analysis.md §5. normalize-sbom.sh / generate-notice.sh
 # need NO SPDX branch because everything downstream sees CycloneDX.
@@ -53,9 +55,10 @@ elif jq -e '(.["@context"]? // "" | tostring | test("spdx.org/rdf/3")) or (.["@g
 elif grep -q '^SPDXVersion:' "$INPUT" 2>/dev/null; then
     FORMAT="SPDX-TagValue"
 elif head -c 4096 "$INPUT" 2>/dev/null | grep -qi -e '^[[:space:]]*<?xml' -e '<bom[ >]' -e '<rdf:RDF'; then
-    # CycloneDX XML and SPDX RDF/XML are recognized only to say so: they fall
-    # through to a named error instead of "unrecognized format", which sent
-    # users looking for a corrupted file rather than a format conversion.
+    # CycloneDX XML was already rewritten as JSON by normalize_sbom_encoding, so
+    # XML that reaches this point is SPDX RDF/XML or a CycloneDX document that
+    # could not be read. It falls through to a named error instead of
+    # "unrecognized format", which sent users looking for a corrupted file.
     FORMAT="unsupported-xml"
 fi
 
@@ -106,10 +109,10 @@ case "$FORMAT" in
         fi
         ;;
     unsupported-xml)
-        echo "[convert] ERROR: XML SBOMs are not supported yet: $INPUT" >&2
-        echo "[convert]        This looks like CycloneDX or SPDX in XML. Convert it to JSON and retry, e.g." >&2
-        echo "[convert]          cyclonedx convert --input-file bom.xml --output-file bom.json" >&2
-        echo "[convert]        or export JSON from the tool that produced it." >&2
+        echo "[convert] ERROR: this XML SBOM could not be read: $INPUT" >&2
+        echo "[convert]        CycloneDX XML is read, but SPDX RDF/XML is not, and a CycloneDX XML file" >&2
+        echo "[convert]        that is malformed or declares a DTD is refused (see the [cdx-xml] line above)." >&2
+        echo "[convert]        Export JSON from the tool that produced it and retry." >&2
         exit 1
         ;;
     *)

@@ -41,7 +41,7 @@ def license_flag($s):
 # Known permissive SPDX ids (uppercased). An allowlist, not a heuristic — keep
 # in sync with the PERMISSIVE set in licenses.ts (single line: the drift guard
 # extracts the quoted ids from this def).
-def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11"];
+def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","BSD-3-CLAUSE-LBNL","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11"];
 
 # Classify ONE license id/name/expression. Order matters: AGPL and LGPL are
 # matched before the bare GPL test so they don't fall to strong-copyleft, and a

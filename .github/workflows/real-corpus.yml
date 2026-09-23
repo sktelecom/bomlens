@@ -1,0 +1,82 @@
+name: Real-repository corpus
+
+# Real public repositories pinned to commits (tests/corpus/real-corpus.tsv),
+# scanned with the scanner image built from this commit. Reports, per
+# repository, components found, purl and license coverage, exit code and whether
+# the scan left the checkout changed, and fails on an empty result, a failed or
+# timed-out scan, a changed source tree, or an ecosystem whose mean license
+# coverage fell 10 points or more against the earlier successful run. A
+# repository that cannot be fetched is "undetermined", not a failure. Scheduled and manual only: never a required
+# check and not part of the nightly failure alarm (observation stage), and it
+# does not run on pull requests.
+on:
+  schedule:
+    - cron: "47 19 * * *"
+  workflow_dispatch:
+    inputs:
+      ecosystems:
+        description: "Limit to these ecosystems (space separated, e.g. 'go rust'); empty runs all"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  real-corpus:
+    name: Real-repository corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build scanner image from this commit
+        run: docker build -t sbom-scanner:test ./docker
+
+      # The baseline is the newest successful run on main whose results cover the
+      # whole corpus (a run limited to some ecosystems, or one that skipped, does
+      # not qualify). A run that failed, a regression included, never replaces it.
+      # Not finding one is reported, not hidden.
+      - name: Fetch the earlier results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .corpus-baseline
+          want=$(grep -vc '^#' tests/corpus/real-corpus.tsv)
+          if ! ids=$(gh run list --workflow real-corpus.yml --branch main --status success \
+                       --limit 10 --json databaseId --jq '.[].databaseId'); then
+            echo "::warning::could not list earlier runs; the comparison with them is skipped"
+            exit 0
+          fi
+          for id in $ids; do
+            rm -rf .corpus-baseline/*
+            gh run download "$id" -n real-corpus-results -D .corpus-baseline 2>/dev/null || continue
+            rows=$(grep -vc '^name' .corpus-baseline/results.tsv 2>/dev/null || echo 0)
+            if [ "$rows" -ge "$want" ]; then echo "baseline: run $id ($rows repositories)"; exit 0; fi
+          done
+          rm -rf .corpus-baseline/*
+          echo "::warning::no earlier successful run with complete results was found (first run, expired artifacts or a limited run); only the floors apply"
+
+      - name: Scan the corpus
+        env:
+          BASELINE_FILE: ${{ github.workspace }}/.corpus-baseline/results.tsv
+          SBOM_SCANNER_IMAGE: sbom-scanner:test
+          ECOSYSTEMS: ${{ inputs.ecosystems }}
+          WORK_DIR: ${{ github.workspace }}/.corpus-work
+          SCAN_TIMEOUT: "1200"
+        run: bash tests/test-real-corpus.sh
+
+      - name: Keep the results table
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: real-corpus-results
+          path: .corpus-work/results.tsv
+          if-no-files-found: ignore

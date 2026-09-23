@@ -13,10 +13,10 @@
 # Defaults use ${VAR:-default} so a caller that already exported these (the CLI)
 # keeps its values; a caller that did not (the UI) gets the defaults.
 
-# renovate: datasource=docker depName=ghcr.io/cyclonedx/cdxgen
-CDXGEN_TAG="${CDXGEN_TAG:-v12}"                                  # cdxgen language image tag
-# renovate: datasource=docker depName=ghcr.io/cyclonedx/cdxgen
-CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cyclonedx/cdxgen:v12.5.0}"
+# renovate: datasource=docker depName=ghcr.io/cdxgen/cdxgen
+CDXGEN_TAG="${CDXGEN_TAG:-v13}"                                  # cdxgen language image tag
+# renovate: datasource=docker depName=ghcr.io/cdxgen/cdxgen
+CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cdxgen/cdxgen:v13.1}"
 # A local name, not a registry one: the Android SDK is not open source and its
 # terms bar redistributing it, so this image is built on the machine that uses
 # it rather than published. scan-sbom.sh prints the build command when it is
@@ -34,7 +34,7 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # container, so every path that starts it (scan-sbom.sh stage 1, the web UI
 # container, generate_sbom_cdxgen in entrypoint.sh) passes these on by name.
 # docker skips a name-only -e whose variable is unset.
-BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_PREP_TIMEOUT"
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
 
 # Prints "-e NAME" for each name above. Names only, never values, so the output
 # is safe to splice into the eval'd docker command in scan-sbom.sh.
@@ -326,17 +326,58 @@ detect_lang() {
 
 img_for_lang() {
     case "$1" in
-        rust)   echo "ghcr.io/cyclonedx/cdxgen-debian-rust:$CDXGEN_TAG" ;;
-        go)     echo "ghcr.io/cyclonedx/cdxgen-debian-golang124:$CDXGEN_TAG" ;;
-        ruby)   echo "ghcr.io/cyclonedx/cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
-        java)   echo "ghcr.io/cyclonedx/cdxgen-temurin-java21:$CDXGEN_TAG" ;;
-        python) echo "ghcr.io/cyclonedx/cdxgen-python312:$CDXGEN_TAG" ;;
-        node)   echo "ghcr.io/cyclonedx/cdxgen-node20:$CDXGEN_TAG" ;;
-        php)    echo "ghcr.io/cyclonedx/cdxgen-debian-php84:$CDXGEN_TAG" ;;
-        dotnet) echo "ghcr.io/cyclonedx/cdxgen-debian-dotnet9:$CDXGEN_TAG" ;;
-        swift)  echo "ghcr.io/cyclonedx/cdxgen-debian-swift:$CDXGEN_TAG" ;;
+        rust)   echo "ghcr.io/cdxgen/cdxgen-debian-rust:$CDXGEN_TAG" ;;
+        go)     echo "ghcr.io/cdxgen/cdxgen-debian-golang124:$CDXGEN_TAG" ;;
+        ruby)   echo "ghcr.io/cdxgen/cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
+        java)   echo "ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG" ;;
+        python) echo "ghcr.io/cdxgen/cdxgen-python312:$CDXGEN_TAG" ;;
+        node)   echo "ghcr.io/cdxgen/cdxgen-alpine-node24:$CDXGEN_TAG" ;;
+        php)    echo "ghcr.io/cdxgen/cdxgen-debian-php84:$CDXGEN_TAG" ;;
+        dotnet) echo "ghcr.io/cdxgen/cdxgen-debian-dotnet9:$CDXGEN_TAG" ;;
+        swift)  echo "ghcr.io/cdxgen/cdxgen-debian-swift:$CDXGEN_TAG" ;;
         *)      echo "$CDXGEN_ALLINONE" ;;   # mixed / unknown
     esac
+}
+
+# A Java (Maven/Gradle) or Android build runs inside the engine and is killed
+# when the engine has too little memory; the scan then falls back to a
+# shallower, direct-dependencies-only result. Say so before the build starts.
+# Shared by the CLI (scan-sbom.sh) and the web UI's source scan (entrypoint.sh).
+# `docker info` reports the engine's own memory (the VM behind Docker Desktop,
+# Rancher Desktop or Colima, the WSL 2 VM, or the whole host on native Linux),
+# not the host's. A best-effort hint: it never stops the scan, and a value that
+# cannot be read prints nothing. A 4 GiB engine reports a little under that
+# (about 3.8 GiB), so the line is drawn at 3.5 GiB. Every line carries [WARN]
+# because the web UI keeps only the lines that start with it.
+warn_low_engine_memory() {  # warn_low_engine_memory <build-kind>
+    local bytes mb
+    bytes=$(docker info --format '{{.MemTotal}}' 2>/dev/null) || return 0
+    bytes=${bytes%%$'\r'*}
+    case "$bytes" in ''|*[!0-9]*) return 0 ;; esac
+    mb=$((bytes / 1024 / 1024))
+    [ "$mb" -gt 0 ] && [ "$mb" -lt 3584 ] || return 0
+    echo "[WARN] The Docker engine has about $(( (mb + 512) / 1024 )) GB of memory. A $1 build needs about 4 GB; with less, it can be killed and the scan falls back to direct dependencies only."
+    echo "[WARN]   Colima:          colima stop && colima start --memory 4"
+    echo "[WARN]   Docker Desktop:  Settings > Resources > Memory (WSL 2 backend: memory=4GB in %UserProfile%\\.wslconfig, then wsl --shutdown)"
+    echo "[WARN]   Rancher Desktop: Preferences > Virtual Machine > Memory (Windows: .wslconfig as above). Native Linux uses the host's memory."
+}
+
+# Which build does this tree need, if any: the language decides for Java and
+# Android; a mixed or unrecognised tree still runs Maven or Gradle when it holds
+# a pom.xml or build.gradle within four levels (cdxgen collects recursively).
+warn_low_engine_memory_for() {  # warn_low_engine_memory_for <lang> <dir>
+    local kind=""
+    case "$1" in
+        java)    kind="Java" ;;
+        android) kind="Gradle" ;;
+        mixed|unknown)
+            if [ -n "$(find "$2" -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o -name pom.xml -print 2>/dev/null | head -n 1)" ]; then
+                kind="Maven"
+            elif [ -n "$(find "$2" -maxdepth 4 \( -name .git -o -name node_modules \) -prune -o \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null | head -n 1)" ]; then
+                kind="Gradle"
+            fi ;;
+    esac
+    [ -z "$kind" ] || warn_low_engine_memory "$kind"
 }
 
 android_api() {

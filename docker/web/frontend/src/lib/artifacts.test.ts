@@ -55,6 +55,23 @@ describe("groupArtifacts", () => {
     expect(profile.formats.every((f) => f.viewable)).toBe(true);
   });
 
+  it("groups the recorded judgements and their VEX export on one card, apart from the Yocto file", () => {
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`),
+      file(`${PREFIX}_vex.json`),
+      file(`${PREFIX}_vex.cdx.json`),
+      file(`${PREFIX}_vex_imported.json`),
+      file(`${PREFIX}_yocto_vex.json`),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom", "vex"]);
+    const vex = groups.find((g) => g.key === "vex")!;
+    // The export gets its own chip label instead of a second "JSON".
+    expect(vex.formats.map((f) => f.ext).sort()).toEqual(["cdx", "json", "json"]);
+    expect(vex.formats.some((f) => f.name.endsWith("_vex_imported.json"))).toBe(true);
+    expect(vex.formats.every((f) => f.viewable)).toBe(true);
+    expect(vex.formats.some((f) => f.name.includes("_yocto_vex"))).toBe(false);
+  });
+
   it("flags the risk report as the single primary deliverable", () => {
     const groups = groupArtifacts(RESULTS);
     expect(groups.filter((g) => g.primary).map((g) => g.key)).toEqual(["riskReport"]);

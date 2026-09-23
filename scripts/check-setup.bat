@@ -55,7 +55,7 @@ docker image inspect "%DOCKER_IMAGE%" >nul 2>&1
 if errorlevel 1 goto :image_missing
 call :say M_O_IMAGE
 call :sayval DOCKER_IMAGE
-goto :check_port_step
+goto :check_mem_step
 
 :image_missing
 call :say M_X_NO_IMAGE
@@ -65,7 +65,33 @@ echo   docker pull %DOCKER_IMAGE%
 call :say M_OFFLINE_HINT
 set /a PROBLEMS+=1
 
-REM 4) UI port available
+REM 4) Docker engine memory for Maven/Gradle builds. A hint only: an unreadable
+REM value is skipped. docker info prints bytes; the last six digits are dropped
+REM to get decimal megabytes, so set /a never sees a number past 32 bits. The
+REM line is 3.5 GiB (a 4 GiB engine reports about 3.8), as in scan-sbom.sh.
+:check_mem_step
+set "MEM_BYTES="
+for /f "delims=" %%m in ('docker info --format "{{.MemTotal}}" 2^>nul') do set "MEM_BYTES=%%m"
+if not defined MEM_BYTES goto :check_port_step
+for /f "delims=0123456789" %%x in ("%MEM_BYTES%") do goto :check_port_step
+if "%MEM_BYTES:~7,1%"=="" goto :check_port_step
+set "MEM_MB=%MEM_BYTES:~0,-6%"
+set "MEM_MBN=0"
+set /a "MEM_MBN=%MEM_MB%" 2>nul
+REM Decimal megabytes to GiB, rounded, like check-setup.sh: (MB*1000+2^29)/2^30.
+set /a "MEM_GB=(MEM_MBN*1000+536871)/1073742"
+if %MEM_MBN% LSS 3758 goto :mem_low
+call :say M_O_MEM
+echo   %MEM_GB% GB
+goto :check_port_step
+
+:mem_low
+call :say M_X_MEM
+echo   %MEM_GB% GB
+call :say M_MEM_FIX
+set /a PROBLEMS+=1
+
+REM 5) UI port available
 :check_port_step
 set "PORT_BUSY="
 call :cache_ranges
@@ -89,6 +115,8 @@ set /a PROBLEMS+=1
 call :say M_SEP2
 if "%PROBLEMS%"=="0" call :say M_ALL_GOOD
 if not "%PROBLEMS%"=="0" call :say M_SOME_BAD
+if not "%PROBLEMS%"=="0" call :say M_PROBLEMS
+if not "%PROBLEMS%"=="0" echo   %PROBLEMS%
 call :say M_PRESS
 pause >nul
 endlocal & exit /b 0
@@ -201,6 +229,7 @@ set "M_TITLE=  BomLens setup check"
 set "M_O_INSTALLED=[O] Docker is installed"
 set "M_O_ENGINE=[O] Docker engine is running"
 set "M_O_IMAGE=[O] Scanner image is present:"
+set "M_O_MEM=[O] Docker engine memory is enough for Java builds:"
 set "M_O_PORT=[O] UI port is available:"
 set "M_X_NO_DOCKER=[X] Docker is not installed, or not on PATH."
 set "M_OPT_RANCHER=    Free on Windows: Rancher Desktop (GUI) https://rancherdesktop.io/"
@@ -210,10 +239,13 @@ set "M_X_NO_ENGINE=[X] The Docker engine is not running. Start Rancher Desktop o
 set "M_X_NO_IMAGE=[X] The scanner image is not downloaded yet:"
 set "M_PREPULL=    The first run downloads about 250 MB automatically. To fetch it now:"
 set "M_OFFLINE_HINT=    No network at the venue? See bomlens.settings.example.txt (SBOM_IMAGE_TAR) to install from a file."
+set "M_X_MEM=[X] The Docker engine has too little memory. A Maven or Gradle build needs about 4 GB:"
+set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. With the WSL 2 backend or Rancher Desktop: set memory=4GB in .wslconfig in your user folder, then run wsl --shutdown."
 set "M_X_PORT=[X] UI port is already in use or reserved:"
 set "M_PORT_FIX=    sbom-ui.bat will move to the next free port by itself. To pin a port, set UI_PORT in bomlens.settings.txt next to these scripts."
 set "M_ALL_GOOD=Result: everything is ready. You can run sbom-ui.bat"
 set "M_SOME_BAD=Result: please review the items marked [X] above."
+set "M_PROBLEMS=Items to review:"
 set "M_PRESS=Press any key to close this window."
 goto :eof
 
@@ -224,6 +256,7 @@ set "M_TITLE=  BomLens 설치 점검"
 set "M_O_INSTALLED=[O] Docker 설치됨"
 set "M_O_ENGINE=[O] Docker 엔진 실행 중"
 set "M_O_IMAGE=[O] 스캐너 이미지 보유:"
+set "M_O_MEM=[O] Docker 엔진 메모리가 Java 빌드에 충분합니다:"
 set "M_O_PORT=[O] UI 포트 사용 가능:"
 set "M_X_NO_DOCKER=[X] Docker가 설치되어 있지 않거나 PATH에 없습니다."
 set "M_OPT_RANCHER=    Windows 무료 옵션: Rancher Desktop (GUI) https://rancherdesktop.io/"
@@ -233,9 +266,12 @@ set "M_X_NO_ENGINE=[X] Docker 엔진이 실행 중이 아닙니다. Rancher Desk
 set "M_X_NO_IMAGE=[X] 스캐너 이미지가 아직 없습니다:"
 set "M_PREPULL=    처음 실행할 때 약 250MB를 자동으로 내려받습니다. 지금 미리 받으려면:"
 set "M_OFFLINE_HINT=    현장에 네트워크가 없나요? 파일로 설치하려면 bomlens.settings.example.txt의 SBOM_IMAGE_TAR을 참고하세요."
+set "M_X_MEM=[X] Docker 엔진 메모리가 부족합니다. Maven/Gradle 빌드에는 약 4GB가 필요합니다:"
+set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. WSL 2 백엔드나 Rancher Desktop은 사용자 폴더의 .wslconfig 에 memory=4GB 를 적고 wsl --shutdown 을 실행하세요."
 set "M_X_PORT=[X] UI 포트가 이미 사용 중이거나 예약되어 있습니다:"
 set "M_PORT_FIX=    sbom-ui.bat이 알아서 비어 있는 다음 포트로 옮깁니다. 포트를 고정하려면 스크립트 옆 bomlens.settings.txt에 UI_PORT를 지정하세요."
 set "M_ALL_GOOD=점검 결과: 모두 준비됐습니다. sbom-ui.bat 을 실행해도 좋습니다."
 set "M_SOME_BAD=점검 결과: 위에서 [X] 표시된 항목을 확인하세요."
+set "M_PROBLEMS=확인할 항목 수:"
 set "M_PRESS=아무 키나 누르면 창이 닫힙니다."
 goto :eof

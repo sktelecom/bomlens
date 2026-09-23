@@ -1,0 +1,9 @@
+# ecosystem	minimum mean license coverage (percent) over the repositories that scanned ok
+nodejs	85
+python	85
+go	85
+rust	85
+ruby	85
+php	85
+dotnet	85
+java-maven	85

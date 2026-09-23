@@ -145,6 +145,20 @@ export interface SbomSummary {
   pipelineStepsFailed?: string[];
   /** How many more failed steps exist past the 20 in pipelineStepsFailed. */
   pipelineStepsFailedMore?: number;
+  /** How much of a firmware image the unpacker could open (the
+   *  bomlens:firmware:* properties scan-firmware.sh stamps). Null or absent when
+   *  the image was opened in full or the document carries none. A statement of
+   *  scope, not a failure: what sits in an unopened region is not in the SBOM. */
+  firmwareScope?: {
+    unknownPercent: number;
+    unknownBytes: number;
+    failedSteps: number;
+    encryptedRegions: number;
+    failedFormats: string[];
+    missingExtractors: string[];
+    /** Names past the cap in the two lists above. */
+    namesMore: number;
+  } | null;
   /** CycloneDX root component type (application/firmware/container/…) — drives
    *  the honest scan-kind subtitle, available on re-open (unlike the MODE). */
   componentType?: string | null;
@@ -228,6 +242,10 @@ export interface VulnItem {
    *  `status` above (the vendor/advisory's own disposition). Absent until one
    *  is saved for this component + CVE. */
   vexState?: VexState;
+  /** What a supplier's VEX document said about this CVE and component
+   *  (POST /vex-import). Its own field, never merged into `vexState`: the user's
+   *  own judgement and a received statement are shown side by side. */
+  vexReceived?: VexReceived;
   /** Optional note recorded alongside vexState. */
   vexDetail?: string;
   /** ISO 8601 timestamp of when vexState was last saved. */
@@ -279,6 +297,10 @@ export type SecuritySummary = Record<Severity, number> & {
   /** Engine failure message when the scan did not complete (scan-security.sh
    *  ScanError). Present => the counts above understate the real exposure. */
   scanError?: string;
+  /** How many CVE judgements are on file for this scan, present only when there
+   *  are some. Counts the sidecar, not the rows in view: a judgement outlives a
+   *  re-scan even when its CVE is no longer among the findings. */
+  vexCount?: number;
   /** Advisories filed against the kernel, counted apart from the severity figures
    *  above and from TOTAL. An old kernel carries thousands of them, nearly all
    *  for subsystems the image never compiled in, so mixing them in would make a
@@ -421,6 +443,14 @@ export interface ConformanceSummary {
   pipelineStepsFailed?: string[];
   /** How many more failed steps exist past the cap in pipelineStepsFailed. */
   pipelineStepsFailedMore?: number;
+  /** Components other than operating-system and file entries: what the scan
+   *  identified as software. Absent on a report from before this field existed. */
+  softwareComponentCount?: number;
+  /** True when softwareComponentCount is 0. Absent on an older report. */
+  emptyResult?: boolean;
+  /** Of the software components, how many declare a license. pct is rounded
+   *  down and null when there are no components. Absent on an older report. */
+  licenseCoverage?: { declared: number; total: number; pct: number | null };
 }
 
 /** One G7 cluster's coverage counts in the aiProfile card. */
@@ -1055,6 +1085,111 @@ export async function exportSpdx(
   }
 }
 
+/** A statement received in a supplier's VEX document, already mapped to the
+ *  four states the screen uses. */
+export interface VexReceived {
+  state: VexState;
+  detail?: string;
+  /** The CycloneDX justification word the sender chose (e.g. "code_not_reachable"). */
+  justification?: string;
+  /** The product the document says it describes. */
+  source?: string;
+}
+
+/** One received statement as the import endpoint returns it, with the identity
+ *  it was matched to (purl, else pkg + installed). */
+export interface VexReceivedStatement {
+  cve: string;
+  state: VexState;
+  purl?: string;
+  pkg?: string;
+  installed?: string;
+  /** "product": the sender's statement is about the product itself, so it
+   *  covers every finding of this CVE that has no statement of its own. */
+  scope?: "product";
+  detail?: string;
+  justification?: string;
+}
+
+export type VexImportOutcome =
+  | {
+      ok: true;
+      imported: number;
+      unmatched: number;
+      ignored: number;
+      source: string | null;
+      statements: VexReceivedStatement[];
+      results: ResultFile[];
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      /** Set on a 409: the product the document describes and the one scanned. */
+      vexProduct?: string;
+      scanProduct?: string;
+    };
+
+/**
+ * Send a CycloneDX VEX document (its text) to be read against a finished scan.
+ * Resolves to the outcome instead of throwing: the caller words a refusal
+ * (different product, no matching component, not a VEX) for the reader.
+ */
+export async function importVex(scanId: string, text: string): Promise<VexImportOutcome> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
+  try {
+    const res = await fetch(`/vex-import?id=${encodeURIComponent(scanId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: text,
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: typeof j.error === "string" ? j.error : `could not import (${res.status})`,
+        vexProduct: j.vexProduct,
+        scanProduct: j.scanProduct,
+      };
+    }
+    return { ok: true, ...j } as VexImportOutcome;
+  } catch {
+    return { ok: false, status: 0, error: "network" };
+  }
+}
+
+/**
+ * Export the judgements recorded for a scan as a CycloneDX VEX document, built
+ * on the server from the saved judgements and rebuilt on every call (they keep
+ * changing after the scan). Resolves to the new artifact's name plus the
+ * refreshed listing, or null on failure (no judgement yet, or the server could
+ * not build it); the caller surfaces a toast.
+ */
+export async function exportVex(id: string): Promise<{
+  name: string;
+  /** Judgements written into the document, and those left out because their
+   *  component is not in the SBOM. */
+  exported: number;
+  skipped: number;
+  results: ResultFile[];
+} | null> {
+  // The static demo cannot record a judgement, so there is nothing to export.
+  if (IS_STATIC_DEMO) return null;
+  try {
+    const res = await fetch(`/vex-export?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as {
+      name: string;
+      exported: number;
+      skipped: number;
+      results: ResultFile[];
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** A past scan in the local output dir (history; no account / DB). */
 export interface RecentScan {
   /** The run_id (run-folder name); pass to loadScan/deleteScan/fileUrl. */
@@ -1157,6 +1292,34 @@ export async function loadScan(id: string): Promise<DoneEvent | null> {
     const res = await fetch(apiUrl(`/scan?id=${encodeURIComponent(id)}`));
     if (!res.ok) return null;
     return (await res.json()) as DoneEvent;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The plain-text diagnostics summary for the "Report a problem" panel (GET
+ * /diagnostics). `id` is the finished scan's run id; without it the server
+ * returns the environment section only (a scan that failed before it had a run
+ * folder). `error` is the failure text already on screen for such a scan: it is
+ * sent so the server can mask it like every other line of the summary and add it.
+ * Null on any failure. The text is only ever shown to the user, who decides
+ * whether to copy it: nothing here is sent anywhere.
+ */
+export async function getDiagnostics(
+  id?: string | null,
+  error?: string | null,
+): Promise<string | null> {
+  if (IS_STATIC_DEMO) return null; // no server behind the demo
+  const qs = new URLSearchParams();
+  if (id) qs.set("id", id);
+  else if (error) qs.set("error", error.slice(0, 500));
+  const query = qs.toString();
+  try {
+    const res = await fetch(apiUrl(query ? `/diagnostics?${query}` : "/diagnostics"));
+    if (!res.ok) return null;
+    const j = (await res.json()) as { text?: unknown };
+    return typeof j.text === "string" ? j.text : null;
   } catch {
     return null;
   }

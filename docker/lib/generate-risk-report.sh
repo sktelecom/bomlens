@@ -82,6 +82,41 @@ if [ -f "${OUT_PREFIX}_bom.json" ] && jq empty "${OUT_PREFIX}_bom.json" >/dev/nu
         "${OUT_PREFIX}_bom.json" 2>/dev/null || echo 0)
 fi
 
+# Firmware analysis scope (scan-firmware.sh stamps bomlens:firmware:* from the
+# unpacker's own report). Regions the unpacker could not identify or open hold
+# components this SBOM does not list, so a clean vulnerability table describes
+# only what was opened. Read for a FIRMWARE scan only: an SBOM handed in for
+# review (ANALYZE) is data from someone else, and its properties are not this
+# scan's statement about its own coverage. Absent when the report was unavailable:
+# no section rather than a reassuring blank.
+FW_SCOPE=false; FW_UNKNOWN_PCT=0; FW_UNKNOWN_BYTES=0
+FW_FAILED=0; FW_FAILED_FORMATS=""; FW_MISSING=""; FW_ENCRYPTED=0
+if [ "$SCAN_MODE" = "FIRMWARE" ] && [ -f "${OUT_PREFIX}_bom.json" ] \
+   && jq empty "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
+    fw_prop() { jq -r --arg n "bomlens:firmware:$1" \
+        '[.metadata.component.properties[]? | select(.name == $n) | .value][0] // ""' \
+        "${OUT_PREFIX}_bom.json" 2>/dev/null; }
+    # Values are interpolated into Markdown and HTML, so keep only the characters
+    # a number, a handler name or a tool name can contain: a number that is not
+    # plainly one is dropped, not repaired into a plausible one.
+    fw_num() { fw_prop "$1" | grep -E '^[0-9]+(\.[0-9]+)?$' | cut -c1-12; }
+    fw_list() { fw_prop "$1" | tr -cd 'A-Za-z0-9_.,+-' | cut -c1-200; }
+    if [ -n "$(fw_prop input-bytes)" ]; then
+        FW_UNKNOWN_PCT=$(fw_num unknown-top-level-percent); FW_UNKNOWN_PCT="${FW_UNKNOWN_PCT:-0}"
+        FW_UNKNOWN_BYTES=$(fw_num unknown-bytes); FW_UNKNOWN_BYTES="${FW_UNKNOWN_BYTES:-0}"
+        FW_FAILED=$(fw_num extraction-failed); FW_FAILED="${FW_FAILED:-0}"
+        FW_ENCRYPTED=$(fw_num encrypted-regions); FW_ENCRYPTED="${FW_ENCRYPTED:-0}"
+        FW_FAILED_FORMATS=$(fw_list extraction-failed-formats)
+        FW_MISSING=$(fw_list missing-extractors)
+        case "$FW_UNKNOWN_BYTES$FW_FAILED$FW_ENCRYPTED" in *[!0-9]*) ;; *)
+            if [ "$FW_UNKNOWN_BYTES" -gt 0 ] || [ "$FW_FAILED" -gt 0 ] \
+               || [ "$FW_ENCRYPTED" -gt 0 ] || [ -n "$FW_MISSING" ]; then
+                FW_SCOPE=true
+            fi ;;
+        esac
+    fi
+fi
+
 # --------------------------------------------------------
 # Report kind: on the ANALYZE path this is a SUPPLIER SBOM review (validate an
 # externally-submitted SBOM format); otherwise it is a SELF-GENERATED
@@ -253,6 +288,14 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
+    P_FW_LABEL=$(kstr risk.fw_scope_label)
+    P_FW_UNKNOWN=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$FW_UNKNOWN_BYTES")
+    P_FW_FAILED=$(tfmt risk.fw_scope_failed "$FW_FAILED")
+    P_FW_ENCRYPTED=$(tfmt risk.fw_scope_encrypted "$FW_ENCRYPTED")
+    P_FW_TAIL=$(kstr risk.fw_scope_tail)
+    P_FW_FORMATS=$(tfmt risk.fw_scope_formats "$FW_FAILED_FORMATS")
+    P_FW_MISSING=$(tfmt risk.fw_scope_missing "$FW_MISSING")
     P_H2_LIC=$(kstr risk.h2_lic)
     P_LIC_NO_NOTICE_MD=$(kstr risk.lic_no_notice_md); P_LIC_NO_NOTICE_HTML=$(kstr risk.lic_no_notice_html)
     P_MD_LIC_COUNT=$(tfmt risk.md_lic_count "$LIC_COUNT" "$OUT_PREFIX")
@@ -311,6 +354,14 @@ else
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_FW_SCOPE_H="Firmware analysis scope"
+    P_FW_LABEL="Analysis scope:"
+    P_FW_UNKNOWN="${FW_UNKNOWN_PCT}% of the image (${FW_UNKNOWN_BYTES} bytes) was not recognized as a known format."
+    P_FW_FAILED="${FW_FAILED} extraction step(s) did not complete."
+    P_FW_ENCRYPTED="${FW_ENCRYPTED} region(s) are encrypted."
+    P_FW_TAIL="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts above describe only what could be opened."
+    P_FW_FORMATS="Formats whose extraction did not complete: ${FW_FAILED_FORMATS}."
+    P_FW_MISSING="Extraction tools the scanner image does not include: ${FW_MISSING}."
     P_H2_LIC="License summary"
     P_LIC_NO_NOTICE_MD="_Skipped: no NOTICE artifact was produced._"
     P_LIC_NO_NOTICE_HTML="Skipped: no NOTICE artifact was produced."
@@ -347,6 +398,16 @@ else
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
     P_KIND="Risk Report"
     P_META_PROJECT="Project:"; P_META_GENERATED="Generated:"; P_META_FORMAT="Input format:"
+fi
+
+# Only the parts that apply are said, so a scan that lost nothing but one tool
+# does not read "0% ... 0 steps ... 0 regions".
+FW_SCOPE_TEXT=""
+if [ "$FW_SCOPE" = "true" ]; then
+    [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_UNKNOWN}"
+    [ "${FW_FAILED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_FAILED}"
+    [ "${FW_ENCRYPTED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_ENCRYPTED}"
+    FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_TAIL}"
 fi
 
 # Shared composites (built from the localized pieces above; identical structure
@@ -386,6 +447,14 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
     echo ""
     if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "${P_PRESENCE_MD}"
+        echo ""
+    fi
+    if [ "$FW_SCOPE" = "true" ]; then
+        echo "### ${P_FW_SCOPE_H}"
+        echo ""
+        echo "> ${FW_SCOPE_TEXT}"
+        if [ -n "$FW_FAILED_FORMATS" ]; then echo ">"; echo "> ${P_FW_FORMATS}"; fi
+        if [ -n "$FW_MISSING" ]; then echo ">"; echo "> ${P_FW_MISSING}"; fi
         echo ""
     fi
     if [ "$TOTAL" -gt 0 ]; then
@@ -590,6 +659,12 @@ HTMLSEC
 
     if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
+    fi
+    if [ "$FW_SCOPE" = "true" ]; then
+        echo "<div class=\"note\"><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
+        if [ -n "$FW_FAILED_FORMATS" ]; then echo "<br>${P_FW_FORMATS}"; fi
+        if [ -n "$FW_MISSING" ]; then echo "<br>${P_FW_MISSING}"; fi
+        echo "</div>"
     fi
 
     if [ "$TOTAL" -gt 0 ]; then

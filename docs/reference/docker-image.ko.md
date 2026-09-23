@@ -28,13 +28,13 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 | 도구 | 버전 | 역할 |
 |------|------|------|
-| syft | v1.51.0 | 이미지, 바이너리, 디렉터리 스캔 |
+| syft | v1.52.0 | 이미지, 바이너리, 디렉터리 스캔 |
 | Trivy | v0.74.0 | 취약점 보고서 |
 | cosign | v3.1.3 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
 | docker CLI | 29.7.2 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
-| cdxgen | 12.8.4 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
+| cdxgen | 13.1.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
 
@@ -99,7 +99,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
-직접 실행의 `SOURCE` 모드는 컨테이너 안에서 syft가 패키지 매니페스트를 읽는 방식이라 직접 의존성만 잡힐 수 있습니다. 전이 의존성까지 필요하면 cdxgen 언어 이미지를 라우팅하는 `scan-sbom.sh`를 쓰세요.
+직접 실행의 `SOURCE` 모드는 컨테이너 안에서 syft가 패키지 매니페스트를 읽는 방식이라 직접 의존성만 잡힐 수 있습니다. 전이 의존성까지 필요하면 cdxgen 언어 이미지를 라우팅하는 `scan-sbom.sh`를 쓰세요. syft의 매니페스트 판독기는 의존성을 하나라도 풀어내려면 락파일(Node는 `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, 다른 생태계도 마찬가지)이 있어야 합니다. 락파일이 없으면 직접 실행의 `SOURCE` 모드는 읽을 것이 없어, 빈 결과를 완료로 보고하는 대신 안내와 함께 실패합니다.
 
 ### 고지문과 보고서까지 한 번에
 
@@ -159,16 +159,23 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
 | `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP(Composer) 소스 스캔: `1`로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지 |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | 소스 스캔: `1`로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌 |
-| `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |
+| `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |
 | `BOMLENS_CANCEL_GRACE` | — | `30` | 스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 `--ui`에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다 |
 | `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | 소스 스캔: `1`로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트와 `.github/workflows`의 GitHub Actions 워크플로를 포함 |
-| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
-| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. 1.7을 추가로 허용 |
+| `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
+| `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
+| `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
+| `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. AIBOM 도구가 내보내는 1.7을 항상 포함 |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | 적합성 검사가 허용하는 SPDX spec 버전 |
 | `PURL_MIN_PCT` | — | `90` | 적합성 검사: PURL을 가진 컴포넌트 비율의 최소 기준(필수 검사). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
 | `LICENSE_MIN_PCT` | — | `80` | 적합성 검사: 라이선스를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
 | `HASH_MIN_PCT` | — | `50` | 적합성 검사: 해시를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
 | `FIELD_MIN_PCT` | — | `80` | 적합성 검사: 규제 대응용 컴포넌트별 필드의 참고 기준 커버리지. CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
+| `PURL_TYPES_FILE` | — | `docker/lib/purl-types.json` | 적합성 검사: 어떤 purl 타입이 있고 그중 어떤 타입이 네임스페이스를 요구하는지 담은 purl-spec 데이터 |
+| `NS_ADVISORY_TYPES` | — | `golang huggingface` | 적합성 검사: 네임스페이스가 없어도 실패로 보지 않고 권고 항목으로만 보고할 타입(공백 구분) |
+| `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
+| `PURL_RESOLVE_IGNORE` | — | — | 조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다 |
+| `PURL_RESOLVE_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다 |
 
 > TRUSCA(구 TrustedOSS Portal)의 네이티브 ingest 엔드포인트(`POST /v1/projects/{id}/sbom-ingest`, Bearer 인증)는 Dependency-Track와 호환되지 않습니다. 일반 Dependency-Track 서버로 올릴 때는 `UPLOAD_TARGET=dependency-track`(기본값)을 그대로 두세요.
 

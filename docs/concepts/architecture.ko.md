@@ -113,7 +113,7 @@ sequenceDiagram
 | ruby | `cdxgen-debian-ruby34` |
 | java | `cdxgen-temurin-java21` |
 | python | `cdxgen-python312` |
-| node | `cdxgen-node20` |
+| node | `cdxgen-alpine-node24` |
 | php | `cdxgen-debian-php84` |
 | dotnet | `cdxgen-debian-dotnet9` |
 | android | 자체 빌드 `bomlens-android-sdk<API>` (compileSdk 자동 추출) |

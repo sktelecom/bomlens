@@ -17,7 +17,7 @@
 #   SBOM_FIXTURES_DIR   project root to scan; falls back to ./examples when unset
 #                       or when the directory does not exist
 #   SBOM_SCANNER_IMAGE  BomLens image (default: ghcr.io/sktelecom/sbom-scanner:latest)
-#   CDXGEN_IMAGE        baseline cdxgen image (default: ghcr.io/cyclonedx/cdxgen:latest)
+#   CDXGEN_IMAGE        baseline cdxgen image (default: ghcr.io/cdxgen/cdxgen:latest)
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,7 +29,7 @@ WORK_ROOT="$WORKSPACE/compare"
 rm -rf "$WORK_ROOT"; mkdir -p "$WORK_ROOT"
 
 SCANNER_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/sbom-scanner:latest}"
-CDXGEN_IMAGE="${CDXGEN_IMAGE:-ghcr.io/cyclonedx/cdxgen:latest}"
+CDXGEN_IMAGE="${CDXGEN_IMAGE:-ghcr.io/cdxgen/cdxgen:latest}"
 FIXTURES_DIR="${SBOM_FIXTURES_DIR:-$SCRIPT_DIR/../examples}"
 
 if [ ! -d "$FIXTURES_DIR" ]; then

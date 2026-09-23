@@ -27,7 +27,7 @@ description: BomLens에 새 프로그래밍 언어나 패키지 매니저 지원
 
 ```bash
 # img_for_lang() 예시 — 새 언어 항목 추가
-newlang) echo "ghcr.io/cyclonedx/cdxgen-debian-newlang:$CDXGEN_TAG" ;;
+newlang) echo "ghcr.io/cdxgen/cdxgen-debian-newlang:$CDXGEN_TAG" ;;
 ```
 
 ### 2. 의존성 보강이 필요하면 build-prep.sh 수정

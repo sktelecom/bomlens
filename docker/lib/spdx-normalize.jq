@@ -22,7 +22,7 @@ def normalize($s):
   elif ($n | test("general public.*2 0|general public.*v2")) then "GPL-2.0-only"
   elif ($n | test("general public.*3.*later")) then "GPL-3.0-or-later"
   elif ($n | test("general public.*3")) then "GPL-3.0-only"
-  elif ($n | test(" or | and ")) then $s
+  elif ($n | test(" or | and | with ")) then $s
   # Creative Commons. Datasets and documentation carry these where code carries
   # Apache/MIT, and HuggingFace spells them lowercase ("cc-by-sa-4.0"), which
   # would otherwise split from an upstream "CC-BY-SA-4.0" into two buckets in the

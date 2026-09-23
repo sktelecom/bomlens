@@ -118,6 +118,17 @@
         background: none;
         border: 1px solid var(--border);
       }
+      /* 보조 링크: 항상 보이되 눈에 띄지 않게. 메뉴바가 숨겨진 OS에서도 신고 양식에 닿는 길. */
+      #report {
+        display: inline-block;
+        margin: 0;
+        padding: 0 32px 14px;
+        font-size: 11.5px;
+        color: var(--dim);
+      }
+      #report:hover {
+        color: var(--fg);
+      }
       #version {
         margin: 0;
         padding: 0 32px 14px;
@@ -161,6 +172,7 @@
     <button id="retry" type="button"></button>
     <button id="open-logs" type="button"></button>
     <footer id="version"></footer>
+    <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
       const params = new URLSearchParams(location.search);
@@ -189,6 +201,7 @@
           subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
           retry: "다시 시도",
           openLogs: "로그 폴더 열기",
+          report: "문제 신고",
           help: {
             // 사내 프록시는 데모 현장에서 가장 흔한 실패다. 핵심은 "앱이 아니라 데몬이 받는다".
             proxy:
@@ -207,6 +220,7 @@
             "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
           retry: "Try again",
           openLogs: "Open log folder",
+          report: "Report a problem",
           help: {
             proxy:
               "This looks like a corporate proxy blocking the download. The image is fetched by the Docker daemon, not by BomLens, so setting proxy variables for this app has no effect. Configure the proxy in Docker Desktop -> Settings -> Resources -> Proxies, or Rancher Desktop -> Preferences -> WSL -> Proxy, then press Try again.",
@@ -252,6 +266,7 @@
       const openLogs = document.getElementById("open-logs");
       retry.textContent = s.retry;
       openLogs.textContent = s.openLogs;
+      document.getElementById("report").textContent = s.report;
       if (window.sbomDesktop && window.sbomDesktop.onStartupState) {
         window.sbomDesktop.onStartupState(({ state, reason }) => {
           const failed = String(state).startsWith("failed-");

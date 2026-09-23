@@ -1,6 +1,6 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-09-14T00:44:39Z",
+  "generatedAt": "2026-09-15T12:45:05Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
@@ -570,7 +570,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-09-14T00:44:36+00:00",
+            "detail": "2026-09-15T12:45:01+00:00",
             "refs": [
               "Section 5.2.1"
             ]
@@ -620,7 +620,7 @@
             "label": "Transitive dependencies (graph edges)",
             "status": "pass",
             "source": "auto",
-            "detail": "2 edge(s)",
+            "detail": "2 edge(s), graph completeness unknown (no positive evidence found, not a defect)",
             "refs": [
               "Section 5.1; 5.2.2"
             ]

@@ -890,6 +890,10 @@ else
 
         [ -f "$w/testapp_1.0_NOTICE.txt" ] && [ -f "$w/testapp_1.0_NOTICE.html" ] \
             && pass "nodejs --all: notice files produced" || fail "nodejs --all: notice files produced"
+        # The installed packages' license files carry the attribution; it must reach the NOTICE.
+        grep -q "^ *Copyright: ." "$w/testapp_1.0_NOTICE.txt" 2>/dev/null \
+            && pass "nodejs --all: NOTICE prints copyright lines read from the installed packages" \
+            || fail "nodejs --all: NOTICE prints copyright lines read from the installed packages"
         [ -f "$w/testapp_1.0_security.json" ] && [ -f "$w/testapp_1.0_security.md" ] && [ -f "$w/testapp_1.0_security.html" ] \
             && pass "nodejs --all: security files produced" || fail "nodejs --all: security files produced"
 
@@ -1005,6 +1009,13 @@ else
         else
             fail "go newer toolchain: transitive dependency resolved (spf13/pflag)" "$(tail -3 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
         fi
+        # The module cache's license files carry the attribution; it must reach the SBOM.
+        if jq -e '[.components[]? | select((.purl // "") | startswith("pkg:golang/")) | select(.copyright)] | length > 0' \
+               "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
+            pass "go newer toolchain: copyright read from the module cache"
+        else
+            fail "go newer toolchain: copyright read from the module cache" "$(grep 'copyright:' "$w/_scan.log" 2>/dev/null | tail -3)"
+        fi
         rm -rf "$w"
     else
         skip "go-newer-toolchain fixture not found"
@@ -1078,7 +1089,7 @@ else
         # (no local layer cache) the pull itself can take longer than a
         # resolve step would, and the wait below is measuring build-prep.sh's
         # own responsiveness, not network/registry variance.
-        docker pull -q "ghcr.io/cyclonedx/cdxgen-debian-swift:${CDXGEN_TAG:-v12}" >/dev/null 2>&1
+        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-v13}" >/dev/null 2>&1
         w="$(mktemp -d "$WORK_ROOT/interrupt.XXXXXX")"
         out="$(mktemp -d "$WORK_ROOT/interrupt-out.XXXXXX")"
         cp -R "$swiftsrc/." "$w/"

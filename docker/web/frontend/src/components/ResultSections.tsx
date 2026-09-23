@@ -114,6 +114,7 @@ export function ResultSection({
           scanId={scanId}
           query={query}
           onQueryChange={onQueryChange}
+          onResultsChange={onResultsChange}
           onPickComponent={
             onPick ? (name) => onPick("components", { term: name }) : undefined
           }
@@ -216,6 +217,7 @@ export function ResultSection({
           scanId={scanId}
           results={result.results}
           isSuppliedDocument={Boolean(inputSbomFileName(result))}
+          isAiDocument={isAiScan(result)}
         />
       ) : null;
 

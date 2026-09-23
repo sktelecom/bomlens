@@ -10,6 +10,7 @@
 #   produces <out_prefix>_conformance.json   (machine-readable result)
 #            <out_prefix>_conformance.md      (human summary)
 #            <out_prefix>_conformance.html    (visual summary)
+#            <out_prefix>_summary.result      (key<TAB>value facts for the CLI closing summary)
 #            <out_prefix>_conformance.result  (bare "pass"/"fail", for --fail-on-conformance
 #                                              to read without a host jq dependency)
 #
@@ -18,10 +19,10 @@
 # the pipeline: a non-conformant SBOM yields result="fail" but exit 0.
 #
 # Requirements:
-#   mandatory : spec version (CycloneDX 1.3-1.6 / SPDX 2.2-2.3; AI SBOMs also
-#               accept CycloneDX 1.7), timestamp, tool info, top component,
-#               name+version coverage, PURL coverage (>= threshold), PURL
-#               syntax, no pkg:generic, transitive edges
+#   mandatory : spec version (CycloneDX 1.3-1.7 / SPDX 2.2-2.3), timestamp,
+#               tool info, top component, name+version coverage, PURL coverage
+#               (>= threshold), PURL syntax, PURL namespace where the type
+#               requires one, no pkg:generic, transitive edges
 #   recommended (warn only): license coverage, hash coverage
 #   AI SBOMs (machine-learning-model present): the full G7 minimum-element
 #               checklist is appended (7 clusters / 50 elements, data-driven from
@@ -51,15 +52,16 @@ if [ -f "${SBOM}.sig" ]; then HAS_SIG_FILE=true; else HAS_SIG_FILE=false; fi
 SIGN_REQUESTED="${SIGN_SBOM:-false}"
 SIGN_ATTEMPT_FAILED="${SIGN_FAILED:-0}"
 
-# Submission profile. "skt-submission" tightens PURL coverage to 100% and
-# makes pkg:generic a required (failing) check instead of advisory; "default"
-# keeps the existing thresholds. Unknown values fall back to "default".
+# Submission profile. "skt-submission" tightens PURL coverage to 100% and makes
+# both pkg:generic and a purl type that purl-spec does not define required
+# (failing) checks instead of advisory ones; "default" keeps the existing
+# thresholds. Unknown values fall back to "default".
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 case "$CONFORMANCE_PROFILE" in
-    skt-submission) _PURL_DEFAULT=100; GENERIC_REQUIRED=true ;;
-    default|"")     _PURL_DEFAULT=90;  GENERIC_REQUIRED=false ;;
+    skt-submission) _PURL_DEFAULT=100; GENERIC_REQUIRED=true;  PURL_TYPE_REQUIRED=true ;;
+    default|"")     _PURL_DEFAULT=90;  GENERIC_REQUIRED=false; PURL_TYPE_REQUIRED=false ;;
     *)              echo "[validate] WARN: unknown CONFORMANCE_PROFILE '$CONFORMANCE_PROFILE'; using default." >&2
-                     _PURL_DEFAULT=90; GENERIC_REQUIRED=false ;;
+                     _PURL_DEFAULT=90; GENERIC_REQUIRED=false; PURL_TYPE_REQUIRED=false ;;
 esac
 
 # Coverage thresholds (percent). Override via env to tune strictness.
@@ -70,10 +72,16 @@ FIELD_MIN_PCT="${FIELD_MIN_PCT:-80}"     # advisory: regulatory per-component fi
 MISSING_CAP=50                            # cap missing-item lists in the report
 
 # Accepted spec versions (space-separated), per the SKT submission
-# requirements. Override via env. AI SBOMs (ML-BOM) additionally accept
-# CycloneDX 1.7: the OWASP AIBOM Generator emits 1.7 and the G7 model fields
-# need it, while the plain dependency-SBOM submission range stays 1.3-1.6.
-CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6}"
+# requirements. Override via env.
+#
+# CycloneDX 1.7 is accepted for every kind of SBOM. It was released in October
+# 2025 and generators have been emitting it since, so a submission at 1.7 is a
+# current document, not an unsupported one. What this pipeline WRITES is still
+# 1.6 (docker/lib/cdx-version.sh) because the bundled Trivy cannot decode 1.7:
+# reading a version and emitting it are separate decisions. The AI list stays a
+# variable of its own so that narrowing CYCLONEDX_SPEC_VERSIONS by env never
+# rejects the AIBOM toolchain's own output, which is always 1.7.
+CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6 1.7}"
 AI_CYCLONEDX_SPEC_VERSIONS="${AI_CYCLONEDX_SPEC_VERSIONS:-$CYCLONEDX_SPEC_VERSIONS 1.7}"
 SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3 SPDX-3.0}"
 
@@ -93,17 +101,63 @@ SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-SPDX-2.2 SPDX-2.3 SPDX-3.0}"
 # there.
 PURL_SYNTAX_REGEX='^pkg:[a-z][a-z0-9.+-]*(/[A-Za-z0-9._%~@+-]+)+(@[A-Za-z0-9._%~+:-]+)?(\?[A-Za-z0-9._%~+=&:,/-]+)?(#[A-Za-z0-9._%~+/-]+)?$'
 
-# OS package identifiers carry the distribution in the namespace slot
-# (pkg:rpm/rhel/bind@..., pkg:deb/debian/curl@...). purl-spec makes that
-# namespace required for these types, and vulnerability matching keys on it, so
-# an identifier without it is syntactically well formed and matches nothing: a
-# server SBOM measured this way reported 261 packages and resolved zero.
-# PURL_SYNTAX_REGEX cannot catch it because the namespace is optional there,
-# which is correct for npm and pypi. The second pattern asks whether a
-# segment ending in '/' follows the type; '@?#' are excluded from the segment so
-# a version, qualifier or subpath is never mistaken for a namespace.
-OS_PURL_TYPE_REGEX='^pkg:(rpm|deb|apk)/'
-OS_PURL_NS_REGEX='^pkg:(rpm|deb|apk)/[^/@?#]+/'
+# Some purl types carry a required namespace in the slot between the type and
+# the name: the distribution for an OS package (pkg:rpm/rhel/bind@...), the
+# groupId for a Maven artifact (pkg:maven/org.slf4j/slf4j-api@...), the owner
+# for a repository. Vulnerability matching and repository lookup both key on
+# it, so an identifier missing it is syntactically well formed and resolves to
+# nothing: a server SBOM measured this way reported 261 packages and matched
+# zero. A generator that rebuilds identifiers from a component's display name
+# instead of reading the package manager loses the namespace the same way, for
+# a whole Java dependency tree at once. PURL_SYNTAX_REGEX cannot catch either,
+# because the namespace is optional there, which is correct for npm and pypi.
+#
+# Which types require one is data, not code: docker/lib/purl-types.json mirrors
+# the namespace_definition.requirement of each type definition in purl-spec.
+# Two of the required types are measured but never failed, because an
+# identifier of theirs can legitimately carry no namespace:
+#
+#   golang       a module path can be a bare host ("connect.example.com"), and
+#                syft writes the Go standard library as pkg:golang/stdlib
+#   huggingface  a model published outside an organisation has no owner
+#                segment ("bert-base-uncased")
+#
+# Both are reported on an advisory row instead, so the gap stays visible
+# without rejecting an identifier that is correct as written.
+NS_ADVISORY_TYPES="${NS_ADVISORY_TYPES:-golang huggingface}"
+PURL_TYPES_FILE="${PURL_TYPES_FILE:-$(dirname "$0")/purl-types.json}"
+
+# An alternation that matches nothing, for when a list comes out empty: '()'
+# inside the regex below would match every purl of any type.
+_NO_TYPE='\x00never\x00'
+_ns_required="rpm|deb|apk"   # fallback if the type data is unreadable
+_ns_advisory="$_NO_TYPE"
+PURL_KNOWN_TYPES='[]'
+if [ -f "$PURL_TYPES_FILE" ]; then
+    _req=$(jq -r --arg adv "$NS_ADVISORY_TYPES" '
+        ($adv | split(" ")) as $a
+        | [ .types | to_entries[] | select(.value.namespace == "required") | .key
+            | . as $k | select(($a | index($k)) == null) ] | join("|")' "$PURL_TYPES_FILE" 2>/dev/null) || _req=""
+    _adv=$(jq -r --arg adv "$NS_ADVISORY_TYPES" '
+        ($adv | split(" ")) as $a
+        | [ .types | to_entries[] | select(.value.namespace == "required") | .key
+            | . as $k | select(($a | index($k)) != null) ] | join("|")' "$PURL_TYPES_FILE" 2>/dev/null) || _adv=""
+    _known=$(jq -c '[ .types | keys[] ]' "$PURL_TYPES_FILE" 2>/dev/null) || _known=""
+    [ -n "$_req" ] && _ns_required="$_req"
+    [ -n "$_adv" ] && _ns_advisory="$_adv"
+    [ -n "$_known" ] && PURL_KNOWN_TYPES="$_known"
+else
+    echo "[validate] WARN: $PURL_TYPES_FILE not found; PURL namespace checks cover OS packages only and the purl type check is skipped." >&2
+fi
+# The second pattern of each pair asks whether a segment ending in '/' follows
+# the type; '@?#' are excluded from the segment so a version, qualifier or
+# subpath is never mistaken for a namespace.
+NS_PURL_TYPE_REGEX="^pkg:($_ns_required)/"
+NS_PURL_NS_REGEX="^pkg:($_ns_required)/[^/@?#]+/"
+NS_ADV_PURL_TYPE_REGEX="^pkg:($_ns_advisory)/"
+NS_ADV_PURL_NS_REGEX="^pkg:($_ns_advisory)/[^/@?#]+/"
+NS_ADVISORY_LABEL=$(printf '%s' "$_ns_advisory" | tr '|' '/')
+[ "$NS_ADVISORY_LABEL" = "$_NO_TYPE" ] && NS_ADVISORY_LABEL="these types"
 
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[validate] SBOM file not found: $SBOM" >&2
@@ -160,10 +214,15 @@ cdx_checks() {
        --argjson fieldmin "$FIELD_MIN_PCT" \
        --argjson cap "$MISSING_CAP" \
        --argjson genericRequired "$GENERIC_REQUIRED" \
+       --argjson typeRequired "$PURL_TYPE_REQUIRED" \
+       --argjson knowntypes "$PURL_KNOWN_TYPES" \
        --arg okvers "${1:-$CYCLONEDX_SPEC_VERSIONS}" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
-       --arg osre "$OS_PURL_TYPE_REGEX" \
-       --arg osnsre "$OS_PURL_NS_REGEX" "
+       --arg nsre "$NS_PURL_TYPE_REGEX" \
+       --arg nsnsre "$NS_PURL_NS_REGEX" \
+       --arg advre "$NS_ADV_PURL_TYPE_REGEX" \
+       --arg advnsre "$NS_ADV_PURL_NS_REGEX" \
+       --arg advtypes "$NS_ADVISORY_LABEL" "
     $PCT_DEF
     ([.components[]?]) as \$c
     | (\$c|length) as \$tot
@@ -210,8 +269,18 @@ cdx_checks() {
     | ([ \$file[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]) as \$miss_fid
     | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
     | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
-    | ([ \$c[] | (.purl // empty) | select(test(\$osre)) ]) as \$os_purl
-    | ([ \$os_purl[] | select(test(\$osnsre) | not) ]) as \$os_nons
+    | ([ \$c[] | (.purl // empty) | select(test(\$nsre)) ]) as \$ns_purl
+    | ([ \$ns_purl[] | select(test(\$nsnsre) | not) ]) as \$ns_nons
+    | ([ \$c[] | (.purl // empty) | select(test(\$advre)) ]) as \$adv_purl
+    | ([ \$adv_purl[] | select(test(\$advnsre) | not) ]) as \$adv_nons
+    # The type is everything between 'pkg:' and the first '/', minus a version
+    # on a purl that has no namespace at all (pkg:applications/java@11.0.25 is
+    # type \"applications\"; pkg:foo@1 is type \"foo\"). purl-spec says the type is
+    # case insensitive and canonically lower case, so it is compared that way.
+    | ([ \$c[] | (.purl // empty) | select(startswith(\"pkg:\"))
+         | . as \$pu
+         | (\$pu | ltrimstr(\"pkg:\") | split(\"/\")[0] | split(\"@\")[0] | ascii_downcase) as \$ty
+         | select((\$knowntypes | index(\$ty)) == null) | \$pu ]) as \$unk_type
     | (\$okvers | split(\" \")) as \$vers
     | ((.specVersion // \"\") | tostring) as \$sv
     | ((\$c | map(select((.licenses // []) | length > 0)) | length)) as \$lic_ok
@@ -241,7 +310,7 @@ cdx_checks() {
                             and (\$props | any(.name == \"bsi:component:archive\"))
                             and (\$props | any(.name == \"bsi:component:structured\"))) ] | length) as \$fprops_ok
     | [
-       {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|join(\"/\")) + \")\"), required:true,
+       {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|unique|join(\"/\")) + \")\"), required:true,
         status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),
         detail:(\"CycloneDX \" + \$sv), missing:[]},
        {id:\"timestamp\", label:\"Timestamp (metadata.timestamp)\", required:true,
@@ -296,13 +365,28 @@ cdx_checks() {
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
-       {id:\"os-purl-namespace\", label:\"OS package PURL distribution (pkg:rpm/<distro>/name)\", required:true,
-        source:(if (\$os_purl|length)==0 then \"na\" else \"auto\" end),
-        naKind:(if (\$os_purl|length)==0 then \"not-applicable\" else \"\" end),
-        status:(if (\$os_nons|length)==0 then \"pass\" else \"fail\" end),
-        detail:(if (\$os_purl|length)==0 then \"no OS package identifiers\"
-                else \"\(\$os_nons|length) without distribution\" end),
-        missing:(\$os_nons[0:\$cap])},
+       {id:\"purl-namespace\", label:\"PURL namespace where the type requires it (pkg:maven/<groupId>/name)\", required:true,
+        source:(if (\$ns_purl|length)==0 then \"na\" else \"auto\" end),
+        naKind:(if (\$ns_purl|length)==0 then \"not-applicable\" else \"\" end),
+        status:(if (\$ns_nons|length)==0 then \"pass\" else \"fail\" end),
+        detail:(if (\$ns_purl|length)==0 then \"no identifiers of a type that requires a namespace\"
+                else \"\(\$ns_nons|length) without namespace\" end),
+        missing:(\$ns_nons[0:\$cap])},
+       {id:\"purl-namespace-advisory\", label:(\"PURL namespace for \" + \$advtypes + \" (advisory)\"), required:false,
+        source:(if (\$adv_purl|length)==0 then \"na\" else \"auto\" end),
+        naKind:(if (\$adv_purl|length)==0 then \"not-applicable\" else \"\" end),
+        status:(if (\$adv_nons|length)==0 then \"pass\" else \"warn\" end),
+        detail:(if (\$adv_purl|length)==0 then \"no identifiers of a type that requires a namespace\"
+                else \"\(\$adv_nons|length) without namespace\" end),
+        missing:(\$adv_nons[0:\$cap])},
+       {id:\"purl-type\", label:(if \$typeRequired then \"PURL type defined by purl-spec\" else \"PURL type defined by purl-spec (advisory)\" end), required:\$typeRequired,
+        source:(if (\$knowntypes|length)==0 then \"na\" else \"auto\" end),
+        status:(if (\$knowntypes|length)==0 then \"warn\"
+                elif (\$unk_type|length)==0 then \"pass\"
+                elif \$typeRequired then \"fail\" else \"warn\" end),
+        detail:(if (\$knowntypes|length)==0 then \"purl type list unavailable\"
+                else \"\(\$unk_type|length) undefined type(s)\" end),
+        missing:(\$unk_type[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (graph edges)\", required:true,
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
@@ -530,10 +614,15 @@ spdx_json_checks() {
        --argjson hashmin "$HASH_MIN_PCT" \
        --argjson cap "$MISSING_CAP" \
        --argjson genericRequired "$GENERIC_REQUIRED" \
+       --argjson typeRequired "$PURL_TYPE_REQUIRED" \
+       --argjson knowntypes "$PURL_KNOWN_TYPES" \
        --arg okvers "$SPDX_SPEC_VERSIONS" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
-       --arg osre "$OS_PURL_TYPE_REGEX" \
-       --arg osnsre "$OS_PURL_NS_REGEX" "
+       --arg nsre "$NS_PURL_TYPE_REGEX" \
+       --arg nsnsre "$NS_PURL_NS_REGEX" \
+       --arg advre "$NS_ADV_PURL_TYPE_REGEX" \
+       --arg advnsre "$NS_ADV_PURL_NS_REGEX" \
+       --arg advtypes "$NS_ADVISORY_LABEL" "
     $PCT_DEF
     ([.packages[]?]) as \$p
     | (\$p|length) as \$tot
@@ -547,8 +636,16 @@ spdx_json_checks() {
                        and (([.externalRefs[]? | select(.referenceType==\"cpe23Type\")]|length)>0)) ] | length) as \$cpe_only
     | ([ \$p[] | .externalRefs[]? | select((.referenceLocator // \"\")|startswith(\"pkg:generic\")) | .referenceLocator ]) as \$generic
     | ([ \$p[] | .externalRefs[]? | select(.referenceType==\"purl\") | (.referenceLocator // \"\") | select(test(\$purlre) | not) ]) as \$badpurl
-    | ([ \$p[] | .externalRefs[]? | select(.referenceType==\"purl\") | (.referenceLocator // \"\") | select(test(\$osre)) ]) as \$os_purl
-    | ([ \$os_purl[] | select(test(\$osnsre) | not) ]) as \$os_nons
+    | ([ \$p[] | .externalRefs[]? | select(.referenceType==\"purl\") | (.referenceLocator // \"\") ]) as \$purl_all
+    | ([ \$purl_all[] | select(test(\$nsre)) ]) as \$ns_purl
+    | ([ \$ns_purl[] | select(test(\$nsnsre) | not) ]) as \$ns_nons
+    | ([ \$purl_all[] | select(test(\$advre)) ]) as \$adv_purl
+    | ([ \$adv_purl[] | select(test(\$advnsre) | not) ]) as \$adv_nons
+    # See the CycloneDX side for how the type is read off the identifier.
+    | ([ \$purl_all[] | select(startswith(\"pkg:\"))
+         | . as \$pu
+         | (\$pu | ltrimstr(\"pkg:\") | split(\"/\")[0] | split(\"@\")[0] | ascii_downcase) as \$ty
+         | select((\$knowntypes | index(\$ty)) == null) | \$pu ]) as \$unk_type
     | (\$okvers | split(\" \")) as \$vers
     | (.spdxVersion // \"\") as \$sv
     | ((\$p | map(select(((.licenseConcluded // \"NOASSERTION\") != \"NOASSERTION\") or ((.licenseDeclared // \"NOASSERTION\") != \"NOASSERTION\"))) | length)) as \$lic_ok
@@ -593,13 +690,28 @@ spdx_json_checks() {
        {id:\"purl-syntax\", label:\"PURL syntax (pkg:type/[namespace/]name)\", required:true,
         status:(if (\$badpurl|length)==0 then \"pass\" else \"fail\" end),
         detail:\"\(\$badpurl|length) malformed\", missing:(\$badpurl[0:\$cap])},
-       {id:\"os-purl-namespace\", label:\"OS package PURL distribution (pkg:rpm/<distro>/name)\", required:true,
-        source:(if (\$os_purl|length)==0 then \"na\" else \"auto\" end),
-        naKind:(if (\$os_purl|length)==0 then \"not-applicable\" else \"\" end),
-        status:(if (\$os_nons|length)==0 then \"pass\" else \"fail\" end),
-        detail:(if (\$os_purl|length)==0 then \"no OS package identifiers\"
-                else \"\(\$os_nons|length) without distribution\" end),
-        missing:(\$os_nons[0:\$cap])},
+       {id:\"purl-namespace\", label:\"PURL namespace where the type requires it (pkg:maven/<groupId>/name)\", required:true,
+        source:(if (\$ns_purl|length)==0 then \"na\" else \"auto\" end),
+        naKind:(if (\$ns_purl|length)==0 then \"not-applicable\" else \"\" end),
+        status:(if (\$ns_nons|length)==0 then \"pass\" else \"fail\" end),
+        detail:(if (\$ns_purl|length)==0 then \"no identifiers of a type that requires a namespace\"
+                else \"\(\$ns_nons|length) without namespace\" end),
+        missing:(\$ns_nons[0:\$cap])},
+       {id:\"purl-namespace-advisory\", label:(\"PURL namespace for \" + \$advtypes + \" (advisory)\"), required:false,
+        source:(if (\$adv_purl|length)==0 then \"na\" else \"auto\" end),
+        naKind:(if (\$adv_purl|length)==0 then \"not-applicable\" else \"\" end),
+        status:(if (\$adv_nons|length)==0 then \"pass\" else \"warn\" end),
+        detail:(if (\$adv_purl|length)==0 then \"no identifiers of a type that requires a namespace\"
+                else \"\(\$adv_nons|length) without namespace\" end),
+        missing:(\$adv_nons[0:\$cap])},
+       {id:\"purl-type\", label:(if \$typeRequired then \"PURL type defined by purl-spec\" else \"PURL type defined by purl-spec (advisory)\" end), required:\$typeRequired,
+        source:(if (\$knowntypes|length)==0 then \"na\" else \"auto\" end),
+        status:(if (\$knowntypes|length)==0 then \"warn\"
+                elif (\$unk_type|length)==0 then \"pass\"
+                elif \$typeRequired then \"fail\" else \"warn\" end),
+        detail:(if (\$knowntypes|length)==0 then \"purl type list unavailable\"
+                else \"\(\$unk_type|length) undefined type(s)\" end),
+        missing:(\$unk_type[0:\$cap])},
        {id:\"transitive\", label:\"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)\", required:true,
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
@@ -628,7 +740,8 @@ spdx_tv_checks() {
     # so a well-formed Tag-Value SBOM — where pkg:generic is always 0 — never got a
     # conformance report. Capture the count and emit exactly one integer.
     g() { local n; n=$(grep -cE "$1" "$SBOM" 2>/dev/null) || true; printf '%s' "${n:-0}"; }
-    local ts tools names vers purls generic deps lics hashes verpat specok purlok os_purls os_ns_ok
+    local ts tools names vers purls generic deps lics hashes verpat specok purlok
+    local ns_purls ns_ns_ok adv_purls adv_ns_ok known_ok known_alt
     ts=$(g '^Created:'); tools=$(g '^Creator: ?Tool:')
     names=$(g '^PackageName:'); vers=$(g '^PackageVersion:')
     purls=$(g 'ExternalRef: ?PACKAGE-MANAGER purl'); generic=$(g 'purl +pkg:generic')
@@ -636,18 +749,29 @@ spdx_tv_checks() {
     verpat=$(printf '%s' "$SPDX_SPEC_VERSIONS" | sed 's/\./\\./g; s/ /|/g')
     specok=$(g "^SPDXVersion: *($verpat) *\$")
     purlok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:[a-z][a-z0-9.+-]*/[^ ]+ *$')
-    # Same question on the Tag-Value side: how many OS identifiers carry a
-    # distribution, out of those that should. Counted, not listed, like every
-    # other row here.
-    os_purls=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:(rpm|deb|apk)/')
-    os_ns_ok=$(g 'ExternalRef: ?PACKAGE-MANAGER purl +pkg:(rpm|deb|apk)/[^/@?#]+/')
+    # Same questions on the Tag-Value side: how many identifiers of a type that
+    # requires a namespace carry one, and how many use a type purl-spec defines.
+    # Counted, not listed, like every other row here.
+    ns_purls=$(g "ExternalRef: ?PACKAGE-MANAGER purl +pkg:($_ns_required)/")
+    ns_ns_ok=$(g "ExternalRef: ?PACKAGE-MANAGER purl +pkg:($_ns_required)/[^/@?#]+/")
+    adv_purls=$(g "ExternalRef: ?PACKAGE-MANAGER purl +pkg:($_ns_advisory)/")
+    adv_ns_ok=$(g "ExternalRef: ?PACKAGE-MANAGER purl +pkg:($_ns_advisory)/[^/@?#]+/")
+    known_alt=$(printf '%s' "$PURL_KNOWN_TYPES" | jq -r 'join("|")')
+    if [ -n "$known_alt" ]; then
+        known_ok=$(g "ExternalRef: ?PACKAGE-MANAGER purl +pkg:($known_alt)[/@]")
+    else
+        known_ok="$purls"   # no type data: nothing to judge, the row says so
+    fi
     jq -cn \
        --argjson ts "$ts" --argjson tools "$tools" --argjson names "$names" \
        --argjson vers "$vers" --argjson purls "$purls" --argjson generic "$generic" \
        --argjson deps "$deps" --argjson lics "$lics" --argjson hashes "$hashes" \
        --argjson specok "$specok" --argjson purlok "$purlok" \
-       --argjson osp "$os_purls" --argjson osnsok "$os_ns_ok" --arg okvers "$SPDX_SPEC_VERSIONS" \
-       --argjson genericRequired "$GENERIC_REQUIRED" '
+       --argjson nsp "$ns_purls" --argjson nsok "$ns_ns_ok" \
+       --argjson advp "$adv_purls" --argjson advok "$adv_ns_ok" \
+       --argjson knownok "$known_ok" --argjson knowntypes "$PURL_KNOWN_TYPES" \
+       --arg advtypes "$NS_ADVISORY_LABEL" --arg okvers "$SPDX_SPEC_VERSIONS" \
+       --argjson genericRequired "$GENERIC_REQUIRED" --argjson typeRequired "$PURL_TYPE_REQUIRED" '
     [
       {id:"spec-version", label:"Spec version (\($okvers|split(" ")|join("/")))", required:true, status:(if $specok>0 then "pass" else "fail" end), detail:"\($specok) accepted SPDXVersion line(s)", missing:[]},
       {id:"timestamp", label:"Timestamp (Created:)", required:true, status:(if $ts>0 then "pass" else "fail" end), detail:"\($ts) found", missing:[]},
@@ -657,11 +781,71 @@ spdx_tv_checks() {
       {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:(if $genericRequired then "Traceable PURL (no pkg:generic)" else "Traceable PURL (no pkg:generic, advisory)" end), required:$genericRequired, status:(if $generic==0 then "pass" elif $genericRequired then "fail" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/[namespace/]name)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
-      {id:"os-purl-namespace", label:"OS package PURL distribution (pkg:rpm/<distro>/name)", required:true, source:(if $osp==0 then "na" else "auto" end), naKind:(if $osp==0 then "not-applicable" else "" end), status:(if $osp<=$osnsok then "pass" else "fail" end), detail:(if $osp==0 then "no OS package identifiers" else "\($osp - $osnsok) without distribution" end), missing:[]},
+      {id:"purl-namespace", label:"PURL namespace where the type requires it (pkg:maven/<groupId>/name)", required:true, source:(if $nsp==0 then "na" else "auto" end), naKind:(if $nsp==0 then "not-applicable" else "" end), status:(if $nsp<=$nsok then "pass" else "fail" end), detail:(if $nsp==0 then "no identifiers of a type that requires a namespace" else "\($nsp - $nsok) without namespace" end), missing:[]},
+      {id:"purl-namespace-advisory", label:("PURL namespace for " + $advtypes + " (advisory)"), required:false, source:(if $advp==0 then "na" else "auto" end), naKind:(if $advp==0 then "not-applicable" else "" end), status:(if $advp<=$advok then "pass" else "warn" end), detail:(if $advp==0 then "no identifiers of a type that requires a namespace" else "\($advp - $advok) without namespace" end), missing:[]},
+      {id:"purl-type", label:(if $typeRequired then "PURL type defined by purl-spec" else "PURL type defined by purl-spec (advisory)" end), required:$typeRequired, source:(if ($knowntypes|length)==0 then "na" else "auto" end), status:(if ($knowntypes|length)==0 then "warn" elif $purls<=$knownok then "pass" elif $typeRequired then "fail" else "warn" end), detail:(if ($knowntypes|length)==0 then "purl type list unavailable" else "\($purls - $knownok) undefined type(s)" end), missing:[]},
       {id:"transitive", label:"Transitive dependencies (DEPENDS_ON/DEPENDENCY_OF)", required:true, status:(if $deps>0 or $names==0 then "pass" else "fail" end), detail:(if $deps==0 and $names==0 then "nothing to relate" else "\($deps) relationship(s)" end), missing:[]},
       {id:"license", label:"License present (recommended)", required:false, status:(if $lics>0 then "pass" else "warn" end), detail:"\($lics) license field(s)", missing:[]},
       {id:"hash", label:"Checksums present (recommended)", required:false, status:(if $hashes>0 then "pass" else "warn" end), detail:"\($hashes) checksum(s)", missing:[]}
     ]'
+}
+
+# --------------------------------------------------------
+# Measurements for --fail-on (docker/lib/evaluate-gate.sh). Printed as one JSON
+# object:
+#   softwareComponentCount  components other than operating-system and file
+#                           entries: what the scan identified as software (for
+#                           SPDX, packages the document DESCRIBES are the
+#                           subject itself, as CycloneDX's metadata.component
+#                           is, and are not counted)
+#   emptyResult             true when that count is 0
+#   licenseCoverage         {declared,total,pct}: of those components, how many
+#                           declare a license, and the percentage rounded down.
+#                           A license of NOASSERTION or NONE (any case) is not a
+#                           declaration, in every format. pct is null when
+#                           total is 0.
+# Separate from the checks on purpose: the license check keeps its own counting
+# (and its report text), and these numbers can differ from it.
+# --------------------------------------------------------
+cdx_signal() {
+    jq -c '
+      ([ .components[]? | select(.type != "operating-system" and .type != "file") ]) as $s
+      | ($s | length) as $n
+      | ([ $s[] | select([ (.licenses // [])[] | objects
+                            | (.license.id // .license.name // .expression // "")
+                            | select(type == "string" and . != "" and (ascii_upcase != "NOASSERTION") and (ascii_upcase != "NONE")) ]
+                          | length > 0) ] | length) as $d
+      | { softwareComponentCount: $n, emptyResult: ($n == 0),
+          licenseCoverage: { declared: $d, total: $n, pct: (if $n == 0 then null else (($d * 100 / $n) | floor) end) } }' "$SBOM" 2>/dev/null || echo '{}'
+}
+spdx_json_signal() {
+    jq -c '
+      def declared($v): ($v // "NOASSERTION") | (ascii_upcase != "NOASSERTION" and ascii_upcase != "NONE");
+      ([ (.documentDescribes // [])[]?, (.relationships[]? | select(.relationshipType == "DESCRIBES" and .spdxElementId == "SPDXRef-DOCUMENT") | .relatedSpdxElement) ]) as $roots
+      | ([ .packages[]? | select((.SPDXID // "") as $id | ($roots | index($id)) == null) ]) as $p
+      | ($p | length) as $n
+      | ([ $p[] | select(declared(.licenseConcluded) or declared(.licenseDeclared)) ] | length) as $d
+      | { softwareComponentCount: $n, emptyResult: ($n == 0),
+          licenseCoverage: { declared: $d, total: $n, pct: (if $n == 0 then null else (($d * 100 / $n) | floor) end) } }' "$SBOM" 2>/dev/null || echo '{}'
+}
+spdx_tv_signal() {
+    # One record per PackageName; a package declares a license when either license
+    # line names something other than NOASSERTION or NONE.
+    local counts n d
+    counts=$(awk '
+        function flush() { if (inpkg && !(id in root)) { n++; if (ok) d++ } }
+        NR == FNR { if ($1 == "Relationship:" && $2 == "SPDXRef-DOCUMENT" && $3 == "DESCRIBES") root[$4] = 1; next }
+        /^PackageName:/ { flush(); inpkg = 1; ok = 0; id = ""; next }
+        /^SPDXID:/ { if (inpkg) { id = $2 } next }
+        /^PackageLicense(Concluded|Declared):/ {
+            v = $0; sub(/^[^:]*:[ \t]*/, "", v); sub(/[ \t\r]+$/, "", v); u = toupper(v)
+            if (inpkg && u != "" && u != "NOASSERTION" && u != "NONE") ok = 1
+        }
+        END { flush(); printf "%d %d", n + 0, d + 0 }' "$SBOM" "$SBOM" 2>/dev/null) || counts="0 0"
+    n=${counts% *}; d=${counts#* }
+    jq -cn --argjson n "${n:-0}" --argjson d "${d:-0}" '
+      { softwareComponentCount: $n, emptyResult: ($n == 0),
+        licenseCoverage: { declared: $d, total: $n, pct: (if $n == 0 then null else (($d * 100 / $n) | floor) end) } }'
 }
 
 # --------------------------------------------------------
@@ -702,6 +886,7 @@ case "$FORMAT" in
         else
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
         fi
+        SIGNAL=$(cdx_signal)
         if registry_applies "${G7_REGISTRY:-$(dirname "$0")/g7-registry.json}"; then
             G7=$(g7_ai_checks)
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$G7" | jq -cs 'add')
@@ -719,7 +904,7 @@ case "$FORMAT" in
             echo "[validate] added the 2026 SBOM minimum-element checks"
         fi
         ;;
-    SPDX-JSON)     CHECKS=$(spdx_json_checks) ;;
+    SPDX-JSON)     CHECKS=$(spdx_json_checks); SIGNAL=$(spdx_json_signal) ;;
     SPDX-3.0)
         # SPDX 3.0 is JSON-LD (@graph); the 2.x package/relationship shape the
         # spdx_json checks read does not exist. Measure conformance on the
@@ -739,6 +924,7 @@ case "$FORMAT" in
            && [ -s "$SPDX3_CDX" ]; then
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+            SIGNAL=$(cdx_signal)
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 (Yocto) measured on the installed package set"
         elif command -v syft >/dev/null 2>&1 \
@@ -746,6 +932,7 @@ case "$FORMAT" in
            && [ -s "$SPDX3_CDX" ]; then
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
+            SIGNAL=$(cdx_signal)
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 measured via CycloneDX conversion"
         else
@@ -753,12 +940,53 @@ case "$FORMAT" in
             CHECKS='[{"id":"spec-version","label":"Spec version (SPDX-3.0)","required":true,"status":"pass","detail":"SPDX-3.0 (recognized; not measured without syft)","missing":[]}]'
         fi
         ;;
-    SPDX-TagValue) CHECKS=$(spdx_tv_checks) ;;
+    SPDX-TagValue) CHECKS=$(spdx_tv_checks); SIGNAL=$(spdx_tv_signal) ;;
     *)
         CHECKS='[{"id":"format","label":"Recognized SBOM format","required":true,"status":"fail","detail":"not CycloneDX or SPDX","missing":[]}]'
         ;;
 esac
 [ -n "$CHECKS" ] || CHECKS='[{"id":"parse","label":"Parseable SBOM","required":true,"status":"fail","detail":"could not evaluate","missing":[]}]'
+
+# --------------------------------------------------------
+# Repository resolution (advisory, opt-in, format independent).
+#
+# docker/lib/resolve-purl.py asks a package repository whether each identifier
+# names something that exists, and leaves its answer in a sidecar beside the
+# report. That step runs before this one and only when the scan asked for it,
+# so its absence is the normal case and reads as "not checked", never as a gap.
+#
+# The row can only ever warn. An identifier that resolves to nothing is usually
+# a generator defect (a groupId repeated inside the artifactId, a vendor
+# display name in the namespace slot), but a package published only to a
+# company-internal repository answers exactly the same way, and a submission
+# may legitimately be full of them.
+# --------------------------------------------------------
+RESOLVE_FILE="${PURL_RESOLUTION_FILE:-${OUT_PREFIX}_purl-resolution.json}"
+if [ "$FORMAT" = "unknown" ]; then
+    : # nothing was read, so there are no identifiers to have looked up
+elif [ -f "$RESOLVE_FILE" ]; then
+    if RESOLVE_ROW=$(jq -c --argjson cap "$MISSING_CAP" '
+        (.counts // {}) as $c
+        | (($c.found // 0) + ($c.missing // 0)) as $checked
+        | [{id: "purl-resolution",
+            label: "PURL resolves in its repository (advisory)",
+            required: false,
+            source: (if $checked == 0 then "na" else "auto" end),
+            naKind: (if $checked == 0 then "not-applicable" else "" end),
+            status: (if ($c.missing // 0) == 0 then "pass" else "warn" end),
+            detail: (if $checked == 0 then "nothing could be looked up"
+                     else "\($c.missing // 0) of \($checked) not found in the repository" end),
+            missing: ((.missing // [])[0:$cap])}]' "$RESOLVE_FILE" 2>/dev/null); then
+        CHECKS=$(printf '%s\n%s' "$CHECKS" "$RESOLVE_ROW" | jq -cs 'add')
+    else
+        echo "[validate] WARN: could not read $RESOLVE_FILE; the repository-resolution row is omitted." >&2
+    fi
+else
+    CHECKS=$(printf '%s\n%s' "$CHECKS" '[{"id":"purl-resolution",
+        "label":"PURL resolves in its repository (advisory)","required":false,
+        "source":"na","naKind":"not-applicable","status":"pass",
+        "detail":"repository lookup not run","missing":[]}]' | jq -cs 'add')
+fi
 
 # --------------------------------------------------------
 # Join the regulatory crosswalk (best-effort) over EVERY check, not just the G7
@@ -821,6 +1049,9 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           elif ($en|test("^Component filename coverage ")) then ($C["conformance.label.filename"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           elif ($en|test("^Source or distribution URI coverage ")) then ($C["conformance.label.artifact_uri"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
           elif ($en|test("^File component identifier coverage ")) then ($C["conformance.label.file_identifier"] | gsub("%n%"; ($en|capture(">= (?<n>[0-9]+)%").n)))
+          # The advisory namespace row names the types it measured, so its label
+          # is built rather than looked up whole.
+          elif ($en|test("^PURL namespace for ")) then ($C["conformance.label.purl_ns_advisory"] | gsub("%t%"; ($en|capture("^PURL namespace for (?<t>.+) \\(advisory\\)$").t)))
           else ($C["conformance.label_exact"][$en] // $en) end;
         def ldetail($d):
           if $d=="present" then $C["conformance.detail.present"]
@@ -842,8 +1073,13 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           elif ($d|test("^[0-9]+ edge\\(s\\)$")) then ($C["conformance.detail.edge"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ untraceable$")) then ($C["conformance.detail.untraceable"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ malformed$")) then ($C["conformance.detail.malformed"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
-          elif $d=="no OS package identifiers" then $C["conformance.detail.no_os_purls"]
-          elif ($d|test("^[0-9]+ without distribution$")) then ($C["conformance.detail.no_distro"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif $d=="no identifiers of a type that requires a namespace" then $C["conformance.detail.no_ns_purls"]
+          elif ($d|test("^[0-9]+ without namespace$")) then ($C["conformance.detail.no_namespace"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ undefined type\\(s\\)$")) then ($C["conformance.detail.undefined_type"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif $d=="purl type list unavailable" then $C["conformance.detail.no_type_list"]
+          elif $d=="repository lookup not run" then $C["conformance.detail.resolve_not_run"]
+          elif $d=="nothing could be looked up" then $C["conformance.detail.resolve_nothing"]
+          elif ($d|test("^[0-9]+ of [0-9]+ not found in the repository$")) then ($d|capture("^(?<a>[0-9]+) of (?<b>[0-9]+)")) as $m | ($C["conformance.detail.resolve_missing"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
           elif ($d|test("^[0-9]+ found$")) then ($C["conformance.detail.found"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ accepted SPDXVersion line\\(s\\)$")) then ($C["conformance.detail.spdxver"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ package\\(s\\)$")) then ($C["conformance.detail.package"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
@@ -996,20 +1232,59 @@ fi
 # --------------------------------------------------------
 # JSON report
 # --------------------------------------------------------
+# Two measurements stated on their own, so --fail-on empty-result and
+# --fail-on license-coverage read a value instead of inferring it from a check
+# that passes or warns on an empty denominator. Neither changes RESULT nor any
+# check. SIGNAL is set per format above (empty when the format was not measured).
+[ -n "${SIGNAL:-}" ] || SIGNAL='{}'
 jq -n \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
    --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
    --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" \
-   --argjson pipelineStepsFailed "$PIPELINE_STEPS_FAILED" --argjson pipelineStepsFailedMore "$PIPELINE_STEPS_FAILED_MORE" '
+   --argjson pipelineStepsFailed "$PIPELINE_STEPS_FAILED" --argjson pipelineStepsFailedMore "$PIPELINE_STEPS_FAILED_MORE" \
+   --argjson signal "$SIGNAL" '
 { project: $project, format: $format, result: $result, generatedAt: $ts,
   profile: $profile, untraceableComponents: $untraceable, checks: $checks,
   pipelineStepsFailed: $pipelineStepsFailed, pipelineStepsFailedMore: $pipelineStepsFailedMore }
++ $signal
 + (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
 
 # Bare pass/fail sidecar for --fail-on-conformance (scripts/scan-sbom.sh): a
 # single word, so the CLI can gate on it without requiring jq on the host.
 printf '%s' "$RESULT" > "${OUT_PREFIX}_conformance.result"
+
+# Closing-summary sidecar for the CLI (scripts/scan-sbom.sh), one "key<TAB>value"
+# line per fact, so the host needs no jq. The counts are the SIGNAL measured
+# above, the same numbers as the conformance report's top-level fields; only the
+# purl share is counted here (CycloneDX only, "-" otherwise). Not written for an
+# AI SBOM (no software to count) or when nothing was measured.
+rm -f "${OUT_PREFIX}_summary.result"
+if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("softwareComponentCount")' >/dev/null 2>&1; then
+    _sum_purl="-"
+    if [ "$FORMAT" = "CycloneDX" ]; then
+        # The same package set and rule as the conformance report's purl check:
+        # every component except data, file and operating-system ones.
+        _sum_purl=$(jq -r '[ .components[]? | select(.type != "operating-system" and .type != "file" and .type != "data") ] as $p
+            | if ($p | length) == 0 then "-"
+              else (([ $p[] | select(.purl != null) ] | length) * 100 / ($p | length) | floor | tostring) end' "$SBOM" 2>/dev/null) || _sum_purl="-"
+    fi
+    {
+        printf '%s' "$SIGNAL" | jq -r '"components\t\(.softwareComponentCount)",
+            "licensed\t\(.licenseCoverage.declared // 0)",
+            "licensePercent\t\(.licenseCoverage.pct // "-")"'
+        printf 'purlPercent\t%s\n' "${_sum_purl:--}"
+        # A shallow fallback analysis and any failed post-processing step are the
+        # two reasons a result is smaller than the scan was asked to give. Values
+        # come from the SBOM (a supplier's document under --analyze), so every
+        # control character is replaced and the length is capped before they can
+        # reach a terminal.
+        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-tool-degraded") | .value)
+               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:100] | "reduced\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
+        printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r --argjson more "${PIPELINE_STEPS_FAILED_MORE:-0}" '
+            if length > 0 then "failedSteps\t\(map(gsub("\\p{Cc}"; " ") | .[0:100]) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)" else empty end' 2>/dev/null
+    } > "${OUT_PREFIX}_summary.result" 2>/dev/null
+fi
 
 # --------------------------------------------------------
 # Localization (REPORT_LANG=ko). The JSON above is NEVER localized — it is an

@@ -113,7 +113,7 @@ The per-language cdxgen image mapping is as follows (`scan-sbom.sh:158-177`; the
 | ruby | `cdxgen-debian-ruby34` |
 | java | `cdxgen-temurin-java21` |
 | python | `cdxgen-python312` |
-| node | `cdxgen-node20` |
+| node | `cdxgen-alpine-node24` |
 | php | `cdxgen-debian-php84` |
 | dotnet | `cdxgen-debian-dotnet9` |
 | android | self-built `bomlens-android-sdk<API>` (compileSdk extracted automatically) |

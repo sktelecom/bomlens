@@ -28,7 +28,6 @@
 import json
 import os
 import sys
-import xml.etree.ElementTree as ET
 
 # A supplier document is a header plus a component list; only the header is read,
 # but json.load still parses the whole file. Refuse absurd inputs rather than
@@ -210,36 +209,25 @@ def describe_spdx3(doc):
 
 
 def describe_xml(path):
-    """XML input: read the format, its version and the component count. The rest
-    of the header varies enough between writers that guessing is not worth it."""
+    """XML input. CycloneDX XML is converted with the same reader the pipeline
+    uses (cdx-xml-to-json.py, which also refuses a DTD and decodes UTF-16) and
+    described from the result, so a document summarizes the same whether it
+    arrived as XML or as JSON. Other XML is not described."""
+    import importlib.util
+    lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cdx-xml-to-json.py")
     try:
-        root = ET.parse(path).getroot()
-    except (ET.ParseError, OSError):
+        spec = importlib.util.spec_from_file_location("cdx_xml_to_json", lib)
+        reader = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(reader)
+        with open(path, "rb") as fh:
+            raw = fh.read()
+    except (OSError, ImportError, AttributeError):
         return None
-    tag = root.tag.split("}")[-1].lower()
-    ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
-    if tag != "bom":
+    try:
+        doc = reader.read_document(raw)
+    except reader.Refused:
         return None
-    version = root.get("specVersion") or ""
-    if not version and "cyclonedx" in ns:
-        # Pre-1.3 CycloneDX carried the version only in the namespace URI.
-        version = ns.rstrip("/").rsplit("/", 1)[-1]
-    count = 0
-    for child in root.iter():
-        if child.tag.split("}")[-1] == "component":
-            count += 1
-    return {
-        "format": "CycloneDX",
-        "specVersion": version,
-        "documentId": root.get("serialNumber") or "",
-        "documentName": "",
-        "created": "",
-        "tools": [],
-        "authors": [],
-        "supplier": "",
-        "rootComponent": {"name": "", "version": "", "type": "", "purl": "", "licenses": []},
-        "componentCount": count,
-    }
+    return describe_cyclonedx(doc) if doc else None
 
 
 def describe(path):

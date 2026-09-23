@@ -15,6 +15,7 @@
  */
 import {
   BadgeCheck,
+  ClipboardCheck,
   Cpu,
   FileJson,
   FileSignature,
@@ -123,15 +124,33 @@ const GROUPS: GroupSpec[] = [
     rank: 6,
     match: (n) => n.includes("_scancode"),
   },
+  {
+    // The judgements a supplier recorded (`_vex.json`, written by the web UI),
+    // their CycloneDX VEX export (`_vex.cdx.json`) and the statements received
+    // from a supplier's VEX (`_vex_imported.json`). None matched a group, so
+    // the header counted them while no card offered them. The Yocto build's own
+    // `_yocto_vex.json` is a different file and stays out.
+    key: "vex",
+    Icon: ClipboardCheck,
+    primary: false,
+    rank: 8,
+    match: (n) =>
+      (n.endsWith("_vex.json") ||
+        n.endsWith("_vex.cdx.json") ||
+        n.endsWith("_vex_imported.json")) &&
+      !n.includes("_yocto_vex"),
+  },
 ];
 
 // Preferred chip order within a card: rich/human formats first.
-const FORMAT_RANK: Record<string, number> = { html: 0, md: 1, txt: 2, json: 3, spdx: 4 };
+const FORMAT_RANK: Record<string, number> = { html: 0, md: 1, txt: 2, json: 3, spdx: 4, cdx: 5 };
 
 function extOf(name: string): string {
   // The SPDX export is also .json; a distinct pseudo-extension keeps its chip
   // distinguishable from the CycloneDX one ("SPDX" vs "JSON").
   if (name.endsWith(".spdx.json")) return "spdx";
+  // Same for the CycloneDX VEX export next to the plain judgements file.
+  if (name.endsWith(".cdx.json")) return "cdx";
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
 }
@@ -142,7 +161,7 @@ function toFormat(f: ResultFile): ArtifactFormat {
     ext,
     name: f.name,
     size: f.size,
-    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx"].includes(ext),
+    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx", "cdx"].includes(ext),
   };
 }
 
@@ -195,5 +214,5 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
 
 /** Format label shown on a download chip (e.g. "HTML", "JSON"). */
 export function formatLabel(ext: string): string {
-  return ext.toUpperCase();
+  return ext === "cdx" ? "CycloneDX" : ext.toUpperCase();
 }

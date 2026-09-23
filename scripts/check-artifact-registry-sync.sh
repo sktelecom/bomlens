@@ -65,6 +65,8 @@ _conformance.json       :: yes :: yes :: _conformance
 _conformance.md         :: yes :: yes :: _conformance
 _conformance.html       :: yes :: yes :: _conformance
 _conformance.result     :: no  :: yes :: skip
+_summary.result         :: no  :: yes :: skip
+_gate.result            :: no  :: yes :: skip
 _risk-report.md         :: yes :: yes :: _risk-report
 _risk-report.html       :: yes :: yes :: _risk-report
 _scancode.json          :: yes :: yes :: _scancode\.json
@@ -77,6 +79,8 @@ _vendored.cdx.json      :: yes :: yes :: _vendored\.cdx\.json
 _ai-profile.json        :: yes :: yes :: _ai-profile
 _ai-profile.md          :: yes :: yes :: _ai-profile
 _vex.json               :: yes :: yes :: _vex\.json
+_vex.cdx.json           :: yes :: yes :: _vex\.cdx\.json
+_vex_imported.json      :: yes :: yes :: _vex_imported\.json
 _modelica.cdx.json      :: no  :: yes :: skip
 _cocoapods.cdx.json     :: no  :: yes :: skip
 _conda.cdx.json         :: no  :: yes :: skip
@@ -85,16 +89,19 @@ _security_grype.json    :: no  :: yes :: skip
 _security_yocto.json    :: no  :: yes :: skip
 "
 
-# _vex.json is deliberately absent from entrypoint.sh's KNOWN_ARTIFACT_SUFFIXES
-# below, and that is not an oversight for the forward check to catch: it is
-# the one entry here the scan pipeline never writes at all (POST /vex-verdict
-# in server.py does, after a scan is already done) and the one entry that
-# must NOT be swept by a re-scan's stale-artifact cleanup. A CVE judgement a
-# supplier recorded against last week's scan of this project/version has to
+# _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's
+# KNOWN_ARTIFACT_SUFFIXES below, and that is not an oversight for the forward
+# check to catch: they hold what a person supplied, not what a scan derived
+# (POST /vex-verdict and POST /vex-import in server.py write them after a scan
+# is done; --vex writes _vex_imported.json during one, only when a document is
+# given), so they are the two entries that must NOT be swept by a re-scan's
+# stale-artifact cleanup. A CVE judgement a supplier recorded, or a VEX
+# document they sent, against last week's scan of this project/version has to
 # survive scanning it again today; every other suffix here is regenerated
 # fresh each run, which is exactly why the cleanup sweeps it first.
 CLEANUP_EXEMPT="
 _vex.json
+_vex_imported.json
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }

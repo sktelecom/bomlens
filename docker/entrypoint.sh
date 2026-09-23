@@ -93,11 +93,11 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _bom.json _bom.json.sig _bom.spdx.json _bom.spdx.json.sig
     _NOTICE.txt _NOTICE.html _NOTICE.pdf
     _security.json _security.md _security.html
-    _conformance.json _conformance.md _conformance.html _conformance.result
+    _conformance.json _conformance.md _conformance.html _conformance.result _summary.result
     _risk-report.md _risk-report.html
     _scancode.json _files.json _source.json _input.json
-    _yocto_vex.json _security_epss.json _vendored.cdx.json
-    _ai-profile.json _ai-profile.md
+    _yocto_vex.json _security_epss.json _vendored.cdx.json _gate.result
+    _ai-profile.json _ai-profile.md _vex.cdx.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
 )
@@ -214,6 +214,26 @@ guard_hash() {
 #   $5 = the cdxgen image the caller is about to run (recorded for cleanup)
 GUARD_STATE_DIR="/bomlens-state"
 GUARD_ID=""
+
+# write_prep_file: place build-prep.sh's content ($1) in a file the cdxgen
+# sibling can run by path, and print that path. build-prep.sh has grown past
+# the kernel's single-argument limit (MAX_ARG_STRLEN, 128KiB on Linux --
+# Docker Desktop's Linux VM, Colima and GitHub Actions runners all enforce
+# it), so injecting it as `sh -c "$prep"` now fails with "argument list too
+# long" once the script crosses that line. GUARD_STATE_DIR is a host-
+# persistent directory both launch paths (scan-sbom.sh --ui, the desktop app)
+# always mount into this container and carry to the sibling via
+# --volumes-from, so a file written here is visible to the sibling at the
+# same path -- the same trick --volumes-from already does for the scanned
+# tree. Prints nothing when that mount is missing; callers fall back to the
+# old -c injection (defensive only, both launch paths always provide it).
+write_prep_file() {
+    [ -d "$GUARD_STATE_DIR" ] || return 1
+    mkdir -p "$GUARD_STATE_DIR/prep" 2>/dev/null || return 1
+    local f="$GUARD_STATE_DIR/prep/prep-$$.sh"
+    printf '%s' "$1" > "$f" 2>/dev/null || return 1
+    echo "$f"
+}
 setup_guard_state() {
     local self="$1" prep="$2" src="$3" next_owner="$4" next_image="$5"
     [ -n "${SOURCE_ROOT_HOST:-}" ] || return 0
@@ -254,11 +274,21 @@ setup_guard_state() {
             return 0
         fi
         echo "[INFO] cleaning up build artifacts a previous, interrupted scan of this folder left behind..."
-        docker run --rm -u 0:0 \
-            --volumes-from "$self" \
-            -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-            --entrypoint sh "$cleanup_image" \
-            -c "$prep" _ "$src" >/dev/null 2>&1 || true
+        local cleanup_prep_file; cleanup_prep_file=$(write_prep_file "$prep")
+        if [ -n "$cleanup_prep_file" ]; then
+            docker run --rm -u 0:0 \
+                --volumes-from "$self" \
+                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+                --entrypoint sh "$cleanup_image" \
+                "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
+            rm -f "$cleanup_prep_file"
+        else
+            docker run --rm -u 0:0 \
+                --volumes-from "$self" \
+                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
+                --entrypoint sh "$cleanup_image" \
+                -c "$prep" _ "$src" >/dev/null 2>&1 || true
+        fi
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
     printf '%s\n' "$next_owner" > "$GUARD_STATE_DIR/$key/owner" 2>/dev/null || return 0
@@ -291,6 +321,7 @@ generate_sbom_cdxgen() {
         return 1
     fi
     lang=$(detect_lang "$src")
+    warn_low_engine_memory_for "$lang" "$src"
     if [ "$lang" = "android" ]; then
         api=$(android_api "$src")
         img="${ANDROID_IMAGE_PREFIX}${api}:latest"
@@ -347,20 +378,42 @@ generate_sbom_cdxgen() {
     setup_guard_state "$self" "$prep" "$src" "$sibling_name" "$img"
     local guard_env=()
     [ -n "$GUARD_ID" ] && guard_env=(-e "BOMLENS_GUARD_ID=$GUARD_ID")
-    ( docker run -u 0:0 \
-        --name "$sibling_name" \
-        --cidfile "$cidf" \
-        --volumes-from "$self" \
-        -e HOME=/tmp/sbomhome \
-        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
-        -e FETCH_LICENSE="$FETCH_LICENSE" \
-        -e PROJECT_NAME="$PROJECT_NAME" \
-        -e PROJECT_VERSION="$PROJECT_VERSION" \
-        -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
-        "${prep_env[@]}" \
-        "${guard_env[@]}" \
-        --entrypoint sh "$img" \
-        -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
+    # See write_prep_file above: run build-prep.sh by path when the guard-state
+    # mount is there (the normal case), fall back to the old -c injection
+    # otherwise (works as long as build-prep.sh stays under the kernel's
+    # 128KiB single-argument limit).
+    local prep_file; prep_file=$(write_prep_file "$prep")
+    ( if [ -n "$prep_file" ]; then
+        docker run -u 0:0 \
+            --name "$sibling_name" \
+            --cidfile "$cidf" \
+            --volumes-from "$self" \
+            -e HOME=/tmp/sbomhome \
+            -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+            -e FETCH_LICENSE="$FETCH_LICENSE" \
+            -e PROJECT_NAME="$PROJECT_NAME" \
+            -e PROJECT_VERSION="$PROJECT_VERSION" \
+            -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
+            "${prep_env[@]}" \
+            "${guard_env[@]}" \
+            --entrypoint sh "$img" \
+            "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
+      else
+        docker run -u 0:0 \
+            --name "$sibling_name" \
+            --cidfile "$cidf" \
+            --volumes-from "$self" \
+            -e HOME=/tmp/sbomhome \
+            -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+            -e FETCH_LICENSE="$FETCH_LICENSE" \
+            -e PROJECT_NAME="$PROJECT_NAME" \
+            -e PROJECT_VERSION="$PROJECT_VERSION" \
+            -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
+            "${prep_env[@]}" \
+            "${guard_env[@]}" \
+            --entrypoint sh "$img" \
+            -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"
+      fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
     local pipe_pid=$!
     # The cidfile appears as soon as the container is created, well before it
     # finishes, so a cancel arriving during the run still has a container id
@@ -401,11 +454,11 @@ generate_sbom_cdxgen() {
             echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-        rm -f "$logf" "$cidf"
+        rm -f "$logf" "$cidf" "$prep_file"
         return 1
     fi
     [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-    rm -f "$logf" "$cidf"
+    rm -f "$logf" "$cidf" "$prep_file"
     if [ "$bom_path" != "$outdir/$out" ] && [ -f "$bom_path" ]; then
         mv "$bom_path" "$outdir/$out"
     fi
@@ -451,7 +504,7 @@ mark_compositions_aggregate() {
     fi
     case "$SCAN_MODE" in
         SOURCE|POSTPROCESS)
-            info=$(jq -r --arg labels "npm-production-set pip-install go-mod-tidy cargo-lockfile bundle-lock swift-package-resolve gradle-dependencies android-release-classpath composer-lock-committed dotnet-lock-committed" '
+            info=$(jq -r --arg labels "npm-production-set pip-install go-mod-tidy cargo-lockfile bundle-lock swift-package-resolve gradle-dependencies android-release-classpath composer-install composer-lock-committed dotnet-lock-committed" '
                 ($labels | split(" ")) as $known
                 | (.metadata.properties // []) as $props
                 | ([$props[] | select(.name=="bomlens:prep-step-applied") | .value]) as $applied
@@ -789,6 +842,16 @@ EOF
             *)              YOCTO_ARCHIVE=false ;;
         esac
         if [ "$YOCTO_ARCHIVE" = "false" ]; then
+        # Ask a package repository whether each identifier names something that
+        # exists. Opt-in (PURL_RESOLVE=true) because it is the only step here
+        # that needs the network, and it runs BEFORE the conformance check so
+        # the report can carry its answer on an advisory row. The submitted
+        # document is not touched; the answer lands in a sidecar.
+        if [ "${PURL_RESOLVE:-false}" = "true" ]; then
+            echo "[analyze] Looking up each PURL in its package repository..."
+            run_optional_step resolve-purl python3 "$LIBDIR/resolve-purl.py" \
+                "$ANALYZE_SBOM" "$OUT_PREFIX"
+        fi
         echo "[1/2] Validating supplier SBOM (conformance, original input)..."
         # Conformance never aborts the pipeline (best-effort report).
         run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
@@ -838,6 +901,8 @@ EOF
         ;;
 esac
 
+# The JSON copy of a CycloneDX XML input (sbom-detect.sh) is scratch, not a result.
+rm -f "$(dirname "$OUTPUT_FILE")"/.sbom-xml.*.json* "$(dirname "$OUT_PREFIX")"/.sbom-xml.*.json* 2>/dev/null || true
 if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE"; exit 1; fi
 echo "[INFO] SBOM ready: $OUTPUT_FILE"
 
@@ -1265,6 +1330,11 @@ if [ "$AI_MODEL_SCAN" = "true" ]; then
 elif [ "$CONFORMANCE_GEN_MODE" = "true" ]; then
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
 fi
+# --no-report skips the block that collects the conformance sidecars below, but the
+# CLI's closing summary still needs its facts on the host.
+if [ "${GENERATE_REPORT:-false}" != "true" ] && [ -f "${OUT_PREFIX}_summary.result" ]; then
+    ARTIFACTS+=("${OUT_PREFIX}_summary.result")
+fi
 
 # Deep license detection (scancode, opt-in). Only meaningful for source trees.
 if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
@@ -1406,6 +1476,59 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
     sync_artifacts
 fi
 
+# A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
+# SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are
+# left as they are. An explicit request the document cannot satisfy is said
+# plainly and does not stop the scan: the SBOM is already complete. A document
+# with nothing that applies leaves an earlier received file as it was, as the
+# web UI's import does.
+if [ -n "${VEX_FILE:-}" ]; then
+    vex_out="${OUT_PREFIX}_vex_imported.json"
+    if [ ! -f "$VEX_FILE" ]; then
+        echo "[WARN] --vex skipped: the document is not visible inside the container ($VEX_FILE). If it is a symbolic link, pass the real file." >&2
+    elif [ ! -f "$LIBDIR/import-vex.py" ]; then
+        echo "[WARN] --vex skipped: this scanner image predates --vex. Refresh it (docker pull) and run again." >&2
+    else
+        vex_tmp="${vex_out}.tmp.$$"
+        vex_rc=0
+        vex_json="$(python3 "$LIBDIR/import-vex.py" "$OUTPUT_FILE" "$VEX_FILE" "$vex_tmp" 2>/dev/null)" || vex_rc=$?
+        case "$vex_rc" in
+            0)
+                if [ "$(printf '%s' "$vex_json" | jq -r '.imported')" = "0" ]; then
+                    echo "[WARN] --vex: no statement in the document applies to a component of this SBOM ($(printf '%s' "$vex_json" | jq -r '.unmatched') name components it does not contain, $(printf '%s' "$vex_json" | jq -r '.ignored') ignored); nothing was saved." >&2
+                elif mv "$vex_tmp" "$vex_out"; then
+                    ARTIFACTS+=("$vex_out")
+                    echo "[vex] $(printf '%s' "$vex_json" | jq -r '"\(.imported) statement(s) apply to this SBOM, \(.unmatched) name a component it does not contain, \(.ignored) ignored"') -> $(basename "$vex_out")"
+                else
+                    echo "[WARN] --vex: could not save $(basename "$vex_out") in the output folder." >&2
+                fi
+                ;;
+            3)
+                echo "[WARN] --vex skipped: the document describes $(printf '%s' "$vex_json" | jq -r '.vexProduct'), but this scan is $(printf '%s' "$vex_json" | jq -r '.scanProduct'). Use the VEX for this product and version." >&2
+                ;;
+            4)
+                echo "[WARN] --vex skipped: the document holds too many statements to import." >&2
+                ;;
+            *)
+                echo "[WARN] --vex skipped: the file is not a readable CycloneDX VEX document (JSON with bomFormat CycloneDX and a vulnerabilities list)." >&2
+                ;;
+        esac
+        rm -f "$vex_tmp"
+    fi
+    sync_artifacts
+fi
+
+# --fail-on: judge the requested conditions now that the security report and the
+# SBOM enrichments (malicious-package, license conflict) are final. The verdict
+# goes to a small sidecar the CLI turns into an exit code; if this step cannot run
+# there is no sidecar, and the CLI reports that rather than passing.
+if [ -n "${FAIL_ON:-}" ]; then
+    bash "$LIBDIR/evaluate-gate.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$FAIL_ON" \
+        || echo "[WARN] --fail-on: the conditions could not be evaluated." >&2
+    [ -f "${OUT_PREFIX}_gate.result" ] && ARTIFACTS+=("${OUT_PREFIX}_gate.result")
+    sync_artifacts
+fi
+
 # Risk report (오픈소스위험분석보고서): always for ANALYZE, and for every other
 # mode when GENERATE_REPORT=true (the CLI/UI default, opt-out via --no-report).
 # It re-aggregates the notice + security artifacts already produced above.
@@ -1424,6 +1547,9 @@ if [ "$SCAN_MODE" = "ANALYZE" ] || [ "${GENERATE_REPORT:-false}" = "true" ]; the
     for ext in json md html result; do
         [ -f "${OUT_PREFIX}_conformance.${ext}" ] && ARTIFACTS+=("${OUT_PREFIX}_conformance.${ext}")
     done
+    # Facts for the CLI's closing summary (written by validate-sbom.sh; not
+    # human-facing, so it is not in server.py's ARTIFACT_SUFFIXES either).
+    [ -f "${OUT_PREFIX}_summary.result" ] && ARTIFACTS+=("${OUT_PREFIX}_summary.result")
     run_optional_step generate-risk-report bash "$LIBDIR/generate-risk-report.sh" "$OUT_PREFIX" "$PROJECT_NAME" "$SCAN_MODE"
     [ -f "${OUT_PREFIX}_risk-report.md" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.md")
     [ -f "${OUT_PREFIX}_risk-report.html" ] && ARTIFACTS+=("${OUT_PREFIX}_risk-report.html")

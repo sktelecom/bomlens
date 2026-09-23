@@ -6,6 +6,7 @@ import {
   CircleQuestionMark,
   Clock,
   ExternalLink,
+  LifeBuoy,
   MonitorPlay,
   Plus,
   RotateCw,
@@ -17,6 +18,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { demoUrl, docsUrl } from "@/lib/demo";
+import { ISSUE_FORM_URL } from "@/lib/diagnostics";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
@@ -285,6 +287,18 @@ function HelpMenu({ version }: { version?: string }) {
           >
             <MonitorPlay className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             {t("nav.helpDemo")}
+            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
+          <a
+            href={ISSUE_FORM_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => setOpen(false)}
+            className={item}
+            data-testid="help-report"
+          >
+            <LifeBuoy className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpReport")}
             <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
           </a>
           <p className="border-t px-3 py-2 text-xs text-muted-foreground" data-testid="app-version">

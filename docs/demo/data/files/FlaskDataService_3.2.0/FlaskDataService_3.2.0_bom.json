@@ -7302,5 +7302,10 @@
   "serialNumber": "urn:uuid:5f56d687-c6dc-45ac-b52b-bacab281c937",
   "services": [],
   "specVersion": "1.6",
-  "version": 1
+  "version": 1,
+  "compositions": [
+    {
+      "aggregate": "unknown"
+    }
+  ]
 }

@@ -1,0 +1,104 @@
+name: Bug Report
+description: Report something that did not work or produced a wrong result
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The fields marked required are what we need to reproduce the problem.
+        In the web UI and the desktop app, the result screen has a "Report a problem" panel that shows a diagnostics summary you can copy into the field below.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How did you run BomLens?
+      options:
+        - Desktop app
+        - Web UI (scan-sbom.sh --ui)
+        - Command line (scan-sbom.sh or scan-sbom.bat)
+        - CI pipeline
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      description: The full command line, or for the desktop app and the web UI the input type and options you picked on the New scan screen. Remove any token or password first.
+      placeholder: "./scan-sbom.sh --project my-app --version 1.0 --target ./my-app"
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Scan mode
+      options:
+        - Source directory
+        - Docker image
+        - Root filesystem directory
+        - Binary or firmware file
+        - AI model
+        - Analyze an existing SBOM
+        - Yocto build directory
+        - Other or not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Container engine
+      options:
+        - Docker Desktop
+        - Docker Engine (Linux)
+        - Colima
+        - Rancher Desktop
+        - Podman
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: image-tag
+    attributes:
+      label: Scanner image tag
+      description: "The tag of the scanner image that ran, for example 1.12.0 or latest. The Help menu of the web UI shows the version, and `docker images ghcr.io/sktelecom/bomlens` lists the tags you have."
+      placeholder: "ghcr.io/sktelecom/bomlens:1.12.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15, Windows 11, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: What you saw, including any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics summary
+      description: Paste the summary from the "Report a problem" panel of the result screen. Read it before you paste it; it lists versions, options and warnings only.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: The scan log or terminal output, if you have it. Remove anything you do not want to share.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, a workaround you found, or the project type you scanned.

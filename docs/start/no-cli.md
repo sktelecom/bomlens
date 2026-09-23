@@ -84,7 +84,7 @@ If you prefer a script over the desktop app, this path works too.
 ===========================================
 ```
 
-To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, and port status, in your Windows display language.
+To check that everything is ready, double-click `scripts\check-setup.bat` in the unzipped folder. It checks Docker installation and status, the scanner image, the Docker engine's memory and port status, in your Windows display language.
 
 ![The BomLens web UI](../images/web-ui-en.png)
 
@@ -92,7 +92,9 @@ To check that everything is ready, double-click `scripts\check-setup.bat` in the
 
 The current macOS build is not yet signed and notarized with an Apple Developer ID, so macOS quarantines the downloaded app. It is the same kind of block as the SmartScreen warning on Windows.
 
-What you see depends on your macOS version. You may get a warning that "BomLens" is damaged and can't be opened, offering only "Move to Trash" — the app is not actually damaged. Or the app may simply open, in which case macOS is running it from a temporary read-only copy rather than from where you installed it (App Translocation). It runs, but not from the location you chose, and nothing guarantees the same state the next time you open it.
+What you see depends on your macOS version. Recent macOS shows a block dialog like the one below, offering only "Move to Trash" — there is no button to open it anyway. Older macOS instead said the app "is damaged and can't be opened," which is the same unsigned-app block despite the wording; the app is not actually damaged. On some versions the app may simply open instead, in which case macOS is running it from a temporary read-only copy rather than from where you installed it (App Translocation). It runs, but not from the location you chose, and nothing guarantees the same state the next time you open it.
+
+![Gatekeeper blocking the unsigned app on a Korean-language mac: "Apple could not verify that 'BomLens' is free of malware that may harm your Mac or compromise your privacy." Only "Move to Trash" and "Done" are offered.](../images/gatekeeper.png)
 
 The fix is the same either way. Right-clicking the app and choosing Open, or the "Open anyway" button in System Settings, usually does not clear it on recent macOS. The reliable way is to remove the quarantine attribute from a terminal.
 

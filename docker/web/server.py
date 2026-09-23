@@ -109,7 +109,7 @@ UPLOAD_EXTS = {
     # .spdx.tar.zst is what a Yocto SPDX 2.2 build deploys, and the only SBOM
     # such a build produces — there is no .spdx.json beside it to send instead.
     # Named in full rather than as .tar.zst, which would admit any zstd tarball.
-    # .xml stays listed so an XML SBOM is answered by name (see the upload
+    # .xml is CycloneDX XML; any other XML is answered by name (see the upload
     # handler) rather than by the generic "unsupported file type".
     "sbom": (".json", ".xml", ".spdx", ".cdx.json", ".spdx.json", ".spdx.tar.zst"),
     "zip": (".zip", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar"),
@@ -204,6 +204,13 @@ ARTIFACT_SUFFIXES = (
     # this server writes itself rather than the scan pipeline. User-facing
     # judgement data, so list/download/delete it like any other result.
     "_vex.json",
+    # The same judgements as a standalone CycloneDX VEX document, built on
+    # request by GET /vex-export (export-vex.py) and rebuilt every time, since
+    # the judgements it reflects change after the scan.
+    "_vex.cdx.json",
+    # CVE statements received from a supplier as a CycloneDX VEX document
+    # (POST /vex-import, import-vex.py), kept apart from the user's own `_vex.json`.
+    "_vex_imported.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -466,25 +473,75 @@ def _classify_git_failure(text):
 # these patterns are a second, explicit layer in case such a line were ever
 # folded into a block some other way).
 _URL_USERINFO_RE = re.compile(r"://[^/\s@]+:[^/\s@]+@")
-_AUTH_HEADER_RE = re.compile(r"(?i)\bauthorization:\s*.+$")
+# A URL whose userinfo is a bare token (`https://<token>@host`). `git@` is the
+# ssh account name, not a credential, so it stays.
+_URL_TOKEN_USERINFO_RE = re.compile(r"://(?!git@)[^/\s@:]+@")
+# Whole rest of the line: a header value can hold spaces (`token ghp_...`).
+_AUTH_HEADER_RE = re.compile(r"(?im)\bauthorization:[ \t]*\S.*$")
 _BEARER_TOKEN_RE = re.compile(r"(?i)\bbearer\s+\S+")
 _TOKEN_PARAM_RE = re.compile(r"(?i)\btoken=[^&\s\"']+")
-_HEX_BLOB_RE = re.compile(r"\b[0-9a-fA-F]{20,}\b")
-_BASE64_BLOB_RE = re.compile(r"\b[A-Za-z0-9+/]{24,}={0,2}\b")
+# "token/secret/password/key" followed by a value, in `k=v`, `k: v` and JSON
+# `"k": "v"` forms; also with a prefix (`api_token`, `db-password`).
+_KEYWORD_VALUE_RE = re.compile(
+    r"(?i)\b((?:[a-z0-9]+[_-])*(?:token|secret|password|passwd|api[_-]?key|"
+    r"access[_-]?key|private[_-]?key))([\"']?[ \t]*[=:][ \t]*[\"']?)[^\s&\"',;]+"
+)
+# Tokens recognizable by their issuer's prefix. Preceded by anything but a
+# letter or digit: `\b` would not match after an underscore (`token_ghp_...`).
+_PREFIXED_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:"
+    r"gh[pousr]_[A-Za-z0-9]{20,}"            # GitHub
+    r"|github_pat_[A-Za-z0-9_]{20,}"         # GitHub fine-grained
+    r"|glpat-[A-Za-z0-9_-]{10,}"             # GitLab
+    r"|hf_[A-Za-z0-9]{20,}"                  # Hugging Face
+    r"|xox[abprs]-[A-Za-z0-9-]{10,}"         # Slack
+    r"|(?:AKIA|ASIA)[A-Z0-9]{16}"            # AWS access key id
+    r"|sk-[A-Za-z0-9_-]{20,}"                # API secret keys
+    r"|npm_[A-Za-z0-9]{30,}"                 # npm
+    r"|pypi-[A-Za-z0-9_-]{30,}"              # PyPI
+    r"|eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}"  # JWT
+    r")"
+)
+# Long hex/base64 runs. Not credentials by shape (an image digest or a commit id
+# looks the same), so they are masked only where a leaked secret is likelier than
+# a digest, and never right after a `sha256:`-style label.
+_NOT_AFTER_DIGEST_LABEL = r"(?<!sha1:)(?<!sha256:)(?<!sha384:)(?<!sha512:)"
+_HEX_BLOB_RE = re.compile(_NOT_AFTER_DIGEST_LABEL + r"\b[0-9a-fA-F]{20,}\b")
+_BASE64_BLOB_RE = re.compile(_NOT_AFTER_DIGEST_LABEL + r"\b[A-Za-z0-9+/]{24,}={0,2}\b")
+# The user-name segment of a home-directory path (`/Users/<name>`, `/home/<name>`,
+# `C:\Users\<name>`).
+_USER_PATH_RES = (
+    re.compile(r"(?i)(/(?:Users|home)/)[^/\s\"']+"),
+    re.compile(r"(?i)([A-Za-z]:[\\/]+Users[\\/]+)[^\\/\s\"']+"),
+)
+
+
+def _mask_credentials(text):
+    """Mask credential-shaped substrings: URL userinfo, an Authorization header,
+    a Bearer token, `token=`-style values, and tokens recognizable by their
+    issuer's prefix. Deliberately leaves long hex/base64 runs alone (see
+    _scrub_error_text for the stricter variant), so it is safe on log lines that
+    carry image digests and checksums.
+
+    Order matters: the structural patterns first, so their replacement text
+    ("***") does not get re-matched by a later pattern."""
+    text = _URL_USERINFO_RE.sub("://***@", text)
+    text = _URL_TOKEN_USERINFO_RE.sub("://***@", text)
+    text = _AUTH_HEADER_RE.sub("Authorization: ***", text)
+    text = _BEARER_TOKEN_RE.sub("Bearer ***", text)
+    text = _TOKEN_PARAM_RE.sub("token=***", text)
+    text = _KEYWORD_VALUE_RE.sub(lambda m: m.group(1) + m.group(2) + "***", text)
+    text = _PREFIXED_TOKEN_RE.sub("***", text)
+    return text
 
 
 def _scrub_error_text(text):
     """Mask credential/token-shaped substrings in one scanner log line before
     it can reach the browser as part of a failed-scan card's error message.
 
-    Order matters: the structural patterns (a URL's embedded userinfo, an
-    Authorization header, a Bearer token, a `token=` query param) are masked
-    first so their replacement text ("***") does not then get re-matched and
-    mangled by the broader hex/base64-blob patterns that run last."""
-    text = _URL_USERINFO_RE.sub("://***@", text)
-    text = _AUTH_HEADER_RE.sub("Authorization: ***", text)
-    text = _BEARER_TOKEN_RE.sub("Bearer ***", text)
-    text = _TOKEN_PARAM_RE.sub("token=***", text)
+    The credential masks of _mask_credentials, then the hex/base64 blob masks
+    last, so the "***" replacements above are not re-matched and mangled."""
+    text = _mask_credentials(text)
     text = _HEX_BLOB_RE.sub("***", text)
     text = _BASE64_BLOB_RE.sub("***", text)
     return text
@@ -1050,6 +1107,7 @@ MAX_ASSESS_URLS = 8  # license source links per assessed model
 # supplier-controlled list surfaced in this file.
 MAX_PIPELINE_STEP_LEN = 100  # chars per step id
 MAX_PIPELINE_STEPS = 20  # step ids listed; the rest are counted, not shown
+MAX_FIRMWARE_SCOPE_NAMES = 10  # handler or tool names listed in the firmware scope note
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -1146,6 +1204,7 @@ def security_summary(run_id):
         return None
     priority = _epss_kev_map(run_id)
     vex_by_purl, vex_by_nv = _vex_verdict_index(run_id)
+    recv_by_purl, recv_by_nv, recv_by_cve, recv_source = _vex_received_index(run_id)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
     kernel = 0
@@ -1233,6 +1292,19 @@ def security_summary(run_id):
                         row["vexDetail"] = verdict["detail"]
                     if verdict.get("updatedAt"):
                         row["vexUpdatedAt"] = verdict["updatedAt"]
+                # A statement the supplier sent (POST /vex-import), joined the
+                # same way but reported on its own keys: it never replaces the
+                # user's own judgement above.
+                received = _received_for_row(
+                    row.get("purl"), v.get("PkgName"), v.get("InstalledVersion"), cid,
+                    recv_by_purl, recv_by_nv, recv_by_cve,
+                )
+                if received:
+                    row["vexReceived"] = {
+                        k: received[k] for k in ("state", "detail", "justification") if received.get(k)
+                    }
+                    if recv_source:
+                        row["vexReceived"]["source"] = recv_source
                 vulns.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
@@ -1245,6 +1317,12 @@ def security_summary(run_id):
     err = data.get("ScanError")
     if isinstance(err, dict) and err.get("Message"):
         sev["scanError"] = str(err["Message"])[:400]
+    # How many judgements are on file for this scan, whether or not their CVE
+    # is still among the findings (the sidecar outlives a re-scan): the UI
+    # offers the VEX export on this count, not on the rows in view.
+    vex_count = len(_load_vex_verdicts(run_id))
+    if vex_count:
+        sev["vexCount"] = vex_count
     return sev
 
 
@@ -1301,10 +1379,72 @@ def _component_risk_index(run_id):
 # pedigree/false-positive states this UI has no use for.
 VEX_STATES = ("affected", "not_affected", "fixed", "under_investigation")
 MAX_VEX_DETAIL = 2000  # chars; a short justification, not a report
+MAX_VEX_IMPORT_BYTES = 4 * 1024 * 1024  # a received VEX document, not a bulk feed
 
 # Serializes read-modify-write on one run's *_vex.json. A single global lock
 # is fine: saves are rare, human-paced actions, never a hot path.
 _vex_write_lock = threading.Lock()
+
+
+def _load_vex_received(run_id):
+    """(statements, source) from a scan's `_vex_imported.json`: what a supplier's
+    VEX document said about this SBOM's components. ([], None) with no file or
+    one that fails to parse; never raises."""
+    p = run_file(run_id, "_vex_imported.json")
+    if not p or not os.path.isfile(p):
+        return [], None
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):  # ValueError covers a bad-JSON or bad-UTF-8 file
+        return [], None
+    if not isinstance(data, dict):
+        return [], None
+    stmts = data.get("statements")
+    src = data.get("source")
+    return (
+        [x for x in stmts if isinstance(x, dict)] if isinstance(stmts, list) else [],
+        src.get("product") if isinstance(src, dict) and isinstance(src.get("product"), str) else None,
+    )
+
+
+def _vex_received_index(run_id):
+    """Received statements keyed for the row join: by normalized purl, by
+    (name, installed) for a finding the scanner reported without a purl, and by
+    CVE alone for a product-level statement. Returns (by_purl, by_nv, by_cve,
+    source product name or None)."""
+    by_purl, by_nv, by_cve = {}, {}, {}
+    stmts, source = _load_vex_received(run_id)
+    for st in stmts:
+        cve = st.get("cve")
+        if not cve:
+            continue
+        if st.get("scope") == "product":
+            by_cve[cve] = st
+            continue
+        if st.get("purl"):
+            by_purl[(_norm_purl(st["purl"]), cve)] = st
+        name = (st.get("pkg") or "").lower()
+        if name:
+            by_nv[(name, st.get("installed") or "", cve)] = st
+    return by_purl, by_nv, by_cve, source
+
+
+def _received_for_row(row_purl, pkg_name, installed, cve, by_purl, by_nv, by_cve):
+    """The received statement for one finding. A finding with a purl matches on
+    the purl; only a statement recorded without one may fall back to name and
+    version, so a purl-bearing statement is never applied to another purl that
+    merely shares a name. A finding without a purl matches on name and version.
+    A product-level statement covers whatever no component statement did."""
+    hit = None
+    if row_purl:
+        hit = by_purl.get((_norm_purl(row_purl), cve))
+        if hit is None:
+            cand = by_nv.get(((pkg_name or "").lower(), installed or "", cve))
+            hit = cand if cand is not None and not cand.get("purl") else None
+    else:
+        hit = by_nv.get(((pkg_name or "").lower(), installed or "", cve))
+    return hit if hit is not None else by_cve.get(cve)
 
 
 def _load_vex_verdicts(run_id):
@@ -1386,6 +1526,58 @@ def _scope_index(data):
     if meta_ref:
         refs.discard(meta_ref)
     return {ref: ("direct" if ref in direct else "transitive") for ref in refs}, True
+
+
+def _firmware_scope(meta):
+    """How much of a firmware image the unpacker could open, from the
+    bomlens:firmware:* properties scan-firmware.sh stamps on the root component.
+    Returns None when the document carries none, when nothing went unopened, or
+    when this document was not produced by a scan that unpacked the image itself.
+
+    That last condition is read from the document: only scan-firmware.sh lists
+    unblob among metadata.tools. A merged SBOM keeps the root component (and its
+    properties) from a earlier firmware scan, and a submitted SBOM is a
+    supplier's data, so neither may present those numbers as this scan's own.
+
+    The values come from the SBOM, so each is accepted only if it is plainly a
+    number or a plain name, and capped, the same rule docker/lib/
+    generate-risk-report.sh applies. A malformed number is dropped, not repaired."""
+    tools = meta.get("tools")
+    tool_list = tools.get("components") if isinstance(tools, dict) else tools
+    if not any(t.get("name") == "unblob" for t in _dicts(tool_list)):
+        return None
+    meta_comp = _as_dict(meta.get("component"))
+    props = {
+        p.get("name"): p.get("value")
+        for p in _dicts(meta_comp.get("properties"))
+        if isinstance(p.get("name"), str) and str(p.get("name")).startswith("bomlens:firmware:")
+    }
+    if props.get("bomlens:firmware:input-bytes") in (None, ""):
+        return None
+
+    def num(name):
+        raw = str(props.get("bomlens:firmware:" + name) or "")
+        return float(raw) if re.fullmatch(r"[0-9]{1,12}(\.[0-9]{1,6})?", raw) else 0.0
+
+    def names(name):
+        raw = re.sub(r"[^A-Za-z0-9_.,+-]", "", str(props.get("bomlens:firmware:" + name) or ""))[:200]
+        return [n for n in raw.split(",") if n]
+
+    formats, tools_missing = names("extraction-failed-formats"), names("missing-extractors")
+    scope = {
+        "unknownPercent": min(num("unknown-top-level-percent"), 100.0),
+        "unknownBytes": int(num("unknown-bytes")),
+        "failedSteps": int(num("extraction-failed")),
+        "encryptedRegions": int(num("encrypted-regions")),
+        "failedFormats": formats[:MAX_FIRMWARE_SCOPE_NAMES],
+        "missingExtractors": tools_missing[:MAX_FIRMWARE_SCOPE_NAMES],
+        "namesMore": max(0, len(formats) - MAX_FIRMWARE_SCOPE_NAMES)
+        + max(0, len(tools_missing) - MAX_FIRMWARE_SCOPE_NAMES),
+    }
+    if not (scope["unknownBytes"] or scope["failedSteps"] or scope["encryptedRegions"]
+            or scope["missingExtractors"]):
+        return None
+    return scope
 
 
 def sbom_summary(run_id):
@@ -1788,6 +1980,7 @@ def sbom_summary(run_id):
         "sbomToolDegraded": degraded,
         "pipelineStepsFailed": pipeline_steps_failed,
         "pipelineStepsFailedMore": pipeline_steps_failed_more,
+        "firmwareScope": _firmware_scope(_as_dict(data.get("metadata"))),
         "sbomOversizedBytes": oversized_bytes,
         # CycloneDX root component type — drives the honest scan-kind subtitle and
         # works on re-open too, where the scan MODE isn't stored.
@@ -2043,6 +2236,12 @@ def conformance_summary(run_id):
         "pipelineStepsFailed": pipeline_steps_failed,
         "pipelineStepsFailedMore": pipeline_steps_failed_more,
     }
+    # Result-quality signals (validate-sbom.sh cdx_signal and siblings). A report
+    # from before they existed reads as absent keys, which stay absent so the UI
+    # shows no warning rather than a false "empty result".
+    signal = _conformance_quality_signal(data)
+    if signal:
+        out.update(signal)
     # Top-level regulatory crosswalk rollup (AI SBOMs only; validate-sbom.sh omits
     # the key entirely for non-AI SBOMs or when the crosswalk registry is absent).
     # Documentation-preparation view, not a compliance verdict. Surfaced as-is,
@@ -2050,6 +2249,37 @@ def conformance_summary(run_id):
     xwalk = _crosswalk_view(data.get("regulatoryCrosswalk"))
     if xwalk is not None:
         out["regulatoryCrosswalk"] = xwalk
+    return out
+
+
+def _conformance_quality_signal(data):
+    """Validated copy of the report's emptyResult / softwareComponentCount /
+    licenseCoverage fields; only the well-typed ones are returned."""
+    out = {}
+
+    def _count(v):
+        return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None
+
+    n = _count(data.get("softwareComponentCount"))
+    if n is not None:
+        out["softwareComponentCount"] = n
+    empty = data.get("emptyResult")
+    # Two fields that contradict each other are both untrustworthy; keep neither.
+    if isinstance(empty, bool):
+        if n is None or empty == (n == 0):
+            out["emptyResult"] = empty
+        else:
+            out.pop("softwareComponentCount", None)
+    lc = data.get("licenseCoverage")
+    if isinstance(lc, dict):
+        declared, total = _count(lc.get("declared")), _count(lc.get("total"))
+        pct = lc.get("pct")
+        if declared is not None and total is not None and declared <= total:
+            if pct is not None and not (
+                isinstance(pct, int) and not isinstance(pct, bool) and 0 <= pct <= 100
+            ):
+                pct = None
+            out["licenseCoverage"] = {"declared": declared, "total": total, "pct": pct}
     return out
 
 
@@ -2365,6 +2595,15 @@ def list_scans():
     return scans[:RECENT_SCANS_CAP]
 
 
+def _public_scan_config(meta):
+    """The sidecar as the browser's `scanConfig`: the settings only. The outcome
+    fields the diagnostics summary reads (mode, ok, errorMessage) stay
+    server-side."""
+    if not isinstance(meta, dict):
+        return meta
+    return {k: v for k, v in meta.items() if k not in ("mode", "ok", "errorMessage")}
+
+
 def scan_detail(run_id):
     """A past scan as a done-event payload (its own artifacts only)."""
     sbom = sbom_summary(run_id)
@@ -2387,11 +2626,229 @@ def scan_detail(run_id):
         # How the scan was launched (source + toggles), saved as a sidecar so the
         # UI can offer "re-scan with the same settings". None for pre-feature
         # scans that have no sidecar.
-        "scanConfig": scanmeta(run_id),
+        "scanConfig": _public_scan_config(scanmeta(run_id)),
         # Warnings the scan emitted, recovered from the same sidecar so a
         # re-opened result says what a live one said.
         "scanWarnings": (scanmeta(run_id) or {}).get("warnings") or [],
     }
+
+
+# --------------------------------------------------------------------------
+# Diagnostics summary ("Report a problem")
+#
+# A short, plain-text summary a user reviews on screen and then pastes into an
+# issue. Built ONLY from the fields listed below (an allowlist, not a filter over
+# whatever a scan happened to record): tool/image versions, the container engine
+# kind, the scan mode and non-secret options, the outcome per stage, and the
+# collected [WARN]/[ERROR] text. It never carries source contents, the scanned
+# path or URL, the project name, tokens, or a raw log. Free-text values are
+# additionally masked by _redact_diagnostic_text (home-directory user names and
+# credential-shaped text); that is a best-effort mask, so the panel tells the
+# user to read the text before pasting it.
+# --------------------------------------------------------------------------
+_DIAG_OPTION_KEYS = (
+    "notice", "security", "deepLicense", "identifyVendored", "includeOsv",
+    "byteStable", "deepCve",
+)
+# Input kinds the server itself dispatches on. Anything else in a recorded scan
+# (the value comes from the request) is shown as "other".
+_DIAG_SOURCES = frozenset((
+    "current-dir", "rootfs-dir", "scan-target-src", "yocto-build-dir",
+    "docker-image", "git-url", "zip-upload", "package-upload", "sbom-upload",
+    "firmware-upload", "model-upload", "ai-model",
+))
+_DIAG_WORD_RE = re.compile(r"[A-Za-z0-9_.-]{1,40}")
+# One warning or error line in the summary is cut here, so a single runaway line
+# cannot make the summary (and the text box that shows it) huge.
+_DIAG_LINE_MAX_CHARS = 300
+_DIAG_ENGINE_TIMEOUT = 5
+_DIAG_ENGINE_CACHE_SECONDS = 60
+
+
+def _diag_image(ref, default):
+    """An image reference for the summary. A reference that differs from the
+    built-in default was set through the environment and can name an internal
+    registry host, so only its tag and digest are kept."""
+    if ref == default:
+        return ref
+    digest = ref.partition("@")[2]
+    name = ref.partition("@")[0]
+    tag = name.rpartition(":")[2] if ":" in name.rpartition("/")[2] else ""
+    out = "<custom image>"
+    if tag:
+        out += ":" + tag
+    if digest:
+        out += "@" + digest
+    return out
+
+
+def _diag_clip(line):
+    line = str(line)
+    if len(line) > _DIAG_LINE_MAX_CHARS:
+        return line[:_DIAG_LINE_MAX_CHARS - 3] + "..."
+    return line
+
+
+_diag_engine_cache = [0.0, ""]
+
+
+def _diag_engine():
+    """Cached for a minute, but only a real answer: `docker info` is a
+    subprocess call and the summary is fetched each time a result screen is
+    shown, while a transient failure must not stick."""
+    now = time.monotonic()
+    if _diag_engine_cache[1] and now - _diag_engine_cache[0] < _DIAG_ENGINE_CACHE_SECONDS:
+        return _diag_engine_cache[1]
+    value, answered = _diag_engine_probe()
+    if answered:
+        _diag_engine_cache[0], _diag_engine_cache[1] = now, value
+    return value
+
+
+def _diag_engine_probe():
+    """(text, answered). The engine kind via the mounted socket. Only the server
+    version, OS name, OS type and architecture are read: `docker info` also
+    reports the engine's host name, which can contain a person's name, so it is
+    not asked."""
+    if not docker_cli_present():
+        return "docker CLI not present in this image", False
+    if not docker_capable():
+        return "engine socket not mounted", False
+    try:
+        # Tab-separated: an OperatingSystem value can contain a "|".
+        r = subprocess.run(
+            ["docker", "info", "--format",
+             "{{.ServerVersion}}\t{{.OperatingSystem}}\t{{.OSType}}\t{{.Architecture}}"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=_DIAG_ENGINE_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "engine did not answer", False
+    if r.returncode != 0:
+        return "engine did not answer", False
+    parts = r.stdout.decode("utf-8", "replace").strip().split("\t")
+    if len(parts) != 4:
+        return "engine did not answer", False
+    return "server %s, %s (%s/%s)" % tuple(p.strip() for p in parts), True
+
+
+_diag_sbom_cache = {}
+
+
+def _diag_sbom_facts(run_id):
+    """(component count, failed pipeline steps) for a run, or None without a
+    readable BOM. Reads only what the summary needs instead of building the
+    whole result summary, and remembers the answer per file version."""
+    p = run_file(run_id, "_bom.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        st = os.stat(p)
+        key = (p, st.st_mtime_ns, st.st_size)
+        if key in _diag_sbom_cache:
+            return _diag_sbom_cache[key]
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    count = len(_as_list(data.get("components")))
+    meta = _as_dict(data.get("metadata"))
+    if _as_dict(meta.get("component")).get("type") == "machine-learning-model":
+        count += 1
+    steps = []
+    for prop in _dicts(meta.get("properties")):
+        v = prop.get("value")
+        if prop.get("name") == "bomlens:pipeline-step-failed" and isinstance(v, str) \
+                and v and v[:MAX_PIPELINE_STEP_LEN] not in steps:
+            steps.append(v[:MAX_PIPELINE_STEP_LEN])
+    if len(_diag_sbom_cache) > 32:
+        _diag_sbom_cache.clear()
+    _diag_sbom_cache[key] = (count, steps)
+    return count, steps
+
+
+def _redact_diagnostic_text(text):
+    """Home-directory user names plus credential-shaped text. Long hex/base64
+    runs are left alone on purpose: image digests and commit ids are not
+    credentials and are what a maintainer needs to see."""
+    # Home-directory names first, so the credential masks do not swallow a
+    # whole path and leave a marker-less gap.
+    text = str(text)
+    for rx in _USER_PATH_RES:
+        text = rx.sub(lambda m: m.group(1) + "***", text)
+    return _mask_credentials(text)
+
+
+def build_diagnostics(run_id=None, error=None):
+    """The diagnostics summary as text, or None for a malformed run id.
+
+    `run_id` is optional: without it (a scan that failed before it had a run
+    folder) only the environment section is produced, plus `error` when given:
+    the failure text the browser already shows for such a scan. It is masked and
+    capped like every other line, and ignored when a run id is present (the run's
+    own recorded error is used then)."""
+    if run_id is not None and not scan_id_ok(run_id):
+        return None
+    lines = [
+        "BomLens diagnostics",
+        "app version: %s" % (os.environ.get("BOMLENS_VERSION") or "unknown"),
+        "scanner image: %s" % _diag_image(
+            SCANNER_IMAGE, "ghcr.io/sktelecom/bomlens:latest"),
+        "firmware image: %s" % _diag_image(
+            FIRMWARE_IMAGE, "ghcr.io/sktelecom/bomlens-firmware:latest"),
+        "aibom image: %s" % _diag_image(
+            AIBOM_IMAGE, "ghcr.io/sktelecom/bomlens-aibom:latest"),
+        "deep-cve image: %s" % _diag_image(
+            DEEP_CVE_IMAGE, "ghcr.io/sktelecom/bomlens-deep-cve:latest"),
+        "container engine: %s" % _diag_engine(),
+    ]
+    if not run_id and error:
+        lines.append("error:")
+        lines.extend("  " + _diag_clip(ln)
+                     for ln in str(error)[:_SCAN_ERROR_MAX_CHARS].splitlines())
+    meta = scanmeta(run_id) if run_id else None
+    if run_id and meta is None:
+        lines.append("scan: no record found for this id")
+    if meta:
+        src = meta.get("source")
+        lines.append("input: %s" % (src if src in _DIAG_SOURCES else "other"))
+        mode = meta.get("mode")
+        lines.append("mode: %s" % (
+            mode if isinstance(mode, str) and _DIAG_WORD_RE.fullmatch(mode) else "unknown"))
+        opts = ["%s=%s" % (k, "on" if meta.get(k) else "off")
+                for k in _DIAG_OPTION_KEYS if k in meta]
+        lines.append("options: %s" % (", ".join(opts) or "none recorded"))
+        prof = meta.get("conformanceProfile")
+        if isinstance(prof, str) and _DIAG_WORD_RE.fullmatch(prof):
+            lines.append("conformance profile: %s" % prof)
+        if "ok" in meta:
+            lines.append("outcome: %s" % ("succeeded" if meta["ok"] else "failed"))
+        stages = []
+        facts = _diag_sbom_facts(run_id)
+        if facts is not None:
+            count, failed = facts
+            stages.append("sbom generated: %d components" % count)
+            stages.append("pipeline steps failed: %s" % (", ".join(failed) or "none"))
+        else:
+            stages.append("sbom generated: no")
+        kinds = []
+        for f in list_results(run_id):
+            name = f["name"]
+            for suf in ARTIFACT_SUFFIXES:
+                if name.endswith(suf):
+                    kinds.append(suf.lstrip("_"))
+                    break
+        stages.append("artifacts: %s" % (", ".join(kinds) or "none"))
+        lines.append("stages:")
+        lines.extend("  - " + s for s in stages)
+        if meta.get("errorMessage"):
+            lines.append("error:")
+            lines.extend("  " + _diag_clip(ln)
+                         for ln in str(meta["errorMessage"]).splitlines())
+        warns = [w for w in _as_list(meta.get("warnings")) if isinstance(w, str)]
+        lines.append("warnings: %s" % (len(warns) or "none"))
+        lines.extend("  " + _diag_clip(w) for w in warns[:MAX_SCAN_WARNINGS])
+    return _redact_diagnostic_text("\n".join(lines)) + "\n"
 
 
 # --------------------------------------------------------------------------
@@ -3030,7 +3487,17 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # network), so an explicit env.get check like DEEP_LICENSE/BYTE_STABLE
         # above, not _bool_env.
         "-e", "STALENESS_ENRICH=%s" % ("true" if env.get("STALENESS_ENRICH") == "true" else "false"),
+        # Repository resolution for a submitted SBOM: opt-in for the same
+        # reason, and read the same way. entrypoint.sh runs it on the ANALYZE
+        # path only, so passing it for every mode costs nothing.
+        "-e", "PURL_RESOLVE=%s" % ("true" if env.get("PURL_RESOLVE") == "true" else "false"),
     ]
+    # Free-form companions to PURL_RESOLVE: a namespace list and a time budget.
+    # Passed by name so the value never reaches the argv, like API_KEY above,
+    # and only when the host set them.
+    for _k in ("PURL_RESOLVE_IGNORE", "PURL_RESOLVE_BUDGET"):
+        if env.get(_k):
+            args += ["-e", _k]
     # The profile the caller resolved (see the main handler's per-mode default),
     # re-derived from a closed allowlist like AI_USAGE_CONTEXT below, never the
     # env string itself, so an unrecognized value cannot reach the docker-run
@@ -4033,8 +4500,17 @@ class Handler(BaseHTTPRequestHandler):
                 # path (what the user recognizes).
                 "scanRoots": EXTRA_SCAN_ROOTS,
             }))
-        elif path == "/spdx-export":
-            self._spdx_export(urllib.parse.parse_qs(parsed.query))
+        elif path in ("/spdx-export", "/vex-export"):
+            # Both write a file into the output folder over GET, so they get
+            # the same Origin check /scan-stream does.
+            if not _origin_allowed(self.headers.get("Origin")):
+                self._send(403, json.dumps({"error": "bad origin"}))
+                return
+            qs = urllib.parse.parse_qs(parsed.query)
+            if path == "/spdx-export":
+                self._spdx_export(qs)
+            else:
+                self._vex_export(qs)
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
         elif path == "/scans":
@@ -4044,6 +4520,8 @@ class Handler(BaseHTTPRequestHandler):
             _sweep_stale_uploads()
         elif path == "/scan":
             self._serve_scan(urllib.parse.parse_qs(parsed.query))
+        elif path == "/diagnostics":
+            self._serve_diagnostics(urllib.parse.parse_qs(parsed.query))
         elif path == "/scan-stream":
             # A scan is a side-effecting action reachable only over GET (an
             # EventSource cannot issue POST), so it needs the CSRF check GET
@@ -4082,6 +4560,8 @@ class Handler(BaseHTTPRequestHandler):
             self._scan_delete(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/vex-verdict":
             self._vex_verdict_save(urllib.parse.parse_qs(parsed.query))
+        elif parsed.path == "/vex-import":
+            self._vex_import(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
@@ -4240,6 +4720,101 @@ class Handler(BaseHTTPRequestHandler):
                 return
         self._send(200, json.dumps({"ok": True, "verdict": record}))
 
+    def _vex_import(self, qs):
+        """Read a CycloneDX VEX document the supplier sent (POST /vex-import?id=
+        <scan id>, the document as the request body) and keep the statements
+        that apply to this scan's SBOM, in `<prefix>_vex_imported.json`.
+
+        The user's own judgements (`_vex.json`) are never touched, and importing
+        again replaces the previous received file. A document that describes a
+        different product or version than the scanned SBOM is refused (409) and
+        nothing is written. Every check runs before the write it guards."""
+        rid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(rid):
+            self._send(400, json.dumps({"error": "bad scan id"}))
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > MAX_VEX_IMPORT_BYTES:
+            self._send(413 if length > MAX_VEX_IMPORT_BYTES else 400,
+                       json.dumps({"error": "bad request size"}))
+            return
+        bom = run_file(rid, "_bom.json")
+        if not bom or not os.path.isfile(bom):
+            self._send(404, json.dumps({"error": "no CycloneDX SBOM for this scan"}))
+            return
+        script = os.path.join(LIB_DIR, "import-vex.py")
+        if not os.path.isfile(script):
+            self._send(503, json.dumps({"error": "VEX import is not available here"}))
+            return
+        try:
+            body = self.rfile.read(length)
+        except OSError:
+            self._send(400, json.dumps({"error": "could not read the request"}))
+            return
+        out = bom[: -len("_bom.json")] + "_vex_imported.json"
+        token = secrets.token_hex(4)
+        src, tmp = "%s.%s.in" % (out, token), "%s.%s.tmp" % (out, token)
+        try:
+            with open(src, "wb") as fh:
+                fh.write(body)
+            r = subprocess.run(
+                [sys.executable, script, bom, src, tmp],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+            )
+            result = {}
+            try:
+                result = json.loads(r.stdout.decode("utf-8", "replace").strip().splitlines()[-1])
+            except (ValueError, IndexError):
+                pass
+            if r.returncode == 2 or result.get("error") == "invalid":
+                self._send(400, json.dumps({"error": "not a CycloneDX VEX document"}))
+                return
+            if r.returncode == 4:
+                self._send(413, json.dumps({"error": "this VEX holds too many statements"}))
+                return
+            if r.returncode == 3:
+                sys.stderr.write("[ui] VEX import refused for %s: document is for %s, scan is %s\n" % (
+                    rid, result.get("vexProduct"), result.get("scanProduct")))
+                self._send(409, json.dumps({
+                    "error": "this VEX describes a different product",
+                    "vexProduct": result.get("vexProduct"),
+                    "scanProduct": result.get("scanProduct"),
+                }))
+                return
+            if r.returncode != 0 or not os.path.isfile(tmp):
+                raise OSError(r.stderr.decode("utf-8", "replace")[-500:])
+            imported = int(result.get("imported", 0))
+            if imported == 0:
+                self._send(422, json.dumps({
+                    "error": "no statement in this VEX applies to a component of this SBOM",
+                    "unmatched": int(result.get("unmatched", 0)),
+                    "ignored": int(result.get("ignored", 0)),
+                }))
+                return
+            os.replace(tmp, out)
+        except (OSError, ValueError, subprocess.SubprocessError) as err:
+            sys.stderr.write("[ui] VEX import failed for %s: %s\n" % (rid, err))
+            self._send(500, json.dumps({"error": "VEX import failed"}))
+            return
+        finally:
+            for leftover in (src, tmp):
+                try:
+                    os.remove(leftover)
+                except OSError:
+                    pass
+        stmts, source = _load_vex_received(rid)
+        self._send(200, json.dumps({
+            "imported": imported,
+            "unmatched": int(result.get("unmatched", 0)),
+            "ignored": int(result.get("ignored", 0)),
+            "source": source,
+            "statements": stmts,
+            "results": list_results(rid),
+        }))
+
     def _git_cred(self):
         """Stash a private-repo token; return a single-use credId."""
         try:
@@ -4321,16 +4896,28 @@ class Handler(BaseHTTPRequestHandler):
             }))
             return
         if kind == "sbom" and lower.endswith(".xml"):
-            # The pipeline reads CycloneDX/SPDX JSON only. Refusing here rather
-            # than in the converter saves starting a container to fail, and says
-            # what to do instead of "unrecognized format".
-            shutil.rmtree(dest_dir, ignore_errors=True)
-            self._send(415, json.dumps({
-                "error": "XML SBOMs are not supported yet (got %s). "
-                         "Convert it to CycloneDX or SPDX JSON and upload that."
-                         % safe_fn
-            }))
-            return
+            # CycloneDX XML is read (docker/lib/cdx-xml-to-json.py). Any other XML,
+            # SPDX RDF/XML in practice, is refused here rather than in the
+            # container: accepting it would only spend a scan to fail, and the
+            # answer names the format and the fix instead of "unsupported file
+            # type". Only the namespace is checked here; the converter is what
+            # validates the document.
+            try:
+                with open(tmp_path, "rb") as fh:
+                    head = fh.read(4096)
+            except OSError:
+                head = b""
+            # UTF-16 (BOM or not) puts a NUL between every character of the
+            # namespace, so drop them before looking; the converter decodes
+            # such a document properly.
+            if b"cyclonedx.org/schema/bom" not in head.replace(b"\x00", b""):
+                shutil.rmtree(dest_dir, ignore_errors=True)
+                self._send(415, json.dumps({
+                    "error": "Only CycloneDX XML is read, and %s is not one. "
+                             "SPDX RDF/XML is not supported yet: export SPDX or "
+                             "CycloneDX JSON and upload that." % safe_fn
+                }))
+                return
         final_path = os.path.join(dest_dir, safe_fn)
         os.replace(tmp_path, final_path)
         self._send(200, json.dumps({"token": token, "filename": safe_fn, "kind": kind}))
@@ -4397,6 +4984,69 @@ class Handler(BaseHTTPRequestHandler):
             "results": list_results(rid),
         }))
 
+    def _vex_export(self, qs):
+        """Write the judgements recorded for a scan as a CycloneDX VEX document
+        (GET /vex-export?id=<scan id>) so they can be handed to another tool.
+
+        Unlike /spdx-export this rebuilds the file on every call: it reflects
+        the `_vex.json` sidecar, which keeps changing after the scan, and it
+        survives a re-scan while the file itself does not. The document lands
+        in the run folder under a name already in ARTIFACT_SUFFIXES, so it joins
+        the results listing and the download bundle. Responds with the new
+        artifact's name plus the refreshed results listing.
+        """
+        rid = (qs.get("id") or [""])[0]
+        if not scan_id_ok(rid):
+            self._send(400, json.dumps({"error": "invalid scan id"}))
+            return
+        bom = run_file(rid, "_bom.json")
+        if not bom or not os.path.isfile(bom):
+            self._send(404, json.dumps({"error": "no CycloneDX SBOM for this scan"}))
+            return
+        sidecar = run_file(rid, "_vex.json")
+        if not sidecar or not _load_vex_verdicts(rid):
+            self._send(404, json.dumps({"error": "no judgements recorded for this scan"}))
+            return
+        script = os.path.join(LIB_DIR, "export-vex.py")
+        if not os.path.isfile(script):
+            self._send(503, json.dumps({"error": "VEX export is not available here"}))
+            return
+        out = bom[: -len("_bom.json")] + "_vex.cdx.json"
+        # A name of its own per request: the server is threaded, so two exports
+        # of one scan must not write the same temporary file.
+        tmp = "%s.%s.tmp" % (out, secrets.token_hex(4))
+        try:
+            r = subprocess.run(
+                [sys.executable, script, bom, sidecar, tmp],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+            )
+            if r.returncode != 0 or not os.path.isfile(tmp):
+                raise OSError(r.stderr.decode("utf-8", "replace")[-500:])
+            counts = json.loads(r.stdout.decode("utf-8", "replace").strip().splitlines()[-1])
+            exported, skipped = int(counts["exported"]), int(counts["skipped"])
+            if exported == 0:
+                os.remove(tmp)
+                self._send(422, json.dumps({
+                    "error": "none of the judgements match a component in the SBOM",
+                    "skipped": skipped,
+                }))
+                return
+            os.replace(tmp, out)
+        except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError) as err:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            sys.stderr.write("[ui] VEX export failed for %s: %s\n" % (rid, err))
+            self._send(500, json.dumps({"error": "VEX export failed"}))
+            return
+        self._send(200, json.dumps({
+            "name": os.path.basename(out),
+            "exported": exported,
+            "skipped": skipped,
+            "results": list_results(rid),
+        }))
+
     def _serve_file(self, qs):
         rid = (qs.get("id") or [""])[0]
         name = (qs.get("name") or [""])[0]
@@ -4427,6 +5077,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, json.dumps({"error": "not found"}))
             return
         self._send(200, json.dumps(detail))
+
+    def _serve_diagnostics(self, qs):
+        """Plain-text diagnostics summary for the Report-a-problem panel. Read
+        only, nothing is sent anywhere; the browser shows it and the user
+        decides whether to copy it."""
+        sid = (qs.get("id") or [""])[0] or None
+        text = build_diagnostics(sid, (qs.get("error") or [""])[0])
+        if text is None:
+            self._send(400, json.dumps({"error": "invalid scan id"}))
+            return
+        self._send(200, json.dumps({"text": text}))
 
     def _download_all(self, qs=None):
         """Bundle one scan's generated artifacts into one in-memory zip.
@@ -4817,12 +5478,28 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
+        def record_outcome(ok_, error_text=None, warnings=None):
+            """Save how this run ended into the run folder's sidecar, for the
+            diagnostics summary (GET /diagnostics). Written from a COPY of
+            scan_config: the settings echoed back to the browser (`scanConfig`)
+            stay exactly the settings, not the outcome. The error text is
+            masked and length-capped here, before it is ever stored."""
+            meta = dict(scan_config)
+            meta["mode"] = mode
+            meta["ok"] = ok_
+            if error_text:
+                meta["errorMessage"] = _scrub_error_text(str(error_text))[:_SCAN_ERROR_MAX_CHARS]
+            if warnings:
+                meta["warnings"] = warnings
+            write_scanmeta(run_out, meta)
+
         def fail(msg, key=None):
             # `key`, when set, names an i18n key the frontend can show as a
             # friendly headline (msg stays available as the collapsible raw
             # detail); every other caller passes only msg, so `key` is null
             # and the frontend falls back to showing msg exactly as before.
             sse("error", json.dumps({"detail": msg, "key": key}))
+            record_outcome(False, msg)
             sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
                                     "sbom": None, "security": None, "conformance": None}))
 
@@ -5363,7 +6040,7 @@ class Handler(BaseHTTPRequestHandler):
                              "or relaunching the UI from the AIBOM image."); return
 
             else:
-                fail("unknown input type: %s" % source); return
+                fail("unknown input type: %s" % source[:40]); return
 
             # For a source scan, hand the entrypoint the HOST path of the scanned
             # tree so it can run a cdxgen language image as a sibling container
@@ -5434,14 +6111,17 @@ class Handler(BaseHTTPRequestHandler):
             # (error_sent stays False): see _ScanErrorTracker.
             error_tracker = _ScanErrorTracker()
             error_sent = False
+            error_detail = None
 
             def note_log(ln):
                 if isinstance(ln, str) and ln.lstrip().startswith("[WARN]"):
-                    text = ln.strip()
+                    text = _mask_credentials(ln.strip())
                     if text not in scan_warnings and len(scan_warnings) < MAX_SCAN_WARNINGS:
                         scan_warnings.append(text)
                 error_tracker.feed(ln)
-                sse("log", json.dumps(ln))
+                # Credential-shaped text is masked before it reaches the browser
+                # (and so the copy-log button); digests and checksums are kept.
+                sse("log", json.dumps(_mask_credentials(ln) if isinstance(ln, str) else ln))
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
@@ -5466,10 +6146,8 @@ class Handler(BaseHTTPRequestHandler):
                 ok = rc == 0
                 if rc == -1:
                     error_sent = True
-                    sse("error", json.dumps({
-                        "detail": "Failed to launch the %s sibling container." % mode.lower(),
-                        "key": None,
-                    }))
+                    error_detail = "Failed to launch the %s sibling container." % mode.lower()
+                    sse("error", json.dumps({"detail": error_detail, "key": None}))
             else:
                 try:
                     proc = subprocess.Popen(
@@ -5503,7 +6181,8 @@ class Handler(BaseHTTPRequestHandler):
                     ok = proc.returncode == 0
                 except Exception as exc:  # noqa: BLE001
                     error_sent = True
-                    sse("error", json.dumps({"detail": "Failed to launch scan: %s" % exc, "key": None}))
+                    error_detail = "Failed to launch scan: %s" % exc
+                    sse("error", json.dumps({"detail": error_detail, "key": None}))
 
             # Artifacts landed in run_out (the run folder named run_id); the
             # summary helpers glob it by suffix. The done event carries id=run_id
@@ -5533,9 +6212,14 @@ class Handler(BaseHTTPRequestHandler):
                 # matched the [ERROR] convention.
                 "errorMessage": None if (ok or error_sent) else error_tracker.result(),
             }
+            # Outcome for the diagnostics summary (GET /diagnostics), which must
+            # work for a failed run too: the tracker's scrubbed [ERROR] text, or
+            # the launch failure the client was already told about.
+            outcome_error = None if ok else (done["errorMessage"] or error_detail)
             if scan_warnings:
+                # Also echoed to the browser, as it was before the summary existed.
                 scan_config["warnings"] = scan_warnings
-                write_scanmeta(run_out, scan_config)
+            record_outcome(ok, outcome_error, scan_warnings)
             sse("done", json.dumps(done))
         except Exception as exc:  # noqa: BLE001
             # The summary helpers are defended against malformed artifacts, so a
@@ -5547,6 +6231,10 @@ class Handler(BaseHTTPRequestHandler):
                 "detail": "Scan finished but the summary could not be built: %s" % exc,
                 "key": None,
             }))
+            try:
+                record_outcome(False, "Scan finished but the summary could not be built: %s" % exc)
+            except Exception:  # noqa: BLE001 - the stream must still get its done event
+                pass
             sse("done", json.dumps({"ok": False, "id": run_id,
                                     "results": list_results(run_id),
                                     "sbom": None, "security": None,

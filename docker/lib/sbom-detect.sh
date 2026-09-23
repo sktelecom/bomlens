@@ -5,7 +5,7 @@
 #
 # sbom-detect.sh — shared supplier-SBOM input helpers, sourced by
 # convert-to-cdx.sh and validate-sbom.sh so both accept the same encodings.
-# Definitions only: no `set -e`, no top-level work.
+# Definitions only: no `set -e`, no top-level work. Bash only (BASH_SOURCE).
 
 # normalize_sbom_encoding <infile> [workdir]
 #   A supplier SBOM saved as UTF-16 (common from Windows tooling, with or without
@@ -16,6 +16,11 @@
 #   preamble sits before the first '{', drop that preamble. Nothing is mutated in
 #   place: the path to use (the rewritten copy, or the original when no change was
 #   needed) is printed on stdout. Diagnostics go to stderr.
+#
+#   A CycloneDX XML document is also rewritten here, as CycloneDX JSON, so the
+#   validator and the converter both read one format (cdx-xml-to-json.py keeps the
+#   hashes and the root component that `syft convert` drops). Anything else that
+#   is XML is left alone and named by the caller.
 normalize_sbom_encoding() {
     _sd_in="$1"
     _sd_workdir="${2:-$(dirname "$1")}"
@@ -70,6 +75,26 @@ EOF
                 echo "[detect] dropped stray non-JSON preamble before first '{'" >&2
                 _sd_path="$_sd_strip"
             fi
+        fi
+    fi
+
+    # CycloneDX XML: the namespace is looked for in the decoded head, so UTF-16
+    # (converted above, or BOM-less) is found the same way as UTF-8.
+    if ! jq -e . "$_sd_path" >/dev/null 2>&1 \
+       && { LC_ALL=C head -c 4096 "$_sd_path" 2>/dev/null | tr -d '\000' | grep -aq 'cyclonedx.org/schema/bom'; } \
+       && command -v python3 >/dev/null 2>&1; then
+        _sd_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # Keyed by content, so the validator and the converter, which both call
+        # this on the same input, convert it once.
+        _sd_key=$(cksum < "$_sd_path" | cut -d' ' -f1,2 | tr ' ' '-')
+        _sd_xml="$_sd_workdir/.sbom-xml.$_sd_key.json"
+        if [ -s "$_sd_xml" ] && jq -e '.bomFormat == "CycloneDX"' "$_sd_xml" >/dev/null 2>&1; then
+            _sd_path="$_sd_xml"
+        elif [ -f "$_sd_lib/cdx-xml-to-json.py" ] \
+             && python3 "$_sd_lib/cdx-xml-to-json.py" "$_sd_path" "$_sd_xml.tmp" >&2 \
+             && [ -s "$_sd_xml.tmp" ] && mv "$_sd_xml.tmp" "$_sd_xml"; then
+            echo "[detect] read CycloneDX XML and converted it to JSON" >&2
+            _sd_path="$_sd_xml"
         fi
     fi
 

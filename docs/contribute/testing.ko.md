@@ -21,9 +21,12 @@ tests/
 ├── test-android-scope.sh      # 관심사별 독립 회귀 테스트 스크립트 —
 ├── test-aibom.sh              # 공용 라이브러리를 쓰지 않고 각자 자기만의
 ├── test-firmware-unpack.sh    # pass()/fail() 헬퍼를 정의한다
+├── test-real-corpus.sh        # 커밋을 고정한 공개 저장소를 스캔한다(아래 참고)
 ├── ...
 ├── lib/
-│   └── snapshot-normalize.jq  # 스냅샷 테스트가 공유하는 jq 헬퍼
+│   ├── snapshot-normalize.jq  # 스냅샷 테스트가 공유하는 jq 헬퍼
+│   └── corpus-compare.sh      # 코퍼스 실행을 이전 실행과 고정 하한선에 견주어 판정한다
+├── corpus/                    # 저장소 목록과 라이선스 포함률 하한선
 ├── fixtures/                  # 독립 스크립트들이 쓰는 입력 픽스처
 └── snapshots/                 # test-snapshot.sh가 비교하는 기대 출력 스냅샷
 ```
@@ -93,6 +96,33 @@ Success rate: 100.0%
 ./tests/test-android-scope.sh
 ./tests/test-aibom.sh
 ```
+
+## 실제 저장소 코퍼스
+
+번들 예제는 규모가 작고 잠금 파일이 없습니다. `tests/test-real-corpus.sh`는 공개 저장소 17개(`tests/corpus/real-corpus.tsv`, 생태계마다 2개 이상, 각각 커밋을 고정)를 스캐너로 스캔하고, 저장소마다 컴포넌트 수, purl과 라이선스가 있는 컴포넌트의 비율, 종료 코드, 소요 시간, 스캔이 체크아웃을 바꿨는지를 보고합니다. 저장소 자신이 무시하도록 설정한 빌드 산출물도 변경으로 셉니다.
+
+저장소마다 결과는 다음 상태 가운데 하나입니다.
+
+| 상태 | 뜻 |
+|---|---|
+| `ok` | 소프트웨어를 찾았다 |
+| `empty` | 스캔이 소프트웨어를 하나도 식별하지 못했다(`--fail-on empty-result`) |
+| `failed` | 스캔이 실패했거나 읽을 수 있는 SBOM을 만들지 못했다 |
+| `timeout` | `SCAN_TIMEOUT` 안에 끝나지 않았다(GNU `timeout`이나 `gtimeout`이 설치된 곳에서만 적용) |
+| `undetermined` | 품질 결과가 아니다. 저장소를 가져오지 못했거나 스캔이 판정하지 못했다(종료 코드 5) |
+
+`empty`, `failed`, `timeout`, 소스 트리 변경이 있거나 라이선스 포함률이 떨어지면 실행이 실패합니다. 측정된 것이 하나도 없을 때도 마찬가지입니다. 포함률은 생태계마다 `ok`였던 저장소의 평균을 두 가지로 판정합니다. 워크플로에서는 코퍼스 전체를 다룬 `main`의 가장 최근 성공 실행과 비교하며, 저장소가 2개 이상 비교되었을 때 10퍼센트포인트 이상 떨어지면 실패로 봅니다. 로컬에서는 `BASELINE_FILE`을 넘길 때만 이 비교가 일어납니다. 또 `tests/corpus/license-floor.tsv`의 하한선과도 비교하는데, 이 판정은 이전 실행이 없어도 적용됩니다. 하한선을 낮추려면 리뷰를 거쳐야 하므로 서서히 나빠지는 추세가 눈에 보입니다.
+
+Docker를 켠 상태에서 로컬로 실행합니다. 클론과 결과는 `~/.cache/bomlens-real-corpus`에 쌓입니다. `WORK_DIR`로 다른 경로를 지정한다면, Colima에서 Docker를 쓸 때 홈 디렉터리 아래에 두어야 합니다.
+
+```bash
+ONLY="cobra logrus" ./tests/test-real-corpus.sh   # 일부 저장소만
+ECOSYSTEMS="go rust" ./tests/test-real-corpus.sh  # 일부 생태계만
+```
+
+`--fail-on`보다 오래된 스캐너 이미지를 쓴다면 `FAIL_ON_ARGS=""`로 설정합니다. 이 경우 빈 결과는 SBOM에서 직접 판별합니다. `SCAN_TIMEOUT`(저장소당 초 단위, 기본 900이며 워크플로는 1200을 씁니다), `WORK_DIR`, `CORPUS_FILE`, `SBOM_SCANNER_IMAGE`, `BASELINE_FILE`, `DROP_POINTS`는 스크립트 머리말에 설명되어 있습니다.
+
+`Real-repository corpus` 워크플로(`real-corpus.yml`)는 매일 밤과 수동 요청 때 실행합니다. 이 커밋으로 스캐너 이미지를 빌드하는 러너에서 돌며 20분에서 25분쯤 걸립니다. 풀 리퀘스트에서는 실행하지 않고 필수 검사도 아닙니다. 결과 표는 실행 요약에 나오고, `results.tsv`는 실행마다 `real-corpus-results` 아티팩트로 남습니다. 다음 실행은 그중 가장 최근의 성공한 완전한 결과를 기준선으로 삼습니다. 직접 시작하려면 `gh workflow run real-corpus.yml`을 실행합니다(`ecosystems` 입력으로 범위를 좁힐 수 있으며, 범위를 좁힌 실행은 기준선이 되지 않습니다).
 
 ## 실행 모드
 
@@ -209,7 +239,7 @@ VERBOSE=true ./tests/test-android-scope.sh
 
 독립 스크립트들은 `test-scan.sh`에서 호출되는 대신 각자 별도의 단계로 연결되어
 있습니다. 예를 들어 `bash tests/test-aibom.sh`는 `ci.yml`에서 실행되고, 느리고
-네트워크에 의존하는 `test-android-scope.sh`는 `nightly.yml`에서 실행됩니다.
+네트워크에 의존하는 `test-android-scope.sh`는 `nightly.yml`에서 실행됩니다. 실제 저장소 코퍼스는 별도의 예약 워크플로 `real-corpus.yml`이 맡습니다.
 
 ### 테스트 실패 시 대응 절차
 

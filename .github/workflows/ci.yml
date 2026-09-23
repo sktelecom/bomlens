@@ -96,7 +96,16 @@ jobs:
     name: Lint Scripts
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 15
-    
+    needs: [changes]
+    # Skipped on a pull request that touches nothing but docs (see the
+    # changes job). Pushes to main and dispatch always run it. Compared
+    # against 'false' rather than 'true' so a classifier failure runs the
+    # job instead of skipping it unnoticed.
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -198,6 +207,15 @@ jobs:
       && fromJSON(vars.CI_WINDOWS_RUNNER || '["self-hosted","windows","bomlens-win"]')
       || fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 20
+    needs: [changes]
+    # Skipped on a pull request that touches nothing but docs (see the
+    # changes job). Pushes to main and dispatch always run it. Compared
+    # against 'false' rather than 'true' so a classifier failure runs the
+    # job instead of skipping it unnoticed.
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
 
     steps:
       - name: Checkout repository
@@ -266,6 +284,15 @@ jobs:
     name: Post-process Unit and Sync Tests
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     timeout-minutes: 20
+    needs: [changes]
+    # Skipped on a pull request that touches nothing but docs (see the
+    # changes job). Pushes to main and dispatch always run it. Compared
+    # against 'false' rather than 'true' so a classifier failure runs the
+    # job instead of skipping it unnoticed.
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.code != 'false')
 
     steps:
       - name: Checkout repository
@@ -395,6 +422,7 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       examples: ${{ steps.filter.outputs.examples }}
       desktop: ${{ steps.filter.outputs.desktop }}
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -422,10 +450,28 @@ jobs:
           }
 
           emit web      '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'
-          emit frontend '^docker/web/frontend/'
+          emit frontend '^(docker/web/frontend/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
           emit docs     '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
+
+          # True when at least one changed file lies outside the docs surface
+          # above. This is the negation of "docs", not another membership
+          # test, so it cannot go through emit(): that helper answers "does
+          # anything match", and this needs "does everything match". Gates
+          # lint/contract/postprocess so a docs-only PR is not queued behind
+          # ShellCheck/hadolint and the scanner/CLI-script suites, none of
+          # which can exercise anything it touched. `test` and `secrets` stay
+          # unconditional: `test` also runs the docs/tool drift checks
+          # (check-docs-drift.sh, check-examples-sync.sh) that verify docs
+          # content against the code, which is exactly what a docs-only
+          # change must not skip, and a secrets scan should never depend on
+          # which files changed.
+          if echo "$changed" | grep -qvE '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # The three heavy suites live in the reusable heavy-e2e.yml (shared with the
   # nightly full run, so the step definitions cannot drift). Gating:

@@ -62,6 +62,8 @@ const MAIN = {
     updateDownload: "다운로드 페이지 열기",
     updateLater: "나중에",
     scanMountChooseTitle: "스캔할 폴더 선택",
+    helpMenu: "도움말",
+    reportProblem: "문제 신고",
   },
   en: {
     dockerChecking: "Checking Docker status...",
@@ -96,6 +98,8 @@ const MAIN = {
     updateDownload: "Open download page",
     updateLater: "Later",
     scanMountChooseTitle: "Choose folders to scan",
+    helpMenu: "Help",
+    reportProblem: "Report a problem",
   },
 };
 

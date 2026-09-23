@@ -52,6 +52,39 @@ def load_library_map():
     return {k: v for k, v in raw.items() if not k.startswith("_")}
 
 
+def version_tuple(version):
+    """Leading numeric fields of a version ("4.0.0" -> (4, 0, 0)); None if none."""
+    if not isinstance(version, str):
+        return None
+    m = re.match(r"\d+(?:\.\d+)*", version.strip())
+    return tuple(int(n) for n in m.group(0).split(".")) if m else None
+
+
+def curated_license(entry, version):
+    """SPDX id the library map records for this version, or None.
+
+    A `uses()` declaration carries no license, so the only source is the map
+    (`license`, valid from `licenseFromVersion` on). Earlier releases can be
+    under a different license (Modelica Standard Library before 3.2.3 used the
+    Modelica License 2), so a version below the recorded floor, or one that
+    does not parse, gets no license instead of a guess. An entry with `license`
+    but no usable `licenseFromVersion` is a map error: it is reported and
+    yields no license, never a license for every version.
+    """
+    spdx = entry.get("license")
+    if not spdx:
+        return None
+    floor = version_tuple(entry.get("licenseFromVersion"))
+    if floor is None:
+        print(f"[modelica] WARN: map entry {entry.get('repo', '?')} has a license "
+              "but no valid licenseFromVersion; no license attached", file=sys.stderr)
+        return None
+    have = version_tuple(version)
+    if have is None or have < floor:
+        return None
+    return spdx
+
+
 def extract_uses_blocks(text):
     """Substrings between a `uses(` and its matching close paren."""
     blocks = []
@@ -92,21 +125,26 @@ def collect_dependencies(source_dir):
 
 def component(name, version, library_map):
     entry = library_map.get(name)
+    spdx = None
     if entry:
         purl = f"pkg:github/{entry['owner']}/{entry['repo']}@{version}"
+        spdx = curated_license(entry, version)
     else:
         purl = f"pkg:generic/{name}@{version}"
+    props = [
+        {"name": "bomlens:layer", "value": "modelica"},
+        {"name": "bomlens:identifiedBy", "value": "modelica-uses-annotation"},
+    ]
+    if spdx:
+        props.append({"name": "bomlens:licenseSource", "value": "modelica-library-map"})
     return {
         "bom-ref": purl,
         "type": "library",
         "name": name,
         "version": version,
         "purl": purl,
-        "licenses": [],
-        "properties": [
-            {"name": "bomlens:layer", "value": "modelica"},
-            {"name": "bomlens:identifiedBy", "value": "modelica-uses-annotation"},
-        ],
+        "licenses": [{"license": {"id": spdx}}] if spdx else [],
+        "properties": props,
     }
 
 

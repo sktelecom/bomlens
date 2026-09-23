@@ -27,7 +27,7 @@ Source scanning is a two-stage design that routes to per-language official cdxge
 
 ```bash
 # img_for_lang() example — add a new language entry
-newlang) echo "ghcr.io/cyclonedx/cdxgen-debian-newlang:$CDXGEN_TAG" ;;
+newlang) echo "ghcr.io/cdxgen/cdxgen-debian-newlang:$CDXGEN_TAG" ;;
 ```
 
 ### 2. Update build-prep.sh if dependency preparation is needed

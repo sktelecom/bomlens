@@ -38,6 +38,10 @@ const badgeVariants = cva(
         info: "border-transparent bg-risk-info/15 text-risk-info-fg",
         success:
           "border-transparent bg-success-surface text-success dark:bg-success-surface/15",
+        // Status caution, the same tokens as the warning banners; the risk tones
+        // above are severity colours and are not reused for a status.
+        warning:
+          "border-transparent bg-warning-surface text-warning dark:bg-warning-surface/15",
         // Text-only green matching the visual weight of the risk tones
         // (critical/high/info render as coloured text on a transparent tint),
         // so in a row of grade badges the RISK colour draws the eye rather than

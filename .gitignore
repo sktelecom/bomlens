@@ -20,6 +20,8 @@ bom.json
 *_conformance.md
 *_conformance.html
 *_conformance.result
+*_gate.result
+*_summary.result
 *_scancode.json
 *_NOTICE.pdf
 *_security_epss.json
@@ -35,6 +37,8 @@ bom.json
 *_ai-profile.json
 *_ai-profile.md
 *_vex.json
+*_vex.cdx.json
+*_vex_imported.json
 *_security_cvebintool.json
 *_security_grype.json
 *.wfp
@@ -133,3 +137,7 @@ scripts/check-doc-style.sh
 # Browser-automation scratch output. Accessibility snapshots of whatever pages
 # were open, including vendor download portals, so it should never be staged.
 .playwright-mcp/
+
+# corpus run scratch
+.corpus-work/
+.corpus-baseline/

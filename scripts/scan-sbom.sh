@@ -102,11 +102,18 @@ REPORT_LANG="${REPORT_LANG:-en}"
 # the SKT supplier submission review applies (100% PURL coverage, pkg:generic
 # required). Passed through as-is; validate-sbom.sh normalizes unknown values.
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
+# Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
+# it is the only part of the conformance check that uses the network.
+PURL_RESOLVE="${PURL_RESOLVE:-false}"
 # CI gate: exit non-zero when this scan's own conformance report says "fail".
 # Host-only logic (see the check near the end of this script); nothing is
 # passed to the container for it.
-FAIL_ON_CONFORMANCE="false"
-FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""
+FAIL_ON_CONFORMANCE="false"; FAIL_ON=()
+fail_on_bad_coverage() {
+    echo "[ERROR] --fail-on: '$1' needs a whole percentage from 0 to 100 without leading zeros, for example license-coverage=80 (there is no default)."
+    exit 1
+}
+FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
 YOCTO_BUILD_DIR=""
@@ -140,6 +147,9 @@ while [[ "$#" -gt 0 ]]; do
         --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
         --model) MODEL="$2"; shift ;;
         --model-file) MODEL_FILE="$2"; shift ;;
+        # The statements attach to vulnerability rows, which come from the security
+        # report, so asking for a VEX asks for that report too (as --deep-cve does).
+        --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --usage) USAGE_CONTEXT="$2"; shift ;;
         --merge)
             # Variadic: absorb every following token until the next option (a
@@ -178,8 +188,27 @@ while [[ "$#" -gt 0 ]]; do
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
         --fail-on-conformance) FAIL_ON_CONFORMANCE="true" ;;
+        # Repeatable. The list of conditions is closed (checked below), so a typo
+        # fails here instead of quietly gating on nothing.
+        --fail-on)
+            case "${2:-}" in
+                vulnerability=critical|vulnerability=high|vulnerability=medium|vulnerability=low)
+                    GENERATE_SECURITY="true" ;;
+                malicious-package|license-conflict|empty-result) ;;
+                license-coverage=*)
+                    # A whole percentage, 0 to 100, with no default: the threshold is the policy.
+                    case "${2#license-coverage=}" in
+                        ''|*[!0-9]*|????*|0?*) fail_on_bad_coverage "$2" ;;
+                        *) [ "${2#license-coverage=}" -le 100 ] || fail_on_bad_coverage "$2" ;;
+                    esac ;;
+                *)
+                    echo "[ERROR] --fail-on: unknown condition '${2:-}'."
+                    echo "[ERROR] Use one of: vulnerability=critical|high|medium|low, malicious-package, license-conflict, empty-result, license-coverage=<0-100>."; exit 1 ;;
+            esac
+            FAIL_ON+=("$2"); shift ;;
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
+        --resolve-purl) PURL_RESOLVE="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -206,6 +235,14 @@ Options:
                          clash with it. Source scans cannot infer this, and
                          without it no conflict verdict is produced. An
                          existing root license in the SBOM is never replaced.
+  --vex <file>           A CycloneDX VEX document (JSON) a supplier sent for this
+                         product. The statements that apply to a component of the
+                         scanned SBOM are kept in <Project>_<Version>_vex_imported.json,
+                         apart from the SBOM and the security report, which stay
+                         unchanged. Turns the security report on, since the
+                         statements are shown on its findings. A document for a
+                         different product or version, or one that is not
+                         CycloneDX VEX, is reported and skipped.
   --sbom-author <name>   Entity that generated this SBOM — the organisation or
                          person running the scan, not the tool and not whoever
                          wrote the software. Use the full name, no acronyms.
@@ -314,6 +351,25 @@ Options:
                          "fail" (exit 3 if no conformance report was produced
                          for this scan). Not offered with --ui. See "Exit
                          codes" in the CLI reference.
+  --fail-on <condition>  Exit 4 when this scan meets the condition (exit 5 when it
+                         cannot be judged from what the scan produced). Repeat
+                         the option for several conditions. Conditions:
+                           vulnerability=<critical|high|medium|low>
+                                        a finding at that severity or worse
+                                        (turns the security report on)
+                           malicious-package
+                                        a component flagged as a known
+                                        malicious package
+                           license-conflict
+                                        a component incompatible with the
+                                        license given by --license
+                           empty-result
+                                        the scan found no component
+                           license-coverage=<0-100>
+                                        fewer than that percent of components
+                                        declare a license (no default value)
+                         Not offered with --ui or --diff. See "Exit codes" in
+                         the CLI reference.
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
                          reports stay English regardless.
@@ -322,6 +378,15 @@ Options:
                          PURL coverage, pkg:generic advisory). skt-submission
                          requires 100% PURL coverage and fails on pkg:generic,
                          matching the SKT supplier submission review.
+  --resolve-purl         --analyze only: ask each package repository whether the
+                         identifiers in the submitted SBOM name packages that
+                         exist, and add the answer to the conformance report as
+                         an advisory row. Off by default; it is the only part of
+                         the check that uses the network. An identifier that
+                         resolves to nothing is reported, never failed: a
+                         package published only to an internal repository
+                         answers the same way. PURL_RESOLVE_IGNORE skips
+                         namespaces you know are internal.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -498,6 +563,8 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # Web UI mode
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
+    [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
+    [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
     # The web UI owns per-run subfolders itself (server.py creates them under the
@@ -580,6 +647,8 @@ fi
 # check below (the same shape UI mode takes above).
 # ========================================================
 if [ -n "$DIFF_OLD" ]; then
+    [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
+    [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
     [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
@@ -640,8 +709,13 @@ if [ -n "$_stale_cli_containers" ]; then
     echo "$_stale_cli_containers" | xargs "${DOCKER_ENV[@]}" docker rm >/dev/null 2>&1 || true
 fi
 
-SAFE_PROJECT=$(echo "$PROJECT_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
-SAFE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/[^a-zA-Z0-9._-]/_/g')
+# The scanner container names every output file with its own cleaning rule
+# (docker/entrypoint.sh: only [A-Za-z0-9.-] kept, runs of _ folded, edges trimmed).
+# Use the same rule here, or a name such as "@acme/lib" is looked for under a name
+# the container never wrote ("SBOM not found on host", and no result file found).
+container_safe() { printf '%s' "$1" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//'; }
+SAFE_PROJECT=$(container_safe "$PROJECT_NAME")
+SAFE_VERSION=$(container_safe "$PROJECT_VERSION")
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 SOURCE_DIR="$(pwd)"          # input anchor: the dir the user ran the tool in
 SCAN_INPUT_DIR="$SOURCE_DIR" # what cdxgen scans (overridden by git clone / zip extract)
@@ -669,6 +743,12 @@ UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
 # produced it".
 CONFORMANCE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_conformance.result"
 [ "$FAIL_ON_CONFORMANCE" = "true" ] && rm -f "$CONFORMANCE_RESULT_FILE"
+# Same for --fail-on: only this run's own judgement may decide the exit code.
+GATE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_gate.result"
+[ "${#FAIL_ON[@]}" -gt 0 ] && rm -f "$GATE_RESULT_FILE"
+# The closing summary's facts (docker/lib/validate-sbom.sh) belong to this run only.
+SUMMARY_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_summary.result"
+rm -f "$SUMMARY_RESULT_FILE"
 
 # A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
 # the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
@@ -850,13 +930,13 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s' \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET' \
         "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
-        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE"
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -875,6 +955,30 @@ cosign_run() {
     # COSIGN_KEY is a container path (safe as a value); COSIGN_PASSWORD is the
     # secret and is forwarded by name only (value via the exported env).
     printf ' -v %q:/cosign:ro -e COSIGN_KEY=%q -e COSIGN_PASSWORD' "$d" "/cosign/$f"
+}
+
+# --vex: the received document alone is mounted read-only (not the folder it
+# sits in, which may hold unrelated files) and named by its container path;
+# import-vex.py reads it after the SBOM exists.
+# It always appears at the fixed container path /vex-in/vex.json: this string is
+# expanded unquoted inside an eval'd command line, and an env value built from
+# the user's file name that ends in a space leaves a trailing backslash from %q
+# which joins the next token into the same word. The name stays only in the -v
+# source, where it is followed by the constant mount path.
+vex_run() {
+    [ -n "$VEX_FILE" ] || return 0
+    local d f
+    d="$(cd "$(dirname "$VEX_FILE")" && pwd)"; f="$(basename "$VEX_FILE")"
+    printf ' -v %q:/vex-in/vex.json:ro -e VEX_FILE=/vex-in/vex.json' "$(hostpath "$d/$f")"
+}
+
+# --fail-on: the conditions travel to the container as one comma-separated value.
+# Each is from a closed list (checked when the option is read), so none holds a
+# space or a shell-special character.
+gate_run() {
+    [ "${#FAIL_ON[@]}" -gt 0 ] || return 0
+    local joined; joined="$(IFS=,; printf '%s' "${FAIL_ON[*]}")"
+    printf ' -e FAIL_ON=%q' "$joined"
 }
 
 # ========================================================
@@ -1350,6 +1454,12 @@ ingest_archive() {
 if [ -z "$GIT_URL" ] && [ -n "$TARGET" ] && is_git_url "$TARGET"; then
     GIT_URL="$TARGET"; TARGET=""
 fi
+# Host-only check, made before anything is cloned or downloaded.
+if [ -n "$VEX_FILE" ] && [ ! -f "$VEX_FILE" ]; then
+    echo "[ERROR] --vex file not found: $VEX_FILE"
+    echo "[ERROR] Pass the path of a CycloneDX VEX document (JSON), e.g. --vex supplier-vex.json."; exit 1
+fi
+
 if [ -n "$GIT_URL" ]; then
     [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
     [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --git is mutually exclusive with --analyze."; exit 1; }
@@ -1644,6 +1754,16 @@ if [ "$VERIFY_WEIGHTS" = "true" ] && [ "$MODE" != "AIBOM" ]; then
     echo "[ERROR] --verify-weights applies to AI model scans only (use it with --model)."; exit 1
 fi
 
+# --resolve-purl is a submitted-SBOM question. The identifiers in an SBOM this
+# tool generates come from the package manager, so a repository lookup has
+# nothing to catch there; saying so beats letting the flag look like it took
+# effect. A warning rather than an error, so a shared command line that carries
+# the flag still runs.
+if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
+    echo "[WARN] --resolve-purl applies to --analyze only; ignoring it for this scan."
+    PURL_RESOLVE="false"
+fi
+
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
     echo "[ERROR] --firmware expects a file target, but '$TARGET' is not a regular file."; exit 1
 fi
@@ -1663,6 +1783,18 @@ fi
 # every mode; the risk report still renders from the notice, as it does in the
 # UI. Announce the skip only when the user actually asked (--security / --all),
 # so an ordinary --model run stays quiet instead of explaining a default.
+if [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]; then
+    for fo in "${FAIL_ON[@]:-}"; do
+        case "$fo" in
+            vulnerability=*)
+                echo "[ERROR] --fail-on $fo is not available for AI model and dataset inputs: they have no package dependencies to scan, so no security report is produced."
+                echo "[ERROR] Use --fail-on malicious-package or --fail-on license-conflict for these."; exit 1 ;;
+            empty-result)
+                echo "[ERROR] --fail-on empty-result is not available for AI model and dataset inputs: they are not judged by how many dependencies they list."
+                echo "[ERROR] Use --fail-on malicious-package, --fail-on license-conflict or --fail-on license-coverage=<pct> for these."; exit 1 ;;
+        esac
+    done
+fi
 if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]; } && [ "$GENERATE_SECURITY" = "true" ]; then
     [ "$SECURITY_REQUESTED" = "true" ] && \
         echo "[INFO] Skipping the security report: this input has no package dependencies to scan."
@@ -1765,6 +1897,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # separate from the scanned tree, even for --git/zip ingestion.
     [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
     LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
+    warn_low_engine_memory_for "$LANG_DET" "$SCAN_INPUT_DIR"
     if [ "$LANG_DET" = "android" ]; then
         API=$(android_api "$SCAN_INPUT_DIR")
         CDX_IMG="${ANDROID_IMAGE_PREFIX}${API}:latest"
@@ -1961,7 +2094,7 @@ FALLBACK_SH
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run)$(vex_run)$(gate_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
@@ -2042,7 +2175,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 
@@ -2090,6 +2223,9 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         summary_line "Security:" "${P}_security.json" "${P}_security.md" "${P}_security.html" \
             || note_missing "security report"
     fi
+    if [ -n "$VEX_FILE" ]; then
+        summary_line "Supplier VEX:" "${P}_vex_imported.json" || note_missing "supplier VEX import"
+    fi
     if [ "$GENERATE_SPDX" = "true" ]; then
         summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"
     fi
@@ -2124,7 +2260,91 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         echo "  Otherwise the step degraded — check the log above for its warning."
     fi
 fi
+# What the result holds, in every mode: the numbers come from the scan's own
+# measurement (validate-sbom.sh), not from a count made here. Absent (an older
+# image, an AI SBOM) it prints nothing.
+if [ -f "$SUMMARY_RESULT_FILE" ]; then
+    sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""
+    while IFS=$'\t' read -r sum_key sum_val; do
+        case "$sum_key" in
+            components)     sum_components="$sum_val" ;;
+            licensed)       sum_licensed="$sum_val" ;;
+            licensePercent) sum_license_pct="$sum_val" ;;
+            purlPercent)    sum_purl_pct="$sum_val" ;;
+            reduced)        sum_reduced="$sum_val" ;;
+            failedSteps)    sum_failed="$sum_val" ;;
+        esac
+    done < "$SUMMARY_RESULT_FILE"
+    case "$sum_components" in
+        ''|*[!0-9]*) ;;
+        *)
+            if [ "$sum_components" -eq 0 ]; then
+                printf '  %-12s %s\n' "Components:" "0 identified"
+                echo "[WARN] No software was identified. Check that the scanned folder holds a manifest or lock file for a supported ecosystem, and read the log above."
+            else
+                sum_detail=""
+                case "$sum_purl_pct" in ''|-|*[!0-9]*) ;; *) sum_detail="purl on ${sum_purl_pct}%" ;; esac
+                case "$sum_license_pct" in
+                    ''|-|*[!0-9]*) ;;
+                    *) sum_detail="${sum_detail:+$sum_detail, }license declared on ${sum_license_pct}% (${sum_licensed:-0} of ${sum_components})" ;;
+                esac
+                printf '  %-12s %s\n' "Components:" "${sum_components} identified${sum_detail:+ ($sum_detail)}"
+                [ "${sum_licensed:-0}" != "0" ] || echo "[WARN] No component declares a license, so license checks have nothing to work with. Read the log above."
+            fi
+            # Under --analyze these describe the submitted document's history, not
+            # this run, so they are not reported.
+            if [ "$MODE" != "ANALYZE" ]; then
+                if [ -n "$sum_reduced" ]; then
+                    case "$sum_reduced" in
+                        disk-space)  sum_why="the scan ran out of disk space" ;;
+                        oom)         sum_why="the build ran out of memory" ;;
+                        network)     sum_why="a dependency download failed" ;;
+                        cdxgen-crash) sum_why="the dependency analyzer failed" ;;
+                        *)           sum_why="the dependency analyzer could not run" ;;
+                    esac
+                    echo "[WARN] Reduced analysis: ${sum_why}, so only direct dependencies were identified."
+                fi
+                [ -z "$sum_failed" ] || echo "[WARN] Steps that failed: ${sum_failed} (details in the log above)"
+            fi
+            ;;
+    esac
+fi
 echo "=========================================="
+
+# --fail-on: docker/lib/evaluate-gate.sh wrote one line per condition into
+# <prefix>_gate.result (status, condition, detail; tab-separated), so the host
+# needs no jq. Every condition is printed, then the exit code is decided: 4 when
+# any condition is met, else 5 when any could not be judged from what this scan
+# produced (a scan that could not look is not a scan that found nothing). It is
+# applied after the conformance gate below, so 2 and 3 take precedence when
+# --fail-on-conformance is also given, and the report files are on disk by now.
+GATE_EXIT=0
+if [ "${#FAIL_ON[@]}" -gt 0 ]; then
+    if [ ! -f "$GATE_RESULT_FILE" ]; then
+        echo "[ERROR] --fail-on: this scan produced no result to judge. If the scanner image predates the option, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
+        GATE_EXIT=5
+    else
+        gate_lines=0
+        while IFS=$'\t' read -r gate_status gate_cond gate_detail; do
+            gate_lines=$((gate_lines + 1))
+            case "$gate_status" in
+                met)      echo "[ERROR] --fail-on ${gate_cond}: ${gate_detail}"; GATE_EXIT=4 ;;
+                ok)       echo "[GATE] ${gate_cond}: ${gate_detail}" ;;
+                *)        echo "[ERROR] --fail-on ${gate_cond} cannot be judged: ${gate_detail:-the result line is not understood}"
+                          # An older image does not know a newer condition; say how to get one that does.
+                          [ "$gate_detail" != "not a known condition" ] || echo "[ERROR] --fail-on ${gate_cond}: the scanner image predates this condition, refresh it: docker pull ${RUN_IMAGE:-$POSTPROCESS_IMAGE}"
+                          [ "$GATE_EXIT" -eq 4 ] || GATE_EXIT=5 ;;
+            esac
+        done < "$GATE_RESULT_FILE"
+        # One line per condition asked for. Fewer means the judgement was cut off,
+        # and an incomplete result is not a pass.
+        if [ "$gate_lines" -ne "${#FAIL_ON[@]}" ]; then
+            echo "[ERROR] --fail-on: the result holds ${gate_lines} of ${#FAIL_ON[@]} conditions, so the judgement is incomplete."
+            [ "$GATE_EXIT" -eq 4 ] || GATE_EXIT=5
+        fi
+        [ "$GATE_EXIT" -ne 0 ] || echo "[GATE] every --fail-on condition was judged and none is met."
+    fi
+fi
 
 # --fail-on-conformance: judged last, after every artifact above is already on
 # disk, so a failing report can still be opened and acted on. Reads the bare
@@ -2142,3 +2362,4 @@ if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then
         exit 2
     fi
 fi
+[ "$GATE_EXIT" -eq 0 ] || exit "$GATE_EXIT"

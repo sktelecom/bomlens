@@ -30,6 +30,8 @@ import {
   kindTally,
   matchesQuery,
   registryTally,
+  resultQuality,
+  type ResultQuality,
   missingOverflow,
   sortByAttention,
   splitChecks,
@@ -411,6 +413,49 @@ export function CheckGroup({
   );
 }
 
+/** Warns about a result the verdict cannot: nothing found, or no license
+ *  declared anywhere. Same warning style as the Overview banners, so a green
+ *  "pass" never stands alone beside an empty or unlicensed result. When licenses
+ *  are declared, the coverage figure is shown as plain text instead. */
+function ResultQualityNote({
+  quality,
+  isSuppliedDocument,
+}: {
+  quality: ResultQuality;
+  isSuppliedDocument: boolean;
+}) {
+  const { t } = useTranslation();
+  const warn = (testId: string, title: string, body: string) => (
+    <div
+      className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
+      data-testid={testId}
+    >
+      <div className="text-sm font-medium">{title}</div>
+      <p className="mt-1 text-xs">{body}</p>
+    </div>
+  );
+  if (quality.empty) {
+    return warn(
+      "conformance-empty-result",
+      t("conf.qualityEmptyTitle"),
+      t(isSuppliedDocument ? "conf.qualityEmptyBodySupplied" : "conf.qualityEmptyBody"),
+    );
+  }
+  if (!quality.license) return null;
+  if (quality.noLicenses) {
+    return warn(
+      "conformance-no-licenses",
+      t("conf.qualityLicenseTitle"),
+      t("conf.qualityLicenseBody", quality.license),
+    );
+  }
+  return (
+    <p className="text-xs text-muted-foreground" data-testid="conformance-license-coverage">
+      {t("conf.qualityLicenseFigure", quality.license)}
+    </p>
+  );
+}
+
 /**
  * SBOM conformance: the supplier-SBOM verdict, the base CycloneDX format
  * checks, the 2026 SBOM minimum elements and (when the SBOM carries a model) the
@@ -428,6 +473,7 @@ export function ConformancePanel({
   scanId,
   results = [],
   isSuppliedDocument = false,
+  isAiDocument = false,
 }: {
   conformance: ConformanceSummary;
   /** Scoping for the report download links; omit to hide them. */
@@ -438,6 +484,8 @@ export function ConformancePanel({
    *  (`Boolean(inputSbomFileName(result))`), so a failed-pipeline-step note
    *  suggests asking the supplier to regenerate it instead of re-scanning. */
   isSuppliedDocument?: boolean;
+  /** `isAiScan(result)`: the empty-result and license warnings do not apply. */
+  isAiDocument?: boolean;
 }) {
   const { t } = useTranslation();
   const checks = conformance.checks ?? [];
@@ -449,6 +497,8 @@ export function ConformancePanel({
     tally.actionable > 0 ? "actionable" : null,
   );
   const [query, setQuery] = useState("");
+  const quality = resultQuality(conformance, isAiDocument);
+  const warnPass = conformance.result === "pass" && (quality.empty || quality.noLicenses);
 
   const reports = useMemo(
     () =>
@@ -468,6 +518,7 @@ export function ConformancePanel({
           isSuppliedDocument={isSuppliedDocument}
           testId="conformance-pipeline-steps-failed"
         />
+        <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
         <EmptyState>{t("g7.empty")}</EmptyState>
       </div>
     );
@@ -513,8 +564,12 @@ export function ConformancePanel({
           {conformance.format ? (
             <span className="font-medium text-foreground">{conformance.format}</span>
           ) : null}
-          <Badge tone={pass ? "success" : "critical"}>
-            {pass ? t("result.verdictPass") : t("result.verdictFail")}
+          <Badge tone={!pass ? "critical" : warnPass ? "warning" : "success"}>
+            {!pass
+              ? t("result.verdictFail")
+              : warnPass
+                ? t("conf.qualityPassWarn")
+                : t("result.verdictPass")}
           </Badge>
           <div className="flex-1" />
           {scanId
@@ -543,6 +598,7 @@ export function ConformancePanel({
           </span>
         </p>
       </div>
+      <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">

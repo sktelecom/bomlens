@@ -258,7 +258,7 @@ if jq --argjson cmap "$CMAP" '
              .name=="bomlens:cpeSource" and .value=="name-map"))] | length' "$TMP" 2>/dev/null || echo 0)
     D=$(jq '[.components[]? | select((.properties // []) | any(
              .name=="bomlens:cpeSource" and .value=="distro-version-strip"))] | length' "$TMP" 2>/dev/null || echo 0)
-    L=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:licenseSource"))] | length' "$TMP" 2>/dev/null || echo 0)
+    L=$(jq '[.components[]? | select((.properties // []) | any(.name=="bomlens:licenseSource" and .value=="name-map"))] | length' "$TMP" 2>/dev/null || echo 0)
     K=$(jq '[.components[]? | select((.properties // []) | any(
              .name=="bomlens:cpeSource" and .value=="withheld-kernel-module"))] | length' "$TMP" 2>/dev/null || echo 0)
     mv "$TMP" "$SBOM"

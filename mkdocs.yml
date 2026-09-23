@@ -126,7 +126,7 @@ plugins:
             Package managers: 패키지 매니저
             Testing: 테스트
             Release process: 릴리스 절차
-            Talks: 발표
+            News: 소식
             Release notes: 릴리스 노트
   # Redirects for URLs from the pre-IA-restructure site (#154), which served
   # Korean at the root and English under /en/. Old bookmarks, external links
@@ -217,5 +217,5 @@ nav:
       - Local-first: concepts/local-first.md
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md
-  - Talks: talks/index.md
+  - News: talks/index.md
   - Release notes: https://github.com/sktelecom/bomlens/releases

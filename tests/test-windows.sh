@@ -61,7 +61,15 @@ if [ "${DOCKER_STUB_ARGV_DUMP:-0}" = "1" ]; then
   done
 fi
 case "${1:-}" in
-  version|info|pull|image|stop|rm) exit 0 ;;
+  info)
+    # DOCKER_STUB_NO_ENGINE=1 models a Docker CLI whose engine is not running.
+    [ "${DOCKER_STUB_NO_ENGINE:-0}" != "1" ] || exit 1
+    # `docker info --format '{{.MemTotal}}'`: the engine's memory in bytes.
+    # DOCKER_STUB_MEMTOTAL models it; unset prints nothing, as an engine whose
+    # value cannot be read would.
+    [ -z "${DOCKER_STUB_MEMTOTAL:-}" ] || echo "$DOCKER_STUB_MEMTOTAL"
+    exit 0 ;;
+  version|pull|image|stop|rm) exit 0 ;;
   ps)
     # `docker ps -aq --filter label=bomlens.scan=cli --filter status=exited`:
     # the startup sweep for a scan container an earlier, killed run left
@@ -118,13 +126,28 @@ case "${1:-}" in
     # Desktop file sharing / Colima's home-only mount) — nothing lands on disk.
     if [ -n "$pn" ] && [ -n "$pv" ] && [ "${DOCKER_STUB_NOWRITE:-0}" != "1" ]; then
       dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
+      # The container names every output with entrypoint.sh's cleaning rule (only
+      # [A-Za-z0-9.-], runs of _ folded, edges trimmed); do the same here.
+      spn="$(printf '%s' "$pn" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')"
+      spv="$(printf '%s' "$pv" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')"
       printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"}},"components":[]}\n' \
-        "$pn" "$pv" > "$dest/${pn}_${pv}_bom.json"
+        "$pn" "$pv" > "$dest/${spn}_${spv}_bom.json"
       # DOCKER_STUB_CONFORMANCE_RESULT models validate-sbom.sh's bare pass/fail
       # sidecar (--fail-on-conformance reads it). Unset means this run produced
       # no conformance report, same as a mode/step that never generates one.
       if [ -n "${DOCKER_STUB_CONFORMANCE_RESULT:-}" ]; then
-        printf '%s' "$DOCKER_STUB_CONFORMANCE_RESULT" > "$dest/${pn}_${pv}_conformance.result"
+        printf '%s' "$DOCKER_STUB_CONFORMANCE_RESULT" > "$dest/${spn}_${spv}_conformance.result"
+      fi
+      # DOCKER_STUB_GATE_RESULT models evaluate-gate.sh's sidecar (--fail-on reads
+      # it): its lines, tab-separated, written verbatim. Unset means the run
+      # produced none.
+      if [ -n "${DOCKER_STUB_GATE_RESULT:-}" ]; then
+        printf '%b' "$DOCKER_STUB_GATE_RESULT" > "$dest/${spn}_${spv}_gate.result"
+      fi
+      # DOCKER_STUB_SUMMARY_RESULT models validate-sbom.sh's closing-summary
+      # sidecar (key<TAB>value lines), written verbatim. Unset means none.
+      if [ -n "${DOCKER_STUB_SUMMARY_RESULT:-}" ]; then
+        printf '%b' "$DOCKER_STUB_SUMMARY_RESULT" > "$dest/${spn}_${spv}_summary.result"
       fi
     fi
     # MODE=DIFF carries no PROJECT_NAME/VERSION at all — it names its own
@@ -174,7 +197,7 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
-            --conformance-profile --fail-on-conformance; do
+            --conformance-profile --fail-on-conformance --fail-on --vex; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -210,13 +233,59 @@ detect_case() {
   if [ "$ok" = 1 ]; then pass "$label → $lang ($img)"; else
     fail "$label → $lang ($img)" "rc=$RC; mode/lang/image mismatch"; show; fi
 }
-detect_case node   package.json     '{"name":"a","dependencies":{"express":"^4"}}' node   cdxgen-node20
+detect_case node   package.json     '{"name":"a","dependencies":{"express":"^4"}}' node   cdxgen-alpine-node24
 detect_case python requirements.txt 'flask==3.0.0'                                  python cdxgen-python312
 detect_case java   pom.xml          '<project><modelVersion>4.0.0</modelVersion></project>' java cdxgen-temurin-java21
 detect_case go     go.mod           'module x\n\ngo 1.21\n'                          go     cdxgen-debian-golang124
 detect_case rust   Cargo.toml       '[package]\nname="x"\nversion="0.1.0"'          rust   cdxgen-debian-rust
 detect_case ruby   Gemfile          "source 'https://rubygems.org'\ngem 'rack'"     ruby   cdxgen-debian-ruby34
 detect_case php    composer.json    '{"require":{"monolog/monolog":"^3"}}'          php    cdxgen-debian-php84
+
+# A Java build in an engine with too little memory is announced before it starts;
+# a roomy engine, an unreadable value and other languages print nothing.
+for mem_case in "2000000000:low" "6198534144:roomy" "3900000000:roomy" "bogus:unreadable"; do
+  mem_bytes="${mem_case%%:*}"; mem_kind="${mem_case#*:}"
+  d="$(new_proj "mem_$mem_kind")"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+  DOCKER_STUB_MEMTOTAL="$mem_bytes" scan_in "$d" --project "Pmem$mem_kind" --version 1.0.0 --generate-only
+  if [ "$mem_kind" = low ]; then
+    { [ "$RC" -eq 0 ] && in_out "The Docker engine has about 2 GB" && in_out "colima stop && colima start --memory 4" && in_out "Docker Desktop:  Settings" \
+        && in_out ".wslconfig" && in_out "Rancher Desktop:"; } \
+      && pass "a Java scan on a 2 GB engine warns and names the Colima and Docker Desktop settings" \
+      || { fail "no memory warning on a 2 GB engine" "rc=$RC"; show; }
+  else
+    { [ "$RC" -eq 0 ] && ! in_out "The Docker engine has about"; } \
+      && pass "a Java scan does not warn about memory ($mem_bytes: $mem_kind engine)" \
+      || { fail "a spurious memory warning ($mem_bytes)" "rc=$RC"; show; }
+  fi
+done
+# Every line of the warning starts with [WARN], the marker the web UI keeps.
+d="$(new_proj mem_marker)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+DOCKER_STUB_MEMTOTAL=2000000000 scan_in "$d" --project Pmemmarker --version 1.0.0 --generate-only
+mem_lines=$(grep -c "Colima:\|Docker Desktop:\|Rancher Desktop:" "$OUT")
+mem_marked=$(grep "Colima:\|Docker Desktop:\|Rancher Desktop:" "$OUT" | grep -c "^\[WARN\]")
+{ [ "$mem_lines" -eq 3 ] && [ "$mem_marked" -eq 3 ]; } \
+  && pass "every line of the memory warning starts with [WARN]" \
+  || { fail "a memory warning line lacks the [WARN] marker" "$mem_lines lines, $mem_marked marked"; show; }
+# A value with a carriage return (a Windows docker.exe) is still read.
+d="$(new_proj mem_cr)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+DOCKER_STUB_MEMTOTAL="$(printf '2000000000\r')" scan_in "$d" --project Pmemcr --version 1.0.0 --generate-only
+in_out "The Docker engine has about 2 GB" \
+  && pass "an engine memory value ending in a carriage return is still read" \
+  || { fail "a CR-terminated value was ignored"; show; }
+# A pom.xml next to a package.json (a mixed tree), or below the root, still runs Maven.
+d="$(new_proj mem_mixed)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"; printf '{"name":"a"}' > "$d/package.json"
+DOCKER_STUB_MEMTOTAL=2000000000 scan_in "$d" --project Pmemmixed --version 1.0.0 --generate-only
+in_out "Language: mixed" && in_out "A Maven build needs about 4 GB" \
+  && pass "a mixed tree with a pom.xml warns about a Maven build" || { fail "a mixed Java tree was not warned" "rc=$RC"; show; }
+d="$(new_proj mem_nested)"; mkdir -p "$d/backend"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/backend/pom.xml"
+DOCKER_STUB_MEMTOTAL=2000000000 scan_in "$d" --project Pmemnested --version 1.0.0 --generate-only
+in_out "A Maven build needs about 4 GB" \
+  && pass "a pom.xml below the root of an unrecognised tree warns too" || { fail "a nested pom.xml was not warned" "rc=$RC"; show; }
+
+d="$(new_proj mem_node)"; printf '{"name":"a"}' > "$d/package.json"
+DOCKER_STUB_MEMTOTAL=2000000000 scan_in "$d" --project Pmemnode --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && ! in_out "The Docker engine has about"; } \
+  && pass "a Node.js scan does not warn about engine memory" || { fail "a non-Java scan warned about memory" "rc=$RC"; show; }
 
 # Go toolchain settings reach the cdxgen container. The Go image pins
 # GOTOOLCHAIN=local, so the host value travels as HOST_GOTOOLCHAIN.
@@ -373,7 +442,7 @@ if command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1; th
     mkdir -p "$guard_dir/$key"
     printf 'stale-owner-container\n' > "$guard_dir/$key/owner"
     printf '/some/unrelated/other/path\n' > "$guard_dir/$key/path"
-    printf 'ghcr.io/sktelecom/bomlens:cdxgen-node20\n' > "$guard_dir/$key/image"
+    printf 'ghcr.io/sktelecom/bomlens:cdxgen-alpine-node24\n' > "$guard_dir/$key/image"
 
     scan_in "$d" --project Pguardmismatch --version 1.0.0 --generate-only
     ok=1
@@ -427,12 +496,12 @@ scan_in "$d" --project Pdotnetsub --version 1.0.0 --generate-only
 # Unknown (no manifest) and mixed (two manifests) both fall back to all-in-one.
 d="$(new_proj unknown)"; printf 'hello\n' > "$d/README"
 scan_in "$d" --project Punknown --version 1.0.0 --generate-only
-{ in_out "Language: unknown" && in_out "No package manifest" && in_log "cyclonedx/cdxgen:v12"; } \
+{ in_out "Language: unknown" && in_out "No package manifest" && in_log "cdxgen/cdxgen:v13"; } \
   && pass "no manifest → unknown → all-in-one image + warning" || { fail "no manifest → all-in-one"; show; }
 
 d="$(new_proj mixed)"; printf '{}' > "$d/package.json"; printf 'module x\ngo 1.21\n' > "$d/go.mod"
 scan_in "$d" --project Pmixed --version 1.0.0 --generate-only
-{ in_out "Language: mixed" && in_log "cyclonedx/cdxgen:v12"; } \
+{ in_out "Language: mixed" && in_log "cdxgen/cdxgen:v13"; } \
   && pass "two manifests → mixed → all-in-one image" || { fail "mixed → all-in-one"; show; }
 
 # A completed source scan must print success and leave the SBOM on the host,
@@ -488,6 +557,59 @@ scan_in "$d" --project SumOk --version 4.1.0 --generate-only --no-report
   && pass "summary lists the delivered SBOM without a spurious missing-artifact warning" \
   || { fail "summary warned about artifacts that were not requested" "rc=$RC"; show; }
 
+# The closing summary states what the result holds, from the scan's own
+# measurement. With the sidecar present it prints the counts; without one (an
+# older image, an AI SBOM) it prints nothing extra.
+d="$(new_proj sumfacts)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t176\nlicensed\t169\nlicensePercent\t96\npurlPercent\t100\n'
+scan_in "$d" --project Facts --version 5.0.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "Components:" && in_out "176 identified (purl on 100%, license declared on 96% (169 of 176))" \
+    && ! in_out "[WARN] No software" && ! in_out "No component declares" && ! in_out "Reduced analysis"; } \
+  && pass "closing summary states the component count and the purl and license shares" \
+  || { fail "closing summary did not state the result" "rc=$RC"; show; }
+
+d="$(new_proj sumempty)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-\n'
+scan_in "$d" --project Empty0 --version 5.1.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && in_out "0 identified" && in_out "[WARN] No software was identified"; } \
+  && pass "a scan with no components says so after 'Analysis Complete!'" \
+  || { fail "an empty result ended without a warning" "rc=$RC"; show; }
+
+d="$(new_proj sumnolic)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t81\nlicensed\t0\nlicensePercent\t0\npurlPercent\t100\nreduced\tcdxgen-unavailable\nfailedSteps\tpip-install, composer-install\n'
+scan_in "$d" --project NoLic --version 5.2.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "81 identified (purl on 100%, license declared on 0% (0 of 81))" \
+    && in_out "[WARN] No component declares a license" \
+    && in_out "[WARN] Reduced analysis: the dependency analyzer could not run, so only direct dependencies were identified." \
+    && in_out "[WARN] Steps that failed: pip-install, composer-install"; } \
+  && pass "closing summary warns on 0% license coverage, a reduced analysis and failed steps" \
+  || { fail "closing summary missed a warning" "rc=$RC"; show; }
+
+d="$(new_proj sumtiny)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t200\nlicensed\t1\nlicensePercent\t0\npurlPercent\t100\n'
+scan_in "$d" --project Tiny --version 5.15.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "(1 of 200)" && ! in_out "No component declares a license"; } \
+  && pass "one licensed component out of many is not reported as none" \
+  || { fail "the no-license warning followed the rounded percent" "rc=$RC"; show; }
+
+d="$(new_proj sumnone)"; printf '{"name":"a"}' > "$d/package.json"
+scan_in "$d" --project NoFacts --version 5.3.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && ! in_out "Components:" && ! in_out "identified"; } \
+  && pass "no summary sidecar, no invented counts" \
+  || { fail "counts were printed without a sidecar" "rc=$RC"; show; }
+
+# A sidecar left by an earlier scan of the same project and version is not this run's.
+d="$(new_proj sumstale)"; printf '{"name":"a"}' > "$d/package.json"
+mkdir -p "$d/Stale_5.4.0"; printf 'components\t999\n' > "$d/Stale_5.4.0/Stale_5.4.0_summary.result"
+scan_in "$d" --project Stale --version 5.4.0 --generate-only
+{ [ "$RC" -eq 0 ] && ! in_out "999"; } \
+  && pass "a summary sidecar from an earlier scan is not reported" \
+  || { fail "a stale summary sidecar was reported" "rc=$RC"; show; }
+
 # --------------------------------------------------------
 section "Target-mode routing"
 # --------------------------------------------------------
@@ -532,6 +654,19 @@ guard "--firmware without --target"    "--firmware requires" --project p --versi
 guard "unsafe git URL (shell metachar)" "unsafe or unsupported" --project p --version 1 --git "https://github.com/x/y;rm -rf /"
 guard "unsafe git URL (path traversal)" "unsafe or unsupported" --project p --version 1 --git "https://github.com/../../etc"
 guard "--merge + --target rejected"     "mutually exclusive" --project p --version 1 --merge a.json b.json --target z
+guard "--fail-on rejects an unknown condition" "unknown condition 'critical'" --project p --version 1 --target z --fail-on critical
+guard "--fail-on rejects an unknown severity"  "unknown condition 'vulnerability=urgent'" --project p --version 1 --target z --fail-on vulnerability=urgent
+guard "--fail-on needs a value"                "unknown condition ''" --project p --version 1 --target z --fail-on
+guard "--fail-on license-coverage needs a value"  "needs a whole percentage from 0 to 100" --project p --version 1 --target z --fail-on license-coverage=
+guard "--fail-on license-coverage rejects text"   "needs a whole percentage from 0 to 100" --project p --version 1 --target z --fail-on license-coverage=high
+guard "--fail-on license-coverage rejects >100"   "needs a whole percentage from 0 to 100" --project p --version 1 --target z --fail-on license-coverage=101
+guard "--fail-on license-coverage rejects a leading zero" "without leading zeros" --project p --version 1 --target z --fail-on license-coverage=08
+guard "--fail-on license-coverage has no bare form" "unknown condition 'license-coverage'" --project p --version 1 --target z --fail-on license-coverage
+guard "--fail-on is refused with --ui"         "--fail-on is not offered with --ui" --ui --fail-on malicious-package
+guard "--fail-on is refused with --diff"       "--fail-on cannot be combined with --diff" --project p --version 1 --diff a.json b.json --fail-on malicious-package
+guard "--vex file must exist"           "--vex file not found" --project p --version 1 --target z --vex no-such-vex.json
+guard "--vex is refused with --diff"    "--vex cannot be combined with --diff" --project p --version 1 --diff a.json b.json --vex v.json
+guard "--vex is refused with --ui"      "--vex is not offered with --ui" --ui --vex v.json
 guard "--merge needs >=2 files"         "needs at least 2" --project p --version 1 --merge one.json
 guard "--merge-root without --merge"    "only applies with --merge" --project p --version 1 --merge-root x.json
 guard "--merge-root not in --merge list" "must be one of the --merge input files" \
@@ -764,6 +899,44 @@ in_log "<SBOM_AUTHOR=(주)에스케이 & 파트너스>" \
   && pass "a Korean legal-entity name with parens/ampersand reaches the container as one unbroken argv element" \
   || { fail "(주)에스케이 & 파트너스 was split or mangled crossing the eval boundary"; show; cat "$LOG"; }
 
+# --vex: the received document is mounted read-only under /vex-in and named by
+# its container path, and it survives a directory name with a space.
+d="$(new_proj vex-mount)"; printf 'ELFish\n' > "$d/app.out"; mkdir -p "$d/dir with space"
+printf '{"bomFormat":"CycloneDX","vulnerabilities":[]}\n' > "$d/dir with space/supplier vex.json"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project VX1 --version 1 --target app.out --generate-only \
+  --vex "dir with space/supplier vex.json"
+in_log "<VEX_FILE=/vex-in/vex.json>" \
+  && pass "--vex reaches the container as one argv element naming the mounted path" \
+  || { fail "--vex path was split or mangled crossing the eval boundary"; show; cat "$LOG"; }
+in_log "/dir with space/supplier vex.json:/vex-in/vex.json:ro>" \
+  && pass "--vex mounts the file alone, read-only, not the folder it sits in" \
+  || { fail "--vex is not mounted as a single read-only file"; show; cat "$LOG"; }
+in_log "<GENERATE_SECURITY=true>" \
+  && pass "--vex turns the security report on" \
+  || { fail "--vex did not enable the security report"; show; cat "$LOG"; }
+
+# The SOURCE path runs a second (post-process) container: it must get the mount too.
+d="$(new_proj vex-source)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"
+printf '{"bomFormat":"CycloneDX","vulnerabilities":[]}\n' > "$d/v.json"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project VX3 --version 1 --generate-only --vex v.json
+in_log "<MODE=POSTPROCESS>" && in_log "<VEX_FILE=/vex-in/vex.json>" \
+  && pass "the source-scan post-process container receives --vex as well" \
+  || { fail "the source-scan post-process container did not receive --vex"; show; cat "$LOG"; }
+
+# A file name ending in a space must not swallow the image argument after it.
+d="$(new_proj vex-trailing-space)"; printf 'ELFish\n' > "$d/app.out"
+printf '{"bomFormat":"CycloneDX","vulnerabilities":[]}\n' > "$d/trail "
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project VX4 --version 1 --target app.out --generate-only --vex "trail "
+in_log "<VEX_FILE=/vex-in/vex.json>" && in_log "/trail :/vex-in/vex.json:ro>" && in_log "<ghcr.io/sktelecom/bomlens:latest>" \
+  && pass "a --vex file name ending in a space reaches the container intact and keeps the image argument" \
+  || { fail "a trailing-space --vex file name broke the docker command line"; show; cat "$LOG"; }
+
+# A missing file is reported before anything is cloned.
+guard "--vex file is checked before a git clone" "--vex file not found" --project p --version 1 --git https://github.com/x/y --vex missing.json
+
 # Command substitution stays literal text -- eval re-parses the %q-escaped
 # value as one shell word, so $(...) and `...` inside it are data, not syntax.
 rm -f /tmp/bomlens-test-pwned-eval /tmp/bomlens-test-pwned-backtick
@@ -829,6 +1002,89 @@ rc_none=$RC
 { [ "$rc_none" -eq 3 ] && in_out "no conformance report to judge"; } \
   && pass "--fail-on-conformance: no report exits 3" \
   || { fail "--fail-on-conformance no-report case" "rc=$rc_none"; show; }
+
+section "--fail-on exit codes and how the conditions reach the container"
+# The judgement is made in the container (docker/lib/evaluate-gate.sh); here the
+# stub models its sidecar, and this checks how the host turns it into an exit code.
+TAB=$'\t'
+gate_case() { # <label> <expected rc> <expected output fragment> <sidecar text or -> <args...>
+  local label="$1" want_rc="$2" want_out="$3" sidecar="$4"; shift 4
+  local d; d="$(new_proj gate)"; printf 'ELFish\n' > "$d/app.out"
+  if [ "$sidecar" = "-" ]; then unset DOCKER_STUB_GATE_RESULT; else export DOCKER_STUB_GATE_RESULT="$sidecar"; fi
+  scan_in "$d" --project GT --version 1 --target app.out --generate-only "$@"
+  unset DOCKER_STUB_GATE_RESULT
+  if [ "$RC" -eq "$want_rc" ] && in_out "$want_out"; then pass "$label"
+  else fail "$label" "rc=$RC (want $want_rc); expected output containing '$want_out'"; show; fi
+}
+gate_case "--fail-on: every condition judged and none met exits 0" 0 "none is met" \
+  "ok${TAB}malicious-package${TAB}clean\n" --fail-on malicious-package
+gate_case "--fail-on: a met condition exits 4 and names it" 4 "--fail-on vulnerability=high: 2 finding(s)" \
+  "met${TAB}vulnerability=high${TAB}2 finding(s) at HIGH or worse\n" --fail-on vulnerability=high
+gate_case "--fail-on: a condition that cannot be judged exits 5 and says why" 5 "cannot be judged: no security report" \
+  "unjudged${TAB}vulnerability=high${TAB}no security report was produced for this scan\n" --fail-on vulnerability=high
+gate_case "--fail-on: a met condition wins over one that cannot be judged (4)" 4 "cannot be judged" \
+  "unjudged${TAB}license-conflict${TAB}no license\nmet${TAB}malicious-package${TAB}1 component(s)\n" --fail-on license-conflict --fail-on malicious-package
+gate_case "--fail-on: no result from the scan exits 5, never 0" 5 "produced no result to judge" \
+  "-" --fail-on malicious-package
+
+gate_case "--fail-on: empty-result met exits 4 and states the count" 4 "--fail-on empty-result: the scan found 0 components" \
+  "met${TAB}empty-result${TAB}the scan found 0 components\n" --fail-on empty-result
+gate_case "--fail-on: license-coverage met exits 4 and shows the measured value" 4 "0% (1/157)" \
+  "met${TAB}license-coverage=80${TAB}license coverage is 0% (1/157), below 80%\n" --fail-on license-coverage=80
+gate_case "--fail-on: license-coverage ok exits 0" 0 "none is met" \
+  "ok${TAB}license-coverage=80${TAB}license coverage is 100% (3/3), at or above 80%\n" --fail-on license-coverage=80
+gate_case "--fail-on: empty-result without a conformance report exits 5" 5 "no conformance report was produced" \
+  "unjudged${TAB}empty-result${TAB}no conformance report was produced for this scan\n" --fail-on empty-result
+guard "--fail-on empty-result is refused for an AI model input" "not available for AI model and dataset inputs" --project M --version 1 --model owner/repo --fail-on empty-result
+
+gate_case "--fail-on: a condition an older image does not know exits 5 and says to refresh the image" 5 "docker pull" \
+  "unjudged${TAB}empty-result${TAB}not a known condition\n" --fail-on empty-result
+# A judgement that is cut off, or that the host does not understand, is not a pass.
+gate_case "--fail-on: a result with fewer lines than conditions exits 5 as incomplete" 5 "holds 1 of 2 conditions" \
+  "ok${TAB}malicious-package${TAB}clean\n" --fail-on malicious-package --fail-on license-conflict
+gate_case "--fail-on: a result line with an unknown status is not a pass (5)" 5 "cannot be judged" \
+  "fine${TAB}malicious-package${TAB}clean\n" --fail-on malicious-package
+
+# A project name the container cleans differently from this script still finds its result.
+d="$(new_proj gate_name)"; printf 'ELFish\n' > "$d/app.out"
+export DOCKER_STUB_GATE_RESULT="met${TAB}malicious-package${TAB}1 component(s)\n"
+scan_in "$d" --project '@acme' --version 1 --target app.out --generate-only --fail-on malicious-package
+unset DOCKER_STUB_GATE_RESULT
+{ [ "$RC" -eq 4 ] && in_out "--fail-on malicious-package: 1 component"; } \
+  && pass "--fail-on finds its result for a project name the container renames (\"@acme\")" \
+  || { fail "the gate result was looked for under the wrong name" "rc=$RC"; show; }
+
+# AI model and dataset inputs have no dependencies to scan, so no security report exists.
+guard "--fail-on vulnerability is refused for an AI model input" "not available for AI model and dataset inputs" --project M --version 1 --model owner/repo --fail-on vulnerability=high
+
+# Precedence with the conformance gate: 2 wins over a met condition.
+d="$(new_proj gate_conf)"; printf 'ELFish\n' > "$d/app.out"
+export DOCKER_STUB_CONFORMANCE_RESULT=fail DOCKER_STUB_GATE_RESULT="met${TAB}malicious-package${TAB}1 component(s)\n"
+scan_in "$d" --project GC --version 1 --target app.out --generate-only --fail-on-conformance --fail-on malicious-package
+unset DOCKER_STUB_CONFORMANCE_RESULT DOCKER_STUB_GATE_RESULT
+{ [ "$RC" -eq 2 ] && in_out "--fail-on malicious-package: 1 component"; } \
+  && pass "--fail-on with --fail-on-conformance: a failed conformance report (2) wins, and the met condition is still printed" \
+  || { fail "--fail-on / --fail-on-conformance precedence" "rc=$RC"; show; }
+
+# A result left by an earlier run at the same project/version must not decide this run.
+d="$(new_proj gate_stale)"; printf 'ELFish\n' > "$d/app.out"
+mkdir -p "$d/GS_1"; printf 'ok%smalicious-package%sstale\n' "$TAB" "$TAB" > "$d/GS_1/GS_1_gate.result"
+scan_in "$d" --project GS --version 1 --target app.out --generate-only --fail-on malicious-package
+{ [ "$RC" -eq 5 ] && in_out "produced no result to judge"; } \
+  && pass "--fail-on ignores a result left by an earlier run" \
+  || { fail "a stale gate result decided this run" "rc=$RC"; show; }
+
+# The conditions travel as one comma-separated value; a vulnerability condition turns the report on.
+d="$(new_proj gate_env)"; printf 'ELFish\n' > "$d/app.out"
+DOCKER_STUB_ARGV_DUMP=1 DOCKER_STUB_GATE_RESULT="ok${TAB}malicious-package${TAB}x\n" \
+  scan_in "$d" --project GE --version 1 --target app.out --generate-only \
+  --fail-on malicious-package --fail-on vulnerability=critical --fail-on license-conflict
+in_log "<FAIL_ON=malicious-package,vulnerability=critical,license-conflict>" \
+  && pass "--fail-on reaches the container as one comma-separated value, in the order given" \
+  || { fail "--fail-on value did not reach the container"; show; cat "$LOG"; }
+in_log "<GENERATE_SECURITY=true>" \
+  && pass "a vulnerability condition turns the security report on" \
+  || { fail "--fail-on vulnerability=... did not enable the security report"; show; cat "$LOG"; }
 
 # A stale .result from an earlier run at the same project/version (this run's
 # folder is reused, not recreated) must not be read as this run's verdict:
@@ -1045,6 +1301,35 @@ fi
 [ -f "$CHECK_SH" ]  && pass "scripts/check-setup.sh present"  || fail "scripts/check-setup.sh present"
 if [ -f "$CHECK_SH" ]; then
   grep -qi "docker image inspect" "$CHECK_SH" && pass "check-setup.sh inspects the scanner image" || fail "check-setup.sh inspects image"
+fi
+
+# check-setup.sh runs against the stub docker: language, memory hint and exit codes.
+if [ -f "$CHECK_SH" ]; then
+  cs_run() {  # cs_run <memtotal> [ENV=VALUE...]
+    local mem="$1"; shift
+    CS_OUT="$WORK/check-setup.out"
+    env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG "$@" DOCKER_STUB_MEMTOTAL="$mem" UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" > "$CS_OUT" 2>&1
+    CS_RC=$?
+  }
+  cs_run 6198534144 SBOM_LANG=en
+  { [ "$CS_RC" -eq 0 ] && grep -q "BomLens setup check" "$CS_OUT" && grep -q "Docker engine memory is enough for Java builds: 6 GB" "$CS_OUT" \
+      && grep -q "everything is ready" "$CS_OUT"; } \
+    && pass "check-setup.sh: a ready environment exits 0 and reports the engine memory (English)" \
+    || { fail "check-setup.sh ready case" "rc=$CS_RC"; cat "$CS_OUT"; }
+  cs_run 2000000000 SBOM_LANG=en
+  { [ "$CS_RC" -eq 2 ] && grep -q "too little memory" "$CS_OUT" && grep -q "colima start --memory 4" "$CS_OUT" && grep -q "wsl --shutdown" "$CS_OUT" \
+      && grep -q "Items to review: 1" "$CS_OUT"; } \
+    && pass "check-setup.sh: low engine memory is a non-blocking problem (exit 2, counted, fix named)" \
+    || { fail "check-setup.sh low-memory case" "rc=$CS_RC"; cat "$CS_OUT"; }
+  cs_run 6198534144 SBOM_LANG=ko
+  { [ "$CS_RC" -eq 0 ] && grep -q "설치 점검" "$CS_OUT" && ! grep -q "setup check" "$CS_OUT"; } \
+    && pass "check-setup.sh: SBOM_LANG=ko prints Korean" || { fail "check-setup.sh Korean output" "rc=$CS_RC"; cat "$CS_OUT"; }
+  cs_run 6198534144 LANG=ko_KR.UTF-8
+  grep -q "설치 점검" "$CS_OUT" \
+    && pass "check-setup.sh: a Korean locale selects Korean" || { fail "check-setup.sh locale detection"; cat "$CS_OUT"; }
+  cs_run 6198534144 SBOM_LANG=en DOCKER_STUB_NO_ENGINE=1
+  { [ "$CS_RC" -eq 1 ] && grep -q "engine is not running" "$CS_OUT"; } \
+    && pass "check-setup.sh: a stopped engine is blocking (exit 1)" || { fail "check-setup.sh stopped-engine case" "rc=$CS_RC"; cat "$CS_OUT"; }
 fi
 
 # --------------------------------------------------------

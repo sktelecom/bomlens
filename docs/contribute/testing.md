@@ -20,9 +20,12 @@ tests/
 ├── test-android-scope.sh      # Standalone regression scripts, one script per concern —
 ├── test-aibom.sh              # each defines its own local pass()/fail() helpers rather
 ├── test-firmware-unpack.sh    # than sharing a library
+├── test-real-corpus.sh        # Scans pinned public repositories (see below)
 ├── ...
 ├── lib/
-│   └── snapshot-normalize.jq  # Shared jq helper used by the snapshot tests
+│   ├── snapshot-normalize.jq  # Shared jq helper used by the snapshot tests
+│   └── corpus-compare.sh      # Judges a corpus run against an earlier run and fixed floors
+├── corpus/                    # The repository list and the license coverage floors
 ├── fixtures/                  # Input fixtures used by the standalone scripts
 └── snapshots/                 # Expected-output snapshots compared by test-snapshot.sh
 ```
@@ -83,6 +86,33 @@ The standalone scripts, on the other hand, are already independent and can be ru
 ./tests/test-android-scope.sh
 ./tests/test-aibom.sh
 ```
+
+## Real-repository corpus
+
+The bundled examples are small and carry no lock files. `tests/test-real-corpus.sh` scans 17 public repositories (`tests/corpus/real-corpus.tsv`: two or more per ecosystem, each pinned to a commit) with the scanner and reports, for each one, the component count, the share of components with a purl and with a license, the exit code, the time taken and whether the scan left the checkout changed. Build output the repository itself ignores counts as a change.
+
+Each repository ends in one of these states:
+
+| State | Meaning |
+|---|---|
+| `ok` | Software was found |
+| `empty` | The scan identified no software (`--fail-on empty-result`) |
+| `failed` | The scan failed, or wrote no readable SBOM |
+| `timeout` | The scan did not finish within `SCAN_TIMEOUT` (enforced only where GNU `timeout` or `gtimeout` is installed) |
+| `undetermined` | No quality result: the repository could not be fetched, or the scan could not judge (exit 5) |
+
+The run fails on `empty`, `failed`, `timeout`, a changed source tree, or a license coverage regression. A run where nothing could be measured also fails. Coverage is judged per ecosystem as the mean over the repositories that were `ok`, in two ways. In the workflow it is compared with the newest successful run on `main` that covered the whole corpus (a fall of 10 points or more fails, when at least two repositories were compared; locally this happens only when you pass `BASELINE_FILE`). It is also compared with the floors in `tests/corpus/license-floor.tsv`, which apply with or without an earlier run. Lowering a floor goes through review, which keeps a slow decline visible.
+
+Run it locally with Docker running. The clones and results go to `~/.cache/bomlens-real-corpus`. If you point `WORK_DIR` elsewhere, keep it under your home directory when Docker runs in Colima:
+
+```bash
+ONLY="cobra logrus" ./tests/test-real-corpus.sh   # some repositories
+ECOSYSTEMS="go rust" ./tests/test-real-corpus.sh  # some ecosystems
+```
+
+With a scanner image older than `--fail-on`, set `FAIL_ON_ARGS=""`. An empty result is then recognised from the SBOM. `SCAN_TIMEOUT` (seconds per repository, default 900; the workflow uses 1200), `WORK_DIR`, `CORPUS_FILE`, `SBOM_SCANNER_IMAGE`, `BASELINE_FILE` and `DROP_POINTS` are described in the script header.
+
+The `Real-repository corpus` workflow (`real-corpus.yml`) runs it every night and on demand, on a runner that builds the scanner image from the commit, and takes 20 to 25 minutes. It never runs on pull requests and is not a required check. The results table is in the run summary, and `results.tsv` is kept as the `real-corpus-results` artifact of every run; the next run takes the newest successful, complete one as its baseline. To start it by hand: `gh workflow run real-corpus.yml` (the `ecosystems` input limits it; a limited run does not become a baseline).
 
 ## Execution modes
 
@@ -179,7 +209,7 @@ VERBOSE=true ./tests/test-android-scope.sh
     path: tests/test-workspace/failed-tests-logs/
 ```
 
-The standalone scripts are wired in as their own steps rather than being called from `test-scan.sh` — for example `bash tests/test-aibom.sh` runs in `ci.yml`, while the slower, network-dependent `test-android-scope.sh` runs in `nightly.yml`.
+The standalone scripts are wired in as their own steps rather than being called from `test-scan.sh` — for example `bash tests/test-aibom.sh` runs in `ci.yml`, while the slower, network-dependent `test-android-scope.sh` runs in `nightly.yml`. The real-repository corpus has its own scheduled workflow, `real-corpus.yml`.
 
 ### What to do when tests fail
 

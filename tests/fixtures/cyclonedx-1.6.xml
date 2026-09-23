@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
+  <metadata>
+    <timestamp>2026-01-15T09:30:00Z</timestamp>
+    <tools>
+      <components>
+        <component type="application"><name>acme-sbom-gen</name><version>2.1.0</version></component>
+      </components>
+    </tools>
+    <authors><author><name>Acme Build Team</name><email>build@example.com</email></author></authors>
+    <component type="application" bom-ref="acme-app">
+      <name>acme-app</name>
+      <version>4.2.0</version>
+      <hashes><hash alg="SHA-256">aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</hash></hashes>
+    </component>
+    <supplier><name>Acme Corp</name><url>https://acme.example.com</url></supplier>
+  </metadata>
+  <components>
+    <component type="library" bom-ref="pkg:npm/lodash@4.17.21">
+      <supplier><name>Lodash Authors</name></supplier>
+      <group></group>
+      <name>lodash</name>
+      <version>4.17.21</version>
+      <scope>required</scope>
+      <hashes>
+        <hash alg="SHA-1">bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</hash>
+        <hash alg="SHA-512">cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc</hash>
+      </hashes>
+      <licenses><license><id>MIT</id></license></licenses>
+      <copyright>Copyright OpenJS Foundation</copyright>
+      <purl>pkg:npm/lodash@4.17.21</purl>
+      <externalReferences><reference type="website"><url>https://lodash.com</url></reference></externalReferences>
+      <properties><property name="acme:tier">core</property></properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/org.example/dual@1.0">
+      <group>org.example</group>
+      <name>dual</name>
+      <version>1.0</version>
+      <licenses><expression>MIT OR Apache-2.0</expression></licenses>
+      <purl>pkg:maven/org.example/dual@1.0</purl>
+      <components>
+        <component type="library" bom-ref="pkg:maven/org.example/inner@0.3">
+          <name>inner</name>
+          <version>0.3</version>
+          <purl>pkg:maven/org.example/inner@0.3</purl>
+        </component>
+      </components>
+    </component>
+  </components>
+  <dependencies>
+    <dependency ref="acme-app">
+      <dependency ref="pkg:npm/lodash@4.17.21"/>
+      <dependency ref="pkg:maven/org.example/dual@1.0"/>
+    </dependency>
+    <dependency ref="pkg:npm/lodash@4.17.21"/>
+    <dependency ref="pkg:maven/org.example/dual@1.0">
+      <dependency ref="pkg:maven/org.example/inner@0.3"/>
+    </dependency>
+  </dependencies>
+  <compositions>
+    <composition>
+      <aggregate>complete</aggregate>
+      <assemblies><assembly ref="acme-app"/></assemblies>
+    </composition>
+  </compositions>
+</bom>

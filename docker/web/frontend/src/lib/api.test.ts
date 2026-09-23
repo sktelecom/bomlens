@@ -11,8 +11,11 @@ import {
   downloadAllUrl,
   fileUrl,
   exportSpdx,
+  exportVex,
+  importVex,
   formSourceOf,
   getCapabilities,
+  getDiagnostics,
   listScans,
   loadScan,
   saveVexVerdict,
@@ -284,6 +287,57 @@ describe("network functions", () => {
     expect(await getCapabilities()).toEqual({ firmware: false, scanoss: false, docker: true });
   });
 
+  it("importVex posts the document text and reports the outcome instead of throwing", async () => {
+    const good = {
+      imported: 1,
+      unmatched: 2,
+      ignored: 0,
+      source: "acme 2.0",
+      statements: [{ cve: "CVE-2024-1", state: "not_affected", purl: "pkg:npm/foo@1.0" }],
+      results: [],
+    };
+    fetchMock.mockResolvedValue(ok(good));
+    expect(await importVex("app_1.0", '{"bomFormat":"CycloneDX"}')).toEqual({ ok: true, ...good });
+    expect(fetchMock.mock.calls[0][0]).toBe("/vex-import?id=app_1.0");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST", body: '{"bomFormat":"CycloneDX"}' });
+
+    // A refusal carries its reason; a 409 also names the two products.
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: "different product", vexProduct: "b 1", scanProduct: "a 1" }),
+    });
+    expect(await importVex("app_1.0", "{}")).toEqual({
+      ok: false,
+      status: 409,
+      error: "different product",
+      vexProduct: "b 1",
+      scanProduct: "a 1",
+    });
+
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await importVex("app_1.0", "{}")).toMatchObject({ ok: false, status: 0 });
+  });
+
+  it("exportVex builds by id, and returns null on any failure", async () => {
+    const payload = {
+      name: "app_1.0_vex.cdx.json",
+      exported: 2,
+      skipped: 1,
+      results: [{ name: "app_1.0_vex.cdx.json", size: 10 }],
+    };
+    fetchMock.mockResolvedValue(ok(payload));
+    expect(await exportVex("app_1.0")).toEqual(payload);
+    expect(fetchMock.mock.calls[0][0]).toBe("/vex-export?id=app_1.0");
+
+    // 404 (no judgement recorded yet) and a network error both fall back to null
+    // so the caller can say "nothing to export" instead of throwing at the user.
+    fetchMock.mockResolvedValue(fail(404));
+    expect(await exportVex("app_1.0")).toBeNull();
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await exportVex("app_1.0")).toBeNull();
+  });
+
   it("exportSpdx converts by id, and returns null on any failure", async () => {
     const payload = {
       name: "app_1.0_bom.spdx.json",
@@ -535,5 +589,54 @@ describe("formSourceOf", () => {
 
   it("keeps the deep scan-target variant, which the server handles", () => {
     expect(formSourceOf("scan-target-src")).toBe("scan-target-src");
+  });
+});
+
+describe("getDiagnostics", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("requests the scan's summary by id and returns its text", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ text: "BomLens diagnostics\n" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getDiagnostics("run_1.0")).toBe("BomLens diagnostics\n");
+    expect(fetchMock).toHaveBeenCalledWith("/diagnostics?id=run_1.0");
+  });
+
+  it("sends the on-screen error only when there is no id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ text: "t" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await getDiagnostics(null, "Failed to launch scan: boom");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/diagnostics?error=Failed+to+launch+scan%3A+boom",
+    );
+    await getDiagnostics("run_1", "ignored");
+    expect(fetchMock).toHaveBeenLastCalledWith("/diagnostics?id=run_1");
+    await getDiagnostics(null, "x".repeat(900));
+    expect(String(fetchMock.mock.calls.at(-1)?.[0]).length).toBeLessThan(560);
+  });
+
+  it("asks for the environment section alone when there is no id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ text: "env" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await getDiagnostics(null);
+    expect(fetchMock).toHaveBeenCalledWith("/diagnostics");
+  });
+
+  it("is null on an HTTP error, a network failure or a malformed body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    expect(await getDiagnostics("x")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    expect(await getDiagnostics("x")).toBeNull();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ text: 5 }) }),
+    );
+    expect(await getDiagnostics("x")).toBeNull();
   });
 });

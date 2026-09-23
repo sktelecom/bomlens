@@ -51,7 +51,7 @@ import { formatRelativeTime, scanComparison } from "@/lib/recent";
 import { conformanceCount, inputSbomFileName, isAiScan, sbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff } from "@/lib/scanDiff";
-import { cn } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { PipelineStepsFailedNote } from "./PipelineStepsFailedNote";
@@ -734,6 +734,55 @@ export function Overview({
         context="scan"
         isSuppliedDocument={Boolean(inputSbomFileName(result))}
       />
+
+      {/* Firmware only: the parts of the image the unpacker could not open. The
+          vulnerability counts describe what was opened, and this says how much
+          that was. Worded as scope, not failure. A submitted SBOM's properties
+          are the supplier's data, not this scan's own statement, so it is not
+          shown for one. */}
+      {result.sbom?.firmwareScope && !inputSbomFileName(result) && (
+        <div
+          className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground"
+          data-testid="firmware-scope"
+        >
+          <div className="text-sm font-medium text-foreground">{t("result.firmwareScopeTitle")}</div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+            {result.sbom.firmwareScope.unknownBytes > 0 && (
+              <li>
+                {t("result.firmwareScopeUnknown", {
+                  percent: result.sbom.firmwareScope.unknownPercent,
+                  bytes: formatBytes(result.sbom.firmwareScope.unknownBytes),
+                })}
+              </li>
+            )}
+            {result.sbom.firmwareScope.failedSteps > 0 && (
+              <li>
+                {t("result.firmwareScopeFailed", { count: result.sbom.firmwareScope.failedSteps })}
+                {result.sbom.firmwareScope.failedFormats.length > 0 &&
+                  ` ${t("result.firmwareScopeFormats", { formats: result.sbom.firmwareScope.failedFormats.join(", ") })}`}
+              </li>
+            )}
+            {result.sbom.firmwareScope.encryptedRegions > 0 && (
+              <li>
+                {t("result.firmwareScopeEncrypted", { count: result.sbom.firmwareScope.encryptedRegions })}
+              </li>
+            )}
+            {result.sbom.firmwareScope.missingExtractors.length > 0 && (
+              <li>
+                {t("result.firmwareScopeMissing", {
+                  tools: result.sbom.firmwareScope.missingExtractors.join(", "),
+                })}
+              </li>
+            )}
+          </ul>
+          {result.sbom.firmwareScope.namesMore > 0 && (
+            <p className="mt-1 text-xs">
+              {t("result.firmwareScopeMore", { count: result.sbom.firmwareScope.namesMore })}
+            </p>
+          )}
+          <p className="mt-1 text-xs">{t("result.firmwareScopeBody")}</p>
+        </div>
+      )}
 
       {/* What the scan warned about while it ran. The log is streamed and never
           stored, so a result opened later had no way to say it had warned at
