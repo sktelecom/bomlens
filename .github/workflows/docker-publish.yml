@@ -298,7 +298,7 @@ jobs:
         run: trivy config --quiet --format sarif --output trivy-config.sarif --exit-code 0 ./docker
       - name: Upload Dockerfile scan results
         if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-config.sarif'
           category: trivy-config
@@ -313,7 +313,7 @@ jobs:
         run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
       - name: Upload image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image.sarif'
           category: trivy-image
@@ -543,7 +543,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-firmware.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-firmware@${DIGEST}"
       - name: Upload firmware image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-firmware.sarif'
           category: trivy-image-firmware
@@ -684,7 +684,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-aibom.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-aibom@${DIGEST}"
       - name: Upload AIBOM image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-aibom.sarif'
           category: trivy-image-aibom
@@ -849,7 +849,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-deep-cve.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-deep-cve@${DIGEST}"
       - name: Upload deep-cve image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-deep-cve.sarif'
           category: trivy-image-deep-cve
