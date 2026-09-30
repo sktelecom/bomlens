@@ -298,7 +298,7 @@ jobs:
         run: trivy config --quiet --format sarif --output trivy-config.sarif --exit-code 0 ./docker
       - name: Upload Dockerfile scan results
         if: github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-config.sarif'
           category: trivy-config
@@ -313,7 +313,7 @@ jobs:
         run: trivy image --quiet --format sarif --output trivy-image.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens@${DIGEST}"
       - name: Upload image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image.sarif'
           category: trivy-image
@@ -421,7 +421,7 @@ jobs:
       # arm64 image on this x86_64 runner needs binfmt_misc registered at the
       # kernel level, which setup-qemu-action does for the step below.
       - name: Set up QEMU (for running the built arm64 image, not for the build)
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
           platforms: arm64
       # Proves the finished image also RUNS its tools under emulation and
@@ -543,7 +543,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-firmware.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-firmware@${DIGEST}"
       - name: Upload firmware image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-firmware.sarif'
           category: trivy-image-firmware
@@ -684,7 +684,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-aibom.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-aibom@${DIGEST}"
       - name: Upload AIBOM image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-aibom.sarif'
           category: trivy-image-aibom
@@ -762,7 +762,7 @@ jobs:
       # the arm64 layers; running the loaded image afterward needs
       # binfmt_misc registered separately.
       - name: Set up QEMU (for running the built arm64 image, not for the build)
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
           platforms: arm64
       # --load a single-arch arm64 image from the same cache and run grype
@@ -849,7 +849,7 @@ jobs:
         run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-deep-cve.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-deep-cve@${DIGEST}"
       - name: Upload deep-cve image scan results
         if: steps.flags.outputs.push == 'true'
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: 'trivy-image-deep-cve.sarif'
           category: trivy-image-deep-cve
