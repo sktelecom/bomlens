@@ -1152,6 +1152,44 @@ echo sig > "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json.sig"
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/resave.json" "$BASE/ai-declaration?id=aidecl_1.0")
 { [ "$code" = "200" ] && [ ! -f "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json.sig" ]; } \
     && pass "rewriting the document removes the signature made over the earlier one" || fail "stale signature kept (code $code)"
+# A declared service (the app or API the model runs in): saved after the scan,
+# the CycloneDX SBOM does not have it until the next scan, and the summary says
+# so ("pendingScan"); once the SBOM carries the same service it is "applied".
+svc_state() { curl -fsS "$BASE/scan?id=aisvc_1.0" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['spdx3']['service']['state'])"; }
+mkdir -p "$OUT/aisvc_1.0"; cp "$FIX3/bom-ai-sample.json" "$OUT/aisvc_1.0/aisvc_1.0_bom.json"
+curl -fsS "$BASE/spdx3-export?id=aisvc_1.0" >/dev/null 2>&1
+[ "$(svc_state)" = "none" ] && pass "the SPDX 3.0.1 summary says no service is declared (service.state none)" || fail "service.state without a service: $(svc_state)"
+code=$(post_decl "$(cat "$FIX3/declaration-service.json")" "$WORK/decl-svc.json" aisvc_1.0)
+if [ "$code" = "200" ] && python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))['spdx3']
+assert d['service'] == {'state': 'pendingScan'}, d
+" "$WORK/decl-svc.json" 2>/dev/null; then pass "a service saved after the scan is pendingScan until the next scan"
+else fail "service save returned $code" "$(head -c 400 "$WORK/decl-svc.json" 2>/dev/null)"; fi
+[ "$(svc_state)" = "pendingScan" ] && pass "/scan carries service.state pendingScan" || fail "/scan service.state: $(svc_state)"
+python3 - "$OUT/aisvc_1.0/aisvc_1.0_bom.json" "$OUT/aisvc_1.0/aisvc_1.0_spdx3-check.json" <<'PY'
+import json, sys
+bom = json.load(open(sys.argv[1]))
+digest = json.load(open(sys.argv[2]))["service"]["digest"]
+bom["services"] = [{"bom-ref": "service:declared/acme-support-assistant", "name": "Acme Support Assistant",
+                    "properties": [{"name": "bomlens:origin", "value": "declared-input"},
+                                   {"name": "bomlens:service:kind", "value": "application"},
+                                   {"name": "bomlens:service:declarationDigest", "value": digest}]}]
+json.dump(bom, open(sys.argv[1], "w"))
+PY
+curl -fsS "$BASE/spdx3-export?id=aisvc_1.0" >/dev/null 2>&1
+[ "$(svc_state)" = "applied" ] && pass "a CycloneDX SBOM carrying the same declared service is applied" || fail "service.state after the SBOM has it: $(svc_state)"
+SBOM_OUTPUT_DIR="$OUT" python3 -c "
+import json, sys
+sys.path.insert(0, sys.argv[1] + '/docker/web')
+import server
+c = json.load(open(sys.argv[2])); c['service'] = {'state': 'odd'}; json.dump(c, open(sys.argv[2], 'w'))
+assert server.spdx3_summary('aisvc_1.0')['service'] == {'state': 'none'}
+c.pop('service'); json.dump(c, open(sys.argv[2], 'w'))
+assert server.spdx3_summary('aisvc_1.0')['service'] == {'state': 'none'}
+" "$ROOT_DIR" "$OUT/aisvc_1.0/aisvc_1.0_spdx3-check.json" 2>/dev/null \
+    && pass "an unknown or missing service state reads as none" || fail "service.state not bounded to its values"
+
 # A project named only in Korean gets the prefix "_1.0".
 mkdir -p "$OUT/_1.0"; cp "$FIX3/bom-ai-sample.json" "$OUT/_1.0/_1.0_bom.json"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=_1.0")

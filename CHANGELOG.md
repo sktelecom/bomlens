@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.1] - 2026-10-10
+
+### Upgrade note
+
+- An AI declaration can now hold a `service` and the model keys `inputModality`, `outputModality`, `trainingComputeFlops`, `trainingComputeBasis` and `adversarialTesting`. BomLens v1.13 and earlier refuse such a file with "unknown key(s)" rather than dropping the values, so read it with this version or remove the keys.
+- G7 counts change when a service or these model values are declared. The system data flow, data usage, input/output properties and application area leave the "need review" count and join the denominator once the SBOM holds a value, and the system name, producer and version can be met by the service, so the same model can show more elements present and fewer review items than before. Without a declaration the results are unchanged.
+- The G7 system data flow element now accepts CycloneDX serviceData (`services[].data[]` with a `flow`) from any tool, and data usage a data flow with a `description`. An SBOM checked with `--analyze` whose services carry them can read better than with an earlier version.
+
+### Added
+
+- The AI declaration takes the service a model runs in (`service`): its name, version, address, provider and release date, which SPDX requires of it, and optionally what it is for, its fields of use, whether a person is involved in its decisions (`autonomyType`), its input and output kinds, its data flows (`dataFlows[]`, in the shape of CycloneDX serviceData), the standards it follows and a public disclosure page. The SPDX 3.0.1 document writes it as an `ai_AIPackage` with the purpose `application` that depends on the model at runtime; the model stays the document's root. A declaration without a service gives the same document as before.
+- A declared service can list the AI models it calls through an API (`service.externalModels[]`, with a key, name, provider, version and endpoint). They are recorded by identity only, as a `software_Package` with the purpose `model` in the SPDX 3.0.1 document and as services in the CycloneDX SBOM; nothing is read about them, and they are not judged by the risk assessment.
+- The declaration's `model` takes its input and output kinds and three values for regulatory filings: training compute in FLOPs as a decimal string (`trainingComputeFlops`, such as `"3.2e24"`), how it was counted (`trainingComputeBasis`), and whether adversarial testing was done (`adversarialTesting`). The AI model guide names the EU AI Act and Korean AI Basic Act provisions they relate to, as reference only.
+- A new step after the declared dataset sources, and before the risk assessment and the G7 checks, writes the declared service into the CycloneDX SBOM: `services[]` with its data flows, endpoints and disclosure page, its dependency on the model and the external models in `dependencies[]`, and its standards as `declarations.claims[]`. The model component gains the declared regulatory values as `bomlens:regulatory:*` properties and its input and output kinds in `modelCard.modelParameters`, unless the scan already recorded them. Everything written is marked as the publisher's declaration (`bomlens:origin=declared-input`, `bomlens:declared`, `bomlens:declared:observedKept`), and only a declaration the SPDX 3.0.1 converter accepts is applied. The SPDX check reports whether the SBOM follows the current declaration (`service.state`: `none`, `applied` or `pendingScan`). The SPDX 2.3 export and `--diff` do not carry services.
+- The G7 system-level checks read the declared service: the system name, producer and version when the SBOM's root does not give them, and the system data flow, data usage, input/output properties and application area, which were review-only before. An element met this way reads "present (publisher's declaration, not verified by BomLens)". A `modelCard.modelParameters` created only to hold declared formats does not count as a model card.
+- The web UI's questions gain an optional Service step (the service, its data flows and the external models it calls), the model step a folded group for regulatory filings and the model's input and output kinds, and a dataset's known bias moves to its main questions. Models & datasets shows the declared service with a "Publisher's declaration" badge, and a service saved after a scan is flagged until a new scan brings it into the CycloneDX SBOM and the G7 checks.
+
 ## [v1.13.0] - 2026-10-10
 
 ### Upgrade note

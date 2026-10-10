@@ -701,7 +701,8 @@
     "composerInstall": "PHP Composer dependency resolution",
     "pnpmWorkspaceTree": "pnpm workspace dependency tree resolution",
     "enrichDistroSupplier": "OS package supplier enrichment",
-    "declaredSources": "Dataset sources named in the AI declaration"
+    "declaredSources": "Dataset sources named in the AI declaration",
+    "declaredService": "The service named in the AI declaration"
   },
   "pipelineNote": {
     "titleScan": "Some data may be incomplete",
@@ -781,7 +782,21 @@
     "lineageConflict": "The declared license conflicts with the upstream model {{name}}.",
     "disclaimer": "This assessment is guidance, not legal advice.",
     "g7SectionTitle": "What this model discloses",
-    "g7SectionIntro": "Against the G7 minimum elements, what this model's card or listing does and doesn't disclose. This measures the publisher's own disclosure, not a document BomLens wrote."
+    "g7SectionIntro": "Against the G7 minimum elements, what this model's card or listing does and doesn't disclose. This measures the publisher's own disclosure, not a document BomLens wrote.",
+    "service": {
+      "kind": "Service",
+      "declared": "Publisher's declaration",
+      "note": "The model's publisher declared this service. BomLens did not check it.",
+      "provider": "Provider",
+      "runs": "Model it runs",
+      "dataFlows": "Data flows",
+      "dataFlowCount_one": "{{count}} flow",
+      "dataFlowCount_other": "{{count}} flows",
+      "endpoint": "Address",
+      "externalModels": "External AI models it calls",
+      "noExternal": "None declared",
+      "notStated": "Not stated"
+    }
   },
   "aiSummary": {
     "title": "AI model SBOM",
@@ -839,9 +854,10 @@
     "source": {
       "auto": "Auto",
       "inferred": "Inferred",
-      "declared": "Declared",
+      "declared": "Declaration needed",
       "na": "Review needed",
-      "notApplicable": "Not applicable"
+      "notApplicable": "Not applicable",
+      "declaredMet": "Publisher's declaration"
     },
     "help": {
       "g7-meta-author": {
@@ -1324,7 +1340,10 @@
       "missingAt": "Required fields still empty: {{list}}",
       "missingItem_one": "{{label}} ({{count}})",
       "missingItem_other": "{{label}} ({{count}})",
-      "documentLabel": "Document"
+      "documentLabel": "Document",
+      "servicePending": "The declared service and model information are in the SPDX 3.0.1 document. Scan again to include them in the CycloneDX SBOM and the G7 checks.",
+      "serviceLabel": "Service {{name}}",
+      "declarationPending": "The saved declaration and the CycloneDX SBOM differ (the model's input and output kinds or regulatory values, or a service that was removed). Scan again to bring them to the CycloneDX SBOM and the G7 checks."
     },
     "segment": {
       "filled": "Filled",
@@ -1359,7 +1378,10 @@
       "toggle": "Show the document's fields",
       "declaredDatasets": "Datasets named in the declaration",
       "datasetMissing_one": "{{count}} required, empty",
-      "datasetMissing_other": "{{count}} required, empty"
+      "datasetMissing_other": "{{count}} required, empty",
+      "publisherDeclared": "Publisher's declaration",
+      "serviceCaption": "The service that runs the model, in the SPDX 3.0.1 document",
+      "externalModel": "External AI model: {{name}}"
     }
   },
   "aiDecl": {
@@ -1369,21 +1391,24 @@
       "model": "Model",
       "data": "Training data",
       "legal": "Your decisions",
-      "preview": "Review"
+      "preview": "Review",
+      "service": "Service (optional)"
     },
     "question": {
       "base": "Which revision of each base model did you start from?",
       "model": "Tell us about the model",
       "data": "What data did you use?",
       "legal": "Your decisions",
-      "preview": "Review and save"
+      "preview": "Review and save",
+      "service": "Do you run this model in a service, such as an app or an API?"
     },
     "questionHint": {
       "base": "The scan found these base models. A revision makes the lineage reproducible; leave it empty if you do not know it.",
       "model": "Only the fields the scan could not fill are asked.",
       "data": "Say how the model used each dataset and add data the hub does not hold.",
       "legal": "These are judgments, not facts the scan can read. Answer only what you have checked.",
-      "preview": "Saving checks the declaration against this scan and rewrites the SPDX 3.0.1 document."
+      "preview": "Saving checks the declaration against this scan and rewrites the SPDX 3.0.1 document.",
+      "service": "Writing the service fills the G7 system elements (system name, data flow, input and output, application area). What you write is marked as the publisher's declaration."
     },
     "remaining_one": "{{count}} required field left",
     "remaining_other": "{{count}} required fields left",
@@ -1398,7 +1423,8 @@
       "data": "The AI document records what data the model was made from. Whoever receives it uses this to check sources and terms of use.",
       "legal": "Whether personal data was used and how risky the model is are judgments. The tool never fills them for you.",
       "preview": "The file holds only what you entered. Required fields still empty keep the document a draft, which you can finish later.",
-      "baseCreate": "SPDX records which model this one was built from. Naming the base model lets the scan read its licence, and a licence that passes to derivatives shows up in the risk verdict."
+      "baseCreate": "SPDX records which model this one was built from. Naming the base model lets the scan read its licence, and a licence that passes to derivatives shows up in the risk verdict.",
+      "service": "SPDX 3.0.1 records the service as an AI package of its own that runs this model. Regulations ask about the system people use, not only the model: what it is for, whether a person checks its decisions, and what data goes in and out. This step is optional; with no, the document covers the model alone."
     },
     "side": {
       "baseTitle": "Base models",
@@ -1436,7 +1462,14 @@
       "sourceTwice": "The same source is listed twice.",
       "sourceSelf": "A dataset cannot be its own source.",
       "sourceHubOnLocal": "Data the hub does not hold takes sources named in words only.",
-      "license": "Use a HuggingFace licence tag or an SPDX licence id, such as apache-2.0."
+      "license": "Use a HuggingFace licence tag or an SPDX licence id, such as apache-2.0.",
+      "decimal": "Write a number greater than zero, such as 3.2e24 or 1500000.",
+      "agentType": "Write the name of an organization.",
+      "flowMissing": "Choose whether the data comes in or goes out.",
+      "classificationMissing": "Say what data it is, for example personal data.",
+      "externalName": "Each external AI model needs a name.",
+      "externalTwice": "The same external AI model is listed twice.",
+      "labelTooLong": "Too long. Up to 200 characters."
     },
     "base": {
       "revision": {
@@ -1453,7 +1486,9 @@
     "group": {
       "use": "Use and scope (optional)",
       "training": "How it was trained (optional)",
-      "moreData": "More about this data (optional)"
+      "moreData": "More about this data (optional)",
+      "regulatory": "For regulatory filings (optional)",
+      "regulatoryNote": "Information used in filings to regulators. For reference only, not legal advice: the EU AI Act (Annex XI, Article 51, Article 55) and the Korean AI Basic Act enforcement decree (article 24) cover this kind of information."
     },
     "role": {
       "label": "How did the model use it?",
@@ -1480,7 +1515,17 @@
       "noBase": "No base model",
       "revision": "revision {{revision}}",
       "noRevision": "no revision",
-      "role": "How the model used it"
+      "role": "How the model used it",
+      "serviceCreate": "The service also goes into the CycloneDX SBOM of the first scan.",
+      "serviceFill": "Saving puts the service in the SPDX 3.0.1 document now. The CycloneDX SBOM and the G7 checks include it after a new scan.",
+      "service": {
+        "none": "The service question is not answered, so no service is recorded.",
+        "no": "The document records the model only.",
+        "later": "No service is recorded for now.",
+        "yes": "You chose yes but wrote nothing, so no service is recorded."
+      },
+      "modelCreate": "The model's input and output kinds and regulatory values also go into the CycloneDX SBOM of the first scan.",
+      "modelFill": "Saving puts the model's input and output kinds and regulatory values in the SPDX 3.0.1 document now. The CycloneDX SBOM and the G7 checks include them after a new scan."
     },
     "saveRefused": "The declaration was refused. Nothing was saved.",
     "saveBusy": "This scan is running again. Save after it finishes.",
@@ -1520,7 +1565,9 @@
       "directDownload": "Direct download",
       "query": "By query",
       "registration": "After registering",
-      "scrapingScript": "With a scraping script"
+      "scrapingScript": "With a scraping script",
+      "code": "Code",
+      "application": "Application"
     },
     "document": {
       "createdBy": {
@@ -1626,6 +1673,27 @@
         "example": "apache-2.0",
         "hintCreate": "Used for this model's risk verdict; left empty, the verdict reads \"Needs review\". Use a HuggingFace licence tag or an SPDX licence id, or pick one from the list.",
         "hintDeclared": "The risk verdict uses it from this model's next scan; until then the document lists it for review."
+      },
+      "inputModality": {
+        "label": "What the model takes in",
+        "hint": "You can choose more than one."
+      },
+      "outputModality": {
+        "label": "What the model gives out",
+        "hint": "You can choose more than one."
+      },
+      "trainingComputeFlops": {
+        "label": "Training compute (FLOPs)",
+        "hint": "The total floating-point operations used to train the model, written as a number such as 3.2e24. For reference: EU AI Act Annex XI 1(2)(d) and Article 51(2), Korean AI Basic Act enforcement decree article 24.",
+        "example": "3.2e24"
+      },
+      "trainingComputeBasis": {
+        "label": "How the compute was counted",
+        "example": "6 x parameters x training tokens, from the training logs"
+      },
+      "adversarialTesting": {
+        "label": "Was adversarial testing (red teaming) done?",
+        "hint": "For reference: EU AI Act Article 55(1)(a)."
       }
     },
     "dataset": {
@@ -1676,7 +1744,9 @@
         "label": "What it is meant for"
       },
       "knownBias": {
-        "label": "Known bias"
+        "label": "Known bias",
+        "hint": "Ways the data is known to lean one way. Leave it empty if you do not know of any.",
+        "example": "few samples from people over 60"
       },
       "confidentialityLevel": {
         "label": "Confidentiality (TLP)"
@@ -1710,7 +1780,8 @@
       "model": "What the hub cannot say about a model that is not published there.",
       "data": "Add the datasets the model was trained or evaluated on: by HuggingFace id, or as data the hub does not hold.",
       "legal": "These are judgments, not facts a scan can read. Answer only what you have checked.",
-      "preview": "Starting the scan reads the base models and datasets you named from the hub, then writes the SBOM and the SPDX 3.0.1 document."
+      "preview": "Starting the scan reads the base models and datasets you named from the hub, then writes the SBOM and the SPDX 3.0.1 document.",
+      "service": "Writing the service fills the G7 system elements (system name, data flow, input and output, application area). What you write is marked as the publisher's declaration."
     },
     "sources": {
       "label": "Where this data came from",
@@ -1756,7 +1827,154 @@
       "text": "Sentences or documents",
       "timeseries": "Values recorded over time",
       "timestamp": "Records of dates and times",
-      "video": "Video recordings"
-    }
+      "video": "Video recordings",
+      "code": "Program source code"
+    },
+    "serviceAnswer": {
+      "yes": "Yes, I will describe the service",
+      "no": "No, record the model only",
+      "later": "I will write it later",
+      "noNote": "The document records the model only.",
+      "laterNote": "No service is recorded for now. You can come back to this question later."
+    },
+    "serviceGroup": {
+      "use": "Purpose and human involvement",
+      "io": "Input and output",
+      "flows": "Data flows",
+      "external": "External AI models",
+      "standards": "Standards and disclosure"
+    },
+    "service": {
+      "name": {
+        "label": "Service name",
+        "example": "Acme Support Assistant"
+      },
+      "packageVersion": {
+        "label": "Service version",
+        "example": "2.3.0"
+      },
+      "downloadLocation": {
+        "label": "Service address",
+        "hint": "Where people use the service, or its API address.",
+        "example": "https://support.example.com/assistant"
+      },
+      "primaryPurpose": {
+        "label": "Kind"
+      },
+      "suppliedBy": {
+        "label": "Provider",
+        "hint": "The organization that runs the service."
+      },
+      "releaseTime": {
+        "label": "Release date",
+        "hint": "The day the service was launched or first put to use."
+      },
+      "informationAboutApplication": {
+        "label": "What is the service for?",
+        "example": "Answers customer questions in the web chat and hands over to a person on request"
+      },
+      "domain": {
+        "label": "Application area",
+        "example": "customer support"
+      },
+      "autonomyType": {
+        "label": "Is a person involved in the AI's decisions?",
+        "hint": "Choose Involved when a person reviews the results or makes the final decision.",
+        "option": {
+          "no": "Involved",
+          "yes": "Fully automatic",
+          "noAssertion": "Not known"
+        }
+      },
+      "inputModality": {
+        "label": "What the service takes in",
+        "hint": "You can choose more than one."
+      },
+      "outputModality": {
+        "label": "What the service gives out",
+        "hint": "You can choose more than one."
+      },
+      "dataFlows": {
+        "label": "Data flows"
+      },
+      "standardCompliance": {
+        "label": "Standards it follows",
+        "example": "ISO/IEC 42001"
+      },
+      "disclosureUrl": {
+        "label": "Public disclosure page",
+        "hint": "The page that tells users how the service uses AI.",
+        "example": "https://example.com/ai-notice"
+      }
+    },
+    "externalModel": {
+      "intro": "AI models the service calls through an API and does not run itself. Only who and what they are is recorded.",
+      "n": "External AI model {{n}}",
+      "add": {
+        "label": "External AI model name",
+        "button": "Add",
+        "example": "Example Translate"
+      },
+      "name": {
+        "label": "Name"
+      },
+      "suppliedBy": {
+        "label": "Provider"
+      },
+      "packageVersion": {
+        "label": "Version",
+        "example": "2025-05"
+      },
+      "primaryPurpose": {
+        "label": "Kind"
+      },
+      "endpoint": {
+        "label": "API address",
+        "example": "https://api.example.com/v1"
+      }
+    },
+    "dataFlow": {
+      "intro": "Data that comes into the service or goes out of it. Add one by saying what data it is.",
+      "n": "Data flow {{n}}",
+      "add": {
+        "label": "What data is it?",
+        "button": "Add data flow",
+        "hint": "For example personal data, public data or internal data."
+      },
+      "suggest": {
+        "personal": "personal data",
+        "public": "public data",
+        "internal": "internal data"
+      },
+      "flow": {
+        "label": "Direction",
+        "option": {
+          "inbound": "Comes in",
+          "outbound": "Goes out",
+          "bi-directional": "Both ways",
+          "unknown": "Not known"
+        }
+      },
+      "classification": {
+        "label": "What data"
+      },
+      "name": {
+        "label": "Name (optional)"
+      },
+      "description": {
+        "label": "Description (optional)",
+        "example": "Customer questions typed in the chat window"
+      },
+      "source": {
+        "label": "Where it comes from (address, optional)",
+        "example": "https://support.example.com/chat"
+      },
+      "destination": {
+        "label": "Where it goes (address, optional)",
+        "example": "https://api.example.com/v1"
+      }
+    },
+    "organizationPlaceholder": "Organization name",
+    "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step."
   }
 }

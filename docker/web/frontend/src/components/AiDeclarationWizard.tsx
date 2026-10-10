@@ -25,9 +25,16 @@ import type { Spdx3Failure } from "@/lib/api";
 import {
   adapterWithoutBase,
   AGENT_TYPES,
+  blankDeep,
   COMMON_LICENSES,
   DATASET_MORE_FIELDS,
+  dataFlowFields,
+  MAX_LABEL,
+  REGULATORY_FIELDS,
   ROLES,
+  SERVICE_GROUPS,
+  SERVICE_REQUIRED_FIELDS,
+  serviceDeclared,
   SOURCE_RELATIONS,
   dateToDeclared,
   declaredToDate,
@@ -50,12 +57,17 @@ import {
   summaryGroups,
   toFile,
   TRAINING_FIELDS,
+  MAX_TEXT,
+  modelCdxValues,
   type Agent,
+  type DataFlow,
   type Declaration,
+  type ExternalModelEntry,
   type DictEntry,
   type FieldIndex,
   type Issue,
   type MapField,
+  type ServiceAnswer,
   type SourceEntry,
   type Spdx3Check,
   type StepId,
@@ -71,7 +83,16 @@ import {
 } from "@/lib/useAiDeclaration";
 import { cn } from "@/lib/utils";
 
-type Ns = "document" | "model" | "dataset";
+/** The translation namespace of a question: `aiDecl.<ns>.<field>`. */
+type Ns = "document" | "model" | "dataset" | "service" | "externalModel" | "dataFlow";
+
+/** "Is a person involved in the AI's decisions?" answers the service's
+ *  autonomyType the other way round: involved is "no" (not autonomous). */
+const SERVICE_AUTONOMY_ORDER = ["no", "yes", "noAssertion"];
+const SERVICE_AUTONOMY_KEY = "aiDecl.service.autonomyType.option";
+const SERVICE_ANSWERS: ServiceAnswer[] = ["yes", "no", "later"];
+/** What kind of data flows, offered while it is typed; any words can be typed. */
+const CLASSIFICATION_KEYS = ["personal", "public", "internal"];
 
 const textAreaClass =
   "flex min-h-[4.5rem] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background " +
@@ -172,6 +193,7 @@ function AgentInput({
   label,
   describedBy,
   required,
+  types,
 }: {
   value: Agent | null;
   onChange: (v: Agent) => void;
@@ -180,9 +202,12 @@ function AgentInput({
   label?: string;
   describedBy?: string;
   required?: boolean;
+  /** The kinds of agent the field takes; one kind leaves nothing to choose. */
+  types?: string[];
 }) {
   const { t } = useTranslation();
-  const v = value ?? { type: "Organization", name: "" };
+  const only = types?.length === 1 ? types[0] : undefined;
+  const v = value ?? { type: only ?? "Organization", name: "" };
   return (
     <div className="flex gap-2">
       <Input
@@ -191,10 +216,10 @@ function AgentInput({
         aria-describedby={describedBy}
         aria-required={required || undefined}
         value={v.name}
-        placeholder={t("aiDecl.agentPlaceholder")}
-        onChange={(e) => onChange({ type: v.type || "Organization", name: e.target.value })}
+        placeholder={only === "Organization" ? t("aiDecl.organizationPlaceholder") : t("aiDecl.agentPlaceholder")}
+        onChange={(e) => onChange({ type: only ?? (v.type || "Organization"), name: e.target.value })}
       />
-      <Select
+      {!only && <Select
         aria-label={t("aiDecl.agentType")}
         value={v.type || "Organization"}
         onChange={(e) => onChange({ type: e.target.value, name: v.name })}
@@ -205,7 +230,7 @@ function AgentInput({
             {t(`aiDecl.agent.${a}`)}
           </option>
         ))}
-      </Select>
+      </Select>}
     </div>
   );
 }
@@ -263,6 +288,8 @@ function Field({
   hintKey,
   suggestions,
   warning,
+  optionOrder,
+  optionKey,
 }: {
   ns: Ns;
   /** "document", "model" or "datasets[i]", so a jump can find the field. */
@@ -280,6 +307,10 @@ function Field({
   suggestions?: string[];
   /** Advice that does not stop saving, shown under the field. */
   warning?: string;
+  /** The order a choice's options are offered in, when not the mapping's. */
+  optionOrder?: string[];
+  /** Where a choice's option labels are, when not the shared `aiDecl.enum`. */
+  optionKey?: string;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -311,6 +342,7 @@ function Field({
     const opts = field.enum.filter((o) => o !== "noAssertion" || field.noAssertion);
     // The vocabulary's own "unknown" goes last, where a person looks for it.
     opts.sort((a, b) => Number(a === "noAssertion") - Number(b === "noAssertion"));
+    if (optionOrder) opts.sort((a, b) => optionOrder.indexOf(a) - optionOrder.indexOf(b));
     const many = field.max === "*";
     const sel = many ? ((value as string[] | undefined) ?? []) : value ? [value as string] : [];
     input = (
@@ -320,7 +352,7 @@ function Field({
         multi={many}
         labelledBy={labelId}
         describedBy={describedBy}
-        labelOf={(o) => t(`aiDecl.enum.${o}`, { defaultValue: o })}
+        labelOf={(o) => t(`${optionKey ?? "aiDecl.enum"}.${o}`, { defaultValue: o })}
         hintOf={(o) => t(`aiDecl.enumHint.${o}`, { defaultValue: "" }) || undefined}
         onPick={(o) => {
           if (!many) return onChange(sel.includes(o) ? "" : o);
@@ -369,6 +401,7 @@ function Field({
         onChange={(v) => onChange(v)}
         describedBy={describedBy}
         required={required}
+        types={field.agentTypes}
       />
     );
   } else if (field.type === "DictionaryEntry") {
@@ -676,12 +709,23 @@ function AddById({
   placeholder,
   button,
   toAction,
+  valid,
+  invalidKey = "aiDecl.problem.hubId",
+  suggestions,
+  hint,
 }: {
   label: string;
   placeholder: string;
   button: string;
   /** What adding the id does; null when it is already there. */
   toAction: (id: string) => DeclarationAction | null;
+  /** What can be added; a HuggingFace id when not given. */
+  valid?: (value: string) => boolean;
+  /** What to say when the typed value cannot be added. */
+  invalidKey?: string;
+  /** Values to offer while typing. */
+  suggestions?: string[];
+  hint?: string;
 }) {
   const { t } = useTranslation();
   const ctx = useContext(PendingIds);
@@ -690,11 +734,12 @@ function AddById({
   const [value, setValue] = useState("");
   const [held, setHeld] = useState(false);
   const v = value.trim();
-  const bad = v !== "" && !isHubId(v);
+  const bad = v !== "" && !(valid ?? isHubId)(v);
   const latest = useRef<PendingEntry>({ value, toAction, reveal: () => {} });
   latest.current = {
     value,
     toAction,
+    valid,
     reveal: () => {
       setHeld(true);
       input.current?.focus();
@@ -725,8 +770,9 @@ function AddById({
           id={id}
           value={value}
           placeholder={placeholder}
-          aria-describedby={`${id}-err`}
+          aria-describedby={hint ? `${id}-hint ${id}-err` : `${id}-err`}
           aria-invalid={bad || undefined}
+          list={suggestions ? `${id}-list` : undefined}
           onChange={(e) => {
             setValue(e.target.value);
             if (!e.target.value.trim()) setHeld(false);
@@ -743,10 +789,174 @@ function AddById({
           {button}
         </Button>
       </div>
+      {suggestions && <Suggestions id={`${id}-list`} values={suggestions} />}
+      {hint && (
+        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
       <div id={`${id}-err`} aria-live="polite">
-        {bad && <p className="text-xs text-risk-critical-fg">{t("aiDecl.problem.hubId")}</p>}
+        {bad && <p className="text-xs text-risk-critical-fg">{t(invalidKey)}</p>}
         {bad && held && <p className="text-xs text-risk-critical-fg">{t("aiDecl.pendingBlocked")}</p>}
       </div>
+    </div>
+  );
+}
+
+type ProblemAt = (where: string, field: string) => Issue["problem"] | undefined;
+type SetAnswer = (target: Target, field: string, value: Value) => void;
+
+/**
+ * The data the declared service takes in and sends out, one flow per row in
+ * the shape of CycloneDX serviceData. A flow is added by saying what data it
+ * is; what is typed and not added is added when the step is left.
+ */
+function DataFlowsEditor({
+  index,
+  flows,
+  problemAt,
+  showProblems,
+  set,
+  onRemove,
+}: {
+  index: FieldIndex;
+  flows: DataFlow[];
+  problemAt: ProblemAt;
+  showProblems: boolean;
+  set: SetAnswer;
+  onRemove: (i: number) => void;
+}) {
+  const { t } = useTranslation();
+  const fields = dataFlowFields(index);
+  const suggestions = CLASSIFICATION_KEYS.map((k) => t(`aiDecl.dataFlow.suggest.${k}`));
+  return (
+    <div className="space-y-3" data-testid="data-flows">
+      <p className="text-xs text-muted-foreground">{t("aiDecl.dataFlow.intro")}</p>
+      {flows.map((d, i) => {
+        const where = `service.dataFlows[${i}]`;
+        const label = t("aiDecl.dataFlow.n", { n: i + 1 });
+        return (
+          <div key={i} data-where={where} data-flow-row={i} className="space-y-4 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">
+                {label}
+                {d.classification.trim() && (
+                  <span className="ml-2 font-normal text-muted-foreground">{d.classification.trim()}</span>
+                )}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={t("aiDecl.removeRow", { name: label })}
+                onClick={() => onRemove(i)}
+              >
+                <Trash2 className="h-4 w-4" />
+                {t("aiDecl.removeLocal")}
+              </Button>
+            </div>
+            {fields.map((f) => (
+              <Field
+                key={f.id}
+                ns="dataFlow"
+                where={where}
+                field={f}
+                value={(d as unknown as Record<string, Value | undefined>)[f.id]}
+                problem={problemAt(where, f.id)}
+                showProblems={showProblems}
+                onChange={(v) => set({ kind: "dataFlow", index: i }, f.id, v)}
+                optionKey={f.id === "flow" ? "aiDecl.dataFlow.flow.option" : undefined}
+                suggestions={f.id === "classification" ? suggestions : undefined}
+              />
+            ))}
+          </div>
+        );
+      })}
+      <AddById
+        label={t("aiDecl.dataFlow.add.label")}
+        placeholder={t("aiDecl.examplePrefix", { example: suggestions[0] })}
+        button={t("aiDecl.dataFlow.add.button")}
+        hint={t("aiDecl.dataFlow.add.hint")}
+        suggestions={suggestions}
+        valid={(v) => [...v].length <= MAX_LABEL}
+        invalidKey="aiDecl.problem.labelTooLong"
+        toAction={(c) => ({ type: "addDataFlow", classification: c })}
+      />
+    </div>
+  );
+}
+
+/**
+ * The AI models the service calls through an API (a hosted model it does not
+ * run itself). Only who and what they are is recorded; nothing about them is
+ * read. Added by name; a name typed and not added is added when the step is
+ * left.
+ */
+function ExternalModelsEditor({
+  index,
+  models,
+  problemAt,
+  showProblems,
+  set,
+  onRemove,
+}: {
+  index: FieldIndex;
+  models: ExternalModelEntry[];
+  problemAt: ProblemAt;
+  showProblems: boolean;
+  set: SetAnswer;
+  onRemove: (i: number) => void;
+}) {
+  const { t } = useTranslation();
+  const fields = ["name", "suppliedBy", "packageVersion", "endpoint"]
+    .map((k) => index.externalModel[k])
+    .filter((f): f is MapField => Boolean(f));
+  return (
+    <div className="space-y-3" data-testid="external-models">
+      <p className="text-xs text-muted-foreground">{t("aiDecl.externalModel.intro")}</p>
+      {models.map((m, i) => {
+        const where = `service.externalModels[${i}]`;
+        const label = m.name.trim() || t("aiDecl.externalModel.n", { n: i + 1 });
+        return (
+          <div key={i} data-where={where} data-external-model={i} className="space-y-4 rounded-md border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">{label}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={t("aiDecl.removeRow", { name: label })}
+                onClick={() => onRemove(i)}
+              >
+                <Trash2 className="h-4 w-4" />
+                {t("aiDecl.removeLocal")}
+              </Button>
+            </div>
+            {fields.map((f) => (
+              <Field
+                key={f.id}
+                ns="externalModel"
+                where={where}
+                field={f}
+                value={(m as unknown as Record<string, Value | undefined>)[f.id]}
+                problem={problemAt(where, f.id)}
+                showProblems={showProblems}
+                onChange={(v) => set({ kind: "externalModel", index: i }, f.id, v)}
+              />
+            ))}
+          </div>
+        );
+      })}
+      <AddById
+        label={t("aiDecl.externalModel.add.label")}
+        placeholder={t("aiDecl.examplePrefix", { example: t("aiDecl.externalModel.add.example") })}
+        button={t("aiDecl.externalModel.add.button")}
+        valid={(v) => [...v].length <= MAX_TEXT}
+        invalidKey="aiDecl.problem.tooLong"
+        toAction={(name) =>
+          models.some((x) => x.name.trim().toLowerCase() === name.toLowerCase())
+            ? null
+            : { type: "addExternalModel", name }
+        }
+      />
     </div>
   );
 }
@@ -793,12 +1003,15 @@ export function AiDeclarationWizard({
 }) {
   const { t, i18n } = useTranslation();
   const create = mode === "create";
-  const steps = useMemo(() => stepsFor(index, initial, create), [index, initial, create]);
+  const firstSteps = useMemo(() => stepsFor(index, initial, create), [index, initial, create]);
   const [state, dispatch] = useAiDeclaration(
     initial,
-    initialStep && steps.includes(initialStep) ? initialStep : steps[0],
+    initialStep && firstSteps.includes(initialStep) ? initialStep : firstSteps[0],
   );
   const { decl, step } = state;
+  // The steps follow the answers: once the model runs in a declared service,
+  // the decisions step no longer asks the model's autonomy and may go.
+  const steps = useMemo(() => stepsFor(index, decl, create), [index, decl, create]);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<Spdx3Failure | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -837,6 +1050,7 @@ export function AiDeclarationWizard({
   const openIn = openByStep(all);
   const problemAt = (where: string, field: string) => all.find((i) => i.where === where && i.field === field)?.problem;
   const hasIssueIn = (where: string, fields: string[]) => all.some((i) => i.where === where && fields.includes(i.field));
+  const hasIssueUnder = (prefix: string) => all.some((i) => i.where.startsWith(prefix));
   const set = (target: Target, field: string, value: Value) => dispatch({ type: "set", target, field, value });
   // Back from the review step, show every problem at once.
   const [reviewed, setReviewed] = useState(false);
@@ -993,6 +1207,7 @@ export function AiDeclarationWizard({
   } else if (step === "model") {
     why = "model";
     const useFields = MODEL_USE_FIELDS.filter((k) => decl.model && k in decl.model);
+    const regFields = REGULATORY_FIELDS.filter((k) => decl.model && k in decl.model && index.ai_AIPackage[k]);
     body = (
       <Card>
         <CardContent className="space-y-5 p-4">
@@ -1033,6 +1248,17 @@ export function AiDeclarationWizard({
               summary={<span className="text-sm font-medium">{t("aiDecl.group.use")}</span>}
             >
               <div className="mt-3 space-y-5">{useFields.map(modelField)}</div>
+            </Disclosure>
+          )}
+          {regFields.length > 0 && (
+            <Disclosure
+              defaultOpen={hasIssueIn("model", regFields)}
+              summary={<span className="text-sm font-medium">{t("aiDecl.group.regulatory")}</span>}
+            >
+              <div className="mt-3 space-y-5" data-testid="regulatory-fields">
+                <p className="text-xs text-muted-foreground">{t("aiDecl.group.regulatoryNote")}</p>
+                {regFields.map(modelField)}
+              </div>
             </Disclosure>
           )}
         </CardContent>
@@ -1200,11 +1426,129 @@ export function AiDeclarationWizard({
         )}
       </div>
     );
+  } else if (step === "service") {
+    why = "service";
+    const answer = decl.serviceAnswer ?? null;
+    const svc = decl.service ?? {};
+    const serviceField = (id: string) => {
+      const f = index.service[id];
+      if (!f) return null;
+      const autonomy = id === "autonomyType";
+      return (
+        <Field
+          key={id}
+          ns="service"
+          where="service"
+          field={f}
+          value={svc[id] as Value | undefined}
+          problem={problemAt("service", id)}
+          showProblems={loud}
+          onChange={(v) => set({ kind: "service" }, id, v)}
+          optionOrder={autonomy ? SERVICE_AUTONOMY_ORDER : undefined}
+          optionKey={autonomy ? SERVICE_AUTONOMY_KEY : undefined}
+        />
+      );
+    };
+    const groupOpen = (fields: string[]) =>
+      fields.some((f) =>
+        f === "dataFlows"
+          ? hasIssueUnder("service.dataFlows")
+          : f === "externalModels"
+            ? hasIssueUnder("service.externalModels")
+            : hasIssueIn("service", [f]),
+      );
+    body = (
+      <div className="space-y-3">
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <Choices
+              options={SERVICE_ANSWERS}
+              selected={answer ? [answer] : []}
+              labelledBy={headingId}
+              describedBy={`${headingId}-hint`}
+              labelOf={(o) => t(`aiDecl.serviceAnswer.${o}`)}
+              onPick={(o) =>
+                dispatch({ type: "serviceAnswer", answer: answer === o ? null : (o as ServiceAnswer) })
+              }
+            />
+            {answer && answer !== "yes" && (
+              <p className="text-sm text-muted-foreground" data-testid="service-answer-note">
+                {t(`aiDecl.serviceAnswer.${answer}Note`)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        {answer === "yes" && (
+          <>
+            <Card data-testid="service-required">
+              <CardContent className="space-y-5 p-4">{SERVICE_REQUIRED_FIELDS.map(serviceField)}</CardContent>
+            </Card>
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                {SERVICE_GROUPS.map((g) => (
+                  <Disclosure
+                    key={g.id}
+                    defaultOpen={groupOpen(g.fields)}
+                    summary={
+                      <span className="text-sm font-medium" data-service-group={g.id}>
+                        {t(`aiDecl.serviceGroup.${g.id}`)}
+                      </span>
+                    }
+                  >
+                    <div className="mt-3 space-y-5">
+                      {g.id === "flows" ? (
+                        <DataFlowsEditor
+                          index={index}
+                          flows={svc.dataFlows ?? []}
+                          problemAt={problemAt}
+                          showProblems={loud}
+                          set={set}
+                          onRemove={(i) => {
+                            dispatch({ type: "removeDataFlow", index: i });
+                            heading.current?.focus();
+                          }}
+                        />
+                      ) : g.id === "external" ? (
+                        <ExternalModelsEditor
+                          index={index}
+                          models={svc.externalModels ?? []}
+                          problemAt={problemAt}
+                          showProblems={loud}
+                          set={set}
+                          onRemove={(i) => {
+                            dispatch({ type: "removeExternalModel", index: i });
+                            heading.current?.focus();
+                          }}
+                        />
+                      ) : (
+                        g.fields.map(serviceField)
+                      )}
+                    </div>
+                  </Disclosure>
+                ))}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    );
   } else if (step === "legal") {
     why = "legal";
+    const viaService =
+      decl.serviceAnswer === "yes" &&
+      decl.model !== undefined &&
+      "autonomyType" in decl.model &&
+      !judgmentFields(index, decl).includes("autonomyType");
     body = (
       <Card>
-        <CardContent className="space-y-5 p-4">{judgmentFields(index, decl).map(modelField)}</CardContent>
+        <CardContent className="space-y-5 p-4">
+          {judgmentFields(index, decl).map(modelField)}
+          {viaService && (
+            <p className="text-xs text-muted-foreground" data-testid="autonomy-in-service">
+              {t("aiDecl.autonomyInService")}
+            </p>
+          )}
+        </CardContent>
       </Card>
     );
   } else {
@@ -1227,6 +1571,13 @@ export function AiDeclarationWizard({
                   {blockers.length ? t("aiDecl.preview.blocked") : t("aiDecl.preview.draftOk")}
                 </p>
               </>
+            )}
+            {/* The model's own values that also go into the CycloneDX SBOM; a
+                declared service says so in its own group below. */}
+            {!serviceDeclared(decl) && modelCdxValues(decl) && (
+              <p className="text-xs text-muted-foreground" data-testid="cdx-note">
+                {t(create ? "aiDecl.preview.modelCreate" : "aiDecl.preview.modelFill")}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -1269,7 +1620,30 @@ export function AiDeclarationWizard({
                     if (ds?.role) extra.push({ label: t("aiDecl.preview.role"), value: t(`aiDecl.role.${ds.role}`) });
                     const srcs = (ds?.sources ?? []).map((x) => x.ref?.replace(/^huggingface:/, "") || x.name || "").filter(Boolean);
                     if (srcs.length) extra.push({ label: t("aiDecl.sources.label"), value: srcs.join(", ") });
-                    const empty = g.rows.length === 0 && extra.length === 0;
+                    const after: { label: string; value: string }[] = [];
+                    if (g.step === "service") {
+                      const flows = (decl.service?.dataFlows ?? []).filter((d) => !blankDeep(d));
+                      if (flows.length)
+                        after.push({
+                          label: t("aiDecl.serviceGroup.flows"),
+                          value: flows
+                            .map((d) =>
+                              [d.flow ? t(`aiDecl.dataFlow.flow.option.${d.flow}`, { defaultValue: d.flow }) : "", d.classification.trim()]
+                                .filter(Boolean)
+                                .join(": "),
+                            )
+                            .join("\n"),
+                        });
+                      const ext = (decl.service?.externalModels ?? []).filter((m) => !blankDeep(m));
+                      if (ext.length)
+                        after.push({
+                          label: t("aiDecl.serviceGroup.external"),
+                          value: ext
+                            .map((m) => (m.suppliedBy?.name?.trim() ? `${m.name.trim()} (${m.suppliedBy.name.trim()})` : m.name.trim()))
+                            .join("\n"),
+                        });
+                    }
+                    const empty = g.rows.length === 0 && extra.length === 0 && after.length === 0;
                     return (
                       <div key={gi} className="space-y-1">
                         {g.title && <div className="font-mono text-xs font-semibold">{g.title}</div>}
@@ -1290,12 +1664,22 @@ export function AiDeclarationWizard({
                                 value={valueText(r)}
                               />
                             ))}
+                            {after.map((x) => (
+                              <SummaryLine key={x.label} label={x.label} value={x.value} />
+                            ))}
                           </dl>
                         )}
                       </div>
                     );
                   })}
-                  {s !== "base" && mine.length === 0 && (
+                  {s === "service" && (
+                    <p className="text-xs text-muted-foreground" data-testid="service-summary-note">
+                      {serviceDeclared(decl)
+                        ? t(create ? "aiDecl.preview.serviceCreate" : "aiDecl.preview.serviceFill")
+                        : t(`aiDecl.preview.service.${decl.serviceAnswer ?? "none"}`)}
+                    </p>
+                  )}
+                  {s !== "base" && s !== "service" && mine.length === 0 && (
                     <p className="text-xs text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
                   )}
                 </CardContent>
@@ -1402,7 +1786,7 @@ export function AiDeclarationWizard({
             <h2 ref={heading} id={headingId} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
               {t(create && step === "base" ? "aiDecl.questionCreate.base" : `aiDecl.question.${step}`)}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p id={`${headingId}-hint`} className="mt-1 text-sm text-muted-foreground">
               {t(create ? `aiDecl.questionHintCreate.${step}` : `aiDecl.questionHint.${step}`)}
             </p>
           </div>
@@ -1522,6 +1906,7 @@ function formatValue(r: SummaryRow, t: (k: string, o?: Record<string, unknown>) 
       return e.value ? `${e.key} = ${e.value}` : e.key;
     }
     const s = String(x);
+    if (r.ns === "service" && r.field.id === "autonomyType") return t(`${SERVICE_AUTONOMY_KEY}.${s}`, { defaultValue: s });
     if (r.field.enum) return t(`aiDecl.enum.${s}`, { defaultValue: s });
     if (r.field.type === "DateTime") return formatDay(s, lang);
     return s;

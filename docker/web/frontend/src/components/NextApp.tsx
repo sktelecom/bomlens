@@ -680,6 +680,11 @@ export function NextApp() {
             }
             // Saving an AI declaration also refreshes the SPDX 3.0.1 summary.
             onResultPatch={(patch) => setResult((r) => (r ? { ...r, ...patch } : r))}
+            // A service declared after the scan reaches the CycloneDX SBOM
+            // only from a new scan; the SPDX 3.0.1 band offers the re-scan.
+            onRescan={
+              result.scanConfig && !IS_STATIC_DEMO ? () => handleRescan(result.scanConfig!) : undefined
+            }
           />
 
           {/* The run log is reference material for the run you just watched.

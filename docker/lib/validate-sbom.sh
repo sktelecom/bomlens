@@ -475,6 +475,12 @@ cdx_checks() {
 #
 # Two element shapes:
 #   cdxPath     — boolean presence over the whole SBOM (pass / not present).
+#                 Two optional companions: absentSource "na" reports the element
+#                 as a human-review item while cdxPath finds nothing (the G7
+#                 system data flow, data usage, input/output and application
+#                 area, which only a declared or supplied service fills), and
+#                 declaredPath, a jq boolean, marks a pass as the publisher's
+#                 declaration in the detail.
 #   missingPath — per-model coverage: a jq expression (may use $models) returning
 #                 the names of model components MISSING the element. Keeps the
 #                 old cov() semantics: pass only when EVERY model has it, warn with
@@ -527,6 +533,8 @@ registry_checks() {
             + ",source:" + (.source|@json)
             + ",role:" + ((.role // "")|@json)
             + ",_present:(" + (if (.source=="na" or (.cdxPath==null)) then "null" else "(try (" + .cdxPath + ") catch false)" end) + ")"
+            + ",_absent:" + ((.absentSource // null)|@json)
+            + ",_decl:(" + (if (.declaredPath==null) then "false" else "(try (" + .declaredPath + ") catch false)" end) + ")"
             + ",_missing:(" + (if (.missingPath==null) then "null" else "(try (" + .missingPath + ") catch null)" end) + ")"
             + ",_stot:($subjects|length)"
             + ",_slabel:" + ($slabel|@json)
@@ -540,15 +548,23 @@ registry_checks() {
     # An element the SBOM does not satisfy fails when the baseline requires it and
     # warns when the baseline only recommends it. "Requires human review" is not a
     # verdict either way: the SBOM may well satisfy it, and no check here can tell.
+    #
+    # An element with absentSource "na" is a human-review item until its cdxPath
+    # finds a value, and reports source "na" then, so it counts exactly as an
+    # element with no automated source does. One whose declaredPath holds was
+    # satisfied by the publisher's declaration, and its detail says so.
     local fold='
         | map(
             (if .required then "fail" else "warn" end) as $unmet
-            | (if .source=="na" then {status:"warn", detail:"requires human review (no automated source)", missing:[]}
+            | (if (._present==false and ._absent=="na") then "na" else .source end) as $src
+            | (if $src=="na" then {status:"warn", detail:"requires human review (no automated source)", missing:[]}
              elif ._missing != null then
                (._stot) as $t | (._missing|length) as $m |
                (if $t==0 then {status:"warn", detail:._sempty, missing:[]}
                 elif $m==0 then {status:"pass", detail:"\($t)/\($t) \(._slabel)(s)", missing:[]}
                 else {status:$unmet, detail:"\($t - $m)/\($t) \(._slabel)(s)", missing:(._missing[0:$cap])} end)
+             elif ._present==true and ._decl==true then
+               {status:"pass", detail:"present (publisher'"'"'s declaration, not verified by BomLens)", missing:[]}
              elif ._present==true then {status:"pass", detail:"present", missing:[]}
              elif ._present==false then
                (if .id=="cisa-sbom-author-signature" and $signRequested and ($signFailed=="1")
@@ -558,7 +574,7 @@ registry_checks() {
             | {id, label, label_ko, required, status:$s.status, detail:$s.detail,
                missing:$s.missing,
                evidence: ((._ev // []) | unique | .[0:$cap]),
-               cluster, source, role}
+               cluster, source:$src, role}
         )'
     local out
     if ! out=$(jq -c --argjson cap "$MISSING_CAP" --argjson hasSigFile "$HAS_SIG_FILE" \
@@ -1055,6 +1071,7 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           else ($C["conformance.label_exact"][$en] // $en) end;
         def ldetail($d):
           if $d=="present" then $C["conformance.detail.present"]
+          elif $d=="present (publisher'"'"'s declaration, not verified by BomLens)" then $C["conformance.detail.present_declared"]
           elif $d=="not present in the SBOM" then $C["conformance.detail.not_present"]
           elif $d=="signature requested but failed" then $C["conformance.detail.sign_requested_failed"]
           elif $d=="requires human review (no automated source)" then $C["conformance.detail.review"]

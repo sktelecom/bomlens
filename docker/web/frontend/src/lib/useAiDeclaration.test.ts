@@ -129,4 +129,81 @@ describe("flushPendingIds", () => {
     expect(r.actions).toEqual([]);
     expect(r.blocked).toBe(-1);
   });
+
+  it("adds an external model or a data flow typed and not added, by their own rule", () => {
+    const name = (v: string) => v.length <= 20;
+    const r = flushPendingIds(create(), [
+      { value: " Example Translate ", valid: name, toAction: (n) => ({ type: "addExternalModel", name: n }) },
+      { value: "personal data", valid: () => true, toAction: (c) => ({ type: "addDataFlow", classification: c }) },
+    ]);
+    expect(r.blocked).toBe(-1);
+    expect(r.state.decl.service?.externalModels?.map((m) => m.name)).toEqual(["Example Translate"]);
+    expect(r.state.decl.service?.dataFlows?.map((d) => d.classification)).toEqual(["personal data"]);
+    // A name its rule refuses keeps the step open.
+    const s0 = create();
+    const bad = flushPendingIds(s0, [
+      { value: "a name far too long for the rule", valid: name, toAction: (n) => ({ type: "addExternalModel", name: n }) },
+    ]);
+    expect(bad.blocked).toBe(0);
+    expect(bad.state).toBe(s0);
+  });
+});
+
+describe("the service in the reducer", () => {
+  const svc = (): DeclarationState => ({ step: "service", decl: createTemplate(index) });
+
+  it("records the answer, and takes it back", () => {
+    const s1 = declarationReducer(svc(), { type: "serviceAnswer", answer: "yes" });
+    expect(s1.decl.serviceAnswer).toBe("yes");
+    const s2 = declarationReducer(s1, { type: "serviceAnswer", answer: null });
+    expect("serviceAnswer" in s2.decl).toBe(false);
+    // A declaration with no service to ask about ignores it.
+    const noSvc: DeclarationState = { step: "data", decl: { ...createTemplate(index), service: undefined } };
+    expect(declarationReducer(noSvc, { type: "serviceAnswer", answer: "yes" })).toBe(noSvc);
+  });
+
+  it("sets the service's answers and keeps an external model's key following its name", () => {
+    let s = declarationReducer(svc(), { type: "set", target: { kind: "service" }, field: "name", value: "Assistant" });
+    expect(s.decl.service?.name).toBe("Assistant");
+    s = declarationReducer(s, { type: "addExternalModel", name: "Example Translate" });
+    s = declarationReducer(s, { type: "addExternalModel", name: "example translate" });
+    expect(s.decl.service?.externalModels).toHaveLength(1);
+    s = declarationReducer(s, { type: "addExternalModel", name: "번역 모델" });
+    expect(s.decl.service?.externalModels?.map((m) => m.key)).toEqual(["example-translate", "model-2"]);
+    s = declarationReducer(s, { type: "set", target: { kind: "externalModel", index: 1 }, field: "name", value: "Example Translate" });
+    // Two of the same name get two keys.
+    expect(s.decl.service?.externalModels?.map((m) => m.key)).toEqual(["example-translate", "example-translate-2"]);
+    s = declarationReducer(s, {
+      type: "set",
+      target: { kind: "externalModel", index: 0 },
+      field: "endpoint",
+      value: "https://api.example.com",
+    });
+    expect(s.decl.service?.externalModels?.[0].endpoint).toBe("https://api.example.com");
+    s = declarationReducer(s, { type: "removeExternalModel", index: 0 });
+    expect(s.decl.service?.externalModels?.map((m) => m.key)).toEqual(["example-translate-2"]);
+    expect(declarationReducer(s, { type: "removeExternalModel", index: 5 })).toBe(s);
+    expect(declarationReducer(s, { type: "set", target: { kind: "externalModel", index: 5 }, field: "name", value: "x" })).toBe(s);
+  });
+
+  it("adds, edits and removes data flows", () => {
+    let s = declarationReducer(svc(), { type: "addDataFlow", classification: " personal data " });
+    expect(s.decl.service?.dataFlows?.[0]).toMatchObject({ flow: "", classification: "personal data" });
+    s = declarationReducer(s, { type: "set", target: { kind: "dataFlow", index: 0 }, field: "flow", value: "inbound" });
+    expect(s.decl.service?.dataFlows?.[0].flow).toBe("inbound");
+    expect(declarationReducer(s, { type: "set", target: { kind: "dataFlow", index: 3 }, field: "flow", value: "x" })).toBe(s);
+    s = declarationReducer(s, { type: "removeDataFlow", index: 0 });
+    expect(s.decl.service?.dataFlows).toEqual([]);
+    expect(declarationReducer(s, { type: "removeDataFlow", index: 0 })).toBe(s);
+  });
+
+  it("does nothing to a service that is not there", () => {
+    const noSvc: DeclarationState = { step: "data", decl: { ...createTemplate(index), service: undefined } };
+    for (const a of [
+      { type: "addExternalModel", name: "x" },
+      { type: "addDataFlow", classification: "x" },
+      { type: "set", target: { kind: "service" }, field: "name", value: "x" },
+    ] as const)
+      expect(declarationReducer(noSvc, a)).toBe(noSvc);
+  });
 });

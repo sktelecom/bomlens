@@ -204,7 +204,7 @@ flowchart TD
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **opt-in 이미지** `bomlens-aibom`. HuggingFace 모델 카드로 CycloneDX 1.7 ML-BOM 생성, G7 적합성 검사 추가 |
 | `MODELFILE` | `--model-file <경로>` | `identify-model-file.py`(표준 라이브러리) | 기본 이미지, 오프라인. 모델 파일 헤더로 CycloneDX 1.7 ML-BOM 생성(GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX), 같은 G7 검사 추가 |
 | `DATASET` | `--model <Figshare 항목>` 또는 `--model datasets/<owner>/<name>` | `scan-figshare.py`, `scan-hf-dataset.py`(표준 라이브러리) | 기본 이미지. 공개 Figshare 항목 조회로 연구 데이터셋을 읽는다(계정 불필요). 라이선스, DOI, 저자, 파일별 MD5 값이 CycloneDX 1.7 `data` 컴포넌트가 된다. HuggingFace 데이터셋(`datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>`, `hf:<owner>/<name>`)도 같은 `data` 컴포넌트가 되어 라이선스, 허브 리비전, 파일별 SHA-256 값을 담고, 카드의 `source_datasets`에 적힌 데이터셋도 함께 읽는다 |
-| `AIDECLARE` | `--ai-declare <파일>`만 지정(`--model`, `--model-file`, `--target` 없음) | `declare-ai-model.py`(표준 라이브러리) | 기본 이미지. 허브 저장소나 파일이 아직 없는 모델을 공개자의 선언으로 기술한다. 모델은 프로젝트 이름과 버전을 붙인 `metadata.component`가 되고 `bomlens:origin=declared-input`으로 표시한다. 선언에 적은 기반 모델과 HuggingFace 데이터셋은 모델 스캔과 같은 방식으로 허브에서 id로 읽는다. 선언한 값은 SPDX 3.0.1 AI 문서에만 들어간다 |
+| `AIDECLARE` | `--ai-declare <파일>`만 지정(`--model`, `--model-file`, `--target` 없음) | `declare-ai-model.py`(표준 라이브러리) | 기본 이미지. 허브 저장소나 파일이 아직 없는 모델을 공개자의 선언으로 기술한다. 모델은 프로젝트 이름과 버전을 붙인 `metadata.component`가 되고 `bomlens:origin=declared-input`으로 표시한다. 선언에 적은 기반 모델과 HuggingFace 데이터셋은 모델 스캔과 같은 방식으로 허브에서 id로 읽는다. 선언한 값은 대부분 SPDX 3.0.1 AI 문서에만 들어가며, 선언한 서비스와 모델의 입력과 출력 종류, 학습 연산량, 적대적 시험 여부는 CycloneDX SBOM에도 발행자 선언으로 표시되어 들어간다 |
 | `UI` | `--ui` | — | 브라우저 UI, 모든 스캔 대상을 폼/업로드로 실행 |
 
 ---

@@ -31,7 +31,7 @@ Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens
 | `--model-file <path>` | — | Read one AI model file and describe it from its own header: GGUF, safetensors, PyTorch (`.pt`/`.pth`/`.ckpt`), pickle, npz, npy or ONNX. Offline, no HuggingFace account, and it works on a model that was never published. What can be filled depends on the format — GGUF carries a name, a license and an architecture, while safetensors usually carries only tensor shapes, and a field the file does not declare is left empty rather than guessed. A `.gguf`/`.safetensors`/`.pt`/… path passed to `--target` is read this way too. Mutually exclusive with `--target`/`--analyze`/`--git` |
 | `--license <spdx-id>` | — | The outbound license the project is distributed under (e.g. `Apache-2.0`). Recorded on the SBOM's root component and used to flag dependencies whose terms clash with it. A source scan cannot infer this — cdxgen leaves the root license empty for maven and gradle — so without it no conflict verdict is produced. An existing root license (a supplier SBOM's own declaration) is never replaced |
 | `--sbom-author <name>` | — | The entity that generated the SBOM — the organisation or person running the scan, not the tool and not whoever wrote the software. Recorded in `metadata.authors`, using the full name without acronyms. Nothing in a scan can discover it, so the field is left out of the SBOM when it is not given rather than filled with a placeholder |
-| `--ai-declare <file>` | — | For an AI model or dataset scan: the publisher's declaration (JSON) of what a scan cannot read, such as release dates, who made the model and the data, which datasets trained or tested it, the base model revision and the distributed weights scope. Written into the SPDX 3.0.1 AI document only; the CycloneDX SBOM is not changed. Every AI scan writes an empty one to start from, `{Project}_{Version}_ai-declaration.template.json`. A file that names a field, value, dataset or base model the scan does not have is refused with the reasons, and the document is written without it, as a draft. The accepted file is kept as `{Project}_{Version}_ai-declaration.json` and applied again on the next scan of the same version. Given alone, without `--model`, `--model-file` or `--target`, it describes a model that has no hub repository or file yet (`MODE=AIDECLARE`, base image): the base models in `model.baseModels[].ref` and the datasets in `datasets[].ref` (`huggingface:<owner>/<name>`) are read from the hub by id, `datasets[].local` lists data the hub does not hold, and the model is named by `--project` and `--version`. Without a declared download address and supplier, the SPDX document stays a draft. Not offered with `--ui` (use the Models & datasets screen) or `--diff` |
+| `--ai-declare <file>` | — | For an AI model or dataset scan: the publisher's declaration (JSON) of what a scan cannot read, such as release dates, who made the model and the data, which datasets trained or tested it, the base model revision and the distributed weights scope. Most declared values are written only to the SPDX 3.0.1 AI document. The exceptions are the service the model runs in (`service`) and the model's input and output kinds, training compute and adversarial testing, which also go into the CycloneDX SBOM, marked as the publisher's declaration (see [the example below](#the-ai-declaration-file)). Every AI scan writes an empty one to start from, `{Project}_{Version}_ai-declaration.template.json`. A file that names a field, value, dataset or base model the scan does not have is refused with the reasons, and the document is written without it, as a draft. The accepted file is kept as `{Project}_{Version}_ai-declaration.json` and applied again on the next scan of the same version. Given alone, without `--model`, `--model-file` or `--target`, it describes a model that has no hub repository or file yet (`MODE=AIDECLARE`, base image): the base models in `model.baseModels[].ref` and the datasets in `datasets[].ref` (`huggingface:<owner>/<name>`) are read from the hub by id, `datasets[].local` lists data the hub does not hold, and the model is named by `--project` and `--version`. Without a declared download address and supplier, the SPDX document stays a draft. Not offered with `--ui` (use the Models & datasets screen) or `--diff` |
 | `--no-spdx3` | false | For an AI model or dataset scan: do not write the SPDX 3.0.1 AI document, its check or the declaration template |
 | `--vex <file>` | — | A CycloneDX VEX document (JSON) a supplier sent for this product. The statements that apply to a component of the scanned SBOM are kept in `{Project}_{Version}_vex_imported.json`; the SBOM and the security report are not changed. Turns the security report on too (as `--deep-cve` does), because the statements are shown on its findings: open the scan folder in the web UI to see them on the vulnerability rows. A document for a different product or version, or one that is not CycloneDX VEX, is reported and skipped, and the scan still completes; a document with no applicable statement leaves an earlier `_vex_imported.json` as it was. Not offered with `--ui` (use Import VEX on the Vulnerabilities screen) or `--diff` |
 | `--usage <scenario>` | — | Tailor the AI model risk assessment (`--model` and `--model-file`) to how the model will be used: `internal`, `product`, `redistribute` or `outputs-only`. Only the license conditions that bind that scenario decide the verdict, and the report states which scenario it was judged for. Unset judges against every condition |
@@ -121,6 +121,51 @@ to `bomlens.settings.txt` beside the scripts (or to `%USERPROFILE%\.bomlens\sett
 A real environment variable always wins over the file.
 
 Output flags are detailed in the [reports guide](../guides/reports.md); validating a received supplier SBOM is covered in the [supplier SBOM validation](../guides/supplier-sbom.md).
+
+## The AI declaration file
+
+`--ai-declare` takes a JSON file. Start from the `{Project}_{Version}_ai-declaration.template.json` an AI scan writes, and fill what applies. This one describes a model that runs in a support chat service and calls an external translation model:
+
+```json
+{
+  "schema": "bomlens-ai-declaration/1",
+  "document": {"createdBy": [{"type": "Organization", "name": "Acme AI Lab"}]},
+  "model": {
+    "releaseTime": "2025-04-15T00:00:00Z",
+    "originatedBy": [{"type": "Organization", "name": "Acme AI Lab"}],
+    "inputModality": ["text"],
+    "outputModality": ["text"],
+    "trainingComputeFlops": "3.2e21",
+    "trainingComputeBasis": "6 x parameters x training tokens, from the training logs",
+    "adversarialTesting": "yes"
+  },
+  "service": {
+    "name": "Acme Support Assistant",
+    "packageVersion": "2.3.0",
+    "downloadLocation": "https://support.acme.example/assistant",
+    "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
+    "releaseTime": "2025-06-01T00:00:00Z",
+    "autonomyType": "no",
+    "dataFlows": [
+      {"flow": "outbound", "classification": "personal data",
+       "description": "Questions forwarded to the external translation model.",
+       "destination": ["https://api.translate.example/v1"]}
+    ],
+    "externalModels": [
+      {"key": "translate", "name": "Example Translate",
+       "suppliedBy": {"type": "Organization", "name": "Example Inc"},
+       "endpoint": "https://api.translate.example/v1"}
+    ]
+  }
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project support-adapter --version 1.0 \
+  --model "acme/support-adapter" --ai-declare declaration.json --generate-only
+```
+
+The `service` and the model's input and output kinds, training compute and adversarial testing reach the CycloneDX SBOM in the same run; everything else goes only to the SPDX 3.0.1 document. Every key and allowed value is listed under [The declared AI service](artifacts.md#the-declared-ai-service). BomLens v1.13 and earlier refuse a file with `service` or these model keys ("unknown key(s)"). `--no-spdx3` cannot be combined with `--ai-declare` given as the only input, since most declared values have nowhere else to go.
 
 ## Where outputs go
 

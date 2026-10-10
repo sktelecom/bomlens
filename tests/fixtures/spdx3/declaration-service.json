@@ -1,0 +1,154 @@
+{
+  "schema": "bomlens-ai-declaration/1",
+  "document": {
+    "createdBy": [
+      {
+        "type": "Organization",
+        "name": "Acme AI Lab"
+      }
+    ]
+  },
+  "model": {
+    "baseModels": [
+      {
+        "ref": "org/base-instruct",
+        "revision": "a8b602d9dafd3a75d382e62757d83d89fca3be54"
+      }
+    ],
+    "releaseTime": "2025-04-15T00:00:00Z",
+    "originatedBy": [
+      {
+        "type": "Organization",
+        "name": "Acme AI Lab"
+      }
+    ],
+    "informationAboutTraining": "LoRA supervised fine-tuning on open-ds, 3 epochs.",
+    "hyperparameter": [
+      {
+        "key": "learning_rate",
+        "value": "2e-5"
+      },
+      {
+        "key": "lora_rank",
+        "value": "16"
+      }
+    ],
+    "modelDataPreprocessing": [
+      "Personal data masked, then de-duplicated."
+    ],
+    "useSensitivePersonalInformation": "noAssertion",
+    "safetyRiskAssessment": "medium",
+    "inputModality": [
+      "text"
+    ],
+    "outputModality": [
+      "text"
+    ],
+    "trainingComputeFlops": "3.2e21",
+    "trainingComputeBasis": "6 x parameters x training tokens, from the training logs",
+    "adversarialTesting": "yes"
+  },
+  "datasets": [
+    {
+      "ref": "huggingface:org/open-ds",
+      "role": "trainedOn",
+      "originatedBy": {
+        "type": "Organization",
+        "name": "org"
+      },
+      "builtTime": "2023-10-01T00:00:00Z",
+      "releaseTime": "2023-10-24T00:00:00Z"
+    },
+    {
+      "ref": "huggingface:org/pii-ds",
+      "role": "testedOn",
+      "originatedBy": {
+        "type": "Organization",
+        "name": "org"
+      },
+      "builtTime": "2024-01-01T00:00:00Z",
+      "releaseTime": "2024-02-01T00:00:00Z"
+    },
+    {
+      "ref": "huggingface:org/upstream",
+      "originatedBy": {
+        "type": "Organization",
+        "name": "org"
+      },
+      "builtTime": "2022-01-01T00:00:00Z",
+      "releaseTime": "2022-02-01T00:00:00Z"
+    },
+    {
+      "local": "support-logs-2025",
+      "name": "Support logs 2025",
+      "role": "trainedOn",
+      "originatedBy": {
+        "type": "Organization",
+        "name": "Acme support desk"
+      },
+      "builtTime": "2025-03-01T00:00:00Z",
+      "releaseTime": "2025-04-15T00:00:00Z",
+      "downloadLocation": "https://data.example.internal/support-logs-2025",
+      "datasetType": [
+        "text"
+      ],
+      "hasSensitivePersonalInformation": "yes"
+    }
+  ],
+  "relationships": [],
+  "service": {
+    "name": "Acme Support Assistant",
+    "packageVersion": "2.3.0",
+    "downloadLocation": "https://support.acme.example/assistant",
+    "suppliedBy": {
+      "type": "Organization",
+      "name": "Acme Corp"
+    },
+    "releaseTime": "2025-06-01T00:00:00Z",
+    "informationAboutApplication": "Answers customer support questions in the web chat; hands over to a person on request.",
+    "domain": [
+      "customer support"
+    ],
+    "autonomyType": "no",
+    "inputModality": [
+      "text"
+    ],
+    "outputModality": [
+      "text"
+    ],
+    "dataFlows": [
+      {
+        "flow": "inbound",
+        "classification": "personal data",
+        "description": "Customer questions typed in the chat window.",
+        "source": [
+          "https://support.acme.example/chat"
+        ]
+      },
+      {
+        "flow": "outbound",
+        "classification": "personal data",
+        "description": "Questions forwarded to the external translation model.",
+        "destination": [
+          "https://api.translate.example/v1"
+        ]
+      }
+    ],
+    "standardCompliance": [
+      "ISO/IEC 42001:2023"
+    ],
+    "disclosureUrl": "https://support.acme.example/ai-disclosure",
+    "externalModels": [
+      {
+        "key": "translate",
+        "name": "Example Translate",
+        "suppliedBy": {
+          "type": "Organization",
+          "name": "Example Inc"
+        },
+        "packageVersion": "2025-05",
+        "endpoint": "https://api.translate.example/v1"
+      }
+    ]
+  }
+}

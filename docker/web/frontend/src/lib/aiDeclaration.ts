@@ -28,9 +28,16 @@ export interface MapField {
   source: { kind: string; fallback?: string };
   declarable?: boolean;
   judgment?: boolean;
+  /** The kinds of agent the field takes (a service's provider: Organization). */
+  agentTypes?: string[];
+  /** The values of a data flow's direction (CycloneDX dataFlowDirection). */
+  flowEnum?: string[];
 }
 
-export type ElementType = "document" | "ai_AIPackage" | "dataset_DatasetPackage";
+/** The mapping's element keys: the SPDX classes, and the declared service and
+ *  the external models it calls (their SPDX classes are in the mapping's
+ *  spdxType). */
+export type ElementType = "document" | "ai_AIPackage" | "dataset_DatasetPackage" | "service" | "externalModel";
 
 /** Field definitions by element type and field id. */
 export type FieldIndex = Record<ElementType, Record<string, MapField>>;
@@ -43,8 +50,14 @@ function isObj(v: unknown): v is Record<string, unknown> {
 export function parseMap(raw: unknown): FieldIndex | null {
   if (!isObj(raw) || !isObj(raw.elements)) return null;
   const out = {} as FieldIndex;
-  for (const et of ["document", "ai_AIPackage", "dataset_DatasetPackage"] as const) {
+  for (const et of ["document", "ai_AIPackage", "dataset_DatasetPackage", "service", "externalModel"] as const) {
     const el = raw.elements[et];
+    // The service and external models came with v1.14; a mapping without them
+    // asks no service questions.
+    if ((et === "service" || et === "externalModel") && !isObj(el)) {
+      out[et] = {};
+      continue;
+    }
     if (!isObj(el) || !Array.isArray(el.fields)) return null;
     const fields: Record<string, MapField> = {};
     for (const f of el.fields) {
@@ -61,6 +74,12 @@ export function parseMap(raw: unknown): FieldIndex | null {
           : { kind: "user" },
         declarable: f.declarable === true,
         judgment: f.judgment === true,
+        ...(Array.isArray(f.agentTypes)
+          ? { agentTypes: f.agentTypes.filter((x): x is string => typeof x === "string") }
+          : {}),
+        ...(Array.isArray(f.flowEnum)
+          ? { flowEnum: f.flowEnum.filter((x): x is string => typeof x === "string") }
+          : {}),
       };
     }
     out[et] = fields;
@@ -317,6 +336,43 @@ export const COMMON_LICENSES = [
   "gemma",
 ];
 
+/** One flow of data in or out of the declared service, in the shape of
+ *  CycloneDX serviceData. */
+export interface DataFlow {
+  flow: string;
+  classification: string;
+  name?: string;
+  description?: string;
+  /** Where the data comes from and goes to, as addresses. */
+  source?: string[];
+  destination?: string[];
+}
+
+/** The directions a data flow takes (CycloneDX dataFlowDirection). */
+export const FLOWS = ["inbound", "outbound", "bi-directional", "unknown"] as const;
+
+/** An AI model the service calls through an API: identified only. `key` names
+ *  it in the declaration and follows its name. */
+export interface ExternalModelEntry {
+  key: string;
+  name: string;
+  suppliedBy?: Agent | null;
+  packageVersion?: string;
+  endpoint?: string;
+}
+
+/** The service (an app or API) the model runs in, by field id, with its data
+ *  flows and the external models it calls. */
+export interface DeclService {
+  [field: string]: Value | DataFlow[] | ExternalModelEntry[] | undefined;
+  dataFlows?: DataFlow[];
+  externalModels?: ExternalModelEntry[];
+}
+
+/** The answer to "does this model run in a service?": only "yes" declares
+ *  one. "later" and "no" keep anything typed on screen out of the file. */
+export type ServiceAnswer = "yes" | "no" | "later";
+
 export interface Declaration {
   schema: string;
   document: { createdBy?: Agent[] };
@@ -324,22 +380,53 @@ export interface Declaration {
   model?: ModelAnswers;
   datasets: DeclDataset[];
   relationships: unknown[];
+  /** The service the model runs in. Present (possibly blank) where one can be
+   *  declared: a model's document, with a mapping that knows services. */
+  service?: DeclService;
+  /** The screens' answer to the service question; never saved. */
+  serviceAnswer?: ServiceAnswer;
 }
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
+function asService(raw: unknown): DeclService | undefined {
+  if (!isObj(raw)) return undefined;
+  const s = clone(raw) as DeclService;
+  s.dataFlows = Array.isArray(raw.dataFlows)
+    ? raw.dataFlows.filter(isObj).map((d) => ({
+        ...(clone(d) as unknown as DataFlow),
+        flow: typeof d.flow === "string" ? d.flow : "",
+        classification: typeof d.classification === "string" ? d.classification : "",
+      }))
+    : [];
+  s.externalModels = Array.isArray(raw.externalModels)
+    ? raw.externalModels.filter(isObj).map((e) => ({
+        ...(clone(e) as unknown as ExternalModelEntry),
+        key: typeof e.key === "string" ? e.key : "",
+        name: typeof e.name === "string" ? e.name : "",
+      }))
+    : [];
+  return s;
+}
+
 function asDeclaration(raw: unknown): Declaration | null {
   if (!isObj(raw)) return null;
   const doc = isObj(raw.document) ? raw.document : {};
-  return {
+  const model = isObj(raw.model) ? (clone(raw.model) as Declaration["model"]) : undefined;
+  const service = model ? asService(raw.service) : undefined;
+  const out: Declaration = {
     schema: DECLARATION_SCHEMA,
     document: Array.isArray(doc.createdBy) ? { createdBy: clone(doc.createdBy) as Agent[] } : {},
-    model: isObj(raw.model) ? (clone(raw.model) as Declaration["model"]) : undefined,
+    model,
     datasets: Array.isArray(raw.datasets) ? (clone(raw.datasets.filter(isObj)) as DeclDataset[]) : [],
     relationships: [],
   };
+  if (service) out.service = service;
+  // A declaration that holds a service answered "yes" when it was written.
+  if (service && !blankDeep(service)) out.serviceAnswer = "yes";
+  return out;
 }
 
 /**
@@ -375,6 +462,12 @@ export function startDeclaration(template: unknown, saved?: unknown): Declaratio
     return merged;
   });
   if (out.model) out.datasets.push(...prev.datasets.filter((d) => d.local));
+  // The service: the saved answers laid over the blank one, and the answer to
+  // whether there is one kept with them.
+  if (out.model && prev.service) {
+    out.service = { ...(out.service ?? {}), ...prev.service };
+    if (prev.serviceAnswer) out.serviceAnswer = prev.serviceAnswer;
+  }
   return out;
 }
 
@@ -392,6 +485,32 @@ export function isEmpty(v: unknown): boolean {
     (Array.isArray(v) && v.length === 0) ||
     (isObj(v) && "name" in v && typeof v.name === "string" && v.name.trim() === "") ||
     (isObj(v) && "key" in v && !String(v.key ?? "").trim() && !String(v.value ?? "").trim())
+  );
+}
+
+/** Nothing a person wrote, all the way down: blank text, and lists and objects
+ *  of only that. An agent's kind and an external model's key are not values
+ *  (they come with a blank row), as the converter reads it. */
+export function blankDeep(v: unknown): boolean {
+  if (typeof v === "string") return !v.trim();
+  if (Array.isArray(v)) return v.every(blankDeep);
+  if (isObj(v)) return Object.entries(v).every(([k, x]) => k === "type" || k === "key" || blankDeep(x));
+  return v === null || v === undefined;
+}
+
+/** A service is declared: the person said yes and wrote something in it. */
+export function serviceDeclared(decl: Declaration): boolean {
+  return decl.serviceAnswer === "yes" && decl.service !== undefined && !blankDeep(decl.service);
+}
+
+/** The model's values that also go into the CycloneDX SBOM (its input and
+ *  output kinds and the regulatory fields): a scan writes them there, so
+ *  saving them after one leaves the SBOM behind until the next. */
+export function modelCdxValues(decl: Declaration): boolean {
+  const m = decl.model;
+  if (!m) return false;
+  return ["inputModality", "outputModality", "trainingComputeFlops", "trainingComputeBasis", "adversarialTesting"].some(
+    (k) => !isEmpty(m[k]),
   );
 }
 
@@ -417,14 +536,14 @@ export function emptyLocalDataset(index: FieldIndex): DeclDataset {
 
 /** A slug for a dataset the hub does not hold, made from its name. Names with
  *  no Latin letters or digits fall back to a numbered one. */
-export function slugFor(name: string, taken: string[], n: number): string {
+export function slugFor(name: string, taken: string[], n: number, fallback = "dataset"): string {
   let base = name
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^[-._]+|[-._]+$/g, "")
     .slice(0, 56);
-  if (!base) base = `dataset-${n}`;
+  if (!base) base = `${fallback}-${n}`;
   let slug = base;
   for (let i = 2; taken.includes(slug); i++) slug = `${base}-${i}`;
   return slug;
@@ -452,7 +571,22 @@ export function createTemplate(index: FieldIndex): Declaration {
   for (const f of Object.values(index.ai_AIPackage)) {
     if ((f.source.kind === "user" || f.declarable) && f.id !== "packageVersion") model[f.id] = blankOf(f);
   }
-  return { schema: DECLARATION_SCHEMA, document: { createdBy: [] }, model, datasets: [], relationships: [] };
+  const out: Declaration = { schema: DECLARATION_SCHEMA, document: { createdBy: [] }, model, datasets: [], relationships: [] };
+  const service = blankService(index);
+  if (service) out.service = service;
+  return out;
+}
+
+/** The blank service the questions start from; undefined when the mapping
+ *  knows no service (a server before v1.14). */
+export function blankService(index: FieldIndex): DeclService | undefined {
+  const fields = Object.values(index.service ?? {}).filter((f) => f.source.kind === "user");
+  if (!fields.length) return undefined;
+  const s: DeclService = {};
+  for (const f of fields) s[f.id] = f.type === "ServiceData" ? [] : blankOf(f);
+  s.dataFlows = [];
+  s.externalModels = [];
+  return s;
 }
 
 /**
@@ -572,13 +706,47 @@ export type Problem =
   | "sourceHubOnLocal"
   /** A dataset the hub does not hold, partly filled but missing its name or
    *  address: the server would refuse the whole declaration. */
-  | "localIncomplete";
+  | "localIncomplete"
+  /** Not a positive decimal number (3.2e24, 1500000). */
+  | "decimal"
+  /** An agent of a kind the field does not take (a service's provider is an
+   *  organization). */
+  | "agentType"
+  /** A data flow with no direction chosen. */
+  | "flowMissing"
+  /** A data flow that does not say what data it is. */
+  | "classificationMissing"
+  /** An external AI model with no name. */
+  | "externalName"
+  /** The same external AI model twice (or a key the converter cannot take). */
+  | "externalTwice"
+  /** A name or label over its 200-character limit. */
+  | "labelTooLong";
+
+/** A positive decimal number written as text, optionally in exponent notation
+ *  (the converter's DECIMAL_RE). */
+const DECIMAL_RE = /^(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+const MAX_DECIMAL = 100;
+/** A data flow's classification (the converter's MAX_LABEL). */
+export const MAX_LABEL = 200;
+/** An external model's key (the converter's LOCAL_RE). */
+const KEY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/** "3.2e24" and "1500000" are; "0", "-1", "3,2e24" and "about 1e24" are not. */
+export function isPositiveDecimal(v: string): boolean {
+  const s = v.trim();
+  if (!s || s.length > MAX_DECIMAL || !DECIMAL_RE.test(s)) return false;
+  // Zero in any spelling (0, 0.0, 0e5): the digits before the exponent are all 0.
+  return /[1-9]/.test(s.split(/[eE]/)[0]);
+}
 
 /** Check one value against its field, as the converter does. Null when fine
  *  (an empty value is fine here; whether it is required is counted apart). */
 export function checkValue(field: MapField, v: unknown): Problem | null {
   if (isEmpty(v)) return null;
   switch (field.type) {
+    case "decimal":
+      return typeof v === "string" && isPositiveDecimal(v) ? null : "decimal";
     case "DateTime":
       return typeof v === "string" && realDateTime(v) ? null : "date";
     case "anyURI": {
@@ -596,6 +764,7 @@ export function checkValue(field: MapField, v: unknown): Problem | null {
       for (const a of list) {
         if (!isObj(a) || typeof a.name !== "string" || !a.name.trim()) return "agentName";
         if (textLength(a.name) > MAX_TEXT) return "tooLong";
+        if (field.agentTypes?.length && !field.agentTypes.includes(a.type || "Organization")) return "agentType";
       }
       return null;
     }
@@ -617,7 +786,8 @@ export function checkValue(field: MapField, v: unknown): Problem | null {
 
 /** One required field still empty, or one value with a problem. */
 export interface Issue {
-  /** "document", "model", "model.baseModels[0]", "datasets[2]" */
+  /** "document", "model", "model.baseModels[0]", "datasets[2]", "service",
+   *  "service.dataFlows[0]", "service.externalModels[1]" */
   where: string;
   field: string;
   problem: Problem | "required";
@@ -668,6 +838,7 @@ export function issues(index: FieldIndex, decl: Declaration, authorFromScan: boo
         out.push({ where: `model.baseModels[${i}]`, field: "revision", problem: "revision" });
     });
   }
+  if (decl.serviceAnswer === "yes" && decl.service) serviceIssues(index, decl.service, out, visit);
   decl.datasets.forEach((d, i) => {
     if (isBlankLocal(d)) return;
     const where = `datasets[${i}]`;
@@ -693,6 +864,55 @@ export function issues(index: FieldIndex, decl: Declaration, authorFromScan: boo
     });
   });
   return out;
+}
+
+const URI_FIELD: MapField = { id: "uri", type: "anyURI", min: 0, max: 1, noAssertion: false, source: { kind: "user" } };
+
+/** The service's required fields and values, its data flows and its external
+ *  models. Asked only once the person said the model runs in a service. */
+function serviceIssues(
+  index: FieldIndex,
+  svc: DeclService,
+  out: Issue[],
+  visit: (where: string, fields: Record<string, MapField>, values: Record<string, unknown>) => void,
+) {
+  const plain: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(svc)) if (k !== "dataFlows" && k !== "externalModels") plain[k] = v;
+  visit("service", index.service ?? {}, plain);
+  (svc.dataFlows ?? []).forEach((d, i) => {
+    if (blankDeep(d)) return;
+    const where = `service.dataFlows[${i}]`;
+    if (!(FLOWS as readonly string[]).includes(d.flow)) out.push({ where, field: "flow", problem: "flowMissing" });
+    const cls = (d.classification ?? "").trim();
+    if (!cls) out.push({ where, field: "classification", problem: "classificationMissing" });
+    else if (textLength(cls) > MAX_LABEL) out.push({ where, field: "classification", problem: "labelTooLong" });
+    if (textLength(d.name ?? "") > MAX_LABEL) out.push({ where, field: "name", problem: "labelTooLong" });
+    if (textLength(d.description ?? "") > MAX_TEXT) out.push({ where, field: "description", problem: "tooLong" });
+    for (const side of ["source", "destination"] as const) {
+      const p = (d[side] ?? [])
+        .filter((u) => u.trim())
+        .map((u) => checkValue(URI_FIELD, u.trim()))
+        .find(Boolean);
+      if (p) out.push({ where, field: side, problem: p });
+    }
+  });
+  const keys = new Set<string>();
+  (svc.externalModels ?? []).forEach((e, i) => {
+    if (blankDeep(e)) return;
+    const where = `service.externalModels[${i}]`;
+    const name = (e.name ?? "").trim();
+    if (!name) out.push({ where, field: "name", problem: "externalName" });
+    else if (!KEY_RE.test(e.key ?? "") || keys.has(e.key)) out.push({ where, field: "name", problem: "externalTwice" });
+    keys.add(e.key);
+    const fields = index.externalModel ?? {};
+    for (const k of ["name", "suppliedBy", "packageVersion", "endpoint"]) {
+      const f = fields[k];
+      const v = (e as unknown as Record<string, unknown>)[k];
+      if (!f || isEmpty(v)) continue;
+      const p = checkValue(f, v);
+      if (p) out.push({ where, field: k, problem: p });
+    }
+  });
 }
 
 export function remainingRequired(list: Issue[]): number {
@@ -752,21 +972,95 @@ export function toFile(decl: Declaration, keepBases = false): Declaration {
       if (!isBlankLocal(d)) out.datasets.push({ local: d.local, ...e });
     } else if (Object.keys(e).length || keepBases) out.datasets.push({ ref: d.ref, ...e });
   }
+  const svc = decl.serviceAnswer === "yes" && decl.service ? serviceFile(decl.service) : undefined;
+  if (svc) out.service = svc;
   return out;
+}
+
+/** The service as it is saved: blank answers, data flows and external models
+ *  left out; undefined when nothing is left (an untouched service is not
+ *  declared). */
+function serviceFile(svc: DeclService): DeclService | undefined {
+  const out: DeclService = {};
+  for (const [k, v] of Object.entries(svc)) {
+    if (k === "dataFlows" || k === "externalModels") continue;
+    const p = pruned(v as Value);
+    if (p !== undefined) out[k] = p;
+  }
+  const flows = (svc.dataFlows ?? [])
+    .filter((d) => !blankDeep(d))
+    .map((d) => {
+      const f: DataFlow = { flow: d.flow, classification: (d.classification ?? "").trim() };
+      if (d.name?.trim()) f.name = d.name.trim();
+      if (d.description?.trim()) f.description = d.description.trim();
+      for (const side of ["source", "destination"] as const) {
+        const list = [...new Set((d[side] ?? []).map((u) => u.trim()).filter(Boolean))];
+        if (list.length) f[side] = list;
+      }
+      return f;
+    });
+  if (flows.length) out.dataFlows = flows;
+  const models = (svc.externalModels ?? [])
+    .filter((e) => !blankDeep(e))
+    .map((e) => {
+      const m: ExternalModelEntry = { key: e.key, name: (e.name ?? "").trim() };
+      const agent = pruned((e.suppliedBy ?? null) as Value);
+      if (agent) m.suppliedBy = agent as Agent;
+      if (e.packageVersion?.trim()) m.packageVersion = e.packageVersion.trim();
+      if (e.endpoint?.trim()) m.endpoint = e.endpoint.trim();
+      return m;
+    });
+  if (models.length) out.externalModels = models;
+  return Object.keys(out).length ? out : undefined;
 }
 
 // ---- where each question goes --------------------------------------------------------
 
-export type StepId = "base" | "model" | "data" | "legal" | "preview";
+export type StepId = "base" | "model" | "data" | "service" | "legal" | "preview";
 
 /** Model fields asked under "Use and scope (optional)", folded by default. */
 export const MODEL_USE_FIELDS = ["domain", "informationAboutApplication", "standardCompliance", "modelExplainability"];
+/** Model fields asked under "Regulatory submission (optional)", folded. */
+export const REGULATORY_FIELDS = ["trainingComputeFlops", "trainingComputeBasis", "adversarialTesting"];
+/** Service fields asked first, each required by SPDX for an AI package. */
+export const SERVICE_REQUIRED_FIELDS = ["name", "packageVersion", "downloadLocation", "suppliedBy", "releaseTime"];
+/** The service's optional questions, folded by subject. "dataFlows" and
+ *  "externalModels" have their own editors. */
+export const SERVICE_GROUPS: { id: string; fields: string[] }[] = [
+  { id: "use", fields: ["informationAboutApplication", "domain", "autonomyType"] },
+  { id: "io", fields: ["inputModality", "outputModality"] },
+  { id: "flows", fields: ["dataFlows"] },
+  { id: "external", fields: ["externalModels"] },
+  { id: "standards", fields: ["standardCompliance", "disclosureUrl"] },
+];
+/** A data flow's questions, as fields the screens draw like any other. The
+ *  direction and what the data is are needed once a flow is added. */
+export function dataFlowFields(index: FieldIndex): MapField[] {
+  const flowEnum = index.service?.dataFlows?.flowEnum ?? [...FLOWS];
+  const f = (id: string, extra: Partial<MapField>): MapField => ({
+    id,
+    type: "string",
+    min: 0,
+    max: 1,
+    noAssertion: false,
+    source: { kind: "user" },
+    ...extra,
+  });
+  return [
+    f("flow", { enum: flowEnum, min: 1 }),
+    f("classification", { min: 1 }),
+    f("name", {}),
+    f("description", {}),
+    f("source", { type: "anyURI", max: "*" }),
+    f("destination", { type: "anyURI", max: "*" }),
+  ];
+}
+
 /** Model fields asked under "How it was trained (optional)", beside the data. */
 export const TRAINING_FIELDS = ["informationAboutTraining", "hyperparameter", "modelDataPreprocessing"];
 /** Dataset fields folded under "More about this data (optional)". */
 export const DATASET_MORE_FIELDS = [
   "intendedUse",
-  "knownBias",
   "confidentialityLevel",
   "dataCollectionProcess",
   "anonymizationMethodUsed",
@@ -782,6 +1076,7 @@ export const LONG_TEXT = new Set([
   "intendedUse",
   "datasetNoise",
   "datasetUpdateMechanism",
+  "trainingComputeBasis",
 ]);
 
 /** The model step's main questions: everything open on the model that is not a
@@ -790,13 +1085,28 @@ export function modelMainFields(index: FieldIndex, decl: Declaration): string[] 
   if (!decl.model) return [];
   return Object.keys(decl.model).filter((k) => {
     const f = index.ai_AIPackage[k];
-    return f && !f.judgment && !MODEL_USE_FIELDS.includes(k) && !TRAINING_FIELDS.includes(k);
+    return (
+      f &&
+      !f.judgment &&
+      !MODEL_USE_FIELDS.includes(k) &&
+      !TRAINING_FIELDS.includes(k) &&
+      !REGULATORY_FIELDS.includes(k)
+    );
   });
 }
 
+/**
+ * The calls only the publisher can make about the model. Once the model runs
+ * in a declared service, whether a person is involved in its decisions is
+ * asked of the service (where it is decided), so the model's own question is
+ * not asked again; one answered earlier stays on screen to be seen.
+ */
 export function judgmentFields(index: FieldIndex, decl: Declaration): string[] {
   if (!decl.model) return [];
-  return Object.keys(decl.model).filter((k) => index.ai_AIPackage[k]?.judgment);
+  const viaService = decl.serviceAnswer === "yes" && decl.service !== undefined;
+  return Object.keys(decl.model).filter(
+    (k) => index.ai_AIPackage[k]?.judgment && !(viaService && k === "autonomyType" && isEmpty(decl.model?.[k])),
+  );
 }
 
 /** The steps this declaration needs, in order. A dataset scan has no model, so
@@ -807,6 +1117,8 @@ export function stepsFor(index: FieldIndex, decl: Declaration, create = false): 
   if (decl.model && (create || decl.model.baseModels?.length)) steps.push("base");
   if (decl.model) steps.push("model");
   steps.push("data");
+  // The service a model runs in, optional; a dataset's document has none.
+  if (decl.model && decl.service) steps.push("service");
   if (judgmentFields(index, decl).length) steps.push("legal");
   steps.push("preview");
   return steps;
@@ -816,6 +1128,7 @@ export function stepsFor(index: FieldIndex, decl: Declaration, create = false): 
  *  has something open. */
 export function stepOf(issue: Issue): StepId {
   if (issue.where === "document") return "model";
+  if (issue.where === "service" || issue.where.startsWith("service.")) return "service";
   if (issue.where.startsWith("model.baseModels")) return "base";
   if (issue.where.startsWith("datasets")) return "data";
   if (TRAINING_FIELDS.includes(issue.field)) return "data";
@@ -859,9 +1172,9 @@ export function adapterWithoutBase(decl: Declaration): boolean {
 // ---- what the review step shows -------------------------------------------------------
 
 export interface SummaryRow {
-  /** "document", "model" or "datasets[i]": where the value sits. */
+  /** "document", "model", "datasets[i]" or "service": where the value sits. */
   where: string;
-  ns: "document" | "model" | "dataset";
+  ns: "document" | "model" | "dataset" | "service";
   field: MapField;
   value: Value;
 }
@@ -913,6 +1226,16 @@ export function summaryGroups(index: FieldIndex, decl: Declaration, steps: StepI
       });
       const train = decl.model ? TRAINING_FIELDS.filter((k) => k in decl.model!) : [];
       if (train.length) out.push({ step: s, title: null, rows: modelRows(train) });
+    } else if (s === "service") {
+      // The service's own fields; its data flows and external models are
+      // listed by the screen from the declaration.
+      const svc = decl.service;
+      if (decl.serviceAnswer === "yes" && svc) {
+        const rows = Object.keys(svc)
+          .filter((k) => k !== "dataFlows" && k !== "externalModels")
+          .flatMap((k) => row("service", "service", index.service?.[k], svc[k]));
+        out.push({ step: s, title: null, rows });
+      }
     } else if (s === "legal") {
       out.push({ step: s, title: null, rows: modelRows(judgmentFields(index, decl)) });
     }
@@ -933,6 +1256,9 @@ const ENUM_FIELDS = new Set([
   "hasSensitivePersonalInformation",
   "datasetAvailability",
   "confidentialityLevel",
+  "inputModality",
+  "outputModality",
+  "adversarialTesting",
 ]);
 
 export type DisplayValue =
@@ -949,6 +1275,22 @@ export function readDisplay(fieldId: string, display: string): DisplayValue {
   if (DATE_TIME_RE.test(display) && realDateTime(display)) return { kind: "date", date: new Date(display) };
   if (ENUM_FIELDS.has(fieldId)) return { kind: "enum", values: display.split(",").map((s) => s.trim()).filter(Boolean) };
   return { kind: "text", text: display };
+}
+
+/**
+ * A service's data flows as the check writes them ("inbound: personal data,
+ * outbound: logs"), split into each flow's direction and the rest of its text,
+ * so the screens can word the direction. A part that does not start with one
+ * of the four directions is kept whole, with no direction.
+ */
+export function parseFlowDisplay(display: string): { flow: string | null; text: string }[] {
+  const dirs = FLOWS.join("|");
+  return display
+    .split(new RegExp(`, (?=(?:${dirs}): )`))
+    .map((part) => {
+      const m = new RegExp(`^(${dirs}): ([\\s\\S]*)$`).exec(part);
+      return m ? { flow: m[1], text: m[2] } : { flow: null, text: part };
+    });
 }
 
 /** "2026-10-01T00:00:00Z" as a date in the reader's locale (the day as the

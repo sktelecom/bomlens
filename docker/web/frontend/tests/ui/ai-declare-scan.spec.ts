@@ -279,6 +279,40 @@ test("a model trained from scratch says so, and adapter weights without a base m
   expect((state.uploaded as { model: Record<string, unknown> }).model.baseModels).toBeUndefined();
 });
 
+test("a model described from a declaration can name the service it runs in, and the upload carries it", async ({ page }) => {
+  const state = await stub(page);
+  await pickTile(page);
+  await page.getByTestId("run-scan").click();
+  const flow = page.getByTestId("ai-declaration");
+  await flow.getByRole("radio", { name: "Trained from scratch" }).click();
+  await flow.getByRole("button", { name: /^Next/ }).click();
+  await flow.locator('[data-question="model.releaseTime"] input').fill("2025-04-15");
+  await stepButton(flow, "Service (optional)").click();
+  await expect(flow).toContainText("fills the G7 system elements");
+  await flow.getByRole("radio", { name: "Yes, I will describe the service" }).click();
+  const q = (id: string) => flow.locator(`[data-question="service.${id}"]`);
+  await q("name").locator("input").fill("Acme Support Assistant");
+  await q("packageVersion").locator("input").fill("2.3.0");
+  // Left with only the name and version: still saved, the document stays a draft.
+  await flow.locator('[data-service-group="external"]').click();
+  await flow.getByLabel("External AI model name").fill("Example Translate");
+  await flow.getByRole("button", { name: "Add", exact: true }).click();
+  const ext = flow.locator('[data-external-model="0"]');
+  await ext.locator('[data-question="externalModel.endpoint"] input').fill("https://api.translate.example/v1");
+  const axe = await new AxeBuilder({ page }).include('[data-testid="ai-declaration"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations).toEqual([]);
+  await stepButton(flow, "Review").click();
+  await expect(flow.getByTestId("service-summary-note")).toContainText("CycloneDX SBOM of the first scan");
+  await flow.getByRole("button", { name: "Start the scan" }).click();
+  await expect.poll(() => state.scanQuery).toContain("source=ai-declare");
+  expect((state.uploaded as { service: unknown }).service).toEqual({
+    name: "Acme Support Assistant",
+    packageVersion: "2.3.0",
+    externalModels: [{ key: "example-translate", name: "Example Translate", endpoint: "https://api.translate.example/v1" }],
+  });
+});
+
 test("the AI model hint names both documents it writes", async ({ page }) => {
   await stub(page);
   await page.goto("/#/new");

@@ -82,6 +82,7 @@
     "Parseable SBOM": "파싱 가능한 SBOM"
   },
   "conformance.detail.present": "있음",
+  "conformance.detail.present_declared": "있음 (발행자 선언, BomLens가 확인하지 않음)",
   "conformance.detail.no_packages": "측정할 패키지 없음",
   "conformance.detail.files_only": "패키지 구성요소 없음 (파일 목록만)",
   "conformance.detail.no_files": "파일 구성요소 없음",

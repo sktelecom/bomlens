@@ -636,6 +636,11 @@ async function stubSpdx3(page: Page) {
 
 const FILL: Record<Lang, string> = { en: "Fill in empty fields", ko: "빈 항목 채우기" };
 const FIELDS_TOGGLE: Record<Lang, string> = { en: "Show the document's fields", ko: "문서 항목 보기" };
+const SERVICE_YES: Record<Lang, string> = { en: "Yes, I will describe the service", ko: "예, 서비스 정보를 적겠습니다" };
+const SERVICE_EXAMPLE: Record<Lang, { name: string }> = {
+  en: { name: "Acme Support Assistant" },
+  ko: { name: "Acme 상담 도우미" },
+};
 
 for (const lang of ["en", "ko"] as Lang[]) {
   test(`@capture SPDX 3.0.1 band - ${lang}`, async ({ page }) => {
@@ -663,5 +668,29 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await killAnim(page);
     await settleMain(page);
     await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}` });
+  });
+
+  test(`@capture AI declaration service step - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stubSpdx3(page);
+    await runScan(page, "model", "1.0");
+    await NAV(page, "models").click();
+    await page.getByRole("button", { name: FILL[lang] }).click();
+    const flow = page.getByTestId("ai-declaration");
+    await flow.waitFor();
+    await flow.locator('button[data-step="service"]').click();
+    await flow.getByRole("radio", { name: SERVICE_YES[lang] }).click();
+    const q = (id: string) => flow.locator(`[data-question="service.${id}"]`);
+    const ex = SERVICE_EXAMPLE[lang];
+    await q("name").locator("input").fill(ex.name);
+    await q("packageVersion").locator("input").fill("2.3.0");
+    await q("downloadLocation").locator("input").fill("https://support.example.com/assistant");
+    await q("suppliedBy").locator("input").fill("Acme Corp");
+    await q("releaseTime").locator("input").fill("2025-06-01");
+    // No focus ring on the last field typed into.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-service.png", lang)}` });
   });
 }

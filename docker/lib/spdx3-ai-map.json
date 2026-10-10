@@ -6,7 +6,10 @@
     "cardinalitySource": "SPDX 3.0.1 specification pages, class 'All properties' tables, checked 2026-10-09. The published SHACL model and JSON schema do not carry the narrowed 1..1 constraints of ai_AIPackage and dataset_DatasetPackage, so convert-to-spdx3-ai.py enforces these numbers itself.",
     "jsonldKeysChecked": "2026-10-09 against spdx-context.jsonld: locator is an array; extension items may be inline objects; Agent-typed properties take an element reference.",
     "profilesNote": "The extension profile is not claimed in profileConformance: in the 3.0.1 JSON-LD context the bare value 'extension' expands to the Core extension property, not ProfileIdentifierType/extension, and the official SHACL validation (spdx3-validate) refuses it. The CdxPropertiesExtension the document uses needs no claim.",
-    "jsonArrayNote":"A field narrowed to one value on the specification page can still be an array in the JSON schema (dataset originatedBy); jsonArray: true writes it as a one-element array."
+    "jsonArrayNote":"A field narrowed to one value on the specification page can still be an array in the JSON schema (dataset originatedBy); jsonArray: true writes it as a one-element array.",
+    "elementTypesNote": "An element key that is not an SPDX class names its class in 'spdxType' (service: ai_AIPackage, externalModel: software_Package); the check's element 'type' is the element key.",
+    "extensionNote": "A json key 'extension:<name>' is written as a CdxPropertiesExtension entry named <name>; a field with several values gets one entry per value. 'externalRef:<type>' is written as an ExternalRef of that type, with 'refComment' as its comment.",
+    "regulatoryNote": "The model's regulatory fields (bomlens:regulatory:trainingComputeFlops, trainingComputeBasis, adversarialTesting) and its input and output modalities (bomlens:model:input, bomlens:model:output) have no SPDX 3.0.1 AI property and are written as extension entries. 'decimal' is a positive decimal number written as text, optionally in exponent notation (3.2e24)."
   },
   "idPrefix": "https://github.com/sktelecom/bomlens/spdxdocs/{prefix}/spdx3/",
   "profiles": [
@@ -354,6 +357,86 @@
             "from": "weightsScope"
           },
           "declarable": true
+        },
+        {
+          "id": "inputModality",
+          "json": "extension:bomlens:model:input",
+          "type": "CdxProperty",
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "timeseries",
+            "structured",
+            "code",
+            "other"
+          ],
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "outputModality",
+          "json": "extension:bomlens:model:output",
+          "type": "CdxProperty",
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "timeseries",
+            "structured",
+            "code",
+            "other"
+          ],
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "trainingComputeFlops",
+          "json": "extension:bomlens:regulatory:trainingComputeFlops",
+          "type": "decimal",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "trainingComputeBasis",
+          "json": "extension:bomlens:regulatory:trainingComputeBasis",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "adversarialTesting",
+          "json": "extension:bomlens:regulatory:adversarialTesting",
+          "type": "CdxProperty",
+          "enum": [
+            "yes",
+            "no",
+            "noAssertion"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": true,
+          "source": {
+            "kind": "user"
+          }
         }
       ]
     },
@@ -624,6 +707,266 @@
           "id": "datasetUpdateMechanism",
           "json": "dataset_datasetUpdateMechanism",
           "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        }
+      ]
+    },
+    "service": {
+      "spdxType": "ai_AIPackage",
+      "_note": "The AI service (an app or API) the model runs in, from the declaration's top-level 'service'. Written as ai_AIPackage with primaryPurpose application; the 1..1 counts are those of ai_AIPackage. One per document; the document's root element stays the model.",
+      "fields": [
+        {
+          "id": "name",
+          "json": "name",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "packageVersion",
+          "json": "software_packageVersion",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "downloadLocation",
+          "json": "software_downloadLocation",
+          "type": "anyURI",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "primaryPurpose",
+          "json": "software_primaryPurpose",
+          "type": "SoftwarePurpose",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "const",
+            "value": "application"
+          }
+        },
+        {
+          "id": "suppliedBy",
+          "json": "suppliedBy",
+          "type": "Agent",
+          "agentTypes": [
+            "Organization"
+          ],
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "releaseTime",
+          "json": "releaseTime",
+          "type": "DateTime",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "informationAboutApplication",
+          "json": "ai_informationAboutApplication",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "domain",
+          "json": "ai_domain",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "autonomyType",
+          "json": "ai_autonomyType",
+          "type": "PresenceType",
+          "enum": [
+            "yes",
+            "no",
+            "noAssertion"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": true,
+          "source": {
+            "kind": "user"
+          },
+          "judgment": true
+        },
+        {
+          "id": "inputModality",
+          "json": "extension:bomlens:service:input",
+          "type": "CdxProperty",
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "timeseries",
+            "structured",
+            "code",
+            "other"
+          ],
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "outputModality",
+          "json": "extension:bomlens:service:output",
+          "type": "CdxProperty",
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "timeseries",
+            "structured",
+            "code",
+            "other"
+          ],
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "dataFlows",
+          "json": "extension:bomlens:service:dataFlow",
+          "type": "ServiceData",
+          "flowEnum": [
+            "inbound",
+            "outbound",
+            "bi-directional",
+            "unknown"
+          ],
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          },
+          "_note": "Each flow is {flow, classification, name, description, source[], destination[]}, written as one CdxPropertyEntry holding the CycloneDX serviceData object as compact JSON text. 'flowEnum' lists the values of 'flow' (CycloneDX dataFlowDirection)."
+        },
+        {
+          "id": "standardCompliance",
+          "json": "ai_standardCompliance",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "disclosureUrl",
+          "json": "externalRef:documentation",
+          "type": "anyURI",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        }
+      ]
+    },
+    "externalModel": {
+      "spdxType": "software_Package",
+      "_note": "An AI model the service calls through an API, from 'service.externalModels[]'. Identified only, as a software_Package with primaryPurpose model; nothing about it is read by the tool.",
+      "fields": [
+        {
+          "id": "name",
+          "json": "name",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "packageVersion",
+          "json": "software_packageVersion",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "primaryPurpose",
+          "json": "software_primaryPurpose",
+          "type": "SoftwarePurpose",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "const",
+            "value": "model"
+          }
+        },
+        {
+          "id": "suppliedBy",
+          "json": "suppliedBy",
+          "type": "Agent",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "endpoint",
+          "json": "externalRef:other",
+          "refComment": "API endpoint the service calls",
+          "type": "anyURI",
           "min": 0,
           "max": 1,
           "noAssertion": false,

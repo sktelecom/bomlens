@@ -1,7 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { FileCheck2, Loader2, PencilLine, TriangleAlert } from "lucide-react";
+import { FileCheck2, Info, Loader2, PencilLine, RotateCw, TriangleAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -14,6 +14,7 @@ import {
   bandSegments,
   formatDay,
   missingByElement,
+  parseFlowDisplay,
   readDisplay,
   rolesNotStated,
   type CheckElement,
@@ -44,6 +45,7 @@ export function Spdx3StatusBand({
   focusFill,
   check,
   publisher = false,
+  onRescan,
 }: {
   summary: Spdx3Summary | null | undefined;
   /** This server can write the document and save a declaration. */
@@ -60,6 +62,9 @@ export function Spdx3StatusBand({
    *  declaration). Otherwise they scanned someone else's model, and filling
    *  the document matters only if they publish it themselves. */
   publisher?: boolean;
+  /** Open the scan again with its settings (the top bar's re-scan), offered
+   *  when a declared service is not in the CycloneDX SBOM yet. */
+  onRescan?: () => void;
 }) {
   const { t } = useTranslation();
   const fillRef = useRef<HTMLButtonElement>(null);
@@ -92,6 +97,13 @@ export function Spdx3StatusBand({
   const total = segments.reduce((n, s) => n + s.count, 0) || 1;
   const missing = summary.counts.missingRequired ?? 0;
   const refused = summary.declaration?.state === "refused";
+  // What was declared after the scan (a service, or the model's input and
+  // output kinds and regulatory values) is in this document already, but the
+  // CycloneDX SBOM and its G7 checks get it only from a new scan. The check
+  // says so with or without a service, so the note names the service only
+  // when the document has one.
+  const servicePending = summary.service?.state === "pendingScan";
+  const hasService = Boolean(check?.elements.some((e) => e.type === "service"));
   const where = check && missing > 0 ? missingByElement(check) : [];
 
   return (
@@ -143,13 +155,36 @@ export function Spdx3StatusBand({
               list: where
                 .map((e) =>
                   t("spdx3.band.missingItem", {
-                    label: e.type === "CreationInfo" ? t("spdx3.band.documentLabel") : e.label,
+                    label:
+                      e.type === "CreationInfo"
+                        ? t("spdx3.band.documentLabel")
+                        : e.type === "service"
+                          ? t("spdx3.band.serviceLabel", { name: e.label })
+                          : e.label,
                     count: e.count,
                   }),
                 )
                 .join(", "),
             })}
           </p>
+        )}
+        {servicePending && (
+          <div
+            role="status"
+            data-testid="spdx3-service-pending"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-3 text-xs text-foreground"
+          >
+            <span className="flex items-start gap-1.5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              {t(hasService ? "spdx3.band.servicePending" : "spdx3.band.declarationPending")}
+            </span>
+            {onRescan && (
+              <Button variant="outline" size="sm" onClick={onRescan} title={t("result.rescanHint")}>
+                <RotateCw className="h-4 w-4" aria-hidden />
+                {t("result.rescan")}
+              </Button>
+            )}
+          </div>
         )}
         {refused && (
           <div
@@ -193,9 +228,21 @@ export function Spdx3StatusBadge({ status }: { status: FieldStatus }) {
   );
 }
 
-/** The translation namespace for an element type's field names. */
-export function fieldNamespace(type: string): "document" | "model" | "dataset" {
-  return type === "CreationInfo" ? "document" : type === "ai_AIPackage" ? "model" : "dataset";
+/** The translation namespace for an element type's field names. The check
+ *  names a declared service and its external models by their mapping keys. */
+export function fieldNamespace(type: string): "document" | "model" | "dataset" | "service" | "externalModel" {
+  switch (type) {
+    case "CreationInfo":
+      return "document";
+    case "ai_AIPackage":
+      return "model";
+    case "service":
+      return "service";
+    case "externalModel":
+      return "externalModel";
+    default:
+      return "dataset";
+  }
 }
 
 const SHOWN: FieldStatus[] = ["auto", "declared", "noAssertion", "missingRequired", "judgment"];
@@ -240,7 +287,7 @@ export function Spdx3FieldTable({
                 <td className="px-3 py-2 align-top">{t(`aiDecl.${ns}.${f.id}.label`, { defaultValue: f.id })}</td>
                 <td className="px-3 py-2 align-top break-all">
                   {f.display !== undefined ? (
-                    <DisplayText fieldId={f.id} display={f.display} />
+                    <DisplayText ns={ns} fieldId={f.id} display={f.display} />
                   ) : (
                     <span className="text-muted-foreground">{t("spdx3.table.notFilled")}</span>
                   )}
@@ -264,14 +311,28 @@ export function Spdx3FieldTable({
 
 /** A value from the check as the questions word it: a date in the reader's
  *  locale, a choice by its label; anything else as written. */
-function DisplayText({ fieldId, display }: { fieldId: string; display: string }) {
+function DisplayText({ ns, fieldId, display }: { ns: string; fieldId: string; display: string }) {
   const { t, i18n } = useTranslation();
+  // A service's data flows: the direction in the words the questions use.
+  if (ns === "service" && fieldId === "dataFlows") {
+    return (
+      <>
+        {parseFlowDisplay(display)
+          .map((p) =>
+            p.flow ? `${t(`aiDecl.dataFlow.flow.option.${p.flow}`, { defaultValue: p.flow })}: ${p.text}` : p.text,
+          )
+          .join(", ")}
+      </>
+    );
+  }
   const v = readDisplay(fieldId, display);
   if (v.kind === "date") {
     return <time dateTime={display}>{formatDay(display, i18n.language)}</time>;
   }
   if (v.kind === "enum") {
-    return <>{v.values.map((x) => t(`aiDecl.enum.${x}`, { defaultValue: x })).join(", ")}</>;
+    // A service's autonomy reads as the question asked it: is a person involved.
+    const key = ns === "service" && fieldId === "autonomyType" ? "aiDecl.service.autonomyType.option" : "aiDecl.enum";
+    return <>{v.values.map((x) => t(`${key}.${x}`, { defaultValue: x })).join(", ")}</>;
   }
   return <>{v.text}</>;
 }
@@ -300,6 +361,8 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
   const doc = check.elements.find((e) => e.type === "CreationInfo");
   const model = check.elements.find((e) => e.type === "ai_AIPackage");
   const datasets = check.elements.filter((e) => e.type === "dataset_DatasetPackage");
+  const service = check.elements.find((e) => e.type === "service");
+  const externals = check.elements.filter((e) => e.type === "externalModel");
   const author = doc?.fields.find((f) => f.id === "createdBy");
   const extra = author
     ? [{ key: "createdBy", label: t("aiDecl.document.createdBy.label"), value: author.display ?? null, status: author.status }]
@@ -338,6 +401,28 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
                 <span className="text-xs text-muted-foreground">{t("spdx3.table.caption")}</span>
               </div>
               <Spdx3FieldTable element={model} extraRows={extra} trailingRows={roleRows} />
+            </CardContent>
+          </Card>
+        )}
+        {service && (
+          <Card data-testid="spdx3-service-fields">
+            <CardContent className="space-y-2 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  {service.label}
+                  <Badge tone="info">{t("spdx3.table.publisherDeclared")}</Badge>
+                </span>
+                <span className="text-xs text-muted-foreground">{t("spdx3.table.serviceCaption")}</span>
+              </div>
+              <Spdx3FieldTable element={service} />
+              {externals.map((e) => (
+                <div key={e.declarationKey ?? e.label} className="space-y-1 pt-2" data-testid="spdx3-external-model">
+                  <div className="text-xs font-semibold">
+                    {t("spdx3.table.externalModel", { name: e.label })}
+                  </div>
+                  <Spdx3FieldTable element={e} />
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}

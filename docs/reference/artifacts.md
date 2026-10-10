@@ -4,7 +4,7 @@ description: The output files BomLens produces — file list, when each is gener
 
 # Artifacts reference
 
-The generated SBOM is CycloneDX 1.6 JSON. An SPDX 2.3 JSON copy, converted from the final CycloneDX BOM, is produced by `--spdx` during a CLI scan or on demand from the results screen in the UI. AI model and dataset scans also write an SPDX 3.0.1 document with the AI and Dataset profiles (`_bom.spdx3.json`, below). Both paths run the same conversion and give the same file. CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties) is not carried over.
+The generated SBOM is CycloneDX 1.6 JSON. An SPDX 2.3 JSON copy, converted from the final CycloneDX BOM, is produced by `--spdx` during a CLI scan or on demand from the results screen in the UI. AI model and dataset scans also write an SPDX 3.0.1 document with the AI and Dataset profiles (`_bom.spdx3.json`, below). Both paths run the same conversion and give the same file. CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties, and the `services[]` a [declared AI service](#the-declared-ai-service) adds) is not carried over.
 
 The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
@@ -15,9 +15,9 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 | `{Project}_{Version}_bom.json` | always | SBOM (CycloneDX 1.6) |
 | `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all`, or Export as SPDX 2.3 in the UI | SBOM (SPDX 2.3, converted from the CycloneDX output) |
 | `{Project}_{Version}_bom.spdx3.json` | AI model and dataset scans (`--model`, `--model-file`, a dataset), unless `--no-spdx3` | the AI SBOM as an SPDX 3.0.1 document with the AI and Dataset profiles (JSON-LD). Fields come from the CycloneDX output, from fixed rules over it, or from the publisher's declaration (`--ai-declare`); nothing is estimated. Required fields SPDX gives no "unknown" value (who supplied and who made the model and data, release and build dates, the download address, the document's author) stay empty until declared, and the document says it is a draft until then. Base models are identified by id and licence only. The weights scope is carried as `bomlens:weights:scope` (`full`, `adapter`, `quantized`, `merged`) in a CycloneDX properties extension. Not an input for `--analyze` |
-| `{Project}_{Version}_spdx3-check.json` / `.md` | with the SPDX 3.0.1 document | which field of each element came from the scan, from the declaration, or from nothing, which required fields are open, and what needs a decision by the publisher (personal data, safety risk, autonomy). Guidance, not legal advice |
+| `{Project}_{Version}_spdx3-check.json` / `.md` | with the SPDX 3.0.1 document | which field of each element came from the scan, from the declaration, or from nothing, which required fields are open, and what needs a decision by the publisher (personal data, safety risk, autonomy). `service.state` says whether the CycloneDX SBOM carries the declared service and model values: `none` (nothing declared, nothing in the SBOM), `applied` (the SBOM matches the declaration) or `pendingScan` (they differ; a new scan writes them). Guidance, not legal advice |
 | `{Project}_{Version}_ai-declaration.template.json` | with the SPDX 3.0.1 document | an empty declaration for this scan: the fields a person fills, for the model, its datasets and the base models the scan found. Fill it and pass it back with `--ai-declare` |
-| `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>` (the accepted file), or the declaration saved in the web UI | what the model's publisher declared. Like `_vex.json`, it is not removed by re-scanning the same project and version, and a re-scan applies it again. A file that names a dataset or base model the new scan does not have is refused, and the document stays a draft. A dataset entry can list `sources[]`: `{"ref": "huggingface:<id>", "relation": "extended"}` for a hub dataset (read from the hub at the next scan and judged with the dataset), or `{"name": "...", "license": "<hub licence tag or SPDX id>", "relation": "other"}` for one named in words (written to the SPDX 3.0.1 document only, marked as not verified; a licence that is not an SPDX id is kept in words). Data the hub does not hold takes sources named in words only. `model.license` (a hub licence tag or SPDX id) is the model's own licence: it fills the SPDX document when the scan read none or only `other` (as an SPDX expression only when it is a hub tag naming one SPDX licence, or a `LicenseRef-`), and a model described from the declaration alone carries it in its SBOM and is judged on it |
+| `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>` (the accepted file), or the declaration saved in the web UI | what the model's publisher declared. Like `_vex.json`, it is not removed by re-scanning the same project and version, and a re-scan applies it again. A file that names a dataset or base model the new scan does not have is refused, and the document stays a draft. A dataset entry can list `sources[]`: `{"ref": "huggingface:<id>", "relation": "extended"}` for a hub dataset (read from the hub at the next scan and judged with the dataset), or `{"name": "...", "license": "<hub licence tag or SPDX id>", "relation": "other"}` for one named in words (written to the SPDX 3.0.1 document only, marked as not verified; a licence that is not an SPDX id is kept in words). Data the hub does not hold takes sources named in words only. `model.license` (a hub licence tag or SPDX id) is the model's own licence: it fills the SPDX document when the scan read none or only `other` (as an SPDX expression only when it is a hub tag naming one SPDX licence, or a `LicenseRef-`), and a model described from the declaration alone carries it in its SBOM and is judged on it. A declaration can also describe the service the model runs in (`service`) and give the model's input and output kinds and regulatory values; see [The declared AI service](#the-declared-ai-service) |
 | `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / risk report default | open-source notice |
 | `{Project}_{Version}_NOTICE.pdf` | same as above, when a PDF renderer is built into the image (`--build-arg SBOM_PDF=true`) | the notice rendered to PDF; skipped with a log line otherwise |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / risk report default | Trivy security report |
@@ -40,6 +40,51 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 `{P}` = project name, `{V}` = version (special characters are normalized to `_`).
 
 The conditions above are the CLI flags. In the web UI and the desktop app the same choices are the generation options on the New scan screen — Notice and Security report — and every file produced is listed in the Artifacts section of the results, downloadable per format or as one ZIP. SPDX is not a scan option there: the SBOM card in that section has an **Export as SPDX 2.3** button that converts the finished BOM whenever you need it, and the converted file joins the artifact list and the ZIP. The UI has no signing, so an SPDX exported that way is unsigned; use `--spdx --sign` in the CLI when you need a signature. See [Web UI and desktop app](ui.md).
+
+## The declared AI service
+
+An AI declaration (`--ai-declare`, or the declaration saved in the web UI) can describe the service the model runs in with a top-level `service` object, and give the model a few values a scan cannot read. A `service` is accepted only when the document describes a model, not a dataset, and one that holds no value at all counts as not declared. The [AI model guide](../guides/ai-model.md#the-service-a-model-runs-in) explains what these are for.
+
+| Key | Value |
+|-----|-------|
+| `name` | the service's name. Required |
+| `packageVersion` | its version. Required |
+| `downloadLocation` | the address where the service is offered (a URI). Required |
+| `suppliedBy` | the organization that provides it, `{"type": "Organization", "name": "..."}`. Required |
+| `releaseTime` | when it was released, `YYYY-MM-DDThh:mm:ssZ`. Required |
+| `informationAboutApplication` | what the service is for, in words |
+| `domain[]` | the fields it serves, in words |
+| `autonomyType` | whether a person is involved in its decisions: `yes` (fully automatic, no person involved), `no` (a person is involved) or `noAssertion` (not known) |
+| `inputModality[]`, `outputModality[]` | the kinds of input and output: `text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other` |
+| `dataFlows[]` | the data going in and out, each `{flow, classification, name, description, source[], destination[]}`. `flow` is `inbound`, `outbound`, `bi-directional` or `unknown`. `classification` is required (up to 200 characters) and says what the data is, such as personal data. `name` and `description` are optional words; the description says what the service does with the data. `source[]` and `destination[]` are addresses (URIs) |
+| `standardCompliance[]` | the standards the service follows, by name |
+| `disclosureUrl` | a public page about the service's use of AI (a URI) |
+| `externalModels[]` | AI models the service calls through an API, each `{key, name, suppliedBy, packageVersion, endpoint}`. `key` (lowercase letters, digits, `.`, `_` and `-`, up to 64, unique in the list) and `name` are required, and `endpoint` is a URI |
+
+The required keys are the ones SPDX requires of the service; the document stays a draft until they are given. The declaration's `model` takes five more keys:
+
+| Key | Value |
+|-----|-------|
+| `inputModality[]`, `outputModality[]` | the model's input and output kinds, with the same values as the service's |
+| `trainingComputeFlops` | the compute used to train the model in floating-point operations, a positive decimal number written as a string, such as `"3.2e24"` or `"1500000"` |
+| `trainingComputeBasis` | how that figure was counted, in words |
+| `adversarialTesting` | whether adversarial testing was done: `yes`, `no` or `noAssertion` |
+
+In the SPDX 3.0.1 document the service is an `ai_AIPackage` with `software_primaryPurpose` `application`, linked to the model by a `dependsOn` relationship with the scope `runtime`, and each external model is a `software_Package` with the purpose `model`. The data flows, the input and output kinds and the model's regulatory values are CycloneDX property extensions: `bomlens:service:dataFlow` (one per flow, holding it as compact serviceData JSON), `bomlens:service:input` and `:output`, `bomlens:model:input` and `:output`, and `bomlens:regulatory:*`.
+
+A scan also writes them into the CycloneDX SBOM, in a step that runs after the declared dataset sources are read and before the risk assessment and the G7 checks:
+
+| Location | Content |
+|----------|---------|
+| `services[]`, bom-ref `service:declared/<name>` | the service: `name`, `version`, `provider.name`, `endpoints[0]` (its address), `description` (what it is for), `data[]` (the data flows as serviceData), an `externalReferences` entry of type `documentation` (the disclosure page), and the properties `bomlens:service:domain`, `:autonomyType`, `:input`, `:output` and `:releaseTime` |
+| `services[]`, bom-ref `service:declared-external/<key>` | each external model: `name`, `version`, `provider.name`, `endpoints` and `bomlens:service:declarationKey` |
+| `dependencies[]` | the service depends on the model's bom-ref and on each external model |
+| `declarations.claims[]` | one claim per standard, with the service as target, the standard's name as predicate, and the reasoning "publisher's declaration, not verified by BomLens" |
+| the model component | the properties `bomlens:regulatory:trainingComputeFlops`, `:trainingComputeBasis` and `:adversarialTesting`, and the input and output kinds as `modelCard.modelParameters.inputs[]` and `outputs[]` (`{"format": "text"}`) |
+
+Every service written this way carries `bomlens:origin=declared-input` and `bomlens:service:kind` (`application` or `external-model`), and the application service carries `bomlens:service:declarationDigest`. On the model component, a `bomlens:declared` property names each location filled from the declaration (a property name, or a `modelCard` path; `modelCard` and `modelCard.modelParameters` themselves when the step created them). Where the scan had already recorded inputs or outputs, those are kept and a `bomlens:declared:observedKept` property names them. `bomlens:model:declarationDigest` records which declaration the model values came from. A `modelCard.modelParameters` created only to hold declared formats does not count as a model card in the G7 checks. The step can run again on the same SBOM: what an earlier run wrote is removed first, so a declaration without a service removes the old one, and a declaration the SPDX converter refuses is not applied at all.
+
+The G7 system-level elements read the declared service, and an element met by it reports "present (publisher's declaration, not verified by BomLens)". The SPDX 2.3 export and `--diff` do not carry services. BomLens v1.13 and earlier refuse a declaration that has a `service` or one of the new model keys, with "unknown key(s)".
 
 ## SBOM structure
 

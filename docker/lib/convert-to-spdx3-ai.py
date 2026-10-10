@@ -19,6 +19,15 @@ no "unknown" value (agents, dates, the download location) stay empty until the
 publisher declares them, and the document is marked a draft until then. Values
 for a base model are never copied from the model itself, and the reverse.
 
+A declaration can also name the service the model runs in (its top-level
+'service'): it is written as an ai_AIPackage with primaryPurpose application
+that depends on the model at runtime, with the AI models it calls through an
+API identified as software_Package elements. The model stays the document's
+root element. The check reports whether the CycloneDX SBOM carries the same
+declared service and the model's declared input and output kinds, training
+compute and adversarial testing, which apply-declared-service.py writes there
+(service.state: none, applied, pendingScan).
+
 Subcommands
   convert   --bom F --out-dir D --prefix=P [--declaration F [--declaration-fallback]]
             [--map M] [--stable]
@@ -32,6 +41,7 @@ can begin with "-".
 """
 import argparse
 import datetime
+import decimal
 import hashlib
 import json
 import os
@@ -65,6 +75,32 @@ URI_SCHEMES = ("http", "https", "s3", "gs", "ftp", "sftp", "git", "git+https", "
 ROLES = ("trainedOn", "testedOn", "other")
 PLACEHOLDER_DESCRIPTION = "no description available"
 DISCLAIMER = "This check is guidance, not legal advice."
+# A positive decimal number written as text, optionally in exponent notation
+# (training compute in FLOPs is often 3.2e24).
+DECIMAL_RE = re.compile(r"^(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$")
+MAX_DECIMAL = 100
+MAX_LABEL = 200
+# The service a model runs in: the keys of the declaration's 'service' object
+# beyond the mapped fields, of each external model, and of each data flow
+# (the CycloneDX serviceData keys the declaration takes).
+SERVICE_KEYS_EXTRA = ("externalModels",)
+EXTERNAL_MODEL_KEYS_EXTRA = ("key",)
+DATA_FLOW_KEYS = ("flow", "classification", "name", "description", "source", "destination")
+# How the CycloneDX SBOM marks a service written from the declaration
+# (docker/lib/apply-declared-service.py). The digest is the one this check
+# reports, so the SBOM can be compared with the current declaration.
+DECLARED_ORIGIN = "declared-input"
+SERVICE_KIND_PROP = "bomlens:service:kind"
+SERVICE_DIGEST_PROP = "bomlens:service:declarationDigest"
+# The model's declared values that the same step writes on the model component
+# (input and output kinds, training compute and its basis, adversarial
+# testing), and the digest it records there when no service is declared.
+MODEL_CDX_FIELDS = ("inputModality", "outputModality", "trainingComputeFlops", "trainingComputeBasis",
+                    "adversarialTesting")
+MODEL_DIGEST_PROP = "bomlens:model:declarationDigest"
+# Lists whose order carries no meaning: reordering one is not a change.
+UNORDERED_KEYS = ("domain", "standardCompliance", "inputModality", "outputModality", "source", "destination",
+                  "dataFlows", "externalModels")
 
 
 class Refused(Exception):
@@ -84,10 +120,14 @@ def _empty(v):
 def load_map(path):
     with open(path) as fh:
         m = json.load(fh)
-    fields = {}
+    fields, types = {}, {}
     for etype, spec in m["elements"].items():
         fields[etype] = {f["id"]: f for f in spec["fields"]}
+        # An element key that is not an SPDX class (service, externalModel)
+        # names its class in spdxType.
+        types[etype] = spec.get("spdxType", etype)
     m["_fields"] = fields
+    m["_types"] = types
     return m
 
 
@@ -298,7 +338,9 @@ def _check_sources(v, where, self_ref, errs):
     return out
 
 
-def _check_agent(v, where, errs):
+def _check_agent(v, where, errs, types=None):
+    """One agent. `types` narrows the kinds of agent a field takes (the
+    mapping's agentTypes); the kind is then never assumed and must be given."""
     if not isinstance(v, dict) or set(v) - {"type", "name"}:
         errs.append(f"{where}: an agent is an object with 'name' and an optional 'type'")
         return None
@@ -309,6 +351,10 @@ def _check_agent(v, where, errs):
     t = v.get("type") or "Agent"
     if t not in AGENT_TYPES:
         errs.append(f"{where}: agent type must be one of {', '.join(AGENT_TYPES)}")
+        return None
+    if types and t not in types:
+        errs.append(f"{where}: must be {' or '.join(types)}; write it as "
+                    f"{{\"type\": \"{types[0]}\", \"name\": ...}}")
         return None
     if len(name) > MAX_TEXT:
         errs.append(f"{where}: an agent name is limited to {MAX_TEXT} characters")
@@ -323,13 +369,34 @@ def _check_value(field, v, where, errs):
         return None
     t, many = field["type"], field["max"] == "*"
     if t == "Agent":
+        types = field.get("agentTypes")
         if many:
             if not isinstance(v, list):
                 errs.append(f"{where}: expected a list of agents")
                 return None
-            agents = [a for a in (_check_agent(x, where, errs) for x in v) if a]
+            agents = [a for a in (_check_agent(x, where, errs, types) for x in v) if a]
             return agents or None
-        return _check_agent(v, where, errs)
+        return _check_agent(v, where, errs, types)
+    if t == "decimal":
+        if not isinstance(v, str):
+            errs.append(f"{where}: write the number as text, for example \"3.2e24\"")
+            return None
+        s = v.strip()
+        if not s:
+            return None
+        if len(s) > MAX_DECIMAL or not DECIMAL_RE.match(s):
+            errs.append(f"{where}: expected a decimal number such as 3.2e24 or 1500000")
+            return None
+        try:
+            positive = decimal.Decimal(s) > 0
+        except (decimal.InvalidOperation, ValueError):
+            positive = False
+        if not positive:
+            errs.append(f"{where}: must be greater than zero")
+            return None
+        return s
+    if t == "ServiceData":
+        return _check_data_flows(field, v, where, errs)
     if t == "DateTime":
         if not isinstance(v, str) or not DATE_RE.match(v):
             errs.append(f"{where}: a date must be written YYYY-MM-DDThh:mm:ssZ (UTC)")
@@ -413,13 +480,197 @@ def _user_fields(mapping, etype):
             if f["source"]["kind"] == "user" or f.get("declarable")}
 
 
+def _deep_empty(v):
+    """Nothing a person wrote: empty or blank text, and lists and objects of
+    only that. An agent's 'type' alone is not a value (the template's blank
+    agent may carry one)."""
+    if isinstance(v, str):
+        return not v.strip()
+    if isinstance(v, list):
+        return all(_deep_empty(x) for x in v)
+    if isinstance(v, dict):
+        return all(_deep_empty(x) for k, x in v.items() if k != "type")
+    return v is None
+
+
+def _check_data_flows(field, v, where, errs):
+    """The data flows of a declared service, in the shape of CycloneDX
+    serviceData: flow (dataFlowDirection), classification, and optionally a
+    description and the addresses the data comes from and goes to."""
+    if not isinstance(v, list):
+        errs.append(f"{where}: expected a list of data flows")
+        return None
+    flows = []
+    for j, d in enumerate(v):
+        w = f"{where}[{j}]"
+        if not isinstance(d, dict) or set(d) - set(DATA_FLOW_KEYS):
+            errs.append(f"{w}: a data flow is an object with {', '.join(DATA_FLOW_KEYS)}")
+            continue
+        if _deep_empty(d):
+            continue
+        if d.get("flow") not in field["flowEnum"]:
+            errs.append(f"{w}.flow: must be one of {', '.join(field['flowEnum'])}")
+            continue
+        cls = d.get("classification")
+        if not isinstance(cls, str) or not cls.strip():
+            errs.append(f"{w}.classification: a data flow needs a classification, for example personal data")
+            continue
+        if len(cls) > MAX_LABEL:
+            errs.append(f"{w}.classification: limited to {MAX_LABEL} characters")
+            continue
+        entry = {"flow": d["flow"], "classification": cls.strip()}
+        name = d.get("name")
+        if not _empty(name):
+            if not isinstance(name, str) or len(name) > MAX_LABEL:
+                errs.append(f"{w}.name: expected text up to {MAX_LABEL} characters")
+                continue
+            if name.strip():
+                entry["name"] = name.strip()
+        desc = d.get("description")
+        if not _empty(desc):
+            if not isinstance(desc, str) or len(desc) > MAX_TEXT:
+                errs.append(f"{w}.description: expected text up to {MAX_TEXT} characters")
+                continue
+            if desc.strip():
+                entry["description"] = desc.strip()
+        ok = True
+        for side in ("source", "destination"):
+            lst = d.get(side)
+            if _empty(lst):
+                continue
+            if not isinstance(lst, list):
+                errs.append(f"{w}.{side}: expected a list of addresses")
+                ok = False
+                break
+            before = len(errs)
+            uris = [_check_value({"type": "anyURI", "max": 1}, u, f"{w}.{side}[{k}]", errs)
+                    for k, u in enumerate(lst)]
+            if len(errs) > before:
+                ok = False
+                break
+            uris = list(dict.fromkeys(u for u in uris if u))
+            if uris:
+                entry[side] = uris
+        if ok:
+            flows.append(entry)
+    return flows or None
+
+
+def _check_external_models(v, mapping, errs):
+    """The AI models a declared service calls through an API: identified by a
+    key the declaration gives, with a name, and optionally the provider, the
+    version and the endpoint."""
+    if _empty(v):
+        return []
+    if not isinstance(v, list):
+        errs.append("service.externalModels: expected a list")
+        return []
+    efields = _user_fields(mapping, "externalModel")
+    out, seen = [], set()
+    for j, em in enumerate(v):
+        w = f"service.externalModels[{j}]"
+        if not isinstance(em, dict):
+            errs.append(f"{w}: expected an object")
+            continue
+        bad = set(em) - set(efields) - set(EXTERNAL_MODEL_KEYS_EXTRA)
+        if bad:
+            errs.append(f"{w}: unknown key(s): {', '.join(sorted(bad))}")
+            continue
+        if _deep_empty(em):
+            continue
+        key = em.get("key")
+        if not isinstance(key, str) or not LOCAL_RE.match(key):
+            errs.append(f"{w}.key: lowercase letters, digits, '.', '_' and '-', up to 64")
+            continue
+        if key in seen:
+            errs.append(f"{w}.key: {key} is declared twice")
+            continue
+        seen.add(key)
+        entry = {"key": key}
+        before = len(errs)
+        for k, val in em.items():
+            if k in efields:
+                cv = _check_value(efields[k], val, f"{w}.{k}", errs)
+                if cv is not None:
+                    entry[k] = cv
+        if len(errs) > before:
+            continue
+        if "name" not in entry:
+            errs.append(f"{w}.name: an external model needs a name")
+            continue
+        out.append(entry)
+    return out
+
+
+def _check_service(raw, mapping, model_root, errs):
+    """The declaration's 'service': the application or API the model runs in.
+    Returns the normalized service, or None when none is declared (absent, or
+    holding no value at all, as in the template)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        errs.append("service: expected an object")
+        return None
+    sfields = _user_fields(mapping, "service")
+    bad = set(raw) - set(sfields) - set(SERVICE_KEYS_EXTRA)
+    if bad:
+        errs.append(f"service: unknown key(s): {', '.join(sorted(bad))}")
+        return None
+    if _deep_empty(raw):
+        return None
+    if model_root is None:
+        errs.append("service: this document describes a dataset, not a model; a service is declared "
+                    "for the model it runs")
+        return None
+    out = {}
+    for k, v in raw.items():
+        if k in sfields:
+            val = _check_value(sfields[k], v, f"service.{k}", errs)
+            if val is not None:
+                out[k] = val
+    ems = _check_external_models(raw.get("externalModels"), mapping, errs)
+    if ems:
+        out["externalModels"] = ems
+    return out
+
+
+def declared_model_values(decl):
+    """The model's declared values the CycloneDX step writes on the model
+    component, from a normalized declaration."""
+    model = (decl or {}).get("model") or {}
+    return {k: model[k] for k in MODEL_CDX_FIELDS if not _empty(model.get(k))}
+
+
+def _canonical(v, key=None):
+    """A value with the order of meaningless lists removed: sorted by their
+    canonical JSON, so reordering domains or data flows reads as no change."""
+    if isinstance(v, dict):
+        return {k: _canonical(x, k) for k, x in v.items()}
+    if isinstance(v, list):
+        items = [_canonical(x) for x in v]
+        if key in UNORDERED_KEYS:
+            items.sort(key=lambda x: json.dumps(x, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+        return items
+    return v
+
+
+def service_digest(service, model_values=None):
+    """SHA-256 over the normalized declared service and the model's declared
+    values the CycloneDX step writes. The check reports it and that step
+    records it on what it writes, so the two can be compared without re-reading
+    every field. Lists whose order means nothing are compared as sets."""
+    payload = {"service": _canonical(service or None), "model": _canonical(model_values or None)}
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def validate_declaration(raw, mapping, bom, root):
     """Check a declaration against the mapping and the document it applies to.
     Returns a normalized dict; raises Refused listing every problem."""
     errs = []
     if not isinstance(raw, dict):
         raise Refused(["the declaration must be a JSON object"])
-    unknown = set(raw) - {"schema", "document", "model", "datasets", "relationships"}
+    unknown = set(raw) - {"schema", "document", "model", "datasets", "service", "relationships"}
     if unknown:
         errs.append(f"unknown key(s): {', '.join(sorted(unknown))}")
     if raw.get("schema") != DECLARATION_SCHEMA:
@@ -590,6 +841,12 @@ def validate_declaration(raw, mapping, bom, root):
                 continue
             entry["local"], entry["name"] = slug, name.strip()
             out["locals"].append(entry)
+
+    # The service and this model are related by the service being declared;
+    # 'relationships' stays reserved.
+    service = _check_service(raw.get("service"), mapping, model_root, errs)
+    if service is not None:
+        out["service"] = service
 
     rels = raw.get("relationships")
     if not _empty(rels):
@@ -813,11 +1070,20 @@ class Builder:
     def _write(self, el, f, value):
         key, t = f["json"], f["type"]
         if key.startswith("extension:"):
+            # One entry per value, under one name, as CycloneDX properties
+            # repeat a name; an object (a data flow) is written as compact JSON.
+            values = value if isinstance(value, list) else [value]
             el.setdefault("extension", []).append({
                 "type": "extension_CdxPropertiesExtension",
                 "extension_cdxProperty": [{"type": "extension_CdxPropertyEntry",
                                            "extension_cdxPropName": key[len("extension:"):],
-                                           "extension_cdxPropValue": str(value)}]})
+                                           "extension_cdxPropValue": _extension_text(v)} for v in values]})
+            return
+        if key.startswith("externalRef:"):
+            ref = {"type": "ExternalRef", "externalRefType": key[len("externalRef:"):], "locator": [value]}
+            if f.get("refComment"):
+                ref["comment"] = f["refComment"]
+            el.setdefault("externalRef", []).append(ref)
             return
         array = f["max"] == "*" or f.get("jsonArray")
         if t == "Agent":
@@ -939,6 +1205,12 @@ def build(bom, mapping, prefix, declaration, stable):
                 and d.get("ref") == root.get("bom-ref") for x in (d.get("dependsOn") or [])})
     _sources_not_stated(b, data, decl, ds_ids, primary, local_ids)
 
+    # The service the model runs in, written after everything else so a
+    # document without one keeps its element and relationship numbering.
+    service = decl.get("service")
+    service_id = _build_service(b, bom, root_id, service) if service else None
+    service_state = _service_state(b, bom, root, service, declared_model_values(decl), service_id or root_id)
+
     b.relationship(doc_id, "describes", root_id, status=None)
     doc["rootElement"] = [root_id]
     doc["element"] = [el["spdxId"] for el in b.graph if el.get("spdxId") and el["spdxId"] != doc_id]
@@ -962,9 +1234,97 @@ def build(bom, mapping, prefix, declaration, stable):
         doc["comment"] = f"Generated by BomLens from {prefix}_bom.json."
     check = {"schema": CHECK_SCHEMA, "spec": mapping["spec"]["version"], "draft": draft, "counts": counts,
              "elements": b.check_elements, "relationships": b.check_relationships,
-             "messages": b.messages + [{"level": "info", "text": DISCLAIMER}]}
+             "messages": b.messages + [{"level": "info", "text": DISCLAIMER}],
+             "service": service_state}
     document = {"@context": mapping["spec"]["context"], "@graph": b.graph}
     return document, check
+
+
+def _build_service(b, bom, model_id, svc):
+    """The declared service: an ai_AIPackage with primaryPurpose application
+    that depends on the model at runtime, and on each external model it calls."""
+    el = {"type": b.mapping["_types"]["service"], "spdxId": b.ident("service", svc.get("name") or "service"),
+          "creationInfo": CREATION_INFO}
+    b.add(el)
+    b.fill("service", el, svc.get("name") or "service", None, bom, svc, key="service")
+    b.annotate(el["spdxId"], "An AI service the publisher declared (the application or API the model runs in); "
+               "written as ai_AIPackage with primaryPurpose application. Nothing about it was read by the tool.")
+    b.relationship(el["spdxId"], "dependsOn", model_id, scope="runtime",
+                   comment="the declared service runs this model", status="declared")
+    for em in svc.get("externalModels") or []:
+        eid = _build_external_model(b, bom, em)
+        b.relationship(el["spdxId"], "dependsOn", eid, scope="runtime",
+                       comment="the declared service calls this model through an API", status="declared")
+    return el["spdxId"]
+
+
+def _build_external_model(b, bom, em):
+    el = {"type": b.mapping["_types"]["externalModel"], "spdxId": b.ident("external-model", em["key"]),
+          "creationInfo": CREATION_INFO}
+    b.add(el)
+    b.fill("externalModel", el, em["name"], None, bom, em, key="externalModel:" + em["key"])
+    b.annotate(el["spdxId"], "An AI model the declared service calls through an API, from the publisher's "
+               "declaration; written as software_Package because only its identity is known. Not verified "
+               "by the tool.")
+    return el["spdxId"]
+
+
+def _service_state(b, bom, root, service, model_values, element):
+    """Whether the CycloneDX SBOM carries what the declaration puts there (the
+    service, and the model's input and output kinds, training compute and
+    adversarial testing): none (nothing on either side), applied (the SBOM
+    records this declaration's digest, on the declared service, or on the model
+    when no service is declared), pendingScan (the two differ; a new scan
+    writes the SBOM again)."""
+    declared = [s for s in bom.get("services") or [] if isinstance(s, dict)
+                and _one(_props(s), "bomlens:origin") == DECLARED_ORIGIN]
+    model_digest = _one(_props(root), MODEL_DIGEST_PROP) if isinstance(root, dict) else None
+    if not service and not model_values:
+        if not declared and not model_digest:
+            return {"state": "none"}
+        if declared:
+            b.messages.append({"level": "review", "element": element,
+                               "text": "the CycloneDX SBOM records a declared service the declaration does not "
+                                       "have; scan again to remove it"})
+        if model_digest:
+            b.messages.append({"level": "review", "element": element,
+                               "text": "the CycloneDX SBOM records declared model values the declaration does not "
+                                       "have; scan again to remove them"})
+        return {"state": "pendingScan"}
+    digest = service_digest(service, model_values)
+    if not service:
+        if not declared and model_digest == digest:
+            return {"state": "applied", "digest": digest}
+        if declared:
+            text = ("the CycloneDX SBOM records a declared service the declaration does not have; scan again to "
+                    "remove it")
+        elif model_digest:
+            text = ("the model's declared input and output kinds, training compute or adversarial testing differ "
+                    "from those in the CycloneDX SBOM; scan again so the SBOM includes them")
+        else:
+            text = ("the model's declared input and output kinds, training compute or adversarial testing are not "
+                    "in the CycloneDX SBOM yet; scan again so the SBOM includes them")
+        b.messages.append({"level": "review", "element": element, "text": text})
+        return {"state": "pendingScan", "digest": digest}
+    recorded = [_one(_props(s), SERVICE_DIGEST_PROP) for s in declared
+                if _one(_props(s), SERVICE_KIND_PROP) == "application"]
+    if recorded == [digest]:
+        return {"state": "applied", "digest": digest}
+    if not service.get("name"):
+        # CycloneDX requires a service name, so the step cannot write one
+        # without it; scanning again does not help until the name is given.
+        b.messages.append({"level": "review", "element": element,
+                           "text": "the declared service has no name, so the CycloneDX SBOM cannot carry it; "
+                                   "give its name and scan again"})
+        return {"state": "pendingScan", "digest": digest}
+    if declared:
+        text = ("the declared service differs from the one in the CycloneDX SBOM; scan again so the SBOM and "
+                "the G7 checks include it")
+    else:
+        text = ("the declared service is not in the CycloneDX SBOM yet; scan again so the SBOM and the G7 checks "
+                "include it")
+    b.messages.append({"level": "review", "element": element, "text": text})
+    return {"state": "pendingScan", "digest": digest}
 
 
 def _build_model(b, bom, comp, decl):
@@ -1137,11 +1497,19 @@ def _base_models(b, model_id, props, decl):
                            "text": f"The hub's signals disagree on the distributed weights ({signals})."})
 
 
+def _extension_text(v):
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, separators=(",", ":"), ensure_ascii=False)
+    return str(v)
+
+
 def _display(v):
     """A short text form of a written value, for the check and the screens."""
     if isinstance(v, dict):
         if "key" in v:
             return f"{v['key']}={v.get('value', '')}"
+        if "flow" in v:
+            return f"{v['flow']}: {v.get('classification', '')}"
         return str(v.get("name", ""))
     if isinstance(v, list):
         return ", ".join(_display(x) for x in v)[:DISPLAY_MAX]
@@ -1345,6 +1713,23 @@ def check_markdown(check, prefix):
         for m in msgs:
             lines.append(f"- {m['text']}")
         lines.append("")
+    state = (check.get("service") or {}).get("state")
+    has_service = any(e.get("type") == "service" for e in check.get("elements") or [])
+    if state in ("applied", "pendingScan") and not has_service:
+        lines += ["## Declared model values in the CycloneDX SBOM",
+                  ("The model's declared input and output kinds, training compute and adversarial testing are in "
+                   "the CycloneDX SBOM, marked as the publisher's declaration; the tool did not verify them."
+                   if state == "applied" else
+                   "The CycloneDX SBOM does not match the declaration yet. Scan again so it follows the "
+                   "declaration."), ""]
+    elif state == "applied":
+        lines += ["## Service",
+                  "The declared service is in this document and in the CycloneDX SBOM, as the publisher's "
+                  "declaration; the tool did not verify it.", ""]
+    elif state == "pendingScan":
+        lines += ["## Service",
+                  "The declared service in this document and the one in the CycloneDX SBOM differ. Scan again "
+                  "so the CycloneDX SBOM and the G7 checks follow the declaration.", ""]
     lines.append(DISCLAIMER)
     return "\n".join(lines) + "\n"
 
@@ -1397,6 +1782,11 @@ def template(bom, mapping, root):
                 entry[fid] = _blank(f)
         datasets.append(entry)
     out["datasets"] = datasets
+    # The service the model runs in; left empty, it is not declared.
+    if root is not None and root.get("type") == "machine-learning-model":
+        service = {fid: _blank(f) for fid, f in _user_fields(mapping, "service").items()}
+        service["externalModels"] = []
+        out["service"] = service
     out["relationships"] = []
     return out
 

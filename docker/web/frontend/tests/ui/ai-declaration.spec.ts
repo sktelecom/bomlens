@@ -16,7 +16,17 @@ const P = "model_1.0";
 
 const field = (id: string, status: string, display?: string) => ({ id, status, ...(display ? { display } : {}) });
 
-function check(complete: boolean, declared = false) {
+// The service the publisher declared, as the check reports it once saved.
+const SERVICE_ELEMENTS = [
+  { spdxId: "urn:s", type: "service", label: "Acme Support Assistant", declarationKey: "service",
+    fields: [field("name", "declared", "Acme Support Assistant"), field("packageVersion", "declared", "2.3.0"),
+             field("primaryPurpose", "auto", "application"), field("autonomyType", "declared", "no"),
+             field("dataFlows", "declared", "inbound: personal data")] },
+  { spdxId: "urn:e", type: "externalModel", label: "Example Translate", declarationKey: "externalModel:example-translate",
+    fields: [field("name", "declared", "Example Translate"), field("primaryPurpose", "auto", "model")] },
+];
+
+function check(complete: boolean, declared = false, service = false) {
   return {
     schema: "bomlens-spdx3-check/1",
     draft: !complete,
@@ -43,6 +53,7 @@ function check(complete: boolean, declared = false) {
                  field("originatedBy", complete ? "declared" : "missingRequired"),
                  field("builtTime", complete ? "declared" : "missingRequired"),
                  field("releaseTime", complete ? "declared" : "missingRequired")] },
+      ...(service ? SERVICE_ELEMENTS : []),
     ],
     relationships: [{ type: "other", from: "urn:m", to: ["urn:d"], status: "review",
                       note: declared ? "declared dataset, role not stated" : "card-declared dataset, role not stated" }],
@@ -51,14 +62,22 @@ function check(complete: boolean, declared = false) {
   };
 }
 
-const summary = (complete: boolean, upToDate = true) => ({
+const summary = (complete: boolean, upToDate = true, service: "none" | "applied" | "pendingScan" = "none") => ({
   draft: !complete,
   counts: check(complete).counts,
   name: `${P}_bom.spdx3.json`,
   check: `${P}_spdx3-check.json`,
   declaration: { state: complete ? "applied" : "none", reasons: [] },
+  service: { state: service },
   upToDate,
 });
+
+// The blank service the converter's empty declaration holds for a model.
+const BLANK_SERVICE = {
+  name: "", packageVersion: "", downloadLocation: "", suppliedBy: null, releaseTime: "",
+  informationAboutApplication: "", domain: [], autonomyType: "", inputModality: [], outputModality: [],
+  dataFlows: [], standardCompliance: [], disclosureUrl: "", externalModels: [],
+};
 
 const TEMPLATE = {
   schema: "bomlens-ai-declaration/1",
@@ -91,6 +110,24 @@ const SBOM = {
   dependencies: [{ ref: "m", dependsOn: ["dataset:huggingface/org/ds"] }],
 };
 
+// The SBOM after a scan with a declared service: the service, the external
+// model it calls, and what it depends on (docker/lib/apply-declared-service.py).
+const SBOM_WITH_SERVICE = {
+  ...SBOM,
+  services: [
+    { "bom-ref": "service:declared/acme-support-assistant", name: "Acme Support Assistant", version: "2.3.0",
+      provider: { name: "Acme Corp" }, endpoints: ["https://support.acme.example/assistant"],
+      data: [{ flow: "inbound", classification: "personal data" }, { flow: "outbound", classification: "personal data" }],
+      properties: [{ name: "bomlens:origin", value: "declared-input" }, { name: "bomlens:service:kind", value: "application" }] },
+    { "bom-ref": "service:declared-external/example-translate", name: "Example Translate", provider: { name: "Example Inc" },
+      properties: [{ name: "bomlens:origin", value: "declared-input" }, { name: "bomlens:service:kind", value: "external-model" }] },
+  ],
+  dependencies: [
+    ...SBOM.dependencies,
+    { ref: "service:declared/acme-support-assistant", dependsOn: ["m", "service:declared-external/example-translate"] },
+  ],
+};
+
 async function stub(
   page: Page,
   opts: {
@@ -100,9 +137,16 @@ async function stub(
     refuse?: string[];
     declared?: boolean;
     upToDate?: boolean;
+    /** The empty declaration asks about the service (a v1.14 converter). */
+    service?: boolean;
+    /** The CycloneDX SBOM carries a declared service (the next scan wrote it). */
+    sbomService?: boolean;
+    conformance?: unknown;
+    /** The scan's summary says the CycloneDX SBOM is behind the declaration. */
+    serviceState?: "none" | "applied" | "pendingScan";
   } = {},
 ) {
-  const state = { complete: false, saved: null as unknown, exported: 0 };
+  const state = { complete: false, saved: null as unknown, exported: 0, service: false };
   const results = opts.saved ? [...RESULTS, { name: `${P}_ai-declaration.json`, size: 50 }] : RESULTS;
   await page.route("**/capabilities", (r) =>
     r.fulfill({
@@ -112,8 +156,8 @@ async function stub(
   );
   await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
   const done = {
-    ok: true, mode: "AIBOM", id: P, results, security: null, conformance: null,
-    spdx3: opts.withSummary === false ? null : summary(false, opts.upToDate !== false),
+    ok: true, mode: "AIBOM", id: P, results, security: null, conformance: opts.conformance ?? null,
+    spdx3: opts.withSummary === false ? null : summary(false, opts.upToDate !== false, opts.serviceState ?? "none"),
     scanConfig: opts.declared
       ? { source: "ai-declare", target: "", project: "model", version: "1.0" }
       : { source: "hf-model", target: "acme/model", project: "model", version: "1.0" },
@@ -126,12 +170,12 @@ async function stub(
   await page.route("**/file**", (r) => {
     const name = new URL(r.request().url()).searchParams.get("name") ?? "";
     const body = name.endsWith("_spdx3-check.json")
-      ? check(state.complete, opts.declared)
+      ? check(state.complete, opts.declared, state.service)
       : name.endsWith(".template.json")
-        ? TEMPLATE
+        ? opts.service ? { ...TEMPLATE, service: BLANK_SERVICE } : TEMPLATE
         : name.endsWith("_ai-declaration.json")
           ? opts.saved
-          : SBOM;
+          : opts.sbomService ? SBOM_WITH_SERVICE : SBOM;
     return r.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.route("**/spdx3-map", (r) => r.fulfill({ contentType: "application/json", body: MAP }));
@@ -153,12 +197,14 @@ async function stub(
                          body: JSON.stringify({ error: "declaration refused", reasons: opts.refuse }) });
     }
     state.complete = true;
+    // A service saved after the scan is not in the CycloneDX SBOM until the next scan.
+    state.service = Boolean((state.saved as { service?: unknown } | null)?.service);
     return r.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         name: `${P}_bom.spdx3.json`,
         results: [...RESULTS, { name: `${P}_ai-declaration.json`, size: 50 }],
-        spdx3: summary(true),
+        spdx3: summary(true, true, state.service ? "pendingScan" : "none"),
       }),
     });
   });
@@ -594,4 +640,202 @@ test("a hub source typed and not added is added when the step is left", async ({
   expect(saved.datasets.find((d) => d.ref === "huggingface:org/ds")?.sources).toEqual([
     { ref: "huggingface:allenai/c4", relation: "extended" },
   ]);
+});
+
+test("the service step is optional: no keeps the count, yes asks the service's required fields", async ({ page }) => {
+  await stub(page, { service: true });
+  await openModels(page);
+  const flow = await openFlow(page);
+  await expect(flow).toContainText("5 required fields left");
+  // Not answered, it has nothing open.
+  await expect(stepButton(flow, "Service (optional)")).not.toHaveAttribute("aria-describedby", /.+/);
+  await stepButton(flow, "Service (optional)").click();
+  await expect(flow.getByRole("heading", { name: "Do you run this model in a service, such as an app or an API?" })).toBeVisible();
+  await expect(flow).toContainText("fills the G7 system elements");
+  await flow.getByRole("radio", { name: "No, record the model only" }).click();
+  await expect(flow.getByTestId("service-answer-note")).toContainText("records the model only");
+  await expect(flow).toContainText("5 required fields left");
+  await expect(flow.getByTestId("service-required")).toHaveCount(0);
+
+  await flow.getByRole("radio", { name: "Yes, I will describe the service" }).click();
+  await expect(flow).toContainText("10 required fields left");
+  const required = flow.getByTestId("service-required");
+  await expect(required.locator("[data-question]")).toHaveCount(5);
+  // A provider is an organization: there is no kind to choose.
+  await expect(flow.locator('[data-question="service.suppliedBy"] select')).toHaveCount(0);
+  // Nothing open in the optional groups, so they start folded.
+  for (const g of ["use", "io", "flows", "external", "standards"]) {
+    await expect(flow.locator("details").filter({ has: page.locator(`[data-service-group="${g}"]`) })).not.toHaveAttribute("open", "");
+    await flow.locator(`[data-service-group="${g}"]`).click();
+  }
+  // The person question reads as asked, in the order a person thinks of it.
+  const autonomy = flow.locator('[data-question="service.autonomyType"]');
+  await expect(autonomy).toContainText("Is a person involved in the AI's decisions?");
+  await expect(autonomy.getByRole("radio")).toHaveText(["Involved", "Fully automatic", "Not known"]);
+  const axe = await new AxeBuilder({ page }).include('[data-testid="ai-declaration"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations).toEqual([]);
+
+  // Back to "later": the count returns and the review records no service.
+  await flow.getByRole("radio", { name: "I will write it later" }).click();
+  await expect(flow).toContainText("5 required fields left");
+  await stepButton(flow, "Review").click();
+  await expect(flow.getByTestId("service-summary-note")).toContainText("No service is recorded for now");
+});
+
+test("a service declared after the scan is saved, and the band says a new scan brings it to the CycloneDX SBOM", async ({ page }) => {
+  const state = await stub(page, { service: true });
+  await openModels(page);
+  const flow = await openFlow(page);
+  await stepButton(flow, "Service (optional)").click();
+  await flow.getByRole("radio", { name: "Yes, I will describe the service" }).click();
+  const q = (id: string) => flow.locator(`[data-question="service.${id}"]`);
+  await q("name").locator("input").fill("Acme Support Assistant");
+  await q("packageVersion").locator("input").fill("2.3.0");
+  await q("downloadLocation").locator("input").fill("https://support.acme.example/assistant");
+  await q("suppliedBy").locator("input").fill("Acme Corp");
+  await q("releaseTime").locator("input").fill("2025-06-01");
+  await flow.locator('[data-service-group="use"]').click();
+  await q("autonomyType").getByRole("radio", { name: "Involved" }).click();
+  // A data flow is added by what data it is, then given its direction.
+  await flow.locator('[data-service-group="flows"]').click();
+  await flow.getByLabel("What data is it?").fill("personal data");
+  await flow.getByRole("button", { name: "Add data flow" }).click();
+  const row = flow.locator('[data-flow-row="0"]');
+  await row.locator('[data-question="dataFlow.flow"]').getByRole("radio", { name: "Comes in" }).click();
+  // An external model typed and not added is added when the step is left.
+  await flow.locator('[data-service-group="external"]').click();
+  await flow.getByLabel("External AI model name").fill("Example Translate");
+
+  // The decisions step no longer asks the model's autonomy: the service answered it.
+  await stepButton(flow, "Your decisions").click();
+  await expect(flow.locator('[data-question="model.autonomyType"]')).toHaveCount(0);
+  await expect(flow.getByTestId("autonomy-in-service")).toBeVisible();
+
+  await stepButton(flow, "Review").click();
+  const sum = flow.locator('[data-summary="service"]');
+  await expect(sum).toContainText("Acme Support Assistant");
+  await expect(sum).toContainText("Involved");
+  await expect(sum).toContainText("Comes in: personal data");
+  await expect(sum).toContainText("Example Translate");
+  await expect(flow.getByTestId("service-summary-note")).toContainText("include it after a new scan");
+  await flow.getByRole("button", { name: "Save" }).click();
+
+  const pending = page.getByTestId("spdx3-service-pending");
+  await expect(pending).toContainText("The declared service and model information are in the SPDX 3.0.1 document");
+  expect((state.saved as { service: unknown }).service).toEqual({
+    name: "Acme Support Assistant",
+    packageVersion: "2.3.0",
+    downloadLocation: "https://support.acme.example/assistant",
+    suppliedBy: { type: "Organization", name: "Acme Corp" },
+    releaseTime: "2025-06-01T00:00:00Z",
+    autonomyType: "no",
+    dataFlows: [{ flow: "inbound", classification: "personal data" }],
+    externalModels: [{ key: "example-translate", name: "Example Translate" }],
+  });
+  // The document's fields show the service as the publisher's declaration.
+  await page.getByText("Show the document's fields").click();
+  const fields = page.getByTestId("spdx3-service-fields");
+  await expect(fields).toContainText("Publisher's declaration");
+  await expect(fields.locator('tr[data-field="autonomyType"]')).toContainText("Involved");
+  await expect(fields.locator('tr[data-field="dataFlows"]')).toContainText("Comes in: personal data");
+  await expect(fields.locator('tr[data-field="primaryPurpose"]').first()).toContainText("Application");
+  await expect(page.getByTestId("spdx3-external-model")).toContainText("External AI model: Example Translate");
+  const axe = await new AxeBuilder({ page }).include('[data-testid="spdx3-band"]').include('[data-testid="spdx3-fields"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations).toEqual([]);
+  // The band's re-scan opens the scan form, as the top bar's does.
+  await pending.getByRole("button", { name: "Re-scan" }).click();
+  await expect(page).toHaveURL(/#\/new/);
+});
+
+test("the model step asks input and output kinds, and folds the regulatory fields with a format check", async ({ page }) => {
+  const state = await stub(page, { service: true });
+  await page.route("**/file**", async (r) => {
+    const name = new URL(r.request().url()).searchParams.get("name") ?? "";
+    if (!name.endsWith(".template.json")) return r.fallback();
+    const model = { ...TEMPLATE.model, inputModality: [], outputModality: [], trainingComputeFlops: "",
+                    trainingComputeBasis: "", adversarialTesting: "" };
+    const datasets = TEMPLATE.datasets.map((d) => ({ ...d, knownBias: [] }));
+    return r.fulfill({ contentType: "application/json",
+                       body: JSON.stringify({ ...TEMPLATE, model, datasets, service: BLANK_SERVICE }) });
+  });
+  await openModels(page);
+  const flow = await openFlow(page);
+  await flow.locator('[data-question="model.inputModality"]').getByRole("button", { name: "Text" }).click();
+  await flow.locator('[data-question="model.outputModality"]').getByRole("button", { name: "Code" }).click();
+  const reg = flow.locator("details").filter({ hasText: "For regulatory filings (optional)" });
+  await expect(reg).not.toHaveAttribute("open", "");
+  await reg.locator("summary").click();
+  await expect(reg).toContainText("not legal advice");
+  const flops = flow.locator('[data-question="model.trainingComputeFlops"]');
+  await expect(flops).toContainText("Annex XI");
+  await flops.locator("input").fill("about 1e24");
+  await flops.locator("input").blur();
+  await expect(flops).toContainText("Write a number greater than zero");
+  await flops.locator("input").fill("3.2e24");
+  await expect(flops).not.toContainText("Write a number greater than zero");
+  await flow.locator('[data-question="model.adversarialTesting"]').getByRole("radio", { name: "Yes" }).click();
+  // The dataset's known bias is asked with the main questions.
+  await stepButton(flow, "Training data").click();
+  await expect(flow.locator('[data-question="dataset.knownBias"]')).toBeVisible();
+  await stepButton(flow, "Review").click();
+  // No service, but these model values also reach the CycloneDX SBOM only from a new scan.
+  await expect(flow.getByTestId("cdx-note")).toContainText("include them after a new scan");
+  await flow.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByTestId("spdx3-band")).toBeVisible();
+  expect((state.saved as { model: unknown }).model).toMatchObject({
+    inputModality: ["text"], outputModality: ["code"], trainingComputeFlops: "3.2e24", adversarialTesting: "yes",
+  });
+  expect((state.saved as { service?: unknown }).service).toBeUndefined();
+});
+
+test("model values saved after the scan, with no service, need a new scan and no service is named", async ({ page }) => {
+  // pendingScan with no service in the document: the model's input and output
+  // kinds or regulatory values were saved after the scan.
+  await stub(page, { serviceState: "pendingScan" });
+  await openModels(page);
+  const pending = page.getByTestId("spdx3-service-pending");
+  await expect(pending).toContainText("The saved declaration and the CycloneDX SBOM differ");
+  await expect(pending).not.toContainText("declared service");
+  await expect(pending.getByRole("button", { name: "Re-scan" })).toBeVisible();
+});
+
+test("an applied service adds no note to the band", async ({ page }) => {
+  await stub(page, { serviceState: "applied" });
+  await openModels(page);
+  await expect(page.getByTestId("spdx3-band")).toBeVisible();
+  await expect(page.getByTestId("spdx3-service-pending")).toHaveCount(0);
+});
+
+test("Models & datasets shows the declared service from the SBOM as the publisher's declaration", async ({ page }) => {
+  await stub(page, {
+    sbomService: true,
+    conformance: {
+      result: "pass",
+      checks: [
+        { id: "g7-slp-name", label: "System name", required: false, status: "pass", detail: "present (publisher's declaration, not verified by BomLens)",
+          cluster: "slp", source: "declared" },
+        { id: "g7-meta-signature", label: "Signature", required: false, status: "warn", detail: "no signature",
+          cluster: "metadata", source: "declared" },
+      ],
+    },
+  });
+  await openModels(page);
+  const card = page.getByTestId("declared-service");
+  await expect(card).toContainText("Acme Support Assistant");
+  await expect(card).toContainText("Publisher's declaration");
+  await expect(card).toContainText("did not check it");
+  await expect(card).toContainText("Acme Corp");
+  await expect(card).toContainText("acme/model");
+  await expect(card).toContainText("2 flows");
+  await expect(page.getByTestId("declared-external-models")).toContainText("Example Translate");
+  // A G7 element met by a declaration says whose word it is; one still open
+  // says it needs one.
+  await expect(page.locator("li").filter({ hasText: "System name" })).toContainText("Publisher's declaration");
+  await expect(page.locator("li").filter({ hasText: "Signature" })).toContainText("Declaration needed");
+  await expect(page.locator("li").filter({ hasText: "Signature" })).not.toContainText("Publisher's declaration");
+  const axe = await new AxeBuilder({ page }).include('[data-testid="declared-service"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations).toEqual([]);
 });

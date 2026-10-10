@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DoneEvent } from "./api";
-import { datasetTreeRows, parseModelCards } from "./models";
+import { datasetTreeRows, parseDeclaredServices, parseModelCards } from "./models";
 import { isAiScan } from "./results";
 
 // Mirrors the verified OWASP AIBOM Generator 1.7 shape
@@ -468,5 +468,76 @@ describe("isAiScan", () => {
       { name: "openssl", version: "3", group: "", purl: "", type: "library", licenses: [] },
     ] } })).toBe(false);
     expect(isAiScan(base)).toBe(false);
+  });
+});
+
+describe("parseDeclaredServices", () => {
+  const prop = (name: string, value: string) => ({ name, value });
+  const declared = (kind: string) => [prop("bomlens:origin", "declared-input"), prop("bomlens:service:kind", kind)];
+  // The shape docker/lib/apply-declared-service.py writes.
+  const BOM = {
+    metadata: { component: { type: "machine-learning-model", "bom-ref": "pkg:huggingface/acme/m", group: "acme", name: "m" } },
+    components: [{ type: "data", "bom-ref": "d", name: "ds" }],
+    services: [
+      {
+        "bom-ref": "service:declared/acme-support-assistant",
+        name: "Acme Support Assistant",
+        version: "2.3.0",
+        provider: { name: "Acme Corp" },
+        endpoints: ["https://support.acme.example/assistant"],
+        description: "Answers customer questions.",
+        data: [
+          { flow: "inbound", classification: "personal data" },
+          { flow: "outbound", classification: "personal data" },
+        ],
+        properties: declared("application"),
+      },
+      {
+        "bom-ref": "service:declared-external/translate",
+        name: "Example Translate",
+        version: "2025-05",
+        provider: { name: "Example Inc" },
+        endpoints: ["https://api.translate.example/v1"],
+        properties: declared("external-model"),
+      },
+      // A service the scan found itself is not the publisher's declaration.
+      { "bom-ref": "svc-scanned", name: "billing-api" },
+    ],
+    dependencies: [
+      {
+        ref: "service:declared/acme-support-assistant",
+        dependsOn: ["pkg:huggingface/acme/m", "service:declared-external/translate"],
+      },
+    ],
+  };
+
+  it("reads the declared service, the model it runs and the external models it calls", () => {
+    expect(parseDeclaredServices(BOM)).toEqual([
+      {
+        ref: "service:declared/acme-support-assistant",
+        name: "Acme Support Assistant",
+        version: "2.3.0",
+        provider: "Acme Corp",
+        endpoint: "https://support.acme.example/assistant",
+        description: "Answers customer questions.",
+        models: ["acme/m"],
+        externalModels: [
+          { name: "Example Translate", provider: "Example Inc", version: "2025-05", endpoint: "https://api.translate.example/v1" },
+        ],
+        dataFlows: 2,
+      },
+    ]);
+  });
+
+  it("without a dependency list, keeps the external models and names no model", () => {
+    const [s] = parseDeclaredServices({ ...BOM, dependencies: [] });
+    expect(s.models).toEqual([]);
+    expect(s.externalModels.map((m) => m.name)).toEqual(["Example Translate"]);
+  });
+
+  it("is empty for an SBOM with no declared service", () => {
+    expect(parseDeclaredServices({ services: [{ name: "billing-api" }] })).toEqual([]);
+    expect(parseDeclaredServices(null)).toEqual([]);
+    expect(parseDeclaredServices({ services: "x" })).toEqual([]);
   });
 });

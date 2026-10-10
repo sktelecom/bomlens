@@ -701,7 +701,8 @@
     "composerInstall": "PHP Composer 의존성 해석",
     "pnpmWorkspaceTree": "pnpm 워크스페이스 의존성 트리 해석",
     "enrichDistroSupplier": "OS 패키지 공급자 정보 보강",
-    "declaredSources": "AI 선언에 적은 데이터셋 원천 조회"
+    "declaredSources": "AI 선언에 적은 데이터셋 원천 조회",
+    "declaredService": "AI 선언에 적은 서비스 기록"
   },
   "pipelineNote": {
     "titleScan": "일부 데이터가 없을 수 있습니다",
@@ -781,7 +782,21 @@
     "lineageConflict": "선언된 라이선스가 상위 모델 {{name}}의 라이선스와 충돌합니다.",
     "disclaimer": "이 판정은 법적 자문이 아닌 안내입니다.",
     "g7SectionTitle": "이 모델이 공개한 정보",
-    "g7SectionIntro": "G7 최소 요소 기준으로, 이 모델의 카드나 배포 페이지가 무엇을 밝히고 무엇을 밝히지 않았는지입니다. BomLens가 만든 문서가 아니라 모델을 공개한 쪽의 공개 수준을 보여줍니다."
+    "g7SectionIntro": "G7 최소 요소 기준으로, 이 모델의 카드나 배포 페이지가 무엇을 밝히고 무엇을 밝히지 않았는지입니다. BomLens가 만든 문서가 아니라 모델을 공개한 쪽의 공개 수준을 보여줍니다.",
+    "service": {
+      "kind": "서비스",
+      "declared": "발행자 선언",
+      "note": "모델의 발행자가 선언한 서비스입니다. BomLens는 이 내용을 확인하지 않았습니다.",
+      "provider": "제공 조직",
+      "runs": "실행하는 모델",
+      "dataFlows": "데이터 흐름",
+      "dataFlowCount_one": "{{count}}개",
+      "dataFlowCount_other": "{{count}}개",
+      "endpoint": "서비스 주소",
+      "externalModels": "호출하는 외부 AI 모델",
+      "noExternal": "선언한 것 없음",
+      "notStated": "적지 않음"
+    }
   },
   "aiSummary": {
     "title": "AI 모델 SBOM",
@@ -841,7 +856,8 @@
       "inferred": "신호 추정",
       "declared": "선언 필요",
       "na": "검토 필요",
-      "notApplicable": "해당 없음"
+      "notApplicable": "해당 없음",
+      "declaredMet": "발행자 선언"
     },
     "help": {
       "g7-meta-author": {
@@ -1324,7 +1340,10 @@
       "missingAt": "비어 있는 필수 항목: {{list}}",
       "missingItem_one": "{{label}} {{count}}개",
       "missingItem_other": "{{label}} {{count}}개",
-      "documentLabel": "문서 작성 정보"
+      "documentLabel": "문서 작성 정보",
+      "servicePending": "선언한 서비스와 모델 정보는 SPDX 3.0.1 문서에 들어갔습니다. 다시 스캔하면 CycloneDX와 G7 점검에 반영됩니다.",
+      "serviceLabel": "서비스 {{name}}",
+      "declarationPending": "저장한 선언과 CycloneDX SBOM이 아직 다릅니다(모델의 입출력 종류나 규제 제출용 정보, 또는 지운 서비스). 다시 스캔하면 CycloneDX와 G7 점검에 반영됩니다."
     },
     "segment": {
       "filled": "채움",
@@ -1359,7 +1378,10 @@
       "toggle": "문서 항목 보기",
       "declaredDatasets": "선언에 적은 데이터셋",
       "datasetMissing_one": "필수 누락 {{count}}개",
-      "datasetMissing_other": "필수 누락 {{count}}개"
+      "datasetMissing_other": "필수 누락 {{count}}개",
+      "publisherDeclared": "발행자 선언",
+      "serviceCaption": "모델을 실행하는 서비스, SPDX 3.0.1 문서 기준",
+      "externalModel": "외부 AI 모델: {{name}}"
     }
   },
   "aiDecl": {
@@ -1369,21 +1391,24 @@
       "model": "모델 정보",
       "data": "학습 데이터",
       "legal": "직접 판단할 항목",
-      "preview": "미리보기"
+      "preview": "미리보기",
+      "service": "서비스 (선택)"
     },
     "question": {
       "base": "각 기반 모델의 어느 리비전에서 시작했나요?",
       "model": "모델 정보를 알려 주세요",
       "data": "학습에 사용한 데이터는 무엇인가요?",
       "legal": "직접 판단할 항목",
-      "preview": "확인하고 저장하기"
+      "preview": "확인하고 저장하기",
+      "service": "이 모델을 앱이나 API 같은 서비스에 넣어 운영하나요?"
     },
     "questionHint": {
       "base": "스캔이 찾은 기반 모델입니다. 리비전을 적으면 계보를 그대로 재현할 수 있습니다. 모르면 비워 두세요.",
       "model": "스캔이 채우지 못한 항목만 묻습니다.",
       "data": "모델이 각 데이터를 어떻게 썼는지 고르고, 허브에 없는 데이터를 추가하세요.",
       "legal": "스캔이 읽을 수 있는 사실이 아니라 판단이 필요한 항목입니다. 확인한 것만 답하세요.",
-      "preview": "저장하면 선언을 이 스캔과 대조해 확인하고 SPDX 3.0.1 문서를 다시 만듭니다."
+      "preview": "저장하면 선언을 이 스캔과 대조해 확인하고 SPDX 3.0.1 문서를 다시 만듭니다.",
+      "service": "서비스 정보를 적으면 G7 시스템 항목(시스템 이름, 데이터 흐름, 입출력, 적용 분야)이 채워집니다. 적은 값은 발행자 선언으로 표시됩니다."
     },
     "remaining_one": "남은 필수 항목 {{count}}개",
     "remaining_other": "남은 필수 항목 {{count}}개",
@@ -1398,7 +1423,8 @@
       "data": "AI 문서는 모델이 어떤 데이터로 만들어졌는지를 남깁니다. 문서를 받는 쪽이 출처와 이용 조건을 확인할 때 씁니다.",
       "legal": "개인정보를 썼는지, 모델의 위험이 어느 정도인지는 판단이 필요한 항목입니다. 도구가 대신 채우지 않습니다.",
       "preview": "파일에는 직접 입력한 값만 들어갑니다. 필수 항목이 비어 있으면 문서는 초안으로 남고, 나중에 마저 채울 수 있습니다.",
-      "baseCreate": "SPDX는 이 모델이 어떤 모델에서 만들어졌는지 기록합니다. 기반 모델을 적으면 스캔이 그 라이선스를 읽고, 파생 모델에 이어지는 라이선스는 위험 판정에 반영됩니다."
+      "baseCreate": "SPDX는 이 모델이 어떤 모델에서 만들어졌는지 기록합니다. 기반 모델을 적으면 스캔이 그 라이선스를 읽고, 파생 모델에 이어지는 라이선스는 위험 판정에 반영됩니다.",
+      "service": "SPDX 3.0.1은 서비스를 이 모델을 실행하는 별도의 AI 패키지로 기록합니다. 규제는 모델만이 아니라 사람들이 쓰는 시스템을 묻습니다. 무엇에 쓰는지, 사람이 결정을 확인하는지, 어떤 데이터가 오가는지가 그 예입니다. 이 단계는 선택이고, 아니요를 고르면 문서는 모델만 다룹니다."
     },
     "side": {
       "baseTitle": "기반 모델",
@@ -1436,7 +1462,14 @@
       "sourceTwice": "같은 원천이 두 번 들어 있습니다.",
       "sourceSelf": "데이터셋은 자기 자신의 원천이 될 수 없습니다.",
       "sourceHubOnLocal": "허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있습니다.",
-      "license": "apache-2.0 같은 HuggingFace 라이선스 태그나 SPDX 라이선스 ID를 쓰세요."
+      "license": "apache-2.0 같은 HuggingFace 라이선스 태그나 SPDX 라이선스 ID를 쓰세요.",
+      "decimal": "3.2e24나 1500000처럼 0보다 큰 숫자로 적으세요.",
+      "agentType": "조직 이름으로 적으세요.",
+      "flowMissing": "데이터가 들어오는지 나가는지 고르세요.",
+      "classificationMissing": "어떤 데이터인지 적으세요. 예: 개인정보",
+      "externalName": "외부 AI 모델마다 이름이 필요합니다.",
+      "externalTwice": "같은 외부 AI 모델이 두 번 들어 있습니다.",
+      "labelTooLong": "너무 깁니다. 200자까지 입력할 수 있습니다."
     },
     "base": {
       "revision": {
@@ -1453,7 +1486,9 @@
     "group": {
       "use": "용도와 범위 (선택)",
       "training": "학습 방법 (선택)",
-      "moreData": "데이터 추가 정보 (선택)"
+      "moreData": "데이터 추가 정보 (선택)",
+      "regulatory": "규제 제출용 정보 (선택)",
+      "regulatoryNote": "규제 기관에 내는 자료에 쓰는 정보입니다. 참고로 EU AI Act(부속서 XI, 제51조, 제55조)와 인공지능기본법 시행령(제24조)이 이런 정보를 다룹니다. 법률 자문이 아닙니다."
     },
     "role": {
       "label": "모델이 이 데이터를 어떻게 썼나요?",
@@ -1480,7 +1515,17 @@
       "noBase": "기반 모델 없음",
       "revision": "리비전 {{revision}}",
       "noRevision": "리비전 없음",
-      "role": "모델이 쓴 방식"
+      "role": "모델이 쓴 방식",
+      "serviceCreate": "이 서비스 정보는 첫 스캔 결과의 CycloneDX SBOM에도 들어갑니다.",
+      "serviceFill": "저장하면 SPDX 3.0.1 문서에 바로 들어갑니다. CycloneDX SBOM과 G7 점검에는 다시 스캔하면 반영됩니다.",
+      "service": {
+        "none": "서비스 질문에 답하지 않아 서비스는 기록하지 않습니다.",
+        "no": "서비스 없이 모델만 기록합니다.",
+        "later": "서비스는 나중에 적기로 해서 지금은 기록하지 않습니다.",
+        "yes": "예를 골랐지만 적은 값이 없어 서비스는 기록하지 않습니다."
+      },
+      "modelCreate": "모델의 입출력 종류와 규제 제출용 정보는 첫 스캔 결과의 CycloneDX SBOM에도 들어갑니다.",
+      "modelFill": "저장하면 모델의 입출력 종류와 규제 제출용 정보가 SPDX 3.0.1 문서에 바로 들어갑니다. CycloneDX SBOM과 G7 점검에는 다시 스캔하면 반영됩니다."
     },
     "saveRefused": "선언이 거부되어 저장하지 않았습니다.",
     "saveBusy": "이 스캔이 다시 실행 중입니다. 끝난 뒤에 저장하세요.",
@@ -1520,7 +1565,9 @@
       "directDownload": "바로 내려받기",
       "query": "질의로 받기",
       "registration": "가입 후 받기",
-      "scrapingScript": "수집 스크립트로 받기"
+      "scrapingScript": "수집 스크립트로 받기",
+      "code": "코드",
+      "application": "응용 프로그램"
     },
     "document": {
       "createdBy": {
@@ -1626,6 +1673,27 @@
         "example": "apache-2.0",
         "hintCreate": "이 모델의 위험 판정에 쓰입니다. 비워 두면 라이선스 판정이 \"검토 필요\"로 나옵니다. HuggingFace 라이선스 태그나 SPDX 라이선스 ID로 적거나 목록에서 고르세요.",
         "hintDeclared": "이 모델을 다시 스캔하면 그때부터 이 라이선스로 위험을 판정합니다. 그 전까지 문서에는 확인할 항목으로 표시됩니다."
+      },
+      "inputModality": {
+        "label": "모델이 받는 입력",
+        "hint": "여러 개를 고를 수 있습니다."
+      },
+      "outputModality": {
+        "label": "모델이 내놓는 출력",
+        "hint": "여러 개를 고를 수 있습니다."
+      },
+      "trainingComputeFlops": {
+        "label": "학습 연산량 (FLOPs)",
+        "hint": "모델 학습에 쓴 부동소수점 연산의 총 횟수입니다. 3.2e24처럼 숫자로 적습니다. 참고: EU AI Act 부속서 XI 1(2)(d), 제51조 제2항, 인공지능기본법 시행령 제24조.",
+        "example": "3.2e24"
+      },
+      "trainingComputeBasis": {
+        "label": "연산량 산정 근거",
+        "example": "6 x 파라미터 수 x 학습 토큰 수, 학습 로그 기준"
+      },
+      "adversarialTesting": {
+        "label": "적대적 시험(레드팀)을 했나요?",
+        "hint": "참고: EU AI Act 제55조 제1항 (a)호."
       }
     },
     "dataset": {
@@ -1676,7 +1744,9 @@
         "label": "사용 목적"
       },
       "knownBias": {
-        "label": "알려진 편향"
+        "label": "알려진 편향",
+        "hint": "데이터가 한쪽으로 치우친 점이 알려져 있으면 적으세요. 모르면 비워 두세요.",
+        "example": "60세 이상의 데이터가 적음"
       },
       "confidentialityLevel": {
         "label": "기밀 등급(TLP)"
@@ -1710,7 +1780,8 @@
       "model": "허브에 공개하지 않은 모델이라 허브에서 알 수 없는 항목입니다.",
       "data": "모델을 학습하거나 평가한 데이터를 추가하세요. HuggingFace ID로 추가하거나, 허브에 없는 데이터로 추가할 수 있습니다.",
       "legal": "스캔이 읽을 수 있는 사실이 아니라 판단이 필요한 항목입니다. 확인한 것만 답하세요.",
-      "preview": "스캔을 시작하면 적은 기반 모델과 데이터셋을 허브에서 읽은 뒤 SBOM과 SPDX 3.0.1 문서를 만듭니다."
+      "preview": "스캔을 시작하면 적은 기반 모델과 데이터셋을 허브에서 읽은 뒤 SBOM과 SPDX 3.0.1 문서를 만듭니다.",
+      "service": "서비스 정보를 적으면 G7 시스템 항목(시스템 이름, 데이터 흐름, 입출력, 적용 분야)이 채워집니다. 적은 값은 발행자 선언으로 표시됩니다."
     },
     "sources": {
       "label": "이 데이터의 원천",
@@ -1756,7 +1827,154 @@
       "text": "문장이나 문서",
       "timeseries": "시간 순서로 기록한 값",
       "timestamp": "날짜와 시각 기록",
-      "video": "동영상 녹화"
-    }
+      "video": "동영상 녹화",
+      "code": "프로그램 소스 코드"
+    },
+    "serviceAnswer": {
+      "yes": "예, 서비스 정보를 적겠습니다",
+      "no": "아니요, 모델만 기록합니다",
+      "later": "나중에 적겠습니다",
+      "noNote": "서비스 없이 모델만 기록합니다.",
+      "laterNote": "지금은 서비스를 기록하지 않습니다. 나중에 이 질문으로 돌아와 적을 수 있습니다."
+    },
+    "serviceGroup": {
+      "use": "용도와 사람의 관여",
+      "io": "입력과 출력",
+      "flows": "데이터 흐름",
+      "external": "외부 AI 모델",
+      "standards": "준수 표준과 공개 문서"
+    },
+    "service": {
+      "name": {
+        "label": "서비스 이름",
+        "example": "Acme 상담 도우미"
+      },
+      "packageVersion": {
+        "label": "서비스 버전",
+        "example": "2.3.0"
+      },
+      "downloadLocation": {
+        "label": "서비스 주소",
+        "hint": "사람들이 서비스를 쓰는 주소나 API 주소입니다.",
+        "example": "https://support.example.com/assistant"
+      },
+      "primaryPurpose": {
+        "label": "종류"
+      },
+      "suppliedBy": {
+        "label": "제공 조직",
+        "hint": "서비스를 운영하는 조직입니다."
+      },
+      "releaseTime": {
+        "label": "출시일",
+        "hint": "서비스를 처음 공개하거나 운영을 시작한 날입니다."
+      },
+      "informationAboutApplication": {
+        "label": "무엇에 쓰는 서비스인가요?",
+        "example": "웹 채팅에서 고객 문의에 답하고, 요청하면 상담원에게 넘깁니다"
+      },
+      "domain": {
+        "label": "적용 분야",
+        "example": "고객 상담"
+      },
+      "autonomyType": {
+        "label": "AI의 결정에 사람이 관여하나요?",
+        "hint": "사람이 결과를 검토하거나 최종 결정을 내리면 \"관여한다\"를 고르세요.",
+        "option": {
+          "no": "관여한다",
+          "yes": "완전 자동",
+          "noAssertion": "모름"
+        }
+      },
+      "inputModality": {
+        "label": "서비스가 받는 입력",
+        "hint": "여러 개를 고를 수 있습니다."
+      },
+      "outputModality": {
+        "label": "서비스가 내놓는 출력",
+        "hint": "여러 개를 고를 수 있습니다."
+      },
+      "dataFlows": {
+        "label": "데이터 흐름"
+      },
+      "standardCompliance": {
+        "label": "따르는 표준",
+        "example": "ISO/IEC 42001"
+      },
+      "disclosureUrl": {
+        "label": "공개 설명 문서 주소",
+        "hint": "서비스가 AI를 어떻게 쓰는지 이용자에게 알리는 문서입니다.",
+        "example": "https://example.com/ai-notice"
+      }
+    },
+    "externalModel": {
+      "intro": "서비스가 API로 호출하고 직접 실행하지는 않는 AI 모델입니다. 이름과 제공 조직 같은 식별 정보만 기록합니다.",
+      "n": "외부 AI 모델 {{n}}",
+      "add": {
+        "label": "외부 AI 모델 이름",
+        "button": "추가",
+        "example": "외부 번역 모델"
+      },
+      "name": {
+        "label": "이름"
+      },
+      "suppliedBy": {
+        "label": "제공 조직"
+      },
+      "packageVersion": {
+        "label": "버전",
+        "example": "2025-05"
+      },
+      "primaryPurpose": {
+        "label": "종류"
+      },
+      "endpoint": {
+        "label": "API 주소",
+        "example": "https://api.example.com/v1"
+      }
+    },
+    "dataFlow": {
+      "intro": "서비스로 들어오거나 밖으로 나가는 데이터입니다. 어떤 데이터인지 적어 추가하세요.",
+      "n": "데이터 흐름 {{n}}",
+      "add": {
+        "label": "어떤 데이터인가요?",
+        "button": "데이터 흐름 추가",
+        "hint": "예를 들어 개인정보, 공개 데이터, 사내 데이터처럼 적습니다."
+      },
+      "suggest": {
+        "personal": "개인정보",
+        "public": "공개 데이터",
+        "internal": "사내 데이터"
+      },
+      "flow": {
+        "label": "방향",
+        "option": {
+          "inbound": "서비스로 들어옴",
+          "outbound": "서비스 밖으로 나감",
+          "bi-directional": "주고받음",
+          "unknown": "모름"
+        }
+      },
+      "classification": {
+        "label": "데이터 종류"
+      },
+      "name": {
+        "label": "이름 (선택)"
+      },
+      "description": {
+        "label": "설명 (선택)",
+        "example": "채팅창에 입력한 고객 문의"
+      },
+      "source": {
+        "label": "데이터를 보내는 곳 (주소, 선택)",
+        "example": "https://support.example.com/chat"
+      },
+      "destination": {
+        "label": "데이터를 받는 곳 (주소, 선택)",
+        "example": "https://api.example.com/v1"
+      }
+    },
+    "organizationPlaceholder": "조직 이름",
+    "autonomyInService": "AI의 결정에 사람이 관여하는지는 서비스 단계에서 답했습니다."
   }
 }

@@ -180,7 +180,7 @@ To fill them, edit the empty declaration the scan writes, `{Project}_{Version}_a
   --model "acme/support-adapter" --ai-declare my-llm_1.0_ai-declaration.template.json --generate-only
 ```
 
-The declared values go into the SPDX document only, each marked as declared, and never into the CycloneDX SBOM. A declaration that names a dataset or base model the scan did not find, a value outside a field's list, or a date not written as `YYYY-MM-DDThh:mm:ssZ` is refused with the reasons. Some fields are a judgement the tool never makes for you: whether the model uses sensitive personal information, its safety risk level, and its autonomy. The check lists them as needing a decision, and leaving them empty is allowed. `model.license` (a HuggingFace licence tag or an SPDX licence id) gives the model's own licence when the scan read none, or only `other`; one that differs from the licence the scan read is listed for review, and the scan's is kept. It is written as an SPDX expression only when it is a hub tag that names exactly one SPDX licence, or a `LicenseRef-`; anything else is kept in words, with `NoAssertionLicense` as the expression.
+Most declared values go into the SPDX document only, each marked as declared. The exceptions are the service the model runs in and the model's input and output kinds, training compute and adversarial testing, which also reach the CycloneDX SBOM (see [The service a model runs in](#the-service-a-model-runs-in)). A declaration that names a dataset or base model the scan did not find, a value outside a field's list, or a date not written as `YYYY-MM-DDThh:mm:ssZ` is refused with the reasons. Some fields are a judgement the tool never makes for you: whether the model uses sensitive personal information, its safety risk level, and its autonomy. The check lists them as needing a decision, and leaving them empty is allowed. `model.license` (a HuggingFace licence tag or an SPDX licence id) gives the model's own licence when the scan read none, or only `other`; one that differs from the licence the scan read is listed for review, and the scan's is kept. It is written as an SPDX expression only when it is a hub tag that names exactly one SPDX licence, or a `LicenseRef-`; anything else is kept in words, with `NoAssertionLicense` as the expression.
 
 In the web UI there is no file to edit: **Models & datasets** shows the document's state and a **Fill in empty fields** button that asks for the open fields one step at a time and saves them as the declaration (see [the web UI reference](../reference/ui.md#ai-surfaces)). The saved declaration is the same `{Project}_{Version}_ai-declaration.json` file, so a re-scan applies it again, from the CLI as well.
 
@@ -201,20 +201,77 @@ A dataset's card often lists no sources, so the scan cannot trace them. The decl
 
 Two rules apply. A value that is not in the scan and not declared is left out rather than estimated, and a base model is written by its id and licence only, so nothing the publisher declares about the model is copied onto it. `--no-spdx3` skips the document.
 
+## The service a model runs in
+
+A model card describes the model. The G7 checklist also asks about the system around it: the system's name, maker and version, how data flows through it, what it does with that data, its input and output, and the field it is meant for. None of that is in a model card or a weight file, so without help those elements stay review items. When you run the model inside an app or an API, the declaration can describe that service, and BomLens writes it into both documents. The EU AI Act's technical documentation (Annex IV, point 1) and the NIST AI Risk Management Framework (MAP 1.1, the intended purpose and context of use) ask for the same kind of description. They are named here only as context; declaring a service does not show that a system meets either.
+
+In the declaration file the service is a top-level `service` object:
+
+```json
+"service": {
+  "name": "Acme Support Assistant",
+  "packageVersion": "2.3.0",
+  "downloadLocation": "https://support.acme.example/assistant",
+  "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
+  "releaseTime": "2025-06-01T00:00:00Z",
+  "informationAboutApplication": "Answers customer support questions in the web chat.",
+  "domain": ["customer support"],
+  "autonomyType": "no",
+  "inputModality": ["text"],
+  "outputModality": ["text"],
+  "dataFlows": [
+    {"flow": "inbound", "classification": "personal data",
+     "description": "Customer questions typed in the chat window.",
+     "source": ["https://support.acme.example/chat"]}
+  ],
+  "standardCompliance": ["ISO/IEC 42001:2023"],
+  "disclosureUrl": "https://support.acme.example/ai-disclosure"
+}
+```
+
+SPDX requires the first five keys of a service, and the document stays a draft until they are given; the rest are optional. `autonomyType` answers whether a person is involved in the AI's decisions: `no` means a person is involved, `yes` that it acts fully automatically, and `noAssertion` that you do not know. Every key and allowed value is listed in [the artifacts reference](../reference/artifacts.md#the-declared-ai-service). In the web UI the same questions form the optional Service step of Fill in empty fields and of Enter model information.
+
+![Fill in empty fields: the optional Service step with the five required service fields](../images/web-ui-ai-service.png)
+
+The SPDX 3.0.1 document writes the service as an `ai_AIPackage` with the purpose `application` that depends on the model at runtime; the model stays the document's root. The scan also writes the service into the CycloneDX SBOM, in a step that runs after the declared dataset sources are read and before the risk assessment and the G7 checks. The service goes into `services[]` with its data flows as `data[]`, its dependency on the model into `dependencies[]`, and each standard it names into `declarations.claims[]`. Each of these is marked `bomlens:origin=declared-input`, and a claim's reasoning says it is the publisher's declaration, not verified by BomLens.
+
+With a service declared, the G7 system-level elements read from it: the system name, producer and version when the SBOM's root does not already give them, and the system data flow, data usage (the description of a data flow), input/output properties and intended application area. An element met this way reads "present (publisher's declaration, not verified by BomLens)", and the web UI gives it a "Publisher's declaration" badge. BomLens records what you state; it does not check that the service behaves that way. An SBOM from another tool counts too when its services carry CycloneDX `data` (serviceData) entries: a flow direction meets the data flow element and a description meets data usage, and both read as plainly present. A security standard named in `standardCompliance` does not meet the security compliance element, which stays a review item.
+
+The CycloneDX SBOM changes only when a scan runs. A service saved in the web UI after the scan goes into the SPDX document at once, but reaches the CycloneDX SBOM and the G7 checks only with the next scan. Until then the SPDX check reports `service.state` as `pendingScan`, and the band on Models & datasets offers a re-scan. A declaration passed with `--ai-declare` is applied in the same run.
+
+### External AI models
+
+A service often calls models it does not run itself, such as a hosted translation or embedding API. List them under `service.externalModels[]`, each with a `key` and a `name`, and optionally `suppliedBy`, `packageVersion` and `endpoint`. They are recorded by identity only: a `software_Package` with the purpose `model` in the SPDX document, and a service of its own in CycloneDX `services[]` that the declared service depends on. BomLens reads nothing about them; the risk assessment does not judge them, and the G7 checks do not count them as models.
+
+### Values for regulatory filings
+
+Rules for large general-purpose models ask for figures no model card holds. The declaration's `model` takes three of them:
+
+- `trainingComputeFlops`, the compute used to train the model in floating-point operations, written as a decimal string such as `"3.2e24"`, with `trainingComputeBasis` saying how it was counted. The EU AI Act asks for the training compute in the technical documentation of a general-purpose AI model (Annex XI, Section 1, point 2(d)) and uses it in Article 51(2) to presume high-impact capabilities. The Korean AI Basic Act enforcement decree, Article 24, also refers to training compute.
+- `adversarialTesting` (`yes`, `no` or `noAssertion`), whether adversarial testing such as red-teaming was done. Article 55(1)(a) of the EU AI Act asks providers of general-purpose AI models with systemic risk to conduct and document it.
+
+The articles are named so you know why the fields exist. BomLens does not compare a figure with a threshold or decide whether a rule applies to your model, and filling these fields does not make a model compliant with any of them.
+
+The model also takes `inputModality` and `outputModality` (`text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other`). All five values go into the SPDX document and onto the model component of the CycloneDX SBOM: the three regulatory values as `bomlens:regulatory:*` properties, and the input and output kinds as formats in `modelCard.modelParameters`. Where the scan already recorded inputs or outputs there, the scanned values are kept. A `bomlens:declared` property names each location filled from the declaration.
+
+### Older BomLens versions
+
+BomLens v1.13 and earlier do not know these keys. They refuse a declaration that has a `service`, or one of the new model keys, with "unknown key(s)" rather than dropping the values without a word; read such a file with a version that has them, or remove the keys. The SPDX 2.3 export and `--diff` do not carry services: the SPDX 2.3 copy is converted from the components of the CycloneDX SBOM, and `--diff` compares models and components.
+
 ## Reading the conformance report
 
-The G7 block leads with a headline such as "N / 41 present". The denominator counts only the checks that have an automated source — 41 of the 51 — so the number states what the tool could verify on its own. The 10 review-only elements appear next to it as a separate "need review" count, and any automated check that found nothing is counted as advisory.
+The G7 block leads with a headline such as "N / 41 present". The denominator counts only the checks that have an automated source (41 of the 51), so the number states what the tool could verify on its own. The 10 review-only elements appear next to it as a separate "need review" count, and any automated check that found nothing is counted as advisory. Four of the ten, the system data flow, data usage, input/output properties and application area, leave the review count and join the denominator once the SBOM holds a value for them, which a [declared service](#the-service-a-model-runs-in) supplies.
 
-Each check has one of three statuses. Pass means the element is present in the ML-BOM. Warn means it is missing or could not be confirmed; the 10 review-only elements always show this status, labeled as requiring human review. Fail does not occur for G7 checks in practice: every G7 element is advisory, so a missing one never fails the SBOM as a whole. An overall fail verdict can only come from the base format checks — the required CycloneDX ones.
+Each check has one of three statuses. Pass means the element is present in the ML-BOM. Warn means it is missing or could not be confirmed; the review-only elements always show this status, labeled as requiring human review. Fail does not occur for G7 checks in practice: every G7 element is advisory, so a missing one never fails the SBOM as a whole. An overall fail verdict can only come from the base format checks, the required CycloneDX ones.
 
 Some rows read "not applicable" instead, with a count of their own in the summary. Those are checks the document gives nothing to judge: a coverage percentage over zero components, or dependency relationships in a document whose only subject is the model itself. They leave both sides of the fraction rather than counting as met, because crediting them would put a card that declares less above one that declares its datasets and is measured on them. They are not review items either — a reviewer has nothing to look at. A model card that names its training datasets therefore has more checks actually measured, and a smaller denominator is not a better result.
 
 A source badge on each row says where a satisfied value comes from:
 
-- Auto (22 checks) — read directly from a field of the ML-BOM.
-- Inferred (15) — derived from signals in the BOM rather than a single dedicated field.
-- Declared (4) — present only when a person or a manifest supplied the value.
-- Review needed (10) — no automated source exists; a person has to confirm it.
+- Auto (22 checks): read directly from a field of the ML-BOM.
+- Inferred (15): derived from signals in the BOM rather than a single dedicated field.
+- Declared (8): present only when a person or a manifest supplied the value. Four of them (the system data flow, data usage, input/output properties and application area) show as review needed until the SBOM holds a value. A pass that comes from the publisher's declaration says so in its detail.
+- Review needed (6, or 10 with the four above): no automated source exists; a person has to confirm it.
 
 The same result ships in three formats: `{Project}_{Version}_conformance.json` for machines (CI gates, diffing), `_conformance.md` as a readable table, and `_conformance.html` as a visual summary. Each format also carries the [regulatory crosswalk](#regulatory-crosswalk); in JSON it is the `regulatoryCrosswalk` object, present only when at least one mapped check was evaluated.
 
@@ -249,7 +306,7 @@ The report this run produced is here to open as-is: the [conformance report](../
 A report is not a finished review. Some elements a tool can fill; others only a person can.
 
 1. Fill the elements that have an automated source but came back empty, then scan again. The shape that satisfies each one sits on its own row in the report.
-2. Answer the 10 review-only elements yourself — things like training-data sensitivity or the intended application area, which no model card field can prove.
+2. Answer the 10 review-only elements yourself: things like training-data sensitivity or the intended application area, which no model card field can prove. If the model runs in a service, declaring it fills four of them (see [The service a model runs in](#the-service-a-model-runs-in)).
 3. Check separately what this tool does not look at, such as training dataset licensing and personal data.
 
 If you are preparing a model for release inside a company, the approval steps and the pre-release checks live alongside this: see [Releasing an AI model](https://sktelecom.github.io/guide/release/ai-model/) in the SK Telecom open source guide.
@@ -265,14 +322,14 @@ BomLens shows the 50 elements as 51 checks. Model openness (whether weights, arc
 | Cluster | Checks | Of which need human review |
 | --- | --- | --- |
 | Metadata | 10 | 0 |
-| System-level properties | 9 | 4 |
+| System-level properties | 9 | 4 (0 when a service fills them) |
 | Models | 14 | 0 |
 | Dataset properties | 10 | 2 |
 | Infrastructure | 2 | 0 |
 | Security properties | 4 | 3 |
 | Key performance indicators | 2 | 1 |
 
-Ten elements have no automated source — things like the intended application area or dataset sensitivity, which no model-card field can prove. BomLens lists them as requiring human review instead of guessing.
+Ten elements have no automated source, such as the intended application area or dataset sensitivity, which no model-card field can prove. BomLens lists them as requiring human review instead of guessing. The four system-level ones (data flow, data usage, input/output properties and application area) are read from CycloneDX `services[]`: all four from a declared service, and data flow and data usage also from the services of another tool's SBOM. Once the SBOM holds a value for one, it stops counting as a review item.
 
 ## Regulatory crosswalk
 

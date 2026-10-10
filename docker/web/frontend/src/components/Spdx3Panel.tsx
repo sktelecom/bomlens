@@ -73,6 +73,7 @@ export function Spdx3Panel({
   declaredScan = false,
   autoFill = false,
   onAutoFill,
+  onRescan,
 }: {
   scanId: string | null;
   /** Shown above the steps: the project and version. */
@@ -89,6 +90,8 @@ export function Spdx3Panel({
   autoFill?: boolean;
   /** The questions were opened for autoFill; the request can be dropped. */
   onAutoFill?: () => void;
+  /** Open the scan again with its settings (the top bar's re-scan). */
+  onRescan?: () => void;
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -241,6 +244,7 @@ export function Spdx3Panel({
         focusFill={closed}
         check={check}
         publisher={declaredScan}
+        onRescan={onRescan}
       />
       {check && <Spdx3Fields check={check} defaultOpen={declaredScan} />}
     </div>

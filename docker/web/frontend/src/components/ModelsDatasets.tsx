@@ -7,6 +7,7 @@ import {
   CircleDashed,
   Database,
   ExternalLink,
+  Server,
   TriangleAlert,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -21,10 +22,12 @@ import {
   type AiModelData,
   type AssessmentGrade,
   type DatasetRef,
+  type DeclaredService,
   datasetTreeRows,
   GradeBadge,
   type ModelAssessment,
   type ModelCard,
+  parseDeclaredServices,
   parseModelCards,
   USAGE_LABEL_KEY,
 } from "@/lib/models";
@@ -47,6 +50,7 @@ export function ModelsDatasets({
   results,
   title,
   onResultPatch,
+  onRescan,
   declaredScan,
   autoFill,
   onAutoFill,
@@ -62,6 +66,9 @@ export function ModelsDatasets({
   title: string;
   /** A save or a write changed the result (its listing, its SPDX 3 summary). */
   onResultPatch?: (patch: Partial<DoneEvent>) => void;
+  /** Open the scan again with its settings (a declared service reaches the
+   *  CycloneDX SBOM only from a new scan). */
+  onRescan?: () => void;
   /** The scan was made from a declaration alone (its input is that file). */
   declaredScan?: boolean;
   /** Open the SPDX 3.0.1 questions on arrival (the Overview's "fill" link). */
@@ -78,6 +85,7 @@ export function ModelsDatasets({
       summary={spdx3}
       results={results}
       onPatch={onResultPatch}
+      onRescan={onRescan}
       onFillingChange={setFilling}
       declaredScan={declaredScan}
       autoFill={autoFill}
@@ -113,6 +121,7 @@ function ModelsDatasetsBody({
 }) {
   const { t } = useTranslation();
   const [data, setData] = useState<AiModelData | null>(null);
+  const [services, setServices] = useState<DeclaredService[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -123,6 +132,7 @@ function ModelsDatasetsBody({
       .then((sbom) => {
         if (!active) return;
         setData(parseModelCards(sbom));
+        setServices(parseDeclaredServices(sbom));
         setState("ready");
       })
       .catch(() => active && setState("error"));
@@ -156,6 +166,9 @@ function ModelsDatasetsBody({
     <div className="space-y-6">
       {data.models.map((m, i) => (
         <ModelCardView key={m.purl || `${m.name}-${i}`} model={m} />
+      ))}
+      {services.map((s, i) => (
+        <DeclaredServiceCard key={s.ref ?? `${s.name}-${i}`} service={s} />
       ))}
       {data.datasets.length > 0 && (
         <div className="space-y-2">
@@ -377,6 +390,74 @@ function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * The service (an app or API) the publisher declared the model runs in, read
+ * from the CycloneDX SBOM. Every value is the publisher's word: the badge and
+ * the note say so, so it is not read as something the scan found.
+ */
+function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
+  const { t } = useTranslation();
+  return (
+    <Card data-testid="declared-service">
+      <CardContent className="space-y-4 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Server className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="text-xs text-muted-foreground">{t("models.service.kind")}</span>
+          <span className="text-sm font-medium text-foreground">
+            {s.name}
+            {s.version ? <span className="text-muted-foreground"> {s.version}</span> : null}
+          </span>
+          <Badge tone="info">{t("models.service.declared")}</Badge>
+        </div>
+        <p className="max-w-3xl text-xs text-muted-foreground">{t("models.service.note")}</p>
+        {s.description && (
+          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+        )}
+        <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
+          <Field label={t("models.service.provider")}>
+            {s.provider ?? <span className="text-muted-foreground">{t("models.service.notStated")}</span>}
+          </Field>
+          <Field label={t("models.service.runs")}>
+            {s.models.length ? (
+              <span className="break-all font-mono text-xs">{s.models.join(", ")}</span>
+            ) : (
+              <span className="text-muted-foreground">{t("models.service.notStated")}</span>
+            )}
+          </Field>
+          <Field label={t("models.service.dataFlows")}>
+            <span className="tabular-nums">{t("models.service.dataFlowCount", { count: s.dataFlows })}</span>
+          </Field>
+          {s.endpoint && (
+            <Field label={t("models.service.endpoint")}>
+              <span className="break-all font-mono text-xs">{s.endpoint}</span>
+            </Field>
+          )}
+        </div>
+        <Field label={t("models.service.externalModels")}>
+          {s.externalModels.length ? (
+            <ul className="space-y-0.5" data-testid="declared-external-models">
+              {s.externalModels.map((m, i) => (
+                <li key={`${m.name}-${i}`}>
+                  <span className="font-medium">{m.name}</span>
+                  {(m.provider || m.version) && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      {[m.provider, m.version].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                  {m.endpoint && <span className="ml-1 break-all font-mono text-xs text-muted-foreground">{m.endpoint}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="text-muted-foreground">{t("models.service.noExternal")}</span>
+          )}
+        </Field>
+      </CardContent>
+    </Card>
   );
 }
 

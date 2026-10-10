@@ -351,6 +351,15 @@ jobs:
       - name: SPDX 3.0.1 AI document tests
         run: bash tests/test-spdx3-ai.sh
 
+      # The declared AI service and model values written to the CycloneDX SBOM
+      # (services[], dependencies, standard claims, the model's regulatory
+      # properties and input/output formats): idempotent, byte-stable, valid
+      # CycloneDX 1.7, and read by the G7 system-level checks.
+      - name: Declared service tests
+        env:
+          BOMLENS_CDX_SCHEMA: "1"
+        run: bash tests/test-declared-service.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the

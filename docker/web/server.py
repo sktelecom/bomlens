@@ -1486,6 +1486,11 @@ def spdx3_summary(run_id):
     state = decl.get("state") if decl.get("state") in ("none", "applied", "refused") else "none"
     reasons = [str(x)[:500] for x in (decl.get("reasons") or []) if isinstance(x, str)][:50] \
         if state == "refused" and isinstance(decl.get("reasons"), list) else []
+    # Whether the CycloneDX SBOM carries the declared service: "pendingScan"
+    # means a declaration saved after the scan named a service the SBOM and
+    # its G7 checks do not have yet; a new scan writes them.
+    svc = check.get("service") if isinstance(check.get("service"), dict) else {}
+    service_state = svc.get("state") if svc.get("state") in ("none", "applied", "pendingScan") else "none"
     return {
         "draft": bool(check.get("draft")),
         "counts": {k: int(v) for k, v in check["counts"].items() if isinstance(v, int)},
@@ -1495,6 +1500,7 @@ def spdx3_summary(run_id):
         # saying so until the declaration is fixed, not only on the call that
         # found it.
         "declaration": {"state": state, "reasons": reasons},
+        "service": {"state": service_state},
         "upToDate": up_to_date,
     }
 

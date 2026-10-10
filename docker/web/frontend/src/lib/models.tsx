@@ -445,6 +445,97 @@ export function parseModelCards(sbom: unknown): AiModelData {
   return { models, datasets: [...byName.values()] };
 }
 
+// ── Declared services ────────────────────────────────────────────────────────
+
+/** An AI model the declared service calls through an API, as the publisher
+ *  named it. */
+export interface DeclaredExternalModel {
+  name: string;
+  provider?: string;
+  version?: string;
+  endpoint?: string;
+}
+
+/**
+ * The service (an app or API) the publisher declared the model runs in, as the
+ * CycloneDX SBOM records it: a `services[]` entry marked
+ * `bomlens:origin=declared-input` with `bomlens:service:kind=application`.
+ * Nothing in it was read or checked by the tool.
+ */
+export interface DeclaredService {
+  ref?: string;
+  name: string;
+  version?: string;
+  provider?: string;
+  endpoint?: string;
+  description?: string;
+  /** The names of the SBOM's models the service runs (its dependencies). */
+  models: string[];
+  externalModels: DeclaredExternalModel[];
+  /** How many data flows (serviceData entries) it declares. */
+  dataFlows: number;
+}
+
+const DECLARED_ORIGIN = "declared-input";
+
+function readExternal(s: Obj): DeclaredExternalModel {
+  return {
+    name: str(s.name) ?? "",
+    provider: str(obj(s.provider).name),
+    version: str(s.version),
+    endpoint: arr(s.endpoints).map(str).find(Boolean),
+  };
+}
+
+/** The services the publisher declared, from a CycloneDX SBOM. Services the
+ *  scan found itself (no declared origin) are not these and are left out. */
+export function parseDeclaredServices(sbom: unknown): DeclaredService[] {
+  const doc = obj(sbom);
+  const declared = arr(doc.services)
+    .map((s) => obj(s))
+    .filter((s) => propReader(s).one("bomlens:origin") === DECLARED_ORIGIN);
+  const kind = (s: Obj) => propReader(s).one("bomlens:service:kind");
+  const externals = declared.filter((s) => kind(s) === "external-model");
+  const apps = declared.filter((s) => kind(s) !== "external-model" && str(s.name));
+  // Names of the SBOM's parts by bom-ref, the root included, so a dependency
+  // reads as the model it points at.
+  const names = new Map<string, string>();
+  const root = obj(obj(doc.metadata).component);
+  for (const c of [root, ...arr(doc.components).map((x) => obj(x))]) {
+    const ref = str(c["bom-ref"]);
+    const name = str(c.name);
+    if (ref && name) names.set(ref, c.group ? `${String(c.group)}/${name}` : name);
+  }
+  const extByRef = new Map<string, Obj>();
+  for (const e of externals) {
+    const ref = str(e["bom-ref"]);
+    if (ref) extByRef.set(ref, e);
+  }
+  const deps = new Map<string, string[]>();
+  for (const d of arr(doc.dependencies).map((x) => obj(x))) {
+    const ref = str(d.ref);
+    if (ref) deps.set(ref, arr(d.dependsOn).map(str).filter((x): x is string => Boolean(x)));
+  }
+  return apps.map((s) => {
+    const ref = str(s["bom-ref"]);
+    const on = ref ? deps.get(ref) : undefined;
+    // Without a dependency list (an SBOM with no model ref to point at), every
+    // declared external model is the service's: there is one service at most.
+    const ext = on ? on.filter((r) => extByRef.has(r)).map((r) => extByRef.get(r) as Obj) : externals;
+    return {
+      ref,
+      name: str(s.name) ?? "",
+      version: str(s.version),
+      provider: str(obj(s.provider).name),
+      endpoint: arr(s.endpoints).map(str).find(Boolean),
+      description: str(s.description),
+      models: (on ?? []).filter((r) => !extByRef.has(r) && names.has(r)).map((r) => names.get(r) as string),
+      externalModels: ext.map(readExternal),
+      dataFlows: arr(s.data).length,
+    };
+  });
+}
+
 // ── Grade badge ──────────────────────────────────────────────────────────────
 //
 // Shared between the Models & datasets view and the AI summary card, so a

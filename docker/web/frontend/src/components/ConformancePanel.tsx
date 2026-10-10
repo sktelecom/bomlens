@@ -151,13 +151,18 @@ function CrosswalkBlock({
 // Provenance badge: where a satisfied value comes from. Reuses existing badge
 // tones (no invented colours); the word carries the meaning, colour only backs
 // it. "na" (no automated source) takes the review-needed tone.
-function SourceBadge({ source, naKind }: { source?: string; naKind?: string }) {
+// A met element whose source is "declared" holds the publisher's declaration
+// (a declared service, for instance), which the tool did not check: it says so
+// rather than reading as something still to declare.
+function SourceBadge({ source, naKind, met }: { source?: string; naKind?: string; met?: boolean }) {
   const { t } = useTranslation();
   if (!source) return null;
   const notApplicable = naKind === "not-applicable";
   const label = notApplicable
     ? t("g7.source.notApplicable", { defaultValue: "" })
-    : t(`g7.source.${source}`, { defaultValue: "" });
+    : source === "declared" && met
+      ? t("g7.source.declaredMet")
+      : t(`g7.source.${source}`, { defaultValue: "" });
   if (notApplicable && label) return <Badge variant="muted">{label}</Badge>;
   if (!label) return null;
   switch (source) {
@@ -229,7 +234,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           {check.required ? (
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
-          {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} /> : null}
+          {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} met={check.status === "pass"} /> : null}
           {detail && !notMet ? (
             <span className="text-xs tabular-nums text-muted-foreground">{detail}</span>
           ) : null}

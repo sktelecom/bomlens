@@ -28,6 +28,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "enrich-malicious": "pipelineSteps.enrichMalicious",
   "enrich-staleness": "pipelineSteps.enrichStaleness",
   "declared-sources": "pipelineSteps.declaredSources",
+  "declared-service": "pipelineSteps.declaredService",
   "assess-ai-risk": "pipelineSteps.assessAiRisk",
   "source-file-tree": "pipelineSteps.sourceFileTree",
   "source-snapshot": "pipelineSteps.sourceSnapshot",

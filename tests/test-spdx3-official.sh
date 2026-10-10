@@ -70,6 +70,18 @@ complete full "the model with a complete declaration"
 convert draft "$FIX/bom-ai-sample.json"
 draft draft "the model with no declaration"
 
+echo "== the service the model runs in =="
+# The service is an ai_AIPackage (primaryPurpose application) with its data
+# flows as extension JSON text; an external API model is a software_Package.
+convert service "$FIX/bom-ai-sample.json" "$FIX/declaration-service.json"
+complete service "the model with a declared service and an external model"
+jq 'del(.service.releaseTime, .service.suppliedBy)' "$FIX/declaration-service.json" > "$WORK/decl-svc-draft.json"
+convert svcdraft "$FIX/bom-ai-sample.json" "$WORK/decl-svc-draft.json"
+complete svcdraft "a service the check calls a draft (no release time, no supplier)"
+jq 'del(.document)' "$FIX/declaration-service.json" > "$WORK/decl-svc-noauthor.json"
+convert svcnoauthor "$FIX/bom-ai-sample.json" "$WORK/decl-svc-noauthor.json"
+draft svcnoauthor "the service document with no author"
+
 echo "== licences and sources the publisher declares =="
 jq 'del(.metadata.component.licenses)' "$FIX/bom-ai-sample.json" > "$WORK/nolic.json"
 jq '.model.license = "apache-2.0"

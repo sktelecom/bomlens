@@ -13,8 +13,11 @@ import {
   hubDatasetEntry,
   isHubId,
   slugFor,
+  type DataFlow,
   type Declaration,
+  type ExternalModelEntry,
   type FieldIndex,
+  type ServiceAnswer,
   type StepId,
   type Value,
 } from "./aiDeclaration";
@@ -24,12 +27,16 @@ export interface DeclarationState {
   decl: Declaration;
 }
 
-/** Where an answer goes: the document, the model, one base model or one dataset. */
+/** Where an answer goes: the document, the model, one base model, one
+ *  dataset, the service, or one of the service's external models or data flows. */
 export type Target =
   | { kind: "document" }
   | { kind: "model" }
   | { kind: "base"; index: number }
-  | { kind: "dataset"; index: number };
+  | { kind: "dataset"; index: number }
+  | { kind: "service" }
+  | { kind: "externalModel"; index: number }
+  | { kind: "dataFlow"; index: number };
 
 export type DeclarationAction =
   | { type: "step"; step: StepId }
@@ -44,7 +51,19 @@ export type DeclarationAction =
   | { type: "clearBases" }
   | { type: "addHub"; index: FieldIndex; id: string }
   | { type: "removeHub"; index: number }
+  /** "Does this model run in a service?"; null takes the answer back. */
+  | { type: "serviceAnswer"; answer: ServiceAnswer | null }
+  | { type: "addExternalModel"; name: string }
+  | { type: "removeExternalModel"; index: number }
+  | { type: "addDataFlow"; classification: string }
+  | { type: "removeDataFlow"; index: number }
   | { type: "reset"; decl: Declaration; step: StepId };
+
+/** The key an external model gets from its name, unique in the service. */
+function externalKey(name: string, models: ExternalModelEntry[], self: number): string {
+  const taken = models.filter((_, i) => i !== self).map((m) => m.key);
+  return slugFor(name, taken, self + 1, "model");
+}
 
 export function declarationReducer(state: DeclarationState, action: DeclarationAction): DeclarationState {
   switch (action.type) {
@@ -66,6 +85,24 @@ export function declarationReducer(state: DeclarationState, action: DeclarationA
         decl.model = {
           ...decl.model,
           baseModels: bases.map((b, i) => (i === t.index ? { ...b, revision: String(action.value ?? "") } : b)),
+        };
+      } else if (t.kind === "service") {
+        if (!decl.service) return state;
+        decl.service = { ...decl.service, [action.field]: action.value };
+      } else if (t.kind === "externalModel") {
+        const models = decl.service?.externalModels ?? [];
+        const m = models[t.index];
+        if (!decl.service || !m) return state;
+        const next = { ...m, [action.field]: action.value } as ExternalModelEntry;
+        // The key follows the name until the declaration is saved.
+        if (action.field === "name") next.key = externalKey(String(action.value ?? ""), models, t.index);
+        decl.service = { ...decl.service, externalModels: models.map((x, i) => (i === t.index ? next : x)) };
+      } else if (t.kind === "dataFlow") {
+        const flows = decl.service?.dataFlows ?? [];
+        if (!decl.service || !flows[t.index]) return state;
+        decl.service = {
+          ...decl.service,
+          dataFlows: flows.map((x, i) => (i === t.index ? ({ ...x, [action.field]: action.value } as DataFlow) : x)),
         };
       } else {
         const d = decl.datasets[t.index];
@@ -135,6 +172,59 @@ export function declarationReducer(state: DeclarationState, action: DeclarationA
         decl: { ...state.decl, datasets: state.decl.datasets.filter((_, i) => i !== action.index) },
       };
     }
+    case "serviceAnswer": {
+      if (!state.decl.service) return state;
+      const decl = { ...state.decl };
+      if (action.answer) decl.serviceAnswer = action.answer;
+      else delete decl.serviceAnswer;
+      return { ...state, decl };
+    }
+    case "addExternalModel": {
+      const name = action.name.trim();
+      const svc = state.decl.service;
+      const models = svc?.externalModels ?? [];
+      if (!svc || !name || models.some((m) => m.name.trim().toLowerCase() === name.toLowerCase())) return state;
+      const entry: ExternalModelEntry = {
+        key: externalKey(name, [...models, { key: "", name }], models.length),
+        name,
+        suppliedBy: null,
+        packageVersion: "",
+        endpoint: "",
+      };
+      return { ...state, decl: { ...state.decl, service: { ...svc, externalModels: [...models, entry] } } };
+    }
+    case "removeExternalModel": {
+      const svc = state.decl.service;
+      if (!svc?.externalModels?.[action.index]) return state;
+      return {
+        ...state,
+        decl: {
+          ...state.decl,
+          service: { ...svc, externalModels: svc.externalModels.filter((_, i) => i !== action.index) },
+        },
+      };
+    }
+    case "addDataFlow": {
+      const svc = state.decl.service;
+      if (!svc) return state;
+      const flow: DataFlow = {
+        flow: "",
+        classification: action.classification.trim(),
+        name: "",
+        description: "",
+        source: [],
+        destination: [],
+      };
+      return { ...state, decl: { ...state.decl, service: { ...svc, dataFlows: [...(svc.dataFlows ?? []), flow] } } };
+    }
+    case "removeDataFlow": {
+      const svc = state.decl.service;
+      if (!svc?.dataFlows?.[action.index]) return state;
+      return {
+        ...state,
+        decl: { ...state.decl, service: { ...svc, dataFlows: svc.dataFlows.filter((_, i) => i !== action.index) } },
+      };
+    }
   }
 }
 
@@ -144,6 +234,9 @@ export interface PendingId {
   value: string;
   /** What adding it does; null when it is already there. */
   toAction: (id: string) => DeclarationAction | null;
+  /** Whether the typed value can be added. A HuggingFace id when not given
+   *  (a base model, a dataset, a source); any name for an external model. */
+  valid?: (value: string) => boolean;
 }
 
 /**
@@ -156,7 +249,7 @@ export function flushPendingIds(
   pending: PendingId[],
 ): { state: DeclarationState; actions: DeclarationAction[]; blocked: number } {
   const typed = pending.map((p) => ({ ...p, value: p.value.trim() }));
-  const blocked = typed.findIndex((p) => p.value !== "" && !isHubId(p.value));
+  const blocked = typed.findIndex((p) => p.value !== "" && !(p.valid ?? isHubId)(p.value));
   if (blocked >= 0) return { state, actions: [], blocked };
   const actions: DeclarationAction[] = [];
   let next = state;

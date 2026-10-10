@@ -4,7 +4,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 # 산출물 레퍼런스
 
-생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(`_bom.spdx3.json`, 아래 표)도 만듭니다.
+생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성, [선언한 AI 서비스](#선언한-ai-서비스)가 더하는 `services[]`)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(`_bom.spdx3.json`, 아래 표)도 만듭니다.
 
 파일명은 `{Project}_{Version}_bom.json`입니다(예: `MyApp_1.0.0_bom.json`).
 
@@ -15,9 +15,9 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_bom.json` | 항상 | SBOM (CycloneDX 1.6) |
 | `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all`, 또는 UI의 SPDX 2.3으로 내보내기 | SBOM (SPDX 2.3, CycloneDX 결과를 변환) |
 | `{Project}_{Version}_bom.spdx3.json` | AI 모델과 데이터셋 스캔(`--model`, `--model-file`, 데이터셋), `--no-spdx3`를 주지 않은 경우 | AI SBOM을 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(JSON-LD)로 담은 파일. 값은 CycloneDX 결과, 그 결과에 대한 고정 규칙, 모델 공개자의 선언(`--ai-declare`)에서만 가져오며 추정하지 않는다. SPDX에 "알 수 없음" 값이 없는 필수 필드(모델과 데이터의 공급 주체와 제작 주체, 출시일과 생성일, 내려받기 주소, 문서 작성자)는 선언하기 전까지 비어 있고, 그동안 문서에 초안이라고 표시한다. 기반 모델은 id와 라이선스로만 식별한다. 배포 가중치 범위는 CycloneDX 속성 확장의 `bomlens:weights:scope`(`full`, `adapter`, `quantized`, `merged`)로 담는다. `--analyze` 입력으로는 쓸 수 없다 |
-| `{Project}_{Version}_spdx3-check.json` / `.md` | SPDX 3.0.1 문서와 함께 | 요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. 법적 자문이 아닌 안내 |
+| `{Project}_{Version}_spdx3-check.json` / `.md` | SPDX 3.0.1 문서와 함께 | 요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. `service.state`는 선언한 서비스와 모델 값이 CycloneDX SBOM에 들어 있는지를 알린다. `none`(선언도 없고 SBOM에도 없음), `applied`(SBOM이 선언과 같음), `pendingScan`(둘이 다르며 다시 스캔하면 반영됨) 중 하나다. 법적 자문이 아닌 안내 |
 | `{Project}_{Version}_ai-declaration.template.json` | SPDX 3.0.1 문서와 함께 | 이 스캔의 빈 선언 양식. 모델과 데이터셋, 스캔이 찾은 기반 모델마다 사람이 채울 필드가 들어 있다. 채워서 `--ai-declare`로 다시 넘긴다 |
-| `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>`(받아들인 파일), 또는 웹 UI에서 저장한 선언 | 모델 공개자가 선언한 내용. `_vex.json`처럼 같은 프로젝트와 버전을 다시 스캔해도 지워지지 않고, 다시 스캔하면 다시 적용된다. 새 스캔에 없는 데이터셋이나 기반 모델을 적은 파일은 거부하며, 그 경우 문서는 초안으로 남는다. 데이터셋 항목에는 `sources[]`를 적을 수 있다. 허브 데이터셋은 `{"ref": "huggingface:<id>", "relation": "extended"}`로 적으며 다음 스캔에서 허브에서 읽어 그 데이터셋과 함께 판정한다. 문장으로만 아는 원천은 `{"name": "...", "license": "<허브 라이선스 태그나 SPDX ID>", "relation": "other"}`로 적으며 SPDX 3.0.1 문서에만 기록되고 확인되지 않은 것으로 표시된다. SPDX ID가 아닌 라이선스는 문장으로만 남는다. 허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있다. `model.license`(허브 라이선스 태그나 SPDX ID)는 모델 자체의 라이선스다. 스캔이 라이선스를 읽지 못했거나 `other`만 읽었을 때 SPDX 문서에 들어가고(SPDX 라이선스 하나에 대응하는 허브 태그나 `LicenseRef-`일 때만 SPDX 식으로 기록), 선언만으로 만든 모델은 SBOM에도 이 라이선스가 들어가 이것으로 판정한다 |
+| `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>`(받아들인 파일), 또는 웹 UI에서 저장한 선언 | 모델 공개자가 선언한 내용. `_vex.json`처럼 같은 프로젝트와 버전을 다시 스캔해도 지워지지 않고, 다시 스캔하면 다시 적용된다. 새 스캔에 없는 데이터셋이나 기반 모델을 적은 파일은 거부하며, 그 경우 문서는 초안으로 남는다. 데이터셋 항목에는 `sources[]`를 적을 수 있다. 허브 데이터셋은 `{"ref": "huggingface:<id>", "relation": "extended"}`로 적으며 다음 스캔에서 허브에서 읽어 그 데이터셋과 함께 판정한다. 문장으로만 아는 원천은 `{"name": "...", "license": "<허브 라이선스 태그나 SPDX ID>", "relation": "other"}`로 적으며 SPDX 3.0.1 문서에만 기록되고 확인되지 않은 것으로 표시된다. SPDX ID가 아닌 라이선스는 문장으로만 남는다. 허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있다. `model.license`(허브 라이선스 태그나 SPDX ID)는 모델 자체의 라이선스다. 스캔이 라이선스를 읽지 못했거나 `other`만 읽었을 때 SPDX 문서에 들어가고(SPDX 라이선스 하나에 대응하는 허브 태그나 `LicenseRef-`일 때만 SPDX 식으로 기록), 선언만으로 만든 모델은 SBOM에도 이 라이선스가 들어가 이것으로 판정한다. 선언에는 모델을 실행하는 서비스(`service`)와 모델의 입력과 출력 종류, 규제 제출용 값도 적을 수 있다. [선언한 AI 서비스](#선언한-ai-서비스)를 참고한다 |
 | `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 | 오픈소스 고지문 |
 | `{Project}_{Version}_NOTICE.pdf` | 위와 동일한 조건, 이미지에 PDF 렌더러가 포함된 경우(`--build-arg SBOM_PDF=true`) | 고지문을 PDF로 렌더링한 파일. 렌더러가 없으면 로그만 남기고 건너뜀 |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
@@ -40,6 +40,51 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 `{P}`=프로젝트 이름, `{V}`=버전 (특수문자는 `_`로 정규화).
 
 위 표의 생성 조건은 CLI 옵션 기준입니다. 웹 UI와 데스크톱 앱에서는 새 스캔 화면의 생성 옵션(고지문, 보안 보고서)이 같은 역할을 하고, 만들어진 파일은 결과 화면의 산출물 섹션에 모두 표시되어 형식별로 또는 ZIP 하나로 내려받을 수 있습니다. SPDX는 스캔 옵션이 아닙니다. 산출물 섹션의 SBOM 카드에 있는 **SPDX 2.3으로 내보내기** 버튼으로 필요할 때 완성된 SBOM을 변환하며, 변환된 파일은 산출물 목록과 ZIP 묶음에 함께 들어갑니다. UI에는 서명 기능이 없어 이렇게 내보낸 SPDX는 서명되지 않으므로, 서명이 필요하면 CLI에서 `--spdx --sign`을 쓰세요. [웹 UI와 데스크톱 앱](ui.ko.md)을 참고하세요.
+
+## 선언한 AI 서비스
+
+AI 선언(`--ai-declare`, 또는 웹 UI에서 저장한 선언)에는 최상위 `service` 객체로 모델을 실행하는 서비스를 적을 수 있고, 스캔으로 읽을 수 없는 모델 값 몇 가지도 적을 수 있습니다. `service`는 문서가 데이터셋이 아니라 모델을 기술할 때만 받으며, 값이 하나도 없는 `service`는 선언하지 않은 것으로 봅니다. 이 값들이 무엇을 위한 것인지는 [AI 모델 가이드](../guides/ai-model.ko.md#모델을-실행하는-서비스)에서 설명합니다.
+
+| 키 | 값 |
+|----|----|
+| `name` | 서비스 이름. 필수 |
+| `packageVersion` | 서비스 버전. 필수 |
+| `downloadLocation` | 서비스를 제공하는 주소(URI). 필수 |
+| `suppliedBy` | 서비스를 제공하는 조직, `{"type": "Organization", "name": "..."}`. 필수 |
+| `releaseTime` | 출시일, `YYYY-MM-DDThh:mm:ssZ`. 필수 |
+| `informationAboutApplication` | 서비스의 용도를 적은 글 |
+| `domain[]` | 서비스가 쓰이는 분야를 적은 글 |
+| `autonomyType` | AI의 결정에 사람이 관여하는지. `yes`(사람이 관여하지 않는 완전 자동), `no`(사람이 관여함), `noAssertion`(모름) |
+| `inputModality[]`, `outputModality[]` | 입력과 출력의 종류. `text`, `image`, `audio`, `video`, `timeseries`, `structured`, `code`, `other` |
+| `dataFlows[]` | 들어오고 나가는 데이터. 항목마다 `{flow, classification, name, description, source[], destination[]}`이다. `flow`는 `inbound`, `outbound`, `bi-directional`, `unknown` 중 하나다. `classification`은 필수(200자 이내)이며 개인정보처럼 어떤 데이터인지 적는다. `name`과 `description`은 선택이며, 설명에는 서비스가 그 데이터를 어떻게 쓰는지 적는다. `source[]`와 `destination[]`은 주소(URI)다 |
+| `standardCompliance[]` | 서비스가 따르는 표준의 이름 |
+| `disclosureUrl` | 서비스의 AI 사용을 설명하는 공개 페이지(URI) |
+| `externalModels[]` | 서비스가 API로 호출하는 AI 모델. 항목마다 `{key, name, suppliedBy, packageVersion, endpoint}`이다. `key`(영문 소문자, 숫자, `.`, `_`, `-`로 64자 이내, 목록 안에서 중복 불가)와 `name`은 필수이고, `endpoint`는 URI다 |
+
+필수 키는 SPDX가 서비스에 요구하는 항목이며, 모두 적을 때까지 문서는 초안으로 남습니다. 선언의 `model`에는 다음 다섯 키를 더 적을 수 있습니다.
+
+| 키 | 값 |
+|----|----|
+| `inputModality[]`, `outputModality[]` | 모델의 입력과 출력 종류. 값은 서비스와 같다 |
+| `trainingComputeFlops` | 모델 학습에 쓴 연산량(부동소수점 연산 횟수). `"3.2e24"`나 `"1500000"`처럼 문자열로 적은 양의 10진수 |
+| `trainingComputeBasis` | 그 수치를 산정한 방법을 적은 글 |
+| `adversarialTesting` | 적대적 시험을 했는지. `yes`, `no`, `noAssertion` |
+
+SPDX 3.0.1 문서에서 서비스는 `software_primaryPurpose`가 `application`인 `ai_AIPackage`이며, 범위(scope)가 `runtime`인 `dependsOn` 관계로 모델과 이어집니다. 외부 모델은 각각 용도가 `model`인 `software_Package`입니다. 데이터 흐름, 입력과 출력 종류, 모델의 규제 값은 CycloneDX 속성 확장으로 들어갑니다. `bomlens:service:dataFlow`(흐름마다 하나, serviceData를 압축한 JSON 문자열), `bomlens:service:input`과 `:output`, `bomlens:model:input`과 `:output`, `bomlens:regulatory:*`입니다.
+
+스캔은 같은 내용을 CycloneDX SBOM에도 기록합니다. 선언한 데이터셋 원천을 읽은 다음, 위험 판정과 G7 검사보다 먼저 도는 단계입니다.
+
+| 위치 | 내용 |
+|------|------|
+| `services[]`, bom-ref `service:declared/<이름>` | 서비스. `name`, `version`, `provider.name`, `endpoints[0]`(서비스 주소), `description`(용도), `data[]`(serviceData 형식의 데이터 흐름), 유형이 `documentation`인 `externalReferences` 항목(공개 페이지), 그리고 `bomlens:service:domain`, `:autonomyType`, `:input`, `:output`, `:releaseTime` 속성 |
+| `services[]`, bom-ref `service:declared-external/<key>` | 외부 모델마다 하나. `name`, `version`, `provider.name`, `endpoints`, `bomlens:service:declarationKey` |
+| `dependencies[]` | 서비스가 모델의 bom-ref와 각 외부 모델에 의존 |
+| `declarations.claims[]` | 표준마다 하나. 대상(target)은 서비스, 서술(predicate)은 표준 이름, 근거(reasoning)는 "publisher's declaration, not verified by BomLens" |
+| 모델 컴포넌트 | `bomlens:regulatory:trainingComputeFlops`, `:trainingComputeBasis`, `:adversarialTesting` 속성과, `modelCard.modelParameters.inputs[]`와 `outputs[]`에 적은 입력과 출력 종류(`{"format": "text"}`) |
+
+이렇게 기록한 서비스에는 모두 `bomlens:origin=declared-input`과 `bomlens:service:kind`(`application` 또는 `external-model`)가 붙고, 서비스 본체에는 `bomlens:service:declarationDigest`도 붙습니다. 모델 컴포넌트에는 선언에서 채운 위치마다 `bomlens:declared` 속성이 붙습니다. 값은 속성 이름이나 `modelCard` 경로이며, 이 단계가 `modelCard`나 `modelCard.modelParameters`를 새로 만들었다면 그 경로도 적습니다. 스캔이 이미 입력이나 출력을 기록했다면 그 값을 그대로 두고 `bomlens:declared:observedKept` 속성에 그 위치를 적습니다. `bomlens:model:declarationDigest`는 모델 값이 어느 선언에서 왔는지 기록합니다. 선언한 형식을 담으려고 새로 만든 `modelCard.modelParameters`는 G7 검사에서 모델 카드로 세지 않습니다. 이 단계는 같은 SBOM에 여러 번 돌려도 됩니다. 이전 실행이 쓴 내용을 먼저 지우므로, 서비스가 없는 선언을 적용하면 예전 서비스가 지워집니다. SPDX 변환기가 거부한 선언은 아예 적용하지 않습니다.
+
+G7 시스템 속성 요소는 선언한 서비스를 읽고, 이렇게 충족된 요소는 "있음 (발행자 선언, BomLens가 확인하지 않음)"으로 나옵니다. SPDX 2.3 내보내기와 `--diff`는 서비스를 다루지 않습니다. BomLens v1.13 이하는 `service`나 새 모델 키가 있는 선언을 "unknown key(s)" 오류로 거부합니다.
 
 ## SBOM 구조
 

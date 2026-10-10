@@ -1348,6 +1348,11 @@ if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
     fi
     if [ "$AI_MODEL_SCAN" = "true" ] && [ -n "$DECL_FOR_SOURCES" ] && [ -f "$DECL_FOR_SOURCES" ]; then
         run_optional_step declared-sources python3 "$LIBDIR/apply-declared-sources.py" "$OUTPUT_FILE" "$DECL_FOR_SOURCES"
+        # The service the model runs in (services[], with its dependencies and
+        # standard claims) and the model's declared input and output kinds,
+        # training compute and adversarial testing, each marked as the
+        # publisher's declaration. Before the G7 checks, which read them.
+        run_optional_step declared-service python3 "$LIBDIR/apply-declared-service.py" "$OUTPUT_FILE" "$DECL_FOR_SOURCES"
     fi
     run_optional_step assess-ai-risk bash "$LIBDIR/assess-ai-risk.sh" "$OUTPUT_FILE"
 fi

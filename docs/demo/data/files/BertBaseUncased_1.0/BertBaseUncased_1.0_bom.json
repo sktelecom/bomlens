@@ -87,6 +87,14 @@
           "value": "original"
         },
         {
+          "name": "bomlens:dataset:depth",
+          "value": "0"
+        },
+        {
+          "name": "bomlens:dataset:canonicalId",
+          "value": "bookcorpus/bookcorpus"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
         },
@@ -476,6 +484,14 @@
           "value": "original"
         },
         {
+          "name": "bomlens:dataset:depth",
+          "value": "0"
+        },
+        {
+          "name": "bomlens:dataset:canonicalId",
+          "value": "legacy-datasets/wikipedia"
+        },
+        {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
         },
@@ -698,6 +714,34 @@
           "value": "2"
         },
         {
+          "name": "bomlens:weights:file",
+          "value": "c0c9f4914b4f0053785e96b8583cd59cda63c2f1b6e95a03970d772bf097e289  coreml/fill-mask/float32_model.mlpackage/Data/com.apple.CoreML/weights/weight.bin"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "ea201fabe466ef7182f1f687fb5be4b62a73d3a78883f11264ff7f682cdb54bf  flax_model.msgpack"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "44d7a2896d341c51fb1eba89aea3a590e6af0ce33e25481136f7eeecb62e5f7f  model.onnx"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "68d45e234eb4a928074dfd868cead0219ab85354cc53d20e772753c6bb9169d3  model.safetensors"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "097417381d6c7230bd9e3557456d726de6e83245ec8b24f529f60198a67b203a  pytorch_model.bin"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "a7a17d6d844b5de815ccab5f42cad6d24496db3850a2a43d8258221018ce87d2  tf_model.h5"
+        },
+        {
+          "name": "bomlens:hf:revisionTime",
+          "value": "2024-02-19T11:06:12+00:00"
+        },
+        {
           "name": "cdx:ai:kind",
           "value": "model"
         },
@@ -727,11 +771,11 @@
         },
         {
           "name": "cdx:huggingface:downloads",
-          "value": "45895818"
+          "value": "36717147"
         },
         {
           "name": "cdx:huggingface:downloadsAllTime",
-          "value": "3239324091"
+          "value": "3257030849"
         },
         {
           "name": "cdx:huggingface:fileCount",
@@ -755,7 +799,7 @@
         },
         {
           "name": "cdx:huggingface:likes",
-          "value": "3367"
+          "value": "3397"
         },
         {
           "name": "cdx:huggingface:private",
@@ -812,7 +856,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-23T00:56:58+00:00",
+    "timestamp": "2026-10-10T06:33:21+00:00",
     "tools": {
       "components": [
         {
@@ -828,12 +872,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.12.1"
+          "version": "1.13.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:5b8d18ff-c6f6-42f7-bbfd-0192fb7820a1",
+  "serialNumber": "urn:uuid:4cd8c544-87b3-45e9-9cd1-2171f2a08e38",
   "specVersion": "1.7",
   "version": 1,
   "compositions": [

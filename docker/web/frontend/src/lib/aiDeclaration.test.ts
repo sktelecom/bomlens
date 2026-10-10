@@ -8,8 +8,16 @@ import { describe, expect, it } from "vitest";
 import {
   adapterWithoutBase,
   bandSegments,
+  blankDeep,
   checkValue,
   COMMON_LICENSES,
+  dataFlowFields,
+  DATASET_MORE_FIELDS,
+  isPositiveDecimal,
+  modelCdxValues,
+  parseFlowDisplay,
+  REGULATORY_FIELDS,
+  serviceDeclared,
   firstOpenIn,
   firstOpenStep,
   formatDay,
@@ -611,5 +619,266 @@ describe("COMMON_LICENSES", () => {
       readFileSync(new URL("../../../../lib/ai-risk-knowledge.json", import.meta.url), "utf-8"),
     ) as { hfLicenseTags: string[] };
     for (const l of COMMON_LICENSES) expect(knowledge.hfLicenseTags).toContain(l);
+  });
+});
+
+describe("the service a model runs in", () => {
+  // The converter's empty declaration with its blank service.
+  const withService = (): Declaration =>
+    startDeclaration({
+      ...TEMPLATE,
+      service: {
+        name: "",
+        packageVersion: "",
+        downloadLocation: "",
+        suppliedBy: null,
+        releaseTime: "",
+        informationAboutApplication: "",
+        domain: [],
+        autonomyType: "",
+        inputModality: [],
+        outputModality: [],
+        dataFlows: [],
+        standardCompliance: [],
+        disclosureUrl: "",
+        externalModels: [],
+      },
+    }) as Declaration;
+  const filled = (): Declaration => {
+    const d = withService();
+    d.serviceAnswer = "yes";
+    Object.assign(d.service!, {
+      name: "Acme Support Assistant",
+      packageVersion: "2.3.0",
+      downloadLocation: "https://support.acme.example/assistant",
+      suppliedBy: { type: "Organization", name: "Acme Corp" },
+      releaseTime: "2025-06-01T00:00:00Z",
+      autonomyType: "no",
+      dataFlows: [
+        {
+          flow: "inbound",
+          classification: " personal data ",
+          name: "",
+          description: "Questions typed in the chat",
+          source: ["https://support.acme.example/chat", ""],
+          destination: [],
+        },
+        { flow: "", classification: "", name: "", description: "", source: [], destination: [] },
+      ],
+      externalModels: [
+        {
+          key: "example-translate",
+          name: "Example Translate",
+          suppliedBy: null,
+          packageVersion: "",
+          endpoint: "https://api.translate.example/v1",
+        },
+        { key: "", name: "", suppliedBy: null, packageVersion: "", endpoint: "" },
+      ],
+    });
+    return d;
+  };
+
+  it("reads the service and the external models from the mapping", () => {
+    expect(index.service.suppliedBy.agentTypes).toEqual(["Organization"]);
+    expect(index.service.dataFlows.flowEnum).toEqual(["inbound", "outbound", "bi-directional", "unknown"]);
+    expect(index.externalModel.name.min).toBe(1);
+    expect(index.ai_AIPackage.trainingComputeFlops.type).toBe("decimal");
+    // A mapping from before services asks no service questions.
+    const old = JSON.parse(JSON.stringify(MAP)) as { elements: Record<string, unknown> };
+    delete old.elements.service;
+    delete old.elements.externalModel;
+    const oldIndex = parseMap(old) as FieldIndex;
+    expect(oldIndex.service).toEqual({});
+    expect(createTemplate(oldIndex).service).toBeUndefined();
+  });
+
+  it("offers the service step for a model's document only", () => {
+    expect(stepsFor(index, withService())).toEqual(["base", "model", "data", "service", "legal", "preview"]);
+    // A template without a service (an older server) has no service step.
+    expect(stepsFor(index, startDeclaration(TEMPLATE) as Declaration)).not.toContain("service");
+    // A dataset's document never has one, even if a saved file names a service.
+    const ds = startDeclaration(
+      { ...TEMPLATE, model: undefined },
+      { ...TEMPLATE, model: undefined, service: { name: "x" } },
+    ) as Declaration;
+    expect(ds.service).toBeUndefined();
+    expect(stepsFor(index, ds)).toEqual(["data", "preview"]);
+    expect(stepsFor(index, createTemplate(index), true)).toContain("service");
+  });
+
+  it("counts the service's required fields only once the answer is yes", () => {
+    const d = withService();
+    const before = remainingRequired(issues(index, d, false));
+    for (const answer of ["no", "later"] as const) {
+      expect(remainingRequired(issues(index, { ...d, serviceAnswer: answer }, false))).toBe(before);
+    }
+    const yes = issues(index, { ...d, serviceAnswer: "yes" }, false);
+    expect(remainingRequired(yes)).toBe(before + 5);
+    expect(
+      yes
+        .filter((i) => i.where === "service")
+        .map((i) => i.field)
+        .sort(),
+    ).toEqual(["downloadLocation", "name", "packageVersion", "releaseTime", "suppliedBy"]);
+    // Open required fields keep the document a draft but never block saving.
+    expect(saveBlockers(yes)).toEqual([]);
+    expect(firstOpenIn("service", yes)?.where).toBe("service");
+  });
+
+  it("reports what the converter would refuse in a data flow or an external model", () => {
+    const d = filled();
+    d.service!.dataFlows = [
+      { flow: "", classification: "x", source: ["ftp:/bad"] },
+      { flow: "outbound", classification: "", destination: ["mailto:a@b.example"] },
+    ];
+    d.service!.externalModels = [
+      { key: "a", name: "", endpoint: "https://x.example" },
+      { key: "dup", name: "One" },
+      { key: "dup", name: "Two" },
+    ];
+    const found = issues(index, d, true).map((i) => `${i.where}.${i.field}:${i.problem}`);
+    expect(found).toEqual(
+      expect.arrayContaining([
+        "service.dataFlows[0].flow:flowMissing",
+        "service.dataFlows[0].source:uri",
+        "service.dataFlows[1].classification:classificationMissing",
+        "service.dataFlows[1].destination:uri",
+        "service.externalModels[0].name:externalName",
+        "service.externalModels[2].name:externalTwice",
+      ]),
+    );
+    // Each of them blocks saving; the service's own required fields are filled.
+    expect(saveBlockers(issues(index, d, true)).filter((i) => i.where.startsWith("service"))).toHaveLength(6);
+    expect(stepOf({ where: "service.dataFlows[0]", field: "flow", problem: "flowMissing" })).toBe("service");
+    // A provider must be an organization.
+    d.service!.suppliedBy = { type: "Person", name: "Kim" };
+    expect(issues(index, d, true)).toContainEqual({ where: "service", field: "suppliedBy", problem: "agentType" });
+    // Nothing is checked while the answer is not yes.
+    expect(issues(index, { ...d, serviceAnswer: "later" }, true).some((i) => i.where.startsWith("service"))).toBe(false);
+  });
+
+  it("checks a decimal as the converter does", () => {
+    const f = index.ai_AIPackage.trainingComputeFlops;
+    for (const ok of ["3.2e24", "1500000", "1E+25", ".5", "2.0e-3"]) expect(checkValue(f, ok)).toBeNull();
+    for (const bad of ["0", "0.0e5", "-1", "3,2e24", "about 1e24", "1e", "1".repeat(101)])
+      expect(checkValue(f, bad)).toBe("decimal");
+    expect(checkValue(f, "")).toBeNull();
+    expect(isPositiveDecimal(" 3.2e24 ")).toBe(true);
+    const d = createTemplate(index);
+    d.model!.trainingComputeFlops = "lots";
+    expect(issues(index, d, true)).toContainEqual({ where: "model", field: "trainingComputeFlops", problem: "decimal" });
+  });
+
+  it("saves the service with blank rows left out, and drops a service left empty or not chosen", () => {
+    const file = toFile(filled());
+    expect(file.service).toEqual({
+      name: "Acme Support Assistant",
+      packageVersion: "2.3.0",
+      downloadLocation: "https://support.acme.example/assistant",
+      suppliedBy: { type: "Organization", name: "Acme Corp" },
+      releaseTime: "2025-06-01T00:00:00Z",
+      autonomyType: "no",
+      dataFlows: [
+        {
+          flow: "inbound",
+          classification: "personal data",
+          description: "Questions typed in the chat",
+          source: ["https://support.acme.example/chat"],
+        },
+      ],
+      externalModels: [
+        { key: "example-translate", name: "Example Translate", endpoint: "https://api.translate.example/v1" },
+      ],
+    });
+    expect("serviceAnswer" in file).toBe(false);
+    // Yes with nothing typed is no service; no and later keep what was typed out of the file.
+    expect(toFile({ ...withService(), serviceAnswer: "yes" }).service).toBeUndefined();
+    expect(toFile({ ...filled(), serviceAnswer: "later" }).service).toBeUndefined();
+    expect(toFile({ ...filled(), serviceAnswer: "no" }).service).toBeUndefined();
+  });
+
+  it("keeps a saved service when the questions reopen", () => {
+    const saved = toFile(filled());
+    const back = startDeclaration({ ...TEMPLATE, service: withService().service }, saved) as Declaration;
+    expect(back.serviceAnswer).toBe("yes");
+    expect(toFile(back).service).toEqual(saved.service);
+    const again = startCreate(index, toFile(filled(), true));
+    expect(again.serviceAnswer).toBe("yes");
+    expect(toFile(again, true).service).toEqual(saved.service);
+    // The ids a declared model named are kept, and so is its service.
+    expect(keepDeclaredIds(toFile(back), saved).service).toEqual(saved.service);
+    // A template whose service is blank is not a declared service.
+    expect(withService().serviceAnswer).toBeUndefined();
+  });
+
+  it("does not ask the model's autonomy again once the service answers it", () => {
+    const d = withService();
+    expect(judgmentFields(index, d)).toContain("autonomyType");
+    const yes = { ...d, serviceAnswer: "yes" as const };
+    expect(judgmentFields(index, yes)).not.toContain("autonomyType");
+    expect(judgmentFields(index, yes)).toContain("safetyRiskAssessment");
+    // One answered before stays to be seen.
+    expect(judgmentFields(index, { ...yes, model: { ...yes.model, autonomyType: "yes" } })).toContain("autonomyType");
+    expect(judgmentFields(index, { ...d, serviceAnswer: "no" })).toContain("autonomyType");
+    // Its review lists only what the decisions step asks.
+    const legal = summaryGroups(index, { ...yes, model: { ...yes.model, safetyRiskAssessment: "low" } }, ["legal"]);
+    expect(legal[0].rows.map((r) => r.field.id)).toEqual(["safetyRiskAssessment"]);
+  });
+
+  it("puts the regulatory fields in their own fold and the dataset's known bias in the main questions", () => {
+    const main = modelMainFields(index, createTemplate(index));
+    for (const k of REGULATORY_FIELDS) expect(main).not.toContain(k);
+    expect(main).toEqual(expect.arrayContaining(["inputModality", "outputModality"]));
+    expect(DATASET_MORE_FIELDS).not.toContain("knownBias");
+  });
+
+  it("lists the service in the review, and reads the new vocabulary words", () => {
+    const groups = summaryGroups(index, filled(), ["model", "service", "preview"]);
+    const svc = groups.find((g) => g.step === "service");
+    expect(svc?.rows.map((r) => r.field.id)).toEqual(
+      expect.arrayContaining(["name", "packageVersion", "downloadLocation", "suppliedBy", "releaseTime", "autonomyType"]),
+    );
+    expect(svc?.rows.every((r) => r.ns === "service")).toBe(true);
+    expect(summaryGroups(index, { ...filled(), serviceAnswer: "no" }, ["service"])).toEqual([]);
+    expect(readDisplay("inputModality", "text, image")).toEqual({ kind: "enum", values: ["text", "image"] });
+    expect(readDisplay("adversarialTesting", "yes")).toEqual({ kind: "enum", values: ["yes"] });
+  });
+
+  it("knows a blank row from a written one, and when a service is declared", () => {
+    expect(blankDeep({ key: "model-1", name: " ", suppliedBy: { type: "Organization", name: "" } })).toBe(true);
+    expect(blankDeep({ flow: "", classification: "", source: [""] })).toBe(true);
+    expect(blankDeep({ flow: "inbound" })).toBe(false);
+    expect(serviceDeclared(filled())).toBe(true);
+    expect(serviceDeclared({ ...withService(), serviceAnswer: "yes" })).toBe(false);
+  });
+
+  it("knows when model values also go into the CycloneDX SBOM", () => {
+    const d = createTemplate(index);
+    expect(modelCdxValues(d)).toBe(false);
+    expect(modelCdxValues({ ...d, model: { ...d.model, inputModality: ["text"] } })).toBe(true);
+    expect(modelCdxValues({ ...d, model: { ...d.model, adversarialTesting: "yes" } })).toBe(true);
+    expect(modelCdxValues({ ...d, model: undefined })).toBe(false);
+  });
+
+  it("splits the check's data flow text into directions and the rest", () => {
+    expect(parseFlowDisplay("inbound: personal data, bi-directional: logs, a, b")).toEqual([
+      { flow: "inbound", text: "personal data" },
+      { flow: "bi-directional", text: "logs, a, b" },
+    ]);
+    expect(parseFlowDisplay("outbound: x, unknown: y")).toEqual([
+      { flow: "outbound", text: "x" },
+      { flow: "unknown", text: "y" },
+    ]);
+    // Not one of the four directions: the text as it is.
+    expect(parseFlowDisplay("sideways: data")).toEqual([{ flow: null, text: "sideways: data" }]);
+    expect(parseFlowDisplay("")).toEqual([{ flow: null, text: "" }]);
+  });
+
+  it("gives a data flow's questions with the mapping's directions", () => {
+    const f = dataFlowFields(index);
+    expect(f.map((x) => x.id)).toEqual(["flow", "classification", "name", "description", "source", "destination"]);
+    expect(f[0].enum).toEqual(["inbound", "outbound", "bi-directional", "unknown"]);
+    expect(required(f[0]) && required(f[1])).toBe(true);
   });
 });

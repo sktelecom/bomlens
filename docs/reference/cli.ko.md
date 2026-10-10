@@ -31,7 +31,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--model-file <경로>` | — | AI 모델 파일 하나를 읽어 그 헤더만으로 기술한다. GGUF, safetensors, PyTorch(`.pt`/`.pth`/`.ckpt`), pickle, npz, npy, ONNX를 인식한다. 오프라인으로 동작하고 HuggingFace 계정이 필요 없어 공개하지 않은 모델도 스캔할 수 있다. 채울 수 있는 정보는 형식마다 다르다. GGUF는 이름과 라이선스, 아키텍처를 담고 있지만 safetensors는 대개 텐서 정보만 있으며, 파일이 선언하지 않은 값은 추측하지 않고 비워 둔다. `--target`에 `.gguf`나 `.safetensors`, `.pt` 같은 경로를 주면 이 방식으로 읽는다. `--target`/`--analyze`/`--git`와 배타 |
 | `--license <spdx-id>` | — | 프로젝트를 배포하는 배포 라이선스(예: `Apache-2.0`). SBOM 루트 컴포넌트에 기록하고, 조건이 충돌하는 의존성을 표시하는 데 쓴다. 소스 스캔으로는 알아낼 수 없어(cdxgen이 maven과 gradle에서 루트 라이선스를 비워 둔다) 지정하지 않으면 충돌 판정을 내리지 않는다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않는다 |
 | `--sbom-author <name>` | — | 이 SBOM을 생성한 주체. 스캔을 실행하는 조직이나 사람을 가리키며, 도구도 소프트웨어를 만든 쪽도 아니다. `metadata.authors`에 정식 명칭으로 기록하고 약어는 쓰지 않는다. 스캔으로는 알아낼 수 없는 값이라 지정하지 않으면 자리표시자를 채우지 않고 필드를 빼 둔다 |
-| `--ai-declare <file>` | — | AI 모델이나 데이터셋 스캔에서, 스캔으로 읽을 수 없는 내용을 모델 공개자가 선언한 파일(JSON). 출시일, 모델과 데이터를 만든 주체, 학습과 평가에 쓴 데이터셋, 기반 모델 리비전, 배포 가중치 범위 같은 값이다. SPDX 3.0.1 AI 문서에만 반영하고 CycloneDX SBOM은 바꾸지 않는다. 모든 AI 스캔이 시작점으로 쓸 빈 양식 `{Project}_{Version}_ai-declaration.template.json`을 만든다. 스캔에 없는 필드, 값, 데이터셋, 기반 모델을 적은 파일은 이유와 함께 거부하고, 문서는 선언 없이 초안으로 만든다. 받아들인 파일은 `{Project}_{Version}_ai-declaration.json`으로 보관하고 같은 버전을 다시 스캔할 때 다시 적용한다. `--model`, `--model-file`, `--target` 없이 이 옵션만 주면 허브 저장소나 파일이 아직 없는 모델을 기술한다(`MODE=AIDECLARE`, 기본 이미지). `model.baseModels[].ref`의 기반 모델과 `datasets[].ref`(`huggingface:<owner>/<name>`)의 데이터셋은 허브에서 id로 읽고, `datasets[].local`에는 허브에 없는 데이터를 적으며, 모델 이름과 버전은 `--project`와 `--version`을 쓴다. 내려받기 주소와 공급자를 선언하지 않으면 SPDX 문서는 초안으로 남는다. `--ui`(모델 · 데이터셋 화면 사용)와 `--diff`에는 쓸 수 없다 |
+| `--ai-declare <file>` | — | AI 모델이나 데이터셋 스캔에서, 스캔으로 읽을 수 없는 내용을 모델 공개자가 선언한 파일(JSON). 출시일, 모델과 데이터를 만든 주체, 학습과 평가에 쓴 데이터셋, 기반 모델 리비전, 배포 가중치 범위 같은 값이다. 선언한 값은 대부분 SPDX 3.0.1 AI 문서에만 반영한다. 예외는 모델을 실행하는 서비스(`service`)와 모델의 입력과 출력 종류, 학습 연산량, 적대적 시험 여부이며, 이 값들은 CycloneDX SBOM에도 발행자 선언으로 표시되어 들어간다([아래 예시](#ai-선언-파일) 참고). 모든 AI 스캔이 시작점으로 쓸 빈 양식 `{Project}_{Version}_ai-declaration.template.json`을 만든다. 스캔에 없는 필드, 값, 데이터셋, 기반 모델을 적은 파일은 이유와 함께 거부하고, 문서는 선언 없이 초안으로 만든다. 받아들인 파일은 `{Project}_{Version}_ai-declaration.json`으로 보관하고 같은 버전을 다시 스캔할 때 다시 적용한다. `--model`, `--model-file`, `--target` 없이 이 옵션만 주면 허브 저장소나 파일이 아직 없는 모델을 기술한다(`MODE=AIDECLARE`, 기본 이미지). `model.baseModels[].ref`의 기반 모델과 `datasets[].ref`(`huggingface:<owner>/<name>`)의 데이터셋은 허브에서 id로 읽고, `datasets[].local`에는 허브에 없는 데이터를 적으며, 모델 이름과 버전은 `--project`와 `--version`을 쓴다. 내려받기 주소와 공급자를 선언하지 않으면 SPDX 문서는 초안으로 남는다. `--ui`(모델 · 데이터셋 화면 사용)와 `--diff`에는 쓸 수 없다 |
 | `--no-spdx3` | false | AI 모델이나 데이터셋 스캔에서 SPDX 3.0.1 AI 문서와 그 검사 결과, 선언 양식을 만들지 않는다 |
 | `--vex <file>` | — | 공급사가 이 제품에 대해 보낸 CycloneDX VEX 문서(JSON). 스캔한 SBOM의 컴포넌트에 해당하는 진술을 `{Project}_{Version}_vex_imported.json`에 보관하며, SBOM과 보안 보고서는 바꾸지 않는다. 진술이 보안 보고서의 발견 항목에 표시되므로 `--deep-cve`처럼 보안 보고서도 함께 켠다. 웹 UI에서 스캔 폴더를 열면 취약점 행에서 볼 수 있다. 제품이나 버전이 다른 문서, 또는 CycloneDX VEX가 아닌 파일은 알리고 건너뛰며 스캔은 끝까지 진행한다. 적용할 진술이 없는 문서는 이전 `_vex_imported.json`을 그대로 둔다. `--ui`(취약점 화면의 "VEX 가져오기" 사용)와 `--diff`에는 쓸 수 없다 |
 | `--usage <scenario>` | — | AI 모델 위험 판정을 사용 형태에 맞춘다(`--model`과 `--model-file`): `internal`, `product`, `redistribute`, `outputs-only`. 그 사용 형태에 적용되는 라이선스 조건만으로 판정하고, 보고서에 어떤 형태 기준인지 명시한다. 지정하지 않으면 전체 조건 기준으로 판정한다 |
@@ -118,6 +118,51 @@ Windows에서는 명령 프롬프트에서 설정한 환경변수가 더블클�
 `%USERPROFILE%\.bomlens\settings.txt`에 두면 됩니다. 실제 환경변수가 있으면 그쪽이 우선합니다.
 
 출력 플래그 상세는 [보고서 생성 가이드](../guides/reports.ko.md)를, 공급사 SBOM 검증은 [공급사 SBOM 검증](../guides/supplier-sbom.ko.md)을 참고하세요.
+
+## AI 선언 파일
+
+`--ai-declare`는 JSON 파일을 받습니다. AI 스캔이 만든 `{Project}_{Version}_ai-declaration.template.json`에서 시작해 해당하는 항목만 채우면 됩니다. 아래 예는 고객 상담 채팅 서비스에서 실행되며 외부 번역 모델을 호출하는 모델을 기술합니다.
+
+```json
+{
+  "schema": "bomlens-ai-declaration/1",
+  "document": {"createdBy": [{"type": "Organization", "name": "Acme AI Lab"}]},
+  "model": {
+    "releaseTime": "2025-04-15T00:00:00Z",
+    "originatedBy": [{"type": "Organization", "name": "Acme AI Lab"}],
+    "inputModality": ["text"],
+    "outputModality": ["text"],
+    "trainingComputeFlops": "3.2e21",
+    "trainingComputeBasis": "6 x parameters x training tokens, from the training logs",
+    "adversarialTesting": "yes"
+  },
+  "service": {
+    "name": "Acme Support Assistant",
+    "packageVersion": "2.3.0",
+    "downloadLocation": "https://support.acme.example/assistant",
+    "suppliedBy": {"type": "Organization", "name": "Acme Corp"},
+    "releaseTime": "2025-06-01T00:00:00Z",
+    "autonomyType": "no",
+    "dataFlows": [
+      {"flow": "outbound", "classification": "personal data",
+       "description": "Questions forwarded to the external translation model.",
+       "destination": ["https://api.translate.example/v1"]}
+    ],
+    "externalModels": [
+      {"key": "translate", "name": "Example Translate",
+       "suppliedBy": {"type": "Organization", "name": "Example Inc"},
+       "endpoint": "https://api.translate.example/v1"}
+    ]
+  }
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project support-adapter --version 1.0 \
+  --model "acme/support-adapter" --ai-declare declaration.json --generate-only
+```
+
+`service`와 모델의 입력과 출력 종류, 학습 연산량, 적대적 시험 여부는 같은 실행에서 CycloneDX SBOM에 들어가고, 나머지 값은 SPDX 3.0.1 문서에만 들어갑니다. 키와 허용 값 전체는 [선언한 AI 서비스](artifacts.ko.md#선언한-ai-서비스)에 있습니다. BomLens v1.13 이하는 `service`나 이 모델 키가 있는 파일을 "unknown key(s)" 오류로 거부합니다. `--ai-declare`만 입력으로 줄 때는 `--no-spdx3`를 함께 쓸 수 없습니다. 선언한 값 대부분이 들어갈 곳이 없어지기 때문입니다.
 
 ## 산출물 위치
 

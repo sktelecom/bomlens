@@ -4,7 +4,7 @@
   "subjectLabel": "model component",
   "emptySubjectDetail": "no machine-learning-model components",
   "spec": "G7 Software Bill of Materials for AI — Minimum Elements (BSI/ACN et al., 2026-05)",
-  "note": "Declarative map of the 50 G7 minimum elements (7 clusters) to CycloneDX 1.7 ML-BOM checks. Read by validate-sbom.sh's registry evaluator, which binds $subjects = the components the registry declares as its subject (here machine-learning-model components) once per run. Element shapes: 'cdxPath' is a jq boolean over the whole SBOM (pass / not present); 'missingPath' is a jq expression (may use $subjects) returning the names of model components MISSING the element — per-model coverage, so one unlicensed model in a multi-model SBOM warns with the offender listed instead of passing on any-model presence; when both are null the element has no automated source and is surfaced as 'requires human review'. 'source' records where a satisfied value comes from: auto (read directly), inferred (derived from signals), declared (present only if a human/manifest supplied it), na (no automated source). 'role' is informational — the party the G7 text names as the provider — NOT a required/optional gate (the G7 document defines no per-role required matrix). Openness (open weight/architecture/data/training) is not a separate G7 element; the spec lists it as an example facet of 'Model license', so g7-model-openness is grouped under models and tied to the license element; it accepts either openness:* properties (written by enrich-aibom.sh) or a prose declaration anywhere in the SBOM, so supplier SBOMs that state openness in text still count.",
+  "note": "Declarative map of the 50 G7 minimum elements (7 clusters) to CycloneDX 1.7 ML-BOM checks. Read by validate-sbom.sh's registry evaluator, which binds $subjects = the components the registry declares as its subject (here machine-learning-model components) once per run. Element shapes: 'cdxPath' is a jq boolean over the whole SBOM (pass / not present); 'missingPath' is a jq expression (may use $subjects) returning the names of model components MISSING the element — per-model coverage, so one unlicensed model in a multi-model SBOM warns with the offender listed instead of passing on any-model presence; when both are null the element has no automated source and is surfaced as 'requires human review'. 'source' records where a satisfied value comes from: auto (read directly), inferred (derived from signals), declared (present only if a human/manifest supplied it), na (no automated source). 'role' is informational — the party the G7 text names as the provider — NOT a required/optional gate (the G7 document defines no per-role required matrix). Openness (open weight/architecture/data/training) is not a separate G7 element; the spec lists it as an example facet of 'Model license', so g7-model-openness is grouped under models and tied to the license element; it accepts either openness:* properties (written by enrich-aibom.sh) or a prose declaration anywhere in the SBOM, so supplier SBOMs that state openness in text still count. 'absentSource' (optional) is the source an element reports when its cdxPath finds nothing: 'na' keeps the element a human-review item until a value is present (the system data flow, data usage, input/output and application area are read from CycloneDX services[], which a declared service fills; without one they read exactly as before). 'declaredPath' (optional) is a jq boolean saying the satisfying value comes from the publisher's declaration (a service marked bomlens:origin=declared-input); the check's detail then says so, since BomLens did not verify it. g7-model-card does not count a modelCard.modelParameters that apply-declared-service.py created only to hold the declared input/output formats (it is named in bomlens:declared): that is not a model card. g7-model-io still reads those formats, marked as the publisher's declaration.",
   "clusters": [
     {
       "id": "metadata",
@@ -106,7 +106,9 @@
           "label_ko": "시스템 이름",
           "role": "system-producer",
           "source": "declared",
-          "cdxPath": "((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))"
+          "cdxPath": "(((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))) or (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.name // \"\") != \"\")) | length) > 0)",
+          "declaredPath": "((((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))) | not) and (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.name // \"\") != \"\")) | length) > 0)",
+          "evidencePath": "if (((.metadata.component // {}) | (.type != \"machine-learning-model\") and ((.name // \"\") != \"\"))) then [] else ([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.name // empty | select(. != \"\")) | unique) end"
         },
         {
           "id": "g7-slp-components",
@@ -122,7 +124,9 @@
           "label_ko": "시스템 제작자",
           "role": "system-producer",
           "source": "declared",
-          "cdxPath": "((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)"
+          "cdxPath": "(((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)) or (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.provider.name // \"\") != \"\")) | length) > 0)",
+          "declaredPath": "((((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)) | not) and (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.provider.name // \"\") != \"\")) | length) > 0)",
+          "evidencePath": "if (((.metadata.component.publisher // \"\") != \"\") or ((.metadata.supplier // null) != null)) then [] else ([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.provider.name // empty | select(. != \"\")) | unique) end"
         },
         {
           "id": "g7-slp-version",
@@ -130,7 +134,9 @@
           "label_ko": "시스템 버전",
           "role": "system-producer",
           "source": "inferred",
-          "cdxPath": "((.metadata.component.version // \"\") != \"\")"
+          "cdxPath": "(((.metadata.component.version // \"\") != \"\")) or (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.version // \"\") != \"\")) | length) > 0)",
+          "declaredPath": "((((.metadata.component.version // \"\") != \"\")) | not) and (([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select((.version // \"\") != \"\")) | length) > 0)",
+          "evidencePath": "if (((.metadata.component.version // \"\") != \"\")) then [] else ([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.version // empty | select(. != \"\")) | unique) end"
         },
         {
           "id": "g7-slp-timestamp",
@@ -145,32 +151,43 @@
           "label": "System data flow",
           "label_ko": "시스템 데이터 흐름",
           "role": "system-producer",
-          "source": "na",
-          "cdxPath": null
+          "source": "declared",
+          "cdxPath": "([ (.services // [])[]? | recurse(.services[]?) | select(type==\"object\") ] | map((.data // [])[]? | select(type==\"object\" and ((.flow // \"\") != \"\"))) | length) > 0",
+          "absentSource": "na",
+          "declaredPath": "([ (.services // [])[]? | recurse(.services[]?) | select(type==\"object\") ] | map(select(((.data // []) | length) > 0) | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") | not)) | length) == 0",
+          "evidencePath": "[ (.services // [])[]? | recurse(.services[]?) | select(type==\"object\") ] | map((.data // [])[]? | select(type==\"object\" and ((.flow // \"\") != \"\"))) | map(\"\\(.flow): \\(.classification // \"\")\") | unique"
         },
         {
           "id": "g7-slp-data-usage",
           "label": "System data usage",
           "label_ko": "시스템 데이터 사용",
           "role": "system-producer",
-          "source": "na",
-          "cdxPath": null
+          "source": "declared",
+          "cdxPath": "([ (.services // [])[]? | recurse(.services[]?) | select(type==\"object\") ] | map((.data // [])[]? | select(type==\"object\" and ((.description // \"\") != \"\"))) | length) > 0",
+          "absentSource": "na",
+          "declaredPath": "([ (.services // [])[]? | recurse(.services[]?) | select(type==\"object\") ] | map(select(([(.data // [])[]? | select(type==\"object\" and ((.description // \"\") != \"\"))] | length) > 0) | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") | not)) | length) == 0"
         },
         {
           "id": "g7-slp-io",
           "label": "System input/output properties",
           "label_ko": "시스템 입출력 속성",
           "role": "system-producer",
-          "source": "na",
-          "cdxPath": null
+          "source": "declared",
+          "cdxPath": "([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.properties[]? | select(.name==\"bomlens:service:input\" or .name==\"bomlens:service:output\")) | length) > 0",
+          "absentSource": "na",
+          "declaredPath": "true",
+          "evidencePath": "[ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.properties[]? | select(.name==\"bomlens:service:input\" or .name==\"bomlens:service:output\")) | map(\"\\(.name | ltrimstr(\"bomlens:service:\")): \\(.value)\") | unique"
         },
         {
           "id": "g7-slp-app-area",
           "label": "Intended application area",
           "label_ko": "적용 대상 분야",
           "role": "system-producer",
-          "source": "na",
-          "cdxPath": null
+          "source": "declared",
+          "cdxPath": "([ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(select(((.description // \"\") != \"\") or any(.properties[]?; .name==\"bomlens:service:domain\"))) | length) > 0",
+          "absentSource": "na",
+          "declaredPath": "true",
+          "evidencePath": "[ .services[]? | select(type==\"object\") | select(any(.properties[]?; .name==\"bomlens:origin\" and .value==\"declared-input\") and any(.properties[]?; .name==\"bomlens:service:kind\" and .value==\"application\")) ] | map(.properties[]? | select(.name==\"bomlens:service:domain\") | .value) | unique"
         }
       ]
     },
@@ -252,8 +269,8 @@
           "label_ko": "모델 속성 (모델 카드)",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select((.modelCard.modelParameters // null) == null) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $subjects[] | .modelCard.modelParameters | select(. != null) | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique"
+          "missingPath": "[ $subjects[] | select((((.modelCard.modelParameters // null) | type) != \"object\") or ([(.properties // [])[]? | select((.name // \"\") == \"bomlens:declared\") | .value] as $d | (($d | index(\"modelCard.modelParameters\")) != null) and ((((.modelCard.modelParameters | keys) - ($d | map(select(startswith(\"modelCard.modelParameters.\")) | ltrimstr(\"modelCard.modelParameters.\")))) | length) == 0))) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "[ $subjects[] | select(((((.modelCard.modelParameters // null) | type) != \"object\") or ([(.properties // [])[]? | select((.name // \"\") == \"bomlens:declared\") | .value] as $d | (($d | index(\"modelCard.modelParameters\")) != null) and ((((.modelCard.modelParameters | keys) - ($d | map(select(startswith(\"modelCard.modelParameters.\")) | ltrimstr(\"modelCard.modelParameters.\")))) | length) == 0))) | not) | .modelCard.modelParameters | (.architectureFamily // .modelArchitecture // \"documented\") ] | unique"
         },
         {
           "id": "g7-model-io",

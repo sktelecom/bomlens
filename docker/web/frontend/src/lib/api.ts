@@ -1129,6 +1129,11 @@ export interface Spdx3Summary {
    *  the reasons) means it no longer fits the scan and the document was
    *  written without it; this holds until the declaration is fixed. */
   declaration?: { state: "none" | "applied" | "refused"; reasons: string[] };
+  /** Whether the CycloneDX SBOM carries the declared service (an app or API
+   *  the model runs in). "pendingScan": the declaration saved after the scan
+   *  names a service the SBOM and its G7 checks do not have yet, or the two
+   *  differ; a new scan writes them. Absent from servers before v1.14. */
+  service?: { state: "none" | "applied" | "pendingScan" };
   /** The document still matches the SBOM, the saved declaration and this
    *  converter. False when rebuilding it would change it (a declaration
    *  edited outside the screens, a newer BomLens). */

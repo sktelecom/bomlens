@@ -221,13 +221,31 @@ import json, sys
 m = json.load(open(sys.argv[1]))
 s = json.load(open(sys.argv[2]))
 problems = []
-cls = {"ai_AIPackage": "ai_AIPackage", "dataset_DatasetPackage": "dataset_DatasetPackage", "document": "CreationInfo"}
+# An element key that is not an SPDX class names its class in spdxType.
+cls = {etype: ("CreationInfo" if etype == "document" else spec.get("spdxType", etype))
+       for etype, spec in m["elements"].items()}
+for etype, c in cls.items():
+    if c not in s["classes"]:
+        problems.append(f"{etype}: '{c}' is not a class in the schema extract")
+ref_types = set(s["enums"]["prop_ExternalRef_externalRefType"])
+purposes = set(s["enums"]["prop_software_SoftwareArtifact_software_primaryPurpose"])
 for etype, spec in m["elements"].items():
     props = set(s["classes"][cls[etype]]["properties"])
     for f in spec["fields"]:
         key = f["json"]
         if key.startswith("extension:"):
+            if "extension" not in props:
+                problems.append(f"{etype}.{f['id']}: {cls[etype]} takes no extension")
             continue
+        if key.startswith("externalRef:"):
+            if "externalRef" not in props:
+                problems.append(f"{etype}.{f['id']}: {cls[etype]} takes no externalRef")
+            if key[len("externalRef:"):] not in ref_types:
+                problems.append(f"{etype}.{f['id']}: '{key}' is not an ExternalRefType")
+            continue
+        if key == "software_primaryPurpose" and f["source"]["kind"] == "const" \
+                and f["source"]["value"] not in purposes:
+            problems.append(f"{etype}.{f['id']}: {f['source']['value']!r} is not a SoftwarePurpose")
         if key not in props:
             problems.append(f"{etype}.{f['id']}: '{key}' is not a property of {cls[etype]}")
         if "enum" in f:
@@ -241,7 +259,7 @@ for etype, spec in m["elements"].items():
                 problems.append(f"{etype}.{f['id']}: {sorted(set(f['enum']) - allowed)} not allowed")
     for f in spec["fields"]:
         key = f["json"]
-        if key.startswith("extension:") or key not in props:
+        if key.startswith(("extension:", "externalRef:")) or key not in props:
             continue
         schema_array = key in set(s["classes"][cls[etype]]["arrays"])
         written_array = f["max"] == "*" or bool(f.get("jsonArray"))
@@ -261,6 +279,10 @@ pages = {"ai_AIPackage": {"software_packageVersion": 1, "software_downloadLocati
          "dataset_DatasetPackage": {"originatedBy": 1, "builtTime": 1, "releaseTime": 1,
                                     "dataset_datasetType": 1, "software_downloadLocation": 1,
                                     "software_primaryPurpose": 1, "suppliedBy": 0, "software_packageVersion": 0}}
+# The declared service is an ai_AIPackage: the same page, the same counts.
+pages["service"] = {k: v for k, v in pages["ai_AIPackage"].items() if k != "originatedBy"}
+if m["elements"]["service"].get("spdxType") != "ai_AIPackage":
+    problems.append("service is not written as ai_AIPackage")
 for etype, want in pages.items():
     got = {f["json"]: f["min"] for f in m["elements"][etype]["fields"]}
     for k, v in want.items():
@@ -526,6 +548,202 @@ python3 -I "$CONV" convert --bom "$WORK/scan-author-bom.json" --out-dir "$OUT" -
     --declaration "$FIX/declaration-complete.json" --stable 2>/dev/null
 [ "$(status_of document createdBy)" = "auto" ] && grep -q -- "--sbom-author" "$DOC" \
     && pass "an author the scan was given is still the scan's" || fail "scan author status=$(status_of document createdBy)"
+
+echo "== the service the model runs in =="
+# A declared service is an ai_AIPackage with primaryPurpose application that
+# depends on the model at runtime; an external API model is identified only.
+SVC="$FIX/declaration-service.json"
+convert "$SVC"
+[ $? -eq 0 ] && pass "a declaration with a service is accepted" || fail "service refused" "$(cat "$WORK/err")"
+[ "$(jq -r .draft "$CHK")" = "false" ] && pass "a service with its five required fields keeps the document complete" \
+    || fail "service draft: $(jq -r '[.elements[] | .label as $l | .fields[] | select(.status=="missingRequired") | "\($l):\(.id)"] | join(" ")' "$CHK")"
+s=$(el ai_AIPackage "Acme Support Assistant")
+{ [ "$(echo "$s" | jq -r .software_primaryPurpose)" = "application" ] \
+  && [ "$(echo "$s" | jq -r '"\(.software_packageVersion) \(.software_downloadLocation) \(.releaseTime)"')" = "2.3.0 https://support.acme.example/assistant 2025-06-01T00:00:00Z" ] \
+  && [ "$(echo "$s" | jq -r '.suppliedBy | split("/") | last')" = "Organization%3AAcme%20Corp" ]; } \
+    && pass "the service is an ai_AIPackage with primaryPurpose application and the declared values" \
+    || fail "service element: $s"
+{ [ "$(echo "$s" | jq -c '[.ai_domain, .ai_autonomyType, .ai_standardCompliance, .ai_informationAboutApplication != null]')" = '[["customer support"],"no",["ISO/IEC 42001:2023"],true]' ] \
+  && [ "$(echo "$s" | jq -c '[.externalRef[] | "\(.externalRefType) \(.locator[0])"]')" = '["documentation https://support.acme.example/ai-disclosure"]' ]; } \
+    && pass "domain, autonomy, standards and the disclosure page are written as SPDX AI properties" || fail "service AI fields: $s"
+m=$(el ai_AIPackage support-adapter)
+[ "$(jq -r '[.["@graph"][] | select(.type=="SpdxDocument") | .rootElement] | first | length' "$DOC")" = "1" ] \
+  && [ "$(jq -r '[.["@graph"][] | select(.type=="SpdxDocument") | .rootElement[0]] | first' "$DOC")" = "$(echo "$m" | jq -r .spdxId)" ] \
+    && pass "the model stays the document's only root element" || fail "rootElement changed"
+deps=$(jq -r '[.["@graph"][] | select(.type=="LifecycleScopedRelationship" and (.from | contains("/service/")))
+  | "\(.relationshipType)/\(.scope)/\(.to[0] | split("/") | .[-2])"] | join(" ")' "$DOC")
+[ "$deps" = "dependsOn/runtime/model dependsOn/runtime/external-model" ] \
+    && pass "the service depends at runtime on the model and on the external model" || fail "service relationships: $deps"
+x=$(el software_Package "Example Translate")
+{ [ "$(echo "$x" | jq -r .software_primaryPurpose)" = "model" ] \
+  && [ "$(echo "$x" | jq -c '[has("software_downloadLocation"), has("releaseTime"), .software_packageVersion]')" = '[false,false,"2025-05"]' ] \
+  && [ "$(echo "$x" | jq -c '[.externalRef[] | "\(.externalRefType) \(.locator[0])"]')" = '["other https://api.translate.example/v1"]' ] \
+  && jq -e --arg id "$(echo "$x" | jq -r .spdxId)" '[.["@graph"][] | select(.type=="Annotation" and .subject==$id and (.statement | contains("only its identity is known")))] | length == 1' "$DOC" >/dev/null; } \
+    && pass "an external API model is a software_Package with its identity and endpoint, annotated as declared" || fail "external model: $x"
+flows=$(echo "$s" | jq -c '[.extension[].extension_cdxProperty[] | select(.extension_cdxPropName=="bomlens:service:dataFlow") | .extension_cdxPropValue | fromjson | .flow]')
+{ [ "$flows" = '["inbound","outbound"]' ] \
+  && [ "$(echo "$s" | jq '[.extension[] | select(.extension_cdxProperty[0].extension_cdxPropName=="bomlens:service:dataFlow")] | length')" = "1" ]; } \
+    && pass "each data flow is one entry of one extension, as CycloneDX serviceData JSON" || fail "data flows: $flows"
+regs=$(echo "$m" | jq -r '[.extension[].extension_cdxProperty[] | "\(.extension_cdxPropName)=\(.extension_cdxPropValue)"] | join(" ")')
+[ "$regs" = "bomlens:weights:scope=adapter bomlens:model:input=text bomlens:model:output=text bomlens:regulatory:trainingComputeFlops=3.2e21 bomlens:regulatory:trainingComputeBasis=6 x parameters x training tokens, from the training logs bomlens:regulatory:adversarialTesting=yes" ] \
+    && pass "the model's regulatory fields and modalities are extension entries, after the weights scope" || fail "model extensions: $regs"
+{ [ "$(jq -c '[.elements[] | select(.declarationKey=="service" or (.declarationKey // "" | startswith("externalModel:"))) | "\(.type) \(.declarationKey)"]' "$CHK")" = '["service service","externalModel externalModel:translate"]' ] \
+  && [ "$(jq -r '.elements[] | select(.type=="service") | .fields[] | select(.id=="dataFlows") | .display' "$CHK")" = "inbound: personal data, outbound: personal data" ]; } \
+    && pass "the check names the service and the external model by their mapping keys" || fail "check service elements"
+{ [ "$(jq -r .service.state "$CHK")" = "pendingScan" ] && [ "$(jq -r '.service.digest | length' "$CHK")" = "64" ] \
+  && grep -q "the declared service is not in the CycloneDX SBOM yet" "$CHK" \
+  && grep -q "^## Service" "$OUT/${P}_spdx3-check.md"; } \
+    && pass "a service the SBOM does not carry yet is pendingScan, listed for review" || fail "service state: $(jq -c .service "$CHK")"
+digest=$(jq -r .service.digest "$CHK")
+# The CycloneDX step marks the service it writes with the check's digest.
+cdx_service() {  # <digest> <kind>
+    jq --arg d "$1" --arg k "$2" '.services = [{"bom-ref": "service:declared/x", "name": "Acme Support Assistant",
+        "properties": [{"name": "bomlens:origin", "value": "declared-input"},
+                       {"name": "bomlens:service:kind", "value": $k},
+                       {"name": "bomlens:service:declarationDigest", "value": $d}]}]' "$FIX/bom-ai-sample.json"
+}
+cdx_service "$digest" application > "$WORK/svc-bom.json"
+python3 -I "$CONV" check --bom "$WORK/svc-bom.json" --declaration "$SVC" > "$WORK/svc-check.json" 2>/dev/null
+{ [ "$(jq -r .service.state "$WORK/svc-check.json")" = "applied" ] && ! grep -q "declared service" "$WORK/svc-check.json"; } \
+    && pass "a service the SBOM carries with the same digest is applied" || fail "applied: $(jq -c .service "$WORK/svc-check.json")"
+jq '.service.packageVersion = "2.4.0"' "$SVC" > "$WORK/svc-changed.json"
+python3 -I "$CONV" check --bom "$WORK/svc-bom.json" --declaration "$WORK/svc-changed.json" > "$WORK/svc-check.json" 2>/dev/null
+{ [ "$(jq -r .service.state "$WORK/svc-check.json")" = "pendingScan" ] \
+  && grep -q "the declared service differs from the one in the CycloneDX SBOM" "$WORK/svc-check.json"; } \
+    && pass "a service changed after the scan is pendingScan" || fail "changed: $(jq -c .service "$WORK/svc-check.json")"
+python3 -I "$CONV" check --bom "$WORK/svc-bom.json" --declaration "$FIX/declaration-complete.json" > "$WORK/svc-check.json" 2>/dev/null
+{ [ "$(jq -r .service.state "$WORK/svc-check.json")" = "pendingScan" ] \
+  && grep -q "records a declared service the declaration does not have" "$WORK/svc-check.json"; } \
+    && pass "a service removed from the declaration is pendingScan until the next scan" || fail "removed: $(jq -c .service "$WORK/svc-check.json")"
+python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$FIX/declaration-complete.json" > "$WORK/svc-check.json" 2>/dev/null
+[ "$(jq -c .service "$WORK/svc-check.json")" = '{"state":"none"}' ] && pass "no service on either side is none" || fail "none: $(jq -c .service "$WORK/svc-check.json")"
+# A data flow can be named, as CycloneDX serviceData is.
+jq '.service.dataFlows[0].name = "  Chat questions "' "$SVC" > "$WORK/svc-named.json"
+convert "$WORK/svc-named.json"
+named=$(el ai_AIPackage "Acme Support Assistant" | jq -r '[.extension[].extension_cdxProperty[] | select(.extension_cdxPropName=="bomlens:service:dataFlow") | .extension_cdxPropValue | fromjson | .name // empty] | join("|")')
+[ "$named" = "Chat questions" ] && pass "a data flow's name is accepted, trimmed and written with the flow" || fail "data flow name: $named"
+# Reordering a list whose order means nothing is not a change; a new value is.
+digest_of() { python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$1" 2>/dev/null | jq -r .service.digest; }
+jq '.service.domain = ["support", "customer support"] | .service.standardCompliance = ["ISO/IEC 42001:2023", "ISO/IEC 23894:2023"]
+    | .service.dataFlows[0].source = ["https://a.example/1", "https://a.example/2"]' "$SVC" > "$WORK/order-a.json"
+jq '.service.domain |= reverse | .service.standardCompliance |= reverse | .service.dataFlows |= reverse
+    | .service.dataFlows[1].source |= reverse | .service.inputModality = ["text"] | .model.outputModality = ["text"]' \
+    "$WORK/order-a.json" > "$WORK/order-b.json"
+jq '.service.domain += ["health"]' "$WORK/order-a.json" > "$WORK/order-c.json"
+da=$(digest_of "$WORK/order-a.json"); db=$(digest_of "$WORK/order-b.json"); dc=$(digest_of "$WORK/order-c.json")
+{ [ "${#da}" = "64" ] && [ "$da" = "$db" ] && [ "$da" != "$dc" ]; } \
+    && pass "reordering domains, standards, data flows and addresses keeps the digest; a new domain changes it" \
+    || fail "order-insensitive digest: a=$da b=$db c=$dc"
+jq '.service.externalModels += [{"key": "ocr", "name": "Example OCR"}]' "$SVC" > "$WORK/order-d.json"
+jq '.service.externalModels |= reverse' "$WORK/order-d.json" > "$WORK/order-e.json"
+[ "$(digest_of "$WORK/order-d.json")" = "$(digest_of "$WORK/order-e.json")" ] \
+    && pass "reordering the external models keeps the digest" || fail "external models order changed the digest"
+# The model's declared values count without a service: the CycloneDX step
+# records the digest on the model component then.
+jq '.model.inputModality = ["text"] | .model.adversarialTesting = "no"' "$FIX/declaration-complete.json" > "$WORK/mv.json"
+python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$WORK/mv.json" > "$WORK/mv-check.json" 2>/dev/null
+mvd=$(jq -r .service.digest "$WORK/mv-check.json")
+{ [ "$(jq -r .service.state "$WORK/mv-check.json")" = "pendingScan" ] && [ "${#mvd}" = "64" ] \
+  && grep -q "are not in the CycloneDX SBOM yet" "$WORK/mv-check.json"; } \
+    && pass "declared model values the SBOM does not carry yet are pendingScan" || fail "model values pending: $(jq -c .service "$WORK/mv-check.json")"
+jq --arg d "$mvd" '.metadata.component.properties += [{"name": "bomlens:model:declarationDigest", "value": $d}]' \
+    "$FIX/bom-ai-sample.json" > "$WORK/mv-bom.json"
+python3 -I "$CONV" check --bom "$WORK/mv-bom.json" --declaration "$WORK/mv.json" > "$WORK/mv-check.json" 2>/dev/null
+[ "$(jq -r .service.state "$WORK/mv-check.json")" = "applied" ] \
+    && pass "the model's digest on the model component makes them applied" || fail "model values applied: $(jq -c .service "$WORK/mv-check.json")"
+python3 -I "$CONV" check --bom "$WORK/mv-bom.json" --declaration "$FIX/declaration-complete.json" > "$WORK/mv-check.json" 2>/dev/null
+{ [ "$(jq -r .service.state "$WORK/mv-check.json")" = "pendingScan" ] \
+  && grep -q "records declared model values the declaration does not have" "$WORK/mv-check.json"; } \
+    && pass "model values removed from the declaration are pendingScan until the next scan" || fail "model values removed: $(jq -c .service "$WORK/mv-check.json")"
+rm -f "$OUT"/*
+python3 -I "$CONV" convert --bom "$WORK/mv-bom.json" --out-dir "$OUT" --prefix "$P" --declaration "$WORK/mv.json" --stable 2>/dev/null
+{ grep -q "^## Declared model values in the CycloneDX SBOM" "$OUT/${P}_spdx3-check.md" && ! grep -q "^## Service" "$OUT/${P}_spdx3-check.md"; } \
+    && pass "the readable check names the model values, not a service, when no service is declared" || fail "model-only check text"
+jq '.service.name = ""' "$SVC" > "$WORK/svc-noname.json"
+python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$WORK/svc-noname.json" > "$WORK/svc-check.json" 2>/dev/null
+{ [ "$(jq -r .service.state "$WORK/svc-check.json")" = "pendingScan" ] \
+  && grep -q "has no name, so the CycloneDX SBOM cannot carry it" "$WORK/svc-check.json"; } \
+    && pass "a service with no name says the SBOM cannot carry it until it is named" || fail "unnamed service: $(jq -c .service "$WORK/svc-check.json")"
+jq 'del(.service.releaseTime, .service.autonomyType)' "$SVC" > "$WORK/svc-draft.json"
+convert "$WORK/svc-draft.json"
+{ [ $? -eq 0 ] && [ "$(jq -r .draft "$CHK")" = "true" ] \
+  && [ "$(jq -r '[.elements[] | select(.type=="service") | .fields[] | select(.status=="missingRequired" or .status=="judgment") | "\(.id):\(.status)"] | join(" ")' "$CHK")" = "releaseTime:missingRequired autonomyType:judgment" ]; } \
+    && pass "a service missing a required field makes a draft; autonomy is left to the publisher" || fail "service draft: $(jq -c .counts "$CHK")"
+# Without a service, or with only the template's empty one, the output is the
+# same bytes: the document, the check (but for the declaration's digest) and
+# the readable check.
+convert "$FIX/declaration-complete.json"; mkdir -p "$WORK/nosvc"; cp "$OUT"/* "$WORK/nosvc/"
+python3 -I "$CONV" template --bom "$FIX/bom-ai-sample.json" --out-dir "$WORK" --prefix tpl 2>/dev/null
+jq --slurpfile t "$WORK/tpl_ai-declaration.template.json" '.service = $t[0].service' "$FIX/declaration-complete.json" > "$WORK/emptysvc.json"
+convert "$WORK/emptysvc.json"
+{ cmp -s "$WORK/nosvc/${P}_bom.spdx3.json" "$DOC" && cmp -s "$WORK/nosvc/${P}_spdx3-check.md" "$OUT/${P}_spdx3-check.md" \
+  && [ "$(jq -S 'del(.inputs.declaration)' "$WORK/nosvc/${P}_spdx3-check.json")" = "$(jq -S 'del(.inputs.declaration)' "$CHK")" ]; } \
+    && pass "an empty service gives the same bytes as no service" || fail "an empty service changed the output"
+! grep -q '/service/' "$DOC" && [ "$(jq -r .service.state "$CHK")" = "none" ] \
+    && pass "and declares no service" || fail "an empty service was written"
+refuse_s() {  # $1 label, $2 jq edit applied to the service declaration
+    jq "$2" "$SVC" > "$WORK/bad.json"
+    python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$WORK/bad.json" >"$WORK/bad.out" 2>/dev/null
+    rc=$?
+    { [ "$rc" -eq 2 ] && jq -e '.refused | length > 0' "$WORK/bad.out" >/dev/null; } && pass "refused: $1" || fail "not refused: $1 (rc=$rc)"
+}
+refuse_s "an unknown key in the service" '.service.owner = "x"'
+refuse_s "primaryPurpose in the service (it is fixed)" '.service.primaryPurpose = "application"'
+refuse_s "a service supplier that is not an organization" '.service.suppliedBy = {"name": "Acme Corp"}'
+refuse_s "a service supplier given as a person" '.service.suppliedBy.type = "Person"'
+refuse_s "a modality outside the list" '.service.inputModality = ["speech"]'
+refuse_s "a model modality outside the list" '.model.outputModality = ["pdf"]'
+refuse_s "an autonomy value outside the list" '.service.autonomyType = "partial"'
+refuse_s "a service address with a file scheme" '.service.downloadLocation = "file:///srv/app"'
+refuse_s "a disclosure page that is not an address" '.service.disclosureUrl = "see our website"'
+refuse_s "a data flow direction outside CycloneDX's list" '.service.dataFlows[0].flow = "inward"'
+refuse_s "a data flow with no classification" '.service.dataFlows[0].classification = " "'
+refuse_s "a data flow source that is not an address" '.service.dataFlows[0].source = ["chat window"]'
+refuse_s "a data flow destination with a javascript scheme" '.service.dataFlows[1].destination = ["javascript:alert(1)"]'
+refuse_s "an unknown key in a data flow" '.service.dataFlows[0].governance = "x"'
+refuse_s "a data flow name that is not text" '.service.dataFlows[0].name = 5'
+refuse_s "a data flow name longer than the limit" '.service.dataFlows[0].name = ("a" * 300)'
+refuse_s "a data flow description longer than the limit" '.service.dataFlows[0].description = ("a" * 5000)'
+refuse_s "an external model key twice" '.service.externalModels += [{"key": "translate", "name": "Other"}]'
+refuse_s "an external model key with capitals" '.service.externalModels[0].key = "Translate"'
+refuse_s "an external model with no name" '.service.externalModels[0].name = ""'
+refuse_s "an unknown key in an external model" '.service.externalModels[0].licence = "MIT"'
+refuse_s "an external model endpoint that is not an address" '.service.externalModels[0].endpoint = "api.translate"'
+refuse_s "training compute that is not a number" '.model.trainingComputeFlops = "about 1e24"'
+refuse_s "training compute of zero" '.model.trainingComputeFlops = "0.0e5"'
+refuse_s "negative training compute" '.model.trainingComputeFlops = "-3e24"'
+refuse_s "training compute given as a JSON number" '.model.trainingComputeFlops = 3.2e24'
+refuse_s "an adversarial testing value outside the list" '.model.adversarialTesting = "partly"'
+refuse_s "a service that is not an object" '.service = ["x"]'
+refuse_s "relationships, still reserved" '.relationships = [{"from": "service", "to": "model"}]'
+printf '%s' '{"schema":"bomlens-ai-declaration/1","service":{"name":"S","packageVersion":"1","downloadLocation":"https://s.example","suppliedBy":{"type":"Organization","name":"O"},"releaseTime":"2025-01-01T00:00:00Z"}}' > "$WORK/dsroot-svc.json"
+python3 -I "$CONV" check --bom "$WORK/dsroot.json" --declaration "$WORK/dsroot-svc.json" >"$WORK/bad.out" 2>/dev/null
+{ [ $? -eq 2 ] && grep -q "describes a dataset, not a model" "$WORK/bad.out"; } \
+    && pass "refused: a service on a dataset document" || fail "service accepted on a dataset document"
+jq '.model.trainingComputeFlops = "1500000"' "$SVC" > "$WORK/svc-int.json"
+python3 -I "$CONV" check --bom "$FIX/bom-ai-sample.json" --declaration "$WORK/svc-int.json" >/dev/null 2>&1
+[ $? -eq 0 ] && pass "training compute written as a plain integer is accepted" || fail "integer training compute refused"
+T="$WORK/tpl_ai-declaration.template.json"
+{ [ "$(jq -c '.service | keys_unsorted' "$T")" = '["name","packageVersion","downloadLocation","suppliedBy","releaseTime","informationAboutApplication","domain","autonomyType","inputModality","outputModality","dataFlows","standardCompliance","disclosureUrl","externalModels"]' ] \
+  && [ "$(jq -c '[.model.inputModality, .model.trainingComputeFlops, .model.adversarialTesting]' "$T")" = '[[],"",""]' ] \
+  && [ "$(jq -c 'keys_unsorted' "$T")" = '["schema","document","model","datasets","service","relationships"]' ]; } \
+    && pass "the template offers an empty service and the model's regulatory fields" || fail "template service: $(jq -c .service "$T")"
+python3 -I "$CONV" template --bom "$WORK/dsroot.json" --out-dir "$WORK" --prefix dstpl 2>/dev/null
+[ "$(jq 'has("service")' "$WORK/dstpl_ai-declaration.template.json")" = "false" ] \
+    && pass "a dataset document's template offers no service" || fail "dataset template has a service"
+if [ -n "${JSPY:-}" ]; then
+    convert "$SVC"
+    verr=$("$JSPY" - "$FIX/spdx-json-schema.json" "$DOC" <<'PY'
+import json, sys
+import jsonschema
+schema = json.load(open(sys.argv[1]))
+doc = json.load(open(sys.argv[2]))
+errs = sorted(jsonschema.Draft202012Validator(schema).iter_errors(doc), key=lambda e: list(e.path))
+print("\n".join(f"{list(e.path)}: {e.message[:200]}" for e in errs[:10]))
+PY
+)
+    [ -z "$verr" ] && pass "the document with a service is valid SPDX 3.0.1 JSON" || fail "service schema errors" "$verr"
+fi
 
 echo "== bad input is reported, not written =="
 echo '{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"library","name":"x"}]}' > "$WORK/lib.json"

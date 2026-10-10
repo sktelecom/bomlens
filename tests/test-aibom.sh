@@ -1448,7 +1448,9 @@ sub_rows=$(sed -n '/## SBOM format requirements/,/## G7 minimum elements/p' "$WO
 echo "== review-only elements say what a person has to establish =="
 gd="$GD"
 reg="$LIB/g7-registry.json"
-naids=$(jq -r '[.clusters[].elements[] | select(.source=="na") | .id] | sort | join(" ")' "$reg")
+# Review-only: no automated source at all, or a human-review item until the SBOM
+# carries a value (absentSource "na": the system elements a declared service fills).
+naids=$(jq -r '[.clusters[].elements[] | select(.source=="na" or .absentSource=="na") | .id] | sort | join(" ")' "$reg")
 rvids=$(jq -r '[.review | keys[]] | sort | join(" ")' "$gd")
 [ "$naids" = "$rvids" ] && pass "every review-only element has review guidance" || fail "review guidance does not cover the review-only elements" "$naids != $rvids"
 badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.value.how_ko // "") == "") or ((.value.docUrl // "") | startswith("https://") | not)) | .key' "$gd")
@@ -2261,6 +2263,55 @@ for bad in '[]' '{"model":{"baseModels":[{"ref":"../etc"}]}}' '{"datasets":[{"re
     python3 -I "$DECL_PY" "$WORK/decl-bad.json" "$WORK/decl-bad-bom.json" acme 1.0 --offline >/dev/null 2>&1
     [ $? -eq 2 ] && pass "refused before writing: $bad" || fail "not refused: $bad"
 done
+
+echo "== AIDECLARE with a declared service, end to end =="
+# The pipeline order of entrypoint.sh: the SBOM from the declaration, the
+# declared service written into it, the risk assessment, the G7 checks, then the
+# SPDX 3.0.1 document. The service and the model's declared values reach the
+# CycloneDX SBOM marked as the publisher's declaration.
+SVC_FIX="$ROOT_DIR/tests/fixtures/spdx3/declaration-service.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$SVC_FIX" "$WORK/declsvc.json" acme 1.0 >/dev/null 2>"$WORK/declsvc.err"
+[ $? -eq 0 ] && pass "AIDECLARE takes a declaration with a service" || fail "AIDECLARE with a service" "$(cat "$WORK/declsvc.err")"
+python3 -I "$LIB/apply-declared-service.py" "$WORK/declsvc.json" "$SVC_FIX" >/dev/null 2>&1
+{ jq -e '[.services[] | .["bom-ref"]] == ["service:declared/acme-support-assistant", "service:declared-external/translate"]' "$WORK/declsvc.json" >/dev/null \
+  && jq -e '[.dependencies[] | select(.ref == "service:declared/acme-support-assistant") | .dependsOn[]] == ["model:declared/acme@1.0", "service:declared-external/translate"]' "$WORK/declsvc.json" >/dev/null \
+  && jq -e '[.metadata.component.properties[] | select(.name == "bomlens:regulatory:adversarialTesting") | .value] == ["yes"]' "$WORK/declsvc.json" >/dev/null; } \
+    && pass "the service, its external model and the model's declared values are written; the service depends on the declared model" \
+    || fail "declared service in AIDECLARE" "$(jq -c '{services, deps: .dependencies}' "$WORK/declsvc.json")"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/declsvc.json" >/dev/null 2>&1
+jq -e '[.services[] | .properties[] | select(.name | startswith("bomlens:assessment:"))] | length == 0' "$WORK/declsvc.json" >/dev/null \
+    && pass "the risk assessment judges components, not the declared services" || fail "a declared service was assessed"
+bash "$LIB/validate-sbom.sh" "$WORK/declsvc.json" "$WORK/declsvc" acme >/dev/null 2>&1
+cp "$WORK/decl.json" "$WORK/declnosvc.json"
+bash "$LIB/validate-sbom.sh" "$WORK/declnosvc.json" "$WORK/declnosvc" acme >/dev/null 2>&1
+slp=$(jq -r '[.checks[] | select(.id == "g7-slp-name" or .id == "g7-slp-producer" or .id == "g7-slp-data-flow" or .id == "g7-slp-data-usage"
+              or .id == "g7-slp-io" or .id == "g7-slp-app-area") | "\(.status)/\(.source)"] | unique | join(",")' "$WORK/declsvc_conformance.json")
+[ "$slp" = "pass/declared" ] && pass "the six system-level elements a service fills pass as declared" || fail "system-level elements with a service: $slp"
+# What moves, against the same model declared without a service: four review
+# items (data flow, data usage, input/output, application area) and two gaps
+# (system name, system producer) become present, and the model's declared
+# input/output kinds fill g7-model-io (a gap before). The declared model had no
+# card: the modelCard.modelParameters the step creates to hold those kinds is
+# not a model card, so g7-model-card stays a gap. Nothing else changes.
+cnt() { jq -r '[.checks[] | select(.id|startswith("g7-"))] | "\(map(select(.status=="pass")) | length) \(map(select(.source=="na")) | length)"' "$1"; }
+read -r p_with r_with <<< "$(cnt "$WORK/declsvc_conformance.json")"
+read -r p_without r_without <<< "$(cnt "$WORK/declnosvc_conformance.json")"
+{ [ $((r_without - r_with)) -eq 4 ] && [ $((p_with - p_without)) -eq 7 ]; } \
+    && pass "G7 counts: 7 more present, 4 fewer review items ($p_without/$r_without -> $p_with/$r_with)" \
+    || fail "G7 counts with a service: present $p_without -> $p_with, review $r_without -> $r_with" \
+       "$(diff <(jq -c '.checks[] | select(.id|startswith("g7-")) | [.id, .status, .source]' "$WORK/declnosvc_conformance.json") \
+               <(jq -c '.checks[] | select(.id|startswith("g7-")) | [.id, .status, .source]' "$WORK/declsvc_conformance.json"))"
+[ "$(jq -r '.checks[] | select(.id == "g7-model-io") | .status' "$WORK/declsvc_conformance.json")" = "pass" ] \
+    && pass "the model's declared input and output kinds satisfy g7-model-io" || fail "g7-model-io with declared kinds"
+[ "$(jq -r '.checks[] | select(.id == "g7-model-card") | .status' "$WORK/declsvc_conformance.json")" = "warn" ] \
+    && pass "a card created only for the declared kinds does not satisfy g7-model-card" || fail "g7-model-card counted the step-created card"
+python3 -I "$LIB/convert-to-spdx3-ai.py" convert --bom "$WORK/declsvc.json" --declaration "$SVC_FIX" \
+    --out-dir "$WORK" --prefix=declsvc --stable >/dev/null 2>&1
+{ [ "$(jq -r .service.state "$WORK/declsvc_spdx3-check.json")" = "applied" ] \
+  && jq -e '[.["@graph"][] | select(.type == "ai_AIPackage" and .software_primaryPurpose == "application")] | length == 1' "$WORK/declsvc_bom.spdx3.json" >/dev/null; } \
+    && pass "the SPDX 3.0.1 document has the service and the check reads the CycloneDX SBOM as applied" \
+    || fail "SPDX after AIDECLARE with a service" "$(jq -c .service "$WORK/declsvc_spdx3-check.json")"
+cp "$WORK/declsvc.json" "$WORK/cdx/declared-service.json"
 
 echo "== sources the publisher declares by hub id are read and judged =="
 # A card that lists no sources leaves them unknown; a declaration can name them

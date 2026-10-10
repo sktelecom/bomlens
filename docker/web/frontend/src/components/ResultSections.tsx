@@ -43,6 +43,7 @@ export function ResultSection({
   onPick,
   onResultsChange,
   onResultPatch,
+  onRescan,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -77,6 +78,8 @@ export function ResultSection({
   /** A later action changed more of the result than its listing (saving an AI
    *  declaration also refreshes the SPDX 3.0.1 summary). */
   onResultPatch?: (patch: Partial<DoneEvent>) => void;
+  /** Open the scan again with its settings (the top bar's re-scan). */
+  onRescan?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -216,6 +219,7 @@ export function ResultSection({
               : (scanId ?? "")
           }
           onResultPatch={onResultPatch}
+          onRescan={onRescan}
           declaredScan={result.scanConfig?.source === "ai-declare"}
           // The Overview's "fill" link carries ?fill=1; dropped once the
           // questions open, so a reload does not open them again.
